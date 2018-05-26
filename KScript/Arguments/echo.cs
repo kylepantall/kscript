@@ -12,6 +12,7 @@ namespace KScript.Arguments
     public class echo : KScriptObject
     {
         public echo(string contents) { this.contents = contents; }
+
         public string trail_newline { get; set; } = "yes";
         public string contents { get; set; }
 

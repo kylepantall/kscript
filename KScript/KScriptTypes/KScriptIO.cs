@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace KScript.KScriptTypes
 {
-    public class KScriptIO
+    public class KScriptIO : Object
     {
         public KScriptIO() { }
         public KScriptIO(KScriptContainer container) => ParentContainer = container;

@@ -10,11 +10,22 @@ namespace KScript
 {
     public abstract class KScriptObject : KScriptIO
     {
-        public KScriptObject(object contents) : this() { }
-        public KScriptObject(String contents) : this() { }
-        public KScriptObject() : base() { }
+        public KScriptObject(object contents) { }
+        public KScriptObject(String contents) { }
+        public KScriptObject() { }
 
-        private String XAML = "";
+        public enum ScriptType
+        {
+            ENUMERABLE,
+            DEF,
+            OBJECT
+        }
+
+        public ScriptType GetScriptObjectType()
+        {
+            bool isEnumerable = typeof(KScriptObjectEnumerable).IsAssignableFrom(GetType());
+            return isEnumerable ? ScriptType.ENUMERABLE : (typeof(def).IsAssignableFrom(GetType()) ? ScriptType.DEF : ScriptType.OBJECT);
+        }
 
         public def Def(string id)
         {
@@ -29,10 +40,9 @@ namespace KScript
             set { GetType().GetProperty(propertyName).SetValue(this, value, null); }
         }
 
-        public void Init(KScriptContainer container, string code)
+        public void Init(KScriptContainer container)
         {
             SetContainer(container);
-            XAML = code;
         }
 
         abstract public void Validate();

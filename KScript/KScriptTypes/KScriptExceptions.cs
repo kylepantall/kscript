@@ -7,17 +7,20 @@ using System.Threading.Tasks;
 namespace KScript.KScriptTypes.KScriptExceptions
 {
     /// <summary>
-    /// Used amongst all exceptions.
+    /// Used amongst all exceptions - general classification and polymorphism.
     /// </summary>
     class KScriptException : Exception
     {
         public KScriptException() : base() { }
         public KScriptException(string message) : base(message) { }
     }
+
+    class KScriptSkipScriptObject : KScriptException { }
+
     /// <summary>
     /// Used to inform parser that a run method is not needed.
     /// </summary>
-    class KScriptNoRunMethodImplemented : KScriptException { }
+    class KScriptNoRunMethodImplemented : KScriptSkipScriptObject { }
 
     /// <summary>
     /// Used to inform end-user that script type is invalid.
@@ -25,5 +28,8 @@ namespace KScript.KScriptTypes.KScriptExceptions
     class KScriptInvalidScriptType : KScriptException { }
 
 
+    /// <summary>
+    /// Ensures the parser doesn't validate this KScriptObject.
+    /// </summary>
     class KScriptNoValidationNeeded : KScriptException { }
 }

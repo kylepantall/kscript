@@ -32,18 +32,10 @@ namespace KScript
 
                 parser.Parse();
             }
-
-            //catch (Exception ex)
-            //{
-            //    Console.Write(ex);
-            //    Environment.Exit(-1);
-            //}
 #if DEBUG
-            Console.WriteLine("\n\nPress enter to close...");
-            Console.ReadLine();
+            Console.WriteLine("\n\nPress any key to close...");
+            Console.ReadKey();
 #endif
-            //}
-            //}
         }
     }
 }

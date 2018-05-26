@@ -15,6 +15,7 @@ namespace KScript.Arguments
 
         public override void Run()
         {
+            ParentContainer[id] = this;
             //Tells the parser to ignore any code here.
             throw new KScriptNoRunMethodImplemented();
         }

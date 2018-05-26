@@ -9,12 +9,25 @@ namespace KScript
 {
     public class KScriptObjectEnumerable : KScriptObject
     {
-        public KScriptObject Contents { get; set; }
-        public KScriptObjectEnumerable(KScriptObject obj) => Contents = obj;
+        public bool Ignore { get; set; } = false;
 
+        public KScriptObjectEnumerable() => Children = new List<KScriptObject>();
+
+        public List<KScriptObject> Children { get; set; }
         public override void Run()
         {
-            throw new KScriptNoRunMethodImplemented();
+            if (!Ignore)
+            {
+                foreach (var item in Children)
+                {
+                    if (item != null)
+                    {
+                        item.Init(ParentContainer);
+                        item.Validate();
+                        item.Run();
+                    }
+                }
+            }
         }
 
         public override void Validate()
