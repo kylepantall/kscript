@@ -11,8 +11,8 @@ namespace KScript.Commands
     /// </summary>
     public class compare_to : KScriptCommand
     {
-        private string a = "";
-        private string b = "";
+        private string a = "", b = "";
+        private bool ignore_case = false;
 
         public compare_to(string a, string b)
         {
@@ -20,9 +20,17 @@ namespace KScript.Commands
             this.b = b;
         }
 
-        public override void Run()
+        public compare_to(string a, string b, string ignore_case)
         {
-            if (a == b) Result("yes"); else Result("no");
+            this.a = a;
+            this.b = b;
+            this.ignore_case = ToBool(ignore_case);
+        }
+
+        public override string Calculate()
+        {
+            if (!ignore_case) return ToBoolString(a == b);
+            else return ToBoolString(a.ToLower() == b.ToLower());
         }
     }
 }

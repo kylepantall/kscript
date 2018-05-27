@@ -15,12 +15,14 @@ namespace KScript.KScriptTypes
         public KScriptContainer ParentContainer { get; private set; }
         public void SetContainer(KScriptContainer container) => ParentContainer = container;
 
+        public bool ToBool(string @in) => KScriptBoolHandler.Convert(@in);
+        public string ToBoolString(bool @in) => @in ? "yes" : "no";
+
         public void Out() => Console.Out.WriteLine();
         public void Out(string val)
         {
-            string _str = KScriptCommandHandler.HandleCommands(val, ParentContainer);
-            _str = ParentContainer.StringHandler.Format(val);
-            Console.Out.Write(_str);
+            string _str = ParentContainer.StringHandler.Format(val);
+            Console.Out.Write(KScriptCommandHandler.HandleCommands(_str, ParentContainer));
         }
 
         public string In() => Console.In.ReadLine();

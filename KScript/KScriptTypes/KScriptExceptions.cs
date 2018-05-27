@@ -25,11 +25,17 @@ namespace KScript.KScriptTypes.KScriptExceptions
     /// <summary>
     /// Used to inform end-user that script type is invalid.
     /// </summary>
-    class KScriptInvalidScriptType : KScriptException { }
+    class KScriptInvalidScriptType : KScriptValidationException { }
 
 
     /// <summary>
     /// Ensures the parser doesn't validate this KScriptObject.
     /// </summary>
-    class KScriptNoValidationNeeded : KScriptException { }
+    class KScriptNoValidationNeeded : KScriptValidationException { }
+
+
+    /// <summary>
+    /// To catch any exception which occurs from KScriptObject.Validate();
+    /// </summary>
+    class KScriptValidationException : KScriptException { }
 }

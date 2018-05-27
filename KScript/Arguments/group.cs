@@ -11,11 +11,14 @@ namespace KScript.Arguments
     {
         public KScriptObject contents { get; set; }
 
+        public string description { get; set; }
+
         public string id { get; set; }
 
-        public override void Run()
+        public override bool Run()
         {
             if (contents != null) contents.Run();
+            return true;
         }
         public override void Validate() => throw new KScriptNoValidationNeeded();
     }

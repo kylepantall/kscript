@@ -1,4 +1,5 @@
 ﻿using KScript.Arguments;
+using KScript.Handlers;
 using KScript.KScriptTypes;
 using System;
 using System.Collections.Generic;
@@ -13,6 +14,10 @@ namespace KScript
         public KScriptObject(object contents) { }
         public KScriptObject(String contents) { }
         public KScriptObject() { }
+
+        public bool Ignore { get; set; } = false;
+
+        public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.StringHandler.Format(value), ParentContainer);
 
         public enum ScriptType
         {
@@ -45,7 +50,21 @@ namespace KScript
             SetContainer(container);
         }
 
+        /// <summary>
+        /// Validation code to ensure KScriptObject is correctly validated, throw KScriptInvalidScriptType or KScriptNoValidationNeeded
+        /// </summary>
         abstract public void Validate();
-        abstract public void Run();
+
+        /// <summary>
+        /// The KScriptObject method to run when this instance is instantiated
+        /// </summary>
+        /// <returns>true to continue, false to stop invoking this method</returns>
+        abstract public bool Run();
+
+        /// <summary>
+        /// Used to offer detail on how to use this KScriptObject and implement it properly.
+        /// </summary>
+        /// <returns>Instructions as a string</returns>
+        abstract public string UsageInformation();
     }
 }

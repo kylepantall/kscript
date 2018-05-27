@@ -11,12 +11,7 @@ namespace KScript
     {
         public KScriptCommand(KScriptContainer container) : base(container) { }
         public KScriptCommand() { }
-        public abstract void Run();
-
-
-        public void Result(object val)
-        {
-            //Should handle calculated value.
-        }
+        public void Init(KScriptContainer container) => SetContainer(container);
+        public abstract string Calculate();
     }
 }

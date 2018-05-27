@@ -12,15 +12,19 @@ namespace KScript.Arguments
     {
         public String file { get; set; }
         public string args { get; set; }
-        public override void Run()
+        public override bool Run()
         {
-            if (string.IsNullOrWhiteSpace(args)) Process.Start(file);
-            else Process.Start(file, args);
+            if (string.IsNullOrWhiteSpace(HandleCommands(args)))
+                Process.Start(HandleCommands(file));
+            else Process.Start(HandleCommands(file), args);
+            return true;
         }
 
         public override void Validate()
         {
             if (string.IsNullOrWhiteSpace(file)) throw new KScriptException("File must be provided");
         }
+
+        public override string UsageInformation() => @"Used to launch a recognised path (directory, file, url, etc.) on the local machine.";
     }
 }

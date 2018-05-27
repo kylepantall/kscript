@@ -9,5 +9,6 @@ namespace KScript.Document
     public interface IKScriptDocumentNode
     {
         void Run();
+        bool Ignore { get; set; }
     }
 }

@@ -34,7 +34,7 @@ namespace KScript.Arguments
 
         public input(string content) => contents = content;
 
-        public override void Run()
+        public override bool Run()
         {
             if (string.IsNullOrWhiteSpace(type)) type = "string";
             Out(contents);
@@ -53,6 +53,7 @@ namespace KScript.Arguments
                     break;
             }
             if (ParentContainer.Properties.ClearAfterInput || KScriptBoolHandler.Convert(cai)) Console.Clear();
+            return true;
         }
 
         public override void Validate()
@@ -62,5 +63,7 @@ namespace KScript.Arguments
                 throw new KScriptInvalidScriptType();
             }
         }
+
+        public override string UsageInformation() => @"Used to obtain input from the console.";
     }
 }

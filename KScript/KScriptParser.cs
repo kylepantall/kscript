@@ -26,97 +26,88 @@ namespace KScript
 
         public void Parse()
         {
-            XmlNode node = Document.FirstChild;
+            XmlNode node = Document.DocumentElement;
+
             KScriptContainer container = new KScriptContainer(Properties);
             KScriptDocument document = new KScriptDocument();
+            KScriptObject rootElement = GetScriptObject(node);
 
-            document.AddChild(Iterate(node, container, new KScriptDocumentCollectionNode(GetScriptObject(node))));
+            PrepareProperties(rootElement, node, container);
 
-            foreach (XmlNode item in node.ChildNodes)
+            KScriptDocumentCollectionNode collection = new KScriptDocumentCollectionNode(rootElement);
+
+            try
             {
-                Iterate(document, item);
+                Iterate(node, document, container, collection);
+                document.AddChild(collection);
+                document.Run(container);
             }
-
-            document.Run();
-
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
             Complete();
         }
 
-        public void Iterate(KScriptDocument doc, XmlNode node)
+        public void Iterate(XmlNode node, KScriptDocument doc, KScriptContainer container, KScriptDocumentCollectionNode docNode)
         {
             foreach (XmlNode item in node.ChildNodes)
             {
-                if (item.HasChildNodes)
+                if (item.NodeType != XmlNodeType.Comment)
                 {
                     KScriptObject obj = GetScriptObject(item);
-                    KScriptDocumentCollectionNode col = new KScriptDocumentCollectionNode(obj);
-                    Iterate(doc, item, col);
-                } else
-                {
-                    Console.WriteLine(node.ToString());
+                    if (obj != null)
+                    {
+                        bool @continue = PrepareProperties(obj, item, container);
+                        if (@continue)
+                        {
+                            if (item.HasChildNodes)
+                            {
+                                KScriptDocumentCollectionNode newCollection = new KScriptDocumentCollectionNode(obj);
+                                Iterate(item, doc, container, newCollection);
+                                docNode.Nodes.Add(newCollection);
+                            }
+                            else docNode.Nodes.Add(new KScriptDocumentNode(obj));
+                        }
+                    }
                 }
             }
         }
 
-        public void Iterate(KScriptDocument doc, XmlNode node, KScriptDocumentCollectionNode collection)
+        public bool HasDefaultConstructor(Type t) => t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null;
+
+        public Type GetObjectType(string name)
         {
-            Console.WriteLine(collection.ToString());
+            return Type.GetType(string.Format("{0}.{1}", ASSEMBLY_PATH, name), false, true);
         }
 
-        public bool HasDefaultConstructor(Type t) => t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null;
-        public Type GetObjectType(string name) => Type.GetType(string.Format("{0}.{1}", ASSEMBLY_PATH, name.ToLower()));
         public KScriptObject GetScriptObject(Type type, string param = null) => HasDefaultConstructor(type) ? (KScriptObject)Activator.CreateInstance(type) : (KScriptObject)Activator.CreateInstance(type, param);
         public KScriptObject GetScriptObject(XmlNode node)
         {
-            Type _type = GetObjectType(node.Name);
+            Type _type = GetObjectType(node.Name.ToLower());
             if (_type != null)
-                if (HasDefaultConstructor(_type)) return GetScriptObject(_type, node.InnerText);
+                if (!HasDefaultConstructor(_type)) return GetScriptObject(_type, node.InnerText);
                 else return GetScriptObject(_type);
             else
                 return null;
         }
 
-
-        public KScriptDocumentCollectionNode Iterate(XmlNode node, KScriptContainer container, KScriptDocumentCollectionNode co = null)
-        {
-            KScriptDocumentCollectionNode collection = new KScriptDocumentCollectionNode(GetScriptObject(node));
-            foreach (XmlNode item in node.ChildNodes)
-            {
-                KScriptObject obj = GetScriptObject(item);
-
-                PrepareProperties(obj, node, container);
-
-                if (obj.GetScriptObjectType() == KScriptObject.ScriptType.ENUMERABLE)
-                {
-                    if (co != null) co.Nodes.Add(Iterate(item, container, collection));
-                    else co.Nodes.Add(Iterate(item, container, new KScriptDocumentCollectionNode(obj)));
-                }
-                collection.Nodes.Add(new KScriptDocumentNode(obj));
-            }
-            return collection;
-        }
-
-
-        public void PrepareProperties(KScriptObject obj, XmlNode item, KScriptContainer container)
+        public bool PrepareProperties(KScriptObject obj, XmlNode item, KScriptContainer container)
         {
             if (obj["contents"] != null) { obj["contents"] = item.InnerText; }
-            foreach (XmlAttribute at in item.Attributes) { if (at.Name != "contents") obj[at.Name.ToLower()] = at.Value; }
+            foreach (XmlAttribute at in item.Attributes)
+            {
+                if (at.Name != "contents") obj[at.Name.ToLower()] = at.Value;
+            }
             if (typeof(def).IsAssignableFrom(obj.GetType())) { container[((def)obj).id] = obj as def; }
             obj.Init(container);
-            try { obj.Validate(); } catch (KScriptNoValidationNeeded) { }
+            try { obj.Validate(); }
+            catch (KScriptValidationException ex)
+            {
+                if (typeof(KScriptInvalidScriptType).IsAssignableFrom(ex.GetType())) return false;
+            }
+            return true;
         }
-
-
-        //public void HandleKScriptObject(XmlNode item, KScriptContainer container, object _obj)
-        //{
-        //    KScriptObject obj = (KScriptObject)_obj;
-        //    if (obj["contents"] != null) { obj["contents"] = item.InnerText; }
-        //    foreach (XmlAttribute at in item.Attributes) { if (at.Name != "contents") obj[at.Name.ToLower()] = at.Value; }
-        //    if (typeof(def).IsAssignableFrom(obj.GetType())) { container[((def)obj).id] = obj as def; }
-        //    try { obj.Validate(); } catch (KScriptNoValidationNeeded) { }
-        //    try { obj.Run(); } catch (KScriptSkipScriptObject) { }
-        //}
-
 
         public void Complete()
         {

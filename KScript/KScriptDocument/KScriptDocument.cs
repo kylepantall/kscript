@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml;
 
 namespace KScript.Document
 {
@@ -11,13 +7,12 @@ namespace KScript.Document
     {
         private List<IKScriptDocumentNode> nodes;
         public KScriptDocument() => nodes = new List<IKScriptDocumentNode>();
-
         public List<IKScriptDocumentNode> Nodes() => nodes;
-
         public void AddChild(IKScriptDocumentNode obj) => Nodes().Add(obj);
-
         public IKScriptDocumentNode GetFirst() => Nodes().First();
-
-        public void Run() => Nodes().ForEach(item => item.Run());
+        public void Run(KScriptContainer container)
+        {
+            if (container.AllowExecution) Nodes().ForEach(item => item.Run());
+        }
     }
 }

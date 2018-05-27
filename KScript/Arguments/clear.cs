@@ -9,7 +9,14 @@ namespace KScript.Arguments
 {
     public class clear : KScriptObject
     {
-        public override void Run() => Console.Clear();
+        public override bool Run()
+        {
+            Console.Clear();
+            return true;
+        }
+
+        public override string UsageInformation() => "Used to clear the console.";
+
         public override void Validate()
         {
             throw new KScriptNoValidationNeeded();

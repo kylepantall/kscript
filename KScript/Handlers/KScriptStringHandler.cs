@@ -24,11 +24,17 @@ namespace KScript.Handlers
 
         public string Format(string val)
         {
-            string tmp_string = val;
-            tmp_string = String.Format(val);
-            tmp_string = Regex.Replace(tmp_string, @"\\n", Environment.NewLine);
-            tmp_string = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, tmp_string);
-            return tmp_string;
+            if (!string.IsNullOrWhiteSpace(val))
+            {
+                string tmp_string = val;
+                tmp_string = String.Format(val);
+                tmp_string = Regex.Replace(tmp_string, @"\\n", Environment.NewLine);
+                tmp_string = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, tmp_string);
+                return tmp_string;
+            } else
+            {
+                return string.Empty;
+            }
         }
     }
 }

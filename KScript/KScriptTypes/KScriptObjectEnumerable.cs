@@ -9,12 +9,10 @@ namespace KScript
 {
     public class KScriptObjectEnumerable : KScriptObject
     {
-        public bool Ignore { get; set; } = false;
-
         public KScriptObjectEnumerable() => Children = new List<KScriptObject>();
 
         public List<KScriptObject> Children { get; set; }
-        public override void Run()
+        public override bool Run()
         {
             if (!Ignore)
             {
@@ -28,11 +26,10 @@ namespace KScript
                     }
                 }
             }
+            return true;
         }
 
-        public override void Validate()
-        {
-            throw new KScriptNoValidationNeeded();
-        }
+        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override string UsageInformation() => @"Used to store an array of KScriptObjects.";
     }
 }

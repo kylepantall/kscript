@@ -44,16 +44,22 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Arguments\clear.cs" />
-    <Compile Include="Arguments\code.cs" />
     <Compile Include="Arguments\def.cs" />
     <Compile Include="Arguments\download.cs" />
     <Compile Include="Arguments\echo.cs" />
+    <Compile Include="Arguments\end.cs" />
     <Compile Include="Arguments\group.cs" />
     <Compile Include="Arguments\if.cs" />
     <Compile Include="Arguments\input.cs" />
     <Compile Include="Arguments\picker.cs" />
+    <Compile Include="Arguments\kscript.cs" />
     <Compile Include="Arguments\run.cs" />
     <Compile Include="Commands\compare_to.cs" />
+    <Compile Include="Commands\date.cs" />
+    <Compile Include="Commands\extension_of.cs" />
+    <Compile Include="Commands\random.cs" />
+    <Compile Include="Commands\time.cs" />
+    <Compile Include="RegexExtensions.cs" />
     <Compile Include="Handlers\KScriptBoolHandler.cs" />
     <Compile Include="Handlers\KScriptCommandHandler.cs" />
     <Compile Include="Handlers\KScriptStringHandler.cs" />

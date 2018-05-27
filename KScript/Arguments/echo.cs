@@ -16,15 +16,14 @@ namespace KScript.Arguments
         public string trail_newline { get; set; } = "yes";
         public string contents { get; set; }
 
-        public override void Run()
+        public override bool Run()
         {
             Out(contents);
             if (!string.IsNullOrEmpty(trail_newline) && KScriptBoolHandler.Convert(trail_newline)) Out();
+            return true;
         }
 
-        public override void Validate()
-        {
-            throw new KScriptNoValidationNeeded();
-        }
+        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override string UsageInformation() => @"Used to output values to the KScript log.";
     }
 }

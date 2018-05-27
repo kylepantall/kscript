@@ -12,17 +12,16 @@ namespace KScript.Arguments
         public string id { get; set; }
         public string contents { get; set; }
         public def(string contents) => this.contents = contents;
-
-        public override void Run()
+        public override bool Run()
         {
-            ParentContainer[id] = this;
-            //Tells the parser to ignore any code here.
-            throw new KScriptNoRunMethodImplemented();
+            if (string.IsNullOrWhiteSpace(contents)) throw new KScriptNoRunMethodImplemented();
+            else { contents = HandleCommands(contents); }
+            return true;
         }
+        public override void Validate() => throw new KScriptNoValidationNeeded();
 
-        public override void Validate()
-        {
-            throw new KScriptNoValidationNeeded();
-        }
+        public override string UsageInformation() => @"Used to store values to the definition log within KScript." +
+            "\nThe id attribute is to within other KScriptObjects to retrieve the values." +
+            "\nE.g. '$tmp_name' can be used to retrieve the value of a def KScriptObject with the id 'tmp_name'.";
     }
 }

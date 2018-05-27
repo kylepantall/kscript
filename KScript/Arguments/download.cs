@@ -9,12 +9,22 @@ namespace KScript.Arguments
 {
     public class download : KScriptObject
     {
-
+        /// <summary>
+        /// The url of the file to download
+        /// </summary>
         public string url { get; set; }
+
+        /// <summary>
+        /// The destination to save the downloaded file
+        /// </summary>
         public string destination { get; set; }
+
+        /// <summary>
+        /// Share the download progress to the console
+        /// </summary>
         public string share_progress { get; set; }
 
-        public override void Run()
+        public override bool Run()
         {
             string URL = url, DEST = destination;
 
@@ -22,12 +32,11 @@ namespace KScript.Arguments
             destination = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, destination);
 
             System.Net.WebClient client = new System.Net.WebClient();
-            client.DownloadFile(url, destination);
+            client.DownloadFile(HandleCommands(url), HandleCommands(destination));
+            return true;
         }
 
-        public override void Validate()
-        {
-            throw new KScriptNoValidationNeeded();
-        }
+        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override string UsageInformation() => @"Used to download files from an online source to a location on the local machine.";
     }
 }
