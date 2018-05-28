@@ -91,7 +91,6 @@ namespace KScript.Arguments
         }
 
         public override void Validate() => throw new KScriptNoValidationNeeded();
-
         public override string UsageInformation() => @"Used to obtain a directory or file path from the user.";
     }
 }

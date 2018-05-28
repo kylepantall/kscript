@@ -14,12 +14,7 @@ namespace KScript.Arguments
             Console.Clear();
             return true;
         }
-
         public override string UsageInformation() => "Used to clear the console.";
-
-        public override void Validate()
-        {
-            throw new KScriptNoValidationNeeded();
-        }
+        public override void Validate() => throw new KScriptNoValidationNeeded();
     }
 }

@@ -16,12 +16,15 @@ namespace KScript
         public KScriptStringHandler StringHandler { get; }
 
         public IDictionary<string, def> defs { get; set; }
-        public List<@if> Ifs { get; set; }
-        public List<echo> echos { get; set; }
+
+        public string FilePath { get; set; }
+        public string FileDirectory { get; set; }
 
         private Random _random;
         public Random GetRandom() => _random;
         public KScriptProperties Properties { get; } = null;
+
+        public KScriptParser Parser { get; private set; }
 
         public bool HasDefaultConstructor(Type t) => t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null;
         public bool AllowExecution { get; set; } = true;
@@ -57,13 +60,12 @@ namespace KScript
             Console.WriteLine();
         }
 
-        public KScriptContainer(KScriptProperties prop)
+        public KScriptContainer(KScriptProperties prop, KScriptParser parser)
         {
             _random = new Random();
             defs = new Dictionary<string, def>();
-            Ifs = new List<@if>();
-            echos = new List<echo>();
             Properties = prop;
+            Parser = parser;
             StringHandler = new KScriptStringHandler(this);
         }
 

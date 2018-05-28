@@ -31,11 +31,13 @@ namespace KScript
                 parser.Properties.ClearAfterInput = clear_after_input;
 
                 parser.Parse();
+
+                if (parser.Properties.WaitOnFinish)
+                {
+                    Console.WriteLine("\n\nPress any key to close...");
+                    Console.ReadKey();
+                }
             }
-#if DEBUG
-            Console.WriteLine("\n\nPress any key to close...");
-            Console.ReadKey();
-#endif
         }
     }
 }
