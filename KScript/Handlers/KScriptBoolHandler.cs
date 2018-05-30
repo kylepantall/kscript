@@ -17,8 +17,7 @@ namespace KScript.Handlers
                     return true;
                 else if (_val == "false" || val == "0" || val == "f" || val == "no" || val == "n")
                     return false;
-                else
-                    throw new KScriptTypes.KScriptExceptions.KScriptException("bool operator is invalid");
+                else return false;
             }
             else throw new KScriptTypes.KScriptExceptions.KScriptException("bool operator is invalid");
         }

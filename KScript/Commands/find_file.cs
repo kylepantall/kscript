@@ -10,7 +10,6 @@ namespace KScript.Commands
     {
         public find_file(string directory)
         {
-
         }
         public override string Calculate()
         {

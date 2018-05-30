@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace KScript.Handlers
 {
-    public class KScriptStringHandler
+    public class KScriptStringHandler 
     {
         private KScriptContainer ParentContainer { get; }
         private KScriptStringHandler() { }
@@ -31,7 +31,8 @@ namespace KScript.Handlers
                 tmp_string = Regex.Replace(tmp_string, @"\\n", Environment.NewLine);
                 tmp_string = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, tmp_string);
                 return tmp_string;
-            } else
+            }
+            else
             {
                 return string.Empty;
             }

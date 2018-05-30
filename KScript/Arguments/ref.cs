@@ -1,4 +1,5 @@
-﻿using System;
+﻿using KScript.KScriptTypes.KScriptExceptions;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,22 +13,22 @@ namespace KScript.Arguments
     {
         public string directory { get; set; }
         public string @namespace { get; set; }
+        public @ref() => RunImmediately = true;
 
         public override bool Run()
         {
-            IEnumerable<string> files = Directory.EnumerateFiles(directory, ".dll");
-            files.ToList().ForEach(item => Assembly.LoadFile(item).GetTypes().Where(i => i.Namespace == @namespace).ToList().ForEach(x => ParentContainer.Parser.LoadedTypes.Add(x.Name, x)));
+            directory = HandleCommands(directory);
+            @namespace = HandleCommands(@namespace);
+            IEnumerable<string> files = Directory.EnumerateFiles(directory, "*.dll");
+            foreach (var item in files)
+                foreach (var t in Assembly.LoadFrom(item).GetTypes())
+                    if (t.Namespace.ToLower() == @namespace.ToLower())
+                        ParentContainer.AddKScriptObjectType(t);
+
             return true;
         }
 
-        public override string UsageInformation()
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void Validate()
-        {
-            throw new NotImplementedException();
-        }
+        public override string UsageInformation() => @"Used to reference argument extensions for KScript.";
+        public override void Validate() => throw new KScriptNoValidationNeeded();
     }
 }
