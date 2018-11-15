@@ -2,54 +2,129 @@
 using KScript.Handlers;
 using KScript.KScriptTypes;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KScript
 {
+    /// <summary>
+    /// KScriptObject used for parsing of commands and arguments.
+    /// </summary>
     public abstract class KScriptObject : KScriptIO
     {
-        public KScriptObject(object contents) { }
-        public KScriptObject(String contents) { }
+        /// <summary>
+        /// Initialises a KScriptObject with it's content as an object.
+        /// </summary>
+        /// <param name="Contents">Contents of KScript object.</param>
+        public KScriptObject(object Contents) { }
+
+        /// <summary>
+        /// Initialises a KScriptObject with it's content as a string.
+        /// </summary>
+        /// <param name="Contents">Contents of KScript object.</param>
+        public KScriptObject(String Contents) { }
+
+        /// <summary>
+        /// Initialises a KScriptObject without inner objects (no content).
+        /// </summary>
         public KScriptObject() { }
 
+        /// <summary>
+        /// The content of the KScript object as a string.
+        /// </summary>
+        public string Contents { get; set; }
+
+        /// <summary>
+        /// The content of the KScript object as an object.
+        /// </summary>
+        public object ContentsAsObject { get; set; }
+
+        /// <summary>
+        /// Determines whether this KScriptObject should skip validation and should run whilst being parsed instead of after.
+        /// </summary>
         public bool RunImmediately { get; set; } = false;
+
+        /// <summary>
+        /// Determines if this KScriptObject should be ignored completely.
+        /// </summary>
         public bool Ignore { get; set; } = false;
 
+        /// <summary>
+        /// Used to handle any commands from a string such as Contents or KScriptObject properties.
+        /// </summary>
+        /// <param name="value">Value to handle commands from.</param>
+        /// <returns>String with handled commands</returns>
         public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.StringHandler.Format(value), ParentContainer);
 
+        /// <summary>
+        /// The script types
+        /// </summary>
         public enum ScriptType
         {
+            /// <summary>
+            /// The script object contains several objects.
+            /// </summary>
             ENUMERABLE,
+            /// <summary>
+            /// The script object is used to define properties or values.
+            /// </summary>
             DEF,
+            /// <summary>
+            /// The script object is finite and does not contain several objects.
+            /// </summary>
             OBJECT
         }
 
+        /// <summary>
+        /// Returns the type of script object.
+        /// </summary>
+        /// <returns>Script type</returns>
         public ScriptType GetScriptObjectType()
         {
-            bool isEnumerable = typeof(KScriptObjectEnumerable).IsAssignableFrom(GetType());
+            bool isEnumerable = typeof(KScriptConditional).IsAssignableFrom(GetType());
             return isEnumerable ? ScriptType.ENUMERABLE : (typeof(def).IsAssignableFrom(GetType()) ? ScriptType.DEF : ScriptType.OBJECT);
         }
 
+        /// <summary>
+        /// Method used to retrieve def objects with specified id.
+        /// </summary>
+        /// <param name="id">Id of object to retrieve.</param>
+        /// <returns></returns>
         public def Def(string id)
         {
             string _id = id;
-            if (id.StartsWith("$")) _id = id.Substring(1);
+            if (id.StartsWith("$"))
+            {
+                _id = id.Substring(1);
+            }
+
             return ParentContainer.defs[_id];
         }
 
+        /// <summary>
+        /// Used to return a property using the property name.
+        /// </summary>
+        /// <param name="propertyName">Name of property</param>
+        /// <returns>The property</returns>
         public object this[string propertyName]
         {
-            get { if (GetType().GetProperty(propertyName) != null) return GetType().GetProperty(propertyName).GetValue(this, null); else return null; }
+            get
+            {
+                if (GetType().GetProperty(propertyName) != null)
+                {
+                    return GetType().GetProperty(propertyName).GetValue(this, null);
+                }
+                else
+                {
+                    return null;
+                }
+            }
             set { GetType().GetProperty(propertyName).SetValue(this, value, null); }
         }
 
-        public void Init(KScriptContainer container)
-        {
-            SetContainer(container);
-        }
+        /// <summary>
+        /// Used to initialise a KScriptObject
+        /// </summary>
+        /// <param name="container">The script container to attach the KScriptObject to.</param>
+        public void Init(KScriptContainer container) => SetContainer(container);
 
         /// <summary>
         /// Validation code to ensure KScriptObject is correctly validated, throw KScriptInvalidScriptType or KScriptNoValidationNeeded
@@ -67,5 +142,6 @@ namespace KScript
         /// </summary>
         /// <returns>Instructions as a string</returns>
         abstract public string UsageInformation();
+
     }
 }

@@ -9,20 +9,13 @@ namespace KScript
 {
     public static class KScriptVariableHandler
     {
-        public static string ReturnFormattedVariables(KScriptContainer ParentContainer, string contents)
+        public const string TRALING_STRING = "   ";
+        public static bool IsVariable(string val) => Regex.IsMatch(val, @"\$\b\S+\b");
+        public static string ReturnFormattedVariables(KScriptContainer ParentContainer, string Contents)
         {
-            string trailing_str = "   ";
-            contents = trailing_str + contents;
-            string pattern = @"\$\w+";
-            string temp_string = string.Format("{0}", contents);
-            Regex regex = new Regex(pattern, RegexOptions.Multiline);
-            foreach (var item in ParentContainer.defs)
-            {
-                temp_string = temp_string.Replace("$" + item.Key, item.Value.contents);
-            }
-            return temp_string.Substring(trailing_str.Length);
+            string temp_string = string.Format("{0}{1}", TRALING_STRING, Contents);
+            ParentContainer.defs.ToList().ForEach(item => temp_string = Regex.Replace(temp_string, string.Format(@"\$\b{0}\b", item.Key), item.Value.Contents, RegexOptions.IgnoreCase));
+            return temp_string.Substring(TRALING_STRING.Length);
         }
-
-        public static bool IsVariable(string val) => val.StartsWith("$");
     }
 }

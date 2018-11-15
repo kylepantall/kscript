@@ -1,4 +1,5 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptObjects;
+using KScript.KScriptTypes.KScriptExceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,17 +8,19 @@ using System.Threading.Tasks;
 
 namespace KScript.Arguments
 {
-    public class group : KScriptObjectEnumerable
+    public class group : KScriptConditional
     {
-        public KScriptObject contents { get; set; }
+        public new KScriptObject Contents { get; set; }
 
+        [KScriptProperty("Use this attribute to explain this group of script commands for more clarity", false)]
         public string description { get; set; }
 
+        [KScriptProperty("Used to give the group a unique identity for other KScript objects and commands", false)]
         public string id { get; set; }
 
         public override bool Run()
         {
-            if (contents != null) contents.Run();
+            if (Contents != null) Contents.Run();
             return true;
         }
         public override void Validate() => throw new KScriptNoValidationNeeded();

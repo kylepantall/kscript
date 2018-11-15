@@ -1,22 +1,36 @@
 ﻿using KScript.KScriptTypes.KScriptExceptions;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KScript.Arguments
 {
+    [KScriptObjects.KScriptNoInnerObjects]
     public class wait : KScriptObject
     {
+        [KScriptObjects.KScriptProperty("The time to wait.", true)]
+        [KScriptObjects.KScriptAcceptedOptions("s", "ms", "mins")]
+        [KScriptObjects.KScriptExample("<wait interval=\"5ms\"/>")]
+        [KScriptObjects.KScriptExample("<wait interval=\"10mins\"/>")]
+        [KScriptObjects.KScriptExample("<wait interval=\"3s\"/>")]
         public string interval { get; set; } = "5s";
 
         private int fromInterval()
         {
-            if (interval.EndsWith("mins")) return int.Parse(interval.Substring(0, interval.Length - "mins".Length)) * 60000;
-            if (interval.EndsWith("ms")) return int.Parse(interval.Substring(0, interval.Length - "ms".Length)) * 100;
-            if (interval.EndsWith("s")) return int.Parse(interval.Substring(0, interval.Length - "s".Length)) * 1000;
-            return 1000;
+            if (interval.EndsWith("mins") || interval.EndsWith("min"))
+            {
+                return int.Parse(interval.Substring(0, interval.Length - "mins".Length)) * Global.Time.Second;
+            }
+
+            if (interval.EndsWith("ms"))
+            {
+                return int.Parse(interval.Substring(0, interval.Length - "ms".Length)) * Global.Time.Millisecond;
+            }
+
+            if (interval.EndsWith("s"))
+            {
+                return int.Parse(interval.Substring(0, interval.Length - "s".Length)) * Global.Time.Second;
+            }
+
+            return Global.Time.Second;
         }
 
         public override bool Run()
@@ -26,7 +40,7 @@ namespace KScript.Arguments
             return true;
         }
 
-        public override string UsageInformation() => @"Uses the 'interval' property to determine how many seconds to wait until continuing.\n Accepted values e.g. 5ms or 5s or 5mins etc...";
+        public override string UsageInformation() => @"Uses the 'interval' property to determine how many seconds to wait until continuing.";
 
         public override void Validate() => throw new KScriptNoValidationNeeded();
     }

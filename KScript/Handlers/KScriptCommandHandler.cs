@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace KScript.Handlers
 {
@@ -15,8 +12,8 @@ namespace KScript.Handlers
         public static string HandleCommands(string str, KScriptContainer container)
         {
             String temp_string = str;
-
-            string commands_with_params = @"\@(\w+)\(([\$\w+,].*)\)";
+            //string command_with_params_test = @"\@(?<=(?<open>\()).*(?=(?<close>\)))";
+            string commands_with_params = @"\@(\w+)\((.+)\)";
             string commands_no_params = @"\@(\w+)\(\)";
 
             Regex cmd_params = new Regex(commands_with_params);
@@ -27,9 +24,19 @@ namespace KScript.Handlers
 
             foreach (Match with_params in cmd_params_matches)
             {
-                string[] @params = with_params.Groups[2].Value.Split(',');
+                string[] strs = Regex.Split(HandleCommands(with_params.Groups[2].Value, container), @"(?<!,[^(]+\([^)]+),");
+
+                List<string> new_strs = new List<string>();
+                foreach (var item in strs)
+                {
+                    new_strs.Add(HandleCommands(item.Trim('\"'), container));
+                }
+
+                string[] @params = new_strs.ToArray();
+
                 string type_name = with_params.Groups[1].Value;
                 Type _type = GetCommandType(type_name);
+
                 KScriptCommand cmd = GetCommandObject(@params, _type, container);
                 temp_string = temp_string.Replace(with_params.Value, cmd.Calculate());
             }
@@ -54,14 +61,18 @@ namespace KScript.Handlers
 
         private static KScriptCommand GetCommandObject(Type _type, KScriptContainer container)
         {
-            KScriptCommand obj = (KScriptCommand)Activator.CreateInstance(_type);
-            obj.Init(container);
-            return obj;
+            if (_type != null)
+            {
+                KScriptCommand obj = (KScriptCommand)Activator.CreateInstance(_type);
+                obj.Init(container);
+                return obj;
+            }
+            else
+            {
+                return null;
+            }
         }
 
-        private static Type GetCommandType(string type_name)
-        {
-            return Assembly.GetExecutingAssembly().GetType(string.Format("{0}.{1}", COMMANDS_NAMESPACE, type_name));
-        }
+        private static Type GetCommandType(string type_name) => Assembly.GetExecutingAssembly().GetType(string.Format("{0}.{1}", COMMANDS_NAMESPACE, type_name));
     }
 }

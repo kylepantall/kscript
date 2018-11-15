@@ -12,15 +12,6 @@ namespace KScript.Handlers
     /// </summary>
     public static class KScriptArithmeticHandler
     {
-        public static string HandleAdditions(string str)
-        {
-            List<string> splits = str.Split('+').Select(i => i.Trim()).ToList();
-            int total = 0;
-            splits.ForEach(i => total += ParseInt(i, 0));
-            return total.ToString();
-        }
-
-
         public static string HandleCalculation(string str)
         {
             Expression e = new Expression(str);
@@ -28,11 +19,11 @@ namespace KScript.Handlers
             return v.ToString();
         }
 
-
-        public static int ParseInt(string value, int defaultValue)
+        public static string HandleAnds(string str)
         {
-            try { return int.Parse(value); }
-            catch (Exception) { return defaultValue; }
+            throw new NotImplementedException();
+            //List<string> andStatements = str.Split(new string[] { "&&" }, StringSplitOptions.None).ToList();
+            //return null;
         }
     }
 }

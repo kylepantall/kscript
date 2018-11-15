@@ -1,38 +1,31 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
-using System;
-using System.Collections.Generic;
+﻿using KScript.KScriptObjects;
+using KScript.KScriptTypes.KScriptExceptions;
 using System.IO;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KScript.Arguments
 {
     public class write : KScriptObject
     {
         /// <summary>
-        /// Location to read from
-        /// </summary>
-        public string contents { get; set; }
-
-        /// <summary>
         /// Location to write to
         /// </summary>
+        [KScriptProperty("The location to write to.", true)]
+        [KScriptAcceptedOptions("C:\\file.txt\\", "D:\\Documents\\File.txt")]
+        [KScriptExample("<write to=\"D:\\My file.txt\\\"> My new file Contents.</ write > ")]
         public string to { get; set; }
 
-        public write(string contents) => this.contents = contents;
+        public write(string Contents) => this.Contents = Contents;
 
         public override bool Run()
         {
-            contents = HandleCommands(contents);
+            Contents = HandleCommands(Contents);
             to = HandleCommands(to);
 
-            File.WriteAllText(to, contents);
+            File.WriteAllText(to, Contents);
             return true;
         }
 
-        public override string UsageInformation() => "Used to write contents to a file using the properties ('contents' - text) and ('to' - file path).";
+        public override string UsageInformation() => "Used to write Contents to a file using the properties ('Contents' - text) and ('to' - file path).";
 
         public override void Validate() => throw new KScriptNoValidationNeeded();
     }

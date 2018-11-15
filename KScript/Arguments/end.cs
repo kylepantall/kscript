@@ -1,12 +1,8 @@
 ﻿using KScript.KScriptTypes.KScriptExceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KScript.Arguments
 {
+    [KScriptObjects.KScriptNoInnerObjects]
     public class end : KScriptObject
     {
         public override bool Run() => ParentContainer.Stop();

@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KScript.Commands
 {
@@ -22,10 +18,13 @@ namespace KScript.Commands
             {
                 case "os.version": return Environment.OSVersion.VersionString;
                 case "machine.name": return Environment.MachineName;
-                case "execution_file": return ParentContainer.FilePath;
-                case "execution_directory": return ParentContainer.FileDirectory;
-                default:
-                    return ParentContainer.FileDirectory;
+                case "script.path": return ParentContainer.FilePath;
+                case "script.directory": return ParentContainer.FileDirectory;
+                case "username": return Environment.UserName;
+                case "math.pi": return Math.PI.ToString();
+                case "math.e": return Math.E.ToString();
+                case "null": return NULL;
+                default: return ParentContainer.FileDirectory;
             }
         }
     }

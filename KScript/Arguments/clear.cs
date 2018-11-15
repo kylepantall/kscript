@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 
 namespace KScript.Arguments
 {
+    /// <summary>
+    /// KScript object to clear the console.
+    /// </summary>
+    [KScriptObjects.KScriptNoInnerObjects]
     public class clear : KScriptObject
     {
         public override bool Run()

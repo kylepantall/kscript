@@ -8,10 +8,18 @@ using System.Threading.Tasks;
 
 namespace KScript.Arguments
 {
+    [KScriptObjects.KScriptNoInnerObjects]
     public class run : KScriptObject
     {
+        [KScriptObjects.KScriptProperty("The location of the process to run.")]
+        [KScriptObjects.KScriptExample("file path")]
+        [KScriptObjects.KScriptExample("url")]
+        [KScriptObjects.KScriptExample("directory")]
         public String file { get; set; }
+
+        [KScriptObjects.KScriptProperty("The arguments to pass to the process.")]
         public string args { get; set; }
+
         public override bool Run()
         {
             if (string.IsNullOrWhiteSpace(HandleCommands(args)))

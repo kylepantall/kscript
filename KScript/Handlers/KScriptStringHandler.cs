@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace KScript.Handlers
 {
-    public class KScriptStringHandler 
+    public class KScriptStringHandler
     {
         private KScriptContainer ParentContainer { get; }
         private KScriptStringHandler() { }
@@ -18,6 +14,12 @@ namespace KScript.Handlers
             string tmp_string = val;
             tmp_string = String.Format(val, args);
             tmp_string = Regex.Replace(tmp_string, @"\\n", Environment.NewLine);
+
+            if (tmp_string.StartsWith("'") && tmp_string.EndsWith("'"))
+            {
+                tmp_string = tmp_string.Substring(1, tmp_string.Length - 1);
+            }
+
             tmp_string = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, tmp_string);
             return tmp_string;
         }
@@ -29,6 +31,12 @@ namespace KScript.Handlers
                 string tmp_string = val;
                 tmp_string = String.Format(val);
                 tmp_string = Regex.Replace(tmp_string, @"\\n", Environment.NewLine);
+
+                if (tmp_string.StartsWith("'") && tmp_string.EndsWith("'"))
+                {
+                    tmp_string = tmp_string.Substring(1, tmp_string.Length - 1);
+                }
+
                 tmp_string = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, tmp_string);
                 return tmp_string;
             }

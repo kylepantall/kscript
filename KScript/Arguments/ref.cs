@@ -1,18 +1,19 @@
 ﻿using KScript.KScriptTypes.KScriptExceptions;
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KScript.Arguments
 {
+    [KScriptObjects.KScriptNoInnerObjects]
     public class @ref : KScriptObject
     {
+        [KScriptObjects.KScriptProperty("The directory to look for extensions for KScript.", true)]
         public string directory { get; set; }
+
+        [KScriptObjects.KScriptProperty("The namespace to use when loading the extensions.", true)]
         public string @namespace { get; set; }
+
         public @ref() => RunImmediately = true;
 
         public override bool Run()

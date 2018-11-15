@@ -1,27 +1,28 @@
-﻿using System;
-using System.Windows.Forms;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.IO;
+﻿using KScript.Handlers;
 using KScript.KScriptTypes.KScriptExceptions;
-using KScript.Handlers;
+using System;
+using System.IO;
 
 namespace KScript.Arguments
 {
     public class picker : KScriptObject
     {
-        public picker(string contents) => this.contents = contents;
+        public picker(string Contents) => this.Contents = Contents;
 
-        public string contents { get; set; }
+        [KScriptObjects.KScriptProperty("The def value to store the selected value to.", true)]
         public string to { get; set; }
+
+        [KScriptObjects.KScriptProperty("The prompt upon receiving incorrect input.", false)]
         public string error_prompt { get; set; }
 
         private type_options _type = type_options.directory;
+
         /// <summary>
         /// Used to inform the picker whether we're checking for a file path or a directory
         /// </summary>
+        /// 
+        [KScriptObjects.KScriptProperty("The type of directory to expect.", true)]
+        [KScriptObjects.KScriptAcceptedOptions("directory", "file")]
         public string type
         {
             get { return Enum.GetName(typeof(type_options), _type); }
@@ -33,6 +34,8 @@ namespace KScript.Arguments
         /// <summary>
         /// Persist on a valid directory/file path
         /// </summary>
+        /// 
+        [KScriptObjects.KScriptProperty("Indicates whether to persist for a correct directory or file.", true)]
         public string persist { get; set; } = "no";
 
 
@@ -50,7 +53,11 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            if (!string.IsNullOrWhiteSpace(contents)) Out(contents);
+            if (!string.IsNullOrWhiteSpace(Contents))
+            {
+                Out(Contents);
+            }
+
             string input = In();
             if (KScriptBoolHandler.Convert(persist))
             {
@@ -59,14 +66,22 @@ namespace KScript.Arguments
                     case type_options.directory:
                         while (!Directory.Exists(input))
                         {
-                            if (!string.IsNullOrEmpty(error_prompt)) Out(error_prompt);
+                            if (!string.IsNullOrEmpty(error_prompt))
+                            {
+                                Out(error_prompt);
+                            }
+
                             input = In();
                         }
                         break;
                     default:
                         while (!File.Exists(input))
                         {
-                            if (!string.IsNullOrEmpty(error_prompt)) Out(error_prompt);
+                            if (!string.IsNullOrEmpty(error_prompt))
+                            {
+                                Out(error_prompt);
+                            }
+
                             input = In();
                         }
                         break;
@@ -78,15 +93,25 @@ namespace KScript.Arguments
                 {
                     case type_options.directory:
                         if (!Directory.Exists(input))
+                        {
                             throw new KScriptException("Directory doesn't exist");
+                        }
+
                         break;
                     default:
                         if (!File.Exists(input))
+                        {
                             throw new KScriptException("File doesn't exist");
+                        }
+
                         break;
                 }
             }
-            if (!string.IsNullOrWhiteSpace(to)) Def(to).contents = input;
+            if (!string.IsNullOrWhiteSpace(to))
+            {
+                Def(to).Contents = input;
+            }
+
             return true;
         }
 
