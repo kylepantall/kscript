@@ -14,12 +14,12 @@ namespace KScript.Arguments
         public override bool Run()
         {
             string[] _params = args.Split(',');
+            string _method = HandleCommands(method);
 
             List<string> keys = new List<string>();
-
             foreach (var item in ParentContainer.defs)
             {
-                if (item.Key.StartsWith(method) && item.Key.Contains("."))
+                if (item.Key.StartsWith(_method) && item.Key.Contains("."))
                 {
                     keys.Add(item.Key);
                 }
@@ -30,11 +30,13 @@ namespace KScript.Arguments
                 ParentContainer.defs[keys[i]].Contents = _params[i];
             }
 
-            List<IKScriptDocumentNode> nodes = ParentContainer.ObjectStorageContainer.GetMethodCalls(method);
+            List<IKScriptDocumentNode> nodes = ParentContainer.ObjectStorageContainer.GetMethodCalls(_method);
             foreach (IKScriptDocumentNode node in nodes)
             {
                 node.Run(ParentContainer, args);
             }
+
+
             return true;
         }
 
