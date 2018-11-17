@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace KScript.Handlers
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptCommandHandler
     {
         public const string COMMANDS_NAMESPACE = "KScript.Commands";

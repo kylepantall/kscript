@@ -25,7 +25,7 @@ namespace KScript.Arguments
         {
             if (string.IsNullOrEmpty(location))
             {
-                throw new KScriptTypes.KScriptExceptions.KScriptException("The property 'location' is missing and is required for this KScript Object");
+                throw new KScriptException("The property 'location' is missing and is required for this KScript Object");
             }
             else
             {

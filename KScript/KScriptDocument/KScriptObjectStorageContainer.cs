@@ -1,9 +1,11 @@
 ﻿using KScript.Document;
 using KScript.Global;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
-namespace KScriptLib.KScriptDocument
+namespace KScript.KScriptDocument
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptObjectStorageContainer
     {
         private readonly Dictionary<string, Dictionary<string, List<IKScriptDocumentNode>>> Value;

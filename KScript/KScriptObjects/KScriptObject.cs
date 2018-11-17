@@ -2,12 +2,14 @@
 using KScript.Handlers;
 using KScript.KScriptTypes;
 using System;
+using System.Runtime.InteropServices;
 
 namespace KScript
 {
     /// <summary>
     /// KScriptObject used for parsing of commands and arguments.
     /// </summary>
+    [ClassInterface(ClassInterfaceType.None)]
     public abstract class KScriptObject : KScriptIO
     {
         /// <summary>
@@ -52,7 +54,7 @@ namespace KScript
         /// </summary>
         /// <param name="value">Value to handle commands from.</param>
         /// <returns>String with handled commands</returns>
-        public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.StringHandler.Format(value), ParentContainer);
+        public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(value), ParentContainer);
 
         /// <summary>
         /// The script types

@@ -8,10 +8,22 @@ namespace KScript.KScriptTypes.KScriptExceptions
     [Serializable]
     public class KScriptException : Exception
     {
+        public string ExceptionType;
         public KScriptException() : base() { }
-        public KScriptException(string message) : base(message) { }
+        public KScriptException(string exception_type, string message) : base(message)
+        {
+            ExceptionType = exception_type;
+        }
+
+        public KScriptException(string message) : base(message)
+        {
+            ExceptionType = GetType().Name;
+        }
     }
 
+    /// <summary>
+    /// Used to inform the parser to skip the method
+    /// </summary>
     [Serializable]
     public class KScriptSkipScriptObject : KScriptException { }
 
@@ -40,4 +52,34 @@ namespace KScript.KScriptTypes.KScriptExceptions
     /// </summary>
     [Serializable]
     public class KScriptValidationException : KScriptException { }
+
+
+    public class KScriptValidationFail : KScriptException
+    {
+        public KScriptValidationFail(string msg) : base(msg) { }
+    }
+    public class KScriptDirectoryNotFound : KScriptException
+    {
+        public KScriptDirectoryNotFound(string msg) : base(msg) { }
+    }
+    public class KScriptArrayNotFound : KScriptException
+    {
+        public KScriptArrayNotFound(string msg) : base(msg) { }
+    }
+    public class KScriptBoolInvalid : KScriptException
+    {
+        public KScriptBoolInvalid(string msg) : base(msg) { }
+    }
+    public class KScriptDefNotFound : KScriptException
+    {
+        public KScriptDefNotFound(string msg) : base(msg) { }
+    }
+    public class KScriptDefInUse : KScriptException
+    {
+        public KScriptDefInUse(string msg) : base(msg) { }
+    }
+    public class KScriptMissingAttribute : KScriptException
+    {
+        public KScriptMissingAttribute(string msg) : base(msg) { }
+    }
 }

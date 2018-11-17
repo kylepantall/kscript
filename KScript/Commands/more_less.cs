@@ -13,7 +13,7 @@
 
         public override string Calculate()
         {
-            string vA = KScript().StringHandler.Format(ValueA), vB = KScript().StringHandler.Format(ValueB);
+            string vA = KScript().GetStringHandler().Format(ValueA), vB = KScript().GetStringHandler().Format(ValueB);
 
             if (Operator.ToLower() == "mt")
             {

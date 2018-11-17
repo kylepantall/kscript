@@ -71,7 +71,6 @@
     <Compile Include="Arguments\dowhile.cs" />
     <Compile Include="Arguments\load.cs" />
     <Compile Include="Arguments\method.cs" />
-    <Compile Include="Arguments\onexception.cs" />
     <Compile Include="Arguments\picker.cs" />
     <Compile Include="Arguments\ref.cs" />
     <Compile Include="Arguments\registry.cs" />
@@ -130,6 +129,8 @@
     <Compile Include="KScriptObjects\KScriptExceptions.cs" />
     <Compile Include="KScriptObjects\KScriptObject.cs" />
     <Compile Include="KScriptContainerObjects\KScriptConditional.cs" />
+    <Compile Include="VariableFunctions\IVariableFunction.cs" />
+    <Compile Include="VariableFunctions\upper.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -1,26 +1,29 @@
 ﻿using KScript.Arguments;
 using KScript.Handlers;
+using KScript.KScriptDocument;
 using KScript.KScriptObjects;
 using KScript.KScriptTypes.KScriptExceptions;
-using KScriptLib.KScriptDocument;
 using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace KScript
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptContainer
     {
         //Constant to store Assembly path for KScript Arguments.
         const string ASSEMBLY_PATH = "KScript.Arguments";
+        const string VARIABLE_ASSEMBLY_PATH = "KScript.VariableFunctions";
 
         //Property to store the random object used to generate random numbers and digits.
         private readonly Random _random;
 
         //StringHandler property used to store the KScriptStringHandler class.
-        public KScriptStringHandler StringHandler { get; }
+        private KScriptStringHandler StringHandler { get; }
 
         //Properties used to store file path and file directory of opened Script.
         internal string FilePath { get; set; }
@@ -28,7 +31,6 @@ namespace KScript
 
         //Dictionary list of Defs used for retrieval of defs within the script.
         internal IDictionary<string, def> defs { get; set; }
-
 
         //Used to store arrays
         internal IDictionary<string, List<string>> arrays { get; set; }
@@ -44,6 +46,8 @@ namespace KScript
 
         //Property used to store the parser class.
         internal KScriptParser Parser { get; private set; }
+
+        internal IDictionary<string, Type> LoadedVariableFunctions { get; set; }
 
         //Boolean used to determine if a type has a default constructor.
         internal bool HasDefaultConstructor(Type t) => t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null;
@@ -62,7 +66,7 @@ namespace KScript
         public string GetFileDirectory() => FileDirectory;
 
 
-        public KScriptObjectStorageContainer ObjectStorageContainer; 
+        internal KScriptObjectStorageContainer ObjectStorageContainer;
 
         //Method to halt KScript parsing.
         public bool Stop() { AllowExecution = false; return AllowExecution; }
@@ -193,6 +197,7 @@ namespace KScript
             StringHandler = new KScriptStringHandler(this);
             LoadedKScriptObjects = new Dictionary<string, Type>();
             ObjectStorageContainer = new KScriptObjectStorageContainer();
+            LoadedVariableFunctions = new Dictionary<string, Type>();
         }
 
 
@@ -224,6 +229,18 @@ namespace KScript
 
 
         /// <summary>
+        /// Method used to load built in variable types to KScript variable functions list.
+        /// </summary>
+        internal void LoadBuiltInVariableFunctionTypes()
+        {
+            var q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                    where t.IsClass && t.Namespace == VARIABLE_ASSEMBLY_PATH
+                    select t;
+            q.ToList().ForEach(i => AddVariableFunctionType(i));
+        }
+
+
+        /// <summary>
         /// Used to add a type to the KScript loaded Objects dictionary list
         /// </summary>
         /// <param name="t">The type to add</param>
@@ -239,18 +256,28 @@ namespace KScript
             }
         }
 
+        /// <summary>
+        /// Used to add a type to the KScript loaded variable functions dictionary list
+        /// </summary>
+        /// <param name="t">The type to add</param>
+        internal void AddVariableFunctionType(Type t)
+        {
+            if (LoadedVariableFunctions.ContainsKey(t.Name.ToLower()))
+            {
+                LoadedVariableFunctions[t.Name.ToLower()] = t;
+            }
+            else
+            {
+                LoadedVariableFunctions.Add(t.Name.ToLower(), t);
+            }
+        }
+
 
         /// <summary>
         /// Method used to handle exceptions - current purpose is to output the exception message.
         /// </summary>
         /// <param name="ex"></param>
         internal void HandleException(Exception ex) => Out(ex);
-
-
-        /// <summary>
-        /// Used to return the array dictionary.
-        /// </summary>
-        public IDictionary<string, List<string>> GetArrays => arrays;
 
         /// <summary>
         /// Used to insert into the array with specified ID
@@ -259,13 +286,25 @@ namespace KScript
         /// <param name="list">The array to insert with specified id</param>
         public void ArrayInsert(string id, List<string> list) => arrays.Add(id, list);
 
-
         /// <summary>
         /// Used to retrieve an array with specified ID
         /// </summary>
         /// <param name="id">ID to retrieve array</param>
         /// <returns>Array of strings</returns>
         public List<string> ArrayGet(string id) => arrays[id];
+
+
+        /// <summary>
+        /// Method used to retrieve the string handler
+        /// </summary>
+        /// <returns>KScriptStringHandler object</returns>
+        public KScriptStringHandler GetStringHandler() => StringHandler;
+
+        /// <summary>
+        /// Method used to retrieve all arrays for the current KScript script.
+        /// </summary>
+        /// <returns>All arrays as a dictionary where the key is the array ID</returns>
+        public IDictionary<string, List<string>> ArraysGet() => arrays;
 
         /// <summary>
         /// Method used to retrieve defs or add defs to the dictionary list with specified id.
@@ -289,7 +328,7 @@ namespace KScript
             {
                 if (defs.ContainsKey(id))
                 {
-                    throw new KScriptException(string.Format("A def with the id '{0}' already exists.", id));
+                    throw new KScriptException("KScriptDefInUse", string.Format("A def with the id '{0}' already exists.", id));
                 }
                 else
                 {

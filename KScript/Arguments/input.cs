@@ -52,7 +52,7 @@ namespace KScript.Arguments
 
             if (Def(to) == null)
             {
-                throw new KScriptException(string.Format("Definition '{0}' has not been declared", to));
+                throw new KScriptException("KScriptDefNotFound", string.Format("Definition '{0}' has not been declared", to));
             }
 
             switch (type.ToLower())

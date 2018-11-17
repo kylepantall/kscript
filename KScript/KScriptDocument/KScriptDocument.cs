@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace KScript.Document
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptDocument
     {
         private readonly List<IKScriptDocumentNode> nodes;

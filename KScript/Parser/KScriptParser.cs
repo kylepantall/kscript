@@ -1,6 +1,7 @@
 ﻿using KScript.Arguments;
 using KScript.Document;
 using KScript.KScriptTypes.KScriptExceptions;
+using KScript.VariableFunctions;
 using System;
 using System.IO;
 using System.Text;
@@ -51,7 +52,7 @@ namespace KScript
 
         public string FilePath { get; set; }
 
-        public KScriptDocument KScriptDocument { get; set; }
+        public Document.KScriptDocument KScriptDocument { get; set; }
         public KScriptContainer KScriptContainer { get; set; }
 
         public void Parse()
@@ -62,8 +63,11 @@ namespace KScript
             //XmlNodeList catches = Document.DocumentElement.SelectNodes(".//catch");
 
             KScriptContainer = new KScriptContainer(Properties, this);
+
             KScriptContainer.LoadBuiltInTypes();
-            KScriptDocument = new KScriptDocument();
+            KScriptContainer.LoadBuiltInVariableFunctionTypes();
+
+            KScriptDocument = new Document.KScriptDocument();
             KScriptObject rootElement = GetScriptObject(node, KScriptContainer);
             KScriptContainer.FilePath = FilePath;
             KScriptContainer.FileDirectory = Path.GetDirectoryName(FilePath);
@@ -75,7 +79,7 @@ namespace KScript
             Complete();
         }
 
-        public void Iterate(XmlNode node, KScriptDocument doc, KScriptContainer container, KScriptDocumentCollectionNode docNode)
+        public void Iterate(XmlNode node, Document.KScriptDocument doc, KScriptContainer container, KScriptDocumentCollectionNode docNode)
         {
             foreach (XmlNode item in node.ChildNodes)
             {
@@ -118,6 +122,21 @@ namespace KScript
                 {
                     return GetScriptObject(_type);
                 }
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public static IVariableFunction GetVariableFunction(Type type, string param = null) => HasDefaultConstructor(type) ? (IVariableFunction)Activator.CreateInstance(type) : (IVariableFunction)Activator.CreateInstance(type, param);
+        public Type GetVariableType(string name, KScriptContainer container) => container.LoadedKScriptObjects.ContainsKey(name) ? container.LoadedKScriptObjects[name] : null;
+        public IVariableFunction GetVariableFunction(string variable_name, KScriptContainer container)
+        {
+            Type _type = GetVariableType(variable_name, container);
+            if (_type != null)
+            {
+                return GetVariableFunction(_type, null);
             }
             else
             {

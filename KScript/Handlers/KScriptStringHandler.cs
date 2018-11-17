@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace KScript.Handlers
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptStringHandler
     {
         private KScriptContainer ParentContainer { get; }

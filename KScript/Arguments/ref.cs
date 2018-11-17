@@ -1,6 +1,8 @@
 ﻿using KScript.KScriptTypes.KScriptExceptions;
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 
 namespace KScript.Arguments
@@ -11,7 +13,7 @@ namespace KScript.Arguments
         [KScriptObjects.KScriptProperty("The directory to look for extensions for KScript.", true)]
         public string directory { get; set; }
 
-        [KScriptObjects.KScriptProperty("The namespace to use when loading the extensions.", true)]
+        [KScriptObjects.KScriptProperty("The namespace to use when loading the extensions.", false)]
         public string @namespace { get; set; }
 
         public @ref() => RunImmediately = true;
@@ -22,9 +24,20 @@ namespace KScript.Arguments
             @namespace = HandleCommands(@namespace);
             IEnumerable<string> files = Directory.EnumerateFiles(directory, "*.dll");
             foreach (var item in files)
-                foreach (var t in Assembly.LoadFrom(item).GetTypes())
-                    if (t.Namespace.ToLower() == @namespace.ToLower())
+            {
+                Type[] types = (from t in Assembly.LoadFrom(item).GetTypes() where typeof(KScriptObject).IsAssignableFrom(t) select t).ToArray();
+                foreach (Type t in types)
+                {
+                    if (string.IsNullOrEmpty(@namespace))
+                    {
                         ParentContainer.AddKScriptObjectType(t);
+                    }
+                    else if (t.Namespace.ToLower() == @namespace.ToLower())
+                    {
+                        ParentContainer.AddKScriptObjectType(t);
+                    }
+                }
+            }
 
             return true;
         }

@@ -1,7 +1,9 @@
 ﻿using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace KScript.Document
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptDocumentNode : IKScriptDocumentNode
     {
         private readonly KScriptObject Value;

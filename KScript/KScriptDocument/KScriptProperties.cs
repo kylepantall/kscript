@@ -1,5 +1,8 @@
-﻿namespace KScript
+﻿using System.Runtime.InteropServices;
+
+namespace KScript
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptProperties
     {
         public bool Quiet { get; set; }

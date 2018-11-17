@@ -1,5 +1,6 @@
 ﻿using KScript.Document;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace KScript.Arguments
 {
@@ -13,29 +14,29 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            string[] _params = args.Split(',');
             string _method = HandleCommands(method);
 
-            List<string> keys = new List<string>();
-            foreach (var item in ParentContainer.defs)
+            if (!string.IsNullOrEmpty(args))
             {
-                if (item.Key.StartsWith(_method) && item.Key.Contains("."))
+                string[] _params = args.Split(',').Select(i => HandleCommands(i)).ToArray();
+
+                List<string> keys = new List<string>();
+                foreach (var item in ParentContainer.defs)
                 {
-                    keys.Add(item.Key);
+                    if (item.Key.StartsWith(_method) && item.Key.Contains("."))
+                    {
+                        keys.Add(item.Key);
+                    }
+                }
+
+                for (int i = 0; i < _params.Length; i++)
+                {
+                    ParentContainer.defs[keys[i]].Contents = _params[i];
                 }
             }
 
-            for (int i = 0; i < _params.Length; i++)
-            {
-                ParentContainer.defs[keys[i]].Contents = _params[i];
-            }
-
             List<IKScriptDocumentNode> nodes = ParentContainer.ObjectStorageContainer.GetMethodCalls(_method);
-            foreach (IKScriptDocumentNode node in nodes)
-            {
-                node.Run(ParentContainer, args);
-            }
-
+            nodes.ForEach(node => node.Run(ParentContainer, args));
 
             return true;
         }

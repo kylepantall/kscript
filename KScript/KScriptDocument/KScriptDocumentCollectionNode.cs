@@ -1,8 +1,10 @@
 ﻿using KScript.KScriptTypes.KScriptExceptions;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace KScript.Document
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptDocumentCollectionNode : IKScriptDocumentNode
     {
         protected KScriptObject Value;
@@ -63,6 +65,7 @@ namespace KScript.Document
                     else if (typeof(KScriptMethodWrapper).IsAssignableFrom(GetValue().GetType()))
                     {
                         KScriptMethodWrapper obj = GetValue() as KScriptMethodWrapper;
+
                         //Add the method call to the Object Storage Container
                         container.ObjectStorageContainer.Add(Global.GlobalIdentifiers.CALLS, obj.name, Nodes);
                     }
@@ -74,9 +77,8 @@ namespace KScript.Document
                             node.Run(container, null);
                         }
                     }
+
                 }
-
-
 
             }
         }

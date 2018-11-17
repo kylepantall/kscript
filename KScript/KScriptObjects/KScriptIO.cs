@@ -1,9 +1,11 @@
 ﻿using KScript.Handlers;
 using System;
+using System.Runtime.InteropServices;
 
 namespace KScript.KScriptTypes
 {
-    public class KScriptIO : object
+    [ClassInterface(ClassInterfaceType.None)]
+    public class KScriptIO
     {
         /// <summary>
         /// Constructor for KScriptIO class.
@@ -62,7 +64,8 @@ namespace KScript.KScriptTypes
 
 
         public void Out() => Console.Out.WriteLine();
-        public void Out(string val) => Console.Out.Write(KScriptCommandHandler.HandleCommands(ParentContainer.StringHandler.Format(val), ParentContainer));
+        public void Out(string val) => Console.Out.Write(KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(val), ParentContainer));
+        public void Out(object obj) => Out(obj.ToString());
 
         public string In() => Console.In.ReadLine();
         public string In(string prompt) { Out(prompt); return Console.In.ReadLine(); }

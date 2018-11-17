@@ -9,7 +9,14 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            KScript().ArrayGet(to).Add(HandleCommands(Contents));
+            if (KScript().ArrayGet(to) != null)
+            {
+                KScript().ArrayGet(to).Add(HandleCommands(Contents));
+            }
+            else
+            {
+                throw new KScriptArrayNotFound(string.Format("The array with the ID '{0}' was not found.", to));
+            }
             return true;
         }
 

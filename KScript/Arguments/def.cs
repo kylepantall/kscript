@@ -24,7 +24,7 @@ namespace KScript.Arguments
         {
             if (id.Contains(" ") || id.Contains("$"))
             {
-                throw new KScriptException("The id cannot contain any spaces or $ symbols.");
+                throw new KScriptValidationFail("The id cannot contain any spaces or $ symbols.");
             }
         }
 

@@ -1,5 +1,8 @@
-﻿namespace KScript.Handlers
+﻿using System.Runtime.InteropServices;
+
+namespace KScript.Handlers
 {
+    [ClassInterface(ClassInterfaceType.None)]
     public class KScriptBoolHandler
     {
         public static bool Convert(string val)
@@ -22,7 +25,7 @@
             }
             else
             {
-                throw new KScriptTypes.KScriptExceptions.KScriptException("bool operator is invalid");
+                throw new KScriptTypes.KScriptExceptions.KScriptException("KScriptBoolInvalid", string.Format("Bool operator: '{0}' is invalid", val));
             }
         }
     }

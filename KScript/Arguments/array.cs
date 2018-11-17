@@ -5,11 +5,13 @@ namespace KScript.Arguments
 {
     public class array : KScriptObject
     {
+        [KScriptObjects.KScriptProperty("The unique ID of the array", true)]
         public string id { get; set; }
 
         public override bool Run()
         {
-            KScript().ArrayInsert(id, new List<string>());
+            List<string> array = new List<string>();
+            KScript().ArrayInsert(id, array);
             return true;
         }
 
@@ -18,7 +20,7 @@ namespace KScript.Arguments
         {
             if (string.IsNullOrEmpty(id))
             {
-                throw new KScriptException("No ID has been specified for the array object.");
+                throw new KScriptMissingAttribute("No ID has been specified for the array object.");
             }
             else
             {

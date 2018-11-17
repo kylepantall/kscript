@@ -94,14 +94,14 @@ namespace KScript.Arguments
                     case type_options.directory:
                         if (!Directory.Exists(input))
                         {
-                            throw new KScriptException("Directory doesn't exist");
+                            throw new KScriptException("KScriptDirectoryNotFound", string.Format("Directory '{0}' doesn't exist", input));
                         }
 
                         break;
                     default:
                         if (!File.Exists(input))
                         {
-                            throw new KScriptException("File doesn't exist");
+                            throw new KScriptException("KScriptDirectoryNotFound", string.Format("File '{0}' doesn't exist", input));
                         }
 
                         break;
