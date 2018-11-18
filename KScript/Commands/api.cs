@@ -1,4 +1,5 @@
-﻿using System.Net.Http;
+﻿using KScript.KScriptTypes.KScriptExceptions;
+using System.Net.Http;
 using System.Net.Http.Headers;
 
 namespace KScript.Commands
@@ -21,7 +22,7 @@ namespace KScript.Commands
             }
             else
             {
-                return "Status: Timed out.";
+                throw new KScriptException("api.StatusTimedOut", "HttpClient Timed out.");
             }
         }
     }

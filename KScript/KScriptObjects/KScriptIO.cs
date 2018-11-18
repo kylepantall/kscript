@@ -24,6 +24,24 @@ namespace KScript.KScriptTypes
         internal KScriptContainer ParentContainer { get; private set; }
 
         /// <summary>
+        /// Method used to handle an exception
+        /// </summary>
+        /// <param name="ex">the exception to handle</param>
+        internal void HandleException(KScriptObject obj, Exception ex)
+        {
+            ParentContainer.HandleException(obj, ex);
+        }
+
+        /// <summary>
+        /// Method used to handle an exception
+        /// </summary>
+        /// <param name="ex">the exception to handle</param>
+        internal void HandleException(KScriptCommand obj, Exception ex)
+        {
+            ParentContainer.HandleException(obj, ex);
+        }
+
+        /// <summary>
         /// Method used to set the ParentContainer property.
         /// </summary>
         /// <param name="container">The KScriptContainer object to use.</param>

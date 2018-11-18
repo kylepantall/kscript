@@ -1,4 +1,6 @@
-﻿namespace KScript.Commands
+﻿using System;
+
+namespace KScript.Commands
 {
     public class array : KScriptCommand
     {
@@ -9,6 +11,16 @@
             this.index = index;
         }
 
-        public override string Calculate() => KScript().ArrayGet(id)[int.Parse(index)];
+        public override string Calculate()
+        {
+            try
+            {
+                return KScript().ArrayGet(id)[int.Parse(index)];
+            } catch (Exception ex)
+            {
+                HandleException(this, ex);
+                return null;
+            }
+        }
     }
 }

@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KScript.Commands
 {
@@ -19,7 +15,7 @@ namespace KScript.Commands
         /// <param name="format">the format to use</param>
         public date(string format) => this.format = format;
 
-        private string format;
+        private readonly string format;
 
         /// <summary>
         /// Calculates the date using the specified format or using the default format.
@@ -28,8 +24,11 @@ namespace KScript.Commands
         public override string Calculate()
         {
             if (!string.IsNullOrWhiteSpace(format))
+            {
                 try { return DateTime.Now.Date.ToString(format); }
-                catch (Exception) { }
+                catch (Exception ex) { HandleException(this, ex); }
+            }
+
             return DateTime.Now.ToLongDateString();
         }
     }

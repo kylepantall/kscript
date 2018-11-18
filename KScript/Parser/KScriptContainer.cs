@@ -277,7 +277,20 @@ namespace KScript
         /// Method used to handle exceptions - current purpose is to output the exception message.
         /// </summary>
         /// <param name="ex"></param>
-        internal void HandleException(Exception ex) => Out(ex);
+        internal void HandleException(KScriptObject obj, Exception ex)
+        {
+            throw new NotImplementedException();
+        }
+
+
+        /// <summary>
+        /// Method used to handle exceptions - current purpose is to output the exception message.
+        /// </summary>
+        /// <param name="ex"></param>
+        internal void HandleException(KScriptCommand obj, Exception ex)
+        {
+            throw new NotImplementedException();
+        }
 
         /// <summary>
         /// Used to insert into the array with specified ID

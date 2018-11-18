@@ -34,7 +34,7 @@ namespace KScript.Arguments
         {
             if (string.IsNullOrWhiteSpace(file))
             {
-                throw new KScriptException("KScript", "File must be provided");
+                throw new KScriptException("FileNotFound", "File must be provided");
             }
         }
 

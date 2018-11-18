@@ -17,7 +17,15 @@ namespace KScript.Commands
 
         public override string Calculate()
         {
-            return @string.Split(new string[] { split_string }, StringSplitOptions.None)[Index];
+            try
+            {
+                return @string.Split(new string[] { split_string }, StringSplitOptions.None)[Index];
+            }
+            catch (Exception ex)
+            {
+                HandleException(this, ex);
+                return null;
+            }
         }
     }
 }

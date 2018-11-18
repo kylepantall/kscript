@@ -19,9 +19,10 @@ namespace KScript.Commands
             {
                 return KScript().Parser.CustomArguments[Index];
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return NULL;
+                HandleException(this, ex);
+                return null;
             }
         }
     }

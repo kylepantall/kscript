@@ -8,6 +8,17 @@ namespace KScript.Commands
         private string key { get; set; }
 
         public registry(string path, string key) { this.path = path; this.key = key; }
-        public override string Calculate() => Registry.GetValue(path, key, string.Empty).ToString();
+        public override string Calculate()
+        {
+            try
+            {
+                return Registry.GetValue(path, key, string.Empty).ToString()
+            }
+            catch (System.Exception ex)
+            {
+                HandleException(this, ex);
+                return null;
+            }
+        }
     }
 }

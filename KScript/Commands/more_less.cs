@@ -1,4 +1,6 @@
-﻿namespace KScript.Commands
+﻿using KScript.KScriptTypes.KScriptExceptions;
+
+namespace KScript.Commands
 {
     public class more_less : KScriptCommand
     {
@@ -13,6 +15,12 @@
 
         public override string Calculate()
         {
+
+            if (string.IsNullOrEmpty(ValueA) || string.IsNullOrEmpty(ValueB) || string.IsNullOrEmpty(Operator))
+            {
+                throw new KScriptValidationFail("Value cannot be NULL");
+            }
+
             string vA = KScript().GetStringHandler().Format(ValueA), vB = KScript().GetStringHandler().Format(ValueB);
 
             if (Operator.ToLower() == "mt")

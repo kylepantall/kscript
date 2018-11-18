@@ -1,4 +1,6 @@
-﻿namespace KScript.Commands
+﻿using System;
+
+namespace KScript.Commands
 {
     public class contains : KScriptCommand
     {
@@ -10,6 +12,16 @@
             Arg0 = arg0;
             Arg1 = arg1;
         }
-        public override string Calculate() => ToBoolString(Arg0.Contains(Arg1));
+        public override string Calculate()
+        {
+            try
+            {
+                return ToBoolString(Arg0.Contains(Arg1));
+            } catch (Exception ex)
+            {
+                HandleException(this, ex);
+                return null;
+            }
+        }
     }
 }

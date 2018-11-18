@@ -50,7 +50,7 @@ namespace KScript.Arguments
 
             Out(Contents);
 
-            if (Def(to) == null)
+            if (Def(to) is null)
             {
                 throw new KScriptException("KScriptDefNotFound", string.Format("Definition '{0}' has not been declared", to));
             }

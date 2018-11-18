@@ -23,6 +23,7 @@ namespace KScript.Arguments
             if (Contents != null) Contents.Run();
             return true;
         }
+
         public override void Validate() => throw new KScriptNoValidationNeeded();
     }
 }

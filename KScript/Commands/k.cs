@@ -1,4 +1,5 @@
-﻿using System;
+﻿using KScript.KScriptTypes.KScriptExceptions;
+using System;
 
 namespace KScript.Commands
 {
@@ -12,19 +13,24 @@ namespace KScript.Commands
 
         public override string Calculate()
         {
-            string val = value.ToLower();
-
-            switch (val)
+            if (string.IsNullOrEmpty(value))
             {
-                case "os.version": return Environment.OSVersion.VersionString;
-                case "machine.name": return Environment.MachineName;
-                case "script.path": return ParentContainer.FilePath;
-                case "script.directory": return ParentContainer.FileDirectory;
-                case "username": return Environment.UserName;
-                case "math.pi": return Math.PI.ToString();
-                case "math.e": return Math.E.ToString();
-                case "null": return NULL;
-                default: return ParentContainer.FileDirectory;
+                throw new KScriptValidationFail("Value cannot be null");
+            }
+            else
+            {
+                switch (value.ToLower())
+                {
+                    case "os.version": return Environment.OSVersion.VersionString;
+                    case "machine.name": return Environment.MachineName;
+                    case "script.path": return ParentContainer.FilePath;
+                    case "script.directory": return ParentContainer.FileDirectory;
+                    case "username": return Environment.UserName;
+                    case "math.pi": return Math.PI.ToString();
+                    case "math.e": return Math.E.ToString();
+                    case "null": return NULL;
+                    default: return ParentContainer.FileDirectory;
+                }
             }
         }
     }

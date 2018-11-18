@@ -9,7 +9,7 @@ namespace KScript.Commands
 
         public override string Calculate()
         {
-            if (string.IsNullOrEmpty(value))
+            if (!string.IsNullOrEmpty(value))
             {
                 return ToBoolString(KScriptCommandHandler.HandleCommands(value, KScript()) == NULL);
             }
