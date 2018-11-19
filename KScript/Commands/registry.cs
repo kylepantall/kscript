@@ -12,7 +12,7 @@ namespace KScript.Commands
         {
             try
             {
-                return Registry.GetValue(path, key, string.Empty).ToString()
+                return Registry.GetValue(path, key, string.Empty).ToString();
             }
             catch (System.Exception ex)
             {

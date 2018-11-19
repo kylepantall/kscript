@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 
@@ -15,19 +14,12 @@ namespace KScript.Document
         public IKScriptDocumentNode GetFirst() => Nodes().First();
         public void Run(KScriptContainer container)
         {
-            try
+            foreach (var item in Nodes())
             {
-                foreach (var item in Nodes())
+                if (container.AllowExecution)
                 {
-                    if (container.AllowExecution)
-                    {
-                        item.Run(container, null);
-                    }
+                    item.Run(container, null);
                 }
-            }
-            catch (Exception ex)
-            {
-                container.HandleException(ex);
             }
         }
     }

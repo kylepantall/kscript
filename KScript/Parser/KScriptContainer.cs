@@ -282,6 +282,15 @@ namespace KScript
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Method used to handle exceptions - current purpose is to output the exception message.
+        /// </summary>
+        /// <param name="ex"></param>
+        internal void HandleException(Exception ex)
+        {
+            throw new NotImplementedException();
+        }
+
 
         /// <summary>
         /// Method used to handle exceptions - current purpose is to output the exception message.
@@ -341,7 +350,7 @@ namespace KScript
             {
                 if (defs.ContainsKey(id))
                 {
-                    throw new KScriptException("KScriptDefInUse", string.Format("A def with the id '{0}' already exists.", id));
+                    throw new KScriptDefInUse(string.Format("A def with the id '{0}' already exists.", id));
                 }
                 else
                 {

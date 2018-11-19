@@ -18,8 +18,15 @@ namespace KScript.Document
         {
             if (!Ignore && container.AllowExecution)
             {
-                try { GetValue().Run(); }
-                catch (KScriptTypes.KScriptExceptions.KScriptSkipScriptObject) { }
+                try
+                {
+                    try { GetValue().Run(); }
+                    catch (KScriptTypes.KScriptExceptions.KScriptSkipScriptObject) { }
+                }
+                catch (System.Exception ex)
+                {
+                    container.HandleException(GetValue(), ex);
+                }
             }
         }
         public KScriptDocumentNode(KScriptObject obj) => Value = obj;

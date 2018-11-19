@@ -176,7 +176,14 @@ namespace KScript
             }
             if (obj.RunImmediately)
             {
-                obj.Run();
+                try
+                {
+                    obj.Run();
+                }
+                catch (Exception ex)
+                {
+                    container.HandleException(obj, ex);
+                }
             }
 
             return true;
