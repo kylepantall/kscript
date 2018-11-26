@@ -1,10 +1,10 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
     public class dowhile : KScriptConditional
     {
         public override bool Run() => true;
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }
 }

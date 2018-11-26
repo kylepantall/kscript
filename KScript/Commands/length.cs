@@ -1,4 +1,4 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
@@ -10,7 +10,7 @@ namespace KScript.Commands
         {
             if (string.IsNullOrEmpty(str))
             {
-                throw new KScriptValidationFail("Value cannot be NULL");
+                throw new KScriptValidationFail(this);
             }
             else
             {

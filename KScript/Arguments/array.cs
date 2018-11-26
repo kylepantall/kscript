@@ -1,5 +1,5 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -8,10 +8,31 @@ namespace KScript.Arguments
         [KScriptObjects.KScriptProperty("The unique ID of the array", true)]
         public string id { get; set; }
 
+        [KScriptObjects.KScriptProperty("Property used to define where to create the array from.", false)]
+        public string from { get; set; }
+
+
         public override bool Run()
         {
             List<string> array = new List<string>();
             KScript().ArrayInsert(id, array);
+
+            bool createUsingExisting = !string.IsNullOrEmpty(from);
+
+            if (createUsingExisting)
+            {
+                string val = HandleCommands(from);
+
+                if (ParentContainer.ArraysGet().ContainsKey(val))
+                {
+                    KScript().ArraysGet()[id] = KScript().ArraysGet()[val];
+                }
+                else
+                {
+
+                }
+            }
+
             return true;
         }
 
@@ -20,11 +41,11 @@ namespace KScript.Arguments
         {
             if (string.IsNullOrEmpty(id))
             {
-                throw new KScriptMissingAttribute("No ID has been specified for the array object.");
+                throw new KScriptMissingAttribute(this);
             }
             else
             {
-                throw new KScriptNoValidationNeeded();
+                throw new KScriptNoValidationNeeded(this);
             }
         }
     }

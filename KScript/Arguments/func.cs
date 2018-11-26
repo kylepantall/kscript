@@ -93,6 +93,6 @@ namespace KScript.Arguments
 
         public override string UsageInformation() => "Used to update a value based on its value";
 
-        public override void Validate() => new KScriptTypes.KScriptExceptions.KScriptNoValidationNeeded();
+        public override void Validate() => new KScriptExceptions.KScriptNoValidationNeeded(this);
     }
 }

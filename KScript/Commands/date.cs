@@ -26,7 +26,7 @@ namespace KScript.Commands
             if (!string.IsNullOrWhiteSpace(format))
             {
                 try { return DateTime.Now.Date.ToString(format); }
-                catch (Exception ex) { HandleException(this, ex); }
+                catch (Exception ex) { HandleException(ex, this); }
             }
 
             return DateTime.Now.ToLongDateString();

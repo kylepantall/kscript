@@ -1,5 +1,5 @@
 ﻿using KScript.KScriptObjects;
-using KScript.KScriptTypes.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System.IO;
 
 namespace KScript.Arguments
@@ -27,6 +27,6 @@ namespace KScript.Arguments
 
         public override string UsageInformation() => "Used to write Contents to a file using the properties ('Contents' - text) and ('to' - file path).";
 
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }
 }

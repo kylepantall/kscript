@@ -11,6 +11,6 @@
 
         public override bool Run() => true;
         public override string UsageInformation() => "Allows blocks of script to be executed dynamically.";
-        public override void Validate() => throw new KScriptTypes.KScriptExceptions.KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptExceptions.KScriptNoValidationNeeded(this);
     }
 }

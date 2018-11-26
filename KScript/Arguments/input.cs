@@ -1,6 +1,6 @@
 ﻿using KScript.Handlers;
 using KScript.KScriptObjects;
-using KScript.KScriptTypes.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System;
 
 namespace KScript.Arguments
@@ -79,7 +79,7 @@ namespace KScript.Arguments
         {
             if (type != "string" && type != "number" && string.IsNullOrWhiteSpace(type))
             {
-                throw new KScriptInvalidScriptType();
+                throw new KScriptInvalidScriptType(this);
             }
         }
 

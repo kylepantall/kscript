@@ -13,8 +13,8 @@ namespace KScript.Handlers
 
         public static string HandleCommands(string str, KScriptContainer container)
         {
-            String temp_string = str;
-            //string command_with_params_test = @"\@(?<=(?<open>\()).*(?=(?<close>\)))";
+            string temp_string = str;
+
             string commands_with_params = @"\@(\w+)\((.+)\)";
             string commands_no_params = @"\@(\w+)\(\)";
 

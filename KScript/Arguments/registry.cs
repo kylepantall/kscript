@@ -1,4 +1,4 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 using Microsoft.Win32;
 using System;
 using System.Linq;
@@ -46,11 +46,11 @@ namespace KScript.Arguments
         {
             if (string.IsNullOrWhiteSpace(subkey) || string.IsNullOrWhiteSpace(subkey) || string.IsNullOrWhiteSpace(Contents))
             {
-                throw new KScriptInvalidScriptType();
+                throw new KScriptInvalidScriptType(this);
             }
             else
             {
-                throw new KScriptNoValidationNeeded();
+                throw new KScriptNoValidationNeeded(this);
             }
         }
     }

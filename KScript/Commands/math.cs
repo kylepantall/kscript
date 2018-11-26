@@ -1,5 +1,5 @@
 ﻿using KScript.Handlers;
-using KScript.KScriptTypes.KScriptExceptions;
+using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
@@ -12,7 +12,7 @@ namespace KScript.Commands
         {
             if (string.IsNullOrEmpty(maths))
             {
-                throw new KScriptValidationFail("Value cannot be NULL");
+                throw new KScriptValidationFail(this, "Value cannot be NULL");
             }
             else
             {

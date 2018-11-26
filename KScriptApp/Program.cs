@@ -1,16 +1,16 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Principal;
+using KScript.KScriptExceptions;
 
 namespace KScript
 {
     class Program
     {
-        public static String[] Commands() => new string[] { "-s", "-cai", "-cmds", "-admin", "-colourful" };
+        public static string[] Commands() => new string[] { "-s", "-cai", "-cmds", "-admin", "-colourful" };
 
         public static List<string> GetUsedCommands(string[] cmds) => Commands().Where(i => cmds.Contains(i)).Select(i => i.ToLower()).ToList();
 
@@ -41,7 +41,7 @@ namespace KScript
                 bool clear_after_input = args.Any(i => i.ToLower() == "-cai");
                 bool admin_priv = args.Any(i => i.ToLower() == "-admin");
 
-                String path = args[0];
+                string path = args[0];
 
                 if (admin_priv)
                 {

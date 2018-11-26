@@ -1,5 +1,5 @@
 ﻿using KScript.Handlers;
-using KScript.KScriptTypes.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System;
 using System.IO;
 
@@ -94,14 +94,14 @@ namespace KScript.Arguments
                     case type_options.directory:
                         if (!Directory.Exists(input))
                         {
-                            throw new KScriptDirectoryNotFound(string.Format("Directory '{0}' doesn't exist", input));
+                            throw new KScriptDirectoryNotFound(this, string.Format("Directory '{0}' doesn't exist", input));
                         }
 
                         break;
                     default:
                         if (!File.Exists(input))
                         {
-                            throw new KScriptDirectoryNotFound(string.Format("File '{0}' doesn't exist", input));
+                            throw new KScriptDirectoryNotFound(this, string.Format("File '{0}' doesn't exist", input));
                         }
 
                         break;
@@ -115,7 +115,7 @@ namespace KScript.Arguments
             return true;
         }
 
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
         public override string UsageInformation() => @"Used to obtain a directory or file path from the user.";
     }
 }

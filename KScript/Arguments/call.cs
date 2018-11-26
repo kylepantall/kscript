@@ -21,7 +21,7 @@ namespace KScript.Arguments
                 string[] _params = args.Split(',').Select(i => HandleCommands(i)).ToArray();
 
                 List<string> keys = new List<string>();
-                foreach (var item in ParentContainer.defs)
+                foreach (var item in ParentContainer.GetDefs())
                 {
                     if (item.Key.StartsWith(_method) && item.Key.Contains("."))
                     {
@@ -31,11 +31,11 @@ namespace KScript.Arguments
 
                 for (int i = 0; i < _params.Length; i++)
                 {
-                    ParentContainer.defs[keys[i]].Contents = _params[i];
+                    ParentContainer.GetDefs()[keys[i]].Contents = _params[i];
                 }
             }
 
-            List<IKScriptDocumentNode> nodes = ParentContainer.ObjectStorageContainer.GetMethodCalls(_method);
+            List<IKScriptDocumentNode> nodes = ParentContainer.GetObjectStorageContainer().GetMethodCalls(_method);
             nodes.ForEach(node => node.Run(ParentContainer, args));
 
             return true;
@@ -43,6 +43,6 @@ namespace KScript.Arguments
 
         public override string UsageInformation() => "KScriptObject used to call methods contained using the <method> object";
 
-        public override void Validate() => throw new KScriptTypes.KScriptExceptions.KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptExceptions.KScriptNoValidationNeeded(this);
     }
 }

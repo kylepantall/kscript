@@ -10,7 +10,7 @@
                 foreach (var item in _params)
                 {
                     string variable_name = string.Format("{0}.{1}", name, item);
-                    ParentContainer.defs.Add(variable_name, new def(""));
+                    ParentContainer.AddDef(variable_name, new def(""));
                 }
             }
             return true;

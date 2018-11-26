@@ -1,5 +1,5 @@
 ﻿using KScript.KScriptObjects;
-using KScript.KScriptTypes.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System;
 
 namespace KScript.Arguments
@@ -23,6 +23,6 @@ namespace KScript.Arguments
         }
 
         public override string UsageInformation() => "Awaits for any key input using a prompt to signal the user.";
-        public override void Validate() => new KScriptNoValidationNeeded();
+        public override void Validate() => new KScriptNoValidationNeeded(this);
     }
 }

@@ -8,7 +8,7 @@
         {
             if (string.IsNullOrEmpty(value))
             {
-                throw new KScriptTypes.KScriptExceptions.KScriptValidationFail("Value cannot be NULL");
+                throw new KScriptExceptions.KScriptValidationFail(this);
             }
             else
             {

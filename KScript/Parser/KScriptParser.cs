@@ -1,11 +1,11 @@
-﻿using KScript.Arguments;
-using KScript.Document;
-using KScript.KScriptTypes.KScriptExceptions;
-using KScript.VariableFunctions;
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Xml;
+using KScript.Arguments;
+using KScript.Document;
+using KScript.KScriptExceptions;
+using KScript.VariableFunctions;
 
 namespace KScript
 {
@@ -15,13 +15,12 @@ namespace KScript
 
         public XmlDocument Document { get; set; }
         public KScriptParser() { Document = new XmlDocument(); Properties = new KScriptProperties(); }
-        public KScriptParser(String filename) : this()
+        public KScriptParser(string filename) : this()
         {
-            String xml = File.ReadAllText(filename);
+            string xml = File.ReadAllText(filename);
             FilePath = filename;
 
             string _byteOrderMarkUtf8 = Encoding.UTF8.GetString(Encoding.UTF8.GetPreamble());
-            //if (xml.StartsWith(_byteOrderMarkUtf8)) xml = xml.Remove(0, _byteOrderMarkUtf8.Length);
             Document.LoadXml(xml);
 
             StartScriptTime = DateTime.Now;

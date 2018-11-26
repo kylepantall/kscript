@@ -1,4 +1,4 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 
 namespace KScript
 {
@@ -15,7 +15,7 @@ namespace KScript
 
 
         public override bool Run() => true;
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
         public override string UsageInformation() => @"Used to store an array of KScriptObjects.";
     }
 }

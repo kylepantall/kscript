@@ -1,4 +1,4 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
@@ -18,7 +18,7 @@ namespace KScript.Commands
 
             if (string.IsNullOrEmpty(ValueA) || string.IsNullOrEmpty(ValueB) || string.IsNullOrEmpty(Operator))
             {
-                throw new KScriptValidationFail("Value cannot be NULL");
+                throw new KScriptValidationFail(this, "Value cannot be NULL");
             }
 
             string vA = KScript().GetStringHandler().Format(ValueA), vB = KScript().GetStringHandler().Format(ValueB);

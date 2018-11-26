@@ -1,5 +1,5 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using KScript.KScriptExceptions;
 
 namespace KScript.KScriptObjects
 {
@@ -27,7 +27,7 @@ namespace KScript.KScriptObjects
             return true;
         }
 
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
         public override string UsageInformation() => @"Used to store an array of KScriptObjects.";
     }
 }

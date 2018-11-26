@@ -8,6 +8,6 @@ namespace KScript.Arguments
 
         public override string UsageInformation() => "Used to catch and handle specified exceptions";
 
-        public override void Validate() => new KScriptTypes.KScriptExceptions.KScriptNoValidationNeeded();
+        public override void Validate() => new KScriptExceptions.KScriptNoValidationNeeded(this);
     }
 }

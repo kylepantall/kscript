@@ -1,6 +1,6 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using KScript.KScriptExceptions;
 
 namespace KScript.Document
 {
@@ -36,10 +36,7 @@ namespace KScript.Document
                         {
                             do
                             {
-                                foreach (IKScriptDocumentNode node in Nodes)
-                                {
-                                    node.Run(container, null);
-                                }
+                                Nodes.ForEach(node => node.Run(container, null));
                             }
                             while (obj.ToBool(obj.HandleCommands(obj.condition)));
                         }
@@ -49,12 +46,15 @@ namespace KScript.Document
                     else if (typeof(KScriptObjectLoop).IsAssignableFrom(GetValue().GetType()))
                     {
                         KScriptObjectLoop obj = (KScriptObjectLoop)(GetValue());
+
+                        if (!container.GetDefs().ContainsKey(obj.to))
+                        {
+                            container.AddDef(obj.to, new Arguments.def("0"));
+                        }
+
                         do
                         {
-                            foreach (IKScriptDocumentNode node in Nodes)
-                            {
-                                node.Run(container, null);
-                            }
+                            Nodes.ForEach(node => node.Run(container, null));
 
                             string val = obj.HandleCommands(obj.math);
                             obj.Def(obj.to).Contents = val;
@@ -67,15 +67,19 @@ namespace KScript.Document
                         KScriptMethodWrapper obj = GetValue() as KScriptMethodWrapper;
 
                         //Add the method call to the Object Storage Container
-                        container.ObjectStorageContainer.Add(Global.GlobalIdentifiers.CALLS, obj.name, Nodes);
+                        container.GetObjectStorageContainer().Add(Global.GlobalIdentifiers.CALLS, obj, obj.name, Nodes);
+                    }
+
+                    else if (typeof(KScriptExceptionWrapper).IsAssignableFrom(GetValue().GetType()))
+                    {
+                        KScriptExceptionWrapper obj = GetValue() as KScriptExceptionWrapper;
+
+                        container.GetObjectStorageContainer().Add(Global.GlobalIdentifiers.EXCEPTIONS, obj, obj.type, Nodes);
                     }
 
                     else
                     {
-                        foreach (IKScriptDocumentNode node in Nodes)
-                        {
-                            node.Run(container, null);
-                        }
+                        Nodes.ForEach(node => node.Run(container, null));
                     }
 
                 }

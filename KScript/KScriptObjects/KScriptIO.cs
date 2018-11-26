@@ -1,6 +1,6 @@
-﻿using KScript.Handlers;
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
+using KScript.Handlers;
 
 namespace KScript.KScriptTypes
 {
@@ -21,25 +21,33 @@ namespace KScript.KScriptTypes
         /// <summary>
         /// ParentContainer property used to store the KScriptContainer
         /// </summary>
+
         internal KScriptContainer ParentContainer { get; private set; }
 
-        /// <summary>
-        /// Method used to handle an exception
-        /// </summary>
-        /// <param name="ex">the exception to handle</param>
-        internal void HandleException(KScriptObject obj, Exception ex)
+
+        internal void HandleException(Exception ex, KScriptObject obj = null)
         {
-            ParentContainer.HandleException(obj, ex);
+            if (ParentContainer != null)
+            {
+                if (obj != null)
+                {
+                    ParentContainer.HandleException(obj, ex);
+                }
+                else
+                {
+                    ParentContainer.HandleException(ex);
+                }
+            }
         }
 
-        /// <summary>
-        /// Method used to handle an exception
-        /// </summary>
-        /// <param name="ex">the exception to handle</param>
-        internal void HandleException(KScriptCommand obj, Exception ex)
+        internal void HandleException(Exception ex, KScriptCommand obj)
         {
-            ParentContainer.HandleException(obj, ex);
+            if (ParentContainer != null)
+            {
+                ParentContainer.HandleException(obj, ex);
+            }
         }
+
 
         /// <summary>
         /// Method used to set the ParentContainer property.

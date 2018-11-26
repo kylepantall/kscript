@@ -21,7 +21,7 @@ namespace KScript.Document
                 try
                 {
                     try { GetValue().Run(); }
-                    catch (KScriptTypes.KScriptExceptions.KScriptSkipScriptObject) { }
+                    catch (KScriptExceptions.KScriptSkipScriptObject) { }
                 }
                 catch (System.Exception ex)
                 {

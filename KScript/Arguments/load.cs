@@ -1,4 +1,4 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -29,7 +29,7 @@ namespace KScript.Arguments
             }
             else
             {
-                throw new KScriptNoValidationNeeded();
+                throw new KScriptNoValidationNeeded(this);
             }
         }
     }

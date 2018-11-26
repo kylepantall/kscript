@@ -1,7 +1,7 @@
-﻿using KScript.Document;
-using KScript.Global;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using KScript.Document;
+using KScript.Global;
 
 namespace KScript.KScriptDocument
 {
@@ -9,8 +9,13 @@ namespace KScript.KScriptDocument
     public class KScriptObjectStorageContainer
     {
         private readonly Dictionary<string, Dictionary<string, List<IKScriptDocumentNode>>> Value;
+        private readonly Dictionary<string, object> ObjectStorage;
 
-        public KScriptObjectStorageContainer() => Value = new Dictionary<string, Dictionary<string, List<IKScriptDocumentNode>>>();
+        public KScriptObjectStorageContainer()
+        {
+            Value = new Dictionary<string, Dictionary<string, List<IKScriptDocumentNode>>>();
+            ObjectStorage = new Dictionary<string, object>();
+        }
 
         /**
          * Method used to retrieve a KScriptContainer with the given parent key and unique id. 
@@ -19,9 +24,17 @@ namespace KScript.KScriptDocument
         public List<IKScriptDocumentNode> Get(string parent_key, string uid) => Value[parent_key][uid];
 
         /**
+         * Method used to retrieve a KScriptObject which has been specifically added to the ObjectStorage container for
+         * retrieval. For instance, the object can later be used to retrieve specific details of an operation.
+         */
+        public T GetObjectFromUID<T>(string uid) => (T)ObjectStorage[uid];
+
+        public void AddObjectFromUID(string uid, object obj) => ObjectStorage.Add(uid, obj);
+
+        /**
          * Inserts a value at the parent key, with the unique ID
          */
-        public void Add(string at_parent_key, string uid, List<IKScriptDocumentNode> values)
+        public void Add(string at_parent_key, KScriptObject script_obj, string uid, List<IKScriptDocumentNode> values)
         {
             if (Value.ContainsKey(at_parent_key))
             {
@@ -33,9 +46,9 @@ namespace KScript.KScriptDocument
                 obj.Add(uid, values);
                 Value.Add(at_parent_key, obj);
             }
+
+            ObjectStorage.Add(uid, script_obj);
         }
-
-
 
 
         /**
@@ -44,5 +57,17 @@ namespace KScript.KScriptDocument
          */
         public List<IKScriptDocumentNode> GetMethodCalls(string uid) => Value[GlobalIdentifiers.CALLS][uid];
 
+        public List<IKScriptDocumentNode> GetExceptionHandlers(string uid)
+        {
+            if (Value.ContainsKey(GlobalIdentifiers.EXCEPTIONS))
+            {
+                if (Value[GlobalIdentifiers.EXCEPTIONS].ContainsKey(uid))
+                {
+                    return Value[GlobalIdentifiers.EXCEPTIONS][uid];
+                }
+                else { return new List<IKScriptDocumentNode>(); }
+            }
+            else { return new List<IKScriptDocumentNode>(); }
+        }
     }
 }

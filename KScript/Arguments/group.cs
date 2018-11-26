@@ -1,10 +1,5 @@
 ﻿using KScript.KScriptObjects;
-using KScript.KScriptTypes.KScriptExceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -20,10 +15,14 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            if (Contents != null) Contents.Run();
+            if (Contents != null)
+            {
+                Contents.Run();
+            }
+
             return true;
         }
 
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }
 }

@@ -1,4 +1,4 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 using System;
 
 namespace KScript.Arguments
@@ -42,6 +42,6 @@ namespace KScript.Arguments
 
         public override string UsageInformation() => @"Uses the 'interval' property to determine how many seconds to wait until continuing.";
 
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }
 }

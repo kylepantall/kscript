@@ -1,5 +1,5 @@
 ﻿using KScript.KScriptObjects;
-using KScript.KScriptTypes.KScriptExceptions;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -15,7 +15,7 @@ namespace KScript.Arguments
         {
             if (string.IsNullOrWhiteSpace(Contents))
             {
-                throw new KScriptNoRunMethodImplemented();
+                throw new KScriptNoRunMethodImplemented(this);
             }
             else { Contents = HandleCommands(Contents); }
             return true;
@@ -24,7 +24,7 @@ namespace KScript.Arguments
         {
             if (id.Contains(" ") || id.Contains("$"))
             {
-                throw new KScriptValidationFail("The id cannot contain any spaces or $ symbols.");
+                throw new KScriptValidationFail(this,"The id cannot contain any spaces or $ symbols.");
             }
         }
 

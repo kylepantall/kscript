@@ -1,8 +1,8 @@
-﻿using KScript.KScriptTypes;
+﻿using KScript.KScriptObjects;
 
 namespace KScript
 {
-    public abstract class KScriptCommand : KScriptIO
+    public abstract class KScriptCommand : KScriptBaseObject
     {
         public KScriptCommand(KScriptContainer container) : base(container) { }
         public KScriptCommand() { }

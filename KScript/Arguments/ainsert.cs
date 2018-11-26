@@ -1,4 +1,4 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -15,12 +15,12 @@ namespace KScript.Arguments
             }
             else
             {
-                throw new KScriptArrayNotFound(string.Format("The array with the ID '{0}' was not found.", to));
+                throw new KScriptArrayNotFound(this);
             }
             return true;
         }
 
         public override string UsageInformation() => "Used to insert into an Array with specified ID.";
-        public override void Validate() => new KScriptNoValidationNeeded();
+        public override void Validate() => new KScriptNoValidationNeeded(this);
     }
 }

@@ -1,8 +1,9 @@
-﻿using KScript.Arguments;
-using KScript.Handlers;
-using KScript.KScriptTypes;
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
+using KScript.Arguments;
+using KScript.Handlers;
+using KScript.KScriptExceptions;
+using KScript.KScriptObjects;
 
 namespace KScript
 {
@@ -10,7 +11,7 @@ namespace KScript
     /// KScriptObject used for parsing of commands and arguments.
     /// </summary>
     [ClassInterface(ClassInterfaceType.None)]
-    public abstract class KScriptObject : KScriptIO
+    public abstract class KScriptObject : KScriptBaseObject
     {
         /// <summary>
         /// Initialises a KScriptObject with it's content as an object.
@@ -98,7 +99,7 @@ namespace KScript
                 _id = id.Substring(1);
             }
 
-            return ParentContainer.defs[_id];
+            return ParentContainer.GetDefs()[_id];
         }
 
         /// <summary>
@@ -119,7 +120,19 @@ namespace KScript
                     return null;
                 }
             }
-            set { GetType().GetProperty(propertyName).SetValue(this, value, null); }
+            set
+            {
+                if (GetType().GetProperty(propertyName) != null)
+                {
+                    GetType().GetProperty(propertyName).SetValue(this, value, null);
+                }
+                else
+                {
+                    Exception ex = new KScriptMissingAttribute(this);
+                    Console.WriteLine(string.Format("KScriptObject '{0}' threw the error: {1}\nTry looking at the KScript help documentation.", GetType().Name, ex.Message));
+                    Environment.Exit(0);
+                }
+            }
         }
 
         /// <summary>

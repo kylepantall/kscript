@@ -19,7 +19,7 @@ namespace KScript
 
 
             //if (Regex.IsMatch(Contents))
-            ParentContainer.defs.ToList().ForEach(item => temp_string = Regex.Replace(temp_string, string.Format(@"\$\b{0}\b", item.Key), item.Value.Contents, RegexOptions.IgnoreCase));
+            ParentContainer.GetDefs().ToList().ForEach(item => temp_string = Regex.Replace(temp_string, string.Format(@"\$\b{0}\b", item.Key), item.Value.Contents, RegexOptions.IgnoreCase));
 
 
 

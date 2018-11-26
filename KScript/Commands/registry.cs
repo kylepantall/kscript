@@ -16,7 +16,7 @@ namespace KScript.Commands
             }
             catch (System.Exception ex)
             {
-                HandleException(this, ex);
+                HandleException(ex, this);
                 return null;
             }
         }

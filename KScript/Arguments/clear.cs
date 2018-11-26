@@ -1,5 +1,5 @@
 ﻿using System;
-using KScript.KScriptTypes.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,6 +19,6 @@ namespace KScript.Arguments
             return true;
         }
         public override string UsageInformation() => "Used to clear the console.";
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }
 }

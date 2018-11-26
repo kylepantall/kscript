@@ -19,7 +19,7 @@ namespace KScript.Commands
                 return ToBoolString(Arg0.Contains(Arg1));
             } catch (Exception ex)
             {
-                HandleException(this, ex);
+                HandleException(ex, this);
                 return null;
             }
         }

@@ -1,5 +1,5 @@
 ﻿using KScript.KScriptObjects;
-using KScript.KScriptTypes.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,6 +34,6 @@ namespace KScript.Arguments
 
         public override string UsageInformation() => "Used to only run the inner KScriptObjects if the condition is true.";
 
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }
 }

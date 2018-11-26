@@ -1,14 +1,14 @@
-﻿using KScript.Arguments;
-using KScript.Handlers;
-using KScript.KScriptDocument;
-using KScript.KScriptObjects;
-using KScript.KScriptTypes.KScriptExceptions;
-using System;
+﻿using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using KScript.Arguments;
+using KScript.Handlers;
+using KScript.KScriptDocument;
+using KScript.KScriptExceptions;
+using KScript.KScriptObjects;
 
 namespace KScript
 {
@@ -30,10 +30,23 @@ namespace KScript
         internal string FileDirectory { get; set; }
 
         //Dictionary list of Defs used for retrieval of defs within the script.
-        internal IDictionary<string, def> defs { get; set; }
+        private IDictionary<string, def> defs { get; set; }
+
+        /// <summary>
+        /// Method used to retrieve defs dictionary.
+        /// </summary>
+        /// <returns>All defs as a dictionary</returns>
+        internal IDictionary<string, def> GetDefs() => defs;
+
+        /// <summary>
+        /// Method used to add def to def dictionary
+        /// </summary>
+        /// <param name="key">Key to use</param>
+        /// <param name="def">Def object to add</param>
+        internal void AddDef(string key, def def) => defs.Add(key, def);
 
         //Used to store arrays
-        internal IDictionary<string, List<string>> arrays { get; set; }
+        private IDictionary<string, List<string>> arrays { get; set; }
 
         //Dictionary list of Types of loaded KScript Objects.
         internal Dictionary<string, Type> LoadedKScriptObjects { get; set; }
@@ -66,7 +79,8 @@ namespace KScript
         public string GetFileDirectory() => FileDirectory;
 
 
-        internal KScriptObjectStorageContainer ObjectStorageContainer;
+        private readonly KScriptObjectStorageContainer ObjectStorageContainer;
+        public KScriptObjectStorageContainer GetObjectStorageContainer() => ObjectStorageContainer;
 
         //Method to halt KScript parsing.
         public bool Stop() { AllowExecution = false; return AllowExecution; }
@@ -277,10 +291,7 @@ namespace KScript
         /// Method used to handle exceptions - current purpose is to output the exception message.
         /// </summary>
         /// <param name="ex"></param>
-        internal void HandleException(KScriptObject obj, Exception ex)
-        {
-            throw new NotImplementedException();
-        }
+        internal void HandleException(KScriptObject obj, Exception ex) => HandleException(ex);
 
         /// <summary>
         /// Method used to handle exceptions - current purpose is to output the exception message.
@@ -288,7 +299,16 @@ namespace KScript
         /// <param name="ex"></param>
         internal void HandleException(Exception ex)
         {
-            throw new NotImplementedException();
+            var items = GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name);
+
+            if (items.Count > 0 && items != null)
+            {
+                items.ForEach(i => i.Run(this, null));
+            }
+            else
+            {
+                Out(ex);
+            }
         }
 
 
@@ -296,10 +316,7 @@ namespace KScript
         /// Method used to handle exceptions - current purpose is to output the exception message.
         /// </summary>
         /// <param name="ex"></param>
-        internal void HandleException(KScriptCommand obj, Exception ex)
-        {
-            throw new NotImplementedException();
-        }
+        internal void HandleException(KScriptCommand obj, Exception ex) => HandleException(ex);
 
         /// <summary>
         /// Used to insert into the array with specified ID
@@ -350,7 +367,8 @@ namespace KScript
             {
                 if (defs.ContainsKey(id))
                 {
-                    throw new KScriptDefInUse(string.Format("A def with the id '{0}' already exists.", id));
+                    var ex = new KScriptDefInUse(defs[id]);
+                    HandleException(ex);
                 }
                 else
                 {

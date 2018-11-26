@@ -16,6 +16,6 @@
         }
 
         public override string UsageInformation() => "Used to update the value stored within a def.";
-        public override void Validate() => throw new KScriptTypes.KScriptExceptions.KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptExceptions.KScriptNoValidationNeeded(this);
     }
 }

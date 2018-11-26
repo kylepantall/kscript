@@ -71,10 +71,12 @@
     <Compile Include="Arguments\dowhile.cs" />
     <Compile Include="Arguments\load.cs" />
     <Compile Include="Arguments\method.cs" />
+    <Compile Include="Arguments\onexception.cs" />
     <Compile Include="Arguments\picker.cs" />
     <Compile Include="Arguments\ref.cs" />
     <Compile Include="Arguments\registry.cs" />
     <Compile Include="Arguments\run.cs" />
+    <Compile Include="Arguments\throw.cs" />
     <Compile Include="Arguments\update.cs" />
     <Compile Include="Arguments\wait.cs" />
     <Compile Include="Arguments\func.cs" />
@@ -94,6 +96,7 @@
     <Compile Include="Commands\more_less.cs" />
     <Compile Include="Commands\not.cs" />
     <Compile Include="Commands\null.cs" />
+    <Compile Include="Commands\object.cs" />
     <Compile Include="Commands\random.cs" />
     <Compile Include="Commands\read_text.cs" />
     <Compile Include="Commands\registry.cs" />
@@ -103,12 +106,15 @@
     <Compile Include="GlobalValues\Global.cs" />
     <Compile Include="GlobalValues\This.cs" />
     <Compile Include="Handlers\KScriptArithmeticHandler.cs" />
+    <Compile Include="Handlers\KScriptArrayParser.cs" />
     <Compile Include="Handlers\KScriptBoolHandler.cs" />
     <Compile Include="Handlers\KScriptCommandHandler.cs" />
     <Compile Include="Handlers\KScriptStringHandler.cs" />
     <Compile Include="Handlers\KScriptVariableHandler.cs" />
+    <Compile Include="KScriptContainerObjects\KScriptExceptionWrapper.cs" />
     <Compile Include="KScriptContainerObjects\KScriptMethodWrapper.cs" />
     <Compile Include="KScriptDocument\KScriptObjectStorageContainer.cs" />
+    <Compile Include="KScriptObjects\KScriptBaseObject.cs" />
     <Compile Include="KScriptObjects\KScriptNoInnerObjects.cs" />
     <Compile Include="KScriptObjects\KScriptAcceptedOptions.cs" />
     <Compile Include="KScriptObjects\KScriptExample.cs" />

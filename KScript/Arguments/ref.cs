@@ -1,4 +1,4 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -43,6 +43,6 @@ namespace KScript.Arguments
         }
 
         public override string UsageInformation() => @"Used to reference argument extensions for KScript.";
-        public override void Validate() => throw new KScriptNoValidationNeeded();
+        public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }
 }

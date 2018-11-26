@@ -1,6 +1,6 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
@@ -16,7 +16,7 @@ namespace KScript.Commands
 
                 if (array is null)
                 {
-                    throw new KScriptArrayNotFound(string.Format("Array with the ID '{0}' not found...", id));
+                    throw new KScriptArrayNotFound(this);
                 }
                 else
                 {
@@ -26,7 +26,7 @@ namespace KScript.Commands
             }
             catch (Exception ex)
             {
-                HandleException(this, ex);
+                HandleException(ex, this);
                 return null;
             }
         }

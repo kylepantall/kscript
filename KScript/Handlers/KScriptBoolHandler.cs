@@ -1,5 +1,5 @@
-﻿using KScript.KScriptTypes.KScriptExceptions;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
+using KScript.KScriptExceptions;
 
 namespace KScript.Handlers
 {
@@ -26,7 +26,7 @@ namespace KScript.Handlers
             }
             else
             {
-                throw new KScriptBoolInvalid(string.Format("Bool operator: '{0}' is invalid", val));
+                throw new KScriptBoolInvalid();
             }
         }
     }
