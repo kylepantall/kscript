@@ -23,7 +23,7 @@ namespace KScript
         /// Initialises a KScriptObject with it's content as a string.
         /// </summary>
         /// <param name="Contents">Contents of KScript object.</param>
-        public KScriptObject(String Contents) { }
+        public KScriptObject(string Contents) { }
 
         /// <summary>
         /// Initialises a KScriptObject without inner objects (no content).

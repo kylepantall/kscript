@@ -2,9 +2,10 @@
 
 namespace KScript.VariableFunctions
 {
-    class upper : IVariableFunction
+    public class upper : IVariableFunction
     {
-        public string Evaluate(string value) => value.ToUpper();
-        public bool IsAccepted(string value) => new Regex("^[a-zA-Z0-9]*$").IsMatch(value);
+        public upper(KScriptContainer container, string variable_id) : base(container, variable_id) { }
+        public override string Evaluate(params string[] args) => GetDef().Contents.ToUpper();
+        public override bool IsAccepted() => new Regex("^.+$").IsMatch(GetDef().Contents);
     }
 }

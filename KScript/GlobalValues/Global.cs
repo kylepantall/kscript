@@ -16,7 +16,11 @@
         public const string CALLS = "calls";
         public const string EXCEPTIONS = "exceptions";
 
-        public const string VARIABLE_NO_POINTERS = @"\$\b\S+\b";
-        public const string VARIABLE_POINTERS = @"\$(\b\S+\b)\-\>(\w+)";
+        public const string VARIABLE_NO_POINTERS = @"\$\b\S+\b(?!\-\>)";
+        public const string VARIABLE_POINTERS = @"\$(\w+)(?:\-\>)(\w+)\(\)";
+
+
+        //public const string SPLIT_ARRAY_EXPRESSION = @"(?<!,[^(]+\([^)]+),";
+        public const string ARRAY_CHECK_EXPRESSION = @"("".*?""|[^"",\s]+)(?=\s*,|\s*$)";
     }
 }

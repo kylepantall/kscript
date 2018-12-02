@@ -14,7 +14,7 @@ namespace KScript.Handlers
         public string Format(string val, params string[] args)
         {
             string tmp_string = val;
-            tmp_string = String.Format(val, args);
+            tmp_string = string.Format(val, args);
             tmp_string = Regex.Replace(tmp_string, @"\\n", Environment.NewLine);
 
             if (tmp_string.StartsWith("'") && tmp_string.EndsWith("'"))

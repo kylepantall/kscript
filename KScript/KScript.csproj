@@ -42,6 +42,7 @@
       <HintPath>..\packages\MathParser.org-mXparser.4.2.1\lib\net461\MathParser.org-mXparser.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Windows.Forms" />
@@ -52,6 +53,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Arguments\aecho.cs" />
     <Compile Include="Arguments\ainsert.cs" />
     <Compile Include="Arguments\anykey.cs" />
     <Compile Include="Arguments\array.cs" />
@@ -77,6 +79,7 @@
     <Compile Include="Arguments\registry.cs" />
     <Compile Include="Arguments\run.cs" />
     <Compile Include="Arguments\throw.cs" />
+    <Compile Include="Arguments\try.cs" />
     <Compile Include="Arguments\update.cs" />
     <Compile Include="Arguments\wait.cs" />
     <Compile Include="Arguments\func.cs" />
@@ -106,9 +109,10 @@
     <Compile Include="GlobalValues\Global.cs" />
     <Compile Include="GlobalValues\This.cs" />
     <Compile Include="Handlers\KScriptArithmeticHandler.cs" />
-    <Compile Include="Handlers\KScriptArrayParser.cs" />
+    <Compile Include="Handlers\KScriptArraySplitHandler.cs" />
     <Compile Include="Handlers\KScriptBoolHandler.cs" />
     <Compile Include="Handlers\KScriptCommandHandler.cs" />
+    <Compile Include="Handlers\KScriptReplacer.cs" />
     <Compile Include="Handlers\KScriptStringHandler.cs" />
     <Compile Include="Handlers\KScriptVariableHandler.cs" />
     <Compile Include="KScriptContainerObjects\KScriptExceptionWrapper.cs" />
@@ -136,6 +140,9 @@
     <Compile Include="KScriptObjects\KScriptObject.cs" />
     <Compile Include="KScriptContainerObjects\KScriptConditional.cs" />
     <Compile Include="VariableFunctions\IVariableFunction.cs" />
+    <Compile Include="VariableFunctions\lower.cs" />
+    <Compile Include="VariableFunctions\reverse.cs" />
+    <Compile Include="VariableFunctions\toarray.cs" />
     <Compile Include="VariableFunctions\upper.cs" />
   </ItemGroup>
   <ItemGroup>

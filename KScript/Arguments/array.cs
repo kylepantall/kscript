@@ -1,15 +1,22 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using KScript.Handlers;
 using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
     public class array : KScriptObject
     {
+        public array(string Contents) { this.Contents = Contents; }
+
         [KScriptObjects.KScriptProperty("The unique ID of the array", true)]
         public string id { get; set; }
 
         [KScriptObjects.KScriptProperty("Property used to define where to create the array from.", false)]
         public string from { get; set; }
+
+        [KScriptObjects.KScriptProperty("Used to define how the array string should be split", false)]
+        public string delimiter { get; set; } = ",";
 
 
         public override bool Run()
@@ -29,8 +36,22 @@ namespace KScript.Arguments
                 }
                 else
                 {
-
+                    throw new KScriptArrayNotFound(this,
+                        string.Format("The array '{0}' was not found.", val));
                 }
+            }
+
+
+            try
+            {
+                if (!string.IsNullOrEmpty(Contents))
+                {
+                    KScriptArraySplitHandler.Split(Contents, string.IsNullOrEmpty(delimiter) ? "," : delimiter).ForEach(value => KScript().ArrayGet(id).Add(value));
+                }
+            }
+            catch (Exception)
+            {
+                throw new KScriptException("Failture to create array using contents. Ensure values are seperated using ','");
             }
 
             return true;

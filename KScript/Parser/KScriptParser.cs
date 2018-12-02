@@ -5,7 +5,6 @@ using System.Xml;
 using KScript.Arguments;
 using KScript.Document;
 using KScript.KScriptExceptions;
-using KScript.VariableFunctions;
 
 namespace KScript
 {
@@ -128,19 +127,15 @@ namespace KScript
             }
         }
 
-        public static IVariableFunction GetVariableFunction(Type type, string param = null) => HasDefaultConstructor(type) ? (IVariableFunction)Activator.CreateInstance(type) : (IVariableFunction)Activator.CreateInstance(type, param);
-        public Type GetVariableType(string name, KScriptContainer container) => container.LoadedKScriptObjects.ContainsKey(name) ? container.LoadedKScriptObjects[name] : null;
-        public IVariableFunction GetVariableFunction(string variable_name, KScriptContainer container)
+        public static IVariableFunction GetVariableFunction(Type type, KScriptContainer container, string def_id) => (IVariableFunction)Activator.CreateInstance(type, container, def_id);
+        public Type GetVariableType(string variable_func) => KScriptContainer.LoadedVariableFunctions.ContainsKey(variable_func) ? KScriptContainer.LoadedVariableFunctions[variable_func] : null;
+
+        public IVariableFunction GetVariableFunction(string variable_id,
+            string variable_func,
+            KScriptContainer container)
         {
-            Type _type = GetVariableType(variable_name, container);
-            if (_type != null)
-            {
-                return GetVariableFunction(_type, null);
-            }
-            else
-            {
-                return null;
-            }
+            Type _type = GetVariableType(variable_func);
+            return _type != null ? GetVariableFunction(_type, KScriptContainer, variable_id) : null;
         }
 
         public bool PrepareProperties(KScriptObject obj, XmlNode item, KScriptContainer container)

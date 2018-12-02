@@ -100,8 +100,10 @@ namespace KScript
                     select t;
 
 
-            IndentedTextWriter indentedTextWriter = new IndentedTextWriter(Console.Out);
-            indentedTextWriter.Indent = 2;
+            IndentedTextWriter indentedTextWriter = new IndentedTextWriter(Console.Out)
+            {
+                Indent = 2
+            };
 
             foreach (var t in q.ToList())
             {
@@ -213,7 +215,6 @@ namespace KScript
             ObjectStorageContainer = new KScriptObjectStorageContainer();
             LoadedVariableFunctions = new Dictionary<string, Type>();
         }
-
 
         /// <summary>
         /// Allows any KScript Object to handle internal commands and requests.
