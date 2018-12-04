@@ -44,7 +44,10 @@ namespace KScript
             }
 
             FilePath = location;
+
+            Document.PreserveWhitespace = true;
             Document.Load(location);
+
             StartScriptTime = DateTime.Now;
         }
 
@@ -151,23 +154,29 @@ namespace KScript
             if (typeof(def).IsAssignableFrom(obj.GetType())) { container[((def)obj).id] = obj as def; }
             if (typeof(defm).IsAssignableFrom(obj.GetType()))
             {
-                defm _obj = ((defm)obj);
+                defm _obj = (defm)obj;
                 string[] ids = _obj.ids.Split(',');
-                foreach (var id in ids)
+                foreach (string id in ids)
                 {
                     container[id] = new def(_obj.Contents);
                 }
             }
 
             obj.Init(container);
-            try { obj.Validate(); }
-            catch (KScriptValidationException ex)
+
+
+            if (obj.ValidationType != KScriptObject.ValidationTypes.DURING_PARSING)
             {
-                if (typeof(KScriptInvalidScriptType).IsAssignableFrom(ex.GetType()))
+                try { obj.Validate(); }
+                catch (KScriptValidationException ex)
                 {
-                    return false;
+                    if (typeof(KScriptInvalidScriptType).IsAssignableFrom(ex.GetType()))
+                    {
+                        return false;
+                    }
                 }
             }
+
             if (obj.RunImmediately)
             {
                 try

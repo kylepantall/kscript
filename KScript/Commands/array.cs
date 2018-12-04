@@ -15,7 +15,7 @@ namespace KScript.Commands
         {
             try
             {
-                return KScript().ArrayGet(id)[int.Parse(index)];
+                return KScript().ArrayGet(this, id)[int.Parse(index)];
             }
             catch (Exception ex)
             {

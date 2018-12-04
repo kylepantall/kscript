@@ -24,6 +24,7 @@
     <WarningLevel>4</WarningLevel>
     <DocumentationFile>
     </DocumentationFile>
+    <NoWarn>IDE1006</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -54,6 +55,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Arguments\aecho.cs" />
+    <Compile Include="Arguments\afor.cs" />
     <Compile Include="Arguments\ainsert.cs" />
     <Compile Include="Arguments\anykey.cs" />
     <Compile Include="Arguments\array.cs" />
@@ -115,6 +117,7 @@
     <Compile Include="Handlers\KScriptReplacer.cs" />
     <Compile Include="Handlers\KScriptStringHandler.cs" />
     <Compile Include="Handlers\KScriptVariableHandler.cs" />
+    <Compile Include="KScriptContainerObjects\KScriptArrayLoop.cs" />
     <Compile Include="KScriptContainerObjects\KScriptExceptionWrapper.cs" />
     <Compile Include="KScriptContainerObjects\KScriptMethodWrapper.cs" />
     <Compile Include="KScriptDocument\KScriptObjectStorageContainer.cs" />
@@ -126,6 +129,7 @@
     <Compile Include="KScriptObjects\KScriptObjectException.cs" />
     <Compile Include="KScriptContainerObjects\KScriptObjectLoop.cs" />
     <Compile Include="KScriptObjects\KScriptProperty.cs" />
+    <Compile Include="KScriptObjects\KScriptValidator.cs" />
     <Compile Include="Parser\KScriptContainer.cs" />
     <Compile Include="KScriptDocument\KScriptDocument.cs" />
     <Compile Include="KScriptDocument\KScriptDocumentCollectionNode.cs" />
@@ -141,8 +145,10 @@
     <Compile Include="KScriptContainerObjects\KScriptConditional.cs" />
     <Compile Include="VariableFunctions\IVariableFunction.cs" />
     <Compile Include="VariableFunctions\lower.cs" />
+    <Compile Include="VariableFunctions\paragraph.cs" />
     <Compile Include="VariableFunctions\reverse.cs" />
     <Compile Include="VariableFunctions\toarray.cs" />
+    <Compile Include="VariableFunctions\trim.cs" />
     <Compile Include="VariableFunctions\upper.cs" />
   </ItemGroup>
   <ItemGroup>

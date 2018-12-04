@@ -22,7 +22,15 @@ namespace KScript.Document
                 if (GetValue() != null)
                 {
                     //Try and run, if can continue save this value to field @continue.
-                    try { @continue = GetValue().Run(); } catch (KScriptSkipScriptObject) { }
+                    try
+                    {
+                        if (GetValue().ValidationType != KScriptObject.ValidationTypes.BEFORE_PARSING)
+                        {
+                            GetValue().Validate();
+                        }
+                        @continue = GetValue().Run();
+                    }
+                    catch (KScriptSkipScriptObject) { }
                 }
 
 

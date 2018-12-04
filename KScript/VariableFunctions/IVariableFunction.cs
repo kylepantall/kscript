@@ -1,4 +1,5 @@
-﻿using KScript.Arguments;
+﻿using System;
+using KScript.Arguments;
 using KScript.KScriptObjects;
 
 namespace KScript
@@ -18,7 +19,19 @@ namespace KScript
         /// Used to retrieve the variable using the function.
         /// </summary>
         /// <returns></returns>
-        public def GetDef() => ParentContainer.GetDefs()[Variable_ID];
+        public def GetDef()
+        {
+            if (ParentContainer.GetDefs().ContainsKey(Variable_ID))
+            {
+                return ParentContainer.GetDefs()[Variable_ID];
+            }
+            else
+            {
+                Exception ex = new KScriptExceptions.KScriptDefNotFound(this, string.Format("The Def '{0}' could not be found.", Variable_ID));
+                HandleException(ex);
+                return null;
+            }
+        }
 
         /// <summary>
         /// Evaluate the result based on the input of the given variable [value].

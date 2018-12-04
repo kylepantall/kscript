@@ -28,10 +28,10 @@ namespace KScript.Handlers
 
         public string Format(string val)
         {
-            if (!string.IsNullOrWhiteSpace(val))
+            if (!string.IsNullOrEmpty(val))
             {
                 string tmp_string = val;
-                tmp_string = String.Format(val);
+                tmp_string = string.Format(val);
                 tmp_string = Regex.Replace(tmp_string, @"\\n", Environment.NewLine);
 
                 if (tmp_string.StartsWith("'") && tmp_string.EndsWith("'"))

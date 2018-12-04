@@ -86,7 +86,7 @@ namespace KScript.KScriptTypes
         /// For null properties and values
         /// </summary>
         /// <returns>NULL</returns>
-        public string NULL => Global.This.NULL;
+        public string NULL => Global.Values.NULL;
 
 
         public void Out() => Console.Out.WriteLine();

@@ -20,7 +20,14 @@ namespace KScript.Document
             {
                 try
                 {
-                    try { GetValue().Run(); }
+                    try
+                    {
+                        if (GetValue().ValidationType != KScriptObject.ValidationTypes.BEFORE_PARSING)
+                        {
+                            GetValue().Validate();
+                        }
+                        GetValue().Run();
+                    }
                     catch (KScriptExceptions.KScriptSkipScriptObject) { }
                 }
                 catch (System.Exception ex)

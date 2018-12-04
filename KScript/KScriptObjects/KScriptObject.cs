@@ -13,6 +13,30 @@ namespace KScript
     [ClassInterface(ClassInterfaceType.None)]
     public abstract class KScriptObject : KScriptBaseObject
     {
+
+        public enum ValidationTypes
+        {
+            /// <summary>
+            /// Defines that validation should occur before parsing this KScript Object.
+            /// </summary>
+            BEFORE_PARSING,
+
+            /// <summary>
+            /// Defines that validation should occur as this KScript Object is parsed.
+            /// </summary>
+            DURING_PARSING,
+
+            /// <summary>
+            /// Defines that validation should occur before and during the parsing of this KScriptObject.
+            /// </summary>
+            BOTH
+        }
+
+        /// <summary>
+        /// Defines when validation should occur.
+        /// </summary>
+        public ValidationTypes ValidationType { get; set; } = ValidationTypes.BEFORE_PARSING;
+
         /// <summary>
         /// Initialises a KScriptObject with it's content as an object.
         /// </summary>
@@ -56,35 +80,6 @@ namespace KScript
         /// <param name="value">Value to handle commands from.</param>
         /// <returns>String with handled commands</returns>
         public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(value), ParentContainer);
-
-        /// <summary>
-        /// The script types
-        /// </summary>
-        public enum ScriptType
-        {
-            /// <summary>
-            /// The script object contains several objects.
-            /// </summary>
-            ENUMERABLE,
-            /// <summary>
-            /// The script object is used to define properties or values.
-            /// </summary>
-            DEF,
-            /// <summary>
-            /// The script object is finite and does not contain several objects.
-            /// </summary>
-            OBJECT
-        }
-
-        /// <summary>
-        /// Returns the type of script object.
-        /// </summary>
-        /// <returns>Script type</returns>
-        public ScriptType GetScriptObjectType()
-        {
-            bool isEnumerable = typeof(KScriptConditional).IsAssignableFrom(GetType());
-            return isEnumerable ? ScriptType.ENUMERABLE : (typeof(def).IsAssignableFrom(GetType()) ? ScriptType.DEF : ScriptType.OBJECT);
-        }
 
         /// <summary>
         /// Method used to retrieve def objects with specified id.
@@ -142,7 +137,8 @@ namespace KScript
         public void Init(KScriptContainer container) => SetContainer(container);
 
         /// <summary>
-        /// Validation code to ensure KScriptObject is correctly validated, throw KScriptInvalidScriptType or KScriptNoValidationNeeded
+        /// Validation code to ensure KScriptObject is correctly validated, throw KScriptInvalidScriptType or KScriptNoValidationNeeded.
+        /// For correct validation, use a <see cref="KScriptValidator"/> to handle appropraite exceptions and property validations.
         /// </summary>
         abstract public void Validate();
 

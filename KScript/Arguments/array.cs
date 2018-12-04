@@ -46,7 +46,7 @@ namespace KScript.Arguments
             {
                 if (!string.IsNullOrEmpty(Contents))
                 {
-                    KScriptArraySplitHandler.Split(Contents, string.IsNullOrEmpty(delimiter) ? "," : delimiter).ForEach(value => KScript().ArrayGet(id).Add(value));
+                    KScriptArraySplitHandler.Split(Contents, string.IsNullOrEmpty(delimiter) ? "," : delimiter).ForEach(value => KScript().ArrayGet(this, id).Add(value));
                 }
             }
             catch (Exception)

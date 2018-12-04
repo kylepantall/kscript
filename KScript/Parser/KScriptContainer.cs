@@ -292,7 +292,7 @@ namespace KScript
         /// Method used to handle exceptions - current purpose is to output the exception message.
         /// </summary>
         /// <param name="ex"></param>
-        internal void HandleException(KScriptObject obj, Exception ex) => HandleException(ex);
+        internal void HandleException(KScriptBaseObject obj, Exception ex) => HandleException(new KScriptException(obj, ex.Message));
 
         /// <summary>
         /// Method used to handle exceptions - current purpose is to output the exception message.
@@ -308,7 +308,15 @@ namespace KScript
             }
             else
             {
-                Out(ex);
+                if (typeof(KScriptException).IsAssignableFrom(ex.GetType()))
+                {
+                    KScriptException kex = (KScriptException)ex;
+                    Out(string.Format("[error ~{0}: {2}] : {1}\n", kex.GetExceptionType(), kex.Message, DateTime.Now.ToShortTimeString()));
+                }
+                else
+                {
+                    Out(string.Format("[error ~unknown:{0}] {1}\n", DateTime.Now.ToShortTimeString(), ex.Message));
+                }
             }
         }
 
@@ -331,7 +339,25 @@ namespace KScript
         /// </summary>
         /// <param name="id">ID to retrieve array</param>
         /// <returns>Array of strings</returns>
-        public List<string> ArrayGet(string id) => arrays[id];
+        public List<string> ArrayGet(KScriptBaseObject obj, string id)
+        {
+            try
+            {
+                if (arrays.ContainsKey(id))
+                {
+                    return arrays[id];
+                }
+                else
+                {
+                    throw new KScriptDefNotFound(obj, string.Format("The Array '{0}' does not exist.", id));
+                }
+            }
+            catch (Exception ex)
+            {
+                HandleException(ex);
+                return null;
+            }
+        }
 
 
         /// <summary>

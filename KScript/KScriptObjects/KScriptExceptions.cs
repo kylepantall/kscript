@@ -9,16 +9,19 @@ namespace KScript.KScriptExceptions
     [Serializable]
     public class KScriptException : Exception
     {
-        public string ExceptionType;
+        private string ExceptionType;
 
         public KScriptBaseObject KScriptObject { get; set; }
 
         public KScriptException() { }
         public KScriptException(KScriptBaseObject obj) : base() { KScriptObject = obj; }
+
         public KScriptException(string exception_type, string message) : base(message)
         {
             ExceptionType = exception_type;
         }
+
+        public string GetExceptionType() => KScriptObject.GetType().Name;
 
         public KScriptException(string message) : base(message)
         {

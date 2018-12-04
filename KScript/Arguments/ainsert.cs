@@ -9,9 +9,9 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            if (KScript().ArrayGet(to) != null)
+            if (KScript().ArrayGet(this, to) != null)
             {
-                KScript().ArrayGet(to).Add(HandleCommands(Contents));
+                KScript().ArrayGet(this, to).Add(HandleCommands(Contents));
             }
             else
             {

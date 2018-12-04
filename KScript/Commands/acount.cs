@@ -12,7 +12,7 @@ namespace KScript.Commands
         {
             try
             {
-                List<string> array = KScript().ArrayGet(id);
+                List<string> array = KScript().ArrayGet(this, id);
 
                 if (array is null)
                 {
@@ -20,7 +20,7 @@ namespace KScript.Commands
                 }
                 else
                 {
-                    string count = KScript().ArrayGet(id).Count.ToString();
+                    string count = KScript().ArrayGet(this, id).Count.ToString();
                     return count;
                 }
             }

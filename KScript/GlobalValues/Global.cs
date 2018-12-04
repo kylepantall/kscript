@@ -7,6 +7,10 @@
         public const int Millisecond = 1;
     }
 
+    static class Values
+    {
+        public const string NULL = "NULL";
+    }
 
     static class GlobalIdentifiers
     {

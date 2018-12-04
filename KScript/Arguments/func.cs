@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace KScript.Arguments
@@ -30,6 +31,9 @@ namespace KScript.Arguments
             string ifMatchFunction = @"(\$=)(.+\:.+)";
             string ifEqualsThenAdd = @"(\$\+=)(.+\:.+)";
             string ifThenRandomValue = @"(\$\?\?=)(.+|.+\,)";
+
+            //$#=[number of repetitions,value]
+            string repeatFunc = @"\[([0-9]+)\,([^]]+)\]+";
 
             Regex reg = new Regex(ifMatchFunction);
 
@@ -87,6 +91,23 @@ namespace KScript.Arguments
                 string[] Expression = _expression.Split(',');
                 int count = Expression.Count();
                 Def(to).Contents = Expression[rnd.Next(0, count)];
+            }
+            else if (exp.StartsWith("$#=") && Regex.IsMatch(exp, repeatFunc))
+            {
+                //Group 1 is repetition, group 2 is value to repeat
+
+                StringBuilder builder = new StringBuilder();
+                MatchCollection matches = Regex.Matches(exp, repeatFunc);
+                foreach (Match match in matches.Cast<Match>())
+                {
+                    int repeat = int.Parse(match.Groups[1].Value);
+                    string value = HandleCommands(match.Groups[2].Value);
+                    for (int i = 0; i < repeat; i++)
+                    {
+                        builder.Append(value);
+                    }
+                }
+                Def(to).Contents = builder.ToString();
             }
             return true;
         }
