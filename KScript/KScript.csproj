@@ -89,12 +89,12 @@
     <Compile Include="Arguments\onexception.cs" />
     <Compile Include="Arguments\picker.cs" />
     <Compile Include="Arguments\ref.cs" />
-    <Compile Include="Arguments\refreshHTML.cs" />
     <Compile Include="Arguments\registry.cs" />
     <Compile Include="Arguments\run.cs" />
     <Compile Include="Arguments\throw.cs" />
     <Compile Include="Arguments\try.cs" />
     <Compile Include="Arguments\update.cs" />
+    <Compile Include="Arguments\updateContent.cs" />
     <Compile Include="Arguments\wait.cs" />
     <Compile Include="Arguments\func.cs" />
     <Compile Include="Arguments\write.cs" />
@@ -117,6 +117,7 @@
     <Compile Include="Commands\if.cs" />
     <Compile Include="Commands\ifnull.cs" />
     <Compile Include="Commands\k.cs" />
+    <Compile Include="KScriptObjects\KScriptIDObject.cs" />
     <Compile Include="Commands\length.cs" />
     <Compile Include="Commands\math.cs" />
     <Compile Include="Commands\more_less.cs" />

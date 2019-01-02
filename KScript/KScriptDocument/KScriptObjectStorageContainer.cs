@@ -32,7 +32,13 @@ namespace KScript.KScriptDocument
          */
         public T GetObjectFromUID<T>(string uid) => (T)ObjectStorage[uid];
 
-        public void AddObjectFromUID(string uid, object obj) => ObjectStorage.Add(uid, obj);
+        public void AddObjectFromUID(string uid, object obj)
+        {
+            if (!ObjectStorage.ContainsKey(uid))
+            {
+                ObjectStorage.Add(uid, obj);
+            }
+        }
 
         /**
          * Inserts a value at the parent key, with the unique ID

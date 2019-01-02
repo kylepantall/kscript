@@ -110,6 +110,7 @@ namespace KScript.KScriptTypes
         public void Out() => Console.Out.WriteLine();
         public void Out(string val) => Console.Out.Write(KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(val), ParentContainer, GetBaseObject()));
         public void Out(object obj) => Out(obj.ToString());
+        public void Out(string str, params string[] args) => Console.Out.Write(str, args);
 
         public string Format(string val) => ParentContainer.GetStringHandler().Format(val);
 

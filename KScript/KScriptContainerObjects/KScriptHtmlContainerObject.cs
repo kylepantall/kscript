@@ -2,30 +2,60 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using KScript.Document;
 using KScript.HTML;
 using KScript.KScriptObjects;
 
 namespace KScript.KScriptContainerObjects
 {
-    public class KScriptHtmlContainerObject : KScriptObject
+    public class KScriptHtmlContainerObject : KScriptIDObject
     {
         [KScriptProperty("Used to define which method to call when a POST occurs.", true)]
         public string method { get; set; }
 
-        [KScriptProperty("The ID is used to retrieve stored details for this object.", true)]
-        public string id { get; set; }
+        [KScriptProperty("Used to determine which port to use.", false)]
+        public string port { get; set; } = "8080";
+
+        [KScriptProperty("The directory to use when obtaining resource files such as .png etc.", false)]
+        public string directory { get; set; }
 
         public KScriptHtmlContainerObject(string str) => Contents = str;
 
         public override bool Run()
         {
             ParentContainer.GetObjectStorageContainer().AddObjectFromUID(id, this);
-            WebServer ws = new WebServer(HandleResponse, HandleContext, "http://localhost:8080/");
+
+            string localip = WebServer.GetLocalIPAddress();
+            bool is_closed = false;
+
+            using (TcpClient tcpClient = new TcpClient())
+            {
+                try
+                {
+                    tcpClient.Connect(localip, int.Parse(port));
+                    is_closed = false;
+                }
+                catch
+                { is_closed = true; }
+            }
+
+
+            if (is_closed)
+            {
+                port = WebServer.FreeTcpPort();
+            }
+
+            string WebAddress = string.Format("http://{1}:{0}/", port, localip);
+
+            WebServer ws = new WebServer(HandleResponse, HandleContext, WebAddress);
             ws.Run();
 
-            ProcessStartInfo info = new ProcessStartInfo("http://localhost:8080/");
+            Out(string.Format("Local Web Application is running on: {0}\n", WebAddress));
+
+            ProcessStartInfo info = new ProcessStartInfo(WebAddress);
             Process.Start(info);
+
             return true;
         }
 
@@ -42,6 +72,9 @@ namespace KScript.KScriptContainerObjects
                 {
                     return;
                 }
+
+
+
                 using (System.IO.Stream body = request.InputStream)
                 {
                     using (System.IO.StreamReader reader = new System.IO.StreamReader(body, request.ContentEncoding))

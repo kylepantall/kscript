@@ -3,6 +3,7 @@
     using System;
     using System.Linq;
     using System.Net;
+    using System.Net.Sockets;
     using System.Text;
     using System.Threading;
 
@@ -30,6 +31,42 @@
             _responderMethod = method ?? throw new ArgumentException("method");
             _handleContext = handle;
             _listener.Start();
+        }
+
+        /// <summary>
+        /// Returns a free TCP port.
+        /// </summary>
+        /// <returns></returns>
+        public static string FreeTcpPort()
+        {
+            TcpListener l = new TcpListener(IPAddress.Loopback, 0);
+            l.Start();
+            int port = ((IPEndPoint)l.LocalEndpoint).Port;
+            l.Stop();
+            return port.ToString();
+        }
+
+        /// <summary>
+        /// Returns the Local IP Address for this PC;
+        /// </summary>
+        /// <returns>localhost IP Address</returns>
+        public static string GetLocalIPAddress()
+        {
+            string localIP;
+            try
+            {
+                using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0))
+                {
+                    socket.Connect("127.0.0.1", 65530);
+                    IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
+                    localIP = endPoint.Address.ToString();
+                }
+            }
+            catch
+            {
+                localIP = "localhost";
+            }
+            return localIP;
         }
 
         public WebServer(Func<HttpListenerRequest, string> method, Action<HttpListenerContext> handle, params string[] prefixes)

@@ -1,12 +1,13 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using KScript.KScriptObjects;
 
 namespace KScript.Document
 {
     [ClassInterface(ClassInterfaceType.None)]
     public class KScriptDocumentNode : IKScriptDocumentNode
     {
-        private readonly KScriptObject Value;
+        private KScriptObject Value;
         public KScriptObject GetValue() => Value;
 
         public List<IKScriptDocumentNode> Nodes { get; set; }
@@ -26,7 +27,16 @@ namespace KScript.Document
                         {
                             GetValue().Validate();
                         }
-                        GetValue().Run();
+
+                        if (GetValue().GetType().IsAssignableFrom(typeof(KScriptIDObject)))
+                        {
+                            var val = (KScriptIDObject)GetValue();
+                            Value = container.GetObjectStorageContainer().GetObjectFromUID<KScriptIDObject>(val.id);
+                        }
+                        else
+                        {
+                            GetValue().Run();
+                        }
                     }
                     catch (KScriptExceptions.KScriptSkipScriptObject) { }
                 }

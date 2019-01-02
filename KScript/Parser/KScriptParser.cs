@@ -6,6 +6,7 @@ using System.Xml;
 using KScript.Arguments;
 using KScript.Document;
 using KScript.KScriptExceptions;
+using KScript.KScriptObjects;
 using KScript.KScriptParserHandlers;
 
 namespace KScript
@@ -58,6 +59,8 @@ namespace KScript
         public Document.KScriptDocument KScriptDocument { get; set; }
         public KScriptContainer KScriptContainer { get; set; }
 
+        public KScriptDocumentCollectionNode RootElements { get; set; }
+
         public void Parse()
         {
             XmlNode node = Document.DocumentElement;
@@ -73,9 +76,12 @@ namespace KScript
             KScriptContainer.FilePath = FilePath;
             KScriptContainer.FileDirectory = Path.GetDirectoryName(FilePath);
             PrepareProperties(rootElement, node, KScriptContainer);
-            KScriptDocumentCollectionNode collection = new KScriptDocumentCollectionNode(rootElement);
-            Iterate(node, KScriptDocument, KScriptContainer, collection);
-            KScriptDocument.AddChild(collection);
+            RootElements = new KScriptDocumentCollectionNode(rootElement);
+
+
+            Iterate(node, KScriptDocument, KScriptContainer, RootElements);
+            KScriptDocument.AddChild(RootElements);
+
             KScriptDocument.Run(KScriptContainer);
             Complete();
         }
@@ -206,6 +212,11 @@ namespace KScript
             }
 
             obj.Init(container);
+
+            if (obj.GetType().IsAssignableFrom(typeof(KScriptIDObject)))
+            {
+                ((KScriptIDObject)obj).RegisterObject();
+            }
 
             if (obj.ValidationType != KScriptObject.ValidationTypes.DURING_PARSING)
             {
