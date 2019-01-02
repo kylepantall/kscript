@@ -18,7 +18,6 @@ namespace KScript.Arguments
             {
                 Out();
             }
-
             return true;
         }
 

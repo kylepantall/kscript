@@ -1,4 +1,6 @@
-﻿namespace KScript
+﻿using KScript.KScriptObjects;
+
+namespace KScript
 {
     public class KScriptMethodWrapper : KScriptObject
     {
@@ -10,7 +12,14 @@
         public string @params { get; set; }
 
         public override bool Run() => true;
-        public override string UsageInformation() => "Allows blocks of script to be executed dynamically.";
-        public override void Validate() => throw new KScriptExceptions.KScriptNoValidationNeeded(this);
+        public override string UsageInformation() => "Allows blocks of script to be executed upon invocation using the @call command.";
+
+        public override void Validate()
+        {
+            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            validator.AddValidator(new KScriptValidationObject("name", false));
+            validator.AddValidator(new KScriptValidationObject("params", true));
+            validator.Validate(this);
+        }
     }
 }

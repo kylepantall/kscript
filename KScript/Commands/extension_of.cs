@@ -15,5 +15,8 @@
                 return value.Substring(value.LastIndexOf('.') + 1);
             }
         }
+
+
+        public override void Validate() { }
     }
 }

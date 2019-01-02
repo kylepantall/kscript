@@ -5,10 +5,12 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using KScript.Arguments;
+using KScript.CommandHandler;
 using KScript.Handlers;
 using KScript.KScriptDocument;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
+using KScript.KScriptParserHandlers;
 
 namespace KScript
 {
@@ -18,6 +20,7 @@ namespace KScript
         //Constant to store Assembly path for KScript Arguments.
         const string ASSEMBLY_PATH = "KScript.Arguments";
         const string VARIABLE_ASSEMBLY_PATH = "KScript.VariableFunctions";
+        private const string PARSERHANDLERS = "KScript.KScriptParserHandlers";
 
         //Property to store the random object used to generate random numbers and digits.
         private readonly Random _random;
@@ -31,6 +34,95 @@ namespace KScript
 
         //Dictionary list of Defs used for retrieval of defs within the script.
         private IDictionary<string, def> defs { get; set; }
+
+        //Stores the commands used for each KScriptObject session.
+        private readonly Dictionary<string, ICommandObject> CommandStore = new Dictionary<string, ICommandObject>();
+
+
+        #region Global Values Storage - Stores values retrievable across all KScriptObjects (where ParentContainer accessible)
+        private Dictionary<string, Dictionary<string, string>> UniqueStore = new Dictionary<string, Dictionary<string, string>>();
+
+        public void ClearGlobalValues(string key) => UniqueStore.Remove(key);
+
+        /// <summary>
+        /// Adds a global value at the key and ID
+        /// </summary>
+        /// <param name="key">Key of the global variables.</param>
+        /// <param name="id">ID for the value.</param>
+        /// <param name="value">Value to store at the given ID.</param>
+        public void AddGlobalValue(string key, string id, string value)
+        {
+            if (GetGlobalValues(key) != null)
+            {
+                if (GetGlobalValues(key).ContainsKey(id))
+                {
+                    GetGlobalValues(key).Remove(id);
+                }
+
+                GetGlobalValues(key).Add(id, value);
+            }
+            else
+            {
+                UniqueStore.Add(key, new Dictionary<string, string>());
+                GetGlobalValues(key).Add(id, value);
+            }
+        }
+
+        /// <summary>
+        /// Returns the value stored within the Key and with the given ID
+        /// </summary>
+        /// <param name="key">Key to search within</param>
+        /// <param name="id">ID to retrieve value from</param>
+        /// <returns></returns>
+        public string GetGlobalValue(string key, string id)
+        {
+            if (GetGlobalValues(key).ContainsKey(id))
+            {
+                return GetGlobalValues(key)[id];
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Determines if the Key exists with the given ID also.
+        /// </summary>
+        /// <param name="key">Key to check if exists.</param>
+        /// <param name="id">ID to check if existent within the list with the given Key.</param>
+        /// <returns>True if exists, false if otherwise.</returns>
+        public bool HasGlobalValue(string key, string id)
+        {
+            return UniqueStore.ContainsKey(key) && UniqueStore[key].ContainsKey(id);
+        }
+
+        /// <summary>
+        /// Returns global values with the given key
+        /// </summary>
+        /// <param name="key">The values for a unique ID</param>
+        /// <returns>The dictionary list of values for the given key</returns>
+        public Dictionary<string, string> GetGlobalValues(string key)
+        {
+            if (UniqueStore.ContainsKey(key))
+            {
+                return UniqueStore[key];
+            }
+            else
+            {
+                UniqueStore.Add(key, new Dictionary<string, string>());
+                return UniqueStore[key];
+            }
+        }
+        #endregion
+
+        //Method used to obtain the Command store dictionary.
+        public Dictionary<string, ICommandObject> GetCommandStore() => CommandStore;
+
+        /// <summary>
+        /// Used to store resource values.
+        /// </summary>
+        private readonly List<KScriptObject> ResourceKeeper = new List<KScriptObject>();
 
         /// <summary>
         /// Method used to retrieve defs dictionary.
@@ -50,6 +142,8 @@ namespace KScript
 
         //Dictionary list of Types of loaded KScript Objects.
         internal Dictionary<string, Type> LoadedKScriptObjects { get; set; }
+
+        internal Dictionary<string, Type> LoadedParserHandlers { get; set; }
 
         //Property used to retrieve the value of the _random property.
         internal Random GetRandom() => _random;
@@ -138,7 +232,7 @@ namespace KScript
 
                     indentedTextWriter.WriteLine("Object Contents: " + (HasNoInnerObjects ? "Does not require inner elements or content." : "Inner elements or content are required.") + "\n");
 
-                    indentedTextWriter.WriteLine(string.Format(KScriptParser.GetScriptObject(t).UsageInformation()));
+                    indentedTextWriter.WriteLine(string.Format(Parser.GetScriptObject(t).UsageInformation()));
                     indentedTextWriter.WriteLine();
 
                     IEnumerable<PropertyInfo> properties = t.GetProperties().Where(p => p.CanWrite);
@@ -214,6 +308,7 @@ namespace KScript
             LoadedKScriptObjects = new Dictionary<string, Type>();
             ObjectStorageContainer = new KScriptObjectStorageContainer();
             LoadedVariableFunctions = new Dictionary<string, Type>();
+            LoadedParserHandlers = new Dictionary<string, Type>();
         }
 
         /// <summary>
@@ -256,6 +351,18 @@ namespace KScript
 
 
         /// <summary>
+        /// Method used to load built in KScriptParser Handlers.
+        /// </summary>
+        internal void LoadBuiltInParserHandlers()
+        {
+            var q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                    where t.IsClass && t.Namespace == PARSERHANDLERS && !t.IsAssignableFrom(typeof(IParserHandler))
+                    select t;
+            q.ToList().ForEach(i => AddKScriptParserHandler(i));
+        }
+
+
+        /// <summary>
         /// Used to add a type to the KScript loaded Objects dictionary list
         /// </summary>
         /// <param name="t">The type to add</param>
@@ -268,6 +375,19 @@ namespace KScript
             else
             {
                 LoadedKScriptObjects.Add(t.Name.ToLower(), t);
+            }
+        }
+
+
+        internal void AddKScriptParserHandler(Type t)
+        {
+            if (LoadedParserHandlers.ContainsKey(t.Name.ToLower()))
+            {
+                LoadedParserHandlers[t.Name.ToLower()] = t;
+            }
+            else
+            {
+                LoadedParserHandlers.Add(t.Name.ToLower(), t);
             }
         }
 

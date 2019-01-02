@@ -14,5 +14,8 @@
         {
             return NULL;
         }
+
+
+        public override void Validate() { }
     }
 }

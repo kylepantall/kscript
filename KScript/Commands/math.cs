@@ -16,8 +16,17 @@ namespace KScript.Commands
             }
             else
             {
-                return KScriptArithmeticHandler.HandleCalculation(KScriptCommandHandler.HandleCommands(maths, ParentContainer));
+                string value = KScriptCommandHandler.HandleCommands(maths, ParentContainer, GetBaseObject());
+
+                while (KScriptCommandHandler.IsCommand(value, ParentContainer, GetBaseObject()))
+                {
+                    value = KScriptCommandHandler.HandleCommands(value, ParentContainer, GetBaseObject());
+                }
+                return KScriptArithmeticHandler.HandleCalculation(value);
             }
         }
+
+
+        public override void Validate() { }
     }
 }

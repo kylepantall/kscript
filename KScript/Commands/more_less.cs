@@ -25,27 +25,30 @@ namespace KScript.Commands
 
             if (Operator.ToLower() == "mt")
             {
-                return ToBoolString(int.Parse(vA) > int.Parse(vB));
+                return ToBoolString(double.Parse(vA) > double.Parse(vB));
             }
 
             if (Operator.ToLower() == "mte")
             {
-                return ToBoolString(int.Parse(vA) >= int.Parse(vB));
+                return ToBoolString(double.Parse(vA) >= double.Parse(vB));
             }
 
             if (Operator.ToLower() == "lt")
             {
-                return ToBoolString(int.Parse(vA) < int.Parse(vB));
+                return ToBoolString(double.Parse(vA) < double.Parse(vB));
             }
 
             if (Operator.ToLower() == "lte")
             {
-                return ToBoolString(int.Parse(vA) <= int.Parse(vB));
+                return ToBoolString(double.Parse(vA) <= double.Parse(vB));
             }
             else
             {
-                return ToBoolString(int.Parse(vA) < int.Parse(vB));
+                return ToBoolString(double.Parse(vA) < double.Parse(vB));
             }
         }
+
+
+        public override void Validate() { }
     }
 }

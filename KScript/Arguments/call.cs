@@ -1,15 +1,17 @@
-﻿using KScript.Document;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using KScript.Document;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
     public class call : KScriptObject
     {
-        [KScriptObjects.KScriptProperty("Used to declare which method to call", true)]
+        [KScriptProperty("Used to declare which method to call", true)]
         public string method { get; set; }
 
-        [KScriptObjects.KScriptProperty("Used to pass properties used within this method", false)]
+
+        [KScriptProperty("Used to pass properties used within this method", false)]
         public string args { get; set; }
 
         public override bool Run()
@@ -43,6 +45,12 @@ namespace KScript.Arguments
 
         public override string UsageInformation() => "KScriptObject used to call methods contained using the <method> object";
 
-        public override void Validate() => throw new KScriptExceptions.KScriptNoValidationNeeded(this);
+        public override void Validate()
+        {
+            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            validator.AddValidator(new KScriptValidationObject("args", true));
+            validator.AddValidator(new KScriptValidationObject("method", false));
+            validator.Validate(this);
+        }
     }
 }

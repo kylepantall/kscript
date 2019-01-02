@@ -31,5 +31,7 @@ namespace KScript.Commands
 
             return DateTime.Now.ToLongDateString();
         }
+
+        public override void Validate() { }
     }
 }

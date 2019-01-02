@@ -1,5 +1,5 @@
-﻿using KScript.KScriptExceptions;
-using System;
+﻿using System;
+using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
@@ -33,5 +33,9 @@ namespace KScript.Commands
                 }
             }
         }
+
+
+        public override void Validate() { }
+
     }
 }

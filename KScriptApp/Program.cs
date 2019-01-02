@@ -79,8 +79,16 @@ namespace KScript
 
                 if (parser.Properties.WaitOnFinish)
                 {
-                    Console.WriteLine("\n\nPress any key to close...");
-                    Console.ReadKey();
+                    if (Process.GetCurrentProcess().Threads.Count > 0)
+                    {
+                        Console.WriteLine("Awaiting for child processes to finish...");
+                        Console.ReadKey();
+                    }
+                    else
+                    {
+                        Console.WriteLine("\n\nPress any key to close...");
+                        Console.ReadKey();
+                    }
                 }
             }
         }
@@ -99,12 +107,14 @@ namespace KScript
 
             if (!principal.IsInRole(WindowsBuiltInRole.Administrator))
             {
-                ProcessStartInfo proc = new ProcessStartInfo();
-                proc.UseShellExecute = true;
-                proc.WorkingDirectory = Environment.CurrentDirectory;
-                proc.FileName = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                proc.Verb = "runas";
-                proc.Arguments = String.Join(" ", args);
+                ProcessStartInfo proc = new ProcessStartInfo
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = Environment.CurrentDirectory,
+                    FileName = System.Reflection.Assembly.GetExecutingAssembly().Location,
+                    Verb = "runas",
+                    Arguments = string.Join(" ", args)
+                };
 
                 Console.WriteLine(proc.Arguments);
 

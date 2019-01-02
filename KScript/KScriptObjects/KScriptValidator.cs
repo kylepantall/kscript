@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using KScript.KScriptExceptions;
 using static KScript.KScriptObjects.KScriptValidator;
@@ -14,7 +16,12 @@ namespace KScript.KScriptObjects
         {
             ArrayID,
             DefID,
-            Custom
+            Custom,
+            FileLocation,
+            DirectoryLocation,
+            URL,
+            Number,
+            Text
         }
 
         public KScriptValidator(KScriptContainer container)
@@ -132,6 +139,19 @@ namespace KScript.KScriptObjects
                 case ExpectedInput.DefID:
                     string def_id = GetPropertyValue(caller);
                     return container.GetDefs().ContainsKey(def_id);
+                case ExpectedInput.DirectoryLocation:
+                    string directory = GetPropertyValue(caller);
+                    return Directory.Exists(directory);
+                case ExpectedInput.FileLocation:
+                    string file = GetPropertyValue(caller);
+                    return File.Exists(file);
+                case ExpectedInput.URL:
+                    string url = GetPropertyValue(caller);
+                    Uri _url = null;
+                    return Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out _url);
+                case ExpectedInput.Number:
+                    int number;
+                    return int.TryParse(GetPropertyValue(caller), out number);
             }
             return true;
         }
@@ -145,20 +165,29 @@ namespace KScript.KScriptObjects
         {
             if (!IsExpectedInput(container, caller))
             {
-                if (expected_input == ExpectedInput.DefID)
+                switch (expected_input)
                 {
-                    throw new KScriptDefNotFound(caller, string.Format("The def '{0}' does not exist.", GetPropertyValue(caller)));
-                }
-                else
-                {
-                    throw new KScriptArrayNotFound(caller, string.Format("The Array '{0}' does not exist.", GetPropertyValue(caller)));
+                    case ExpectedInput.ArrayID:
+                        throw new KScriptArrayNotFound(caller, string.Format("The Array '{0}' does not exist.", GetPropertyValue(caller)));
+                    case ExpectedInput.DefID:
+                        throw new KScriptDefNotFound(caller, string.Format("The def '{0}' does not exist.", GetPropertyValue(caller)));
+                    case ExpectedInput.FileLocation:
+                        throw new KScriptFileNotFound(caller, string.Format("The file '{0}' does not exist.", GetPropertyValue(caller)));
+                    case ExpectedInput.DirectoryLocation:
+                        throw new KScriptDirectoryNotFound(caller, string.Format("The directory '{0}' does not exist.", GetPropertyValue(caller)));
+                    case ExpectedInput.Number:
+                        throw new KScriptException(caller, "Expected input was not of the type 'Number'");
+                    case ExpectedInput.Text:
+                        throw new KScriptException(caller, "Expected input was not of the type 'Text'");
+                    default:
+                        break;
                 }
             }
 
 
             if (!IsAcceptedValue(caller))
             {
-                throw new KScriptException(caller, string.Format("The value '{0}' was not an accepted value.", GetPropertyValue(caller)));
+                throw new KScriptException(caller, string.Format("The value '{0}' was not an accepted value for the property '{1}'.", GetPropertyValue(caller), property_name));
             }
 
 

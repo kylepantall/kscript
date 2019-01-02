@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using KScript.Document;
 using KScript.Global;
@@ -15,6 +16,8 @@ namespace KScript.KScriptDocument
         {
             Value = new Dictionary<string, Dictionary<string, List<IKScriptDocumentNode>>>();
             ObjectStorage = new Dictionary<string, object>();
+
+            Value.Add(GlobalIdentifiers.CALLS, new Dictionary<string, List<IKScriptDocumentNode>>());
         }
 
         /**
@@ -42,8 +45,10 @@ namespace KScript.KScriptDocument
             }
             else
             {
-                Dictionary<string, List<IKScriptDocumentNode>> obj = new Dictionary<string, List<IKScriptDocumentNode>>();
-                obj.Add(uid, values);
+                Dictionary<string, List<IKScriptDocumentNode>> obj = new Dictionary<string, List<IKScriptDocumentNode>>
+                {
+                    { uid, values }
+                };
                 Value.Add(at_parent_key, obj);
             }
 
@@ -51,11 +56,42 @@ namespace KScript.KScriptDocument
         }
 
 
+        /// <summary>
+        /// Returns all method names stored.
+        /// </summary>
+        /// <returns>Returns all method names</returns>
+        public string[] GetMethodNames()
+        {
+
+            if (Value.ContainsKey(GlobalIdentifiers.CALLS))
+            {
+                return Value[GlobalIdentifiers.CALLS].Select(i => i.Key).ToArray();
+            }
+            else
+            {
+                return new string[0];
+            }
+
+        }
+
         /**
          * Method used to retrieve a KScriptContainer with the given parent key and unique id. 
          * For instrance: 'calls' -> 'my_method' returns the KScriptObjects for this unique KScriptObjectWrapper.
          */
-        public List<IKScriptDocumentNode> GetMethodCalls(string uid) => Value[GlobalIdentifiers.CALLS][uid];
+        public List<IKScriptDocumentNode> GetMethodCalls(string uid)
+        {
+            if (Value.ContainsKey(GlobalIdentifiers.CALLS))
+            {
+                if (Value[GlobalIdentifiers.CALLS].ContainsKey(uid))
+                {
+                    return Value[GlobalIdentifiers.CALLS][uid];
+                }
+            }
+            return new List<IKScriptDocumentNode>();
+        }
+
+
+
 
         public List<IKScriptDocumentNode> GetExceptionHandlers(string uid)
         {

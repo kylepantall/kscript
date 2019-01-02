@@ -7,6 +7,7 @@ namespace KScript.Arguments
     /// <summary>
     /// Class used to handle the KScript Object echo of arrays.
     /// </summary>
+    [KScriptNoInnerObjects()]
     internal class aecho : KScriptObject
     {
         /// <summary>

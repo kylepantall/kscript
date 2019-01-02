@@ -19,5 +19,8 @@ namespace KScript.Commands
 
             return DateTime.Now.TimeOfDay.ToString(@"hh\:mm\:ss");
         }
+
+
+        public override void Validate() { }
     }
 }

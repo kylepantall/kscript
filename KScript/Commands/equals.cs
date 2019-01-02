@@ -46,5 +46,8 @@
                 return ToBoolString(a.ToLower() == b.ToLower());
             }
         }
+
+
+        public override void Validate() { }
     }
 }

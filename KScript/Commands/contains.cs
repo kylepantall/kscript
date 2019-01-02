@@ -17,11 +17,14 @@ namespace KScript.Commands
             try
             {
                 return ToBoolString(Arg0.Contains(Arg1));
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 HandleException(ex, this);
                 return null;
             }
         }
+
+        public override void Validate() { }
     }
 }

@@ -1,6 +1,5 @@
-﻿using KScript.KScriptExceptions;
-using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -11,10 +10,13 @@ namespace KScript.Arguments
         [KScriptObjects.KScriptExample("file path")]
         [KScriptObjects.KScriptExample("url")]
         [KScriptObjects.KScriptExample("directory")]
-        public String file { get; set; }
+        public string file { get; set; }
 
         [KScriptObjects.KScriptProperty("The arguments to pass to the process.")]
         public string args { get; set; }
+
+
+        public run() { }
 
         public override bool Run()
         {

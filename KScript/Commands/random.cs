@@ -33,5 +33,8 @@ namespace KScript.Commands
                 return ParentContainer.GetRandom().Next().ToString();
             }
         }
+
+
+        public override void Validate() { }
     }
 }

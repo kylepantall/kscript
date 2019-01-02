@@ -17,5 +17,7 @@ namespace KScript.Commands
                 return str.Length.ToString();
             }
         }
+
+        public override void Validate() { }
     }
 }

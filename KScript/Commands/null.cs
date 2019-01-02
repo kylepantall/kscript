@@ -11,12 +11,14 @@ namespace KScript.Commands
         {
             if (!string.IsNullOrEmpty(value))
             {
-                return ToBoolString(KScriptCommandHandler.HandleCommands(value, KScript()) == NULL);
+                return ToBoolString(KScriptCommandHandler.HandleCommands(value, KScript(), GetBaseObject()) == NULL);
             }
             else
             {
                 return NULL;
             }
         }
+
+        public override void Validate() { }
     }
 }

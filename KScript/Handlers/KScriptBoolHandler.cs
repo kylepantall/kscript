@@ -6,6 +6,20 @@ namespace KScript.Handlers
     [ClassInterface(ClassInterfaceType.None)]
     public class KScriptBoolHandler
     {
+
+        public static bool IsBool(string val)
+        {
+            try
+            {
+                bool tmp = Convert(val);
+                return true;
+            }
+            catch (KScriptBoolInvalid)
+            {
+                return false;
+            }
+        }
+
         public static bool Convert(string val)
         {
             if (val != null)

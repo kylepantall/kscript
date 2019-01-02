@@ -9,7 +9,7 @@ namespace KScript.KScriptExceptions
     [Serializable]
     public class KScriptException : Exception
     {
-        private string ExceptionType;
+        private readonly string ExceptionType;
 
         public KScriptBaseObject KScriptObject { get; set; }
 
@@ -90,6 +90,11 @@ namespace KScript.KScriptExceptions
     {
         public KScriptDirectoryNotFound(KScriptBaseObject obj) : base(obj, "The given directory could not be found.") { }
         public KScriptDirectoryNotFound(KScriptBaseObject obj, string msg) : base(obj, msg) { }
+    }
+    public class KScriptFileNotFound : KScriptException
+    {
+        public KScriptFileNotFound(KScriptBaseObject obj) : base(obj, "The given file could not be found.") { }
+        public KScriptFileNotFound(KScriptBaseObject obj, string msg) : base(obj, msg) { }
     }
     public class KScriptArrayNotFound : KScriptException
     {

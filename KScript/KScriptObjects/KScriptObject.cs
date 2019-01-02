@@ -13,7 +13,6 @@ namespace KScript
     [ClassInterface(ClassInterfaceType.None)]
     public abstract class KScriptObject : KScriptBaseObject
     {
-
         public enum ValidationTypes
         {
             /// <summary>
@@ -41,18 +40,19 @@ namespace KScript
         /// Initialises a KScriptObject with it's content as an object.
         /// </summary>
         /// <param name="Contents">Contents of KScript object.</param>
-        public KScriptObject(object Contents) { }
+        public KScriptObject(object Contents) : this() { }
 
         /// <summary>
         /// Initialises a KScriptObject with it's content as a string.
         /// </summary>
         /// <param name="Contents">Contents of KScript object.</param>
-        public KScriptObject(string Contents) { }
+        public KScriptObject(string Contents) : this() { }
+
 
         /// <summary>
-        /// Initialises a KScriptObject without inner objects (no content).
+        /// Sets the parent KScriptObject to current object.
         /// </summary>
-        public KScriptObject() { }
+        public KScriptObject() => SetBaseScriptObject(this);
 
         /// <summary>
         /// The content of the KScript object as a string.
@@ -79,7 +79,7 @@ namespace KScript
         /// </summary>
         /// <param name="value">Value to handle commands from.</param>
         /// <returns>String with handled commands</returns>
-        public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(value), ParentContainer);
+        public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(value), ParentContainer, this);
 
         /// <summary>
         /// Method used to retrieve def objects with specified id.
@@ -123,9 +123,8 @@ namespace KScript
                 }
                 else
                 {
-                    Exception ex = new KScriptMissingAttribute(this);
+                    Exception ex = new KScriptMissingAttribute(this, string.Format("KScript Property '{0}' could not be found.", propertyName));
                     Console.WriteLine(string.Format("KScriptObject '{0}' threw the error: {1}\nTry looking at the KScript help documentation.", GetType().Name, ex.Message));
-                    Environment.Exit(0);
                 }
             }
         }

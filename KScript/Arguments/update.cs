@@ -19,11 +19,14 @@ namespace KScript.Arguments
             set { _type = (types)Enum.Parse(typeof(types), value); }
         }
 
+        public update(string Contents)
+        {
+            ValidationType = ValidationTypes.BEFORE_PARSING;
+            this.Contents = Contents;
+        }
+
         private types _type = types.replace;
-
         private enum types { replace, append }
-
-        public update(string Contents) => this.Contents = Contents;
 
         public override bool Run()
         {
@@ -41,6 +44,13 @@ namespace KScript.Arguments
         }
 
         public override string UsageInformation() => "Used to update the value stored within a def.";
-        public override void Validate() => throw new KScriptExceptions.KScriptNoValidationNeeded(this);
+
+        public override void Validate()
+        {
+            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            validator.AddValidator(new KScriptValidationObject("type", false, "replace", "append"));
+            validator.AddValidator(new KScriptValidationObject("to", false, KScriptValidator.ExpectedInput.DefID));
+            validator.Validate(this);
+        }
     }
 }

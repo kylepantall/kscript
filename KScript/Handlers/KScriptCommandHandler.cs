@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using KScript.CommandHandler;
+using KScript.KScriptObjects;
 
 namespace KScript.Handlers
 {
@@ -11,62 +14,202 @@ namespace KScript.Handlers
     {
         public const string COMMANDS_NAMESPACE = "KScript.Commands";
 
-        public static string HandleCommands(string str, KScriptContainer container)
+        public const string COMMANDS_WITH_PARAMS = @"\@(\w+)\((.+)\)";
+        public const string COMMANDS_NO_PARAMS = @"\@(\w+)\(\)";
+
+        public static bool IsCommand(string str, KScriptContainer container, KScriptBaseObject parent)
+        {
+            Regex cmd_params = new Regex(COMMANDS_WITH_PARAMS);
+            Regex cmd_no_params = new Regex(COMMANDS_NO_PARAMS);
+
+            var cmd_no_params_matches = cmd_no_params.Matches(str);
+            var cmd_params_matches = cmd_params.Matches(str);
+
+            return cmd_params.IsMatch(str) || cmd_no_params.IsMatch(str);
+        }
+
+        public static List<ICommand> GetCommands(string str, KScriptContainer container, KScriptBaseObject baseObj)
+        {
+            //Count all open brackets, when finding close bracket, length of string to array
+
+            Stack<ICommand> commands = new Stack<ICommand>();
+
+            List<ICommand> All_Commands = new List<ICommand>();
+
+            char[] str_cmds = str.ToCharArray();
+
+            ICommandObject bracket = new ICommandObject(str, container, baseObj);
+
+            ParamTracker paramTracker = new ParamTracker();
+
+            int index = -1;
+
+            bool ignore = false, encountered_cmd = false;
+
+            for (int i = 0; i < str_cmds.Length; i++)
+            {
+                if (str_cmds[i].Equals('@') && !ignore)
+                {
+                    encountered_cmd = true;
+                }
+
+                if (encountered_cmd)
+                {
+                    paramTracker.Track(str_cmds[i], i);
+                }
+
+
+                if (str_cmds[i].Equals(char.Parse("'")) && encountered_cmd)
+                {
+                    ignore = !ignore;
+                }
+
+                if (str_cmds[i].Equals('@') && !ignore && encountered_cmd)
+                {
+                    bracket = new ICommandObject(str, container, baseObj);
+                    bracket.IndexProperties.Start = i;
+                    bracket.Index = ++index;
+                    commands.Push(bracket);
+                    continue;
+                }
+                else if (str_cmds[i].Equals('$') && !ignore && encountered_cmd)
+                {
+                    ignore = !ignore;
+                }
+                else if (str_cmds[i].Equals('(') && !ignore && encountered_cmd)
+                {
+                    if (commands.Peek().IsCommandObject)
+                    {
+                        commands.Peek().GetCommandObject().EndNameIndex = i;
+                    }
+                    continue;
+                }
+                else if (str_cmds[i].Equals(',') && !ignore && encountered_cmd && commands.Count > 0)
+                {
+                    if (commands.Any())
+                    {
+                        var cmd = commands.Peek();
+
+                        if (cmd.IsCommandObject)
+                        {
+                            if (paramTracker.HasParams)
+                            {
+                                var variable = new IValue(paramTracker.GetIndexPair(), container);
+                                cmd.GetCommandObject().Children.Enqueue(variable);
+                            }
+                        }
+                    }
+                }
+                else if (str_cmds[i].Equals(')') && !ignore && encountered_cmd && commands.Count > 0)
+                {
+                    if (commands.Any())
+                    {
+                        var cmd = commands.Pop();
+                        cmd.IndexProperties.End = i;
+
+                        if (paramTracker.HasParams)
+                        {
+                            var variable = new IValue(paramTracker.GetIndexPair(), container);
+                            cmd.GetCommandObject().Children.Enqueue(variable);
+                        }
+
+                        if (commands.Count > 0)
+                        {
+                            if (commands.Peek().IsCommandObject && !commands.Peek().GetCommandObject().IsClosed)
+                            {
+                                commands.Peek().GetCommandObject().Children.Enqueue(cmd);
+                            }
+                            else
+                            {
+                                All_Commands.Add(cmd);
+                            }
+                        }
+                        else
+                        {
+                            All_Commands.Add(cmd);
+                        }
+                    }
+                    else
+                    {
+                        All_Commands.Add(bracket);
+                    }
+                    continue;
+                }
+            }
+
+            return All_Commands;
+        }
+
+        public static string HandleCommands(string str, KScriptContainer container, KScriptBaseObject parent, bool parse_immediately = false)
         {
             string temp_string = str;
 
-            string commands_with_params = @"\@(\w+)\((.+)\)";
-            string commands_no_params = @"\@(\w+)\(\)";
-
-            Regex cmd_params = new Regex(commands_with_params);
-            Regex cmd_no_params = new Regex(commands_no_params);
-
-            var cmd_no_params_matches = cmd_no_params.Matches(temp_string);
-            var cmd_params_matches = cmd_params.Matches(temp_string);
-
-            foreach (Match with_params in cmd_params_matches)
+            var commands = GetCommands(str, container, parent);
+            if (commands.Count > 0)
             {
-                string[] strs = Regex.Split(HandleCommands(with_params.Groups[2].Value, container), @"(?<!,[^(]+\([^)]+),");
-
-                List<string> new_strs = new List<string>();
-                foreach (var item in strs)
+                foreach (var item in commands)
                 {
-                    new_strs.Add(HandleCommands(item.Trim('\"'), container));
+                    if (item.IsCommandObject)
+                    {
+                        if (parse_immediately)
+                        {
+                            temp_string = ReplaceFirst(temp_string, item.GetCommandObject().CommandParameters, item.GetCommandObject().CalculateValue());
+                        }
+                        else
+                        {
+                            string id = string.Format("[{0}]", Guid.NewGuid().ToString());
+                            temp_string = ReplaceFirst(temp_string, item.GetCommandObject().CommandParameters, id);
+                            container.GetCommandStore().Add(id, item.GetCommandObject());
+                        }
+                    }
                 }
 
-                string[] @params = new_strs.ToArray();
-
-                string type_name = with_params.Groups[1].Value;
-                Type _type = GetCommandType(type_name);
-
-                KScriptCommand cmd = GetCommandObject(@params, _type, container);
-                temp_string = temp_string.Replace(with_params.Value, cmd.Calculate());
-            }
-
-            foreach (Match without_params in cmd_no_params_matches)
-            {
-                string type_name = without_params.Groups[1].Value;
-                Type _type = GetCommandType(type_name);
-                KScriptCommand cmd = GetCommandObject(_type, container);
-                temp_string = temp_string.Replace(without_params.Value, cmd.Calculate());
+                if (!parse_immediately)
+                {
+                    return ReturnCommandString(temp_string, container, parent);
+                }
             }
 
             return temp_string;
         }
 
-        private static KScriptCommand GetCommandObject(string[] @params, Type _type, KScriptContainer container)
+
+        public static string ReturnCommandString(string str, KScriptContainer container, KScriptBaseObject parent)
+        {
+            if (container.GetCommandStore().Any())
+            {
+                string temp_string = str;
+                container.GetCommandStore().ToList().ForEach(item => temp_string = temp_string.Replace(item.Key, item.Value.GetCommandObject().CalculateValue()));
+                container.GetCommandStore().Clear();
+                return temp_string;
+            }
+
+            return string.Empty;
+        }
+
+        public static string ReplaceFirst(string text, string search, string replace)
+        {
+            int pos = text.IndexOf(search);
+            if (pos < 0)
+            {
+                return text;
+            }
+            return text.Substring(0, pos) + replace + text.Substring(pos + search.Length);
+        }
+
+        public static KScriptCommand GetCommandObject(string[] @params, Type _type, KScriptContainer container, KScriptBaseObject parent)
         {
             KScriptCommand obj = (KScriptCommand)Activator.CreateInstance(_type, @params);
-            obj.Init(container);
+            obj.Init(container, parent);
             return obj;
         }
 
-        private static KScriptCommand GetCommandObject(Type _type, KScriptContainer container)
+        public static KScriptCommand GetCommandObject(Type _type, KScriptContainer container, KScriptBaseObject parent)
         {
             if (_type != null)
             {
                 KScriptCommand obj = (KScriptCommand)Activator.CreateInstance(_type);
-                obj.Init(container);
+                obj.Init(container, parent);
                 return obj;
             }
             else
@@ -75,6 +218,6 @@ namespace KScript.Handlers
             }
         }
 
-        private static Type GetCommandType(string type_name) => Assembly.GetExecutingAssembly().GetType(string.Format("{0}.{1}", COMMANDS_NAMESPACE, type_name));
+        public static Type GetCommandType(string type_name) => Assembly.GetExecutingAssembly().GetType(string.Format("{0}.{1}", COMMANDS_NAMESPACE, type_name));
     }
 }

@@ -13,12 +13,18 @@ namespace KScript.Commands
         public override string Calculate()
         {
             bool is_url = false;
+            string Result = string.Empty;
             try { Uri url = new Uri(path); is_url = url != null; } catch (Exception ex) { is_url = false; HandleException(ex, this); }
-            if (is_url) { return new WebClient().DownloadString(path); }
+
+            if (is_url) { Result = new WebClient().DownloadString(path); }
             else
             {
-                return File.ReadAllText(path);
+                Result = File.ReadAllText(path);
             }
+
+            return Result;
         }
+
+        public override void Validate() { }
     }
 }

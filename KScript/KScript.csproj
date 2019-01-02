@@ -39,13 +39,22 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="CsQuery, Version=1.3.3.249, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\CsQuery.1.3.4\lib\net40\CsQuery.dll</HintPath>
+    </Reference>
     <Reference Include="MathParser.org-mXparser, Version=4.2.0.0, Culture=neutral, PublicKeyToken=0fbab7add73ed6e2, processorArchitecture=MSIL">
       <HintPath>..\packages\MathParser.org-mXparser.4.2.1\lib\net461\MathParser.org-mXparser.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.12.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Net" />
+    <Reference Include="System.Web" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -58,6 +67,7 @@
     <Compile Include="Arguments\afor.cs" />
     <Compile Include="Arguments\ainsert.cs" />
     <Compile Include="Arguments\anykey.cs" />
+    <Compile Include="Arguments\aremove.cs" />
     <Compile Include="Arguments\array.cs" />
     <Compile Include="Arguments\call.cs" />
     <Compile Include="Arguments\catch.cs" />
@@ -74,10 +84,12 @@
     <Compile Include="Arguments\kscript.cs" />
     <Compile Include="Arguments\dowhile.cs" />
     <Compile Include="Arguments\load.cs" />
+    <Compile Include="Arguments\loadHtml.cs" />
     <Compile Include="Arguments\method.cs" />
     <Compile Include="Arguments\onexception.cs" />
     <Compile Include="Arguments\picker.cs" />
     <Compile Include="Arguments\ref.cs" />
+    <Compile Include="Arguments\refreshHTML.cs" />
     <Compile Include="Arguments\registry.cs" />
     <Compile Include="Arguments\run.cs" />
     <Compile Include="Arguments\throw.cs" />
@@ -86,28 +98,39 @@
     <Compile Include="Arguments\wait.cs" />
     <Compile Include="Arguments\func.cs" />
     <Compile Include="Arguments\write.cs" />
+    <Compile Include="CommandHandler\ICommand.cs" />
+    <Compile Include="CommandHandler\IValue.cs" />
+    <Compile Include="CommandHandler\ParamTracker.cs" />
     <Compile Include="Commands\acount.cs" />
+    <Compile Include="Commands\and.cs" />
     <Compile Include="Commands\api.cs" />
     <Compile Include="Commands\args.cs" />
     <Compile Include="Commands\array.cs" />
+    <Compile Include="Commands\average.cs" />
     <Compile Include="Commands\contains.cs" />
     <Compile Include="Commands\equals.cs" />
     <Compile Include="Commands\date.cs" />
+    <Compile Include="Commands\exists.cs" />
     <Compile Include="Commands\extension_of.cs" />
     <Compile Include="Commands\find_file.cs" />
+    <Compile Include="Commands\getfiles.cs" />
+    <Compile Include="Commands\if.cs" />
+    <Compile Include="Commands\ifnull.cs" />
     <Compile Include="Commands\k.cs" />
     <Compile Include="Commands\length.cs" />
     <Compile Include="Commands\math.cs" />
     <Compile Include="Commands\more_less.cs" />
     <Compile Include="Commands\not.cs" />
     <Compile Include="Commands\null.cs" />
-    <Compile Include="Commands\object.cs" />
+    <Compile Include="Commands\parse.cs" />
+    <Compile Include="Commands\path.cs" />
     <Compile Include="Commands\random.cs" />
     <Compile Include="Commands\read_text.cs" />
     <Compile Include="Commands\registry.cs" />
     <Compile Include="Commands\split.cs" />
     <Compile Include="Commands\time.cs" />
     <Compile Include="Commands\to_lower.cs" />
+    <Compile Include="Commands\values.cs" />
     <Compile Include="GlobalValues\Global.cs" />
     <Compile Include="GlobalValues\This.cs" />
     <Compile Include="Handlers\KScriptArithmeticHandler.cs" />
@@ -117,10 +140,14 @@
     <Compile Include="Handlers\KScriptReplacer.cs" />
     <Compile Include="Handlers\KScriptStringHandler.cs" />
     <Compile Include="Handlers\KScriptVariableHandler.cs" />
+    <Compile Include="HTML\FormDataHandler.cs" />
+    <Compile Include="HTML\WebServer.cs" />
     <Compile Include="KScriptContainerObjects\KScriptArrayLoop.cs" />
     <Compile Include="KScriptContainerObjects\KScriptExceptionWrapper.cs" />
+    <Compile Include="KScriptContainerObjects\KScriptHtmlContainerObject.cs" />
     <Compile Include="KScriptContainerObjects\KScriptMethodWrapper.cs" />
     <Compile Include="KScriptDocument\KScriptObjectStorageContainer.cs" />
+    <Compile Include="CommandHandler\ICommandObject.cs" />
     <Compile Include="KScriptObjects\KScriptBaseObject.cs" />
     <Compile Include="KScriptObjects\KScriptNoInnerObjects.cs" />
     <Compile Include="KScriptObjects\KScriptAcceptedOptions.cs" />
@@ -130,6 +157,8 @@
     <Compile Include="KScriptContainerObjects\KScriptObjectLoop.cs" />
     <Compile Include="KScriptObjects\KScriptProperty.cs" />
     <Compile Include="KScriptObjects\KScriptValidator.cs" />
+    <Compile Include="KScriptParserHandlers\HtmlObjectParser.cs" />
+    <Compile Include="KScriptParserHandlers\IParserHandler.cs" />
     <Compile Include="Parser\KScriptContainer.cs" />
     <Compile Include="KScriptDocument\KScriptDocument.cs" />
     <Compile Include="KScriptDocument\KScriptDocumentCollectionNode.cs" />

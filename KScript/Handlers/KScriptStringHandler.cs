@@ -26,12 +26,13 @@ namespace KScript.Handlers
             return tmp_string;
         }
 
-        public string Format(string val)
+        public string Format(string val, bool ignore_value_conditions = false)
         {
             if (!string.IsNullOrEmpty(val))
             {
                 string tmp_string = val;
                 tmp_string = string.Format(val);
+
                 tmp_string = Regex.Replace(tmp_string, @"\\n", Environment.NewLine);
 
                 if (tmp_string.StartsWith("'") && tmp_string.EndsWith("'"))

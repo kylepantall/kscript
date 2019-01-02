@@ -1,10 +1,12 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml;
 using KScript.Arguments;
 using KScript.Document;
 using KScript.KScriptExceptions;
+using KScript.KScriptParserHandlers;
 
 namespace KScript
 {
@@ -60,12 +62,10 @@ namespace KScript
         {
             XmlNode node = Document.DocumentElement;
 
-            //XmlNodeList refs = Document.DocumentElement.SelectNodes(".//ref");
-            //XmlNodeList catches = Document.DocumentElement.SelectNodes(".//catch");
-
             KScriptContainer = new KScriptContainer(Properties, this);
 
             KScriptContainer.LoadBuiltInTypes();
+            KScriptContainer.LoadBuiltInParserHandlers();
             KScriptContainer.LoadBuiltInVariableFunctionTypes();
 
             KScriptDocument = new Document.KScriptDocument();
@@ -80,7 +80,9 @@ namespace KScript
             Complete();
         }
 
-        public void Iterate(XmlNode node, Document.KScriptDocument doc, KScriptContainer container, KScriptDocumentCollectionNode docNode)
+        public IParserHandler GetParserInterface(KScriptObject obj) => GetParserHandler(KScriptContainer.LoadedParserHandlers.Values.FirstOrDefault(i => GetParserHandler(i).IsAcceptedObject(obj)) ?? null);
+
+        private void Iterate(XmlNode node, Document.KScriptDocument doc, KScriptContainer container, KScriptDocumentCollectionNode docNode)
         {
             foreach (XmlNode item in node.ChildNodes)
             {
@@ -93,9 +95,20 @@ namespace KScript
                         {
                             if (item.HasChildNodes)
                             {
-                                KScriptDocumentCollectionNode newCollection = new KScriptDocumentCollectionNode(obj);
-                                Iterate(item, doc, container, newCollection);
-                                docNode.Nodes.Add(newCollection);
+
+                                IParserHandler parserHandler = GetParserInterface(obj);
+
+                                if (parserHandler != null)
+                                {
+                                    KScriptDocumentNode newCollection = new KScriptDocumentNode(parserHandler.GenerateKScriptObject(obj, item));
+                                    docNode.Nodes.Add(newCollection);
+                                }
+                                else
+                                {
+                                    KScriptDocumentCollectionNode newCollection = new KScriptDocumentCollectionNode(obj);
+                                    Iterate(item, doc, container, newCollection);
+                                    docNode.Nodes.Add(newCollection);
+                                }
                             }
                             else
                             {
@@ -107,9 +120,10 @@ namespace KScript
             }
         }
 
-        public static bool HasDefaultConstructor(Type t) => t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null;
+        private bool HasDefaultConstructor(Type t) => t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null;
+
         public Type GetObjectType(string name, KScriptContainer container) => container.LoadedKScriptObjects.ContainsKey(name) ? container.LoadedKScriptObjects[name] : null;
-        public static KScriptObject GetScriptObject(Type type, string param = null) => HasDefaultConstructor(type) ? (KScriptObject)Activator.CreateInstance(type) : (KScriptObject)Activator.CreateInstance(type, param);
+        public KScriptObject GetScriptObject(Type type, string param = null) => HasDefaultConstructor(type) ? (KScriptObject)Activator.CreateInstance(type) : (KScriptObject)Activator.CreateInstance(type, param);
         public KScriptObject GetScriptObject(XmlNode node, KScriptContainer container)
         {
             Type _type = GetObjectType(node.Name.ToLower(), container);
@@ -130,6 +144,28 @@ namespace KScript
             }
         }
 
+
+        public IParserHandler GetParserType(string name, KScriptContainer container) => container.LoadedParserHandlers.ContainsKey(name) ? GetParserHandler(container.LoadedParserHandlers[name]) : null;
+
+        private IParserHandler GetParserHandler(Type type)
+        {
+            if (type != null)
+            {
+                if (!type.IsAssignableFrom(typeof(IParserHandler)))
+                {
+                    return (IParserHandler)Activator.CreateInstance(type);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                return null;
+            }
+        }
+
         public static IVariableFunction GetVariableFunction(Type type, KScriptContainer container, string def_id) => (IVariableFunction)Activator.CreateInstance(type, container, def_id);
         public Type GetVariableType(string variable_func) => KScriptContainer.LoadedVariableFunctions.ContainsKey(variable_func) ? KScriptContainer.LoadedVariableFunctions[variable_func] : null;
 
@@ -141,6 +177,13 @@ namespace KScript
             return _type != null ? GetVariableFunction(_type, KScriptContainer, variable_id) : null;
         }
 
+        /// <summary>
+        /// Prepares properties for KScript objects.
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <param name="item"></param>
+        /// <param name="container"></param>
+        /// <returns></returns>
         public bool PrepareProperties(KScriptObject obj, XmlNode item, KScriptContainer container)
         {
             if (obj["Contents"] != null) { obj["Contents"] = item.InnerText; }
@@ -163,7 +206,6 @@ namespace KScript
             }
 
             obj.Init(container);
-
 
             if (obj.ValidationType != KScriptObject.ValidationTypes.DURING_PARSING)
             {
@@ -192,6 +234,9 @@ namespace KScript
             return true;
         }
 
+        /// <summary>
+        /// When the parsing and execution of the script is complete, this function is called.
+        /// </summary>
         public void Complete()
         {
             EndScriptTime = DateTime.Now;

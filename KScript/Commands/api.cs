@@ -1,10 +1,10 @@
-﻿using KScript.KScriptExceptions;
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Net.Http.Headers;
+using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
-    class api : KScriptCommand
+    public class api : KScriptCommand
     {
         private readonly string api_url = "";
 
@@ -25,5 +25,7 @@ namespace KScript.Commands
                 throw new KScriptException("api.StatusTimedOut", "HttpClient Timed out.");
             }
         }
+
+        public override void Validate() { }
     }
 }

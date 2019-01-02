@@ -20,5 +20,8 @@ namespace KScript.Commands
                 return null;
             }
         }
+
+
+        public override void Validate() { }
     }
 }

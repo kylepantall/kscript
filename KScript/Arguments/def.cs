@@ -10,7 +10,10 @@ namespace KScript.Arguments
         [KScriptExample("<def id=\"username\"> ... </def>")]
         [KScriptExample("<def id=\"email_address\"> ... </def>")]
         public string id { get; set; }
+
         public def(string Contents) => this.Contents = Contents;
+        public def() => Contents = NULL;
+
         public override bool Run()
         {
             if (string.IsNullOrWhiteSpace(Contents))

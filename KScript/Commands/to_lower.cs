@@ -16,5 +16,8 @@ namespace KScript.Commands
 
             return str.ToLower();
         }
+
+
+        public override void Validate() { }
     }
 }
