@@ -8,6 +8,7 @@ using KScript.Document;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 using KScript.KScriptParserHandlers;
+using KScript.VariableFunctions;
 
 namespace KScript
 {
@@ -159,7 +160,7 @@ namespace KScript
             {
                 if (!type.IsAssignableFrom(typeof(IParserHandler)))
                 {
-                    return (IParserHandler)Activator.CreateInstance(type);
+                    return (IParserHandler)Activator.CreateInstance(type, KScriptContainer);
                 }
                 else
                 {
@@ -183,6 +184,14 @@ namespace KScript
             return _type != null ? GetVariableFunction(_type, KScriptContainer, variable_id) : null;
         }
 
+
+        public static ITiedVariableFunction GetTiedVariableFunction(Type type, KScriptContainer container, string first_id, string second_id) => (ITiedVariableFunction)Activator.CreateInstance(type, container, first_id, second_id);
+        public ITiedVariableFunction GetTiedVariableFunction(string first_variable_id, string second_variable_id, string variable_func, KScriptContainer container)
+        {
+            Type _type = GetVariableType(variable_func);
+            return _type != null ? GetTiedVariableFunction(_type, KScriptContainer, first_variable_id, second_variable_id) : null;
+        }
+
         /// <summary>
         /// Prepares properties for KScript objects.
         /// </summary>
@@ -200,7 +209,11 @@ namespace KScript
                     obj[at.Name.ToLower()] = at.Value;
                 }
             }
-            if (typeof(def).IsAssignableFrom(obj.GetType())) { container[((def)obj).id] = obj as def; }
+            if (typeof(def).IsAssignableFrom(obj.GetType()))
+            {
+                obj["Contents"] = item.InnerXml;
+                container[((def)obj).id] = obj as def;
+            }
             if (typeof(defm).IsAssignableFrom(obj.GetType()))
             {
                 defm _obj = (defm)obj;

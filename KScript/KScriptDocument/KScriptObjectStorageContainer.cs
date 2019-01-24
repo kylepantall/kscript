@@ -96,9 +96,11 @@ namespace KScript.KScriptDocument
             return new List<IKScriptDocumentNode>();
         }
 
-
-
-
+        /// <summary>
+        /// Method used to retrieve Exception handlers defined using the 'onexception' KScriptObject.
+        /// </summary>
+        /// <param name="uid">Unique ID</param>
+        /// <returns>List of KScriptDocument Nodes</returns>
         public List<IKScriptDocumentNode> GetExceptionHandlers(string uid)
         {
             if (Value.ContainsKey(GlobalIdentifiers.EXCEPTIONS))

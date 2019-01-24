@@ -26,7 +26,7 @@ namespace KScript.Arguments
         }
 
         private types _type = types.replace;
-        private enum types { replace, append }
+        private enum types { replace, append, add }
 
         public override bool Run()
         {
@@ -34,11 +34,22 @@ namespace KScript.Arguments
             {
                 Def(to).Contents = HandleCommands(Contents);
             }
-            else
+            else if (_type == types.append)
             {
                 string tmp = Def(to).Contents;
                 tmp = tmp + HandleCommands(Contents);
                 Def(to).Contents = tmp;
+            }
+            else
+            {
+                int number, otherNumber;
+
+                bool isNumber = int.TryParse(Def(to).Contents, out number);
+                bool newContentsIsNumber = int.TryParse(Contents, out otherNumber);
+                if (isNumber && newContentsIsNumber)
+                {
+                    Def(to).Contents = (otherNumber + number).ToString();
+                }
             }
             return true;
         }
@@ -48,7 +59,7 @@ namespace KScript.Arguments
         public override void Validate()
         {
             KScriptValidator validator = new KScriptValidator(ParentContainer);
-            validator.AddValidator(new KScriptValidationObject("type", false, "replace", "append"));
+            validator.AddValidator(new KScriptValidationObject("type", false, Enum.GetNames(typeof(types))));
             validator.AddValidator(new KScriptValidationObject("to", false, KScriptValidator.ExpectedInput.DefID));
             validator.Validate(this);
         }

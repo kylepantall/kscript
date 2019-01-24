@@ -79,7 +79,9 @@ namespace KScript
 
                 if (parser.Properties.WaitOnFinish)
                 {
-                    if (Process.GetCurrentProcess().Threads.Count > 0)
+                    IEnumerable<ProcessThread> threads = Process.GetCurrentProcess().Threads.Cast<ProcessThread>().Where(i => i.ThreadState == ThreadState.Running);
+
+                    if (threads.Count() > 1)
                     {
                         Console.WriteLine("Awaiting for child processes to finish...");
                         Console.ReadKey();

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Management;
 using KScript.KScriptExceptions;
 
 namespace KScript.Commands
@@ -21,7 +22,7 @@ namespace KScript.Commands
             {
                 switch (value.ToLower())
                 {
-                    case "os.version": return Environment.OSVersion.VersionString;
+                    case "os.name": return GetOSFriendlyName();
                     case "machine.name": return Environment.MachineName;
                     case "script.path": return ParentContainer.FilePath;
                     case "script.directory": return ParentContainer.FileDirectory;
@@ -32,6 +33,26 @@ namespace KScript.Commands
                     default: return ParentContainer.FileDirectory;
                 }
             }
+        }
+
+        /// <summary>
+        /// Returns the name of the operating system.
+        /// </summary>
+        /// <returns>OS Name</returns>
+        public static string GetOSFriendlyName()
+        {
+            string result = string.Empty;
+            try
+            {
+                ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem");
+                foreach (ManagementObject os in searcher.Get())
+                {
+                    result = os["Caption"].ToString();
+                    break;
+                }
+            }
+            catch (Exception) { }
+            return result;
         }
 
 

@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using KScript.VariableFunctions;
 
 namespace KScript
 {
@@ -25,21 +26,49 @@ namespace KScript
         {
             string result = contents;
 
-            MatchCollection matches = Regex.Matches(contents, Global.GlobalIdentifiers.VARIABLE_POINTERS, RegexOptions.Multiline);
+            MatchCollection pointer_matches = Regex.Matches(contents, Global.GlobalIdentifiers.VARIABLE_POINTERS, RegexOptions.Multiline);
+            MatchCollection tied_pointer_matches = Regex.Matches(contents, Global.GlobalIdentifiers.VARIABLE_TIED_POINTERS, RegexOptions.Multiline);
 
-            foreach (Match match in matches)
+            if (tied_pointer_matches.Count > 0)
             {
-                string variable_id = match.Groups[1].Value;
-                string variable_func = match.Groups[2].Value;
-                IVariableFunction func = ParentContainer.Parser.GetVariableFunction(variable_id, variable_func, ParentContainer);
-                if (func.IsAccepted())
+                foreach (Match match in tied_pointer_matches)
                 {
+                    string variable_id = match.Groups[1].Value;
+                    string variable_second_id = match.Groups[2].Value;
+                    string variable_func = match.Groups[3].Value;
 
-                    string val = func.Evaluate(null);
-                    string replace = string.Format(@"\$\b{0}\b\-\>\b{1}\b\(\)", variable_id, variable_func);
-                    result = Regex.Replace(contents, replace, val);
+                    ITiedVariableFunction func = ParentContainer.Parser.GetTiedVariableFunction(variable_id, variable_second_id, variable_func, ParentContainer);
+                    if (func != null)
+                    {
+                        if (func.IsAccepted())
+                        {
+                            string val = func.Evaluate(null);
+                            string replace = string.Format(@"\$(\b{0}\b)\%\$(\b{1}\b)(?:\-\>)(\b{2}\b)\(\)", variable_id, variable_second_id, variable_func);
+                            result = Regex.Replace(contents, replace, val);
+                        }
+                    }
                 }
             }
+
+            if (pointer_matches.Count > 0 && !Regex.IsMatch(contents, Global.GlobalIdentifiers.VARIABLE_POINTERS_CORRECTION))
+            {
+                foreach (Match match in pointer_matches)
+                {
+                    string variable_id = match.Groups[1].Value;
+                    string variable_func = match.Groups[2].Value;
+                    IVariableFunction func = ParentContainer.Parser.GetVariableFunction(variable_id, variable_func, ParentContainer);
+                    if (func != null)
+                    {
+                        if (func.IsAccepted())
+                        {
+                            string val = func.Evaluate(null);
+                            string replace = string.Format(@"\$\b{0}\b\-\>\b{1}\b\(\)", variable_id, variable_func);
+                            result = Regex.Replace(contents, replace, val);
+                        }
+                    }
+                }
+            }
+
 
             result = Regex.Replace(result, string.Format(@"\$\b{0}\b(?!\-\>)", key), value, RegexOptions.IgnoreCase);
 

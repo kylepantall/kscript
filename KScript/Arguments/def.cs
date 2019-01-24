@@ -1,5 +1,5 @@
-﻿using KScript.KScriptObjects;
-using KScript.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
@@ -23,11 +23,12 @@ namespace KScript.Arguments
             else { Contents = HandleCommands(Contents); }
             return true;
         }
+
         public override void Validate()
         {
             if (id.Contains(" ") || id.Contains("$"))
             {
-                throw new KScriptValidationFail(this,"The id cannot contain any spaces or $ symbols.");
+                throw new KScriptValidationFail(this, "The id cannot contain any spaces or $ symbols.");
             }
         }
 

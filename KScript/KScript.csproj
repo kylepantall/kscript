@@ -53,6 +53,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
     <Reference Include="System.Net" />
     <Reference Include="System.Web" />
     <Reference Include="System.Windows.Forms" />
@@ -83,6 +84,7 @@
     <Compile Include="Arguments\input.cs" />
     <Compile Include="Arguments\kscript.cs" />
     <Compile Include="Arguments\dowhile.cs" />
+    <Compile Include="Arguments\languages.cs" />
     <Compile Include="Arguments\load.cs" />
     <Compile Include="Arguments\loadHtml.cs" />
     <Compile Include="Arguments\method.cs" />
@@ -116,6 +118,7 @@
     <Compile Include="Commands\getfiles.cs" />
     <Compile Include="Commands\if.cs" />
     <Compile Include="Commands\ifnull.cs" />
+    <Compile Include="Commands\iftrue.cs" />
     <Compile Include="Commands\k.cs" />
     <Compile Include="KScriptObjects\KScriptIDObject.cs" />
     <Compile Include="Commands\length.cs" />
@@ -160,6 +163,7 @@
     <Compile Include="KScriptObjects\KScriptValidator.cs" />
     <Compile Include="KScriptParserHandlers\HtmlObjectParser.cs" />
     <Compile Include="KScriptParserHandlers\IParserHandler.cs" />
+    <Compile Include="KScriptParserHandlers\LanguageContainerParser.cs" />
     <Compile Include="Parser\KScriptContainer.cs" />
     <Compile Include="KScriptDocument\KScriptDocument.cs" />
     <Compile Include="KScriptDocument\KScriptDocumentCollectionNode.cs" />
@@ -173,6 +177,15 @@
     <Compile Include="KScriptObjects\KScriptExceptions.cs" />
     <Compile Include="KScriptObjects\KScriptObject.cs" />
     <Compile Include="KScriptContainerObjects\KScriptConditional.cs" />
+    <Compile Include="VariableFunctions\add.cs" />
+    <Compile Include="VariableFunctions\decrement.cs" />
+    <Compile Include="VariableFunctions\equals.cs" />
+    <Compile Include="VariableFunctions\increment.cs" />
+    <Compile Include="VariableFunctions\isnumber.cs" />
+    <Compile Include="VariableFunctions\isurl.cs" />
+    <Compile Include="VariableFunctions\ITiedVariableFunction.cs" />
+    <Compile Include="VariableFunctions\notzero.cs" />
+    <Compile Include="VariableFunctions\iszero.cs" />
     <Compile Include="VariableFunctions\IVariableFunction.cs" />
     <Compile Include="VariableFunctions\lower.cs" />
     <Compile Include="VariableFunctions\paragraph.cs" />

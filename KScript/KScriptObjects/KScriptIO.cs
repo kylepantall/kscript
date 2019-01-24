@@ -119,6 +119,25 @@ namespace KScript.KScriptTypes
         public string In() => Console.In.ReadLine();
         public string In(string prompt) { Out(prompt); return Console.In.ReadLine(); }
 
+        /// <summary>
+        /// Hangs for input until condition = true.
+        /// </summary>
+        /// <param name="condition">Hang until condition is true</param>
+        /// <returns>Entered input</returns>
+        public string InUntil(bool condition, string prompt = "")
+        {
+            string tmp = "";
+            while (condition)
+            {
+                if (!string.IsNullOrWhiteSpace(prompt))
+                {
+                    Out(prompt);
+                }
+                tmp = Console.In.ReadLine();
+            }
+            return tmp;
+        }
+
         public int InNumber() => int.Parse(Console.ReadLine().Trim());
         public int InNumber(string prompt) { Out(prompt); return int.Parse(Console.ReadLine().Trim()); }
 

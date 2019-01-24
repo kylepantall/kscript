@@ -137,6 +137,12 @@ namespace KScript
         /// <param name="def">Def object to add</param>
         internal void AddDef(string key, def def) => defs.Add(key, def);
 
+        /// <summary>
+        /// Method used to remove a def from def dictionary
+        /// </summary>
+        /// <param name="key">Key to use</param>
+        internal void RemoveDef(string key) => defs.Remove(key);
+
         //Used to store arrays
         private IDictionary<string, List<string>> arrays { get; set; }
 

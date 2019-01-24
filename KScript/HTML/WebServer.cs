@@ -92,7 +92,7 @@
                                 ctx.Response.ContentLength64 = buf.Length;
                                 ctx.Response.OutputStream.Write(buf, 0, buf.Length);
                             }
-                            catch (Exception ex) { throw ex; }
+                            catch (Exception) { }
                             finally
                             {
                                 ctx.Response.OutputStream.Close();

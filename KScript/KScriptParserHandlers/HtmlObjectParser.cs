@@ -5,6 +5,8 @@ namespace KScript.KScriptParserHandlers
 {
     public class HtmlObjectParser : IParserHandler
     {
+        public HtmlObjectParser(KScriptContainer container) : base(container) { }
+
         /// <summary>
         /// Accepts the given XMLNode and KScriptObject If the KScript Object is of the type loadHtml
         /// </summary>

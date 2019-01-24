@@ -12,15 +12,10 @@ namespace KScript.Handlers
     [ClassInterface(ClassInterfaceType.None)]
     public class KScriptCommandHandler
     {
-        public const string COMMANDS_NAMESPACE = "KScript.Commands";
-
-        public const string COMMANDS_WITH_PARAMS = @"\@(\w+)\((.+)\)";
-        public const string COMMANDS_NO_PARAMS = @"\@(\w+)\(\)";
-
         public static bool IsCommand(string str, KScriptContainer container, KScriptBaseObject parent)
         {
-            Regex cmd_params = new Regex(COMMANDS_WITH_PARAMS);
-            Regex cmd_no_params = new Regex(COMMANDS_NO_PARAMS);
+            Regex cmd_params = new Regex(Global.GlobalIdentifiers.COMMANDS_WITH_PARAMS);
+            Regex cmd_no_params = new Regex(Global.GlobalIdentifiers.COMMANDS_NO_PARAMS);
 
             var cmd_no_params_matches = cmd_no_params.Matches(str);
             var cmd_params_matches = cmd_params.Matches(str);
@@ -218,6 +213,6 @@ namespace KScript.Handlers
             }
         }
 
-        public static Type GetCommandType(string type_name) => Assembly.GetExecutingAssembly().GetType(string.Format("{0}.{1}", COMMANDS_NAMESPACE, type_name));
+        public static Type GetCommandType(string type_name) => Assembly.GetExecutingAssembly().GetType(string.Format("{0}.{1}", Global.GlobalIdentifiers.COMMANDS_NAMESPACE, type_name));
     }
 }

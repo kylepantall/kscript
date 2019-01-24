@@ -1,9 +1,12 @@
 ﻿using System.Xml;
+using KScript.KScriptTypes;
 
 namespace KScript.KScriptParserHandlers
 {
-    public abstract class IParserHandler
+    public abstract class IParserHandler : KScriptIO
     {
+        public IParserHandler(KScriptContainer container) : base(container) { }
+
         /// <summary>
         /// Determines if the given KScriptObject is accepted by this parse handler.
         /// </summary>

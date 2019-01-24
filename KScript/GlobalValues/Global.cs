@@ -22,6 +22,15 @@
 
         public const string VARIABLE_NO_POINTERS = @"\$\b\S+\b(?!\-\>)";
         public const string VARIABLE_POINTERS = @"\$(\w+)(?:\-\>)(\w+)\(\)";
+        public const string VARIABLE_TIED_POINTERS = @"\$(\w+)\%\$(\w+)(?:\-\>)(\w+)\(\)";
+        public const string VARIABLE_POINTERS_CORRECTION = @"\%\$(\w+)(?:\-\>)(\w+)\(\)";
+
+
+
+        public const string COMMANDS_NAMESPACE = "KScript.Commands";
+
+        public const string COMMANDS_WITH_PARAMS = @"\@(\w+)\((.+)\)";
+        public const string COMMANDS_NO_PARAMS = @"\@(\w+)\(\)";
 
 
         //public const string SPLIT_ARRAY_EXPRESSION = @"(?<!,[^(]+\([^)]+),";
