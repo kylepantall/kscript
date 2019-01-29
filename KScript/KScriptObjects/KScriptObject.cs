@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using KScript.Arguments;
 using KScript.Handlers;
@@ -13,6 +14,30 @@ namespace KScript
     [ClassInterface(ClassInterfaceType.None)]
     public abstract class KScriptObject : KScriptBaseObject
     {
+        private List<string> Tags;
+
+        /// <summary>
+        /// Returns collection of KScriptObject tags.
+        /// </summary>
+        /// <returns>Returns the collection of tags</returns>
+        protected List<string> GetTags() => Tags;
+
+        /// <summary>
+        /// Adds a tag for this KScriptObject.
+        /// </summary>
+        /// <param name="id">ID to use</param>
+        /// <param name="value">Value to tag with</param>
+        protected void AddTag(string value) => Tags.Add(value);
+
+
+        /// <summary>
+        /// Returns if the given KScriptObject has the given tag.
+        /// </summary>
+        /// <param name="tag">Tag to search this object for.</param>
+        /// <returns>If the tag is attached.</returns>
+        protected bool HasTag(string tag) => Tags.Contains(tag);
+
+
         public enum ValidationTypes
         {
             /// <summary>
@@ -52,7 +77,11 @@ namespace KScript
         /// <summary>
         /// Sets the parent KScriptObject to current object.
         /// </summary>
-        public KScriptObject() => SetBaseScriptObject(this);
+        public KScriptObject()
+        {
+            SetBaseScriptObject(this);
+            Tags = new List<string>();
+        }
 
         /// <summary>
         /// The content of the KScript object as a string.

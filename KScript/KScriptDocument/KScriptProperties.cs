@@ -9,6 +9,7 @@ namespace KScript
         public bool ClearAfterInput { get; set; }
         public bool WaitOnFinish { get; set; }
         public bool FullScreen { get; set; }
+        public string Language { get; set; }
 
         public KScriptProperties()
         {

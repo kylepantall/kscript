@@ -33,10 +33,7 @@ namespace KScript.Handlers
                 {
                     return false;
                 }
-                else
-                {
-                    return false;
-                }
+                throw new KScriptBoolInvalid();
             }
             else
             {

@@ -60,7 +60,7 @@ namespace KScript.Arguments
         {
             KScriptValidator validator = new KScriptValidator(ParentContainer);
             validator.AddValidator(new KScriptValidationObject("type", false, Enum.GetNames(typeof(types))));
-            validator.AddValidator(new KScriptValidationObject("to", false, KScriptValidator.ExpectedInput.DefID));
+            //validator.AddValidator(new KScriptValidationObject("to", false, KScriptValidator.ExpectedInput.DefID));
             validator.Validate(this);
         }
     }

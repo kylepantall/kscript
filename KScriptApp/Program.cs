@@ -28,6 +28,8 @@ namespace KScript
 
         static void Main(string[] args)
         {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+
             if (args.Length > 0)
             {
                 bool hasColor = args.Any(i => i.ToLower() == "-colourful");
@@ -80,7 +82,6 @@ namespace KScript
                 if (parser.Properties.WaitOnFinish)
                 {
                     IEnumerable<ProcessThread> threads = Process.GetCurrentProcess().Threads.Cast<ProcessThread>().Where(i => i.ThreadState == ThreadState.Running);
-
                     if (threads.Count() > 1)
                     {
                         Console.WriteLine("Awaiting for child processes to finish...");
@@ -88,7 +89,7 @@ namespace KScript
                     }
                     else
                     {
-                        Console.WriteLine("\n\nPress any key to close...");
+                        Console.WriteLine("Press any key to close...");
                         Console.ReadKey();
                     }
                 }

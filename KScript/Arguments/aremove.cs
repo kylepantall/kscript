@@ -14,14 +14,12 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            //ParentContainer.Parser.Iterate
+            KScript().ArraysGet()[from].RemoveAt(int.Parse(index));
             return true;
         }
 
-        public override string UsageInformation()
-        {
-            throw new System.NotImplementedException();
-        }
+        public override string UsageInformation() => "Removes from an array at the given index from the array ID. " +
+            "Example: <aremove from=\"id\" index=\"0\" />";
 
         public override void Validate()
         {

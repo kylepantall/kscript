@@ -20,12 +20,17 @@
         public const string CALLS = "calls";
         public const string EXCEPTIONS = "exceptions";
 
+        // $variable Expressions
         public const string VARIABLE_NO_POINTERS = @"\$\b\S+\b(?!\-\>)";
         public const string VARIABLE_POINTERS = @"\$(\w+)(?:\-\>)(\w+)\(\)";
         public const string VARIABLE_TIED_POINTERS = @"\$(\w+)\%\$(\w+)(?:\-\>)(\w+)\(\)";
         public const string VARIABLE_POINTERS_CORRECTION = @"\%\$(\w+)(?:\-\>)(\w+)\(\)";
 
-
+        //<func/> Expressions
+        public const string IFMATCHFUNCTION = @"(\$=)(.+\:.+)";
+        public const string IFEQUALSTHENADD = @"(\$\+=)(.+\:.+)";
+        public const string IFTHENRANDOMVALUE = @"(\$\?\?=)(.+|.+\,)";
+        public const string REPEATFUNCTION = @"\[([0-9]+)\,([^]]+)\]+";
 
         public const string COMMANDS_NAMESPACE = "KScript.Commands";
 
@@ -35,5 +40,9 @@
 
         //public const string SPLIT_ARRAY_EXPRESSION = @"(?<!,[^(]+\([^)]+),";
         public const string ARRAY_CHECK_EXPRESSION = @"("".*?""|[^"",\s]+)(?=\s*,|\s*$)";
+
+
+        //Paragraph Expressions
+        public const string PARAGRAPH_EXPRESSION = @"\""(.+)\""";
     }
 }

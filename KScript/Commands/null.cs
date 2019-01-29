@@ -6,6 +6,7 @@ namespace KScript.Commands
     {
         private readonly string value = "";
         public @null(string val) => value = val;
+        public @null() { }
 
         public override string Calculate()
         {

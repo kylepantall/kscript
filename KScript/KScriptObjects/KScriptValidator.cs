@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using KScript.Handlers;
 using KScript.KScriptExceptions;
 using static KScript.KScriptObjects.KScriptValidator;
 
@@ -21,7 +22,8 @@ namespace KScript.KScriptObjects
             DirectoryLocation,
             URL,
             Number,
-            Text
+            Text,
+            Bool
         }
 
         public KScriptValidator(KScriptContainer container)
@@ -152,6 +154,9 @@ namespace KScript.KScriptObjects
                 case ExpectedInput.Number:
                     int number;
                     return int.TryParse(GetPropertyValue(caller), out number);
+                case ExpectedInput.Bool:
+                    bool isBool = KScriptBoolHandler.IsBool(GetPropertyValue(caller));
+                    return isBool;
             }
             return true;
         }
@@ -163,7 +168,12 @@ namespace KScript.KScriptObjects
         /// <param name="caller">Object calling the validation.</param>
         public void Validate(KScriptContainer container, KScriptBaseObject caller)
         {
-            if (!IsExpectedInput(container, caller))
+            if (!IsAllowedEmpty(caller))
+            {
+                throw new KScriptMissingAttribute(caller, string.Format("The KScript Object property '{0}' must be declared and given a value.", GetPropertyValue(caller)));
+            }
+
+            if (!IsExpectedInput(container, caller) && !string.IsNullOrEmpty(GetPropertyValue(caller)))
             {
                 switch (expected_input)
                 {
@@ -179,22 +189,20 @@ namespace KScript.KScriptObjects
                         throw new KScriptException(caller, "Expected input was not of the type 'Number'");
                     case ExpectedInput.Text:
                         throw new KScriptException(caller, "Expected input was not of the type 'Text'");
+                    case ExpectedInput.Bool:
+                        throw new KScriptException(caller, "Expected value was not of the type 'Bool'");
+                    case ExpectedInput.URL:
+                        throw new KScriptException(caller, "Expected value was not of the type 'URL'");
                     default:
                         break;
                 }
             }
-
 
             if (!IsAcceptedValue(caller))
             {
                 throw new KScriptException(caller, string.Format("The value '{0}' was not an accepted value for the property '{1}'.", GetPropertyValue(caller), property_name));
             }
 
-
-            if (!IsAllowedEmpty(caller))
-            {
-                throw new KScriptMissingAttribute(caller, string.Format("The KScript Object property '{0}' must be declared and given a value.", GetPropertyValue(caller)));
-            }
         }
     }
 }

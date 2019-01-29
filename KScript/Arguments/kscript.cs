@@ -17,6 +17,9 @@ namespace KScript.Arguments
         [KScriptObjects.KScriptAcceptedOptions("yes", "no", "y", "n", "1", "0", "t", "f", "true", "false")]
         public string on_finish_wait { get; set; } = "yes";
 
+        [KScriptObjects.KScriptProperty("Used to indicate the language of the machine", false)]
+        public string language { get; set; }
+
         public override bool Run()
         {
             bool _quiet = false, _print_info = false, _on_finish_wait = true;
@@ -50,6 +53,8 @@ namespace KScript.Arguments
 
             ParentContainer.Properties.Quiet = _quiet;
             ParentContainer.Properties.WaitOnFinish = _on_finish_wait;
+            ParentContainer.Properties.Language = language;
+
             if (_print_info)
             {
                 ParentContainer.PrintInfo();

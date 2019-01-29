@@ -21,27 +21,20 @@ namespace KScript.Arguments
 
 
         [KScriptObjects.KScriptProperty("Used to declare a expression.", true)]
-        [KScriptObjects.KScriptExample("$='some example text':'value to update'")]
-        [KScriptObjects.KScriptExample("$=1:exit")]
+        [KScriptObjects.KScriptExample("$='some value to replace':'value to update with'")]
+        [KScriptObjects.KScriptExample("$=1:settings,2:exit")]
         public string expression { get; set; }
 
 
         public override bool Run()
         {
-            string ifMatchFunction = @"(\$=)(.+\:.+)";
-            string ifEqualsThenAdd = @"(\$\+=)(.+\:.+)";
-            string ifThenRandomValue = @"(\$\?\?=)(.+|.+\,)";
-
-            //$#=[number of repetitions,value]
-            string repeatFunc = @"\[([0-9]+)\,([^]]+)\]+";
-
-            Regex reg = new Regex(ifMatchFunction);
+            Regex reg = new Regex(Global.GlobalIdentifiers.IFMATCHFUNCTION);
 
             string exp = HandleCommands(expression);
 
-            if (Regex.IsMatch(exp, ifMatchFunction))
+            if (Regex.IsMatch(exp, Global.GlobalIdentifiers.IFMATCHFUNCTION))
             {
-                Match match = Regex.Match(exp, ifMatchFunction);
+                Match match = Regex.Match(exp, Global.GlobalIdentifiers.IFMATCHFUNCTION);
                 string _expression = match.Groups[2].Value;
                 string[] Expression = _expression.Split(',');
 
@@ -55,9 +48,9 @@ namespace KScript.Arguments
                     }
                 }
             }
-            else if (Regex.IsMatch(exp, ifEqualsThenAdd))
+            else if (Regex.IsMatch(exp, Global.GlobalIdentifiers.IFEQUALSTHENADD))
             {
-                Match match = Regex.Match(exp, ifEqualsThenAdd);
+                Match match = Regex.Match(exp, Global.GlobalIdentifiers.IFEQUALSTHENADD);
                 string _expression = match.Groups[2].Value;
                 string[] Expression = _expression.Split(',');
 
@@ -84,20 +77,20 @@ namespace KScript.Arguments
                     }
                 }
             }
-            else if (Regex.IsMatch(exp, ifThenRandomValue))
+            else if (Regex.IsMatch(exp, Global.GlobalIdentifiers.IFTHENRANDOMVALUE))
             {
-                Match match = Regex.Match(exp, ifThenRandomValue);
+                Match match = Regex.Match(exp, Global.GlobalIdentifiers.IFTHENRANDOMVALUE);
                 string _expression = match.Groups[2].Value;
                 string[] Expression = _expression.Split(',');
                 int count = Expression.Count();
                 Def(to).Contents = Expression[rnd.Next(0, count)];
             }
-            else if (exp.StartsWith("$#=") && Regex.IsMatch(exp, repeatFunc))
+            else if (exp.StartsWith("$#=") && Regex.IsMatch(exp, Global.GlobalIdentifiers.REPEATFUNCTION))
             {
                 //Group 1 is repetition, group 2 is value to repeat
 
                 StringBuilder builder = new StringBuilder();
-                MatchCollection matches = Regex.Matches(exp, repeatFunc);
+                MatchCollection matches = Regex.Matches(exp, Global.GlobalIdentifiers.REPEATFUNCTION);
                 foreach (Match match in matches.Cast<Match>())
                 {
                     int repeat = int.Parse(match.Groups[1].Value);

@@ -93,6 +93,7 @@
     <Compile Include="Arguments\ref.cs" />
     <Compile Include="Arguments\registry.cs" />
     <Compile Include="Arguments\run.cs" />
+    <Compile Include="Arguments\temp.cs" />
     <Compile Include="Arguments\throw.cs" />
     <Compile Include="Arguments\try.cs" />
     <Compile Include="Arguments\update.cs" />
@@ -108,7 +109,9 @@
     <Compile Include="Commands\api.cs" />
     <Compile Include="Commands\args.cs" />
     <Compile Include="Commands\array.cs" />
+    <Compile Include="Commands\atindex.cs" />
     <Compile Include="Commands\average.cs" />
+    <Compile Include="Commands\constant.cs" />
     <Compile Include="Commands\contains.cs" />
     <Compile Include="Commands\equals.cs" />
     <Compile Include="Commands\date.cs" />
@@ -120,6 +123,7 @@
     <Compile Include="Commands\ifnull.cs" />
     <Compile Include="Commands\iftrue.cs" />
     <Compile Include="Commands\k.cs" />
+    <Compile Include="Commands\xpath.cs" />
     <Compile Include="KScriptObjects\KScriptIDObject.cs" />
     <Compile Include="Commands\length.cs" />
     <Compile Include="Commands\math.cs" />
@@ -159,6 +163,7 @@
     <Compile Include="KScriptObjects\KScriptHideObject.cs" />
     <Compile Include="KScriptObjects\KScriptObjectException.cs" />
     <Compile Include="KScriptContainerObjects\KScriptObjectLoop.cs" />
+    <Compile Include="Handlers\KScriptParagraphHandler.cs" />
     <Compile Include="KScriptObjects\KScriptProperty.cs" />
     <Compile Include="KScriptObjects\KScriptValidator.cs" />
     <Compile Include="KScriptParserHandlers\HtmlObjectParser.cs" />
@@ -179,8 +184,10 @@
     <Compile Include="KScriptContainerObjects\KScriptConditional.cs" />
     <Compile Include="VariableFunctions\add.cs" />
     <Compile Include="VariableFunctions\decrement.cs" />
-    <Compile Include="VariableFunctions\equals.cs" />
+    <Compile Include="VariableFunctions\equal.cs" />
+    <Compile Include="VariableFunctions\hasvalue.cs" />
     <Compile Include="VariableFunctions\increment.cs" />
+    <Compile Include="VariableFunctions\isbool.cs" />
     <Compile Include="VariableFunctions\isnumber.cs" />
     <Compile Include="VariableFunctions\isurl.cs" />
     <Compile Include="VariableFunctions\ITiedVariableFunction.cs" />

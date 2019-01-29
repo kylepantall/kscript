@@ -38,6 +38,8 @@ namespace KScript
         //Stores the commands used for each KScriptObject session.
         private readonly Dictionary<string, ICommandObject> CommandStore = new Dictionary<string, ICommandObject>();
 
+        //Stores all the constant KScriptObject properties - prefixed with '__'.
+        private readonly Dictionary<string, string> ConstantProperties = new Dictionary<string, string>();
 
         #region Global Values Storage - Stores values retrievable across all KScriptObjects (where ParentContainer accessible)
         private Dictionary<string, Dictionary<string, string>> UniqueStore = new Dictionary<string, Dictionary<string, string>>();
@@ -118,6 +120,12 @@ namespace KScript
 
         //Method used to obtain the Command store dictionary.
         public Dictionary<string, ICommandObject> GetCommandStore() => CommandStore;
+
+        /// <summary>
+        /// Used to retrieve constant KScript Properties - prefixed with '__', registers value + ID.
+        /// </summary>
+        /// <returns></returns>
+        public Dictionary<string, string> GetConstantProperties() => ConstantProperties;
 
         /// <summary>
         /// Used to store resource values.
@@ -520,8 +528,7 @@ namespace KScript
             {
                 if (defs.ContainsKey(id))
                 {
-                    var ex = new KScriptDefInUse(defs[id]);
-                    HandleException(ex);
+                    defs[id] = value;
                 }
                 else
                 {

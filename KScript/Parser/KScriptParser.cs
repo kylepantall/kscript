@@ -206,7 +206,14 @@ namespace KScript
             {
                 if (at.Name != "Contents")
                 {
-                    obj[at.Name.ToLower()] = at.Value;
+                    if (at.Name.StartsWith("__"))
+                    {
+                        container.GetConstantProperties().Add(at.Name.Substring(2), at.Value);
+                    }
+                    else
+                    {
+                        obj[at.Name.ToLower()] = at.Value;
+                    }
                 }
             }
             if (typeof(def).IsAssignableFrom(obj.GetType()))

@@ -20,7 +20,8 @@ namespace KScript.Arguments
             {
                 throw new KScriptNoRunMethodImplemented(this);
             }
-            else { Contents = HandleCommands(Contents); }
+
+            else { ParentContainer[id].Contents = HandleCommands(Contents); }
             return true;
         }
 

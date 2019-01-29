@@ -58,6 +58,9 @@ namespace KScript.Document
                         if (!container.GetDefs().ContainsKey(obj.to))
                         {
                             container.AddDef(obj.to, new Arguments.def("0"));
+                        } else
+                        {
+                            container[obj.to] = new Arguments.def("0");
                         }
 
                         do
@@ -65,9 +68,10 @@ namespace KScript.Document
                             Nodes.ForEach(node => node.Run(container, null));
 
                             string val = obj.HandleCommands(obj.math);
-                            obj.Def(obj.to).Contents = val;
+                            container[obj.to].Contents = val;
 
                         } while (obj.ToBool(obj.HandleCommands(obj.@while)));
+                        container.RemoveDef(obj.to);
                     }
 
                     else if (typeof(KScriptMethodWrapper).IsAssignableFrom(GetValue().GetType()))
