@@ -98,7 +98,7 @@ namespace KScript.KScriptObjects
             }
             else
             {
-                if (string.IsNullOrEmpty(GetPropertyValue(caller)) || GetPropertyValue(caller) == null)
+                if (string.IsNullOrWhiteSpace(GetPropertyValue(caller)) || GetPropertyValue(caller) == null)
                 {
                     return false;
                 }

@@ -11,7 +11,9 @@ namespace KScript.Arguments
         {
             if (KScript().ArrayGet(this, to) != null)
             {
-                KScript().ArrayGet(this, to).Add(HandleCommands(Contents));
+                var array = KScript().ArrayGet(this, to);
+
+                array.Add(HandleCommands(Contents));
             }
             else
             {

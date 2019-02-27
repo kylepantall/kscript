@@ -26,6 +26,7 @@ namespace KScript.Arguments
         /// Where to save input to - uses "def" to save input.
         /// </summary>
         [KScriptProperty("Which def to use to save the input.")]
+        [KScriptExample("my_param_id")]
         public string to { get; set; }
 
 

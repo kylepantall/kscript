@@ -92,6 +92,8 @@ namespace KScript.KScriptTypes
         /// <returns>Bool value.</returns>
         public bool ToBool(string @in) => KScriptBoolHandler.Convert(@in);
 
+        public bool IsBool(string @in) => KScriptBoolHandler.IsBool(@in);
+
         /// <summary>
         /// Method use to convert bool to string appropriate for KScript parsing.
         /// </summary>
@@ -106,6 +108,16 @@ namespace KScript.KScriptTypes
         /// <returns>NULL</returns>
         public string NULL => Global.Values.NULL;
 
+        /// <summary>
+        /// Determines if the input is a number
+        /// </summary>
+        /// <param name="input">String to evaluate</param>
+        /// <returns>If input is numeric (negatives and positives)</returns>
+        public bool IsNumber(string input)
+        {
+            float num;
+            return float.TryParse(input, out num);
+        }
 
         public void Out() => Console.Out.WriteLine();
         public void Out(string val) => Console.Out.Write(KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(val), ParentContainer, GetBaseObject()));

@@ -16,7 +16,11 @@
             int index = -1;
             if (int.TryParse(this.index, out index))
             {
-                return char.ToString(str[index]);
+                if (str.Length >= index)
+                {
+                    return str[index].ToString();
+                }
+                return string.Empty;
             }
 
             return string.Empty;

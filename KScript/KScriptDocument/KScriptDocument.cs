@@ -14,12 +14,19 @@ namespace KScript.Document
         public IKScriptDocumentNode GetFirst() => Nodes().First();
         public void Run(KScriptContainer container)
         {
-            foreach (var item in Nodes())
+            try
             {
-                if (container.AllowExecution)
+                foreach (var item in Nodes())
                 {
-                    item.Run(container, null);
+                    if (container.AllowExecution)
+                    {
+                        item.Run(container, null);
+                    }
                 }
+            }
+            catch (System.Exception ex)
+            {
+                container.HandleException(ex);
             }
         }
     }

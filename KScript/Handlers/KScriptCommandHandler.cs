@@ -34,8 +34,17 @@ namespace KScript.Handlers
             char[] str_cmds = str.ToCharArray();
 
             ICommandObject bracket = new ICommandObject(str, container, baseObj);
-
             ParamTracker paramTracker = new ParamTracker();
+
+            var allowedChars = new HashSet<char>(new[] { '(', ')', char.Parse("'") });
+            var stack = new List<char>(str.Where(allowedChars.Contains));
+
+            if (!(stack.Count % 2 == 0))
+            {
+                throw new KScriptExceptions.KScriptException("KScript Command is incorrectly formatted - check brackets match and that all (') symbols are surrounding strings." +
+                    "\nError occurs when parsing string: \n" + "----------------------------------------------------\n" + str);
+            }
+
 
             int index = -1;
 
@@ -174,7 +183,15 @@ namespace KScript.Handlers
             if (container.GetCommandStore().Any())
             {
                 string temp_string = str;
-                container.GetCommandStore().ToList().ForEach(item => temp_string = temp_string.Replace(item.Key, item.Value.GetCommandObject().CalculateValue()));
+
+                foreach (var item in container.GetCommandStore().ToList())
+                {
+                    var key = item.Key;
+                    var val = item.Value.GetCommandObject().CalculateValue();
+
+                    temp_string = temp_string.Replace(key, val);
+                }
+
                 container.GetCommandStore().Clear();
                 return temp_string;
             }

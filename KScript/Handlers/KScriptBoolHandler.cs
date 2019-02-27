@@ -9,15 +9,8 @@ namespace KScript.Handlers
 
         public static bool IsBool(string val)
         {
-            try
-            {
-                bool tmp = Convert(val);
-                return true;
-            }
-            catch (KScriptBoolInvalid)
-            {
-                return false;
-            }
+            var _val = val;
+            return (_val == "true" || val == "1" || val == "t" || val == "yes" || val == "y") || (_val == "false" || val == "0" || val == "f" || val == "no" || val == "n");
         }
 
         public static bool Convert(string val)
@@ -33,7 +26,10 @@ namespace KScript.Handlers
                 {
                     return false;
                 }
-                throw new KScriptBoolInvalid();
+                else
+                {
+                    throw new KScriptBoolInvalid();
+                }
             }
             else
             {

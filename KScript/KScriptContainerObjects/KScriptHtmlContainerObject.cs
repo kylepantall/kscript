@@ -17,18 +17,22 @@ namespace KScript.KScriptContainerObjects
         [KScriptProperty("Used to determine which port to use.", false)]
         public string port { get; set; } = "8080";
 
+
+        //To-Be Implemented
         [KScriptProperty("The directory to use when obtaining resource files such as .png etc.", false)]
         public string directory { get; set; }
 
-        public KScriptHtmlContainerObject(string str) => Contents = str;
+        public KScriptHtmlContainerObject(string str) : base(str)
+        {
+            Contents = str;
+            ValidationType = ValidationTypes.DURING_PARSING;
+        }
 
         public override bool Run()
         {
-            ParentContainer.GetObjectStorageContainer().AddObjectFromUID(id, this);
-
             string localip = WebServer.GetLocalIPAddress();
-            bool is_closed = false;
 
+            bool is_closed = false;
             using (TcpClient tcpClient = new TcpClient())
             {
                 try
@@ -37,7 +41,9 @@ namespace KScript.KScriptContainerObjects
                     is_closed = false;
                 }
                 catch
-                { is_closed = true; }
+                {
+                    is_closed = true;
+                }
             }
 
 
@@ -72,8 +78,6 @@ namespace KScript.KScriptContainerObjects
                 {
                     return;
                 }
-
-
 
                 using (System.IO.Stream body = request.InputStream)
                 {
@@ -113,7 +117,8 @@ namespace KScript.KScriptContainerObjects
         {
             KScriptValidator validator = new KScriptValidator(ParentContainer);
             validator.AddValidator(new KScriptValidationObject("Contents", false));
-            //validator.AddValidator(new KScriptValidationObject("method", false, ParentContainer.GetObjectStorageContainer().GetMethodNames()));
+            validator.AddValidator(new KScriptValidationObject("id", false));
+            validator.AddValidator(new KScriptValidationObject("method", false, ParentContainer.GetObjectStorageContainer().GetMethodNames()));
             validator.Validate(this);
         }
     }

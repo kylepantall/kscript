@@ -1,6 +1,5 @@
 ﻿using System.Net.Http;
 using System.Net.Http.Headers;
-using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
@@ -22,7 +21,7 @@ namespace KScript.Commands
             }
             else
             {
-                throw new KScriptException("api.StatusTimedOut", "HttpClient Timed out.");
+                return NULL;
             }
         }
 

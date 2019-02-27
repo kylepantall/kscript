@@ -21,7 +21,17 @@ namespace KScript.KScriptExceptions
             ExceptionType = exception_type;
         }
 
-        public string GetExceptionType() => KScriptObject.GetType().Name;
+        public string GetExceptionType()
+        {
+            if (KScriptObject != null)
+            {
+                return KScriptObject.GetType().Name;
+            }
+            else
+            {
+                return "KScript_Internal_Error";
+            }
+        }
 
         public KScriptException(string message) : base(message)
         {
@@ -78,6 +88,22 @@ namespace KScript.KScriptExceptions
     {
         public KScriptValidationException(KScriptBaseObject obj) : base(obj) { }
         public KScriptValidationException(KScriptBaseObject obj, string msg) : base(obj, msg) { }
+    }
+
+    /// <summary>
+    /// Used to declare any KScriptObject as experimental or prototyped.
+    /// </summary>
+    public class KScriptPrototypeException : KScriptException
+    {
+        public KScriptPrototypeException(KScriptBaseObject obj) : base(obj, "This KScriptObject is in prototyping stage and is not ready for distribution with this version of KScript.") { }
+    }
+
+    /// <summary>
+    /// Used to declare any KScriptObject implementation as deprecated.
+    /// </summary>
+    public class KScriptDeprecatedException : KScriptException
+    {
+        public KScriptDeprecatedException(KScriptBaseObject obj) : base(obj, "This KScriptObject has been deprecated and is no longer accessible in this version of KScript.") { }
     }
 
 

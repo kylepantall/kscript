@@ -1,7 +1,7 @@
-﻿using KScript.Handlers;
-using KScript.KScriptExceptions;
-using System;
+﻿using System;
 using System.IO;
+using KScript.Handlers;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -20,7 +20,6 @@ namespace KScript.Arguments
         /// <summary>
         /// Used to inform the picker whether we're checking for a file path or a directory
         /// </summary>
-        /// 
         [KScriptObjects.KScriptProperty("The type of directory to expect.", true)]
         [KScriptObjects.KScriptAcceptedOptions("directory", "file")]
         public string type

@@ -2,6 +2,10 @@
 {
     public abstract class KScriptIDObject : KScriptObject
     {
+        public KScriptIDObject() : base() { }
+        public KScriptIDObject(string contents) : base(contents) { }
+        public KScriptIDObject(object contents) : base(contents) { }
+
         [KScriptProperty("Defines the Unique ID for this KScript Object.", true)]
         public string id { get; set; }
 

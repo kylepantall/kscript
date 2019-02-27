@@ -1,0 +1,16 @@
+﻿<kscript>
+  <def id="input"/>
+
+  <!--<for to="index" math="$index->increment()" while="@more_less('$index','90','lt')">
+    <for to="index" math="$index->increment()" while="@more_less('$index','90','lt')">
+      <echo>[$index] @char('$index')</echo>
+    </for>
+  </for>-->
+
+
+  <dowhile condition="yes">
+    <input to="input" type="text">Enter a command: </input>
+    <echo>@parse('$input')</echo>
+  </dowhile>
+
+</kscript>

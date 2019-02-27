@@ -1,8 +1,8 @@
 ﻿namespace KScript.VariableFunctions
 {
-    class hasvalue : IVariableFunction
+    class has_value : IVariableFunction
     {
-        public hasvalue(KScriptContainer container, string variable_ID) : base(container, variable_ID) { }
+        public has_value(KScriptContainer container, string variable_ID) : base(container, variable_ID) { }
 
         public override string Evaluate(params string[] args) => ToBoolString(!string.IsNullOrEmpty(GetDef().Contents));
 

@@ -1,10 +1,5 @@
-﻿using KScript.KScriptObjects;
-using KScript.KScriptExceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using KScript.KScriptExceptions;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
@@ -27,9 +22,8 @@ namespace KScript.Arguments
         {
             bool _check_for = checkfor != null ? ToBool(checkfor) : true;
             string new_condition = HandleCommands(condition);
+            return IsBool(new_condition) ? (!_check_for ? !ToBool(new_condition) : ToBool(new_condition)) : false;
 
-            if (!_check_for) return !ToBool(new_condition);
-            else return ToBool(new_condition);
         }
 
         public override string UsageInformation() => "Used to only run the inner KScriptObjects if the condition is true.";

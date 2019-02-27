@@ -2,15 +2,15 @@
 
 namespace KScript.VariableFunctions
 {
-    internal class iszero : IVariableFunction
+    internal class not_zero : IVariableFunction
     {
-        public iszero(KScriptContainer container, string value) : base(container, value) { }
+        public not_zero(KScriptContainer container, string value) : base(container, value) { }
 
         public override string Evaluate(params string[] args)
         {
             int num = int.Parse(GetDef().Contents);
 
-            return ToBoolString(num <= 0);
+            return ToBoolString(num > 0);
         }
 
         public override bool IsAccepted() => GetDef().Contents.All(char.IsNumber);

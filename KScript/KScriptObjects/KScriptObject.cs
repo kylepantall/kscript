@@ -57,6 +57,11 @@ namespace KScript
         }
 
         /// <summary>
+        /// Sets the KScriptObject to be ignored.
+        /// </summary>
+        public void SetIgnore() => Ignore = true;
+
+        /// <summary>
         /// Defines when validation should occur.
         /// </summary>
         public ValidationTypes ValidationType { get; set; } = ValidationTypes.BEFORE_PARSING;
@@ -65,13 +70,13 @@ namespace KScript
         /// Initialises a KScriptObject with it's content as an object.
         /// </summary>
         /// <param name="Contents">Contents of KScript object.</param>
-        public KScriptObject(object Contents) : this() { }
+        public KScriptObject(object Contents) : this() => ContentsAsObject = Contents;
 
         /// <summary>
         /// Initialises a KScriptObject with it's content as a string.
         /// </summary>
         /// <param name="Contents">Contents of KScript object.</param>
-        public KScriptObject(string Contents) : this() { }
+        public KScriptObject(string Contents) : this() => this.Contents = Contents;
 
 
         /// <summary>
@@ -109,6 +114,13 @@ namespace KScript
         /// <param name="value">Value to handle commands from.</param>
         /// <returns>String with handled commands</returns>
         public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(value), ParentContainer, this);
+
+        /// <summary>
+        /// Method used to handle commands without converting variables so variables are handled by the commands directly.
+        /// </summary>
+        /// <param name="value">String to parse.</param>
+        /// <returns>Handled commands from raw input</returns>
+        public string HandleRawCommands(string value) => KScriptCommandHandler.HandleCommands(value, ParentContainer, this);
 
         /// <summary>
         /// Method used to retrieve def objects with specified id.

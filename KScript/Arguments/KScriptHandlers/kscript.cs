@@ -1,4 +1,5 @@
-﻿using KScript.KScriptExceptions;
+﻿using System.Globalization;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -53,7 +54,15 @@ namespace KScript.Arguments
 
             ParentContainer.Properties.Quiet = _quiet;
             ParentContainer.Properties.WaitOnFinish = _on_finish_wait;
-            ParentContainer.Properties.Language = language;
+
+            if (language == "auto")
+            {
+                ParentContainer.Properties.Language = CultureInfo.CurrentCulture.Name;
+            }
+            else
+            {
+                ParentContainer.Properties.Language = language;
+            }
 
             if (_print_info)
             {

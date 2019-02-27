@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using KScript.Arguments;
 using KScript.KScriptExceptions;
 
 namespace KScript.Document
@@ -33,8 +34,6 @@ namespace KScript.Document
                     catch (KScriptSkipScriptObject) { }
                 }
 
-
-
                 if (@continue)
                 {
                     if (typeof(KScriptConditional).IsAssignableFrom(GetValue().GetType()))
@@ -44,7 +43,27 @@ namespace KScript.Document
                         {
                             do
                             {
-                                Nodes.ForEach(node => node.Run(container, null));
+                                foreach (IKScriptDocumentNode node in Nodes)
+                                {
+                                    if (node.GetValue().GetType().IsAssignableFrom(typeof(@break)))
+                                    {
+                                        container.StopConditionalLoops();
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        if (!container.GetConditionalLoops())
+                                        {
+                                            node.Run(container, null);
+                                        }
+                                    }
+                                }
+
+                                if (container.GetConditionalLoops())
+                                {
+                                    container.AllowConditionalLoops();
+                                    return;
+                                }
                             }
                             while (obj.ToBool(obj.HandleCommands(obj.condition)));
                         }
@@ -57,20 +76,63 @@ namespace KScript.Document
 
                         if (!container.GetDefs().ContainsKey(obj.to))
                         {
-                            container.AddDef(obj.to, new Arguments.def("0"));
-                        } else
-                        {
-                            container[obj.to] = new Arguments.def("0");
+                            container.AddDef(obj.to, new def("0"));
                         }
+
+
+
+                        //for (int i = int.Parse(container[obj.to].Contents); obj.ToBool(obj.HandleCommands(obj.@while)); i = int.Parse(obj.HandleCommands(obj.math)))
+                        //{
+                        //    foreach (IKScriptDocumentNode node in Nodes)
+                        //    {
+                        //        if (node.GetValue().GetType().IsAssignableFrom(typeof(@break)))
+                        //        {
+                        //            container.StopConditionalLoops();
+                        //            break;
+                        //        }
+                        //        else
+                        //        {
+                        //            if (!container.GetConditionalLoops())
+                        //            {
+                        //                node.Run(container, null);
+                        //            }
+                        //        }
+                        //    }
+                        //    if (container.GetConditionalLoops())
+                        //    {
+                        //        container.AllowConditionalLoops();
+                        //        break;
+                        //    }
+                        //}
 
                         do
                         {
-                            Nodes.ForEach(node => node.Run(container, null));
+                            foreach (IKScriptDocumentNode node in Nodes)
+                            {
+                                if (node.GetValue().GetType().IsAssignableFrom(typeof(@break)))
+                                {
+                                    container.StopConditionalLoops();
+                                    break;
+                                }
+                                else
+                                {
+                                    if (!container.GetConditionalLoops())
+                                    {
+                                        node.Run(container, null);
+                                    }
+                                }
+                            }
+                            if (container.GetConditionalLoops())
+                            {
+                                container.AllowConditionalLoops();
+                                break;
+                            }
 
                             string val = obj.HandleCommands(obj.math);
                             container[obj.to].Contents = val;
 
                         } while (obj.ToBool(obj.HandleCommands(obj.@while)));
+
                         container.RemoveDef(obj.to);
                     }
 

@@ -26,7 +26,7 @@ namespace KScript.Commands
         {
             if (min > -1 && max > -1)
             {
-                return ParentContainer.GetRandom().Next(min, max).ToString();
+                return ParentContainer.GetRandom().Next(min, max + 1).ToString();
             }
             else
             {

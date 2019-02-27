@@ -1,6 +1,6 @@
-﻿using KScript.KScriptObjects;
+﻿using System;
 using KScript.KScriptExceptions;
-using System;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {

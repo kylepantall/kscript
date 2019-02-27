@@ -33,6 +33,7 @@
         public const string REPEATFUNCTION = @"\[([0-9]+)\,([^]]+)\]+";
 
         public const string COMMANDS_NAMESPACE = "KScript.Commands";
+        public const string VARIABLE_FUNCTIONS_NAMESPACE = "KScript.VariableFunctions";
 
         public const string COMMANDS_WITH_PARAMS = @"\@(\w+)\((.+)\)";
         public const string COMMANDS_NO_PARAMS = @"\@(\w+)\(\)";

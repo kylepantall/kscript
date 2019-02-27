@@ -22,11 +22,19 @@ namespace KScript
         const string VARIABLE_ASSEMBLY_PATH = "KScript.VariableFunctions";
         private const string PARSERHANDLERS = "KScript.KScriptParserHandlers";
 
+        private bool ConditionalLoops = true;
+
         //Property to store the random object used to generate random numbers and digits.
         private readonly Random _random;
 
         //StringHandler property used to store the KScriptStringHandler class.
         private KScriptStringHandler StringHandler { get; }
+
+
+        /// <summary>
+        /// Stores KScript Array Containers
+        /// </summary>
+        public readonly Dictionary<string, KScriptArrayContainer> KScriptArrayContainers;
 
         //Properties used to store file path and file directory of opened Script.
         internal string FilePath { get; set; }
@@ -139,6 +147,22 @@ namespace KScript
         internal IDictionary<string, def> GetDefs() => defs;
 
         /// <summary>
+        /// Used to prevent conditional loops - numerical or just conditional
+        /// </summary>
+        internal void StopConditionalLoops() => ConditionalLoops = false;
+
+        /// <summary>
+        /// Used to restore conditional and numerical loops
+        /// </summary>
+        internal void AllowConditionalLoops() => ConditionalLoops = true;
+
+        /// <summary>
+        /// Used to retrieve the conditional loops bool
+        /// </summary>
+        /// <returns></returns>
+        internal bool GetConditionalLoops() => !ConditionalLoops;
+
+        /// <summary>
         /// Method used to add def to def dictionary
         /// </summary>
         /// <param name="key">Key to use</param>
@@ -177,10 +201,20 @@ namespace KScript
         internal bool AllowExecution { get; set; }
 
         //Methods to handle console output using the string handler class.
-        internal void Out(string value) { Console.WriteLine(StringHandler.Format(value)); }
-        internal void Out(object value) { Console.WriteLine(StringHandler.Format(value.ToString())); }
-        internal void Out(object value, params string[] args) { Console.Write(value.ToString(), args); }
-        internal void Out() { Console.WriteLine(); }
+        internal void Out(string value) { HandleOutputEvent(value); Console.WriteLine(StringHandler.Format(value)); }
+        internal void Out(object value) { HandleOutputEvent(value.ToString()); Console.WriteLine(StringHandler.Format(value.ToString())); }
+        internal void Out(object value, params string[] args) { HandleOutputEvent(string.Format(value.ToString(), args)); Console.Write(value.ToString(), args); }
+        internal void Out() { HandleOutputEvent("\n"); Console.WriteLine(); }
+
+        /// <summary>
+        /// Events used to capture output using the KScript Out Method.
+        /// </summary>
+        /// <param name="value"></param>
+        public delegate void OnOutput(string value);
+        public event OnOutput OnOutputEvent;
+
+        public void HandleOutputEvent(string value) => OnOutputEvent?.Invoke(value);
+
 
         //Methods to handle retrieving file and directories.
         public string GetFilePath() => FilePath;
@@ -204,7 +238,7 @@ namespace KScript
             Out("Supported Commands:");
 
             var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && typeof(KScriptObject).IsAssignableFrom(t) && t.Namespace == "KScript.Arguments"
+                    where t.IsClass && typeof(KScriptObject).IsAssignableFrom(t) && t.Namespace.StartsWith(ASSEMBLY_PATH)
                     select t;
 
 
@@ -306,6 +340,13 @@ namespace KScript
         }
 
         /// <summary>
+        /// Method used to retrieve multidimensional arrays stored within a KScript Script.
+        /// </summary>
+        /// <returns></returns>
+        private Dictionary<string, KScriptArrayContainer> GetMultidimensionalArrays() => KScriptArrayContainers;
+        private void AddMultidimensionalArray(string key, KScriptArrayContainer val) => KScriptArrayContainers.Add(key, val);
+
+        /// <summary>
         /// Constructor for KScriptContainer
         /// </summary>
         /// <param name="prop">Properties class to use for KScript parsing.</param>
@@ -323,6 +364,7 @@ namespace KScript
             ObjectStorageContainer = new KScriptObjectStorageContainer();
             LoadedVariableFunctions = new Dictionary<string, Type>();
             LoadedParserHandlers = new Dictionary<string, Type>();
+            KScriptArrayContainers = new Dictionary<string, KScriptArrayContainer>();
         }
 
         /// <summary>
@@ -346,7 +388,7 @@ namespace KScript
         internal void LoadBuiltInTypes()
         {
             var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && t.Namespace == ASSEMBLY_PATH
+                    where t.IsClass && t.Namespace != null && t.Namespace.StartsWith(ASSEMBLY_PATH)
                     select t;
             q.ToList().ForEach(i => AddKScriptObjectType(i));
         }
@@ -358,7 +400,8 @@ namespace KScript
         internal void LoadBuiltInVariableFunctionTypes()
         {
             var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && t.Namespace == VARIABLE_ASSEMBLY_PATH
+                    where t.IsClass && t.Namespace != null &&
+                    t.Namespace.StartsWith(VARIABLE_ASSEMBLY_PATH)
                     select t;
             q.ToList().ForEach(i => AddVariableFunctionType(i));
         }
@@ -370,7 +413,7 @@ namespace KScript
         internal void LoadBuiltInParserHandlers()
         {
             var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && t.Namespace == PARSERHANDLERS && !t.IsAssignableFrom(typeof(IParserHandler))
+                    where t.IsClass && t.Namespace != null && t.Namespace.StartsWith(PARSERHANDLERS) && !t.IsAssignableFrom(typeof(IParserHandler))
                     select t;
             q.ToList().ForEach(i => AddKScriptParserHandler(i));
         }

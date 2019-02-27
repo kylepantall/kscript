@@ -5,9 +5,8 @@ namespace KScript.Arguments
     class updateContent : KScriptObject
     {
         public string id { get; set; }
-
-
         public updateContent(string Contents) => this.Contents = Contents;
+        public override string UsageInformation() => "Used to update the contents of an existing, registered KScript Object";
 
         public override bool Run()
         {
@@ -15,8 +14,6 @@ namespace KScript.Arguments
             obj.Contents = HandleCommands(Contents);
             return true;
         }
-
-        public override string UsageInformation() => "Used to update the contents of an existing, registered KScript Object";
 
         public override void Validate()
         {

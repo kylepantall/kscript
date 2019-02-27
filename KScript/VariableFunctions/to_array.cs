@@ -3,9 +3,9 @@ using KScript.Handlers;
 
 namespace KScript.VariableFunctions
 {
-    class toarray : IVariableFunction
+    class to_array : IVariableFunction
     {
-        public toarray(KScriptContainer container, string variable_id) : base(container, variable_id) { }
+        public to_array(KScriptContainer container, string variable_id) : base(container, variable_id) { }
 
         public override string Evaluate(params string[] args)
         {

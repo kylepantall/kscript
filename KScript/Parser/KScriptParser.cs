@@ -24,10 +24,16 @@ namespace KScript
             FilePath = filename;
 
             string _byteOrderMarkUtf8 = Encoding.UTF8.GetString(Encoding.UTF8.GetPreamble());
+            Document.PreserveWhitespace = false;
             Document.LoadXml(xml);
 
             StartScriptTime = DateTime.Now;
         }
+
+        public void SetOutput(TextWriter obj) => Console.SetOut(obj);
+        public void SetInput(TextReader obj) => Console.SetIn(obj);
+
+        public void SetXML(string xml) => Document.LoadXml(xml);
 
         public DateTime StartScriptTime { get; set; }
         public DateTime EndScriptTime { get; set; }
@@ -102,7 +108,6 @@ namespace KScript
                         {
                             if (item.HasChildNodes)
                             {
-
                                 IParserHandler parserHandler = GetParserInterface(obj);
 
                                 if (parserHandler != null)
@@ -218,7 +223,14 @@ namespace KScript
             }
             if (typeof(def).IsAssignableFrom(obj.GetType()))
             {
-                obj["Contents"] = item.InnerXml;
+                if (item.ChildNodes.OfType<XmlCDataSection>().Count() > 0)
+                {
+                    obj["Contents"] = item.ChildNodes.OfType<XmlCDataSection>().ToArray()[0].Data;
+                }
+                else
+                {
+                    obj["Contents"] = item.InnerXml;
+                }
                 container[((def)obj).id] = obj as def;
             }
             if (typeof(defm).IsAssignableFrom(obj.GetType()))
@@ -233,7 +245,7 @@ namespace KScript
 
             obj.Init(container);
 
-            if (obj.GetType().IsAssignableFrom(typeof(KScriptIDObject)))
+            if (typeof(KScriptIDObject).IsAssignableFrom(obj.GetType()))
             {
                 ((KScriptIDObject)obj).RegisterObject();
             }

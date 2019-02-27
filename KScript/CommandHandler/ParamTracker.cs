@@ -37,7 +37,7 @@ namespace KScript.CommandHandler
             {
                 var value = stringBuilder.ToString();
 
-                if (!string.IsNullOrEmpty(value))
+                if (!string.IsNullOrWhiteSpace(value))
                 {
                     values.Enqueue(value);
                 }
