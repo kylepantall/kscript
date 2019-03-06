@@ -151,6 +151,39 @@ namespace KScript.Document
                         container.GetObjectStorageContainer().Add(Global.GlobalIdentifiers.EXCEPTIONS, obj, obj.type, Nodes);
                     }
 
+
+                    else if (typeof(KScriptArrayLoop).IsAssignableFrom(GetValue().GetType()))
+                    {
+                        KScriptArrayLoop obj = (KScriptArrayLoop)(GetValue());
+
+                        foreach (string item in container.ArrayGet(obj, obj.from))
+                        {
+                            obj.CreateDef(obj.to, Global.Values.NULL);
+                            obj.Def(obj.to).Contents = item;
+
+                            foreach (IKScriptDocumentNode node in Nodes)
+                            {
+                                if (node.GetValue().GetType().IsAssignableFrom(typeof(@break)))
+                                {
+                                    container.StopConditionalLoops();
+                                    break;
+                                }
+                                else
+                                {
+                                    if (!container.GetConditionalLoops())
+                                    {
+                                        node.Run(container, null);
+                                    }
+                                }
+                            }
+                            if (container.GetConditionalLoops())
+                            {
+                                container.AllowConditionalLoops();
+                                break;
+                            }
+                        }
+                    }
+
                     else
                     {
                         Nodes.ForEach(node => node.Run(container, null));
@@ -159,6 +192,7 @@ namespace KScript.Document
                 }
 
             }
+
         }
     }
 }

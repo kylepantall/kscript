@@ -15,8 +15,7 @@ namespace KScript.Arguments
                 ParentContainer.RemoveDef(id);
             }
 
-            ParentContainer.AddDef(id, new def(Contents));
-
+            ParentContainer.AddDef(id, new def(Contents) { id = id });
             return true;
         }
 

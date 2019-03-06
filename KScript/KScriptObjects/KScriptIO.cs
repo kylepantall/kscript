@@ -66,6 +66,19 @@ namespace KScript.KScriptTypes
             }
         }
 
+        /// <summary>
+        /// Method to create a def if it doesn't exist.
+        /// </summary>
+        /// <param name="defID">Def ID to use</param>
+        /// <param name="default_value">Default value to use</param>
+        public void CreateDef(string defID, string default_value = "")
+        {
+            if (!ParentContainer.HasDef(defID))
+            {
+                ParentContainer.AddDef(defID, new Arguments.def(default_value));
+            }
+        }
+
 
         /// <summary>
         /// Method used to set the ParentContainer property.

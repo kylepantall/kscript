@@ -43,7 +43,7 @@ namespace KScript
                         if (func.IsAccepted())
                         {
                             string val = func.Evaluate(null);
-                            string replace = string.Format(@"\$(\b{0}\b)\%\$(\b{1}\b)(?:\-\>)(\b{2}\b)\(\)", variable_id, variable_second_id, variable_func);
+                            string replace = string.Format(@"\$(\b{0}\b)\%\$(\b{1}\b)(?:\-\>)(\b{2}\b)\(\)", Regex.Escape(variable_id), Regex.Escape(variable_second_id), Regex.Escape(variable_func));
                             result = Regex.Replace(contents, replace, val);
                         }
                     }
@@ -62,16 +62,13 @@ namespace KScript
                         if (func.IsAccepted())
                         {
                             string val = func.Evaluate(null);
-                            string replace = string.Format(@"\$\b{0}\b\-\>\b{1}\b\(\)", variable_id, variable_func);
+                            string replace = string.Format(@"\$\b{0}\b\-\>\b{1}\b\(\)", Regex.Escape(variable_id), Regex.Escape(variable_func));
                             result = Regex.Replace(contents, replace, val);
                         }
                     }
                 }
             }
-
-
-            result = Regex.Replace(result, string.Format(@"\$\b{0}\b(?!\-\>)", key), value, RegexOptions.IgnoreCase);
-
+            result = Regex.Replace(result, string.Format(@"\$\b{0}\b(?!\-\>)", Regex.Escape(key)), value, RegexOptions.IgnoreCase);
             return result;
         }
     }

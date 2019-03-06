@@ -10,6 +10,5 @@
         public override string Evaluate(params string[] args) => ToBoolString(num_one < num_two);
 
         public override bool IsAccepted() => int.TryParse(GetFirstDef().Contents, out num_one) && int.TryParse(GetSecondDef().Contents, out num_two);
-
     }
 }

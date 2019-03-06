@@ -147,6 +147,13 @@ namespace KScript
         internal IDictionary<string, def> GetDefs() => defs;
 
         /// <summary>
+        /// Method to determine if the given def ID exists already.
+        /// </summary>
+        /// <param name="id">Def ID to check</param>
+        /// <returns>If the Def exists</returns>
+        internal bool HasDef(string id) => defs.ContainsKey(id);
+
+        /// <summary>
         /// Used to prevent conditional loops - numerical or just conditional
         /// </summary>
         internal void StopConditionalLoops() => ConditionalLoops = false;
@@ -237,9 +244,9 @@ namespace KScript
             Out("Version: 0.0.0.1 (Alpha)");
             Out("Supported Commands:");
 
-            var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && typeof(KScriptObject).IsAssignableFrom(t) && t.Namespace.StartsWith(ASSEMBLY_PATH)
-                    select t;
+            IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                                  where t.IsClass && typeof(KScriptObject).IsAssignableFrom(t) && t.Namespace.StartsWith(ASSEMBLY_PATH)
+                                  select t;
 
 
             IndentedTextWriter indentedTextWriter = new IndentedTextWriter(Console.Out)
@@ -247,7 +254,7 @@ namespace KScript
                 Indent = 2
             };
 
-            foreach (var t in q.ToList())
+            foreach (Type t in q.ToList())
             {
                 bool HideClass = t.GetCustomAttributes<KScriptHideObject>().Any();
                 bool HasNoInnerObjects = t.GetCustomAttributes<KScriptNoInnerObjects>().Any();
@@ -322,7 +329,7 @@ namespace KScript
                                 indentedTextWriter.WriteLine("[ Accepted Values ]");
 
                                 int val_count = 0;
-                                foreach (var item in Accepted_Value.GetValues())
+                                foreach (string item in Accepted_Value.GetValues())
                                 {
                                     indentedTextWriter.Indent = 4;
                                     indentedTextWriter.WriteLine(++val_count + " - " + item);
@@ -387,9 +394,9 @@ namespace KScript
         /// </summary>
         internal void LoadBuiltInTypes()
         {
-            var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && t.Namespace != null && t.Namespace.StartsWith(ASSEMBLY_PATH)
-                    select t;
+            IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                                  where t.IsClass && t.Namespace != null && t.Namespace.StartsWith(ASSEMBLY_PATH)
+                                  select t;
             q.ToList().ForEach(i => AddKScriptObjectType(i));
         }
 
@@ -399,10 +406,10 @@ namespace KScript
         /// </summary>
         internal void LoadBuiltInVariableFunctionTypes()
         {
-            var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && t.Namespace != null &&
-                    t.Namespace.StartsWith(VARIABLE_ASSEMBLY_PATH)
-                    select t;
+            IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                                  where t.IsClass && t.Namespace != null &&
+                                  t.Namespace.StartsWith(VARIABLE_ASSEMBLY_PATH)
+                                  select t;
             q.ToList().ForEach(i => AddVariableFunctionType(i));
         }
 
@@ -412,9 +419,9 @@ namespace KScript
         /// </summary>
         internal void LoadBuiltInParserHandlers()
         {
-            var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && t.Namespace != null && t.Namespace.StartsWith(PARSERHANDLERS) && !t.IsAssignableFrom(typeof(IParserHandler))
-                    select t;
+            IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                                  where t.IsClass && t.Namespace != null && t.Namespace.StartsWith(PARSERHANDLERS) && !t.IsAssignableFrom(typeof(IParserHandler))
+                                  select t;
             q.ToList().ForEach(i => AddKScriptParserHandler(i));
         }
 
@@ -477,7 +484,7 @@ namespace KScript
         /// <param name="ex"></param>
         internal void HandleException(Exception ex)
         {
-            var items = GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name);
+            List<Document.IKScriptDocumentNode> items = GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name);
 
             if (items.Count > 0 && items != null)
             {

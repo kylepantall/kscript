@@ -69,6 +69,8 @@
     <Compile Include="Arguments\Array\afor.cs" />
     <Compile Include="Arguments\Array\ainsert.cs" />
     <Compile Include="Arguments\Conditional\forxy.cs" />
+    <Compile Include="Arguments\FileHandlers\move.cs" />
+    <Compile Include="Arguments\FileHandlers\new_dir.cs" />
     <Compile Include="Arguments\Prototypes\auto.cs" />
     <Compile Include="Arguments\KScriptHandlers\anykey.cs" />
     <Compile Include="Arguments\Array\aremove.cs" />
@@ -122,12 +124,14 @@
     <Compile Include="Commands\constant.cs" />
     <Compile Include="Commands\contains.cs" />
     <Compile Include="Commands\Cryptography\to_md5.cs" />
+    <Compile Include="Commands\dir_exists.cs" />
     <Compile Include="Commands\equals.cs" />
     <Compile Include="Commands\date.cs" />
     <Compile Include="Commands\exists.cs" />
     <Compile Include="Commands\extension_of.cs" />
     <Compile Include="Commands\find_file.cs" />
     <Compile Include="Commands\getfiles.cs" />
+    <Compile Include="Commands\guid.cs" />
     <Compile Include="Commands\if.cs" />
     <Compile Include="Commands\ifnull.cs" />
     <Compile Include="Commands\iftrue.cs" />
@@ -178,6 +182,8 @@
     <Compile Include="Handlers\KScriptParagraphHandler.cs" />
     <Compile Include="KScriptObjects\KScriptProperty.cs" />
     <Compile Include="KScriptObjects\KScriptValidator.cs" />
+    <Compile Include="KScriptOperatorHandlers\ConditionalLoopHandler.cs" />
+    <Compile Include="KScriptOperatorHandlers\NodeHandler.cs" />
     <Compile Include="KScriptParserHandlers\HtmlObjectParser.cs" />
     <Compile Include="KScriptParserHandlers\IParserHandler.cs" />
     <Compile Include="KScriptParserHandlers\LanguageContainerParser.cs" />

@@ -17,8 +17,8 @@ namespace KScript.Handlers
             Regex cmd_params = new Regex(Global.GlobalIdentifiers.COMMANDS_WITH_PARAMS);
             Regex cmd_no_params = new Regex(Global.GlobalIdentifiers.COMMANDS_NO_PARAMS);
 
-            var cmd_no_params_matches = cmd_no_params.Matches(str);
-            var cmd_params_matches = cmd_params.Matches(str);
+            MatchCollection cmd_no_params_matches = cmd_no_params.Matches(str);
+            MatchCollection cmd_params_matches = cmd_params.Matches(str);
 
             return cmd_params.IsMatch(str) || cmd_no_params.IsMatch(str);
         }
@@ -36,8 +36,8 @@ namespace KScript.Handlers
             ICommandObject bracket = new ICommandObject(str, container, baseObj);
             ParamTracker paramTracker = new ParamTracker();
 
-            var allowedChars = new HashSet<char>(new[] { '(', ')', char.Parse("'") });
-            var stack = new List<char>(str.Where(allowedChars.Contains));
+            HashSet<char> allowedChars = new HashSet<char>(new[] { '(', ')', char.Parse("'") });
+            List<char> stack = new List<char>(str.Where(allowedChars.Contains));
 
             if (!(stack.Count % 2 == 0))
             {
@@ -50,7 +50,8 @@ namespace KScript.Handlers
 
             bool ignore = false, encountered_cmd = false;
 
-            for (int i = 0; i < str_cmds.Length; i++)
+            for (
+                int i = 0; i < str_cmds.Length; i++)
             {
                 if (str_cmds[i].Equals('@') && !ignore)
                 {
@@ -92,13 +93,13 @@ namespace KScript.Handlers
                 {
                     if (commands.Any())
                     {
-                        var cmd = commands.Peek();
+                        ICommand cmd = commands.Peek();
 
                         if (cmd.IsCommandObject)
                         {
                             if (paramTracker.HasParams)
                             {
-                                var variable = new IValue(paramTracker.GetIndexPair(), container);
+                                IValue variable = new IValue(paramTracker.GetIndexPair(), container);
                                 cmd.GetCommandObject().Children.Enqueue(variable);
                             }
                         }
@@ -108,13 +109,24 @@ namespace KScript.Handlers
                 {
                     if (commands.Any())
                     {
-                        var cmd = commands.Pop();
+                        ICommand cmd = commands.Pop();
                         cmd.IndexProperties.End = i;
 
                         if (paramTracker.HasParams)
                         {
-                            var variable = new IValue(paramTracker.GetIndexPair(), container);
-                            cmd.GetCommandObject().Children.Enqueue(variable);
+                            if (cmd.IsCommandObject)
+                            {
+                                if (cmd.GetCommandObject().InnerCommand.Length > 0)
+                                {
+                                    IValue variable = new IValue(paramTracker.GetIndexPair(), container);
+                                    cmd.GetCommandObject().Children.Enqueue(variable);
+                                }
+                            }
+                            else
+                            {
+                                IValue variable = new IValue(paramTracker.GetIndexPair(), container);
+                                cmd.GetCommandObject().Children.Enqueue(variable);
+                            }
                         }
 
                         if (commands.Count > 0)
@@ -148,10 +160,10 @@ namespace KScript.Handlers
         {
             string temp_string = str;
 
-            var commands = GetCommands(str, container, parent);
+            List<ICommand> commands = GetCommands(str, container, parent);
             if (commands.Count > 0)
             {
-                foreach (var item in commands)
+                foreach (ICommand item in commands)
                 {
                     if (item.IsCommandObject)
                     {
@@ -184,10 +196,10 @@ namespace KScript.Handlers
             {
                 string temp_string = str;
 
-                foreach (var item in container.GetCommandStore().ToList())
+                foreach (KeyValuePair<string, ICommandObject> item in container.GetCommandStore().ToList())
                 {
-                    var key = item.Key;
-                    var val = item.Value.GetCommandObject().CalculateValue();
+                    string key = item.Key;
+                    string val = item.Value.GetCommandObject().CalculateValue();
 
                     temp_string = temp_string.Replace(key, val);
                 }

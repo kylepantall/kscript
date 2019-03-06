@@ -7,6 +7,7 @@ namespace KScript.Arguments
 {
     public class input : KScriptObject
     {
+        private input_types _type = input_types.text;
         /// <summary>
         /// Type of input to expect...
         /// 
@@ -14,13 +15,28 @@ namespace KScript.Arguments
         /// - Phone number (to be implemented)
         /// - string (by default)
         /// </summary>
-        [KScriptAcceptedOptions("email", "phone", "string", "number")]
+        [KScriptAcceptedOptions("text", "number")]
         [KScriptProperty("The type of input to expect and validate.", false)]
-        [KScriptExample("<input type=\"email\"> Enter an email... </input>")]
-        [KScriptExample("<input type=\"phone\"> Enter a phone number... </input>")]
-        [KScriptExample("<input type=\"string\"> Enter your name... </input>")]
+        [KScriptExample("<input type=\"text\"> Enter an email... </input>")]
+        [KScriptExample("<input type=\"text\"> Enter your name... </input>")]
         [KScriptExample("<input type=\"number\"> Enter your age... </input>")]
-        public string type { get; set; }
+        public string type
+        {
+            get => _type.ToString();
+            set
+            {
+                input_types val = input_types.text;
+                if (Enum.TryParse(value, out val))
+                    _type = val;
+                else
+                    _type = input_types.text;
+            }
+        }
+
+        public enum input_types
+        {
+            text, number
+        }
 
         /// <summary>
         /// Where to save input to - uses "def" to save input.
@@ -30,7 +46,7 @@ namespace KScript.Arguments
         public string to { get; set; }
 
 
-        [KScriptProperty("Used to declare what input is accepted. You can use KScript Commands.")]
+        [KScriptProperty("Used to declare what input is accepted. You can use KScript Commands.", false)]
         public string accepted_values { get; set; }
 
         /// <summary>
@@ -45,15 +61,16 @@ namespace KScript.Arguments
         public override bool Run()
         {
             if (string.IsNullOrWhiteSpace(type))
-            {
                 type = "string";
-            }
+
 
             Out(Contents);
 
-            if (Def(to) is null)
+            if (!string.IsNullOrWhiteSpace(to))
             {
-                throw new KScriptException("KScriptDefNotFound", string.Format("Definition '{0}' has not been declared", to));
+                CreateDef(to);
+                if (Def(to) is null)
+                    throw new KScriptException("KScriptDefNotFound", string.Format("Definition '{0}' has not been declared", to));
             }
 
             switch (type.ToLower())
@@ -68,20 +85,18 @@ namespace KScript.Arguments
                     ParentContainer[to].Contents = In();
                     break;
             }
+
             if (ParentContainer.Properties.ClearAfterInput || KScriptBoolHandler.Convert(cai))
-            {
                 Console.Clear();
-            }
 
             return true;
         }
 
         public override void Validate()
         {
-            if (type != "string" && type != "number" && string.IsNullOrWhiteSpace(type))
-            {
-                throw new KScriptInvalidScriptType(this);
-            }
+            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            validator.AddValidator(new KScriptValidationObject("type", true, Enum.GetNames(typeof(input_types))));
+            validator.Validate(this);
         }
 
         public override string UsageInformation() => @"Used to obtain input from the console.";

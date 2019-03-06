@@ -55,13 +55,9 @@ namespace KScript.Arguments
             ParentContainer.Properties.Quiet = _quiet;
             ParentContainer.Properties.WaitOnFinish = _on_finish_wait;
 
-            if (language == "auto")
+            if (string.IsNullOrWhiteSpace(ParentContainer.Properties.Language))
             {
-                ParentContainer.Properties.Language = CultureInfo.CurrentCulture.Name;
-            }
-            else
-            {
-                ParentContainer.Properties.Language = language;
+                ParentContainer.Properties.Language = (language == "auto" ? CultureInfo.CurrentCulture.Name : language);
             }
 
             if (_print_info)

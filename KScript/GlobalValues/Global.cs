@@ -22,9 +22,9 @@
 
         // $variable Expressions
         public const string VARIABLE_NO_POINTERS = @"\$\b\S+\b(?!\-\>)";
-        public const string VARIABLE_POINTERS = @"\$(\w+)(?:\-\>)(\w+)\(\)";
-        public const string VARIABLE_TIED_POINTERS = @"\$(\w+)\%\$(\w+)(?:\-\>)(\w+)\(\)";
-        public const string VARIABLE_POINTERS_CORRECTION = @"\%\$(\w+)(?:\-\>)(\w+)\(\)";
+        public const string VARIABLE_POINTERS = @"\$([A-Za-z0-9-_.]+)(?:\-\>)([A-Za-z0-9-_.]+)\(\)";
+        public const string VARIABLE_TIED_POINTERS = @"\$([A-Za-z0-9-_.]+)\%\$([A-Za-z0-9-_.]+)(?:\-\>)([A-Za-z0-9-_.]+)\(\)";
+        public const string VARIABLE_POINTERS_CORRECTION = @"\%\$([A-Za-z0-9-_.]+)(?:\-\>)([A-Za-z0-9-_.]+)\(\)";
 
         //<func/> Expressions
         public const string IFMATCHFUNCTION = @"(\$=)(.+\:.+)";

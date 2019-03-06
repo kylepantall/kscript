@@ -39,9 +39,14 @@ namespace KScript
                     SetAppearances();
                 }
 
+                string culture = "auto";
+
                 bool quiet = args.Any(i => i.ToLower() == "-s");
                 bool clear_after_input = args.Any(i => i.ToLower() == "-cai");
                 bool admin_priv = args.Any(i => i.ToLower() == "-admin");
+                bool generate_guid = args.Any(i => i.ToLower() == "-guid");
+
+                bool has_lang = args.Any(i => i.ToLower().StartsWith("-lang") && i.ToLower().Contains("="));
 
                 string path = args[0];
 
@@ -50,23 +55,44 @@ namespace KScript
                     RestartWithAdminPriviledges(args);
                 }
 
-                if (!File.Exists(args[0]))
+
+                if (has_lang)
                 {
-                    string[] files = Directory.GetFiles(Directory.GetCurrentDirectory());
-                    string filePath = files.Select(u => Path.GetFileName(u)).FirstOrDefault().ToLower();
-                    if (filePath != null && filePath == args[0].ToLower())
+                    string lang = args.FirstOrDefault(i => i.ToLower().StartsWith("-lang") && i.ToLower().Contains("="));
+
+                    if (lang != null)
                     {
-                        path = filePath;
+                        culture = lang.Split('=')[1];
+                    }
+                }
+
+
+
+                if (!generate_guid)
+                {
+                    if (!File.Exists(args[0]))
+                    {
+                        string[] files = Directory.GetFiles(Directory.GetCurrentDirectory());
+                        string filePath = files.Select(u => Path.GetFileName(u)).FirstOrDefault().ToLower();
+                        if (filePath != null && filePath == args[0].ToLower())
+                        {
+                            path = filePath;
+                        }
+                        else
+                        {
+                            Console.WriteLine(string.Format("File does not exist - '{0}'...", args[0]));
+                            throw new KScriptException("File does not exist.");
+                        }
                     }
                     else
                     {
-                        Console.WriteLine(string.Format("File does not exist - '{0}'...", args[0]));
-                        throw new KScriptException("File does not exist.");
+                        path = args[0];
                     }
                 }
                 else
                 {
-                    path = args[0];
+                    Console.WriteLine("GUID: " + Guid.NewGuid().ToString());
+                    return;
                 }
 
                 KScriptParser parser = new KScriptParser(path);
@@ -76,6 +102,7 @@ namespace KScript
                 parser.Properties.ClearAfterInput = clear_after_input;
 
                 parser.CustomArguments = args.Skip(1).ToArray();
+                parser.Properties.Language = culture;
 
                 parser.Parse();
 

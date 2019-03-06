@@ -52,7 +52,7 @@ namespace KScript.CommandHandler
                 string[] @params = Children.Select(i => i.CalculateValue()).ToArray();
                 string type_name = Command.ToLower();
                 Type _type = KScriptCommandHandler.GetCommandType(type_name);
-                KScriptCommand cmd = KScriptCommandHandler.GetCommandObject(@params, _type, kScriptContainer, kScriptBaseObject);
+                KScriptCommand cmd = KScriptCommandHandler.GetCommandObject(_type, kScriptContainer, kScriptBaseObject);
                 return cmd.Calculate();
             }
         }
