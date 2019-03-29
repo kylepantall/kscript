@@ -19,7 +19,9 @@ namespace KScript
             ParentContainer.GetDefs().ToList()
                 .ForEach(
                     item => temp_string = CalculateValue(ParentContainer, temp_string, item.Key, item.Value.Contents));
-            return temp_string.Substring(TRALING_STRING.Length);
+
+            return MultiArray.MultiArrayParser.HandleString(temp_string, ParentContainer).Substring(TRALING_STRING.Length);
+            //return temp_string.Substring(TRALING_STRING.Length);
         }
 
         public static string CalculateValue(KScriptContainer ParentContainer, string contents, string key, string value)

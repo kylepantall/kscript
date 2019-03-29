@@ -1,11 +1,16 @@
 <kscript>
-  <def id="new_dir">C:\Users\kylep\OneDrive\Desktop\Executables</def>
+  <picker to="new_dir" error_prompt="Couldn't find the specified directory, try again: " persist="yes" type="directory">Specify the directory to move files to? </picker>
+  <picker to="old_dir" error_prompt="oops" persist="yes" type="directory">Specify the directory to move files from? </picker>
+  <input to="file_types" type="text">Enter the file types to move separated by commas (e.g. '.exe,.cs'): </input>
+
   <if condition="@not(@dir_exists('$new_dir'))">
     <new_dir path="$new_dir"/>
   </if>
-  <array id="files_to_move">@getfiles('C:\Users\kylep\OneDrive\Desktop\',',','$value','.js,.exe,.cs,.php')</array>
+
+  <array id="files_to_move">@getfiles('$old_dir',',','$value','$file_types')</array>
   <afor from="files_to_move" to="item">
     <move from="$item" to="$new_dir\@path('$item','filename')" />
-    <echo>Moved $item to $new_dir\@path('$item','filename')</echo>
+    <echo>[Info] Moved '$item' to '$new_dir\@path('$item','filename')'.</echo>
   </afor>
+
 </kscript>

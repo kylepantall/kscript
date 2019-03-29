@@ -39,19 +39,11 @@ namespace KScript.Handlers
             HashSet<char> allowedChars = new HashSet<char>(new[] { '(', ')', char.Parse("'") });
             List<char> stack = new List<char>(str.Where(allowedChars.Contains));
 
-            if (!(stack.Count % 2 == 0))
-            {
-                throw new KScriptExceptions.KScriptException("KScript Command is incorrectly formatted - check brackets match and that all (') symbols are surrounding strings." +
-                    "\nError occurs when parsing string: \n" + "----------------------------------------------------\n" + str);
-            }
-
-
             int index = -1;
 
             bool ignore = false, encountered_cmd = false;
 
-            for (
-                int i = 0; i < str_cmds.Length; i++)
+            for (int i = 0; i < str_cmds.Length; i++)
             {
                 if (str_cmds[i].Equals('@') && !ignore)
                 {
@@ -151,6 +143,12 @@ namespace KScript.Handlers
                     }
                     continue;
                 }
+            }
+
+            if (!(stack.Count % 2 == 0) && encountered_cmd)
+            {
+                throw new KScriptExceptions.KScriptException("KScript Command is incorrectly formatted - check brackets match and that all (') symbols are surrounding strings." +
+                    "\nError occurs when parsing string: \n" + "----------------------------------------------------\n" + str);
             }
 
             return All_Commands;

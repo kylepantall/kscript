@@ -11,6 +11,7 @@ using KScript.KScriptDocument;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 using KScript.KScriptParserHandlers;
+using KScript.MultiArray;
 
 namespace KScript
 {
@@ -34,7 +35,7 @@ namespace KScript
         /// <summary>
         /// Stores KScript Array Containers
         /// </summary>
-        public readonly Dictionary<string, KScriptArrayContainer> KScriptArrayContainers;
+        public readonly KScriptArrayContainer KScriptArrayContainer;
 
         //Properties used to store file path and file directory of opened Script.
         internal string FilePath { get; set; }
@@ -350,8 +351,8 @@ namespace KScript
         /// Method used to retrieve multidimensional arrays stored within a KScript Script.
         /// </summary>
         /// <returns></returns>
-        private Dictionary<string, KScriptArrayContainer> GetMultidimensionalArrays() => KScriptArrayContainers;
-        private void AddMultidimensionalArray(string key, KScriptArrayContainer val) => KScriptArrayContainers.Add(key, val);
+        public KScriptArrayContainer GetMultidimensionalArrays() => KScriptArrayContainer;
+        public void AddMultidimensionalArray(string key, ArrayBase val) => KScriptArrayContainer.AddArray(key, val);
 
         /// <summary>
         /// Constructor for KScriptContainer
@@ -371,7 +372,7 @@ namespace KScript
             ObjectStorageContainer = new KScriptObjectStorageContainer();
             LoadedVariableFunctions = new Dictionary<string, Type>();
             LoadedParserHandlers = new Dictionary<string, Type>();
-            KScriptArrayContainers = new Dictionary<string, KScriptArrayContainer>();
+            KScriptArrayContainer = new KScriptArrayContainer();
         }
 
         /// <summary>
