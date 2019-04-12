@@ -91,6 +91,18 @@ namespace KScript.KScriptExceptions
     }
 
     /// <summary>
+    /// To catch an exception which occurs from accessing a multiarray with an index greater than the array
+    /// size e.g. ~myArray[0][1][100] etc.
+    /// </summary>
+    [Serializable]
+    public class KScriptIndexOutOfBoundsException : KScriptException
+    {
+        public KScriptIndexOutOfBoundsException(KScriptBaseObject obj) : base(obj) { }
+        public KScriptIndexOutOfBoundsException(KScriptBaseObject obj, string msg) : base(obj, msg) { }
+    }
+
+
+    /// <summary>
     /// Used to declare any KScriptObject as experimental or prototyped.
     /// </summary>
     public class KScriptPrototypeException : KScriptException

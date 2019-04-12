@@ -105,7 +105,7 @@ namespace KScript.KScriptContainerObjects
             if (req.HttpMethod == "POST")
             {
                 List<IKScriptDocumentNode> items = ParentContainer.GetObjectStorageContainer().GetMethodCalls(method);
-                items.ForEach(i => i.Run(ParentContainer, null));
+                items.ForEach(i => i.Run(ParentContainer, null, this));
             }
 
             return HandleCommands(Contents);

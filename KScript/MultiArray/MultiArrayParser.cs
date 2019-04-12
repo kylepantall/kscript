@@ -1,11 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Linq;
+using System;
 
 namespace KScript.MultiArray
 {
     public class MultiArrayParser
     {
-        const string ArrayMatch = @"~(\w+)\[.+\]";
+        //~(\w+)\[.+\]
+        const string ArrayMatch = @"~(\w+)(\[(\w|\d+|\'\w+\')\])+";
+
         const string RetrieveItems = @"\[(\d+|\'\w+\'|\~\'\w+\')\]";
 
 
@@ -26,45 +30,61 @@ namespace KScript.MultiArray
 
         public static string HandleString(string str, KScriptContainer container)
         {
-            if (Regex.IsMatch(str, ArrayMatch))
+            try
             {
-                string id = Regex.Match(str, ArrayMatch).Groups[1].Value;
-                MatchCollection matches = Regex.Matches(str, RetrieveItems);
+                var matches = Regex.Matches(str, ArrayMatch);
 
-                IArray current = container.GetMultidimensionalArrays()[id].GetRoot();
+                Dictionary<string, Match> Matched_Items = new Dictionary<string, Match>();
 
-                foreach (Match match in matches)
+                string tmp = str;
+
+                if (matches.Count > 0)
                 {
-                    current = current.Find(StripKey(match.Groups[1].Value));
+                    foreach (Match match in matches)
+                    {
+                        string uID = Guid.NewGuid().ToString();
+                        tmp = tmp.Replace(match.Groups[0].Value, $"[{{{uID}}}]");
+                        Matched_Items.Add(uID, match);
+                    }
                 }
 
-                if (current != null)
-                    container.Out(current.GetValue());
+                foreach (var item in Matched_Items)
+                {
+                    MatchCollection m = Regex.Matches(item.Value.Groups[0].Value, RetrieveItems);
+                    string id = Regex.Match(item.Value.Groups[0].Value, ArrayMatch).Groups[1].Value;
+                    ArrayBase current = container.GetMultidimensionalArrays()[id];
+                    IArray needle = current.Find(m.Cast<Match>().ToArray());
+
+                    tmp = tmp.Replace($"[{{{item.Key}}}]", needle.GetValue());
+                }
+                return tmp;
             }
-            return str;
+            catch (System.Exception ex)
+            {
+                container.HandleException(ex);
+                return string.Empty;
+            }
         }
 
 
         public static string StripKey(string val)
         {
-            string value = val;
-            if (val.StartsWith("~"))
-                value = value.TrimStart('~');
-            value = val.Trim('\'');
-            return value;
+            var tmp = val.TrimStart('~');
+            tmp = tmp.Trim('\'');
+            return tmp;
         }
 
         // a => (b => 'kitten', c => (d => 'cat', e => 'dog', f => (g => 'animals')))
         public static void CreateExampleArray(KScriptContainer container)
         {
             ArrayBase values = new ArrayBase(
-                new ArrayCollection("a", new List<IArray>(){
-                    new ArrayItem("b","kitten"),
-                    new ArrayCollection("c", new List<IArray>() {
-                        new ArrayItem("d", "cat"),
-                        new ArrayItem("e", "dog"),
-                        new ArrayCollection("f", new List<IArray>() {
-                            new ArrayItem("g","animals")
+                new ArrayCollection("Values", new List<IArray>(){
+                    new ArrayItem("Size","1045MB"),
+                    new ArrayCollection("Files", new List<IArray>() {
+                        new ArrayItem("Users.xml"),
+                        new ArrayItem("Admins.xml"),
+                        new ArrayCollection("Archive", new List<IArray>() {
+                            new ArrayItem("App.exe")
                         })
                     })
                 })

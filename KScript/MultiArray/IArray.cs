@@ -4,9 +4,26 @@
     {
         public string Key { get; set; }
 
-        public bool Equals(string val) => Key.Equals(val, System.StringComparison.OrdinalIgnoreCase);
+        public bool Equals(string val)
+        {
+            if (HasKey())
+            {
+                if (Key.Length > 0)
+                {
+                    return Key.Equals(val, System.StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return false;
+            }
+        }
 
-        public bool HasKey() => string.IsNullOrEmpty(Key);
+        public bool HasKey() => !string.IsNullOrEmpty(Key);
 
         public bool IsCollection() => GetType().IsAssignableFrom(typeof(ArrayCollection));
 
@@ -27,53 +44,45 @@
             }
         }
 
-        public IArray Find(string val)
+        public IArray Find(string key)
         {
-            IArray self = this;
-            int valInt = -1;
-            bool isIndex = int.TryParse(val, out valInt);
-
             if (IsCollection())
             {
-                if (isIndex)
+                foreach (var item in GetCollection().GetItems())
                 {
-                    return GetCollection().AtIndex(valInt);
-                }
-                else
-                {
-                    if (Equals(val))
-                        return this;
-                    else
+                    if (item.Equals(MultiArrayParser.StripKey(key)))
                     {
-                        foreach (IArray item in GetCollection().GetItems())
-                            return item.Find(val);
+                        return item;
                     }
                 }
             }
             else
             {
-                if (!isIndex)
+                if (GetArrayItem().Equals(MultiArrayParser.StripKey(key)))
                 {
-                    if (Equals(val))
-                        return this;
+                    return GetArrayItem();
                 }
-                else return this;
             }
-
             return null;
         }
 
-        public IArray FindWithKey(string val)
+        public IArray Find(int index)
         {
             if (IsCollection())
-                return GetCollection().Find(val);
-            else
             {
-                if (Equals(val))
-                    return this;
+                var x = GetCollection().GetItems();
+
+                if (index > x.Count)
+                {
+                    throw new KScriptExceptions.KScriptIndexOutOfBoundsException(null);
+                }
                 else
-                    return null;
+                {
+                    return x[index];
+                }
             }
+
+            return null;
         }
 
     }

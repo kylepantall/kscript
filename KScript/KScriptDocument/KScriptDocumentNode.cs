@@ -15,7 +15,7 @@ namespace KScript.Document
         public bool Ignore { get; set; } = false;
         public bool Continue { get; set; } = true;
 
-        public void Run(KScriptContainer container, string args)
+        public void Run(KScriptContainer container, string args, KScriptObject Pobj)
         {
             if (!Ignore && container.AllowExecution)
             {
@@ -35,6 +35,7 @@ namespace KScript.Document
                         }
                         else
                         {
+                            GetValue().SetBaseScriptObject(Pobj);
                             GetValue().Run();
                         }
                     }

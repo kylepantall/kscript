@@ -3,6 +3,9 @@
     public class ArrayItem : IArray
     {
         public string Value { get; set; }
+
+        public ArrayItem(string value) => Value = value;
+
         public ArrayItem(string key, string value)
         {
             Key = key;

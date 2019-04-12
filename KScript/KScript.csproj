@@ -139,6 +139,7 @@
     <Compile Include="Commands\iftrue.cs" />
     <Compile Include="Commands\k.cs" />
     <Compile Include="Commands\math_previous.cs" />
+    <Compile Include="Commands\this.cs" />
     <Compile Include="Commands\xpath.cs" />
     <Compile Include="Handlers\KScriptArrayHandler.cs" />
     <Compile Include="KScriptObjects\KScriptIDObject.cs" />
@@ -188,6 +189,7 @@
     <Compile Include="KScriptParserHandlers\HtmlObjectParser.cs" />
     <Compile Include="KScriptParserHandlers\IParserHandler.cs" />
     <Compile Include="KScriptParserHandlers\LanguageContainerParser.cs" />
+    <Compile Include="KScriptParserHandlers\MArrayParser.cs" />
     <Compile Include="MultiArray\ArrayCollection.cs" />
     <Compile Include="MultiArray\ArrayBase.cs" />
     <Compile Include="MultiArray\IArray.cs" />

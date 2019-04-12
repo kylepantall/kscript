@@ -8,9 +8,11 @@ namespace KScript.MultiArray
         public List<IArray> GetItems() => Items;
         public IArray AtIndex(int index)
         {
-            var i = index - 1;
-            return GetItems()[i];
+            return GetItems()[index];
         }
+
+
+        public void AddItem(IArray obj) => Items.Add(obj);
 
         public ArrayCollection() => Items = new List<IArray>();
         public ArrayCollection(List<IArray> items) => Items = items;

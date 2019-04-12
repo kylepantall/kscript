@@ -5,7 +5,7 @@ namespace KScript.Arguments.Array
     class marray : KScriptObject
     {
         [KScriptProperty("Used as a unique identifier for this array", true)]
-        public string name { get; set; }
+        public string id { get; set; }
 
         public override bool Run()
         {
@@ -21,7 +21,7 @@ namespace KScript.Arguments.Array
         public override void Validate()
         {
             KScriptValidator validator = new KScriptValidator(ParentContainer);
-            validator.AddValidator(new KScriptValidationObject("name", false));
+            validator.AddValidator(new KScriptValidationObject("id", false));
             validator.Validate(this);
         }
     }

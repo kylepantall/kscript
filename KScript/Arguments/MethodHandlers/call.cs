@@ -38,7 +38,7 @@ namespace KScript.Arguments
             }
 
             List<IKScriptDocumentNode> nodes = ParentContainer.GetObjectStorageContainer().GetMethodCalls(_method);
-            nodes.ForEach(node => node.Run(ParentContainer, args));
+            nodes.ForEach(node => node.Run(ParentContainer, args, this));
 
             return true;
         }

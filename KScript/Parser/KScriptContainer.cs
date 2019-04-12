@@ -21,6 +21,8 @@ namespace KScript
         //Constant to store Assembly path for KScript Arguments.
         const string ASSEMBLY_PATH = "KScript.Arguments";
         const string VARIABLE_ASSEMBLY_PATH = "KScript.VariableFunctions";
+        const bool THROW_ALL_EXCEPTIONS = false;
+
         private const string PARSERHANDLERS = "KScript.KScriptParserHandlers";
 
         private bool ConditionalLoops = true;
@@ -485,23 +487,30 @@ namespace KScript
         /// <param name="ex"></param>
         internal void HandleException(Exception ex)
         {
-            List<Document.IKScriptDocumentNode> items = GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name);
+            if (!THROW_ALL_EXCEPTIONS)
+            {
+                List<Document.IKScriptDocumentNode> items = GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name);
 
-            if (items.Count > 0 && items != null)
-            {
-                items.ForEach(i => i.Run(this, null));
-            }
-            else
-            {
-                if (typeof(KScriptException).IsAssignableFrom(ex.GetType()))
+                if (items.Count > 0 && items != null)
                 {
-                    KScriptException kex = (KScriptException)ex;
-                    Out(string.Format("[error ~{0}: {2}] : {1}\n", kex.GetExceptionType(), kex.Message, DateTime.Now.ToShortTimeString()));
+                    items.ForEach(i => i.Run(this, null, i.GetValue()));
                 }
                 else
                 {
-                    Out(string.Format("[error ~unknown:{0}] {1}\n", DateTime.Now.ToShortTimeString(), ex.Message));
+                    if (typeof(KScriptException).IsAssignableFrom(ex.GetType()))
+                    {
+                        KScriptException kex = (KScriptException)ex;
+                        Out(string.Format("[error ~{0}: {2}] : {1}\n", kex.GetExceptionType(), kex.Message, DateTime.Now.ToShortTimeString()));
+                    }
+                    else
+                    {
+                        Out(string.Format("[error ~unknown:{0}] {1}\n", DateTime.Now.ToShortTimeString(), ex.Message));
+                    }
                 }
+            }
+            else
+            {
+                throw ex;
             }
         }
 

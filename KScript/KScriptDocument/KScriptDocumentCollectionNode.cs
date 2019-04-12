@@ -15,7 +15,7 @@ namespace KScript.Document
         public KScriptDocumentCollectionNode() => Nodes = new List<IKScriptDocumentNode>();
         public bool Ignore { get; set; } = false;
 
-        public void Run(KScriptContainer container, string args)
+        public void Run(KScriptContainer container, string args, KScriptObject Pobj)
         {
             bool @continue = true;
             if (!Ignore && container.AllowExecution)
@@ -54,7 +54,7 @@ namespace KScript.Document
                                     {
                                         if (!container.GetConditionalLoops())
                                         {
-                                            node.Run(container, null);
+                                            node.Run(container, null, GetValue());
                                         }
                                     }
                                 }
@@ -118,7 +118,7 @@ namespace KScript.Document
                                 {
                                     if (!container.GetConditionalLoops())
                                     {
-                                        node.Run(container, null);
+                                        node.Run(container, null, GetValue());
                                     }
                                 }
                             }
@@ -172,7 +172,7 @@ namespace KScript.Document
                                 {
                                     if (!container.GetConditionalLoops())
                                     {
-                                        node.Run(container, null);
+                                        node.Run(container, null, GetValue());
                                     }
                                 }
                             }
@@ -186,7 +186,7 @@ namespace KScript.Document
 
                     else
                     {
-                        Nodes.ForEach(node => node.Run(container, null));
+                        Nodes.ForEach(node => node.Run(container, null, GetValue()));
                     }
 
                 }

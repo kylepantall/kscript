@@ -29,7 +29,7 @@ namespace KScript.KScriptOperatorHandlers
                         {
                             if (!Container.GetConditionalLoops())
                             {
-                                node.Run(Container, null);
+                                node.Run(Container, null, obj);
                             }
                         }
                     }

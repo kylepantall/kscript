@@ -20,7 +20,7 @@ namespace KScript.Document
                 {
                     if (container.AllowExecution)
                     {
-                        item.Run(container, null);
+                        item.Run(container, null, null);
                     }
                 }
             }
