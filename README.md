@@ -4,11 +4,12 @@ KScript allows the parsing of a XML KScript document into a functional scripting
 An example of a KScript document:
 
 
-##########################################################################################################################
+#########################################################################################
 SCRIPT EXAMPLE
 
 For additional information, include: print_info="yes" attribute within the <kscript> document open tag.
-##########################################################################################################################
+
+#########################################################################################
 
 <kscript>
   <!-- Declares a variable called 'entered_name' -->
@@ -22,14 +23,12 @@ For additional information, include: print_info="yes" attribute within the <kscr
 
 </kscript>
 
-##########################################################################################################################
-
+#########################################################################################
 In order to parse XML KScript documents, use the following CMD command:
 
 <KScript.exe> "File Location"
 
 Replacing <KScript.exe> with the KScript.exe file location and "File location" with the full file path of the .XML KScript file.
-
-##########################################################################################################################
+#########################################################################################
 
 Further documentation is still within development. 
