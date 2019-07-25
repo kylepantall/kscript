@@ -10,7 +10,8 @@ An example of a KScript document:
 
 <hr />
 (View this file as RAW format in order to view the below script)
-<textarea style="border: none;">
+
+<textarea>
 <kscript>
   <!-- Declares a variable called 'entered_name' -->
   <def id="entered_name"/>
