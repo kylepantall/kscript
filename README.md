@@ -11,7 +11,7 @@ An example of a KScript document:
 <hr />
 (View this file as RAW format in order to view the below script)
 
-<textarea>
+<xmp>
 <kscript>
   <!-- Declares a variable called 'entered_name' -->
   <def id="entered_name"/>
@@ -23,7 +23,7 @@ An example of a KScript document:
   <echo>Hello, $entered_name!</echo>
 
 </kscript>
-</textarea>
+</xmp>
 
 <hr />
 
