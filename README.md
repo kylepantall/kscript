@@ -9,7 +9,6 @@ An example of a KScript document:
 <p>For additional information, include: print_info="yes" attribute within the <kscript> document open tag.</p>
 
 <hr />
-(View this file as RAW format in order to view the below script)
 
 ```
 <kscript>
