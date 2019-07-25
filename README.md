@@ -10,6 +10,7 @@ An example of a KScript document:
 
 <hr />
 (View this file as RAW format in order to view the below script)
+<textarea style="border: none;">
 <kscript>
   <!-- Declares a variable called 'entered_name' -->
   <def id="entered_name"/>
@@ -21,6 +22,7 @@ An example of a KScript document:
   <echo>Hello, $entered_name!</echo>
 
 </kscript>
+</textarea>
 
 <hr />
 
@@ -28,6 +30,6 @@ An example of a KScript document:
 <strong>&lt;KScript.exe&gt; "File Location"</strong>
 
 Replacing &lt;KScript.exe&gt; with the KScript.exe file location and "File location" with the full file path of the .XML KScript file.
-#########################################################################################
 
+<h2>Additional Information</h2>
 Further documentation is still within development. 
