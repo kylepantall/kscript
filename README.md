@@ -3,13 +3,12 @@
 KScript allows the parsing of a XML KScript document into a functional scripting language.
 An example of a KScript document:
 
+<hr />
 
-#########################################################################################
-SCRIPT EXAMPLE
+<h2>Script Example</h2>
+<p>For additional information, include: print_info="yes" attribute within the <kscript> document open tag.</p>
 
-For additional information, include: print_info="yes" attribute within the <kscript> document open tag.
-
-#########################################################################################
+<hr />
 (View this file as RAW format in order to view the below script)
 <kscript>
   <!-- Declares a variable called 'entered_name' -->
@@ -22,12 +21,13 @@ For additional information, include: print_info="yes" attribute within the <kscr
   <echo>Hello, $entered_name!</echo>
 
 </kscript>
-#########################################################################################
-In order to parse XML KScript documents, use the following CMD command:
 
-<KScript.exe> "File Location"
+<hr />
 
-Replacing <KScript.exe> with the KScript.exe file location and "File location" with the full file path of the .XML KScript file.
+<p>In order to parse XML KScript documents, use the following CMD command:</p>
+<strong>&lt;KScript.exe&gt; "File Location"</strong>
+
+Replacing &lt;KScript.exe&gt; with the KScript.exe file location and "File location" with the full file path of the .XML KScript file.
 #########################################################################################
 
 Further documentation is still within development. 
