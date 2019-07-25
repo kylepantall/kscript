@@ -1,4 +1,4 @@
-KScript is a developing project.
+<h1>KScript is a developing project.</h1>
 
 KScript allows the parsing of a XML KScript document into a functional scripting language.
 An example of a KScript document:
@@ -10,7 +10,7 @@ SCRIPT EXAMPLE
 For additional information, include: print_info="yes" attribute within the <kscript> document open tag.
 
 #########################################################################################
-<code>
+(View this file as RAW format in order to view the below script)
 <kscript>
   <!-- Declares a variable called 'entered_name' -->
   <def id="entered_name"/>
@@ -22,7 +22,6 @@ For additional information, include: print_info="yes" attribute within the <kscr
   <echo>Hello, $entered_name!</echo>
 
 </kscript>
-</code>
 #########################################################################################
 In order to parse XML KScript documents, use the following CMD command:
 
