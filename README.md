@@ -10,7 +10,7 @@ SCRIPT EXAMPLE
 For additional information, include: print_info="yes" attribute within the <kscript> document open tag.
 
 #########################################################################################
-
+<code>
 <kscript>
   <!-- Declares a variable called 'entered_name' -->
   <def id="entered_name"/>
@@ -22,7 +22,7 @@ For additional information, include: print_info="yes" attribute within the <kscr
   <echo>Hello, $entered_name!</echo>
 
 </kscript>
-
+</code>
 #########################################################################################
 In order to parse XML KScript documents, use the following CMD command:
 
