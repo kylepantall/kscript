@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Principal;
 using KScript.KScriptExceptions;
 
@@ -10,7 +11,7 @@ namespace KScript
 {
     class Program
     {
-        public static string[] Commands() => new string[] { "-s", "-cai", "-cmds", "-admin", "-colourful" };
+        public static string[] Commands() => new string[] { "-s", "-cai", "-cmds", "-admin", "-colourful", "-root" };
 
         public static List<string> GetUsedCommands(string[] cmds) => Commands().Where(i => cmds.Contains(i)).Select(i => i.ToLower()).ToList();
 
@@ -45,6 +46,7 @@ namespace KScript
                 bool clear_after_input = args.Any(i => i.ToLower() == "-cai");
                 bool admin_priv = args.Any(i => i.ToLower() == "-admin");
                 bool generate_guid = args.Any(i => i.ToLower() == "-guid");
+                bool root = args.Any(i => i.ToLower() == "-root");
 
                 bool has_lang = args.Any(i => i.ToLower().StartsWith("-lang") && i.ToLower().Contains("="));
 
@@ -53,6 +55,14 @@ namespace KScript
                 if (admin_priv)
                 {
                     RestartWithAdminPriviledges(args);
+                }
+
+
+                if (root)
+                {
+                    string codeBase = Assembly.GetExecutingAssembly().CodeBase;
+                    UriBuilder uri = new UriBuilder(codeBase);
+                    Process.Start(Path.GetDirectoryName(Uri.UnescapeDataString(uri.Path)));
                 }
 
 
@@ -68,56 +78,64 @@ namespace KScript
 
 
 
-                if (!generate_guid)
+                if (!generate_guid && !root)
                 {
-                    if (!File.Exists(args[0]))
-                    {
-                        string[] files = Directory.GetFiles(Directory.GetCurrentDirectory());
-                        string filePath = files.Select(u => Path.GetFileName(u)).FirstOrDefault().ToLower();
-                        if (filePath != null && filePath == args[0].ToLower())
+                    if (!args[0].ToString().StartsWith("-"))
+                        if (!File.Exists(args[0]))
                         {
-                            path = filePath;
+                            string[] files = Directory.GetFiles(Directory.GetCurrentDirectory());
+                            string filePath = files.Select(u => Path.GetFileName(u)).FirstOrDefault().ToLower();
+                            if (filePath != null && filePath == args[0].ToLower())
+                            {
+                                path = filePath;
+                            }
+                            else
+                            {
+                                Console.WriteLine(string.Format("File does not exist - '{0}'...", args[0]));
+                                throw new KScriptException("File does not exist.");
+                            }
                         }
                         else
                         {
-                            Console.WriteLine(string.Format("File does not exist - '{0}'...", args[0]));
-                            throw new KScriptException("File does not exist.");
+                            path = args[0];
                         }
-                    }
-                    else
-                    {
-                        path = args[0];
-                    }
                 }
-                else
+
+                if (generate_guid)
                 {
                     Console.WriteLine("GUID: " + Guid.NewGuid().ToString());
                     return;
                 }
 
-                KScriptParser parser = new KScriptParser(path);
 
-
-                parser.Properties.Quiet = quiet;
-                parser.Properties.ClearAfterInput = clear_after_input;
-
-                parser.CustomArguments = args.Skip(1).ToArray();
-                parser.Properties.Language = culture;
-
-                parser.Parse();
-
-                if (parser.Properties.WaitOnFinish)
+                if (!root && !generate_guid)
                 {
-                    IEnumerable<ProcessThread> threads = Process.GetCurrentProcess().Threads.Cast<ProcessThread>().Where(i => i.ThreadState == ThreadState.Running);
-                    if (threads.Count() > 1)
+                    KScriptParser parser = new KScriptParser(path);
+
+
+                    parser.Properties.Quiet = quiet;
+                    parser.Properties.ClearAfterInput = clear_after_input;
+
+                    parser.CustomArguments = args.Skip(1).ToArray();
+                    parser.Properties.Language = culture;
+
+                    parser.Parse();
+
+                    if (parser.Properties.WaitOnFinish)
                     {
-                        Console.WriteLine("Awaiting for child processes to finish...");
-                        Console.ReadKey();
-                    }
-                    else
-                    {
-                        Console.WriteLine("Press any key to close...");
-                        Console.ReadKey();
+                        IEnumerable<ProcessThread> threads = Process.GetCurrentProcess().Threads.Cast<ProcessThread>().Where(i => i.ThreadState == ThreadState.Running);
+                        if (threads.Count() > 1)
+                        {
+                            if (!parser.Properties.Quiet)
+                                Console.WriteLine("Awaiting for child processes to finish...");
+                            Console.ReadKey();
+                        }
+                        else
+                        {
+                            if (!parser.Properties.Quiet)
+                                Console.WriteLine("Press any key to close...");
+                            Console.ReadKey();
+                        }
                     }
                 }
             }

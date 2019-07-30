@@ -23,10 +23,10 @@ namespace KScript.Arguments
             return true;
         }
 
-        public override string UsageInformation() => @"Used to store values to the definition log within KScript." +
-            "\nThe id attribute is to within other KScriptObjects to retrieve the values." +
-            "\nE.g. '$tmp_name' can be used to retrieve the value of a def KScriptObject with the id 'tmp_name'." +
-            "\nUsed to declare multiple defs";
+        public override string UsageInformation() => @"Used to declare multiple variables within the KScript Definition container." +
+            "\nMultiple KScript defs can be declared by using a commas, e.g. id,id2,id3 would define id, id2 and id3 with the same value." +
+            "\nThe id attribute is used within other KScriptObjects to retrieve the value of the declared definition." +
+            "\nE.g. '$tmp_name' can be used to retrieve the value of the def with the id 'tmp_name'.";
 
         public override void Validate()
         {

@@ -33,8 +33,8 @@ namespace KScript.Arguments
             }
         }
 
-        public override string UsageInformation() => @"Used to store values to the definition log within KScript." +
-            "\nThe id attribute is to within other KScriptObjects to retrieve the values." +
-            "\nE.g. '$tmp_name' can be used to retrieve the value of a def KScriptObject with the id 'tmp_name'.";
+        public override string UsageInformation() => @"Used to declare a variable within the KScript Definition container." +
+            "\nThe id attribute is used within other KScriptObjects to retrieve the value of the declared definition." +
+            "\nE.g. '$tmp_name' can be used to retrieve the value of the def with the id 'tmp_name'.";
     }
 }

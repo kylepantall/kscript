@@ -22,7 +22,7 @@ namespace KScript.Arguments
         /// Defines the format to use when outputting the array values.
         /// </summary>
         [KScriptProperty("Define the output format using $value and $index. Commands are accepted." +
-            "By Default, format is '[$index] - $value'.", true)]
+            "By Default, format is '[$index] - $value'.", false)]
         public string format { get; set; } = @"[$index] - $value\n";
 
         public aecho() => ValidationType = ValidationTypes.DURING_PARSING;

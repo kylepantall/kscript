@@ -2,9 +2,12 @@
 
 namespace KScript.Arguments
 {
+    [KScriptObjects.KScriptNoInnerObjects()]
     public class ainsert : KScriptObject
     {
         public ainsert(string contents) => Contents = contents;
+
+        [KScriptObjects.KScriptProperty("The array ID to insert a value into.", true)]
         public string to { get; set; }
 
         public override bool Run()

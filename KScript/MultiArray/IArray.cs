@@ -1,6 +1,6 @@
 ﻿namespace KScript.MultiArray
 {
-    public abstract class IArray
+    public abstract class IArray 
     {
         public string Key { get; set; }
 
@@ -43,6 +43,8 @@
                 return GetArrayItem().Value;
             }
         }
+
+        public bool HasChildren() => IsCollection() ? GetCollection().GetItems().Count > 0 : false;
 
         public IArray Find(string key)
         {

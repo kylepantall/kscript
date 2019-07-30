@@ -1,4 +1,5 @@
 ﻿using KScript.KScriptObjects;
+using System;
 
 namespace KScript.Arguments
 {
@@ -25,9 +26,12 @@ namespace KScript.Arguments
         /// Share the download progress to the console
         /// </summary>
         /// 
-        [KScriptProperty("Stores the download progress in the Object store. Must assign an ID. -- STILL IN DEVELOPMENT --", false)]
+        [KScriptProperty("Stores the download progress in the Object store. Must assign an ID. [-- STILL IN DEVELOPMENT --]", false)]
         [KScriptAcceptedOptions("yes", "no", "1", "0", "n", "y", "true", "false", "t", "f")]
         public string share_progress { get; set; }
+
+        [KScriptProperty("Unique ID used by other KScript Objects to retrieve properties about this object.", false)]
+        public string id { get; set; }
 
         public override bool Run()
         {
@@ -37,14 +41,21 @@ namespace KScript.Arguments
             DEST = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, destination);
 
             System.Net.WebClient client = new System.Net.WebClient();
-            client.DownloadFile(HandleCommands(URL), HandleCommands(DEST));
+            client.DownloadProgressChanged += Client_DownloadProgressChanged;
+            Out("Ok");
+            client.DownloadFileAsync(new Uri(HandleCommands(URL)), HandleCommands(DEST));
             return true;
+        }
+
+        private void Client_DownloadProgressChanged(object sender, System.Net.DownloadProgressChangedEventArgs e)
+        {
+            Out(e.ProgressPercentage.ToString() + "%\n");
         }
 
         public override void Validate()
         {
             KScriptValidator validator = new KScriptValidator(ParentContainer);
-            validator.AddValidator(new KScriptValidationObject("destination",false));
+            validator.AddValidator(new KScriptValidationObject("destination", false));
             validator.AddValidator(new KScriptValidationObject("url", false, KScriptValidator.ExpectedInput.URL));
             validator.Validate(this);
         }

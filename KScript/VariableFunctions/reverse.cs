@@ -6,7 +6,7 @@ namespace KScript.VariableFunctions
     class reverse : IVariableFunction
     {
         public reverse(KScriptContainer container, string variable_id) : base(container, variable_id) { }
-        public override bool IsAccepted() => new Regex("^.+$").IsMatch(GetDef().Contents);
+        public override bool IsAccepted() => true;
 
         public override string Evaluate(params string[] args)
         {

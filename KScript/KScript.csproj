@@ -70,6 +70,7 @@
     <Compile Include="Arguments\Array\ainsert.cs" />
     <Compile Include="Arguments\Array\marray.cs" />
     <Compile Include="Arguments\Conditional\forxy.cs" />
+    <Compile Include="Arguments\FileHandlers\file_info.cs" />
     <Compile Include="Arguments\FileHandlers\move.cs" />
     <Compile Include="Arguments\FileHandlers\new_dir.cs" />
     <Compile Include="Arguments\KScriptHandlers\x.cs" />
@@ -81,6 +82,7 @@
     <Compile Include="Arguments\MethodHandlers\call.cs" />
     <Compile Include="Arguments\ExceptionHandlers\catch.cs" />
     <Compile Include="Arguments\KScriptHandlers\clear.cs" />
+    <Compile Include="Arguments\Threading\thread.cs" />
     <Compile Include="Arguments\VariableHandlers\def.cs" />
     <Compile Include="Arguments\VariableHandlers\defm.cs" />
     <Compile Include="Arguments\Network\download.cs" />
@@ -139,9 +141,12 @@
     <Compile Include="Commands\iftrue.cs" />
     <Compile Include="Commands\k.cs" />
     <Compile Include="Commands\math_previous.cs" />
+    <Compile Include="Commands\pretty_print.cs" />
+    <Compile Include="Commands\range.cs" />
     <Compile Include="Commands\this.cs" />
     <Compile Include="Commands\xpath.cs" />
     <Compile Include="Handlers\KScriptArrayHandler.cs" />
+    <Compile Include="KScriptObjects\KScriptBooleanProperty.cs" />
     <Compile Include="KScriptObjects\KScriptIDObject.cs" />
     <Compile Include="Commands\length.cs" />
     <Compile Include="Commands\math.cs" />

@@ -11,7 +11,14 @@ namespace KScript.MultiArray
 
         public IArray Find(Match[] values)
         {
-            IArray current_node = new ArrayCollection(new List<IArray>() { GetRoot() });
+            IArray current_node;
+
+            if (GetRoot().HasKey())
+            {
+                current_node = new ArrayCollection(new List<IArray>() { GetRoot() });
+            }
+            else current_node = GetRoot();
+
             int index = -1;
 
             foreach (var item in values)

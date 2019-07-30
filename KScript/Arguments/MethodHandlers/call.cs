@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using KScript.Document;
 using KScript.KScriptObjects;
 
@@ -10,6 +11,8 @@ namespace KScript.Arguments
         [KScriptProperty("Used to declare which method to call", true)]
         public string method { get; set; }
 
+
+        public string type { get; set; } = "method";
 
         [KScriptProperty("Used to pass properties used within this method", false)]
         public string args { get; set; }
@@ -38,7 +41,17 @@ namespace KScript.Arguments
             }
 
             List<IKScriptDocumentNode> nodes = ParentContainer.GetObjectStorageContainer().GetMethodCalls(_method);
-            nodes.ForEach(node => node.Run(ParentContainer, args, this));
+
+            if (type == "thread")
+            {
+                new Thread(() =>
+                {
+                    Thread.CurrentThread.IsBackground = true;
+                    /* run your code here */
+                    nodes.ForEach(node => node.Run(ParentContainer, args, this));
+                }).Start();
+            }
+            else nodes.ForEach(node => node.Run(ParentContainer, args, this));
 
             return true;
         }
