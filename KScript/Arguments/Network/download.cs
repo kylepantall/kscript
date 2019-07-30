@@ -42,7 +42,6 @@ namespace KScript.Arguments
 
             System.Net.WebClient client = new System.Net.WebClient();
             client.DownloadProgressChanged += Client_DownloadProgressChanged;
-            Out("Ok");
             client.DownloadFileAsync(new Uri(HandleCommands(URL)), HandleCommands(DEST));
             return true;
         }
