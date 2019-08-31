@@ -14,7 +14,7 @@ namespace KScript.Arguments
         public override bool Run()
         {
             KScript().Stop();
-            KScript().Parser.Load(location, ToBool(refresh));
+            KScript().Parser.Load(HandleCommands(location), ToBool(refresh));
             KScript().Parser.Parse();
             return true;
         }

@@ -21,7 +21,11 @@ namespace KScript
         //Constant to store Assembly path for KScript Arguments.
         const string ASSEMBLY_PATH = "KScript.Arguments";
         const string VARIABLE_ASSEMBLY_PATH = "KScript.VariableFunctions";
-        const bool THROW_ALL_EXCEPTIONS = false;
+
+        /// <summary>
+        /// Constant which determines if KScript should return all exceptions instead of attempting to handle them.
+        /// </summary>
+        const bool THROW_ALL_EXCEPTIONS = true;
 
         private const string PARSERHANDLERS = "KScript.KScriptParserHandlers";
 
@@ -87,17 +91,8 @@ namespace KScript
         /// <param name="key">Key to search within</param>
         /// <param name="id">ID to retrieve value from</param>
         /// <returns></returns>
-        public string GetGlobalValue(string key, string id)
-        {
-            if (GetGlobalValues(key).ContainsKey(id))
-            {
-                return GetGlobalValues(key)[id];
-            }
-            else
-            {
-                return string.Empty;
-            }
-        }
+        public string GetGlobalValue(string key, string id) => GetGlobalValues(key).ContainsKey(id) ? GetGlobalValues(key)[id] : string.Empty;
+
 
         /// <summary>
         /// Determines if the Key exists with the given ID also.

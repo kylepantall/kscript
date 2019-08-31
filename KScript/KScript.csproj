@@ -129,6 +129,7 @@
     <Compile Include="Commands\contains.cs" />
     <Compile Include="Commands\Cryptography\to_md5.cs" />
     <Compile Include="Commands\dir_exists.cs" />
+    <Compile Include="Commands\Environment\directory.cs" />
     <Compile Include="Commands\equals.cs" />
     <Compile Include="Commands\date.cs" />
     <Compile Include="Commands\exists.cs" />

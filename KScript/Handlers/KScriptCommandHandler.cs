@@ -71,7 +71,7 @@ namespace KScript.Handlers
                 }
                 else if (str_cmds[i].Equals('$') && !ignore && encountered_cmd)
                 {
-                    ignore = !ignore;
+                    //ignore = !ignore;
                 }
                 else if (str_cmds[i].Equals('(') && !ignore && encountered_cmd)
                 {

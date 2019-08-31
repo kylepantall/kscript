@@ -23,10 +23,10 @@ namespace KScript.Commands
                 switch (value.ToLower())
                 {
                     case "os.name": return GetOSFriendlyName();
-                    case "machine.name": return Environment.MachineName;
+                    case "machine.name": return System.Environment.MachineName;
                     case "script.path": return ParentContainer.FilePath;
                     case "script.directory": return ParentContainer.FileDirectory;
-                    case "username": return Environment.UserName;
+                    case "username": return System.Environment.UserName;
                     case "math.pi": return Math.PI.ToString();
                     case "math.e": return Math.E.ToString();
                     case "null": return NULL;

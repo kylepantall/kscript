@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using KScript.Handlers;
 using KScript.VariableFunctions;
 
 namespace KScript
@@ -15,13 +16,17 @@ namespace KScript
 
         public static string ReturnFormattedVariables(KScriptContainer ParentContainer, string Contents)
         {
+            bool isCommand = KScriptCommandHandler.IsCommand(Contents, ParentContainer, null);
+
+            if (isCommand) return Contents;
+
             string temp_string = string.Format("{0}{1}", TRALING_STRING, Contents);
+
             ParentContainer.GetDefs().ToList()
                 .ForEach(
                     item => temp_string = CalculateValue(ParentContainer, temp_string, item.Key, item.Value.Contents));
 
             return MultiArray.MultiArrayParser.HandleString(temp_string, ParentContainer).Substring(TRALING_STRING.Length);
-            //return temp_string.Substring(TRALING_STRING.Length);
         }
 
         public static string CalculateValue(KScriptContainer ParentContainer, string contents, string key, string value)

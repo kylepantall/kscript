@@ -115,11 +115,11 @@ namespace KScript.KScriptContainerObjects
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
-            validator.AddValidator(new KScriptValidationObject("Contents", false));
-            validator.AddValidator(new KScriptValidationObject("id", false));
-            validator.AddValidator(new KScriptValidationObject("method", false, ParentContainer.GetObjectStorageContainer().GetMethodNames()));
-            validator.Validate(this);
+            //KScriptValidator validator = new KScriptValidator(ParentContainer);
+            //validator.AddValidator(new KScriptValidationObject("Contents", false));
+            //validator.AddValidator(new KScriptValidationObject("id", false));
+            //validator.AddValidator(new KScriptValidationObject("method", false, ParentContainer.GetObjectStorageContainer().GetMethodNames()));
+            //validator.Validate(this);
         }
     }
 }
