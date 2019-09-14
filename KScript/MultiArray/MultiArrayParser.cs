@@ -74,7 +74,7 @@ namespace KScript.MultiArray
             return tmp;
         }
 
-        // a => (b => 'kitten', c => (d => 'cat', e => 'dog', f => (g => 'animals')))
+        // Values => (Size => '1045MB', Files => (0 => 'Users.xml', 1 => 'Admins.xml', 2 => (Archive => 'App.exe')))
         public static void CreateExampleArray(KScriptContainer container)
         {
             ArrayBase values = new ArrayBase(
@@ -91,7 +91,6 @@ namespace KScript.MultiArray
             );
 
             container.AddMultidimensionalArray("myArray", values);
-            //container.GetMultidimensionalArrays()["myArray"]
         }
     }
 }
