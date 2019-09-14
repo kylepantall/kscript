@@ -32,12 +32,12 @@ namespace KScript.Arguments.Conditional
 
         public override string UsageInformation()
         {
-            throw new NotImplementedException();
+            return "To loop in an iteration such that there exists an X for every Y.";
         }
 
         public override void Validate()
         {
-            throw new NotImplementedException();
+            //throw new NotImplementedException();
         }
     }
 }

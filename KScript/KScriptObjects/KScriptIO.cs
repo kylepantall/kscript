@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using KScript.Handlers;
 using KScript.KScriptObjects;
+using System.Linq;
 
 namespace KScript.KScriptTypes
 {
@@ -131,6 +132,15 @@ namespace KScript.KScriptTypes
             float num;
             return float.TryParse(input, out num);
         }
+
+
+        /// <summary>
+        /// Checks a haystack for a given value. Determines if value is within the haystack.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="values"></param>
+        /// <returns></returns>
+        public bool IsWithinHaystack(string value, params string[] values) => values.Any(x => x == value);
 
         public void Out() => Console.Out.WriteLine();
         public void Out(string val) => Console.Out.Write(KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(val), ParentContainer, GetBaseObject()));

@@ -239,13 +239,12 @@ namespace KScript
         {
             Out("About KScript");
             Out("-----------------------------------------------");
-            Out("Version: 0.0.0.1 (Alpha)");
+            Out($"Version: {Assembly.GetExecutingAssembly().GetName().Version.ToString()}");
             Out("Supported Commands:");
 
             IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
                                   where t.IsClass && typeof(KScriptObject).IsAssignableFrom(t) && t.Namespace.StartsWith(ASSEMBLY_PATH)
                                   select t;
-
 
             IndentedTextWriter indentedTextWriter = new IndentedTextWriter(Console.Out)
             {

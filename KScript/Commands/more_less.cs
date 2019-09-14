@@ -4,51 +4,43 @@ namespace KScript.Commands
 {
     public class more_less : KScriptCommand
     {
-        private readonly string ValueA = "";
-        private readonly string ValueB = "";
-        private string Operator = "<";
+        private string firstValue = "";
+        private string secondValue = "";
+        private string lastValue = "<";
 
-        public more_less(string a, string b) { ValueA = a; ValueB = b; }
-
-        //[KScriptObjects.KScriptAcceptedOptions("mt", "mte", "lt", "lte")]
-        public more_less(string a, string b, string Operator) : this(a, b) => this.Operator = Operator;
+        public readonly string[] Operators = { "mt", "mte", "lt", "lte" };
+        public more_less(string firstNumber, string secondNumber) { this.firstValue = firstNumber; this.secondValue = secondNumber; }
+        public more_less(string firstComparison, string middleValue, string finalValue) : this(firstComparison, middleValue) => this.lastValue = finalValue;
 
         public override string Calculate()
         {
+            bool isSecondValueOperator = IsWithinHaystack(secondValue, Operators) && !IsNumber(secondValue);
 
-            if (string.IsNullOrEmpty(ValueA) || string.IsNullOrEmpty(ValueB) || string.IsNullOrEmpty(Operator))
-            {
-                throw new KScriptValidationFail(this, "Value cannot be NULL");
-            }
+            if (isSecondValueOperator)
+                (secondValue, lastValue) = (lastValue, secondValue);
 
-            string vA = KScript().GetStringHandler().Format(ValueA), vB = KScript().GetStringHandler().Format(ValueB);
+            string firstNumber = KScript().GetStringHandler().Format(firstValue),
+                secondNumber = KScript().GetStringHandler().Format(secondValue);
 
-            if (Operator.ToLower() == "mt")
+            switch (lastValue.ToLower())
             {
-                return ToBoolString(double.Parse(vA) > double.Parse(vB));
-            }
-
-            if (Operator.ToLower() == "mte")
-            {
-                return ToBoolString(double.Parse(vA) >= double.Parse(vB));
-            }
-
-            if (Operator.ToLower() == "lt")
-            {
-                return ToBoolString(double.Parse(vA) < double.Parse(vB));
-            }
-
-            if (Operator.ToLower() == "lte")
-            {
-                return ToBoolString(double.Parse(vA) <= double.Parse(vB));
-            }
-            else
-            {
-                return ToBoolString(double.Parse(vA) < double.Parse(vB));
+                case "mt":
+                    return ToBoolString(double.Parse(firstNumber) > double.Parse(secondNumber));
+                case "mte":
+                    return ToBoolString(double.Parse(firstNumber) >= double.Parse(secondNumber));
+                case "lt":
+                    return ToBoolString(double.Parse(firstNumber) < double.Parse(secondNumber));
+                case "lte":
+                    return ToBoolString(double.Parse(firstNumber) <= double.Parse(secondNumber));
+                default:
+                    return ToBoolString(double.Parse(firstNumber) < double.Parse(secondNumber));
             }
         }
 
-
-        public override void Validate() { }
+        public override void Validate()
+        {
+            if (string.IsNullOrEmpty(this.firstValue) || string.IsNullOrEmpty(this.secondValue) || string.IsNullOrEmpty(lastValue))
+                throw new KScriptValidationFail(this, "Value cannot be NULL");
+        }
     }
 }

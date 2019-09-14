@@ -151,10 +151,7 @@ namespace KScript
                 {
                     return GetType().GetProperty(propertyName).GetValue(this, null);
                 }
-                else
-                {
-                    return null;
-                }
+                return null;
             }
             set
             {
