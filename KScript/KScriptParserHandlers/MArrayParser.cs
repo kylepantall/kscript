@@ -33,6 +33,10 @@ namespace KScript.KScriptParserHandlers
             }
         }
 
-        public override bool IsAcceptedObject(KScriptObject obj) => obj.GetType().IsAssignableFrom(typeof(marray));
+        //public override bool IsAcceptedObject(KScriptObject obj) => obj.GetType().IsAssignableFrom(typeof(marray));
+        public override bool IsAcceptedObject(KScriptObject obj)
+        {
+            return false;
+        }
     }
 }

@@ -1,4 +1,7 @@
-﻿using KScript.KScriptObjects;
+﻿using KScript.Handlers;
+using KScript.KScriptObjects;
+using Newtonsoft.Json.Linq;
+using System;
 
 namespace KScript.Arguments.Array
 {
@@ -7,10 +10,12 @@ namespace KScript.Arguments.Array
         [KScriptProperty("Used as a unique identifier for this array", true)]
         public string id { get; set; }
 
+        public marray(string Contents) => this.Contents = Contents;
+
         public override bool Run()
         {
-            //ParentContainer.AddMultidimensionalArray(name, new MultiArray.ArrayCollection());
-            return true;
+            //JArray array_obj = Newtonsoft.Json.JsonConvert.DeserializeObject<JArray>(Contents);
+            return MArrayHandler.ConvertJSONToMArray(id, Contents, ParentContainer);
         }
 
         public override string UsageInformation()

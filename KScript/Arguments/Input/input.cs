@@ -25,11 +25,13 @@ namespace KScript.Arguments
             get => _type.ToString();
             set
             {
-                input_types val = input_types.text;
+                input_types val;
                 if (Enum.TryParse(value, out val))
+                {
                     _type = val;
-                else
-                    _type = input_types.text;
+                    return;
+                }
+                _type = input_types.text;
             }
         }
 
@@ -70,7 +72,7 @@ namespace KScript.Arguments
             {
                 CreateDef(to);
                 if (Def(to) is null)
-                    throw new KScriptException("KScriptDefNotFound", string.Format("Definition '{0}' has not been declared", to));
+                    throw new KScriptException("KScriptDefNotFound", $"Definition '{to}' has not been declared");
             }
 
             switch (type.ToLower())

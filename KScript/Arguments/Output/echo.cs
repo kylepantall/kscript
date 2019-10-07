@@ -1,7 +1,7 @@
-﻿using System;
-using System.Linq;
-using KScript.Handlers;
+﻿using KScript.Handlers;
 using KScript.KScriptObjects;
+using System;
+using System.Linq;
 
 namespace KScript.Arguments
 {
@@ -60,23 +60,13 @@ namespace KScript.Arguments
         public override bool Run()
         {
             string _text = Contents;
-
             if (KScriptBoolHandler.Convert(trim))
-            {
                 _text = _text.Trim();
-            }
-
             if (type == "paragraph")
-            {
                 _text = KScriptParagraphHandler.Parse(_text);
-            }
 
             Out(_text);
-
-            if (!string.IsNullOrEmpty(trail_newline) && KScriptBoolHandler.Convert(trail_newline))
-            {
-                Out();
-            }
+            Out(string.Empty, () => !string.IsNullOrEmpty(trail_newline) && KScriptBoolHandler.Convert(trail_newline));
             return true;
         }
 

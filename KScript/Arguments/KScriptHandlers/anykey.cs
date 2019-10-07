@@ -4,7 +4,7 @@ using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
-    [KScriptObjects.KScriptNoInnerObjects]
+    [KScriptNoInnerObjects]
     public class anykey : KScriptObject
     {
         [KScriptProperty("The prompt used to inform the user to press any key.", false)]
@@ -13,11 +13,7 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            if (!string.IsNullOrEmpty(prompt))
-            {
-                Out(prompt);
-            }
-
+            Out(prompt, () => !string.IsNullOrEmpty(prompt));
             Console.ReadKey(true);
             return true;
         }

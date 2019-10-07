@@ -17,8 +17,7 @@
         {
             if (!HttpListener.IsSupported)
             {
-                throw new NotSupportedException(
-                        "Needs Windows XP SP2, Server 2003 or later.");
+                throw new NotSupportedException("Needs Windows XP SP2, Server 2003 or later.");
             }
 
             if (prefixes == null || prefixes.Length == 0)
