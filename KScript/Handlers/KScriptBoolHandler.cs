@@ -31,10 +31,7 @@ namespace KScript.Handlers
                     throw new KScriptBoolInvalid();
                 }
             }
-            else
-            {
-                throw new KScriptBoolInvalid();
-            }
+            throw new KScriptBoolInvalid();
         }
     }
 }

@@ -27,10 +27,7 @@ namespace KScript.KScriptExceptions
             {
                 return KScriptObject.GetType().Name;
             }
-            else
-            {
-                return "KScript_Internal_Error";
-            }
+            return "KScript_Internal_Error";
         }
 
         public KScriptException(string message) : base(message)
