@@ -64,14 +64,13 @@ namespace KScript
                     string variable_id = match.Groups[1].Value;
                     string variable_func = match.Groups[2].Value;
                     IVariableFunction func = ParentContainer.Parser.GetVariableFunction(variable_id, variable_func, ParentContainer);
-                    if (func != null)
+                    if (func == null) continue;
+
+                    if (func.IsAccepted())
                     {
-                        if (func.IsAccepted())
-                        {
-                            string val = func.Evaluate(null);
-                            string replace = string.Format(@"\$\b{0}\b\-\>\b{1}\b\(\)", Regex.Escape(variable_id), Regex.Escape(variable_func));
-                            result = Regex.Replace(contents, replace, val);
-                        }
+                        string val = func.Evaluate(null);
+                        string replace = string.Format(@"\$\b{0}\b\-\>\b{1}\b\(\)", Regex.Escape(variable_id), Regex.Escape(variable_func));
+                        result = Regex.Replace(contents, replace, val);
                     }
                 }
             }
