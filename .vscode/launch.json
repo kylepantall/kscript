@@ -1,0 +1,29 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C# Debugger",
+            "type": "mono",
+            "request": "launch",
+            "program": "${workspaceRoot}/KScriptApp/bin/Debug/KScript.exe",
+            "args": [
+                "${input:filePath}"
+            ],
+            "cwd": "${workspaceRoot}",
+            "console": "externalTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "preLaunchTask": "build",
+        }
+    ],
+    "inputs": [
+        {
+            "id": "filePath",
+            "description": "Enter a KScript file path to run: ",
+            "default": "DebugScripts/Debug.xml",
+            "type": "promptString"
+        }
+    ],
+}

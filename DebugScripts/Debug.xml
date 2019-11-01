@@ -1,0 +1,4 @@
+<kscript>
+    <echo>Debugging.\n</echo>
+    <load location="@k('script.directory')/Loops.xml" />
+</kscript>

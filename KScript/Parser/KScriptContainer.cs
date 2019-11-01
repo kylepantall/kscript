@@ -481,31 +481,22 @@ namespace KScript
         /// <param name="ex"></param>
         internal void HandleException(Exception ex)
         {
-            if (!THROW_ALL_EXCEPTIONS)
-            {
-                List<Document.IKScriptDocumentNode> items = GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name);
-
-                if (items.Count > 0 && items != null)
-                {
-                    items.ForEach(i => i.Run(this, null, i.GetValue()));
-                }
-                else
-                {
-                    if (typeof(KScriptException).IsAssignableFrom(ex.GetType()))
-                    {
-                        KScriptException kex = (KScriptException)ex;
-                        Out(string.Format("[error ~{0}: {2}] : {1}\n", kex.GetExceptionType(), kex.Message, DateTime.Now.ToShortTimeString()));
-                    }
-                    else
-                    {
-                        Out(string.Format("[error ~unknown:{0}] {1}\n", DateTime.Now.ToShortTimeString(), ex.Message));
-                    }
-                }
-            }
-            else
+            if (THROW_ALL_EXCEPTIONS)
             {
                 throw ex;
             }
+
+            GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name)
+                                       .ForEach(i => i.Run(this, null, i.GetValue()));
+
+            if (typeof(KScriptException).IsAssignableFrom(ex.GetType()))
+            {
+                KScriptException kex = (KScriptException)ex;
+                Out(string.Format("[error ~{0}: {2}] : {1}\n", kex.GetExceptionType(), kex.Message, DateTime.Now.ToShortTimeString()));
+                return;
+            }
+
+            Out(string.Format("[error ~unknown:{0}] {1}\n", DateTime.Now.ToShortTimeString(), ex.Message));
         }
 
 
