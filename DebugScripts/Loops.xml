@@ -1,4 +1,4 @@
-﻿<kscript>
+﻿<!-- <kscript>
   <def id="input"/>
 
   <dowhile condition="yes">
@@ -6,4 +6,9 @@
     <echo>@parse('$input')\n</echo>
   </dowhile>
 
+</kscript> -->
+
+
+<kscript>
+  <echo></echo>
 </kscript>

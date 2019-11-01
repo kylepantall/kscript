@@ -564,21 +564,17 @@ namespace KScript
                 {
                     return defs[id];
                 }
-                else
-                {
-                    return null;
-                }
+
+                return null;
             }
             set
             {
-                if (defs.ContainsKey(id))
-                {
-                    defs[id] = value;
-                }
-                else
+                if (!defs.ContainsKey(id))
                 {
                     defs.Add(new KeyValuePair<string, def>(id, value));
                 }
+
+                defs[id] = value;
             }
         }
     }
