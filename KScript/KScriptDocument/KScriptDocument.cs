@@ -16,13 +16,7 @@ namespace KScript.Document
         {
             try
             {
-                foreach (var item in Nodes())
-                {
-                    if (container.AllowExecution)
-                    {
-                        item.Run(container, null, null);
-                    }
-                }
+                Nodes().ForEach(item => item.Run(container, null, null));
             }
             catch (System.Exception ex)
             {
