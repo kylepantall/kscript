@@ -25,7 +25,11 @@ namespace KScript
         /// <summary>
         /// Constant which determines if KScript should return all exceptions instead of attempting to handle them.
         /// </summary>
+#if DEBUG
         const bool THROW_ALL_EXCEPTIONS = true;
+#else
+        const bool THROW_ALL_EXCEPTIONS = false;
+#endif
 
         private const string PARSERHANDLERS = "KScript.KScriptParserHandlers";
 
@@ -151,6 +155,28 @@ namespace KScript
         /// <returns>If the Def exists</returns>
         internal bool HasDef(string id) => defs.ContainsKey(id);
 
+
+        /// <summary>
+        /// Method used to obtain a def with the given id.
+        /// If dynamic def creation is enabled, when not found, the def will be generated. 
+        /// </summary>
+        /// <param name="id">ID of the def</param>
+        internal def GetDef(string id)
+        {
+            if (defs.ContainsKey(id))
+            {
+                return defs[id];
+            }
+
+            if (Properties.DynamicDefs)
+            {
+                defs[id] = new def();
+                return defs[id];
+            }
+
+            throw new KScriptDefNotFound(null, $"The def with the id '{id}' could not be found.");
+        }
+
         /// <summary>
         /// Used to prevent conditional loops - numerical or just conditional
         /// </summary>
@@ -246,10 +272,7 @@ namespace KScript
                                   where t.IsClass && typeof(KScriptObject).IsAssignableFrom(t) && t.Namespace.StartsWith(ASSEMBLY_PATH)
                                   select t;
 
-            IndentedTextWriter indentedTextWriter = new IndentedTextWriter(Console.Out)
-            {
-                Indent = 2
-            };
+            IndentedTextWriter indentedTextWriter = new IndentedTextWriter(Console.Out) { Indent = 2 };
 
             foreach (Type t in q.ToList())
             {
@@ -338,6 +361,8 @@ namespace KScript
                     indentedTextWriter.WriteLine();
                 }
             }
+
+            indentedTextWriter.Dispose();
 
             Out();
             Out();

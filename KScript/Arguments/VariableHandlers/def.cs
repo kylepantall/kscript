@@ -27,10 +27,9 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            if (id.Contains(" ") || id.Contains("$"))
-            {
-                throw new KScriptValidationFail(this, "The id cannot contain any spaces or $ symbols.");
-            }
+            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            validator.AddValidator(new KScriptValidationObject("id", false, Global.GlobalIdentifiers.VARIABLE_NAME_DETECTION));
+            validator.Validate(this);
         }
 
         public override string UsageInformation() => @"Used to declare a variable within the KScript Definition container." +

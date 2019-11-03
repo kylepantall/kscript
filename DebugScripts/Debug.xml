@@ -1,4 +1,8 @@
-<kscript>
-    <echo>Debugging.\n</echo>
-    <load location="@k('script.directory')/Loops.xml" />
+<kscript dynamic_defs="yes">
+    <input to="name">Enter your name: </input>
+    <guard from="name">
+        <echo>You must enter a name.</echo>
+        <end />
+    </guard>
+    <echo>$name</echo>
 </kscript>

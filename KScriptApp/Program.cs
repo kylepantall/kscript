@@ -123,21 +123,31 @@ namespace KScript
 
                     if (parser.Properties.WaitOnFinish)
                     {
-                        IEnumerable<ProcessThread> threads = Process.GetCurrentProcess().Threads.Cast<ProcessThread>().Where(i => i.ThreadState == ThreadState.Running);
-                        if (threads.Count() > 1)
+                        if (HasAnyChildProcesses())
                         {
                             if (!parser.Properties.Quiet)
                                 Console.WriteLine("Awaiting for child processes to finish...");
                             Console.ReadKey();
+                            return;
                         }
-                        else
-                        {
-                            if (!parser.Properties.Quiet)
-                                Console.WriteLine("Press any key to close...");
-                            Console.ReadKey();
-                        }
+
+                        if (!parser.Properties.Quiet)
+                            Console.WriteLine("Press any key to close...");
+                        Console.ReadKey();
                     }
                 }
+            }
+        }
+
+        public static bool HasAnyChildProcesses()
+        {
+            try
+            {
+                return Process.GetCurrentProcess().Threads.Cast<ProcessThread>().Where(i => i.ThreadState == ThreadState.Running).Any();
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 

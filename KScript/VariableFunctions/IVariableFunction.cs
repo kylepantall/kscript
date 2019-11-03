@@ -21,16 +21,7 @@ namespace KScript
         /// <returns></returns>
         public def GetDef()
         {
-            if (ParentContainer.GetDefs().ContainsKey(Variable_ID))
-            {
-                return ParentContainer.GetDefs()[Variable_ID];
-            }
-            else
-            {
-                Exception ex = new KScriptExceptions.KScriptDefNotFound(this, string.Format("The Def '{0}' could not be found.", Variable_ID));
-                HandleException(ex);
-                return null;
-            }
+            return ParentContainer.GetDef(Variable_ID);
         }
 
         /// <summary>

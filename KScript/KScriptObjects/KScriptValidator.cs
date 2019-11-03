@@ -5,6 +5,7 @@ using System.Linq;
 using KScript.Handlers;
 using KScript.KScriptExceptions;
 using static KScript.KScriptObjects.KScriptValidator;
+using System.Text.RegularExpressions;
 
 namespace KScript.KScriptObjects
 {
@@ -57,6 +58,7 @@ namespace KScript.KScriptObjects
         private readonly bool can_be_empty = true;
         private readonly ExpectedInput expected_input = ExpectedInput.Custom;
         private readonly string[] accepted_values = null;
+        private readonly string regex;
 
         public KScriptValidationObject(string property_name, bool can_be_empty = false)
         {
@@ -76,6 +78,13 @@ namespace KScript.KScriptObjects
             this.property_name = property_name;
             this.can_be_empty = can_be_empty;
             this.expected_input = expected_input;
+        }
+
+        public KScriptValidationObject(string property_name, bool can_be_empty, string regex)
+        {
+            this.property_name = property_name;
+            this.can_be_empty = can_be_empty;
+            this.regex = regex;
         }
 
         public string GetPropertyValue(KScriptBaseObject caller)
@@ -124,6 +133,21 @@ namespace KScript.KScriptObjects
         }
 
         /// <summary>
+        /// Checks that the property value returns the expected regular expression.
+        /// </summary>
+        /// <param name="caller">Object calling method</param>
+        /// <returns>If the check was successfull</returns>
+        public bool IsExpectedRegularExpression(KScriptBaseObject caller)
+        {
+            if (string.IsNullOrEmpty(regex))
+            {
+                return true;
+            }
+
+            return new Regex(regex).IsMatch(GetPropertyValue(caller));
+        }
+
+        /// <summary>
         /// Checks for existing array or def with specified ID.
         /// If ExpectedInput type is custom, will not be validated. Must be overriden.
         /// </summary>
@@ -139,6 +163,8 @@ namespace KScript.KScriptObjects
                     string array_id = GetPropertyValue(caller);
                     return container.ArraysGet().ContainsKey(array_id);
                 case ExpectedInput.DefID:
+                    if (container.Properties.DynamicDefs)
+                        return true;
                     string def_id = GetPropertyValue(caller);
                     return container.GetDefs().ContainsKey(def_id);
                 case ExpectedInput.DirectoryLocation:
@@ -201,6 +227,11 @@ namespace KScript.KScriptObjects
             if (!IsAcceptedValue(caller))
             {
                 throw new KScriptException(caller, string.Format("The value '{0}' was not an accepted value for the property '{1}'.", GetPropertyValue(caller), property_name));
+            }
+
+            if (!IsExpectedRegularExpression(caller))
+            {
+                throw new KScriptException(caller, string.Format("The value '{0}' was not an accepted value for the property '{1}'", GetPropertyValue(caller), property_name));
             }
 
         }

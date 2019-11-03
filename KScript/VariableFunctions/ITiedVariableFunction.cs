@@ -28,37 +28,13 @@ namespace KScript.VariableFunctions
         /// Used to retrieve the variable using the function.
         /// </summary>
         /// <returns></returns>
-        public def GetFirstDef()
-        {
-            if (ParentContainer.GetDefs().ContainsKey(First_VariableID))
-            {
-                return ParentContainer.GetDefs()[First_VariableID];
-            }
-            else
-            {
-                Exception ex = new KScriptExceptions.KScriptDefNotFound(this, string.Format("The Def '{0}' could not be found.", First_VariableID));
-                HandleException(ex);
-                return null;
-            }
-        }
+        public def GetFirstDef() => ParentContainer.GetDef(First_VariableID);
 
         /// <summary>
         /// Used to retrieve the second variable using the function.
         /// </summary>
         /// <returns></returns>
-        public def GetSecondDef()
-        {
-            if (ParentContainer.GetDefs().ContainsKey(Second_VariableID))
-            {
-                return ParentContainer.GetDefs()[Second_VariableID];
-            }
-            else
-            {
-                Exception ex = new KScriptExceptions.KScriptDefNotFound(this, string.Format("The Def '{0}' could not be found.", Second_VariableID));
-                HandleException(ex);
-                return null;
-            }
-        }
+        public def GetSecondDef() => ParentContainer.GetDef(Second_VariableID);
 
         /// <summary>
         /// Evaluate the result based on the input of the given variable [value].

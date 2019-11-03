@@ -10,6 +10,7 @@ namespace KScript
         public bool WaitOnFinish { get; set; }
         public bool FullScreen { get; set; }
         public string Language { get; set; }
+        public bool DynamicDefs {get; set;}
 
         public KScriptProperties()
         {
@@ -17,6 +18,7 @@ namespace KScript
             Quiet = true;
             FullScreen = false;
             WaitOnFinish = true;
+            DynamicDefs = true;
         }
     }
 }
