@@ -23,11 +23,14 @@ namespace KScript.Arguments
 
         public string dynamic_defs { get; set; } = "no";
 
+        public string throw_exceptions { get; set; } = "no";
+
         public override bool Run()
         {
             ParentContainer.Properties.Quiet = ToBool(quiet);
             ParentContainer.Properties.WaitOnFinish = ToBool(on_finish_wait);
             ParentContainer.Properties.DynamicDefs = ToBool(dynamic_defs);
+            ParentContainer.Properties.ThrowAllExceptions = ToBool(throw_exceptions);
 
             if (string.IsNullOrWhiteSpace(ParentContainer.Properties.Language))
             {

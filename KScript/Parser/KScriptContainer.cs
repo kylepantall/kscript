@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.ComponentModel;
+using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,11 +26,6 @@ namespace KScript
         /// <summary>
         /// Constant which determines if KScript should return all exceptions instead of attempting to handle them.
         /// </summary>
-#if DEBUG
-        const bool THROW_ALL_EXCEPTIONS = true;
-#else
-        const bool THROW_ALL_EXCEPTIONS = false;
-#endif
 
         private const string PARSERHANDLERS = "KScript.KScriptParserHandlers";
 
@@ -506,7 +502,7 @@ namespace KScript
         /// <param name="ex"></param>
         internal void HandleException(Exception ex)
         {
-            if (THROW_ALL_EXCEPTIONS)
+            if (Properties.ThrowAllExceptions)
             {
                 throw ex;
             }

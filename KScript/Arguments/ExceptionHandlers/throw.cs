@@ -6,26 +6,26 @@ using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
-    class @throw : KScriptObject
+    public class @throw : KScriptObject
     {
-        const string EXCEPTION_TYPES = "KScript.KScriptExceptions";
-
         public string type { get; set; }
 
-        public @throw(string msg) => Contents = msg;
+        public @throw(string Contents) => this.Contents = Contents;
 
         public override bool Run()
         {
             var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && (typeof(KScriptException).IsAssignableFrom(t) || typeof(Exception).IsAssignableFrom(t) && t.Namespace == EXCEPTION_TYPES) && t.Name == type
+                    where t.IsClass && (typeof(KScriptException).IsAssignableFrom(t) || typeof(Exception).IsAssignableFrom(t) && t.Namespace == Global.GlobalIdentifiers.EXCEPTION_TYPES) && t.Name == type
                     select t;
 
             if (q.FirstOrDefault() != null)
             {
-                Exception ex = (Exception)Activator.CreateInstance(q.FirstOrDefault());
+                var ex = Activator.CreateInstance(q.FirstOrDefault(), args: new object[] { Contents });
+
+                Out(Contents);
                 if (ex != null)
                 {
-                    HandleException(ex);
+                    HandleException((Exception)ex);
                     return true;
                 }
             }

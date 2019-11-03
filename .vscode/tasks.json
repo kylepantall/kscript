@@ -6,6 +6,15 @@
             "command": "xbuild",
             "type": "process",
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build_release",
+            "command": "xbuild",
+            "args": [
+                "/p:Configuration=Release"
+            ],
+            "type": "process",
+            "problemMatcher": "$msCompile"
         }
     ]
 }

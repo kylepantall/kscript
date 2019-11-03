@@ -1,8 +1,12 @@
-<kscript dynamic_defs="yes">
+<kscript dynamic_defs="yes" throw_exceptions="yes">
+
     <input to="name">Enter your name: </input>
+
     <guard from="name">
         <echo>You must enter a name.</echo>
+        <throw type="KScriptException">No name has been entered</throw>
         <end />
     </guard>
     <echo>$name</echo>
+
 </kscript>
