@@ -105,13 +105,12 @@ namespace KScript.KScriptObjects
             {
                 return true;
             }
-            else
+
+            if (string.IsNullOrWhiteSpace(GetPropertyValue(caller)) || GetPropertyValue(caller) == null)
             {
-                if (string.IsNullOrWhiteSpace(GetPropertyValue(caller)) || GetPropertyValue(caller) == null)
-                {
-                    return false;
-                }
+                return false;
             }
+
             return true;
         }
 
@@ -126,10 +125,8 @@ namespace KScript.KScriptObjects
             {
                 return accepted_values.Any(i => GetPropertyValue(caller).Contains(i));
             }
-            else
-            {
-                return true;
-            }
+
+            return true;
         }
 
         /// <summary>
