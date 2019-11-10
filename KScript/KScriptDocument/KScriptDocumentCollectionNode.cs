@@ -25,7 +25,7 @@ namespace KScript.Document
                     //Try and run, if can continue save this value to field @continue.
                     try
                     {
-                        if (GetValue().ValidationType != KScriptObject.ValidationTypes.BEFORE_PARSING)
+                        if (GetValue().GetValidationType() != KScriptObject.ValidationTypes.BEFORE_PARSING)
                         {
                             GetValue().Validate();
                         }

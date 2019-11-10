@@ -93,7 +93,6 @@ namespace KScript.KScriptObjects
             return value;
         }
 
-
         /// <summary>
         /// Checks if a property is empty or null if not allowed nullable/empty value.
         /// </summary>

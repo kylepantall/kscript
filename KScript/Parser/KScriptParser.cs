@@ -250,7 +250,7 @@ namespace KScript
                 ((KScriptIDObject)obj).RegisterObject();
             }
 
-            if (obj.ValidationType != KScriptObject.ValidationTypes.DURING_PARSING)
+            if (obj.GetValidationType() != KScriptObject.ValidationTypes.DURING_PARSING)
             {
                 try { obj.Validate(); }
                 catch (KScriptValidationException ex)

@@ -23,7 +23,7 @@ namespace KScript.Document
                 {
                     try
                     {
-                        if (GetValue().ValidationType != KScriptObject.ValidationTypes.BEFORE_PARSING)
+                        if (GetValue().GetValidationType() != KScriptObject.ValidationTypes.BEFORE_PARSING)
                         {
                             GetValue().Validate();
                         }

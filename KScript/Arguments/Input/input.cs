@@ -68,13 +68,6 @@ namespace KScript.Arguments
 
             Out(Contents);
 
-            if (!string.IsNullOrWhiteSpace(to))
-            {
-                CreateDef(to);
-                if (Def(to) is null)
-                    throw new KScriptException("KScriptDefNotFound", $"Definition '{to}' has not been declared");
-            }
-
             switch (type.ToLower())
             {
                 case "number":

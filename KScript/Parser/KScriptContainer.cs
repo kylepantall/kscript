@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System.Runtime.CompilerServices;
+using System.ComponentModel;
 using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
@@ -579,15 +580,7 @@ namespace KScript
         /// <returns>Def with specified ID</returns>
         public def this[string id]
         {
-            get
-            {
-                if (!string.IsNullOrWhiteSpace(id))
-                {
-                    return defs[id];
-                }
-
-                return null;
-            }
+            get => GetDef(id);
             set
             {
                 if (!defs.ContainsKey(id))

@@ -5,7 +5,10 @@
             "label": "build",
             "command": "xbuild",
             "type": "process",
-            "problemMatcher": "$msCompile"
+            "problemMatcher": "$msCompile",
+            "args": [
+                "/t:Rebuild"
+            ]
         },
         {
             "label": "build_release",

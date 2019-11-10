@@ -1,12 +1,14 @@
-<kscript dynamic_defs="yes" throw_exceptions="yes">
+<kscript dynamic_defs="yes" throw_exceptions="yes" quiet="yes" print_info="no">
 
-    <input to="name">Enter your name: </input>
+    <dowhile condition="true">
+        <input to="name">Enter your name: </input>
 
-    <guard from="name">
-        <echo>You must enter a name.</echo>
-        <throw type="KScriptException">No name has been entered</throw>
-        <end />
-    </guard>
-    <echo>$name</echo>
+        <guard from="name">
+            <echo>You must enter a name.</echo>
+            <throw type="KScriptException">No name has been entered</throw>
+            <end />
+        </guard>
+        <echo>$name\n</echo>
+    </dowhile>
 
 </kscript>

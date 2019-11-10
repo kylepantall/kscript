@@ -25,7 +25,7 @@ namespace KScript.Arguments
             "By Default, format is '[$index] - $value'.", false)]
         public string format { get; set; } = @"[$index] - $value\n";
 
-        public aecho() => ValidationType = ValidationTypes.DURING_PARSING;
+        public aecho() => SetValidationType(ValidationTypes.DURING_PARSING);
 
         public override bool Run()
         {
