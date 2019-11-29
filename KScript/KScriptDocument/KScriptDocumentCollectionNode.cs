@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using KScript.Arguments;
 using KScript.KScriptExceptions;
@@ -17,6 +18,14 @@ namespace KScript.Document
 
         public void Run(KScriptContainer container, string args, KScriptObject Pobj)
         {
+
+            // var operatorHandlers = container.LoadedOperatorHandlers;
+
+            // foreach (var t in operatorHandlers)
+            // {
+            //     Console.Write(t);
+            // }
+
             bool @continue = true;
             if (!Ignore && container.AllowExecution)
             {

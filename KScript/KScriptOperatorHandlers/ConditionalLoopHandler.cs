@@ -4,7 +4,7 @@ using KScript.Document;
 
 namespace KScript.KScriptOperatorHandlers
 {
-    class ConditionalLoopHandler : NodeHandler
+    class ConditionalLoopHandler : OperatorHandler
     {
         public override bool CanRun(KScriptObject obj)
         {
@@ -25,12 +25,10 @@ namespace KScript.KScriptOperatorHandlers
                             Container.StopConditionalLoops();
                             break;
                         }
-                        else
+
+                        if (!Container.GetConditionalLoops())
                         {
-                            if (!Container.GetConditionalLoops())
-                            {
-                                node.Run(Container, null, obj);
-                            }
+                            node.Run(Container, null, obj);
                         }
                     }
 
@@ -39,8 +37,7 @@ namespace KScript.KScriptOperatorHandlers
                         Container.AllowConditionalLoops();
                         return;
                     }
-                }
-                while (obj_x.ToBool(obj_x.HandleCommands(obj_x.condition)));
+                } while (obj_x.ToBool(obj_x.HandleCommands(obj_x.condition)));
             }
         }
     }

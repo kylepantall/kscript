@@ -1,11 +1,9 @@
-﻿using System.Runtime.CompilerServices;
-using System.ComponentModel;
-using System;
-using System.CodeDom.Compiler;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+
 using KScript.Arguments;
 using KScript.CommandHandler;
 using KScript.Handlers;
@@ -20,16 +18,6 @@ namespace KScript
     [ClassInterface(ClassInterfaceType.None)]
     public class KScriptContainer
     {
-        //Constant to store Assembly path for KScript Arguments.
-        const string ASSEMBLY_PATH = "KScript.Arguments";
-        const string VARIABLE_ASSEMBLY_PATH = "KScript.VariableFunctions";
-
-        /// <summary>
-        /// Constant which determines if KScript should return all exceptions instead of attempting to handle them.
-        /// </summary>
-
-        private const string PARSERHANDLERS = "KScript.KScriptParserHandlers";
-
         private bool ConditionalLoops = true;
 
         //Property to store the random object used to generate random numbers and digits.
@@ -38,11 +26,10 @@ namespace KScript
         //StringHandler property used to store the KScriptStringHandler class.
         private KScriptStringHandler StringHandler { get; }
 
-
         /// <summary>
         /// Stores KScript Array Containers
         /// </summary>
-        public readonly KScriptArrayContainer KScriptArrayContainer;
+        private readonly KScriptArrayContainer KScriptArrayContainer;
 
         //Properties used to store file path and file directory of opened Script.
         internal string FilePath { get; set; }
@@ -58,7 +45,7 @@ namespace KScript
         private readonly Dictionary<string, string> ConstantProperties = new Dictionary<string, string>();
 
         #region Global Values Storage - Stores values retrievable across all KScriptObjects (where ParentContainer accessible)
-        private Dictionary<string, Dictionary<string, string>> UniqueStore = new Dictionary<string, Dictionary<string, string>>();
+        private readonly Dictionary<string, Dictionary<string, string>> UniqueStore = new Dictionary<string, Dictionary<string, string>>();
 
         public void ClearGlobalValues(string key) => UniqueStore.Remove(key);
 
@@ -70,29 +57,25 @@ namespace KScript
         /// <param name="value">Value to store at the given ID.</param>
         public void AddGlobalValue(string key, string id, string value)
         {
-            if (GetGlobalValues(key) != null)
-            {
-                if (GetGlobalValues(key).ContainsKey(id))
-                {
-                    GetGlobalValues(key).Remove(id);
-                }
+            var globalValue = GetGlobalValues(key);
 
-                GetGlobalValues(key).Add(id, value);
-            }
-            else
-            {
+            if (globalValue != null && globalValue.ContainsKey(id))
+                GetGlobalValues(key).Remove(id);
+
+            if (GetGlobalValues(key) == null)
                 UniqueStore.Add(key, new Dictionary<string, string>());
-                GetGlobalValues(key).Add(id, value);
-            }
+
+            GetGlobalValues(key).Add(id, value);
         }
 
         /// <summary>
         /// Returns the value stored within the Key and with the given ID
+        /// If no global value is found, the null string is returned
         /// </summary>
         /// <param name="key">Key to search within</param>
         /// <param name="id">ID to retrieve value from</param>
         /// <returns></returns>
-        public string GetGlobalValue(string key, string id) => GetGlobalValues(key).ContainsKey(id) ? GetGlobalValues(key)[id] : string.Empty;
+        public string GetGlobalValue(string key, string id) => GetGlobalValues(key).ContainsKey(id) ? GetGlobalValues(key)[id] : Global.Values.NULL;
 
 
         /// <summary>
@@ -101,10 +84,7 @@ namespace KScript
         /// <param name="key">Key to check if exists.</param>
         /// <param name="id">ID to check if existent within the list with the given Key.</param>
         /// <returns>True if exists, false if otherwise.</returns>
-        public bool HasGlobalValue(string key, string id)
-        {
-            return UniqueStore.ContainsKey(key) && UniqueStore[key].ContainsKey(id);
-        }
+        public bool HasGlobalValue(string key, string id) => UniqueStore.ContainsKey(key) && UniqueStore[key].ContainsKey(id);
 
         /// <summary>
         /// Returns global values with the given key
@@ -113,15 +93,11 @@ namespace KScript
         /// <returns>The dictionary list of values for the given key</returns>
         public Dictionary<string, string> GetGlobalValues(string key)
         {
-            if (UniqueStore.ContainsKey(key))
-            {
-                return UniqueStore[key];
-            }
-            else
+            if (!UniqueStore.ContainsKey(key))
             {
                 UniqueStore.Add(key, new Dictionary<string, string>());
-                return UniqueStore[key];
             }
+            return UniqueStore[key];
         }
         #endregion
 
@@ -133,11 +109,6 @@ namespace KScript
         /// </summary>
         /// <returns></returns>
         public Dictionary<string, string> GetConstantProperties() => ConstantProperties;
-
-        /// <summary>
-        /// Used to store resource values.
-        /// </summary>
-        private readonly List<KScriptObject> ResourceKeeper = new List<KScriptObject>();
 
         /// <summary>
         /// Method used to retrieve defs dictionary.
@@ -211,6 +182,8 @@ namespace KScript
 
         internal Dictionary<string, Type> LoadedParserHandlers { get; set; }
 
+        internal Dictionary<string, Type> LoadedOperatorHandlers { get; set; }
+
         //Property used to retrieve the value of the _random property.
         internal Random GetRandom() => _random;
 
@@ -225,8 +198,11 @@ namespace KScript
         //Boolean used to determine if a type has a default constructor.
         internal bool HasDefaultConstructor(Type t) => t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null;
 
-        //Property to store whether execution of the KScript document is allowed.
-        internal bool AllowExecution { get; set; }
+        /// <summary>
+        /// Property used to store whether execution of the KScript document is allowed.
+        /// </summary>
+        /// <value>default is true</value>
+        internal bool AllowExecution { get; set; } = true;
 
         //Methods to handle console output using the string handler class.
         internal void Out(string value) { HandleOutputEvent(value); Console.WriteLine(StringHandler.Format(value)); }
@@ -256,113 +232,12 @@ namespace KScript
         public bool Stop() { AllowExecution = false; return AllowExecution; }
 
         /// <summary>
-        /// Class to handle printing out KScript information such as commands, versions etc.
+        /// Method to handle printing out KScript information such as commands, versions etc.
         /// </summary>
         public void PrintInfo()
         {
-            Out("About KScript");
-            Out("-----------------------------------------------");
-            Out($"Version: {Assembly.GetExecutingAssembly().GetName().Version.ToString()}");
-            Out("Supported Commands:");
-
-            IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                                  where t.IsClass && typeof(KScriptObject).IsAssignableFrom(t) && t.Namespace.StartsWith(ASSEMBLY_PATH)
-                                  select t;
-
-            IndentedTextWriter indentedTextWriter = new IndentedTextWriter(Console.Out) { Indent = 2 };
-
-            foreach (Type t in q.ToList())
-            {
-                bool HideClass = t.GetCustomAttributes<KScriptHideObject>().Any();
-                bool HasNoInnerObjects = t.GetCustomAttributes<KScriptNoInnerObjects>().Any();
-
-                if (!HideClass)
-                {
-                    indentedTextWriter.Indent = 0;
-                    indentedTextWriter.WriteLine();
-
-                    for (int i = 0; i < Console.WindowWidth; i++)
-                    {
-                        indentedTextWriter.Write("=");
-                    }
-
-                    indentedTextWriter.WriteLine();
-
-                    if (!HasNoInnerObjects)
-                    {
-                        indentedTextWriter.Write("< " + t.Name + " > ... </ " + t.Name + " >\n");
-                    }
-                    else
-                    {
-                        indentedTextWriter.Write("< " + t.Name + " />\n");
-                    }
-
-                    indentedTextWriter.Indent = 1;
-                    indentedTextWriter.WriteLine();
-                    indentedTextWriter.WriteLine("[ Usage ] ");
-                    indentedTextWriter.Indent = 2;
-
-                    indentedTextWriter.WriteLine("Object Contents: " + (HasNoInnerObjects ? "Does not require inner elements or content." : "Inner elements or content are required.") + "\n");
-
-                    indentedTextWriter.WriteLine(string.Format(Parser.GetScriptObject(t).UsageInformation()));
-                    indentedTextWriter.WriteLine();
-
-                    IEnumerable<PropertyInfo> properties = t.GetProperties().Where(p => p.CanWrite);
-
-                    int index = 0;
-
-                    if (properties.Any(p => p.GetCustomAttributes<KScriptProperty>().Any()))
-                    {
-                        indentedTextWriter.Indent = 1;
-                        indentedTextWriter.WriteLine("[ Arguments ]");
-                    }
-
-                    foreach (PropertyInfo p in properties)
-                    {
-                        IEnumerable<KScriptProperty> Properties = p.GetCustomAttributes<KScriptProperty>(false);
-                        foreach (KScriptProperty prop in Properties)
-                        {
-                            indentedTextWriter.Indent = 2;
-                            indentedTextWriter.WriteLine("[" + ++index + "] - " + p.Name + (prop.IsRequired() ? " (required)" : ""));
-                            indentedTextWriter.Indent = 3;
-                            indentedTextWriter.WriteLine(prop.ToString());
-                            IEnumerable<KScriptExample> Examples = p.GetCustomAttributes<KScriptExample>(false);
-                            int example_count = 0;
-                            if (Examples.Any())
-                            {
-                                indentedTextWriter.WriteLine("[ Examples ]");
-                                foreach (KScriptExample example in Examples)
-                                {
-                                    indentedTextWriter.Indent = 4;
-                                    indentedTextWriter.WriteLine(++example_count + " - " + example.ToString());
-                                }
-                            }
-
-                            KScriptAcceptedOptions Accepted_Value = p.GetCustomAttribute<KScriptAcceptedOptions>(false);
-
-                            if (Accepted_Value != null)
-                            {
-                                indentedTextWriter.Indent = 3;
-                                indentedTextWriter.WriteLine("[ Accepted Values ]");
-
-                                int val_count = 0;
-                                foreach (string item in Accepted_Value.GetValues())
-                                {
-                                    indentedTextWriter.Indent = 4;
-                                    indentedTextWriter.WriteLine(++val_count + " - " + item);
-                                }
-                            }
-                        }
-                    }
-
-                    indentedTextWriter.WriteLine();
-                }
-            }
-
-            indentedTextWriter.Dispose();
-
-            Out();
-            Out();
+            KScriptObjectHelperWriter writer = new KScriptObjectHelperWriter();
+            writer.Write(Parser);
         }
 
         /// <summary>
@@ -390,22 +265,8 @@ namespace KScript
             ObjectStorageContainer = new KScriptObjectStorageContainer();
             LoadedVariableFunctions = new Dictionary<string, Type>();
             LoadedParserHandlers = new Dictionary<string, Type>();
+            LoadedOperatorHandlers = new Dictionary<string, Type>();
             KScriptArrayContainer = new KScriptArrayContainer();
-        }
-
-        /// <summary>
-        /// Allows any KScript Object to handle internal commands and requests.
-        /// </summary>
-        /// <param name="req">Requested property</param>
-        /// <param name="val">New value</param>
-        internal void HandleInternalCommandRequest(string req, string val)
-        {
-            //switch (req)
-            //{
-            //    default:
-            //        break;
-            //}
-            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -414,7 +275,9 @@ namespace KScript
         internal void LoadBuiltInTypes()
         {
             IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                                  where t.IsClass && t.Namespace != null && t.Namespace.StartsWith(ASSEMBLY_PATH)
+                                  where t.IsClass
+                                  && t.Namespace != null
+                                  && t.Namespace.StartsWith(Global.GlobalIdentifiers.ASSEMBLY_PATH)
                                   select t;
             q.ToList().ForEach(i => AddKScriptObjectType(i));
         }
@@ -427,7 +290,7 @@ namespace KScript
         {
             IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
                                   where t.IsClass && t.Namespace != null &&
-                                  t.Namespace.StartsWith(VARIABLE_ASSEMBLY_PATH)
+                                  t.Namespace.StartsWith(Global.GlobalIdentifiers.VARIABLE_ASSEMBLY_PATH)
                                   select t;
             q.ToList().ForEach(i => AddVariableFunctionType(i));
         }
@@ -439,57 +302,41 @@ namespace KScript
         internal void LoadBuiltInParserHandlers()
         {
             IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                                  where t.IsClass && t.Namespace != null && t.Namespace.StartsWith(PARSERHANDLERS) && !t.IsAssignableFrom(typeof(IParserHandler))
+                                  where t.IsClass && t.Namespace != null
+                                  && t.Namespace.StartsWith(Global.GlobalIdentifiers.PARSER_HANDLERS)
+                                  && !t.IsAssignableFrom(typeof(IParserHandler))
                                   select t;
             q.ToList().ForEach(i => AddKScriptParserHandler(i));
         }
 
+        /// <summary>
+        /// Method used to load built in Node Handlers.
+        /// </summary>
+        internal void LoadBuiltInOperatorHandlers()
+        {
+            IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                                  where t.IsClass && t.Namespace != null
+                                  && t.Namespace.StartsWith(Global.GlobalIdentifiers.OPERATOR_HANDLERS)
+                                  && !t.IsAssignableFrom(typeof(KScriptOperatorHandlers.OperatorHandler))
+                                  select t;
+            q.ToList().ForEach(i => AddOperatorHandler(i));
+        }
 
         /// <summary>
         /// Used to add a type to the KScript loaded Objects dictionary list
         /// </summary>
         /// <param name="t">The type to add</param>
-        internal void AddKScriptObjectType(Type t)
-        {
-            if (LoadedKScriptObjects.ContainsKey(t.Name.ToLower()))
-            {
-                LoadedKScriptObjects[t.Name.ToLower()] = t;
-            }
-            else
-            {
-                LoadedKScriptObjects.Add(t.Name.ToLower(), t);
-            }
-        }
+        internal void AddKScriptObjectType(Type t) => LoadedKScriptObjects[t.Name.ToLower()] = t;
 
+        internal void AddOperatorHandler(Type t) => LoadedOperatorHandlers[t.Name.ToLower()] = t;
 
-        internal void AddKScriptParserHandler(Type t)
-        {
-            if (LoadedParserHandlers.ContainsKey(t.Name.ToLower()))
-            {
-                LoadedParserHandlers[t.Name.ToLower()] = t;
-            }
-            else
-            {
-                LoadedParserHandlers.Add(t.Name.ToLower(), t);
-            }
-        }
+        internal void AddKScriptParserHandler(Type t) => LoadedParserHandlers[t.Name.ToLower()] = t;
 
         /// <summary>
         /// Used to add a type to the KScript loaded variable functions dictionary list
         /// </summary>
         /// <param name="t">The type to add</param>
-        internal void AddVariableFunctionType(Type t)
-        {
-            if (LoadedVariableFunctions.ContainsKey(t.Name.ToLower()))
-            {
-                LoadedVariableFunctions[t.Name.ToLower()] = t;
-            }
-            else
-            {
-                LoadedVariableFunctions.Add(t.Name.ToLower(), t);
-            }
-        }
-
+        internal void AddVariableFunctionType(Type t) => LoadedVariableFunctions[t.Name.ToLower()] = t;
 
         /// <summary>
         /// Method used to handle exceptions - current purpose is to output the exception message.
@@ -514,11 +361,13 @@ namespace KScript
             if (typeof(KScriptException).IsAssignableFrom(ex.GetType()))
             {
                 KScriptException kex = (KScriptException)ex;
-                Out(string.Format("[error ~{0}: {2}] : {1}\n", kex.GetExceptionType(), kex.Message, DateTime.Now.ToShortTimeString()));
+
+                if (!GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name).Any())
+                    Out($"[error ~{kex.GetExceptionType()}: {kex.Message}] : {DateTime.Now.ToShortTimeString()}\n");
                 return;
             }
 
-            Out(string.Format("[error ~unknown:{0}] {1}\n", DateTime.Now.ToShortTimeString(), ex.Message));
+            Out($"[error ~{ex.GetType().Name}:{DateTime.Now.ToShortTimeString()}] {ex.Message}\n");
         }
 
 
@@ -548,10 +397,8 @@ namespace KScript
                 {
                     return arrays[id];
                 }
-                else
-                {
-                    throw new KScriptDefNotFound(obj, string.Format("The Array '{0}' does not exist.", id));
-                }
+
+                throw new KScriptDefNotFound(obj, string.Format("The Array '{0}' does not exist.", id));
             }
             catch (Exception ex)
             {

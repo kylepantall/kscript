@@ -2,7 +2,6 @@
 
 namespace KScript.Arguments
 {
-    [KScriptObjects.KScriptNoInnerObjects()]
     public class ainsert : KScriptObject
     {
         public ainsert(string contents) => Contents = contents;

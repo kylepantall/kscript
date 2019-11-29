@@ -1,6 +1,16 @@
-<kscript dynamic_defs="yes" throw_exceptions="yes" quiet="yes" print_info="no">
+<kscript dynamic_defs="yes" throw_exceptions="no" quiet="no" print_info="no">
 
-    <dowhile condition="true">
+    <onexception type="KScriptException">
+        <echo>An exception occured.</echo>
+    </onexception>
+
+    <input to="entry"/>
+
+    <guard from="entry">
+        <throw type="Exception"/>
+    </guard>
+
+    <!-- <dowhile condition="true">
         <input to="name">Enter your name: </input>
 
         <guard from="name">
@@ -9,6 +19,16 @@
             <end />
         </guard>
         <echo>$name\n</echo>
-    </dowhile>
+    </dowhile> -->
+
+    <!-- <dowhile condition="@not(@equals(@random(1,1000),998))">
+        <echo>@char(@random(97,112))</echo>
+        <wait interval="10ms"/>
+    </dowhile> -->
+
+    <!-- <input to="number">Maths: </input>
+    <echo>@math('$number')</echo> -->
+
+    <echo>Hello</echo>
 
 </kscript>

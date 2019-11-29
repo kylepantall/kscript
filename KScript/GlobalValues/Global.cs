@@ -47,5 +47,19 @@
 
         //Paragraph Expressions
         public const string PARAGRAPH_EXPRESSION = @"\""(.+)\""";
+
+
+        //Constant to store Assembly path for KScript Arguments.
+        public const string ASSEMBLY_PATH = "KScript.Arguments";
+        public const string VARIABLE_ASSEMBLY_PATH = "KScript.VariableFunctions";
+
+        /// <summary>
+        /// Constant which determines if KScript should return all exceptions instead of attempting to handle them.
+        /// </summary>
+
+        public const string PARSER_HANDLERS = "KScript.KScriptParserHandlers";
+
+
+        public const string OPERATOR_HANDLERS = "KScript.KScriptOperatorHandlers";
     }
 }
