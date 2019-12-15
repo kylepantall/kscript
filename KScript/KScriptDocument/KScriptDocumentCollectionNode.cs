@@ -19,11 +19,9 @@ namespace KScript.Document
         public void Run(KScriptContainer container, string args, KScriptObject Pobj)
         {
 
-            // var operatorHandlers = container.LoadedOperatorHandlers;
-
-            // foreach (var t in operatorHandlers)
+            // foreach (var item in container.LoadedOperatorHandlers)
             // {
-            //     Console.Write(t);
+            //     Console.WriteLine(container.Parser.GetOperatorInterface(GetValue()).GetType().Name);
             // }
 
             bool @continue = true;
@@ -38,6 +36,7 @@ namespace KScript.Document
                         {
                             GetValue().Validate();
                         }
+                        GetValue().SetBaseScriptObject(Pobj);
                         @continue = GetValue().Run();
                     }
                     catch (KScriptSkipScriptObject) { }
@@ -85,7 +84,7 @@ namespace KScript.Document
 
                         if (!container.GetDefs().ContainsKey(obj.to))
                         {
-                            container.AddDef(obj.to, new def("0"));
+                            container.AddDef(obj.to, new def("0"), Pobj);
                         }
 
 

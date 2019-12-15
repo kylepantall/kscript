@@ -4,10 +4,10 @@ using KScript.Handlers;
 
 namespace KScript.Commands
 {
-    public class @or : KScriptCommand
+    public class any : KScriptCommand
     {
         private readonly string[] conditions;
-        public @or(params string[] conditions) => this.conditions = conditions;
+        public any(params string[] conditions) => this.conditions = conditions;
 
         public override string Calculate()
         {
@@ -15,7 +15,7 @@ namespace KScript.Commands
 
             if (tmp.All(i => KScriptBoolHandler.IsBool(i)))
             {
-                return ToBoolString(tmp.All(x => KScriptBoolHandler.Convert(x)));
+                return ToBoolString(tmp.Any(x => KScriptBoolHandler.Convert(x)));
             }
             else
             {

@@ -244,7 +244,10 @@
     <Compile Include="VariableFunctions\upper.cs" />
     <Compile Include="Helpers\KScriptObjectHelpWriter.cs" />
     <Compile Include="KScriptOperatorHandlers\OperatorHandler.cs" />
-    <Content Include="Commands\or.cs" />
+    <Compile Include="Commands\any.cs" />
+    <Compile Include="Commands\types.cs" />
+    <Compile Include="Arguments\Conditional\else.cs" />
+    <Compile Include="Commands\parent.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

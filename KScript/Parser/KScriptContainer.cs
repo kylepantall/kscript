@@ -166,7 +166,14 @@ namespace KScript
         /// </summary>
         /// <param name="key">Key to use</param>
         /// <param name="def">Def object to add</param>
-        internal void AddDef(string key, def def) => defs.Add(key, def);
+        internal void AddDef(string key, def def, KScriptObject parent = null)
+        {
+            if (parent != null)
+            {
+                def.SetBaseScriptObject(parent);
+            }
+            defs.Add(key, def);
+        }
 
         /// <summary>
         /// Method used to remove a def from def dictionary

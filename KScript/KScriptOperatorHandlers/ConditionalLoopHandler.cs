@@ -6,6 +6,8 @@ namespace KScript.KScriptOperatorHandlers
 {
     class ConditionalLoopHandler : OperatorHandler
     {
+        public ConditionalLoopHandler(KScriptContainer container) : base(container) { }
+
         public override bool CanRun(KScriptObject obj)
         {
             return obj.GetType().IsAssignableFrom(typeof(KScriptConditional));

@@ -3,10 +3,12 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Xml;
+
 using KScript.Arguments;
 using KScript.Document;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
+using KScript.KScriptOperatorHandlers;
 using KScript.KScriptParserHandlers;
 using KScript.VariableFunctions;
 
@@ -94,6 +96,7 @@ namespace KScript
         }
 
         public IParserHandler GetParserInterface(KScriptObject obj) => GetParserHandler(KScriptContainer.LoadedParserHandlers.Values.FirstOrDefault(i => GetParserHandler(i).IsAcceptedObject(obj)) ?? null);
+        public OperatorHandler GetOperatorInterface(KScriptObject obj) => GetOperatorHandler(KScriptContainer.LoadedOperatorHandlers.Values.FirstOrDefault(i => GetOperatorHandler(i).CanRun(obj)) ?? null);
 
         private void Iterate(XmlNode node, Document.KScriptDocument doc, KScriptContainer container, KScriptDocumentCollectionNode docNode)
         {
@@ -152,17 +155,20 @@ namespace KScript
             return null;
         }
 
-
-        public IParserHandler GetParserType(string name, KScriptContainer container) => container.LoadedParserHandlers.ContainsKey(name) ? GetParserHandler(container.LoadedParserHandlers[name]) : null;
-
         private IParserHandler GetParserHandler(Type type)
         {
-            if (type != null)
+            if (type != null && !type.IsAssignableFrom(typeof(IParserHandler)))
             {
-                if (!type.IsAssignableFrom(typeof(IParserHandler)))
-                {
-                    return (IParserHandler)Activator.CreateInstance(type, KScriptContainer);
-                }
+                return (IParserHandler)Activator.CreateInstance(type, KScriptContainer);
+            }
+            return null;
+        }
+
+        private OperatorHandler GetOperatorHandler(Type type)
+        {
+            if (type != null && !type.IsAssignableFrom(typeof(OperatorHandler)))
+            {
+                return (OperatorHandler)Activator.CreateInstance(type, KScriptContainer);
             }
             return null;
         }

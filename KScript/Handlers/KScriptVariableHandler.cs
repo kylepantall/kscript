@@ -16,7 +16,7 @@ namespace KScript
 
         public static string ReturnFormattedVariables(KScriptContainer ParentContainer, string Contents)
         {
-            bool isCommand = KScriptCommandHandler.IsCommand(Contents, ParentContainer, null);
+            bool isCommand = KScriptCommandHandler.IsCommand(Contents);
 
             if (isCommand) return Contents;
 

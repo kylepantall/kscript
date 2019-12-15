@@ -20,9 +20,11 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            bool _check_for = checkfor != null ? ToBool(checkfor) : true;
-            string new_condition = HandleCommands(condition);
-            return IsBool(new_condition) ? (!_check_for ? !ToBool(new_condition) : ToBool(new_condition)) : false;
+            bool checkFor = checkfor != null ? ToBool(checkfor) : true;
+            string boolValue = HandleCommands(condition);
+            var result = IsBool(boolValue) ? (!checkFor ? !ToBool(boolValue) : ToBool(boolValue)) : false;
+            GetValueStore().Add("result", result);
+            return result;
 
         }
 

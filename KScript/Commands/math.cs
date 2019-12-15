@@ -18,7 +18,7 @@ namespace KScript.Commands
             {
                 string value = KScriptCommandHandler.HandleCommands(maths, ParentContainer, GetBaseObject());
 
-                while (KScriptCommandHandler.IsCommand(value, ParentContainer, GetBaseObject()))
+                while (KScriptCommandHandler.IsCommand(value))
                 {
                     value = KScriptCommandHandler.HandleCommands(value, ParentContainer, GetBaseObject());
                 }
