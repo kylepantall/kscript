@@ -11,9 +11,9 @@ An example of a KScript document:
 <hr />
 
 ```
-<kscript>
-  <!-- Declares a variable called 'entered_name' -->
-  <def id="entered_name"/>
+<kscript dyanmic_defs="yes">
+  <!-- By default KScript allows Dynamic defs, meaning they'll be defined automatically if they haven't already upon usage -->
+  <!-- <def id="entered_name"/> -->
   
   <!-- Obtains input with the prompt "What's your name?" and stores the text input to variable 'entered_name' -->
   <input to="entered_name" type="text">What's your name?</input>
