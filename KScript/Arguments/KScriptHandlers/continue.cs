@@ -1,19 +1,18 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
     [KScriptObjects.KScriptNoInnerObjects()]
-    class @break : KScriptObject
+    class @continue : KScriptObject
     {
         public override bool Run()
         {
-            ParentContainer.StopConditionalLoops();
             return true;
         }
 
         public override string UsageInformation()
         {
-            return "Used within loops to break conditional loops.";
+            return "Used within for loops to skip current iterations.";
         }
 
         public override void Validate()

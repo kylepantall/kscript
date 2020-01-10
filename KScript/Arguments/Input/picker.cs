@@ -28,10 +28,9 @@ namespace KScript.Arguments
             set
             {
                 type_options val = type_options.directory;
-                if (Enum.TryParse(value, out val))
-                    _type = val;
-                else
-                    _type = type_options.directory;
+                if (!Enum.TryParse(value, out val))
+                    val = type_options.directory;
+                _type = val;
             }
         }
 

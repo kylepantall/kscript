@@ -10,7 +10,8 @@
             "request": "launch",
             "program": "${workspaceRoot}/KScriptApp/bin/Debug/KScript.exe",
             "args": [
-                "${input:filePath}"
+                "${input:filePath}",
+                ""
             ],
             "cwd": "${workspaceRoot}",
             "console": "externalTerminal",

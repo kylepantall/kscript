@@ -129,7 +129,7 @@ namespace KScript
         /// If dynamic def creation is enabled, when not found, the def will be generated. 
         /// </summary>
         /// <param name="id">ID of the def</param>
-        internal def GetDef(string id)
+        internal def GetDef(string id, string defaultValue = null)
         {
             if (defs.ContainsKey(id))
             {
@@ -138,7 +138,7 @@ namespace KScript
 
             if (Properties.DynamicDefs)
             {
-                defs[id] = new def();
+                defs[id] = (defaultValue == null) ? new def() : new def(defaultValue);
                 return defs[id];
             }
 
@@ -171,6 +171,7 @@ namespace KScript
             if (parent != null)
             {
                 def.SetBaseScriptObject(parent);
+                def.SetContainer(this);
             }
             defs.Add(key, def);
         }

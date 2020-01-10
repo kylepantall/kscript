@@ -15,10 +15,12 @@ namespace KScript.Arguments.FileHandlers
             FileAttributes attr = File.GetAttributes(HandleCommands(from));
 
             if (attr.HasFlag(FileAttributes.Directory))
+            {
                 Directory.Move(HandleCommands(from), HandleCommands(to));
-            else
-                File.Move(HandleCommands(from), HandleCommands(to));
-
+                return true;
+            }
+            
+            File.Move(HandleCommands(from), HandleCommands(to));
             return true;
         }
 

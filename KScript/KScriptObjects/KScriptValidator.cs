@@ -171,11 +171,9 @@ namespace KScript.KScriptObjects
                     return File.Exists(file);
                 case ExpectedInput.URL:
                     string url = GetPropertyValue(caller);
-                    Uri _url = null;
-                    return Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out _url);
+                    return Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out _);
                 case ExpectedInput.Number:
-                    int number;
-                    return int.TryParse(GetPropertyValue(caller), out number);
+                    return int.TryParse(GetPropertyValue(caller), out _);
                 case ExpectedInput.Bool:
                     bool isBool = KScriptBoolHandler.IsBool(GetPropertyValue(caller));
                     return isBool;

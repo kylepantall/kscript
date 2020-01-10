@@ -11,6 +11,7 @@ namespace KScript
         public bool FullScreen { get; set; }
         public string Language { get; set; }
         public bool DynamicDefs { get; set; }
+        public bool PrintInfo { get; set; }
 
         public bool ThrowAllExceptions { get; set; }
 
@@ -22,6 +23,7 @@ namespace KScript
             WaitOnFinish = true;
             DynamicDefs = false;
             ThrowAllExceptions = false;
+            PrintInfo = false;
         }
     }
 }

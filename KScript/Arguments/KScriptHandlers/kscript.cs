@@ -37,7 +37,7 @@ namespace KScript.Arguments
                 ParentContainer.Properties.Language = (language == "auto" ? CultureInfo.CurrentCulture.Name : language);
             }
 
-            if (ToBool(print_info))
+            if (ParentContainer.Properties.PrintInfo || ToBool(print_info))
                 ParentContainer.PrintInfo();
 
             return true;

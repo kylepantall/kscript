@@ -30,15 +30,13 @@ namespace KScript.Arguments
             {
                 string val = HandleCommands(from);
 
-                if (ParentContainer.ArraysGet().ContainsKey(val))
-                {
-                    KScript().ArraysGet()[id] = KScript().ArraysGet()[val];
-                }
-                else
+                if (!ParentContainer.ArraysGet().ContainsKey(val))
                 {
                     throw new KScriptArrayNotFound(this,
                         string.Format("The array '{0}' was not found.", val));
                 }
+
+                KScript().ArraysGet()[id] = KScript().ArraysGet()[val];
             }
 
 
@@ -61,14 +59,12 @@ namespace KScript.Arguments
         public override string UsageInformation() => "Used to declare array's with specified ID.";
         public override void Validate()
         {
-            if (string.IsNullOrEmpty(id))
-            {
-                throw new KScriptMissingAttribute(this);
-            }
-            else
+            if (!string.IsNullOrEmpty(id))
             {
                 throw new KScriptNoValidationNeeded(this);
             }
+
+            throw new KScriptMissingAttribute(this);
         }
     }
 }

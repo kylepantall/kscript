@@ -1,5 +1,7 @@
 ﻿using System.Xml;
 using KScript.KScriptTypes;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace KScript.KScriptParserHandlers
 {
@@ -19,5 +21,14 @@ namespace KScript.KScriptParserHandlers
         /// </summary>
         /// <returns></returns>
         public abstract KScriptObject GenerateKScriptObject(KScriptObject parentObject, XmlNode node);
+
+
+        /// <summary>
+        /// Used to return Xpath results from a node as a list of XmlNodes
+        /// </summary>
+        /// <param name="xpath">The xpath expression</param>
+        /// <param name="node">The node to run the xpath expression on</param>
+        /// <returns>List <XmlNode></returns>
+        public List<XmlNode> SelectNodes(string xpath, XmlNode node) => node.SelectNodes(xpath).Cast<XmlNode>().ToList();
     }
 }

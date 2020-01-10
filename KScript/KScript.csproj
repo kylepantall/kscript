@@ -248,6 +248,18 @@
     <Compile Include="Commands\types.cs" />
     <Compile Include="Arguments\Conditional\else.cs" />
     <Compile Include="Commands\parent.cs" />
+    <Compile Include="VariableFunctions\positive.cs" />
+    <Compile Include="Arguments\KScriptHandlers\continue.cs" />
+    <Compile Include="KScriptOperatorHandlers\ObjectLoopHandler.cs" />
+    <Compile Include="KScriptOperatorHandlers\MethodWrapperHandler.cs" />
+    <Compile Include="KScriptOperatorHandlers\ExceptionWrapperHandler.cs" />
+    <Compile Include="KScriptOperatorHandlers\ArrayLoopHandler.cs" />
+    <Compile Include="KScriptOperatorHandlers\ConditionalStatementHandler.cs" />
+    <Compile Include="KScriptContainerObjects\KScriptLoopConditional.cs" />
+    <Compile Include="KScriptParserHandlers\WatcherHandler.cs" />
+    <Compile Include="Arguments\Watcher\rule.cs" />
+    <Compile Include="Arguments\Watcher\watcher.cs" />
+    <Compile Include="Arguments\Watcher\watch.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

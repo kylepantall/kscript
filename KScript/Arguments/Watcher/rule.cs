@@ -1,10 +1,13 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
-namespace KScript.Arguments
+namespace KScript.Arguments.Watcher
 {
-    public class @if : KScriptConditional
+    public class rule : KScriptConditional
     {
+        public rule(KScriptContainer container) => SetContainer(container);
+
+
         [KScriptProperty("Used to signify whether to check for a yes or no value in order to parse inner script objects. By default, checks for true.", false)]
         [KScriptAcceptedOptions("yes", "no", "1", "0", "y", "n", "true", "false", "t", "f")]
         [KScriptExample(@"<if checkfor=""yes""> ... </if>")]
@@ -22,7 +25,7 @@ namespace KScript.Arguments
             return result;
         }
 
-        public override string UsageInformation() => "Used to only run the inner KScriptObjects if the condition is true.";
+        public override string UsageInformation() => "Used to only run dependent upon a variable value.";
 
         public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }

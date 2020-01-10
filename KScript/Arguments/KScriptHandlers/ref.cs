@@ -31,8 +31,10 @@ namespace KScript.Arguments
                     if (string.IsNullOrEmpty(@namespace))
                     {
                         ParentContainer.AddKScriptObjectType(t);
+                        continue;
                     }
-                    else if (t.Namespace.ToLower() == @namespace.ToLower())
+
+                    if (t.Namespace.ToLower() == @namespace.ToLower())
                     {
                         ParentContainer.AddKScriptObjectType(t);
                     }

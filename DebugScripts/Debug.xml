@@ -1,9 +1,36 @@
-<kscript dynamic_defs="yes" throw_exceptions="no" quiet="no" print_info="no">
-    <def id="z">20</def>
+<!-- 
+    KScript treats any node without child elements as a single node. 
+    This means a "dowhile" without any elements isn't handled.
+    In order for any KScript Object node containers to handle nodes they must 
+    contain elements so the parser can treat them as a collection of nodes 
+    and pass them to the appropriate Operator handler.
+-->
 
-    <for to="x" math="$x->increment()" while="$x%$z->lte()">
-        <for to="y" math="$y->increment()" while="@more_less($y,'lte',10)">
-            <echo>$x - $y\n</echo>
-        </for>
-    </for>
+<kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
+    <defm ids="name,age" />
+
+    <def id="name">Hi</def>
+    <echo>$name</echo>
+
+    <watcher handle_method="once">
+        <watchers>
+            <watch for="name"/>
+            <watch for="age" />
+        </watchers>
+
+        <rules>
+            <rule condition="@empty($name)">
+                <echo>You must enter a name</echo>
+            </rule>
+    
+            <rule condition="@more_less($name,gt,10)">
+                <echo>Name can't be more than 10</echo>
+            </rule>
+        </rules>
+    </watcher>
+
+    <update to="name">Kyle</update>
+
+
+    <echo>$name</echo>
 </kscript>

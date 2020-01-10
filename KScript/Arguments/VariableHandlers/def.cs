@@ -5,11 +5,23 @@ namespace KScript.Arguments
 {
     public class def : KScriptObject
     {
+        private string contents;
+
         [KScriptProperty("The unique id for this definition. Must not contain any spaces or $ symbols.", true)]
         [KScriptExample("<def id=\"tmp_str\"> ... </def>")]
         [KScriptExample("<def id=\"username\"> ... </def>")]
         [KScriptExample("<def id=\"email_address\"> ... </def>")]
         public string id { get; set; }
+
+        public new string Contents
+        {
+            get => contents;
+            set
+            {
+                contents = value;
+                Out($"Value changed for {id} to {Contents}");
+            }
+        }
 
         public def(string Contents) => this.Contents = Contents;
         public def() => Contents = NULL;

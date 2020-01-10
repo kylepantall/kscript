@@ -1,16 +1,10 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 
 namespace KScript
 {
-    public class KScriptObjectLoop : KScriptObject
+    public class KScriptLoopConditional : KScriptObject
     {
-        public string to { get; set; }
-
-        public string math { get; set; }
-
-        public string @while { get; set; }
-
-        public string @default { get; set; }
+        public string condition { get; set; } = "";
 
         public override bool Run() => true;
         public override void Validate() => throw new KScriptNoValidationNeeded(this);

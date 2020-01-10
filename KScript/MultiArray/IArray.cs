@@ -1,26 +1,17 @@
 ﻿namespace KScript.MultiArray
 {
-    public abstract class IArray 
+    public abstract class IArray
     {
         public string Key { get; set; }
 
         public bool Equals(string val)
         {
-            if (HasKey())
-            {
-                if (Key.Length > 0)
-                {
-                    return Key.Equals(val, System.StringComparison.OrdinalIgnoreCase);
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            else
+            if (!HasKey())
             {
                 return false;
             }
+
+            return Key.Length > 0 ? Key.Equals(val, System.StringComparison.OrdinalIgnoreCase) : false;
         }
 
         public bool HasKey() => !string.IsNullOrEmpty(Key);
@@ -38,10 +29,8 @@
             {
                 return string.Empty;
             }
-            else
-            {
-                return GetArrayItem().Value;
-            }
+
+            return GetArrayItem().Value;
         }
 
         public bool HasChildren() => IsCollection() ? GetCollection().GetItems().Count > 0 : false;
@@ -52,39 +41,38 @@
             {
                 foreach (var item in GetCollection().GetItems())
                 {
-                    if (item.Equals(MultiArrayParser.StripKey(key)))
+                    if (!item.Equals(MultiArrayParser.StripKey(key)))
                     {
-                        return item;
+                        continue;
                     }
+
+                    return item;
                 }
             }
-            else
+
+            if (!GetArrayItem().Equals(MultiArrayParser.StripKey(key)))
             {
-                if (GetArrayItem().Equals(MultiArrayParser.StripKey(key)))
-                {
-                    return GetArrayItem();
-                }
+                return null;
             }
-            return null;
+
+            return GetArrayItem();
         }
 
         public IArray Find(int index)
         {
-            if (IsCollection())
+            if (!IsCollection())
             {
-                var x = GetCollection().GetItems();
-
-                if (index > x.Count)
-                {
-                    throw new KScriptExceptions.KScriptIndexOutOfBoundsException(null);
-                }
-                else
-                {
-                    return x[index];
-                }
+                return null;
             }
 
-            return null;
+            var collectionItems = GetCollection().GetItems();
+
+            if (index <= collectionItems.Count && index >= 0)
+            {
+                return collectionItems[index];
+            }
+
+            throw new KScriptExceptions.KScriptIndexOutOfBoundsException(null);
         }
 
     }

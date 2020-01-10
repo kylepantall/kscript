@@ -96,8 +96,11 @@ namespace KScript
         }
 
         public IParserHandler GetParserInterface(KScriptObject obj) => GetParserHandler(KScriptContainer.LoadedParserHandlers.Values.FirstOrDefault(i => GetParserHandler(i).IsAcceptedObject(obj)) ?? null);
-        public OperatorHandler GetOperatorInterface(KScriptObject obj) => GetOperatorHandler(KScriptContainer.LoadedOperatorHandlers.Values.FirstOrDefault(i => GetOperatorHandler(i).CanRun(obj)) ?? null);
-
+        public OperatorHandler GetOperatorInterface(KScriptObject obj)
+        {
+            var objX = KScriptContainer.LoadedOperatorHandlers.Values.FirstOrDefault(i => GetOperatorHandler(i).CanRun(obj)) ?? null;
+            return GetOperatorHandler(objX);
+        }
         private void Iterate(XmlNode node, Document.KScriptDocument doc, KScriptContainer container, KScriptDocumentCollectionNode docNode)
         {
             foreach (XmlNode item in node.ChildNodes)
@@ -166,10 +169,12 @@ namespace KScript
 
         private OperatorHandler GetOperatorHandler(Type type)
         {
-            if (type != null && !type.IsAssignableFrom(typeof(OperatorHandler)))
-            {
+            if (type == null)
+                return null;
+
+            if (typeof(OperatorHandler).IsAssignableFrom(type))
                 return (OperatorHandler)Activator.CreateInstance(type, KScriptContainer);
-            }
+
             return null;
         }
 
@@ -218,6 +223,7 @@ namespace KScript
             }
             if (typeof(def).IsAssignableFrom(obj.GetType()))
             {
+                obj.SetContainer(container);
                 if (item.ChildNodes.OfType<XmlCDataSection>().Count() > 0)
                 {
                     obj["Contents"] = item.ChildNodes.OfType<XmlCDataSection>().ToArray()[0].Data;

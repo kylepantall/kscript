@@ -12,7 +12,7 @@ namespace KScript
 {
     class Program
     {
-        public static string[] Commands() => new string[] { "-s", "-cai", "-cmds", "-admin", "-colourful", "-root" };
+        public static string[] Commands() => new string[] { "-s", "-cai", "-cmds", "-admin", "-colourful", "-root", "-all" };
 
         public static List<string> GetUsedCommands(string[] cmds) => Commands().Where(i => cmds.Contains(i)).Select(i => i.ToLower()).ToList();
 
@@ -44,16 +44,17 @@ namespace KScript
                 string culture = "auto";
 
                 bool quiet = args.Any(i => i.ToLower() == "-s");
-                bool clear_after_input = args.Any(i => i.ToLower() == "-cai");
-                bool admin_priv = args.Any(i => i.ToLower() == "-admin");
-                bool generate_guid = args.Any(i => i.ToLower() == "-guid");
+                bool clearAfterInput = args.Any(i => i.ToLower() == "-cai");
+                bool adminPriv = args.Any(i => i.ToLower() == "-admin");
+                bool generateGuid = args.Any(i => i.ToLower() == "-guid");
                 bool root = args.Any(i => i.ToLower() == "-root");
+                bool allCommands = args.Any(i => i.ToLower() == "-all");
 
                 bool has_lang = args.Any(i => i.ToLower().StartsWith("-lang") && i.ToLower().Contains("="));
 
                 string path = args[0];
 
-                if (admin_priv)
+                if (adminPriv)
                 {
                     RestartWithAdminPriviledges(args);
                 }
@@ -79,7 +80,7 @@ namespace KScript
 
 
 
-                if (!generate_guid && !root)
+                if (!generateGuid && !root)
                 {
                     if (!args[0].ToString().StartsWith("-"))
                         if (!File.Exists(args[0]))
@@ -102,23 +103,25 @@ namespace KScript
                         }
                 }
 
-                if (generate_guid)
+                if (generateGuid)
                 {
                     Console.WriteLine("GUID: " + Guid.NewGuid().ToString());
                     return;
                 }
 
 
-                if (!root && !generate_guid)
+                if (!root && !generateGuid)
                 {
                     KScriptParser parser = new KScriptParser(path);
 
 
                     parser.Properties.Quiet = quiet;
-                    parser.Properties.ClearAfterInput = clear_after_input;
+                    parser.Properties.ClearAfterInput = clearAfterInput;
 
                     parser.CustomArguments = args.Skip(1).ToArray();
                     parser.Properties.Language = culture;
+
+                    parser.Properties.PrintInfo = allCommands;
 
                     parser.Parse();
 
