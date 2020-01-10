@@ -10,8 +10,8 @@ An example of a KScript document:
 
 <hr />
 
-```
-<kscript dyanmic_defs="yes">
+```xml
+<kscript dynamic_defs="yes">
   <!-- By default KScript allows Dynamic defs, meaning they'll be defined automatically if they haven't already upon usage -->
   <!-- <def id="entered_name"/> -->
   
