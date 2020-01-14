@@ -12,7 +12,6 @@ namespace KScript.Commands
 
         public directory()
         {
-            
             this._directory = System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory);
         }
 
