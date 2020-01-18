@@ -38,10 +38,10 @@
         /// <returns></returns>
         public static string FreeTcpPort()
         {
-            TcpListener l = new TcpListener(IPAddress.Loopback, 0);
-            l.Start();
-            int port = ((IPEndPoint)l.LocalEndpoint).Port;
-            l.Stop();
+            TcpListener tcpListener = new TcpListener(IPAddress.Loopback, 0);
+            tcpListener.Start();
+            int port = ((IPEndPoint)tcpListener.LocalEndpoint).Port;
+            tcpListener.Stop();
             return port.ToString();
         }
 
@@ -86,8 +86,8 @@
                             try
                             {
                                 _handleContext(ctx);
-                                string rstr = _responderMethod(ctx.Request);
-                                byte[] buf = Encoding.UTF8.GetBytes(rstr);
+                                string responseString = _responderMethod(ctx.Request);
+                                byte[] buf = Encoding.UTF8.GetBytes(responseString);
                                 ctx.Response.ContentLength64 = buf.Length;
                                 ctx.Response.OutputStream.Write(buf, 0, buf.Length);
                             }

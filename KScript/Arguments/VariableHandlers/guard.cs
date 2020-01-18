@@ -1,4 +1,5 @@
-﻿using KScript.KScriptObjects;
+﻿using System.Runtime.CompilerServices;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
@@ -6,6 +7,11 @@ namespace KScript.Arguments
     {
         [KScriptProperty("The variable ID to check for a value.", true)]
         public string from { get; set; }
+
+        public guard()
+        {
+            SetValidationType(ValidationTypes.DURING_PARSING);
+        }
 
         public override bool Run()
         {

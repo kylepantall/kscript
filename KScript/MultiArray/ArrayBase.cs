@@ -1,55 +1,36 @@
-﻿using System.Collections.Generic;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
+using System.Collections.Generic;
 
 namespace KScript.MultiArray
 {
     public class ArrayBase
     {
         private readonly ArrayCollection Root;
-        public ArrayBase(ArrayCollection r) => Root = r;
+        public ArrayBase(ArrayCollection Root) => this.Root = Root;
         public ArrayCollection GetRoot() => Root;
-
         public IArray Find(Match[] values)
         {
-            IArray current_node;
+            IArray current_node = GetRoot().HasKey() ? new ArrayCollection(
+                                new List<IArray>() {
+                                     GetRoot()
+                                }) : GetRoot();
 
-            if (GetRoot().HasKey())
+            foreach (var item in values)
             {
-                current_node = new ArrayCollection(new List<IArray>() { GetRoot() });
-            }
-            else
-            {
-                current_node = GetRoot();
-            }
-
-            int index = -1;
-
-            foreach (Match item in values)
-            {
-                if (int.TryParse(item.Groups[1].Value, out index))
+                if (current_node == null)
                 {
-                    if (current_node != null)
-                    {
-                        current_node = current_node.Find(index);
-                    }
+                    continue;
                 }
-                else
+
+                if (int.TryParse(item.Groups[1].Value, out int index))
                 {
-                    if (current_node != null)
-                    {
-                        current_node = current_node.Find(item.Groups[1].Value);
-                    }
+                    current_node = current_node.Find(index);
+                    continue;
                 }
+                current_node = current_node.Find(item.Groups[1].Value);
             }
 
-            if (current_node != null)
-            {
-                return current_node;
-            }
-            else
-            {
-                return null;
-            }
+            return current_node;
         }
     }
 }

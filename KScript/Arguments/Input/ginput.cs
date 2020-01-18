@@ -4,6 +4,8 @@ namespace KScript.Arguments
 {
     class ginput : KScriptObject
     {
+        public ginput() => SetValidationType(ValidationTypes.DURING_PARSING);
+
         [KScriptProperty("The property to store the input to.", true)]
         public string to { get; set; }
 
@@ -18,11 +20,8 @@ namespace KScript.Arguments
             {
                 return true;
             }
-            else
-            {
-                Def(to).Contents = input;
-            }
 
+            Def(to).Contents = input;
             return false;
         }
 

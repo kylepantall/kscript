@@ -7,11 +7,6 @@ namespace KScript.Handlers
     /// </summary>
     public static class KScriptArithmeticHandler
     {
-        public static string HandleCalculation(string str)
-        {
-            Expression e = new Expression(str);
-            double v = e.calculate();
-            return v.ToString();
-        }
+        public static string HandleCalculation(string str) => new Expression(str).calculate().ToString();
     }
 }

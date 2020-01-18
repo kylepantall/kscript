@@ -64,7 +64,11 @@ namespace KScript
         /// <summary>
         /// Defines when validation should occur.
         /// </summary>
-        public ValidationTypes ValidationType { get; set; } = ValidationTypes.BEFORE_PARSING;
+        private ValidationTypes ValidationType { get; set; } = ValidationTypes.BEFORE_PARSING;
+
+        public ValidationTypes GetValidationType() => ValidationType;
+
+        public void SetValidationType(ValidationTypes type) => ValidationType = type;
 
         /// <summary>
         /// Initialises a KScriptObject with it's content as an object.

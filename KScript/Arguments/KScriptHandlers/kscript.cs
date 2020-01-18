@@ -8,7 +8,7 @@ namespace KScript.Arguments
     {
         [KScriptObjects.KScriptProperty("Used to indicate whether the script is quiet - if false, no script timing is reported to the user.", false)]
         [KScriptObjects.KScriptAcceptedOptions("yes", "no", "y", "n", "1", "0", "t", "f", "true", "false")]
-        public string quiet { get; set; } = "yes";
+        public string quiet { get; set; } = "no";
 
         [KScriptObjects.KScriptProperty("Used to indicate whether the console should print information regarding commands or KScript objects.", false)]
         [KScriptObjects.KScriptAcceptedOptions("yes", "no", "y", "n", "1", "0", "t", "f", "true", "false")]
@@ -21,49 +21,24 @@ namespace KScript.Arguments
         [KScriptObjects.KScriptProperty("Used to indicate the language of the machine", false)]
         public string language { get; set; }
 
+        public string dynamic_defs { get; set; } = "no";
+
+        public string throw_exceptions { get; set; } = "no";
+
         public override bool Run()
         {
-            bool _quiet = false, _print_info = false, _on_finish_wait = true;
-
-            if (quiet != null)
-            {
-                _quiet = ToBool(quiet);
-            }
-            else
-            {
-                _quiet = false;
-            }
-
-            if (print_info != null)
-            {
-                _print_info = ToBool(print_info);
-            }
-            else
-            {
-                _print_info = false;
-            }
-
-            if (on_finish_wait != null)
-            {
-                _on_finish_wait = ToBool(on_finish_wait);
-            }
-            else
-            {
-                _on_finish_wait = false;
-            }
-
-            ParentContainer.Properties.Quiet = _quiet;
-            ParentContainer.Properties.WaitOnFinish = _on_finish_wait;
+            ParentContainer.Properties.Quiet = ToBool(quiet);
+            ParentContainer.Properties.WaitOnFinish = ToBool(on_finish_wait);
+            ParentContainer.Properties.DynamicDefs = ToBool(dynamic_defs);
+            ParentContainer.Properties.ThrowAllExceptions = ToBool(throw_exceptions);
 
             if (string.IsNullOrWhiteSpace(ParentContainer.Properties.Language))
             {
                 ParentContainer.Properties.Language = (language == "auto" ? CultureInfo.CurrentCulture.Name : language);
             }
 
-            if (_print_info)
-            {
+            if (ParentContainer.Properties.PrintInfo || ToBool(print_info))
                 ParentContainer.PrintInfo();
-            }
 
             return true;
         }

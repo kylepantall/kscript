@@ -5,11 +5,23 @@ namespace KScript.Arguments
 {
     public class def : KScriptObject
     {
+        private string contents;
+
         [KScriptProperty("The unique id for this definition. Must not contain any spaces or $ symbols.", true)]
         [KScriptExample("<def id=\"tmp_str\"> ... </def>")]
         [KScriptExample("<def id=\"username\"> ... </def>")]
         [KScriptExample("<def id=\"email_address\"> ... </def>")]
         public string id { get; set; }
+
+        public new string Contents
+        {
+            get => contents;
+            set
+            {
+                contents = value;
+                Out($"Value changed for {id} to {Contents}");
+            }
+        }
 
         public def(string Contents) => this.Contents = Contents;
         public def() => Contents = NULL;
@@ -27,10 +39,9 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            if (id.Contains(" ") || id.Contains("$"))
-            {
-                throw new KScriptValidationFail(this, "The id cannot contain any spaces or $ symbols.");
-            }
+            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            validator.AddValidator(new KScriptValidationObject("id", false, Global.GlobalIdentifiers.VARIABLE_NAME_DETECTION));
+            validator.Validate(this);
         }
 
         public override string UsageInformation() => @"Used to declare a variable within the KScript Definition container." +

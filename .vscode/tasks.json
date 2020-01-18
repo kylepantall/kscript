@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "xbuild",
+            "type": "process",
+            "problemMatcher": "$msCompile",
+            "args": [
+                "/t:Rebuild"
+            ]
+        },
+        {
+            "label": "build_release",
+            "command": "xbuild",
+            "args": [
+                "/p:Configuration=Release"
+            ],
+            "type": "process",
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

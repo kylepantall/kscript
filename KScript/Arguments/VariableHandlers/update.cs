@@ -21,7 +21,7 @@ namespace KScript.Arguments
 
         public update(string Contents)
         {
-            ValidationType = ValidationTypes.BEFORE_PARSING;
+            SetValidationType(ValidationTypes.BEFORE_PARSING);
             this.Contents = Contents;
         }
 

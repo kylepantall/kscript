@@ -1,37 +1,37 @@
-﻿using KScript.KScriptExceptions;
-using System;
+﻿using System;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
-    class @throw : KScriptObject
+    public class @throw : KScriptObject
     {
-        const string EXCEPTION_TYPES = "KScript.KScriptExceptions";
-
         public string type { get; set; }
 
-        public @throw(string msg) => Contents = msg;
+        public @throw(string Contents) => this.Contents = Contents;
 
         public override bool Run()
         {
-            System.Collections.Generic.IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                                                             where t.IsClass && (typeof(KScriptException).IsAssignableFrom(t) || typeof(Exception).IsAssignableFrom(t) && t.Namespace == EXCEPTION_TYPES) && t.Name == type
-                                                             select t;
+            var q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                    where t.IsClass && (typeof(KScriptException).IsAssignableFrom(t) || typeof(Exception).IsAssignableFrom(t) && t.Namespace == Global.GlobalIdentifiers.EXCEPTION_TYPES) && t.Name == type
+                    select t;
 
             if (q.FirstOrDefault() != null)
             {
-                Exception ex = (Exception)Activator.CreateInstance(q.FirstOrDefault());
+                var ex = Activator.CreateInstance(q.FirstOrDefault(), args: new object[] { Contents });
+
+                Out(Contents);
                 if (ex != null)
                 {
-                    HandleException(ex);
+                    HandleException((Exception)ex);
                     return true;
                 }
             }
 
 
-            System.Collections.Generic.IEnumerable<Type> qs = from t in typeof(Exception).Assembly.GetTypes() where typeof(_Exception).IsAssignableFrom(t) && t.Name == type select t;
+            var qs = from t in typeof(Exception).Assembly.GetTypes() where typeof(_Exception).IsAssignableFrom(t) && t.Name == type select t;
 
             if (qs.FirstOrDefault() != null)
             {

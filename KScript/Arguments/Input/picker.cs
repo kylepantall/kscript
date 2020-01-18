@@ -1,7 +1,7 @@
-﻿using KScript.KScriptExceptions;
-using KScript.KScriptObjects;
-using System;
+﻿using System;
 using System.IO;
+using KScript.KScriptExceptions;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
@@ -28,14 +28,9 @@ namespace KScript.Arguments
             set
             {
                 type_options val = type_options.directory;
-                if (Enum.TryParse(value, out val))
-                {
-                    _type = val;
-                }
-                else
-                {
-                    _type = type_options.directory;
-                }
+                if (!Enum.TryParse(value, out val))
+                    val = type_options.directory;
+                _type = val;
             }
         }
 
@@ -64,29 +59,21 @@ namespace KScript.Arguments
         public override bool Run()
         {
             if (!string.IsNullOrWhiteSpace(to))
-            {
                 CreateDef(to, "");
-            }
 
             if (!string.IsNullOrWhiteSpace(Contents))
-            {
                 Out(Contents);
-            }
 
             string input = In();
 
             if (ToBool(persist))
-            {
                 switch (GetType_Options())
                 {
                     case type_options.directory:
                         while (!Directory.Exists(input))
                         {
                             if (!string.IsNullOrEmpty(error_prompt))
-                            {
                                 Out(error_prompt);
-                            }
-
                             input = In();
                         }
                         break;
@@ -94,35 +81,23 @@ namespace KScript.Arguments
                         while (!File.Exists(input))
                         {
                             if (!string.IsNullOrEmpty(error_prompt))
-                            {
                                 Out(error_prompt);
-                            }
-
                             input = In();
                         }
                         break;
                 }
-            }
             else
-            {
                 switch (GetType_Options())
                 {
                     case type_options.directory:
                         if (!Directory.Exists(input))
-                        {
                             throw new KScriptDirectoryNotFound(this, string.Format("Directory '{0}' doesn't exist", input));
-                        }
-
                         break;
                     default:
                         if (!File.Exists(input))
-                        {
                             throw new KScriptDirectoryNotFound(this, string.Format("File '{0}' doesn't exist", input));
-                        }
-
                         break;
                 }
-            }
 
             Def(to).Contents = input;
 

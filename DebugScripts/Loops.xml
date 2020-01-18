@@ -1,0 +1,14 @@
+﻿<!-- <kscript>
+  <def id="input"/>
+
+  <dowhile condition="yes">
+    <input to="input" type="text">Enter a command: </input>
+    <echo>@parse('$input')\n</echo>
+  </dowhile>
+
+</kscript> -->
+
+
+<kscript>
+  <echo></echo>
+</kscript>

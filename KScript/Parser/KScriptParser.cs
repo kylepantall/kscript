@@ -1,14 +1,16 @@
-﻿using KScript.Arguments;
-using KScript.Document;
-using KScript.KScriptExceptions;
-using KScript.KScriptObjects;
-using KScript.KScriptParserHandlers;
-using KScript.VariableFunctions;
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Xml;
+
+using KScript.Arguments;
+using KScript.Document;
+using KScript.KScriptExceptions;
+using KScript.KScriptObjects;
+using KScript.KScriptOperatorHandlers;
+using KScript.KScriptParserHandlers;
+using KScript.VariableFunctions;
 
 namespace KScript
 {
@@ -23,7 +25,6 @@ namespace KScript
             string xml = File.ReadAllText(filename);
             FilePath = filename;
 
-            string _byteOrderMarkUtf8 = Encoding.UTF8.GetString(Encoding.UTF8.GetPreamble());
             Document.PreserveWhitespace = false;
             Document.LoadXml(xml);
 
@@ -76,6 +77,7 @@ namespace KScript
 
             KScriptContainer.LoadBuiltInTypes();
             KScriptContainer.LoadBuiltInParserHandlers();
+            KScriptContainer.LoadBuiltInOperatorHandlers();
             KScriptContainer.LoadBuiltInVariableFunctionTypes();
 
             KScriptDocument = new Document.KScriptDocument();
@@ -94,41 +96,45 @@ namespace KScript
         }
 
         public IParserHandler GetParserInterface(KScriptObject obj) => GetParserHandler(KScriptContainer.LoadedParserHandlers.Values.FirstOrDefault(i => GetParserHandler(i).IsAcceptedObject(obj)) ?? null);
-
+        public OperatorHandler GetOperatorInterface(KScriptObject obj)
+        {
+            var objX = KScriptContainer.LoadedOperatorHandlers.Values.FirstOrDefault(i => GetOperatorHandler(i).CanRun(obj)) ?? null;
+            return GetOperatorHandler(objX);
+        }
         private void Iterate(XmlNode node, Document.KScriptDocument doc, KScriptContainer container, KScriptDocumentCollectionNode docNode)
         {
             foreach (XmlNode item in node.ChildNodes)
             {
-                if (item.NodeType != XmlNodeType.Comment || item.NodeType == XmlNodeType.Text)
-                {
-                    KScriptObject obj = GetScriptObject(item, container);
-                    if (obj != null)
-                    {
-                        if (PrepareProperties(obj, item, container))
-                        {
-                            if (item.HasChildNodes)
-                            {
-                                IParserHandler parserHandler = GetParserInterface(obj);
+                if (!(item.NodeType != XmlNodeType.Comment || item.NodeType == XmlNodeType.Text))
+                    continue;
 
-                                if (parserHandler != null)
-                                {
-                                    KScriptDocumentNode newCollection = new KScriptDocumentNode(parserHandler.GenerateKScriptObject(obj, item));
-                                    docNode.Nodes.Add(newCollection);
-                                }
-                                else
-                                {
-                                    KScriptDocumentCollectionNode newCollection = new KScriptDocumentCollectionNode(obj);
-                                    Iterate(item, doc, container, newCollection);
-                                    docNode.Nodes.Add(newCollection);
-                                }
-                            }
-                            else
-                            {
-                                docNode.Nodes.Add(new KScriptDocumentNode(obj));
-                            }
-                        }
+                KScriptObject obj = GetScriptObject(item, container);
+
+                if (obj == null)
+                    continue;
+
+                if (!PrepareProperties(obj, item, container))
+                    continue;
+
+                if (item.HasChildNodes)
+                {
+                    IParserHandler parserHandler = GetParserInterface(obj);
+
+                    if (parserHandler != null)
+                    {
+                        KScriptDocumentNode collection = new KScriptDocumentNode(parserHandler.GenerateKScriptObject(obj, item));
+                        docNode.Nodes.Add(collection);
+                        continue;
                     }
+
+                    KScriptDocumentCollectionNode withoutParserCollection = new KScriptDocumentCollectionNode(obj);
+                    Iterate(item, doc, container, withoutParserCollection);
+                    docNode.Nodes.Add(withoutParserCollection);
+                    continue;
                 }
+
+                docNode.Nodes.Add(new KScriptDocumentNode(obj));
+                continue;
             }
         }
 
@@ -145,37 +151,31 @@ namespace KScript
                 {
                     return GetScriptObject(_type, node.InnerText);
                 }
-                else
-                {
-                    return GetScriptObject(_type);
-                }
+
+                return GetScriptObject(_type);
             }
-            else
-            {
-                return null;
-            }
+
+            return null;
         }
-
-
-        public IParserHandler GetParserType(string name, KScriptContainer container) => container.LoadedParserHandlers.ContainsKey(name) ? GetParserHandler(container.LoadedParserHandlers[name]) : null;
 
         private IParserHandler GetParserHandler(Type type)
         {
-            if (type != null)
+            if (type != null && !type.IsAssignableFrom(typeof(IParserHandler)))
             {
-                if (!type.IsAssignableFrom(typeof(IParserHandler)))
-                {
-                    return (IParserHandler)Activator.CreateInstance(type, KScriptContainer);
-                }
-                else
-                {
-                    return null;
-                }
+                return (IParserHandler)Activator.CreateInstance(type, KScriptContainer);
             }
-            else
-            {
+            return null;
+        }
+
+        private OperatorHandler GetOperatorHandler(Type type)
+        {
+            if (type == null)
                 return null;
-            }
+
+            if (typeof(OperatorHandler).IsAssignableFrom(type))
+                return (OperatorHandler)Activator.CreateInstance(type, KScriptContainer);
+
+            return null;
         }
 
         public static IVariableFunction GetVariableFunction(Type type, KScriptContainer container, string def_id) => (IVariableFunction)Activator.CreateInstance(type, container, def_id);
@@ -223,6 +223,7 @@ namespace KScript
             }
             if (typeof(def).IsAssignableFrom(obj.GetType()))
             {
+                obj.SetContainer(container);
                 if (item.ChildNodes.OfType<XmlCDataSection>().Count() > 0)
                 {
                     obj["Contents"] = item.ChildNodes.OfType<XmlCDataSection>().ToArray()[0].Data;
@@ -250,7 +251,7 @@ namespace KScript
                 ((KScriptIDObject)obj).RegisterObject();
             }
 
-            if (obj.ValidationType != KScriptObject.ValidationTypes.DURING_PARSING)
+            if (obj.GetValidationType() != KScriptObject.ValidationTypes.DURING_PARSING)
             {
                 try { obj.Validate(); }
                 catch (KScriptValidationException ex)
@@ -284,10 +285,10 @@ namespace KScript
         {
             EndScriptTime = DateTime.Now;
             TimeSpan comparison = EndScriptTime.Subtract(StartScriptTime);
-            DateTime toDateObj = new DateTime(comparison.Ticks);
+            string comparisonTicks = new DateTime(comparison.Ticks).ToString("HH:mm:ss");
             if (!Properties.Quiet)
             {
-                Console.Out.WriteLine("\nScript finished - {0}", toDateObj.ToString("HH:mm:ss"));
+                Console.Out.WriteLine($"\nScript finished - {comparisonTicks}\n");
             }
         }
     }

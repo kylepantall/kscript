@@ -13,7 +13,7 @@ namespace KScript.Arguments
 
         public override string UsageInformation()
         {
-            return "Used within dowhile loops to break conditional loops.";
+            return "Used within loops to break conditional loops.";
         }
 
         public override void Validate()

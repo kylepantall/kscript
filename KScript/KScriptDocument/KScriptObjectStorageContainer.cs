@@ -35,9 +35,7 @@ namespace KScript.KScriptDocument
         public void AddObjectFromUID(string uid, object obj)
         {
             if (!ObjectStorage.ContainsKey(uid))
-            {
                 ObjectStorage.Add(uid, obj);
-            }
         }
 
         /**
@@ -46,10 +44,9 @@ namespace KScript.KScriptDocument
         public void Add(string at_parent_key, KScriptObject script_obj, string uid, List<IKScriptDocumentNode> values)
         {
             if (Value.ContainsKey(at_parent_key))
-            {
                 Value[at_parent_key].Add(uid, values);
-            }
-            else
+
+            if (!Value.ContainsKey(at_parent_key))
             {
                 Dictionary<string, List<IKScriptDocumentNode>> obj = new Dictionary<string, List<IKScriptDocumentNode>>
                 {
@@ -68,16 +65,9 @@ namespace KScript.KScriptDocument
         /// <returns>Returns all method names</returns>
         public string[] GetMethodNames()
         {
-
             if (Value.ContainsKey(GlobalIdentifiers.CALLS))
-            {
                 return Value[GlobalIdentifiers.CALLS].Select(i => i.Key).ToArray();
-            }
-            else
-            {
-                return new string[0];
-            }
-
+            return new string[0];
         }
 
         /**
@@ -86,13 +76,8 @@ namespace KScript.KScriptDocument
          */
         public List<IKScriptDocumentNode> GetMethodCalls(string uid)
         {
-            if (Value.ContainsKey(GlobalIdentifiers.CALLS))
-            {
-                if (Value[GlobalIdentifiers.CALLS].ContainsKey(uid))
-                {
-                    return Value[GlobalIdentifiers.CALLS][uid];
-                }
-            }
+            if (Value.ContainsKey(GlobalIdentifiers.CALLS) && Value[GlobalIdentifiers.CALLS].ContainsKey(uid))
+                return Value[GlobalIdentifiers.CALLS][uid];
             return new List<IKScriptDocumentNode>();
         }
 
@@ -103,15 +88,10 @@ namespace KScript.KScriptDocument
         /// <returns>List of KScriptDocument Nodes</returns>
         public List<IKScriptDocumentNode> GetExceptionHandlers(string uid)
         {
-            if (Value.ContainsKey(GlobalIdentifiers.EXCEPTIONS))
-            {
-                if (Value[GlobalIdentifiers.EXCEPTIONS].ContainsKey(uid))
-                {
-                    return Value[GlobalIdentifiers.EXCEPTIONS][uid];
-                }
-                else { return new List<IKScriptDocumentNode>(); }
-            }
-            else { return new List<IKScriptDocumentNode>(); }
+            if (Value.ContainsKey(GlobalIdentifiers.EXCEPTIONS) &&
+                Value[GlobalIdentifiers.EXCEPTIONS].ContainsKey(uid))
+                return Value[GlobalIdentifiers.EXCEPTIONS][uid];
+            return new List<IKScriptDocumentNode>();
         }
     }
 }

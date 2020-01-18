@@ -17,14 +17,12 @@ namespace KScript.Arguments.Arithmetic
             string math = HandleCommands(Contents);
             string result = KScriptArithmeticHandler.HandleCalculation(math);
 
-            if (string.IsNullOrWhiteSpace(to))
-            {
-                ParentContainer.AddGlobalValue("math", "previous_result", result);
-            }
-            else
+            if (!string.IsNullOrWhiteSpace(to))
             {
                 Def(to).Contents = result;
             }
+
+            ParentContainer.AddGlobalValue("math", "previous_result", result);
 
             return true;
         }

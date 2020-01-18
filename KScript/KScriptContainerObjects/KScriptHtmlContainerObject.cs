@@ -24,8 +24,8 @@ namespace KScript.KScriptContainerObjects
 
         public KScriptHtmlContainerObject(string str) : base(str)
         {
+            SetValidationType(ValidationTypes.DURING_PARSING);
             Contents = str;
-            ValidationType = ValidationTypes.DURING_PARSING;
         }
 
         public override bool Run()

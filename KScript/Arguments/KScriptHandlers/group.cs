@@ -3,7 +3,7 @@ using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
-    public class group : KScriptConditional
+    public class group : KScriptObject
     {
         public new KScriptObject Contents { get; set; }
 
@@ -13,15 +13,9 @@ namespace KScript.Arguments
         [KScriptProperty("Used to give the group a unique identity for other KScript objects and commands", false)]
         public string id { get; set; }
 
-        public override bool Run()
-        {
-            if (Contents != null)
-            {
-                Contents.Run();
-            }
+        public override bool Run() => true;
 
-            return true;
-        }
+        public override string UsageInformation() => "Used to contain KScript Objects with familiar functionality.";
 
         public override void Validate() => throw new KScriptNoValidationNeeded(this);
     }

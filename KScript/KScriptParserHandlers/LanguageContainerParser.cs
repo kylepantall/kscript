@@ -31,7 +31,7 @@ namespace KScript.KScriptParserHandlers
                     }
                 }
             }
-            parentObject.GetValueStore().Add("data", Values);
+            parentObject.GetValueStore()["data"] =  Values;
             return parentObject;
         }
 

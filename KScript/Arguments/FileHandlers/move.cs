@@ -1,5 +1,5 @@
-﻿using KScript.KScriptObjects;
-using System.IO;
+﻿using System.IO;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments.FileHandlers
 {
@@ -17,12 +17,10 @@ namespace KScript.Arguments.FileHandlers
             if (attr.HasFlag(FileAttributes.Directory))
             {
                 Directory.Move(HandleCommands(from), HandleCommands(to));
+                return true;
             }
-            else
-            {
-                File.Move(HandleCommands(from), HandleCommands(to));
-            }
-
+            
+            File.Move(HandleCommands(from), HandleCommands(to));
             return true;
         }
 

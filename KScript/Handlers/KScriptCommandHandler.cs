@@ -12,14 +12,10 @@ namespace KScript.Handlers
     [ClassInterface(ClassInterfaceType.None)]
     public class KScriptCommandHandler
     {
-        public static bool IsCommand(string str, KScriptContainer container, KScriptBaseObject parent)
+        public static bool IsCommand(string str)
         {
             Regex cmd_params = new Regex(Global.GlobalIdentifiers.COMMANDS_WITH_PARAMS);
             Regex cmd_no_params = new Regex(Global.GlobalIdentifiers.COMMANDS_NO_PARAMS);
-
-            MatchCollection cmd_no_params_matches = cmd_no_params.Matches(str);
-            MatchCollection cmd_params_matches = cmd_params.Matches(str);
-
             return cmd_params.IsMatch(str) || cmd_no_params.IsMatch(str);
         }
 
@@ -99,48 +95,44 @@ namespace KScript.Handlers
                 }
                 else if (str_cmds[i].Equals(')') && !ignore && encountered_cmd && commands.Count > 0)
                 {
-                    if (commands.Any())
+                    if (!commands.Any())
                     {
-                        ICommand cmd = commands.Pop();
-                        cmd.IndexProperties.End = i;
+                        All_Commands.Add(bracket);
+                        continue;
+                    }
 
-                        if (paramTracker.HasParams)
+                    ICommand cmd = commands.Pop();
+                    cmd.IndexProperties.End = i;
+
+                    if (paramTracker.HasParams)
+                    {
+                        if (cmd.IsCommandObject)
                         {
-                            if (cmd.IsCommandObject)
-                            {
-                                if (cmd.GetCommandObject().InnerCommand.Length > 0)
-                                {
-                                    IValue variable = new IValue(paramTracker.GetIndexPair(), container);
-                                    cmd.GetCommandObject().Children.Enqueue(variable);
-                                }
-                            }
-                            else
+                            if (cmd.GetCommandObject().InnerCommand.Length > 0)
                             {
                                 IValue variable = new IValue(paramTracker.GetIndexPair(), container);
                                 cmd.GetCommandObject().Children.Enqueue(variable);
                             }
                         }
-
-                        if (commands.Count > 0)
-                        {
-                            if (commands.Peek().IsCommandObject && !commands.Peek().GetCommandObject().IsClosed)
-                            {
-                                commands.Peek().GetCommandObject().Children.Enqueue(cmd);
-                            }
-                            else
-                            {
-                                All_Commands.Add(cmd);
-                            }
-                        }
                         else
                         {
-                            All_Commands.Add(cmd);
+                            IValue variable = new IValue(paramTracker.GetIndexPair(), container);
+                            cmd.GetCommandObject().Children.Enqueue(variable);
                         }
                     }
-                    else
+
+                    if (commands.Count == 0)
                     {
-                        All_Commands.Add(bracket);
+                        All_Commands.Add(cmd);
                     }
+
+                    if (commands.Count > 0 && commands.Peek().IsCommandObject && !commands.Peek().GetCommandObject().IsClosed)
+                    {
+                        commands.Peek().GetCommandObject().Children.Enqueue(cmd);
+                        continue;
+                    }
+
+                    All_Commands.Add(cmd);
                     continue;
                 }
             }
@@ -171,9 +163,9 @@ namespace KScript.Handlers
                         }
                         else
                         {
-                            string id = string.Format("[{0}]", Guid.NewGuid().ToString());
-                            temp_string = ReplaceFirst(temp_string, item.GetCommandObject().CommandParameters, id);
-                            container.GetCommandStore().Add(id, item.GetCommandObject());
+                            string id = Guid.NewGuid().ToString();
+                            temp_string = ReplaceFirst(temp_string, item.GetCommandObject().CommandParameters, $"[{id}]");
+                            container.GetCommandStore().Add($"[{id}]", item.GetCommandObject());
                         }
                     }
                 }
@@ -196,10 +188,8 @@ namespace KScript.Handlers
 
                 foreach (KeyValuePair<string, ICommandObject> item in container.GetCommandStore().ToList())
                 {
-                    string key = item.Key;
                     string val = item.Value.GetCommandObject().CalculateValue();
-
-                    temp_string = temp_string.Replace(key, val);
+                    temp_string = temp_string.Replace(item.Key, val);
                 }
 
                 container.GetCommandStore().Clear();

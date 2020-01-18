@@ -1,7 +1,7 @@
-﻿using KScript.Handlers;
+﻿using System;
+using KScript.Handlers;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
-using System;
 
 namespace KScript.Arguments
 {
@@ -63,20 +63,10 @@ namespace KScript.Arguments
         public override bool Run()
         {
             if (string.IsNullOrWhiteSpace(type))
-            {
                 type = "string";
-            }
+
 
             Out(Contents);
-
-            if (!string.IsNullOrWhiteSpace(to))
-            {
-                CreateDef(to);
-                if (Def(to) is null)
-                {
-                    throw new KScriptException("KScriptDefNotFound", $"Definition '{to}' has not been declared");
-                }
-            }
 
             switch (type.ToLower())
             {
@@ -92,9 +82,7 @@ namespace KScript.Arguments
             }
 
             if (ParentContainer.Properties.ClearAfterInput || KScriptBoolHandler.Convert(cai))
-            {
                 Console.Clear();
-            }
 
             return true;
         }

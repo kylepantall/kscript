@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using static KScript.KScriptObjects.KScriptValidator;
+using System.Text.RegularExpressions;
 
 namespace KScript.KScriptObjects
 {
@@ -57,6 +58,7 @@ namespace KScript.KScriptObjects
         private readonly bool can_be_empty = true;
         private readonly ExpectedInput expected_input = ExpectedInput.Custom;
         private readonly string[] accepted_values = null;
+        private readonly string regex;
 
         public KScriptValidationObject(string property_name, bool can_be_empty = false)
         {
@@ -78,12 +80,18 @@ namespace KScript.KScriptObjects
             this.expected_input = expected_input;
         }
 
+        public KScriptValidationObject(string property_name, bool can_be_empty, string regex)
+        {
+            this.property_name = property_name;
+            this.can_be_empty = can_be_empty;
+            this.regex = regex;
+        }
+
         public string GetPropertyValue(KScriptBaseObject caller)
         {
             string value = (string)caller.GetType().GetProperty(property_name, typeof(string)).GetValue(caller);
             return value;
         }
-
 
         /// <summary>
         /// Checks if a property is empty or null if not allowed nullable/empty value.
@@ -96,13 +104,12 @@ namespace KScript.KScriptObjects
             {
                 return true;
             }
-            else
+
+            if (string.IsNullOrWhiteSpace(GetPropertyValue(caller)) || GetPropertyValue(caller) == null)
             {
-                if (string.IsNullOrWhiteSpace(GetPropertyValue(caller)) || GetPropertyValue(caller) == null)
-                {
-                    return false;
-                }
+                return false;
             }
+
             return true;
         }
 
@@ -117,10 +124,23 @@ namespace KScript.KScriptObjects
             {
                 return accepted_values.Any(i => GetPropertyValue(caller).Contains(i));
             }
-            else
+
+            return true;
+        }
+
+        /// <summary>
+        /// Checks that the property value returns the expected regular expression.
+        /// </summary>
+        /// <param name="caller">Object calling method</param>
+        /// <returns>If the check was successfull</returns>
+        public bool IsExpectedRegularExpression(KScriptBaseObject caller)
+        {
+            if (string.IsNullOrEmpty(regex))
             {
                 return true;
             }
+
+            return new Regex(regex).IsMatch(GetPropertyValue(caller));
         }
 
         /// <summary>
@@ -139,6 +159,8 @@ namespace KScript.KScriptObjects
                     string array_id = GetPropertyValue(caller);
                     return container.ArraysGet().ContainsKey(array_id);
                 case ExpectedInput.DefID:
+                    if (container.Properties.DynamicDefs)
+                        return true;
                     string def_id = GetPropertyValue(caller);
                     return container.GetDefs().ContainsKey(def_id);
                 case ExpectedInput.DirectoryLocation:
@@ -149,11 +171,9 @@ namespace KScript.KScriptObjects
                     return File.Exists(file);
                 case ExpectedInput.URL:
                     string url = GetPropertyValue(caller);
-                    Uri _url = null;
-                    return Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out _url);
+                    return Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out _);
                 case ExpectedInput.Number:
-                    int number;
-                    return int.TryParse(GetPropertyValue(caller), out number);
+                    return int.TryParse(GetPropertyValue(caller), out _);
                 case ExpectedInput.Bool:
                     bool isBool = KScriptBoolHandler.IsBool(GetPropertyValue(caller));
                     return isBool;
@@ -201,6 +221,11 @@ namespace KScript.KScriptObjects
             if (!IsAcceptedValue(caller))
             {
                 throw new KScriptException(caller, string.Format("The value '{0}' was not an accepted value for the property '{1}'.", GetPropertyValue(caller), property_name));
+            }
+
+            if (!IsExpectedRegularExpression(caller))
+            {
+                throw new KScriptException(caller, string.Format("The value '{0}' was not an accepted value for the property '{1}'", GetPropertyValue(caller), property_name));
             }
 
         }

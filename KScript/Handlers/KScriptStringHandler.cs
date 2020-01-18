@@ -42,10 +42,7 @@ namespace KScript.Handlers
                 tmp_string = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, tmp_string);
                 return tmp_string;
             }
-            else
-            {
-                return string.Empty;
-            }
+            return string.Empty;
         }
     }
 }

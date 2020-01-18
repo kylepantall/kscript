@@ -2,15 +2,26 @@
 {
     class forxy : KScriptObject
     {
-        public string x_to { get; set; }
-        public string y_to { get; set; }
+        public string to_x { get; set; }
+        public string to_y { get; set; }
 
         public string x_math { get; set; }
         public string y_math { get; set; }
 
-        public string x_while { get; set; }
-        public string y_while { get; set; }
+        public string @while { get; set; }
 
+        public forxy()
+        {
+            if (!string.IsNullOrWhiteSpace(x_math))
+            {
+                x_math = $"${to_x}->increment()";
+            }
+
+            if (!string.IsNullOrWhiteSpace(y_math))
+            {
+                y_math = $"${to_y}->increment()";
+            }
+        }
 
 
         public override bool Run()

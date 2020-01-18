@@ -1,19 +1,25 @@
-﻿using KScript.Arguments;
-using KScript.Document;
+﻿using System;
 using System.Collections.Generic;
+using KScript.Arguments;
+using KScript.Document;
 
 namespace KScript.KScriptOperatorHandlers
 {
-    class ConditionalLoopHandler : NodeHandler
+    class ConditionalLoopHandler : OperatorHandler
     {
+        public ConditionalLoopHandler(KScriptContainer container) : base(container) { }
+
         public override bool CanRun(KScriptObject obj)
         {
-            return obj.GetType().IsAssignableFrom(typeof(KScriptConditional));
+            if (obj == null)
+                return false;
+
+            return typeof(KScriptLoopConditional).IsAssignableFrom(obj.GetType());
         }
 
         public override void Execute(KScriptObject obj, List<IKScriptDocumentNode> Nodes, KScriptContainer Container)
         {
-            KScriptConditional obj_x = (KScriptConditional)(obj);
+            KScriptLoopConditional obj_x = obj as KScriptLoopConditional;
             if (obj_x.condition != null && obj_x.ToBool(obj_x.HandleCommands(obj_x.condition)))
             {
                 do
@@ -25,12 +31,10 @@ namespace KScript.KScriptOperatorHandlers
                             Container.StopConditionalLoops();
                             break;
                         }
-                        else
+
+                        if (!Container.GetConditionalLoops())
                         {
-                            if (!Container.GetConditionalLoops())
-                            {
-                                node.Run(Container, null, obj);
-                            }
+                            node.Run(Container, null, obj);
                         }
                     }
 
@@ -39,8 +43,7 @@ namespace KScript.KScriptOperatorHandlers
                         Container.AllowConditionalLoops();
                         return;
                     }
-                }
-                while (obj_x.ToBool(obj_x.HandleCommands(obj_x.condition)));
+                } while (obj_x.ToBool(obj_x.HandleCommands(obj_x.condition)));
             }
         }
     }

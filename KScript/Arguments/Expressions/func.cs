@@ -45,6 +45,7 @@ namespace KScript.Arguments
                     if (Def(to).Contents == find)
                     {
                         Def(to).Contents = replace;
+                        break;
                     }
                 }
             }

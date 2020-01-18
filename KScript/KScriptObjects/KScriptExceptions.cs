@@ -9,13 +9,12 @@ namespace KScript.KScriptExceptions
     [Serializable]
     public class KScriptException : Exception
     {
-        private readonly string ExceptionType;
+        private readonly string ExceptionType = "KScript_Internal_Error";
 
         public KScriptBaseObject KScriptObject { get; set; }
 
         public KScriptException() { }
         public KScriptException(KScriptBaseObject obj) : base() { KScriptObject = obj; }
-
         public KScriptException(string exception_type, string message) : base(message)
         {
             ExceptionType = exception_type;
@@ -27,18 +26,13 @@ namespace KScript.KScriptExceptions
             {
                 return KScriptObject.GetType().Name;
             }
-            else
-            {
-                return "KScript_Internal_Error";
-            }
+
+            return ExceptionType;
         }
 
-        public KScriptException(string message) : base(message)
-        {
-            ExceptionType = GetType().Name;
-        }
-
+        public KScriptException(string message) : base(message) => ExceptionType = GetType().Name;
         public KScriptException(KScriptBaseObject obj, string message) : base(message) { KScriptObject = obj; }
+
     }
 
     /// <summary>
@@ -107,7 +101,9 @@ namespace KScript.KScriptExceptions
     /// </summary>
     public class KScriptPrototypeException : KScriptException
     {
-        public KScriptPrototypeException(KScriptBaseObject obj) : base(obj, "This KScriptObject is in prototyping stage and is not ready for distribution with this version of KScript.") { }
+        public KScriptPrototypeException(KScriptBaseObject obj) :
+        base(obj, "This KScriptObject is in prototyping stage and is not ready for distribution with this version of KScript.")
+        { }
     }
 
     /// <summary>
@@ -115,51 +111,73 @@ namespace KScript.KScriptExceptions
     /// </summary>
     public class KScriptDeprecatedException : KScriptException
     {
-        public KScriptDeprecatedException(KScriptBaseObject obj) : base(obj, "This KScriptObject has been deprecated and is no longer accessible in this version of KScript.") { }
+        public KScriptDeprecatedException(KScriptBaseObject obj) :
+        base(obj, "This KScriptObject has been deprecated and is no longer accessible in this version of KScript.")
+        { }
     }
 
 
     public class KScriptValidationFail : KScriptException
     {
-        public KScriptValidationFail(KScriptBaseObject obj) : base(obj, "Validation has failed for the given KScriptObject.") { }
+        public KScriptValidationFail(KScriptBaseObject obj) :
+        base(obj, "Validation has failed for the given KScriptObject.")
+        { }
         public KScriptValidationFail(KScriptBaseObject obj, string msg) : base(obj, msg) { }
     }
     public class KScriptDirectoryNotFound : KScriptException
     {
-        public KScriptDirectoryNotFound(KScriptBaseObject obj) : base(obj, "The given directory could not be found.") { }
+        public KScriptDirectoryNotFound(KScriptBaseObject obj) :
+        base(obj, "The given directory could not be found.")
+        { }
         public KScriptDirectoryNotFound(KScriptBaseObject obj, string msg) : base(obj, msg) { }
     }
     public class KScriptFileNotFound : KScriptException
     {
-        public KScriptFileNotFound(KScriptBaseObject obj) : base(obj, "The given file could not be found.") { }
+        public KScriptFileNotFound(KScriptBaseObject obj) :
+        base(obj, "The given file could not be found.")
+        { }
         public KScriptFileNotFound(KScriptBaseObject obj, string msg) : base(obj, msg) { }
     }
     public class KScriptArrayNotFound : KScriptException
     {
-        public KScriptArrayNotFound(KScriptBaseObject obj) : base(obj, "The array could not be found with the given ID") { }
-        public KScriptArrayNotFound(KScriptBaseObject obj, string msg) : base(obj, msg) { }
+        public KScriptArrayNotFound(KScriptBaseObject obj) :
+        base(obj, "The array could not be found with the given ID")
+        { }
+        public KScriptArrayNotFound(KScriptBaseObject obj, string msg) :
+        base(obj, msg)
+        { }
     }
     public class KScriptBoolInvalid : KScriptException
     {
         public KScriptBoolInvalid() : base("Bool invalid") { }
-        public KScriptBoolInvalid(KScriptBaseObject obj) : base(obj, "The bool value given is not valid.") { }
+        public KScriptBoolInvalid(KScriptBaseObject obj) :
+        base(obj, "The bool value given is not valid.")
+        { }
         public KScriptBoolInvalid(KScriptBaseObject obj, string msg) : base(obj, msg) { }
     }
     public class KScriptDefNotFound : KScriptException
     {
         public KScriptDefNotFound() : base("Given def does not exist.") { }
-        public KScriptDefNotFound(KScriptBaseObject obj) : base(obj, "Given def does not exist.") { }
-        public KScriptDefNotFound(KScriptBaseObject obj, string msg) : base(obj, msg) { }
+        public KScriptDefNotFound(KScriptBaseObject obj) :
+        base(obj, "Given def does not exist.")
+        { }
+        public KScriptDefNotFound(KScriptBaseObject obj, string msg) :
+        base(obj, msg)
+        { }
     }
     public class KScriptDefInUse : KScriptException
     {
         public KScriptDefInUse() : base("The given def is already in use.") { }
-        public KScriptDefInUse(KScriptBaseObject obj) : base(obj, "The given def is already in use.") { }
+        public KScriptDefInUse(KScriptBaseObject obj) :
+        base(obj, "The given def is already in use.")
+        { }
         public KScriptDefInUse(KScriptBaseObject obj, string msg) : base(obj, msg) { }
     }
     public class KScriptMissingAttribute : KScriptException
     {
-        public KScriptMissingAttribute(KScriptBaseObject obj) : base(obj, "The given KScriptObject is missing an attribute.") { }
+        public KScriptMissingAttribute(KScriptBaseObject obj) :
+        base(obj, "The given KScriptObject is missing an attribute.")
+        { }
         public KScriptMissingAttribute(KScriptBaseObject obj, string msg) : base(obj, msg) { }
     }
 }
