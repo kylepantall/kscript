@@ -1,6 +1,6 @@
 ﻿namespace KScript.MultiArray
 {
-    public abstract class IArray 
+    public abstract class IArray
     {
         public string Key { get; set; }
 
@@ -50,7 +50,7 @@
         {
             if (IsCollection())
             {
-                foreach (var item in GetCollection().GetItems())
+                foreach (IArray item in GetCollection().GetItems())
                 {
                     if (item.Equals(MultiArrayParser.StripKey(key)))
                     {
@@ -72,7 +72,7 @@
         {
             if (IsCollection())
             {
-                var x = GetCollection().GetItems();
+                System.Collections.Generic.List<IArray> x = GetCollection().GetItems();
 
                 if (index > x.Count)
                 {

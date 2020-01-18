@@ -15,8 +15,13 @@ namespace KScript.MultiArray
             get
             {
                 if (Arrays.ContainsKey(key))
+                {
                     return Arrays[key];
-                else return null;
+                }
+                else
+                {
+                    return null;
+                }
             }
         }
     }

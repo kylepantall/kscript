@@ -15,8 +15,8 @@ namespace KScript.HTML
 
             foreach (Match m in matches)
             {
-                var key = m.Groups[1].Value;
-                var value = m.Groups[2].Value;
+                string key = m.Groups[1].Value;
+                string value = m.Groups[2].Value;
                 values.Add(key, value);
             }
 

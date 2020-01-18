@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
-using KScript.Handlers;
+﻿using KScript.Handlers;
 using KScript.KScriptObjects;
+using System.Collections.Generic;
 
 namespace KScript.Arguments
 {
@@ -33,7 +33,7 @@ namespace KScript.Arguments
 
             for (int i = 0; i < KScript().ArrayGet(this, from).Count; i++)
             {
-                var array = KScript().ArrayGet(this, from);
+                List<string> array = KScript().ArrayGet(this, from);
                 Out(KScriptReplacer.Replace(_format, new KeyValuePair<string, string>("index", i.ToString()), new KeyValuePair<string, string>("value", array[i])));
             }
 

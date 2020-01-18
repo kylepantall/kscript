@@ -1,7 +1,4 @@
-﻿using KScript.Handlers;
-using KScript.KScriptObjects;
-using Newtonsoft.Json.Linq;
-using System;
+﻿using KScript.KScriptObjects;
 
 namespace KScript.Arguments.Array
 {
@@ -14,8 +11,7 @@ namespace KScript.Arguments.Array
 
         public override bool Run()
         {
-            //JArray array_obj = Newtonsoft.Json.JsonConvert.DeserializeObject<JArray>(Contents);
-            return MArrayHandler.ConvertJSONToMArray(id, Contents, ParentContainer);
+            return true;
         }
 
         public override string UsageInformation()

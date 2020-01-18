@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace KScript.Arguments.Conditional
+﻿namespace KScript.Arguments.Conditional
 {
     class forxy : KScriptObject
     {

@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using KScript.KScriptObjects;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using KScript.KScriptObjects;
 
 namespace KScript.Document
 {
@@ -30,7 +30,7 @@ namespace KScript.Document
 
                         if (GetValue().GetType().IsAssignableFrom(typeof(KScriptIDObject)))
                         {
-                            var val = (KScriptIDObject)GetValue();
+                            KScriptIDObject val = (KScriptIDObject)GetValue();
                             Value = container.GetObjectStorageContainer().GetObjectFromUID<KScriptIDObject>(val.id);
                         }
                         else

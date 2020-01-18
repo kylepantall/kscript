@@ -151,7 +151,6 @@
     <Compile Include="Commands\this.cs" />
     <Compile Include="Commands\xpath.cs" />
     <Compile Include="Handlers\KScriptArrayHandler.cs" />
-    <Compile Include="Handlers\MArrayHandler.cs" />
     <Compile Include="KScriptObjects\KScriptBooleanProperty.cs" />
     <Compile Include="KScriptObjects\KScriptIDObject.cs" />
     <Compile Include="Commands\length.cs" />

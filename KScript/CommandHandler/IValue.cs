@@ -13,7 +13,7 @@
         {
             if (KScriptVariableHandler.IsVariable(Value))
             {
-                var val = KScriptVariableHandler.ReturnFormattedVariables(Container, Value);
+                string val = KScriptVariableHandler.ReturnFormattedVariables(Container, Value);
 
                 if (val.Trim().StartsWith("'") && val.Trim().EndsWith("'"))
                 {

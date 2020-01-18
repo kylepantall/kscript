@@ -8,11 +8,11 @@ namespace KScript.KScriptParserHandlers
     {
         public MArrayParser(KScriptContainer container) : base(container) => ArrayCollection = new ArrayCollection();
 
-        private ArrayCollection ArrayCollection;
+        private readonly ArrayCollection ArrayCollection;
         public override KScriptObject GenerateKScriptObject(KScriptObject parentObject, XmlNode node)
         {
             Iterate(node, ArrayCollection);
-            var x = ArrayCollection;
+            ArrayCollection x = ArrayCollection;
             return parentObject;
         }
 
@@ -20,23 +20,20 @@ namespace KScript.KScriptParserHandlers
         {
             if (node.HasChildNodes)
             {
-                var col = new ArrayCollection();
-                parent.Key = (node.Attributes?["key"]?.InnerText) ?? "";
+                ArrayCollection col = new ArrayCollection();
+                parent.Key = node.Name;
                 foreach (XmlNode cnode in node.ChildNodes)
+                {
                     Iterate(cnode, col);
-                parent.AddItem(col);
-            }
-            else
-            {
-                var aItem = new ArrayItem((node.Attributes?["key"]?.InnerText) ?? "", node.InnerText);
-                parent.AddItem(aItem);
-            }
-        }
+                }
 
-        //public override bool IsAcceptedObject(KScriptObject obj) => obj.GetType().IsAssignableFrom(typeof(marray));
-        public override bool IsAcceptedObject(KScriptObject obj)
-        {
-            return false;
+                parent.AddItem(col);
+                return;
+            }
+
+            ArrayItem aItem = new ArrayItem(node.Name, node.InnerText);
+            parent.AddItem(aItem);
         }
+        public override bool IsAcceptedObject(KScriptObject obj) => obj.GetType().IsAssignableFrom(typeof(marray));
     }
 }

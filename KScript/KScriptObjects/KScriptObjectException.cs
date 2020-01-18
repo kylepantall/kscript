@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using KScript.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
+using System.Collections.Generic;
 
 namespace KScript.KScriptObjects
 {
@@ -14,7 +14,7 @@ namespace KScript.KScriptObjects
         {
             if (!Ignore && ParentContainer.AllowExecution)
             {
-                foreach (var item in Children)
+                foreach (KScriptObject item in Children)
                 {
                     if (item != null)
                     {

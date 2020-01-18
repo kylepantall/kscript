@@ -18,7 +18,7 @@ namespace KScript.Arguments
             List<KeyValuePair<string, string>> values = (!Values.ContainsKey(Language) ?
                 Values["default"] : Values[KScript().Properties.Language]);
 
-            foreach (var item in values)
+            foreach (KeyValuePair<string, string> item in values)
             {
                 KScript().AddDef(string.IsNullOrWhiteSpace(prefix) ?
                     item.Key : prefix + item.Key,

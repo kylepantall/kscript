@@ -1,8 +1,8 @@
-﻿using System;
+﻿using KScript.KScriptExceptions;
+using System;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
@@ -16,9 +16,9 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            var q = from t in Assembly.GetExecutingAssembly().GetTypes()
-                    where t.IsClass && (typeof(KScriptException).IsAssignableFrom(t) || typeof(Exception).IsAssignableFrom(t) && t.Namespace == EXCEPTION_TYPES) && t.Name == type
-                    select t;
+            System.Collections.Generic.IEnumerable<Type> q = from t in Assembly.GetExecutingAssembly().GetTypes()
+                                                             where t.IsClass && (typeof(KScriptException).IsAssignableFrom(t) || typeof(Exception).IsAssignableFrom(t) && t.Namespace == EXCEPTION_TYPES) && t.Name == type
+                                                             select t;
 
             if (q.FirstOrDefault() != null)
             {
@@ -31,7 +31,7 @@ namespace KScript.Arguments
             }
 
 
-            var qs = from t in typeof(Exception).Assembly.GetTypes() where typeof(_Exception).IsAssignableFrom(t) && t.Name == type select t;
+            System.Collections.Generic.IEnumerable<Type> qs = from t in typeof(Exception).Assembly.GetTypes() where typeof(_Exception).IsAssignableFrom(t) && t.Name == type select t;
 
             if (qs.FirstOrDefault() != null)
             {

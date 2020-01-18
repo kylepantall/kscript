@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using KScript.Handlers;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using KScript.Handlers;
 
 namespace KScript.Commands
 {

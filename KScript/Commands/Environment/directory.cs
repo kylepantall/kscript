@@ -1,18 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KScript.Commands
 {
     class directory : KScriptCommand
     {
-        private string _directory = string.Empty;
+        private readonly string _directory = string.Empty;
 
         public directory()
         {
-            this._directory = System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory);
+            _directory = System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory);
         }
 
 
@@ -31,13 +27,13 @@ namespace KScript.Commands
         {
             directory_values directory_value = directory_values.desktop;
             Enum.TryParse(val, out directory_value);
-            this._directory = System.Environment.GetFolderPath((Environment.SpecialFolder)(int)directory_value);
+            _directory = System.Environment.GetFolderPath((Environment.SpecialFolder)(int)directory_value);
         }
 
 
         public override string Calculate()
         {
-            return this._directory;
+            return _directory;
         }
 
         public override void Validate()

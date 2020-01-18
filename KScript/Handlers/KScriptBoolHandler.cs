@@ -1,5 +1,5 @@
-﻿using System.Runtime.InteropServices;
-using KScript.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
+using System.Runtime.InteropServices;
 
 namespace KScript.Handlers
 {
@@ -9,7 +9,7 @@ namespace KScript.Handlers
 
         public static bool IsBool(string val)
         {
-            var _val = val;
+            string _val = val;
             return (_val == "true" || val == "1" || val == "t" || val == "yes" || val == "y") || (_val == "false" || val == "0" || val == "f" || val == "no" || val == "n");
         }
 

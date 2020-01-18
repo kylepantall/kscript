@@ -1,5 +1,5 @@
-﻿using System.Diagnostics;
-using KScript.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
+using System.Diagnostics;
 
 namespace KScript.Arguments
 {

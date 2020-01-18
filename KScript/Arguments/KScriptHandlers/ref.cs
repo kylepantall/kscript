@@ -23,7 +23,7 @@ namespace KScript.Arguments
             directory = HandleCommands(directory);
             @namespace = HandleCommands(@namespace);
             IEnumerable<string> files = Directory.EnumerateFiles(directory, "*.dll");
-            foreach (var item in files)
+            foreach (string item in files)
             {
                 Type[] types = (from t in Assembly.LoadFrom(item).GetTypes() where typeof(KScriptObject).IsAssignableFrom(t) select t).ToArray();
                 foreach (Type t in types)

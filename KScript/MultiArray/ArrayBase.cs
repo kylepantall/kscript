@@ -1,5 +1,5 @@
-﻿using System.Text.RegularExpressions;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace KScript.MultiArray
 {
@@ -17,21 +17,28 @@ namespace KScript.MultiArray
             {
                 current_node = new ArrayCollection(new List<IArray>() { GetRoot() });
             }
-            else current_node = GetRoot();
+            else
+            {
+                current_node = GetRoot();
+            }
 
             int index = -1;
 
-            foreach (var item in values)
+            foreach (Match item in values)
             {
                 if (int.TryParse(item.Groups[1].Value, out index))
                 {
                     if (current_node != null)
+                    {
                         current_node = current_node.Find(index);
+                    }
                 }
                 else
                 {
                     if (current_node != null)
+                    {
                         current_node = current_node.Find(item.Groups[1].Value);
+                    }
                 }
             }
 

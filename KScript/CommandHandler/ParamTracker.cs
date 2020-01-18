@@ -18,7 +18,7 @@ namespace KScript.CommandHandler
             return values.Dequeue();
         }
 
-        private Queue<string> values = new Queue<string>();
+        private readonly Queue<string> values = new Queue<string>();
         private StringBuilder stringBuilder = new StringBuilder();
 
         /// <summary>
@@ -35,7 +35,7 @@ namespace KScript.CommandHandler
 
             if ((ch.Equals(',') || ch.Equals(')')) && !IsCommand && !Ignore)
             {
-                var value = stringBuilder.ToString();
+                string value = stringBuilder.ToString();
 
                 if (!string.IsNullOrWhiteSpace(value))
                 {

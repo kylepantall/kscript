@@ -16,7 +16,7 @@ namespace KScript.Document
         {
             try
             {
-                foreach (var item in Nodes())
+                foreach (IKScriptDocumentNode item in Nodes())
                 {
                     if (container.AllowExecution)
                     {

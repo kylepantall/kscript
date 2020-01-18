@@ -13,7 +13,7 @@ namespace KScript.Handlers
         /// <returns>Returns an Array of string</returns>
         public static List<string> Split(string value, string split_char)
         {
-            var parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(new System.IO.StringReader(value));
+            Microsoft.VisualBasic.FileIO.TextFieldParser parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(new System.IO.StringReader(value));
             parser.SetDelimiters(split_char);
             parser.HasFieldsEnclosedInQuotes = true;
             parser.TrimWhiteSpace = false;

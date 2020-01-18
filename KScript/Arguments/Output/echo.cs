@@ -61,9 +61,14 @@ namespace KScript.Arguments
         {
             string _text = Contents;
             if (KScriptBoolHandler.Convert(trim))
+            {
                 _text = _text.Trim();
+            }
+
             if (type == "paragraph")
+            {
                 _text = KScriptParagraphHandler.Parse(_text);
+            }
 
             Out(_text);
             Out(string.Empty, () => !string.IsNullOrEmpty(trail_newline) && KScriptBoolHandler.Convert(trail_newline));

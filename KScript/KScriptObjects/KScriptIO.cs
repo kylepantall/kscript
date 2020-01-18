@@ -1,8 +1,8 @@
-﻿using System;
-using System.Runtime.InteropServices;
-using KScript.Handlers;
+﻿using KScript.Handlers;
 using KScript.KScriptObjects;
+using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace KScript.KScriptTypes
 {
@@ -147,7 +147,10 @@ namespace KScript.KScriptTypes
 
         public void Out(string val, Func<bool> condition)
         {
-            if (condition()) Out(val);
+            if (condition())
+            {
+                Out(val);
+            }
         }
         public void Out(string val) => Console.Out.Write(KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(val), ParentContainer, GetBaseObject()));
         public void Out(object obj) => Out(obj.ToString());

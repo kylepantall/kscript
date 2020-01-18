@@ -1,6 +1,4 @@
-﻿using System.Text.RegularExpressions;
-
-namespace KScript.VariableFunctions
+﻿namespace KScript.VariableFunctions
 {
     public class upper : IVariableFunction
     {

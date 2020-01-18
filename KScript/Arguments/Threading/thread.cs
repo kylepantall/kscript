@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace KScript.Arguments.Threading
+﻿namespace KScript.Arguments.Threading
 {
     class thread : KScriptMethodWrapper
     {
@@ -13,7 +7,7 @@ namespace KScript.Arguments.Threading
             if (!string.IsNullOrEmpty(@params))
             {
                 string[] _params = @params.Split(',');
-                foreach (var item in _params)
+                foreach (string item in _params)
                 {
                     string variable_name = string.Format("{0}.{1}", name, item);
                     ParentContainer.AddDef(variable_name, new def(""));

@@ -4,20 +4,22 @@ namespace KScript.Commands
 {
     public class more_less : KScriptCommand
     {
-        private string firstValue = "";
+        private readonly string firstValue = "";
         private string secondValue = "";
         private string lastValue = "<";
 
         public readonly string[] Operators = { "mt", "mte", "lt", "lte" };
-        public more_less(string firstNumber, string secondNumber) { this.firstValue = firstNumber; this.secondValue = secondNumber; }
-        public more_less(string firstComparison, string middleValue, string finalValue) : this(firstComparison, middleValue) => this.lastValue = finalValue;
+        public more_less(string firstNumber, string secondNumber) { firstValue = firstNumber; secondValue = secondNumber; }
+        public more_less(string firstComparison, string middleValue, string finalValue) : this(firstComparison, middleValue) => lastValue = finalValue;
 
         public override string Calculate()
         {
             bool isSecondValueOperator = IsWithinHaystack(secondValue, Operators) && !IsNumber(secondValue);
 
             if (isSecondValueOperator)
+            {
                 (secondValue, lastValue) = (lastValue, secondValue);
+            }
 
             string firstNumber = KScript().GetStringHandler().Format(firstValue),
                 secondNumber = KScript().GetStringHandler().Format(secondValue);
@@ -39,8 +41,10 @@ namespace KScript.Commands
 
         public override void Validate()
         {
-            if (string.IsNullOrEmpty(this.firstValue) || string.IsNullOrEmpty(this.secondValue) || string.IsNullOrEmpty(lastValue))
+            if (string.IsNullOrEmpty(firstValue) || string.IsNullOrEmpty(secondValue) || string.IsNullOrEmpty(lastValue))
+            {
                 throw new KScriptValidationFail(this, "Value cannot be NULL");
+            }
         }
     }
 }

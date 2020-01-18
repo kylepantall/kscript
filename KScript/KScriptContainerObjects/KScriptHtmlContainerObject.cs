@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using KScript.Document;
+using KScript.HTML;
+using KScript.KScriptObjects;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using KScript.Document;
-using KScript.HTML;
-using KScript.KScriptObjects;
 
 namespace KScript.KScriptContainerObjects
 {
@@ -73,7 +73,7 @@ namespace KScript.KScriptContainerObjects
 
             if (context.Request.HttpMethod == "POST")
             {
-                var request = context.Request;
+                HttpListenerRequest request = context.Request;
                 if (!request.HasEntityBody)
                 {
                     return;
@@ -92,7 +92,7 @@ namespace KScript.KScriptContainerObjects
 
         public string HandleResponse(HttpListenerRequest req)
         {
-            foreach (var key in req.QueryString.AllKeys)
+            foreach (string key in req.QueryString.AllKeys)
             {
                 string value = req.QueryString.Get(key);
                 if (ParentContainer.GetGlobalValues(id).ContainsKey(key))

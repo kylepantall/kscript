@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace KScript.Commands
+﻿namespace KScript.Commands
 {
     public class range : KScriptCommand
     {
-        private string check, max, min = "";
+        private readonly string check, max, min = "";
 
         public range(string check, string min, string max)
         {

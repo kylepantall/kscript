@@ -82,7 +82,7 @@
                     {
                         ThreadPool.QueueUserWorkItem((c) =>
                         {
-                            var ctx = c as HttpListenerContext;
+                            HttpListenerContext ctx = c as HttpListenerContext;
                             try
                             {
                                 _handleContext(ctx);

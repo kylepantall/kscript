@@ -1,11 +1,9 @@
-﻿using System.Reflection;
-
-namespace KScript.Global
+﻿namespace KScript.Global
 {
     static class This
     {
         public const string Name = "KScript Alpha";
-        
+
         public const bool IsFinal = false;
         //-----------------------------------
         public const string Developer = "Kyle Pantall";

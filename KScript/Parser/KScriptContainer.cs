@@ -1,10 +1,4 @@
-﻿using System;
-using System.CodeDom.Compiler;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using KScript.Arguments;
+﻿using KScript.Arguments;
 using KScript.CommandHandler;
 using KScript.Handlers;
 using KScript.KScriptDocument;
@@ -12,6 +6,12 @@ using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 using KScript.KScriptParserHandlers;
 using KScript.MultiArray;
+using System;
+using System.CodeDom.Compiler;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace KScript
 {
@@ -57,7 +57,7 @@ namespace KScript
         private readonly Dictionary<string, string> ConstantProperties = new Dictionary<string, string>();
 
         #region Global Values Storage - Stores values retrievable across all KScriptObjects (where ParentContainer accessible)
-        private Dictionary<string, Dictionary<string, string>> UniqueStore = new Dictionary<string, Dictionary<string, string>>();
+        private readonly Dictionary<string, Dictionary<string, string>> UniqueStore = new Dictionary<string, Dictionary<string, string>>();
 
         public void ClearGlobalValues(string key) => UniqueStore.Remove(key);
 

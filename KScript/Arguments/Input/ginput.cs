@@ -12,7 +12,7 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            var input = !string.IsNullOrEmpty(output) ? In(output) : In();
+            string input = !string.IsNullOrEmpty(output) ? In(output) : In();
 
             if (string.IsNullOrEmpty(input))
             {

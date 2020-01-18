@@ -16,7 +16,7 @@ namespace KScript.Commands
             HttpResponseMessage response = client.GetAsync(api_url).Result;
             if (response.IsSuccessStatusCode)
             {
-                var reply = response.Content.ReadAsStringAsync().Result;
+                string reply = response.Content.ReadAsStringAsync().Result;
                 return reply;
             }
             else

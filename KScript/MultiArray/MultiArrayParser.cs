@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Text.RegularExpressions;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using System;
+using System.Text.RegularExpressions;
 
 namespace KScript.MultiArray
 {
@@ -32,7 +32,7 @@ namespace KScript.MultiArray
         {
             try
             {
-                var matches = Regex.Matches(str, ArrayMatch);
+                MatchCollection matches = Regex.Matches(str, ArrayMatch);
 
                 Dictionary<string, Match> Matched_Items = new Dictionary<string, Match>();
 
@@ -48,7 +48,7 @@ namespace KScript.MultiArray
                     }
                 }
 
-                foreach (var item in Matched_Items)
+                foreach (KeyValuePair<string, Match> item in Matched_Items)
                 {
                     MatchCollection m = Regex.Matches(item.Value.Groups[0].Value, RetrieveItems);
                     string id = Regex.Match(item.Value.Groups[0].Value, ArrayMatch).Groups[1].Value;
@@ -69,7 +69,7 @@ namespace KScript.MultiArray
 
         public static string StripKey(string val)
         {
-            var tmp = val.TrimStart('~');
+            string tmp = val.TrimStart('~');
             tmp = tmp.Trim('\'');
             return tmp;
         }

@@ -4,7 +4,7 @@ namespace KScript.Commands
 {
     public class split : KScriptCommand
     {
-        private string @string;
+        private readonly string @string;
         private readonly string split_string;
         private readonly int Index;
 

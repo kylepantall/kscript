@@ -4,7 +4,7 @@ namespace KScript.Commands
 {
     public class contains : KScriptCommand
     {
-        private string Arg0;
+        private readonly string Arg0;
         private readonly string Arg1;
 
         public contains(string arg0, string arg1)

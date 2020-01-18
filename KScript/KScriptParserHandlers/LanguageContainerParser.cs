@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using KScript.Arguments;
+using System.Collections.Generic;
 using System.Xml;
-using KScript.Arguments;
 
 namespace KScript.KScriptParserHandlers
 {
@@ -20,7 +20,7 @@ namespace KScript.KScriptParserHandlers
                 {
                     if (ccnode.Name == "value")
                     {
-                        var val = new KeyValuePair<string, string>(ccnode.Attributes["id"].InnerText, ccnode.InnerText);
+                        KeyValuePair<string, string> val = new KeyValuePair<string, string>(ccnode.Attributes["id"].InnerText, ccnode.InnerText);
 
                         if (!Values.ContainsKey(cnode.Name))
                         {

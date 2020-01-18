@@ -1,8 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using KScript.Document;
+using KScript.Global;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using KScript.Document;
-using KScript.Global;
 
 namespace KScript.KScriptDocument
 {

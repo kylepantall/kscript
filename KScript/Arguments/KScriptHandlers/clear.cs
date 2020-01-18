@@ -1,9 +1,5 @@
-﻿using System;
-using KScript.KScriptExceptions;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using KScript.KScriptExceptions;
+using System;
 
 namespace KScript.Arguments
 {

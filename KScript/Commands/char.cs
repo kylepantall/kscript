@@ -1,5 +1,5 @@
-﻿using System;
-using KScript.KScriptExceptions;
+﻿using KScript.KScriptExceptions;
+using System;
 
 namespace KScript.Commands
 {

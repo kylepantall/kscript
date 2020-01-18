@@ -1,8 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using KScript.Document;
+using KScript.KScriptObjects;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using KScript.Document;
-using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
@@ -26,7 +26,7 @@ namespace KScript.Arguments
                 string[] _params = args.Split(',').Select(i => HandleCommands(i)).ToArray();
 
                 List<string> keys = new List<string>();
-                foreach (var item in ParentContainer.GetDefs())
+                foreach (KeyValuePair<string, def> item in ParentContainer.GetDefs())
                 {
                     if (item.Key.StartsWith(_method) && item.Key.Contains("."))
                     {
@@ -51,7 +51,10 @@ namespace KScript.Arguments
                     nodes.ForEach(node => node.Run(ParentContainer, args, this));
                 }).Start();
             }
-            else nodes.ForEach(node => node.Run(ParentContainer, args, this));
+            else
+            {
+                nodes.ForEach(node => node.Run(ParentContainer, args, this));
+            }
 
             return true;
         }

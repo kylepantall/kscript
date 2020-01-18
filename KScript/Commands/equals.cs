@@ -5,7 +5,7 @@
     /// </summary>
     public class equals : KScriptCommand
     {
-        private string a = "", b = "";
+        private readonly string a = "", b = "";
         private readonly bool ignore_case = false;
 
         /// <summary>

@@ -7,7 +7,7 @@
             if (!string.IsNullOrEmpty(@params))
             {
                 string[] _params = @params.Split(',');
-                foreach (var item in _params)
+                foreach (string item in _params)
                 {
                     string variable_name = string.Format("{0}.{1}", name, item);
                     ParentContainer.AddDef(variable_name, new def(""));

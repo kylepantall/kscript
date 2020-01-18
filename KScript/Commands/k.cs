@@ -1,6 +1,6 @@
-﻿using System;
+﻿using KScript.KScriptExceptions;
+using System;
 using System.Management;
-using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {

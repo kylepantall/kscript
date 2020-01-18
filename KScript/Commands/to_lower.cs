@@ -4,7 +4,7 @@ namespace KScript.Commands
 {
     public class to_lower : KScriptCommand
     {
-        private string str;
+        private readonly string str;
         public to_lower(string str) => this.str = str;
 
         public override string Calculate()

@@ -7,7 +7,7 @@ namespace KScript.Arguments
 {
     public class func : KScriptObject
     {
-        private Random rnd;
+        private readonly Random rnd;
 
         public func(string contents)
         {
@@ -38,7 +38,7 @@ namespace KScript.Arguments
                 string _expression = match.Groups[2].Value;
                 string[] Expression = _expression.Split(',');
 
-                foreach (var item in Expression)
+                foreach (string item in Expression)
                 {
                     string find = item.Split(':')[0];
                     string replace = item.Split(':')[1];
@@ -54,7 +54,7 @@ namespace KScript.Arguments
                 string _expression = match.Groups[2].Value;
                 string[] Expression = _expression.Split(',');
 
-                foreach (var item in Expression)
+                foreach (string item in Expression)
                 {
                     string find = item.Split(':')[0];
                     string addition = item.Split(':')[1];

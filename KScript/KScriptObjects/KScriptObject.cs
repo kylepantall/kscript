@@ -1,10 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using KScript.Arguments;
+﻿using KScript.Arguments;
 using KScript.Handlers;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace KScript
 {
@@ -14,7 +14,7 @@ namespace KScript
     [ClassInterface(ClassInterfaceType.None)]
     public abstract class KScriptObject : KScriptBaseObject
     {
-        private List<string> Tags;
+        private readonly List<string> Tags;
 
         /// <summary>
         /// Returns collection of KScriptObject tags.

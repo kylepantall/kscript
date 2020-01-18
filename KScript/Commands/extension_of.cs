@@ -2,7 +2,7 @@
 {
     public class extension_of : KScriptCommand
     {
-        private string value;
+        private readonly string value;
         public extension_of(string value) => this.value = value;
         public override string Calculate()
         {

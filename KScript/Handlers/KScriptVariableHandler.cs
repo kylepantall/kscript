@@ -1,8 +1,8 @@
-﻿using System.Linq;
+﻿using KScript.Handlers;
+using KScript.VariableFunctions;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using KScript.Handlers;
-using KScript.VariableFunctions;
 
 namespace KScript
 {
@@ -18,7 +18,10 @@ namespace KScript
         {
             bool isCommand = KScriptCommandHandler.IsCommand(Contents, ParentContainer, null);
 
-            if (isCommand) return Contents;
+            if (isCommand)
+            {
+                return Contents;
+            }
 
             string temp_string = string.Format("{0}{1}", TRALING_STRING, Contents);
 
