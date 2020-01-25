@@ -148,10 +148,8 @@ namespace KScript.KScriptTypes
         }
         public void Out(string val, bool handleCmds = true)
         {
-            if (ParentContainer == null) {
-                SetContainer(GetBaseObject().ParentContainer);
-                throw new Exception("Parent Container is null");
-            }
+            if (ParentContainer == null)
+                return;
 
             var value = ParentContainer.GetStringHandler().Format(val);
             Console.Out.Write(handleCmds ? KScriptCommandHandler.HandleCommands(value, ParentContainer, GetBaseObject()) : value);

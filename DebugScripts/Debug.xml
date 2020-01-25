@@ -7,12 +7,12 @@
 -->
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
-    <defm ids="name,age" />
+    <!-- <defm ids="name,age" /> -->
 
     <def id="name">Hi</def>
     <echo>$name</echo>
 
-    <watcher handle_method="once">
+    <!-- <watcher handle_method="once">
         <watchers>
             <watch for="name"/>
             <watch for="age" />
@@ -27,10 +27,9 @@
                 <echo>Name can't be more than 10</echo>
             </rule>
         </rules>
-    </watcher>
+    </watcher> -->
 
     <update to="name">Kyle</update>
-
 
     <echo>$name</echo>
 </kscript>

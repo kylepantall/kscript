@@ -1,4 +1,6 @@
-﻿using KScript.KScriptExceptions;
+﻿using System;
+using System.Collections.Generic;
+using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments
@@ -19,12 +21,19 @@ namespace KScript.Arguments
             set
             {
                 contents = value;
-                Out($"Value changed for {id} to {Contents}");
+
+                this.StateLog.HasKey(value, (self) =>
+                {
+                    Out($"def '{id}' updated with value '{value}'");
+                    self.Insert(value, DateTime.Now);
+                });
             }
         }
 
         public def(string Contents) => this.Contents = Contents;
         public def() => Contents = NULL;
+
+        public HashDictionary<string, DateTime> StateLog = new KScript.HashDictionary<string, DateTime>();
 
         public override bool Run()
         {
@@ -33,7 +42,7 @@ namespace KScript.Arguments
                 throw new KScriptNoRunMethodImplemented(this);
             }
 
-            else { ParentContainer[id].Contents = HandleCommands(Contents); }
+            ParentContainer[id].Contents = HandleCommands(Contents);
             return true;
         }
 
