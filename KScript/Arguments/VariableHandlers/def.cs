@@ -27,6 +27,11 @@ namespace KScript.Arguments
                     Out($"def '{id}' updated with value '{value}'");
                     self.Insert(value, DateTime.Now);
                 });
+
+                this.StateLog.HasKey(value, (self) =>
+                {
+                    Out($"Did not contain key");
+                }, false);
             }
         }
 

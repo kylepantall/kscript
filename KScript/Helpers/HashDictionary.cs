@@ -23,11 +23,11 @@ namespace KScript
             return @initiatedObject[key] != null;
         }
 
-        public bool HasKey(TKey key) => @initiatedObject.ContainsKey(key);
+        public bool HasKey(TKey key, bool expect = true) => expect == @initiatedObject.ContainsKey(key);
 
-        public HashDictionary<TKey, XValue> HasKey(TKey key, Action<HashDictionary<TKey, XValue>> func)
+        public HashDictionary<TKey, XValue> HasKey(TKey key, Action<HashDictionary<TKey, XValue>> func, bool expect = true)
         {
-            if (HasKey(key))
+            if (HasKey(key) == expect)
             {
                 func.Invoke(this);
                 return this;
