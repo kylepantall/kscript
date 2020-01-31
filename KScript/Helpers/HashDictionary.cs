@@ -1,3 +1,6 @@
+using System.CodeDom.Compiler;
+using System.Linq;
+using System.Text;
 using System.Linq.Expressions;
 using System;
 using System.Collections.Generic;
@@ -10,7 +13,16 @@ namespace KScript
         private Dictionary<TKey, HashSet<XValue>> @initiatedObject;
         public HashDictionary() => initiatedObject = new Dictionary<TKey, HashSet<XValue>>();
 
+        public new string ToString()
+        {
+            StringBuilder builder = new StringBuilder();
 
+            foreach (var item in this.initiatedObject)
+            {
+                builder.AppendLine($"{item.Key}: {item.Value.ToString()}");
+            }
+            return builder.ToString();
+        }
         private bool HasSecondaryObject(TKey key)
         {
             bool hasKey = @initiatedObject.ContainsKey(key);

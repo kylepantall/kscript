@@ -24,13 +24,14 @@ namespace KScript.Arguments
 
                 this.StateLog.HasKey(value, (self) =>
                 {
-                    Out($"def '{id}' updated with value '{value}'");
+                    // Out($"\ndef '{id}' updated with value '{value}'\n");
                     self.Insert(value, DateTime.Now);
                 });
 
                 this.StateLog.HasKey(value, (self) =>
                 {
-                    Out($"Did not contain key");
+                    // Out($"\ndef '{id}' state log did not contain key '{value}' \n");
+                    self.Insert(value, DateTime.Now);
                 }, false);
             }
         }

@@ -10,7 +10,7 @@
     <!-- <defm ids="name,age" /> -->
 
     <def id="name">Hi</def>
-    <echo>$name</echo>
+    <echo>$name\n</echo>
 
     <!-- <watcher handle_method="once">
         <watchers>
@@ -31,5 +31,7 @@
 
     <update to="name">Kyle</update>
 
-    <echo>$name</echo>
+    <echo>$name\n</echo>
+
+    <echo>@defstate('name')</echo>
 </kscript>
