@@ -29,7 +29,7 @@ namespace KScript.Commands
                     case "username": return System.Environment.UserName;
                     case "math.pi": return Math.PI.ToString();
                     case "math.e": return Math.E.ToString();
-                    case "null": return NULL;
+                    case Global.Values.NULL: return NULL;
                     default: return ParentContainer.FileDirectory;
                 }
             }

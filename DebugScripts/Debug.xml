@@ -7,10 +7,11 @@
 -->
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
-    <!-- <defm ids="name,age" /> -->
+    <def id="name">James</def>
+    <wait interval="1m"/>
+    <update to="name">Chloe</update>
 
-    <def id="name">Hi</def>
-    <echo>$name\n</echo>
+    <echo>@defstate('name')</echo>
 
     <!-- <watcher handle_method="once">
         <watchers>
@@ -28,10 +29,4 @@
             </rule>
         </rules>
     </watcher> -->
-
-    <update to="name">Kyle</update>
-
-    <echo>$name\n</echo>
-
-    <echo>@defstate('name')</echo>
 </kscript>

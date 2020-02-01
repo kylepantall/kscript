@@ -15,6 +15,7 @@ namespace KScript.Arguments
         [KScriptExample("<def id=\"email_address\"> ... </def>")]
         public string id { get; set; }
 
+        public HashDictionary<string, object> StateLog = new KScript.HashDictionary<string, object>();
         public new string Contents
         {
             get => contents;
@@ -22,25 +23,17 @@ namespace KScript.Arguments
             {
                 contents = value;
 
-                this.StateLog.HasKey(value, (self) =>
+                this.StateLog.IfNotContain(value, (self) =>
                 {
-                    // Out($"\ndef '{id}' updated with value '{value}'\n");
-                    self.Insert(value, DateTime.Now);
+                    var date = DateTime.Now;
+                    self.Insert(value, new DateTime(date.Year, date.Month, date.Day, date.Hour, date.Minute, 0));
+                    return;
                 });
-
-                this.StateLog.HasKey(value, (self) =>
-                {
-                    // Out($"\ndef '{id}' state log did not contain key '{value}' \n");
-                    self.Insert(value, DateTime.Now);
-                }, false);
             }
         }
 
         public def(string Contents) => this.Contents = Contents;
         public def() => Contents = NULL;
-
-        public HashDictionary<string, DateTime> StateLog = new KScript.HashDictionary<string, DateTime>();
-
         public override bool Run()
         {
             if (string.IsNullOrWhiteSpace(Contents))

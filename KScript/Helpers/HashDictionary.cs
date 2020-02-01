@@ -1,9 +1,8 @@
-using System.CodeDom.Compiler;
 using System.Linq;
 using System.Text;
-using System.Linq.Expressions;
 using System;
 using System.Collections.Generic;
+
 namespace KScript
 {
     public class HashDictionary<TKey, XValue>
@@ -17,12 +16,40 @@ namespace KScript
         {
             StringBuilder builder = new StringBuilder();
 
-            foreach (var item in this.initiatedObject)
+            builder.AppendLine("---------------------------------------");
+            builder.AppendLine(string.Format(" {0,-10} | {1,-10} ", "Value", "Timestamp"));
+            builder.AppendLine("---------------------------------------");
+
+            foreach (var key in Keys())
             {
-                builder.AppendLine($"{item.Key}: {item.Value.ToString()}");
+                var loop = @initiatedObject[key].Skip(@initiatedObject[key].Count > 1 ? 1 : 0);
+
+                builder.AppendLine(String.Format(" {0,-10} | {1,-10} ", key, loop.First().ToString()));
+
+                foreach (var value in loop)
+                {
+                    var keyValue = value.Equals(@initiatedObject[key].First()) ? EmptyEqualLength(key) : key.ToString();
+                    builder.AppendLine(String.Format(" {0,-10} | {1,-10} ", keyValue, value.ToString()));
+                }
+
+                builder.AppendLine("---------------------------------------");
             }
+
             return builder.ToString();
         }
+
+        private string EmptyEqualLength(object value)
+        {
+            var str = value.ToString();
+            value.ToString().ToCharArray().ToList().ForEach(item => str = str.Replace(item, ' '));
+            return str;
+        }
+
+        private List<TKey> Keys()
+        {
+            return @initiatedObject.Keys.ToList();
+        }
+
         private bool HasSecondaryObject(TKey key)
         {
             bool hasKey = @initiatedObject.ContainsKey(key);
@@ -48,13 +75,30 @@ namespace KScript
             return this;
         }
 
+        public HashDictionary<TKey, XValue> IfNotContain(TKey key, Action<HashDictionary<TKey, XValue>> func)
+        {
+            if (!HasKey(key))
+            {
+                func.Invoke(this);
+                return this;
+            }
+
+            return this;
+        }
+
         public bool Insert(TKey key, XValue value)
         {
             try
             {
                 if (HasSecondaryObject(key))
                 {
-                    @initiatedObject[key].Add(value);
+                    if (!@initiatedObject[key].ToList().Any((x) =>
+                    {
+                        return x.Equals(value);
+                    }))
+                    {
+                        @initiatedObject[key].Add(value);
+                    }
                 }
 
                 HashSet<XValue> _ = new HashSet<XValue>();
