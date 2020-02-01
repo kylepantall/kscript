@@ -261,6 +261,7 @@
     <Compile Include="Arguments\Watcher\watch.cs" />
     <Compile Include="Helpers\HashDictionary.cs" />
     <Compile Include="Commands\defstate.cs" />
+    <Compile Include="Commands\datetime.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

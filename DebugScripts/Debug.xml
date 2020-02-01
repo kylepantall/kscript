@@ -8,10 +8,20 @@
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
     <def id="name">James</def>
-    <wait interval="1m"/>
+    <wait interval="1s" />
     <update to="name">Chloe</update>
 
-    <echo>@defstate('name')</echo>
+    <def id="datetime">@datetime()</def>
+
+    <for to="i" while="@more_less($i,'lt',10)" math="$i->increment()">
+        <update to="name">$i</update>
+    </for>
+
+    <echo>$datetime \n</echo>
+
+    <echo>@defstate('name') \n</echo>
+
+    <echo>@defstate('name', $datetime)</echo>
 
     <!-- <watcher handle_method="once">
         <watchers>

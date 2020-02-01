@@ -15,19 +15,16 @@ namespace KScript.Arguments
         [KScriptExample("<def id=\"email_address\"> ... </def>")]
         public string id { get; set; }
 
-        public HashDictionary<string, object> StateLog = new KScript.HashDictionary<string, object>();
+        public HashDictionary<string, DateTime> StateLog = new KScript.HashDictionary<string, DateTime>();
         public new string Contents
         {
             get => contents;
             set
             {
                 contents = value;
-
-                this.StateLog.IfNotContain(value, (self) =>
+                this.StateLog.IfNotContain(value, (log) =>
                 {
-                    var date = DateTime.Now;
-                    self.Insert(value, new DateTime(date.Year, date.Month, date.Day, date.Hour, date.Minute, 0));
-                    return;
+                    log.Insert(value, DateTime.Now);
                 });
             }
         }

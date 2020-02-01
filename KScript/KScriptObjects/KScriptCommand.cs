@@ -13,6 +13,8 @@ namespace KScript
             SetBaseScriptObject(parent);
         }
 
+        public bool IsEmpty(string value) => string.IsNullOrEmpty(value);
+
         public abstract string Calculate();
         public abstract void Validate();
     }

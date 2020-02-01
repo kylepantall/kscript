@@ -7,7 +7,7 @@ namespace KScript
 {
     public class HashDictionary<TKey, XValue>
         where TKey : class
-        where XValue : new()
+        where XValue : struct
     {
         private Dictionary<TKey, HashSet<XValue>> @initiatedObject;
         public HashDictionary() => initiatedObject = new Dictionary<TKey, HashSet<XValue>>();
@@ -22,13 +22,9 @@ namespace KScript
 
             foreach (var key in Keys())
             {
-                var loop = @initiatedObject[key].Skip(@initiatedObject[key].Count > 1 ? 1 : 0);
-
-                builder.AppendLine(String.Format(" {0,-10} | {1,-10} ", key, loop.First().ToString()));
-
-                foreach (var value in loop)
+                foreach (var value in @initiatedObject[key])
                 {
-                    var keyValue = value.Equals(@initiatedObject[key].First()) ? EmptyEqualLength(key) : key.ToString();
+                    var keyValue = value.Equals(@initiatedObject[key].First()) ? key.ToString() : EmptyEqualLength(key);
                     builder.AppendLine(String.Format(" {0,-10} | {1,-10} ", keyValue, value.ToString()));
                 }
 
@@ -43,6 +39,23 @@ namespace KScript
             var str = value.ToString();
             value.ToString().ToCharArray().ToList().ForEach(item => str = str.Replace(item, ' '));
             return str;
+        }
+
+
+        public string FindUsingValue(Func<XValue, bool> value)
+        {
+            foreach (var item in @initiatedObject)
+            {
+                foreach (var child in item.Value)
+                {
+                    if (value.Invoke(child))
+                    {
+                        return item.Key.ToString();
+                    }
+                }
+            }
+
+            return Global.Values.NULL;
         }
 
         private List<TKey> Keys()
