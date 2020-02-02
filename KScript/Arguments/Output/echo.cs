@@ -71,7 +71,12 @@ namespace KScript.Arguments
             }
 
             Out(_text);
-            Out(string.Empty, () => !string.IsNullOrEmpty(trail_newline) && KScriptBoolHandler.Convert(trail_newline));
+
+            Out(string.Empty, () =>
+            {
+                return !string.IsNullOrEmpty(trail_newline) && KScriptBoolHandler.Convert(trail_newline);
+            });
+
             return true;
         }
 

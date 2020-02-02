@@ -262,6 +262,7 @@
     <Compile Include="Helpers\HashDictionary.cs" />
     <Compile Include="Commands\defstate.cs" />
     <Compile Include="Commands\datetime.cs" />
+    <Compile Include="Commands\to_date.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
