@@ -26,7 +26,20 @@ namespace KScript.Arguments
                 {
                     log.Insert(value, DateTime.Now);
                 });
+                OnValueChanged(null);
             }
+        }
+
+        public event EventHandler ValueChanged;
+        protected virtual bool OnValueChanged(EventArgs e)
+        {
+            EventHandler handler = ValueChanged;
+            if (handler != null)
+            {
+                handler(this, e);
+            }
+
+            return true;
         }
 
         public def(string Contents) => this.Contents = Contents;

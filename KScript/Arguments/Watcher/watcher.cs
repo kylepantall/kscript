@@ -30,8 +30,35 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            //GetWatches().ForEach(watch => watch.BeginWatch());
+
+            foreach (var watch in GetWatches())
+            {
+                foreach (var rule in GetRules())
+                {
+                    def _def = Def(watch.@for);
+
+                    if (_def == null)
+                    {
+                        return false;
+                    }
+
+                    if (_def.ValueChanged -= ();)
+                    {
+                        return false;
+                    }
+
+                    
+                }
+            }
+
+            // GetWatches().ForEach(i => Out(i.@for));
             return true;
+        }
+
+
+        public void RunRule(EventArgs e)
+        {
+
         }
 
         public override string UsageInformation() => @"Used to watch a variable for provided rulesets. For example, when a variable's becomes empty and respond dynamically.";

@@ -142,6 +142,8 @@ namespace KScript
             return ParentContainer.GetDefs()[_id];
         }
 
+        public IDictionary<string, def> GetDefs() => ParentContainer.GetDefs();
+
         /// <summary>
         /// Used to return a property using the property name.
         /// </summary>

@@ -26,26 +26,30 @@
     <echo>@defstate('name', $datetime)</echo> -->
 
     <echo>@datetime()\n</echo>
-    <def id="date">@to_date(@datetime(), 'D1 H3 S13 Y10 MO13')</def>
+    <def id="date">@to_date(@datetime(), 'D1H3S13Y10MO13')</def>
 
     <echo>$date\n</echo>
 
     <echo>@to_date($date, 'H3')\n</echo>
 
-    <!-- <watcher handle_method="once">
+    <echo>@defstate('date')</echo>
+
+    <watcher handle_method="once">
         <watchers>
-            <watch for="name"/>
-            <watch for="age" />
+            <!-- <watch for="name" /> -->
+            <watch for="date" />
         </watchers>
 
         <rules>
-            <rule condition="@empty($name)">
+            <rule condition="@empty($date)">
                 <echo>You must enter a name</echo>
             </rule>
-    
-            <rule condition="@more_less($name,gt,10)">
+
+            <rule condition="@more_less($date,gt,10)">
                 <echo>Name can't be more than 10</echo>
             </rule>
         </rules>
-    </watcher> -->
+    </watcher>
+
+    <update to="date">Chloe</update>
 </kscript>
