@@ -16,9 +16,12 @@ namespace KScript
         {
             StringBuilder builder = new StringBuilder();
 
-            builder.AppendLine("---------------------------------------");
+            var longest = Keys().Select(key => key.ToString()).OrderByDescending(key => key.Length).FirstOrDefault().Length;
+            var divide = new string('-', longest);
+
+            builder.AppendLine(divide);
             builder.AppendLine(string.Format(" {0,-10} | {1,-10} ", "Value", "Timestamp"));
-            builder.AppendLine("---------------------------------------");
+            builder.AppendLine(divide);
 
             foreach (var key in Keys())
             {
