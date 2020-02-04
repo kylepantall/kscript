@@ -32,11 +32,21 @@
 
     <echo>@to_date($date, 'H3')\n</echo>
 
+    <update to="date">Chloe</update>
+
+    <update to="date">Simon</update>
+
+    <update to="date">Mark</update>
+
+    <update to="date">@to_date(@datetime(), 'D1H3S13Y10MO13')</update>
+
+    <wait interval="2s"/>
+
     <echo>@defstate('date')</echo>
 
-    <watcher handle_method="once">
+    <!-- <watcher handle_method="once">
         <watchers>
-            <!-- <watch for="name" /> -->
+            <watch for="name" />
             <watch for="date" />
         </watchers>
 
@@ -49,7 +59,6 @@
                 <echo>Name can't be more than 10</echo>
             </rule>
         </rules>
-    </watcher>
+    </watcher> -->
 
-    <update to="date">Chloe</update>
 </kscript>

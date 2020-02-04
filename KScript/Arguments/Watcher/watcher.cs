@@ -31,25 +31,25 @@ namespace KScript.Arguments
         public override bool Run()
         {
 
-            foreach (var watch in GetWatches())
-            {
-                foreach (var rule in GetRules())
-                {
-                    def _def = Def(watch.@for);
+            // foreach (var watch in GetWatches())
+            // {
+            //     foreach (var rule in GetRules())
+            //     {
+            //         def _def = Def(watch.@for);
 
-                    if (_def == null)
-                    {
-                        return false;
-                    }
+            //         if (_def == null)
+            //         {
+            //             return false;
+            //         }
 
-                    if (_def.ValueChanged -= ();)
-                    {
-                        return false;
-                    }
+            //         if (_def.ValueChanged -= ();)
+            //         {
+            //             return false;
+            //         }
 
                     
-                }
-            }
+            //     }
+            // }
 
             // GetWatches().ForEach(i => Out(i.@for));
             return true;
