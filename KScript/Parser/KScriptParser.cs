@@ -160,7 +160,12 @@ namespace KScript
 
         private IParserHandler GetParserHandler(Type type)
         {
-            if (type != null && !type.IsAssignableFrom(typeof(IParserHandler)))
+            if (type == null)
+            {
+                return null;
+            }
+
+            if (typeof(IParserHandler).IsAssignableFrom(type))
             {
                 return (IParserHandler)Activator.CreateInstance(type, KScriptContainer);
             }

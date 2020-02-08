@@ -313,6 +313,7 @@ namespace KScript
                                   where t.IsClass && t.Namespace != null
                                   && t.Namespace.StartsWith(Global.GlobalIdentifiers.PARSER_HANDLERS)
                                   && !t.IsAssignableFrom(typeof(IParserHandler))
+                                  && !t.FullName.Contains("<")
                                   select t;
             q.ToList().ForEach(i => AddKScriptParserHandler(i));
         }
@@ -358,24 +359,22 @@ namespace KScript
         /// <param name="ex"></param>
         internal void HandleException(Exception ex)
         {
-            if (Properties.ThrowAllExceptions)
+            if (!Properties.ThrowAllExceptions)
             {
-                throw ex;
+                GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name)
+                           .ForEach(i => i.Run(this, null, i.GetValue()));
+
+                if (typeof(KScriptException).IsAssignableFrom(ex.GetType()))
+                {
+                    KScriptException kex = (KScriptException)ex;
+
+                    if (!GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name).Any())
+                        Out($"[error ~{kex.GetExceptionType()}: {kex.Message}] : {DateTime.Now.ToShortTimeString()}\n");
+                    return;
+                }
+
+                Out($"[error ~{ex.GetType().Name}:{DateTime.Now.ToShortTimeString()}] {ex.Message}\n");
             }
-
-            GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name)
-                                       .ForEach(i => i.Run(this, null, i.GetValue()));
-
-            if (typeof(KScriptException).IsAssignableFrom(ex.GetType()))
-            {
-                KScriptException kex = (KScriptException)ex;
-
-                if (!GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name).Any())
-                    Out($"[error ~{kex.GetExceptionType()}: {kex.Message}] : {DateTime.Now.ToShortTimeString()}\n");
-                return;
-            }
-
-            Out($"[error ~{ex.GetType().Name}:{DateTime.Now.ToShortTimeString()}] {ex.Message}\n");
         }
 
 

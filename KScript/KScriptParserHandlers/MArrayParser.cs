@@ -1,38 +1,34 @@
-﻿using KScript.Arguments.Array;
+﻿using System.Collections.Generic;
+using KScript.Arguments.Array;
 using KScript.MultiArray;
 using System.Xml;
+using System.Linq;
+using CsQuery.ExtensionMethods;
 
 namespace KScript.KScriptParserHandlers
 {
     public class MArrayParser : IParserHandler
     {
-        public MArrayParser(KScriptContainer container) : base(container) => ArrayCollection = new ArrayCollection();
-
-        private readonly ArrayCollection ArrayCollection;
+        public MArrayParser(KScriptContainer container) : base(container)
+        {
+        }
         public override KScriptObject GenerateKScriptObject(KScriptObject parentObject, XmlNode node)
         {
-            Iterate(node, ArrayCollection);
-            ArrayCollection x = ArrayCollection;
+            ArrayCollection collection = new ArrayCollection();
+            Iterate(node, collection);
+            ParentContainer.GetMultidimensionalArrays().AddArray(node.Attributes["id"].Value, new ArrayBase(collection));
             return parentObject;
         }
 
-        public void Iterate(XmlNode node, ArrayCollection parent)
+        private void Iterate(XmlNode node, ArrayCollection parent)
         {
             if (node.HasChildNodes)
             {
                 ArrayCollection col = new ArrayCollection();
-                parent.Key = node.Name;
-                foreach (XmlNode cnode in node.ChildNodes)
-                {
-                    Iterate(cnode, col);
-                }
-
+                node.ChildNodes.Cast<XmlNode>().ForEach(cnode => Iterate(cnode, col));
                 parent.AddItem(col);
                 return;
             }
-
-            ArrayItem aItem = new ArrayItem(node.Name, node.InnerText);
-            parent.AddItem(aItem);
         }
         public override bool IsAcceptedObject(KScriptObject obj) => obj.GetType().IsAssignableFrom(typeof(marray));
     }

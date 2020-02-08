@@ -7,58 +7,29 @@
 -->
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
-    <!-- <def id="name">James</def>
-    <wait interval="1s" />
-    <update to="name">Chloe</update>
 
-    <def id="datetime">@datetime()</def>
+    <marray id="myArray">
+        <item key="name">Kyle</item>
+        <item key="likes">
+            <item key="something">this</item>
+            <item key="other_thing">1</item>
+        </item>
+    </marray>
 
-    <for to="i" while="@more_less($i,'lt',10)" math="$i->increment()">
-        <update to="name">$i</update>
-    </for>
-
-    <echo>$datetime \n</echo>
-
-    
-
-    <echo>@defstate('name') \n</echo>
-
-    <echo>@defstate('name', $datetime)</echo> -->
-
-    <echo>@datetime()\n</echo>
-    <def id="date">@to_date(@datetime(), 'D1H3S13Y10MO13')</def>
-
-    <echo>$date\n</echo>
-
-    <echo>@to_date($date, 'H3')\n</echo>
-
-    <update to="date">Chloe</update>
-
-    <update to="date">Simon</update>
-
-    <update to="date">Mark</update>
-
-    <update to="date">@to_date(@datetime(), 'D1H3S13Y10MO13')</update>
-
-    <wait interval="2s"/>
-
-    <echo>@defstate('date')</echo>
+    <echo>~myArray[0]</echo>
 
     <!-- <watcher handle_method="once">
         <watchers>
             <watch for="name" />
             <watch for="date" />
         </watchers>
-
         <rules>
             <rule condition="@empty($date)">
                 <echo>You must enter a name</echo>
             </rule>
-
             <rule condition="@more_less($date,gt,10)">
                 <echo>Name can't be more than 10</echo>
             </rule>
         </rules>
     </watcher> -->
-
 </kscript>

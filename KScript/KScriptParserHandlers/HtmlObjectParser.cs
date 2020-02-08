@@ -12,7 +12,7 @@ namespace KScript.KScriptParserHandlers
         /// </summary>
         /// <param name="obj">KScript object created using innerXML</param>
         /// <returns>If the HTMLObjectParser accepts the given KScriptObject</returns>
-        public override bool IsAcceptedObject(KScriptObject obj) => obj.GetType().IsAssignableFrom(typeof(loadHtml)) || obj.GetType().IsAssignableFrom(typeof(updateContent));
+        public override bool IsAcceptedObject(KScriptObject obj) => false; //obj.GetType().IsAssignableFrom(typeof(loadHtml)) || obj.GetType().IsAssignableFrom(typeof(updateContent));
 
 
         /// <summary>
