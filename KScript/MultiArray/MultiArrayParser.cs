@@ -38,23 +38,30 @@ namespace KScript.MultiArray
 
                 string tmp = str;
 
-                if (matches.Count > 0)
+                if (matches.Count < 1)
                 {
-                    foreach (Match match in matches)
-                    {
-                        string uID = Guid.NewGuid().ToString();
-                        tmp = tmp.Replace(match.Groups[0].Value, $"[{{{uID}}}]");
-                        Matched_Items.Add(uID, match);
-                    }
+                    return string.Empty;
+                }
+
+                foreach (Match match in matches)
+                {
+                    string uID = Guid.NewGuid().ToString();
+                    tmp = tmp.Replace(match.Groups[0].Value, $"[{{{uID}}}]");
+                    Matched_Items.Add(uID, match);
                 }
 
                 foreach (KeyValuePair<string, Match> item in Matched_Items)
                 {
                     MatchCollection m = Regex.Matches(item.Value.Groups[0].Value, RetrieveItems);
+
+                    if (m.Count < 1)
+                    {
+                        return string.Empty;
+                    }
+
                     string id = Regex.Match(item.Value.Groups[0].Value, ArrayMatch).Groups[1].Value;
                     ArrayBase current = container.GetMultidimensionalArrays()[id];
                     IArray needle = current.Find(m.Cast<Match>().ToArray());
-
                     tmp = tmp.Replace($"[{{{item.Key}}}]", needle.GetValue());
                 }
                 return tmp;
@@ -74,7 +81,16 @@ namespace KScript.MultiArray
             return tmp;
         }
 
-        // Values => (Size => '1045MB', Files => (0 => 'Users.xml', 1 => 'Admins.xml', 2 => (Archive => 'App.exe')))
+        /* 'Values' => (
+            'Size' => '1045MB', 
+            'Files' => (
+                0 => 'Users.xml', 
+                1 => 'Admins.xml', 
+                2 => (
+                    'Archive' => 'App.exe'
+                )
+            )
+        ) */
         public static void CreateExampleArray(KScriptContainer container)
         {
             ArrayBase values = new ArrayBase(

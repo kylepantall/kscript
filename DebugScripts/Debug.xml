@@ -8,7 +8,7 @@
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
 
-    <marray id="myArray">
+    <marray id="values">
         <item key="name">Kyle</item>
         <item key="likes">
             <item key="something">this</item>
@@ -16,7 +16,12 @@
         </item>
     </marray>
 
-    <echo>~myArray[0]</echo>
+    <echo>@length(~values[1]['other_thing'])</echo>
+
+
+    <!-- <x command="mutliarray_init_example_array" /> -->
+
+    <!-- <echo>~myArray[~'Files']</echo> -->
 
     <!-- <watcher handle_method="once">
         <watchers>

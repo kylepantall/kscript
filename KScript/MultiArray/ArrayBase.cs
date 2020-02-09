@@ -6,7 +6,7 @@ namespace KScript.MultiArray
     public class ArrayBase
     {
         private readonly ArrayCollection Root;
-        public ArrayBase(ArrayCollection Root) => this.Root = Root;
+        public ArrayBase(ArrayCollection Root) => this.Root = Root.IsBase() ? Root.AtIndex(0).GetCollection() : Root;
         public ArrayCollection GetRoot() => Root;
         public IArray Find(Match[] values)
         {

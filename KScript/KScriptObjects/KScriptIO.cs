@@ -160,7 +160,10 @@ namespace KScript.KScriptTypes
 
         public string Format(string val) => ParentContainer.GetStringHandler().Format(val);
 
-        public string ReturnFormattedVariables(string val) => KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, val);
+        public string ReturnFormattedVariables(string val)
+        {
+            return KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, val);
+        }
 
         public string In() => Console.In.ReadLine();
         public string In(string prompt) { Out(prompt); return Console.In.ReadLine(); }

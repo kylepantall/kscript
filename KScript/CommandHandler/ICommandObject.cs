@@ -41,7 +41,7 @@ namespace KScript.CommandHandler
         {
             if (HasChildren)
             {
-                string[] @params = Children.Select(i => i.CalculateValue()).ToArray();
+                string[] @params = Children.Select(i => MultiArray.MultiArrayParser.HandleString(i.CalculateValue(), kScriptContainer)).ToArray();
                 string type_name = Command.ToLower();
                 Type _type = KScriptCommandHandler.GetCommandType(type_name);
                 KScriptCommand cmd = KScriptCommandHandler.GetCommandObject(@params.ToArray(), _type, kScriptContainer, kScriptBaseObject);
@@ -49,7 +49,7 @@ namespace KScript.CommandHandler
             }
             else
             {
-                string[] @params = Children.Select(i => i.CalculateValue()).ToArray();
+                string[] @params = Children.Select(i => MultiArray.MultiArrayParser.HandleString(i.CalculateValue(), kScriptContainer)).ToArray();
                 string type_name = Command.ToLower();
                 Type _type = KScriptCommandHandler.GetCommandType(type_name);
                 KScriptCommand cmd = KScriptCommandHandler.GetCommandObject(_type, kScriptContainer, kScriptBaseObject);

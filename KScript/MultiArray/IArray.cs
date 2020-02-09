@@ -27,7 +27,7 @@
         {
             if (IsCollection())
             {
-                return string.Empty;
+                return $"<MultiArray count=\"{GetCollection().GetItems().Count}\"/>";
             }
 
             return GetArrayItem().Value;
