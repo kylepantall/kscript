@@ -117,7 +117,10 @@ namespace KScript
         /// </summary>
         /// <param name="value">Value to handle commands from.</param>
         /// <returns>String with handled commands</returns>
-        public string HandleCommands(string value) => KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(value), ParentContainer, this);
+        public string HandleCommands(string value)
+        {
+            return KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(value), ParentContainer, this);
+        }
 
         /// <summary>
         /// Method used to handle commands without converting variables so variables are handled by the commands directly.

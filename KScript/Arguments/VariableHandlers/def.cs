@@ -26,7 +26,6 @@ namespace KScript.Arguments
                 {
                     log.Insert(value, DateTime.Now);
                 });
-                OnValueChanged(null);
             }
         }
 

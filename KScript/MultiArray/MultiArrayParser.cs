@@ -40,7 +40,7 @@ namespace KScript.MultiArray
 
                 if (matches.Count < 1)
                 {
-                    return string.Empty;
+                    return str;
                 }
 
                 foreach (Match match in matches)
@@ -56,7 +56,7 @@ namespace KScript.MultiArray
 
                     if (m.Count < 1)
                     {
-                        return string.Empty;
+                        return str;
                     }
 
                     string id = Regex.Match(item.Value.Groups[0].Value, ArrayMatch).Groups[1].Value;
@@ -69,7 +69,7 @@ namespace KScript.MultiArray
             catch (System.Exception ex)
             {
                 container.HandleException(ex);
-                return string.Empty;
+                return str;
             }
         }
 

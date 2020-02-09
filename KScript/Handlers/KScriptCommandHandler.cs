@@ -196,7 +196,7 @@ namespace KScript.Handlers
                 return temp_string;
             }
 
-            return string.Empty;
+            return str;
         }
 
         public static string ReplaceFirst(string text, string search, string replace)

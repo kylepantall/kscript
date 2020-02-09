@@ -16,20 +16,20 @@ namespace KScript
 
         public static string ReturnFormattedVariables(KScriptContainer ParentContainer, string Contents)
         {
-            bool isCommand = KScriptCommandHandler.IsCommand(Contents);
+            // bool isCommand = KScriptCommandHandler.IsCommand(Contents);
 
-            if (isCommand)
-            {
-                return Contents;
-            }
+            // if (isCommand)
+            // {
+            //     return Contents;
+            // }
 
-            string temp_string = string.Format("{0}{1}", TRALING_STRING, Contents);
-
+            string temp_string = Contents;
             ParentContainer.GetDefs().ToList()
                 .ForEach(
                     item => temp_string = CalculateValue(ParentContainer, temp_string, item.Key, item.Value.Contents));
 
-            return MultiArray.MultiArrayParser.HandleString(temp_string, ParentContainer).Substring(TRALING_STRING.Length);
+            var parsedArray = MultiArray.MultiArrayParser.HandleString(temp_string, ParentContainer);
+            return parsedArray;
         }
 
         public static string CalculateValue(KScriptContainer ParentContainer, string contents, string key, string value)

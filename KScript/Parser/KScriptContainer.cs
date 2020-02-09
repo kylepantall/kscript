@@ -303,7 +303,6 @@ namespace KScript
             q.ToList().ForEach(i => AddVariableFunctionType(i));
         }
 
-
         /// <summary>
         /// Method used to load built in KScriptParser Handlers.
         /// </summary>

@@ -7,34 +7,23 @@
 -->
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
-
     <marray id="values">
         <item key="name">Kyle</item>
         <item key="likes">
             <item key="something">this</item>
             <item key="other_thing">1</item>
         </item>
+
+        <item key="websites">http://www.google.com/</item>
     </marray>
 
-    <echo>@length(~values[1]['other_thing'])</echo>
+    <def id="website">~values['websites']</def>
+    <echo>@equals(1,1) $website</echo>
 
 
-    <!-- <x command="mutliarray_init_example_array" /> -->
+    <echo>~values['likes']</echo>
 
-    <!-- <echo>~myArray[~'Files']</echo> -->
-
-    <!-- <watcher handle_method="once">
-        <watchers>
-            <watch for="name" />
-            <watch for="date" />
-        </watchers>
-        <rules>
-            <rule condition="@empty($date)">
-                <echo>You must enter a name</echo>
-            </rule>
-            <rule condition="@more_less($date,gt,10)">
-                <echo>Name can't be more than 10</echo>
-            </rule>
-        </rules>
-    </watcher> -->
+    <echo>@keys(~'values')</echo>
+    
+    <echo>Specifying the ~ symbol when referencing a multiarray item will return the index number</echo>
 </kscript>
