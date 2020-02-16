@@ -9,6 +9,7 @@ namespace KScript.MultiArray
 
         public void AddArray(string key, ArrayBase val) => Arrays.Add(key, val);
 
+        public bool ContainsKey(string key) => Arrays.ContainsKey(key);
 
         public ArrayBase this[string key]
         {

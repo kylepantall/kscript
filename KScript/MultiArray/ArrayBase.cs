@@ -32,5 +32,30 @@ namespace KScript.MultiArray
 
             return current_node;
         }
+
+        public IArray Find(string[] values)
+        {
+            IArray current_node = GetRoot().HasKey() ? new ArrayCollection(
+                                new List<IArray>() {
+                                     GetRoot()
+                                }) : GetRoot();
+
+            foreach (var item in values)
+            {
+                if (current_node == null)
+                {
+                    continue;
+                }
+
+                if (int.TryParse(item, out int index))
+                {
+                    current_node = current_node.Find(index);
+                    continue;
+                }
+                current_node = current_node.Find(item);
+            }
+
+            return current_node;
+        }
     }
 }

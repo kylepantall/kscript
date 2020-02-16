@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Linq;
+using System.Collections.Generic;
 
 namespace KScript.MultiArray
 {
@@ -19,6 +20,17 @@ namespace KScript.MultiArray
             _isBase = true;
             return this;
         }
+
+        public IArray Get()
+        {
+            if (Items.Count > 1)
+            {
+                return this;
+            }
+
+            return Items.First();
+        }
+
         public ArrayCollection UnsetBase()
         {
             _isBase = false;
@@ -38,6 +50,8 @@ namespace KScript.MultiArray
             Items = new List<IArray>();
             _isBase = false;
         }
+
+        public int Count() => GetItems().Count;
         public ArrayCollection(string key) : base() => Key = key;
 
         public ArrayCollection(bool isBase) : base() => SetBase();

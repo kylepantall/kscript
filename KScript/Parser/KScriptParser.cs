@@ -141,7 +141,15 @@ namespace KScript
         private bool HasDefaultConstructor(Type t) => t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null;
 
         public Type GetObjectType(string name, KScriptContainer container) => container.LoadedKScriptObjects.ContainsKey(name) ? container.LoadedKScriptObjects[name] : null;
-        public KScriptObject GetScriptObject(Type type, string param = null) => HasDefaultConstructor(type) ? (KScriptObject)Activator.CreateInstance(type) : (KScriptObject)Activator.CreateInstance(type, param);
+        public KScriptObject GetScriptObject(Type type, string param = null)
+        {
+            if (HasDefaultConstructor(type))
+            {
+                return ((KScriptObject)Activator.CreateInstance(type));
+            }
+
+            return ((KScriptObject)Activator.CreateInstance(type, param));
+        }
         public KScriptObject GetScriptObject(XmlNode node, KScriptContainer container)
         {
             Type _type = GetObjectType(node.Name.ToLower(), container);
@@ -149,10 +157,10 @@ namespace KScript
             {
                 if (!HasDefaultConstructor(_type))
                 {
-                    return GetScriptObject(_type, node.InnerText);
+                    return GetScriptObject(_type, node.InnerText).SetNode(node);
                 }
 
-                return GetScriptObject(_type);
+                return GetScriptObject(_type).SetNode(node);
             }
 
             return null;

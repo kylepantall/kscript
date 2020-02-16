@@ -10,25 +10,27 @@ namespace KScript.Commands
         public acount(string id) => this.id = id;
         public override string Calculate()
         {
-            try
+            if (id.StartsWith("~") && ParentContainer.GetMultidimensionalArrays().ContainsKey(MultiArray.MultiArrayParser.StripKey(id)))
             {
-                List<string> array = KScript().ArrayGet(this, id);
+                var arrayItem = MultiArray.MultiArrayParser.GetArrayItem(id, ParentContainer);
 
-                if (array is null)
+                if (arrayItem is null)
                 {
-                    throw new KScriptArrayNotFound(this);
+                    string arrayKey = MultiArray.MultiArrayParser.StripKey(id);
+                    return ParentContainer.GetMultidimensionalArrays()[arrayKey].GetRoot().Count().ToString();
                 }
-                else
-                {
-                    string count = KScript().ArrayGet(this, id).Count.ToString();
-                    return count;
-                }
+
+                return arrayItem.GetCollection().GetItems().Count.ToString();
             }
-            catch (Exception ex)
+
+            List<string> array = KScript().ArrayGet(this, id);
+
+            if (array is null)
             {
-                HandleException(ex, this);
-                return null;
+                throw new KScriptArrayNotFound(this);
             }
+
+            return array.Count.ToString();
         }
 
         public override void Validate() { }

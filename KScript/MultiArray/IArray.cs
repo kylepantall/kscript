@@ -27,13 +27,13 @@
         {
             if (IsCollection())
             {
-                return $"<MultiArray count=\"{GetCollection().GetItems().Count}\"/>";
+                return null;
             }
 
             return GetArrayItem().Value;
         }
 
-        public bool HasChildren() => IsCollection() ? GetCollection().GetItems().Count > 0 : false;
+        public bool HasChildren() => IsCollection() ? GetCollection().Count() > 0 : false;
 
         public IArray Find(string key)
         {

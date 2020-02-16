@@ -3,16 +3,20 @@
     "tasks": [
         {
             "label": "build",
-            "command": "xbuild",
+            "command": "msbuild",
             "type": "process",
             "problemMatcher": "$msCompile",
             "args": [
                 "/t:Rebuild"
-            ]
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         },
         {
             "label": "build_release",
-            "command": "xbuild",
+            "command": "msbuild",
             "args": [
                 "/p:Configuration=Release"
             ],

@@ -1,4 +1,5 @@
-﻿using KScript.Arguments;
+﻿using System.Xml;
+using KScript.Arguments;
 using KScript.Handlers;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
@@ -37,6 +38,14 @@ namespace KScript
         /// <returns>If the tag is attached.</returns>
         protected bool HasTag(string tag) => Tags.Contains(tag);
 
+        public XmlNode GetNode() => this.Node;
+        private XmlNode Node { get; set; }
+
+        public KScriptObject SetNode(XmlNode node)
+        {
+            this.Node = node;
+            return this;
+        }
 
         public enum ValidationTypes
         {
@@ -91,6 +100,12 @@ namespace KScript
             SetBaseScriptObject(this);
             Tags = new List<string>();
         }
+
+        /// <summary>
+        /// Determines if the given contents are empty;
+        /// </summary>  
+        public bool IsEmpty() => string.IsNullOrEmpty(this.Contents) || string.IsNullOrWhiteSpace(this.Contents);
+        public bool IsEmpty(string val) => string.IsNullOrEmpty(val) || string.IsNullOrWhiteSpace(val);
 
         /// <summary>
         /// The content of the KScript object as a string.
