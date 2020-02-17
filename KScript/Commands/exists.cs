@@ -6,7 +6,7 @@ namespace KScript.Commands
     {
         private readonly string id;
         public exists(string id) => this.id = id;
-        public override string Calculate() => ToBoolString(ParentContainer.GetDefs().Any(i => i.Key == id));
+        public override string Calculate() => ToBoolString(KScript().GetDefs().Any(i => i.Key == id));
 
         public override void Validate() { }
     }

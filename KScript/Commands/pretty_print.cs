@@ -1,4 +1,7 @@
-﻿using KScript.MultiArray;
+﻿using System.Linq;
+using System;
+using System.CodeDom.Compiler;
+using KScript.MultiArray;
 using System.Collections.Generic;
 
 namespace KScript.Commands
@@ -14,37 +17,61 @@ namespace KScript.Commands
 
         public override string Calculate()
         {
-            //ArrayBase container = ParentContainer.GetMultidimensionalArrays()[array_id];
+            int indent = 0;
 
-            //if (container != null)
-            //{
+            System.IO.StringWriter baseTextWriter = new System.IO.StringWriter();
+            IndentedTextWriter builder = new IndentedTextWriter(baseTextWriter);
+            string strippedKey = MultiArray.MultiArrayParser.StripKey(array_id);
+            IArray arrayItem = MultiArray.MultiArrayParser.GetArrayItem(array_id, KScript());
 
-            //    ArrayCollection root = container.GetRoot();
-            //    IArray prev = container.GetRoot();
-            //    IndentedTextWriter builder = new IndentedTextWriter(Console.Out);
-            //    int indent = 0;
+            if (arrayItem is null)
+            {
+                Iterate(KScript().GetMultidimensionalArrays()[strippedKey].GetRoot(), 0, builder, indent, true);
+                return baseTextWriter.ToString();
+            }
 
-            //    if (root != null)
-            //    {
-            //        if (root.HasChildren())
-            //        {
-            //            Iterate(root.GetItems(), out indent);
-            //        }
-            //        else
-            //        {
-            //            //Do nothing
-            //        }
-            //    }
-
-            //}
-
-            return "[INFO] In Development.";
+            Iterate(arrayItem, 0, builder, indent, true);
+            return baseTextWriter.ToString();
         }
 
-        public IArray Iterate(List<IArray> current, out int indent)
+        private string GetKey(string key, int index)
         {
-            indent = 1;
-            return null;
+            if (IsEmpty(key))
+            {
+                return $"{index}";
+            }
+
+            return $"\"{key}\"";
+        }
+
+        public void Iterate(IArray item, int index, IndentedTextWriter writer, int indentation = 0, bool LastItem = false)
+        {
+            writer.Indent = indentation;
+            if (item.HasChildren())
+            {
+                writer.WriteLine($"[{GetKey(item.Key, index)}] => {{");
+                indentation++;
+
+                var collection = item.GetCollection().GetItems();
+                var lastItem = collection.Last();
+
+                foreach (var child in collection)
+                {
+                    bool lastChild = lastItem.Equals(child);
+                    Iterate(child,
+                            collection.IndexOf(child),
+                            writer,
+                            indentation,
+                            lastChild);
+                }
+
+                indentation--;
+                writer.Indent = indentation;
+                writer.WriteLine($"}}{(LastItem ? "" : ",")}");
+                return;
+            }
+
+            writer.WriteLine($"[{GetKey(item.Key, index)}] => \"{item.GetValue()}\"{(LastItem ? "" : ",")}");
         }
 
         public override void Validate()

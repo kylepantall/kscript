@@ -8,37 +8,23 @@
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
 
-    <!-- <calias command="more_less" alias="ml" interject="~arg[0], ~arg[1],~arg[2]" /> -->
+    <file_info to="fileInfo" path="/home/kylepantall/file.txt" />
+    <echo>@pretty_print(~fileInfo)</echo>
 
-    <marray id="users">
-        <item>
-            <item key="name">Kyle Pantall</item>
-            <item key="password">M19asd3Omxh5982pai</item>
-            <item key="phone">+44 1234567</item>
-        </item>
-        <item>
-            <item key="name">Bob Rob</item>
-            <item key="password">tg935jwefk09wajf</item>
-            <item key="phone">+44 28458394</item>
-        </item>
-        <item>
-            <item key="name">Alan Fetchers</item>
-            <item key="password">asdorkfdiosjfoskrd</item>
-            <item key="phone">+44 393848584</item>
-        </item>
-    </marray>
 
+    <echo>File extension is: ~fileInfo['Extension']</echo>
+    <!-- 
     <for to="i" while="@more_less($i,'lt',@acount(~users))" math="$i->increment()">
 
         <minsert at="~users[$i]">
-            <item key="unique_details">
-                <item key="uid">@random(0,100000000000000)</item>
-                <item key="name_length">@length(~users[$i]['name'])</item>
-            </item>
+            <item key="uid">@random(0,100000)</item>
         </minsert>
 
-        <echo>~users[$i]['unique_details']['name_length']</echo>
+        <echo>~users[$i]['unique_details']['name_length']\n\n\n\n\n</echo>
     </for>
+
+    <echo>@pretty_print(~users[2],yes)</echo> -->
+
 
     <!-- 
     <echo>~values['likes']['something']%['other_thing] </echo>
@@ -48,6 +34,4 @@
     <echo>I want to put $this next to:$this affecting parsing.</echo>
     <echo>Use space reducers:</echo>
     <echo>I want to put $this_next to:_$this</echo> -->
-
-
 </kscript>

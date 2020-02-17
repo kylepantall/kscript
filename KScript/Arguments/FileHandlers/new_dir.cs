@@ -17,7 +17,7 @@ namespace KScript.Arguments.FileHandlers
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("path", false));
             validator.Validate(this);
         }

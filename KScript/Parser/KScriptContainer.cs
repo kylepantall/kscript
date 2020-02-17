@@ -372,7 +372,9 @@ namespace KScript
                     return;
                 }
 
-                Out($"[error ~{ex.GetType().Name}:{DateTime.Now.ToShortTimeString()}] {ex.Message}\n");
+                Out($"[error ~{ex.GetType().Name}@{DateTime.Now.ToShortTimeString()}] {ex.Message}\n");
+
+                return;
             }
         }
 

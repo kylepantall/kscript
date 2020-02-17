@@ -10,14 +10,14 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            KScriptObject obj = ParentContainer.GetObjectStorageContainer().GetObjectFromUID<KScriptObject>(id);
+            KScriptObject obj = KScript().GetObjectStorageContainer().GetObjectFromUID<KScriptObject>(id);
             obj.Contents = HandleCommands(Contents);
             return true;
         }
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("id", false));
             validator.Validate(this);
         }

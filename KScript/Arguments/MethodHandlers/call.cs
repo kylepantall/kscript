@@ -26,7 +26,7 @@ namespace KScript.Arguments
                 string[] _params = args.Split(',').Select(i => HandleCommands(i)).ToArray();
 
                 List<string> keys = new List<string>();
-                foreach (KeyValuePair<string, def> item in ParentContainer.GetDefs())
+                foreach (KeyValuePair<string, def> item in KScript().GetDefs())
                 {
                     if (item.Key.StartsWith(_method) && item.Key.Contains("."))
                     {
@@ -36,11 +36,11 @@ namespace KScript.Arguments
 
                 for (int i = 0; i < _params.Length; i++)
                 {
-                    ParentContainer.GetDefs()[keys[i]].Contents = _params[i];
+                    KScript().GetDefs()[keys[i]].Contents = _params[i];
                 }
             }
 
-            List<IKScriptDocumentNode> nodes = ParentContainer.GetObjectStorageContainer().GetMethodCalls(_method);
+            List<IKScriptDocumentNode> nodes = KScript().GetObjectStorageContainer().GetMethodCalls(_method);
 
             if (type == "thread")
             {
@@ -48,12 +48,12 @@ namespace KScript.Arguments
                 {
                     Thread.CurrentThread.IsBackground = true;
                     /* run your code here */
-                    nodes.ForEach(node => node.Run(ParentContainer, args, this));
+                    nodes.ForEach(node => node.Run(KScript(), args, this));
                 }).Start();
             }
             else
             {
-                nodes.ForEach(node => node.Run(ParentContainer, args, this));
+                nodes.ForEach(node => node.Run(KScript(), args, this));
             }
 
             return true;
@@ -63,7 +63,7 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("args", true));
             validator.AddValidator(new KScriptValidationObject("method", false));
             validator.Validate(this);

@@ -37,8 +37,8 @@ namespace KScript.Arguments
         {
             string URL = url, DEST = destination;
 
-            URL = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, url);
-            DEST = KScriptVariableHandler.ReturnFormattedVariables(ParentContainer, destination);
+            URL = KScriptVariableHandler.ReturnFormattedVariables(KScript(), url);
+            DEST = KScriptVariableHandler.ReturnFormattedVariables(KScript(), destination);
 
             System.Net.WebClient client = new System.Net.WebClient();
             client.DownloadProgressChanged += Client_DownloadProgressChanged;
@@ -53,7 +53,7 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("destination", false));
             validator.AddValidator(new KScriptValidationObject("url", false, KScriptValidator.ExpectedInput.URL));
             validator.Validate(this);

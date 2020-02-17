@@ -12,6 +12,6 @@
         /// <summary>
         /// Used to register the current object into the ObjectStorage Container.
         /// </summary>
-        public void RegisterObject() => ParentContainer.GetObjectStorageContainer().AddObjectFromUID(id, this);
+        public void RegisterObject() => KScript().GetObjectStorageContainer().AddObjectFromUID(id, this);
     }
 }

@@ -10,7 +10,7 @@
                 foreach (string item in _params)
                 {
                     string variable_name = string.Format("{0}.{1}", name, item);
-                    ParentContainer.AddDef(variable_name, new def(""));
+                    KScript().AddDef(variable_name, new def(""));
                 }
             }
             return true;

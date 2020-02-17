@@ -28,13 +28,13 @@ namespace KScript.VariableFunctions
         /// Used to retrieve the variable using the function.
         /// </summary>
         /// <returns></returns>
-        public def GetFirstDef() => ParentContainer.GetDef(First_VariableID);
+        public def GetFirstDef() => KScript().GetDef(First_VariableID);
 
         /// <summary>
         /// Used to retrieve the second variable using the function.
         /// </summary>
         /// <returns></returns>
-        public def GetSecondDef() => ParentContainer.GetDef(Second_VariableID);
+        public def GetSecondDef() => KScript().GetDef(Second_VariableID);
 
         /// <summary>
         /// Evaluate the result based on the input of the given variable [value].

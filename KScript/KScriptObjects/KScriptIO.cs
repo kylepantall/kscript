@@ -41,7 +41,7 @@ namespace KScript.KScriptTypes
         /// ParentContainer property used to store the KScriptContainer
         /// </summary>
 
-        internal KScriptContainer ParentContainer { get; private set; }
+        private KScriptContainer ParentContainer { get; set; }
 
 
         internal void HandleException(Exception ex, KScriptObject obj = null)

@@ -19,10 +19,10 @@ namespace KScript.Commands
         {
             if (IsEmpty(this.timestamp))
             {
-                return ParentContainer.GetDef(this.id).StateLog.ToString();
+                return KScript().GetDef(this.id).StateLog.ToString();
             }
 
-            return ParentContainer.GetDef(this.id).StateLog.FindUsingValue((date) =>
+            return KScript().GetDef(this.id).StateLog.FindUsingValue((date) =>
             {
                 return date.ToString("dd/MM/yyyy hh:mm:ss") == DateTime.Parse(timestamp).ToString("dd/MM/yyyy hh:mm:ss");
             });

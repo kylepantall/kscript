@@ -14,7 +14,7 @@ namespace KScript
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("to", false));
             validator.AddValidator(new KScriptValidationObject("from", false, KScriptValidator.ExpectedInput.ArrayID));
             validator.Validate(this);

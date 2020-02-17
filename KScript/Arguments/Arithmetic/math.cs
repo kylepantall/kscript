@@ -22,7 +22,7 @@ namespace KScript.Arguments.Arithmetic
                 Def(to).Contents = result;
             }
 
-            ParentContainer.AddGlobalValue("math", "previous_result", result);
+            KScript().AddGlobalValue("math", "previous_result", result);
 
             return true;
         }
@@ -35,7 +35,7 @@ namespace KScript.Arguments.Arithmetic
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("to", true, KScriptValidator.ExpectedInput.DefID));
             //validator.Validate(this);
         }

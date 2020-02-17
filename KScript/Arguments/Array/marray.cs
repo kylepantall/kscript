@@ -15,7 +15,7 @@ namespace KScript.Arguments.Array
         public override string UsageInformation() => @"Used to add a new MultiArray for this script with the given unique name";
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("id", false));
             validator.Validate(this);
         }

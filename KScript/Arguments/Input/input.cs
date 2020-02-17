@@ -71,17 +71,17 @@ namespace KScript.Arguments
             switch (type.ToLower())
             {
                 case "number":
-                    ParentContainer[to].Contents = InNumber().ToString();
+                    KScript()[to].Contents = InNumber().ToString();
                     break;
                 case "multiline":
-                    ParentContainer[to].Contents = In();
+                    KScript()[to].Contents = In();
                     break;
                 default:
-                    ParentContainer[to].Contents = In();
+                    KScript()[to].Contents = In();
                     break;
             }
 
-            if (ParentContainer.Properties.ClearAfterInput || KScriptBoolHandler.Convert(cai))
+            if (KScript().Properties.ClearAfterInput || KScriptBoolHandler.Convert(cai))
                 Console.Clear();
 
             return true;
@@ -89,7 +89,7 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("type", true, Enum.GetNames(typeof(input_types))));
             validator.Validate(this);
         }

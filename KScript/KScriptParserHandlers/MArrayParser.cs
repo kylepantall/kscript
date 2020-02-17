@@ -15,7 +15,7 @@ namespace KScript.KScriptParserHandlers
         {
             var collection = MultiArrayParser.ParseNode(node);
 
-            ParentContainer.GetMultidimensionalArrays().AddArray(
+            KScript().GetMultidimensionalArrays().AddArray(
                 node.Attributes["id"].Value,
                 new ArrayBase(collection)
             );

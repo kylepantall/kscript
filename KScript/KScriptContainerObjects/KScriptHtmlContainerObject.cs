@@ -67,9 +67,9 @@ namespace KScript.KScriptContainerObjects
 
         public void HandleContext(HttpListenerContext context)
         {
-            ParentContainer.ClearGlobalValues(id);
+            KScript().ClearGlobalValues(id);
 
-            ParentContainer.AddGlobalValue(id, "formmode", context.Request.HttpMethod);
+            KScript().AddGlobalValue(id, "formmode", context.Request.HttpMethod);
 
             if (context.Request.HttpMethod == "POST")
             {
@@ -84,7 +84,7 @@ namespace KScript.KScriptContainerObjects
                     using (System.IO.StreamReader reader = new System.IO.StreamReader(body, request.ContentEncoding))
                     {
                         Dictionary<string, string> obtained_values = FormDataHandler.GetFormData(reader.ReadToEnd());
-                        obtained_values.ToList().ForEach(i => ParentContainer.AddGlobalValue(id, i.Key, WebUtility.UrlDecode(i.Value)));
+                        obtained_values.ToList().ForEach(i => KScript().AddGlobalValue(id, i.Key, WebUtility.UrlDecode(i.Value)));
                     }
                 }
             }
@@ -95,17 +95,17 @@ namespace KScript.KScriptContainerObjects
             foreach (string key in req.QueryString.AllKeys)
             {
                 string value = req.QueryString.Get(key);
-                if (ParentContainer.GetGlobalValues(id).ContainsKey(key))
+                if (KScript().GetGlobalValues(id).ContainsKey(key))
                 {
-                    ParentContainer.GetGlobalValues(id).Remove(key);
+                    KScript().GetGlobalValues(id).Remove(key);
                 }
-                ParentContainer.GetGlobalValues(id).Add(key, value);
+                KScript().GetGlobalValues(id).Add(key, value);
             }
 
             if (req.HttpMethod == "POST")
             {
-                List<IKScriptDocumentNode> items = ParentContainer.GetObjectStorageContainer().GetMethodCalls(method);
-                items.ForEach(i => i.Run(ParentContainer, null, this));
+                List<IKScriptDocumentNode> items = KScript().GetObjectStorageContainer().GetMethodCalls(method);
+                items.ForEach(i => i.Run(KScript(), null, this));
             }
 
             return HandleCommands(Contents);
@@ -115,7 +115,7 @@ namespace KScript.KScriptContainerObjects
 
         public override void Validate()
         {
-            //KScriptValidator validator = new KScriptValidator(ParentContainer);
+            //KScriptValidator validator = new KScriptValidator(KScript());
             //validator.AddValidator(new KScriptValidationObject("Contents", false));
             //validator.AddValidator(new KScriptValidationObject("id", false));
             //validator.AddValidator(new KScriptValidationObject("method", false, ParentContainer.GetObjectStorageContainer().GetMethodNames()));

@@ -45,7 +45,7 @@ namespace KScript.KScriptParserHandlers
         public override KScriptObject GenerateKScriptObject(KScriptObject parentObject, XmlNode node)
         {
             var watcher = new watcher();
-            watcher.SetContainer(ParentContainer);
+            watcher.SetContainer(KScript());
 
             var watchers = SelectNodes("//watchers/watch", node);
             var rules = SelectNodes("//rules/rule", node);
@@ -53,7 +53,7 @@ namespace KScript.KScriptParserHandlers
             foreach (XmlNode watch in watchers)
             {
                 watcher.AddWatcher(
-                    new watch(ParentContainer)
+                    new watch(KScript())
                     {
                         @for = watch.Attributes["for"].Value
                     }
@@ -63,7 +63,7 @@ namespace KScript.KScriptParserHandlers
             foreach (XmlNode rule in rules)
             {
                 watcher.AddRule(
-                    new rule(ParentContainer)
+                    new rule(KScript())
                     {
                         condition = rule.Attributes["condition"].Value
                     }

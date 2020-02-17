@@ -106,7 +106,7 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("to", false));
             validator.AddValidator(new KScriptValidationObject("type", false, Enum.GetNames(typeof(type_options))));
             validator.AddValidator(new KScriptValidationObject("persist", false, KScriptValidator.ExpectedInput.Bool));

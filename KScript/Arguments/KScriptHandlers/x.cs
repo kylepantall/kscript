@@ -9,7 +9,7 @@
             switch (command.ToLower())
             {
                 case "mutliarray_init_example_array":
-                    MultiArray.MultiArrayParser.CreateExampleArray(ParentContainer);
+                    MultiArray.MultiArrayParser.CreateExampleArray(KScript());
                     break;
             }
             return true;

@@ -28,7 +28,7 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("from", false, KScriptValidator.ExpectedInput.DefID));
             validator.Validate(this);
         }

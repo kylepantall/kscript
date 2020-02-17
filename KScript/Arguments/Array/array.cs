@@ -30,7 +30,7 @@ namespace KScript.Arguments
             {
                 string val = HandleCommands(from);
 
-                if (!ParentContainer.ArraysGet().ContainsKey(val))
+                if (!KScript().ArraysGet().ContainsKey(val))
                 {
                     throw new KScriptArrayNotFound(this,
                         string.Format("The array '{0}' was not found.", val));

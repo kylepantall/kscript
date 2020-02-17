@@ -8,11 +8,11 @@ namespace KScript.Commands
 
         public constant(string id) => this.id = id;
 
-        public override string Calculate() => ParentContainer.GetConstantProperties()[id];
+        public override string Calculate() => KScript().GetConstantProperties()[id];
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("id", false));
             validator.Validate(this);
         }

@@ -11,7 +11,7 @@
             this.valueid = valueid;
         }
 
-        public override string Calculate() => ParentContainer.GetGlobalValue(id, valueid);
+        public override string Calculate() => KScript().GetGlobalValue(id, valueid);
 
         public override void Validate() { }
     }

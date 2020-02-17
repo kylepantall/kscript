@@ -26,7 +26,7 @@ namespace KScript.Commands
         public override string Calculate()
         {
             string val = value;
-            val = KScriptCommandHandler.HandleCommands(val, ParentContainer, this, true);
+            val = KScriptCommandHandler.HandleCommands(val, KScript(), this, true);
             return ReturnFormattedVariables(val);
         }
 

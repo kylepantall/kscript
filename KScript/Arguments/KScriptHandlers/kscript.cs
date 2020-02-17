@@ -27,18 +27,18 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            ParentContainer.Properties.Quiet = ToBool(quiet);
-            ParentContainer.Properties.WaitOnFinish = ToBool(on_finish_wait);
-            ParentContainer.Properties.DynamicDefs = ToBool(dynamic_defs);
-            ParentContainer.Properties.ThrowAllExceptions = ToBool(throw_exceptions);
+            KScript().Properties.Quiet = ToBool(quiet);
+            KScript().Properties.WaitOnFinish = ToBool(on_finish_wait);
+            KScript().Properties.DynamicDefs = ToBool(dynamic_defs);
+            KScript().Properties.ThrowAllExceptions = ToBool(throw_exceptions);
 
-            if (string.IsNullOrWhiteSpace(ParentContainer.Properties.Language))
+            if (string.IsNullOrWhiteSpace(KScript().Properties.Language))
             {
-                ParentContainer.Properties.Language = (language == "auto" ? CultureInfo.CurrentCulture.Name : language);
+                KScript().Properties.Language = (language == "auto" ? CultureInfo.CurrentCulture.Name : language);
             }
 
-            if (ParentContainer.Properties.PrintInfo || ToBool(print_info))
-                ParentContainer.PrintInfo();
+            if (KScript().Properties.PrintInfo || ToBool(print_info))
+                KScript().PrintInfo();
 
             return true;
         }

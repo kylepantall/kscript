@@ -10,12 +10,12 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            if (ParentContainer.GetDefs().ContainsKey(id))
+            if (KScript().GetDefs().ContainsKey(id))
             {
-                ParentContainer.RemoveDef(id);
+                KScript().RemoveDef(id);
             }
 
-            ParentContainer.AddDef(id, new def(Contents) { id = id });
+            KScript().AddDef(id, new def(Contents) { id = id });
             return true;
         }
 
@@ -26,7 +26,7 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("id", false));
             validator.Validate(this);
         }

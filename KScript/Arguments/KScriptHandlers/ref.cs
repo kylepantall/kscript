@@ -30,13 +30,13 @@ namespace KScript.Arguments
                 {
                     if (string.IsNullOrEmpty(@namespace))
                     {
-                        ParentContainer.AddKScriptObjectType(t);
+                        KScript().AddKScriptObjectType(t);
                         continue;
                     }
 
                     if (t.Namespace.ToLower() == @namespace.ToLower())
                     {
-                        ParentContainer.AddKScriptObjectType(t);
+                        KScript().AddKScriptObjectType(t);
                     }
                 }
             }

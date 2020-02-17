@@ -11,7 +11,7 @@ namespace KScript.Commands
 
         public override string Calculate()
         {
-            IEnumerable<string> tmp = conditions.ToArray().Select(i => KScriptCommandHandler.HandleCommands(i, ParentContainer, GetBaseObject()));
+            IEnumerable<string> tmp = conditions.ToArray().Select(i => KScriptCommandHandler.HandleCommands(i, KScript(), GetBaseObject()));
 
             if (tmp.All(i => KScriptBoolHandler.IsBool(i)))
             {

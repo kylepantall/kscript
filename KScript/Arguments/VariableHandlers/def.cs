@@ -50,13 +50,13 @@ namespace KScript.Arguments
                 throw new KScriptNoRunMethodImplemented(this);
             }
 
-            ParentContainer[id].Contents = HandleCommands(Contents);
+            KScript()[id].Contents = HandleCommands(Contents);
             return true;
         }
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("id", false, Global.GlobalIdentifiers.VARIABLE_NAME_DETECTION));
             validator.Validate(this);
         }

@@ -7,7 +7,7 @@ namespace KScript.Arguments
     {
         public override bool Run()
         {
-            ParentContainer.StopConditionalLoops();
+            KScript().StopConditionalLoops();
             return true;
         }
 

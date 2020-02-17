@@ -134,7 +134,7 @@ namespace KScript
         /// <returns>String with handled commands</returns>
         public string HandleCommands(string value)
         {
-            return KScriptCommandHandler.HandleCommands(ParentContainer.GetStringHandler().Format(value), ParentContainer, this);
+            return KScriptCommandHandler.HandleCommands(KScript().GetStringHandler().Format(value), KScript(), this);
         }
 
         /// <summary>
@@ -142,7 +142,7 @@ namespace KScript
         /// </summary>
         /// <param name="value">String to parse.</param>
         /// <returns>Handled commands from raw input</returns>
-        public string HandleRawCommands(string value) => KScriptCommandHandler.HandleCommands(value, ParentContainer, this);
+        public string HandleRawCommands(string value) => KScriptCommandHandler.HandleCommands(value, KScript(), this);
 
         /// <summary>
         /// Method used to retrieve def objects with specified id.
@@ -157,10 +157,10 @@ namespace KScript
                 _id = id.Substring(1);
             }
 
-            return ParentContainer.GetDefs()[_id];
+            return KScript().GetDefs()[_id];
         }
 
-        public IDictionary<string, def> GetDefs() => ParentContainer.GetDefs();
+        public IDictionary<string, def> GetDefs() => KScript().GetDefs();
 
         /// <summary>
         /// Used to return a property using the property name.

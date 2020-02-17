@@ -36,9 +36,7 @@ namespace KScript.Arguments.FileHandlers
                })
            );
 
-            ParentContainer.AddMultidimensionalArray(array_defined ? to : "this", values);
-
-            MultiArrayParser.CreateExampleArray(ParentContainer);
+            KScript().AddMultidimensionalArray(array_defined ? to : "this", values);
 
             return true;
         }

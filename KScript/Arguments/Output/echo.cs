@@ -81,7 +81,7 @@ namespace KScript.Arguments
 
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("Contents", true));
             validator.AddValidator(new KScriptValidationObject("trim", true, KScriptValidator.ExpectedInput.Bool));
             validator.AddValidator(new KScriptValidationObject("type", true, Enum.GetNames(typeof(Types)).Select(i => i.ToLower()).ToArray()));

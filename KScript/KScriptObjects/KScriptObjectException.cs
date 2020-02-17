@@ -12,13 +12,13 @@ namespace KScript.KScriptObjects
 
         public override bool Run()
         {
-            if (!Ignore && ParentContainer.AllowExecution)
+            if (!Ignore && KScript().AllowExecution)
             {
                 foreach (KScriptObject item in Children)
                 {
                     if (item != null)
                     {
-                        item.Init(ParentContainer);
+                        item.Init(KScript());
                         item.Validate();
                         item.Run();
                     }

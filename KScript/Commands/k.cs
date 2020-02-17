@@ -24,13 +24,13 @@ namespace KScript.Commands
                 {
                     case "os.name": return GetOSFriendlyName();
                     case "machine.name": return System.Environment.MachineName;
-                    case "script.path": return ParentContainer.FilePath;
-                    case "script.directory": return ParentContainer.FileDirectory;
+                    case "script.path": return KScript().FilePath;
+                    case "script.directory": return KScript().FileDirectory;
                     case "username": return System.Environment.UserName;
                     case "math.pi": return Math.PI.ToString();
                     case "math.e": return Math.E.ToString();
                     case Global.Values.NULL: return NULL;
-                    default: return ParentContainer.FileDirectory;
+                    default: return KScript().FileDirectory;
                 }
             }
         }

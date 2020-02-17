@@ -12,10 +12,10 @@ namespace KScript.Arguments.Array
         public minsert(string Contents) => this.Contents = Contents;
         public override bool Run()
         {
-            var array = MultiArray.MultiArrayParser.ParseString(GetNode().InnerXml);
+            var array = MultiArray.MultiArrayParser.ParseString(HandleCommands(GetNode().InnerXml));
             var arrayItem = MultiArray.MultiArrayParser.GetArrayItem(
                             ReturnFormattedVariables(at),
-                            ParentContainer
+                            KScript()
                         );
 
             arrayItem.GetCollection().AddItem(array.Get());
@@ -24,7 +24,7 @@ namespace KScript.Arguments.Array
         public override string UsageInformation() => @"Used to insert into an existing MArray.";
         public override void Validate()
         {
-            KScriptValidator validator = new KScriptValidator(ParentContainer);
+            KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("at", false));
             validator.Validate(this);
         }

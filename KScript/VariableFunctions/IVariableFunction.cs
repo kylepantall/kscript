@@ -21,7 +21,7 @@ namespace KScript
         /// <returns></returns>
         public def GetDef()
         {
-            return ParentContainer.GetDef(Variable_ID);
+            return KScript().GetDef(Variable_ID);
         }
 
         /// <summary>

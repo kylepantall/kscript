@@ -96,11 +96,7 @@ namespace KScript.MultiArray
                 return needle;
 
             }
-            catch (System.Exception ex)
-            {
-                container.HandleException(ex);
-            }
-
+            catch (System.Exception) { }
             return null;
         }
 

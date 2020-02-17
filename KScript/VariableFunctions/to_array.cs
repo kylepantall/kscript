@@ -11,7 +11,7 @@ namespace KScript.VariableFunctions
         {
             try
             {
-                ParentContainer.ArrayInsert(GetDef().id, new System.Collections.Generic.List<string>(KScriptArraySplitHandler.Split(GetDef().Contents, ",")));
+                KScript().ArrayInsert(GetDef().id, new System.Collections.Generic.List<string>(KScriptArraySplitHandler.Split(GetDef().Contents, ",")));
                 return ToBoolString(true);
             }
             catch
