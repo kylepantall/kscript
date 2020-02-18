@@ -36,7 +36,11 @@ namespace KScript.Arguments.FileHandlers
                })
            );
 
-            KScript().AddMultidimensionalArray(array_defined ? to : "this", values);
+            var key = array_defined ? to : "this";
+
+            KScript().GetMultidimensionalArrays()
+                     .RemoveArrayIfExists(key)
+                     .AddArray(key, values);
 
             return true;
         }

@@ -20,18 +20,10 @@
     <def id="number">0</def>
 
     <forever>
-
-        <echo>Hello</echo>
-        <echo>Yay</echo>
-        <delay interval="1s" />
-
-        <update to="number">$number->increment()</update>
-        <echo>$number</echo>
-
-        <if condition="@equals($number,10)">
-            <echo>GOT TO 10</echo>
-            <break />
-        </if>
+        <file_info to="fileInfo" path="/home/kylepantall/file.txt" />
+        <!-- <echo>@pretty_print(~fileInfo)</echo> -->
+        <echo>~fileInfo['LastWriteTime']</echo>
+        <wait interval="2s" />
     </forever>
 
 </kscript>

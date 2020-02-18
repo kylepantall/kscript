@@ -7,7 +7,21 @@ namespace KScript.MultiArray
         private readonly Dictionary<string, ArrayBase> Arrays;
         public KScriptArrayContainer() => Arrays = new Dictionary<string, ArrayBase>();
 
-        public void AddArray(string key, ArrayBase val) => Arrays.Add(key, val);
+        public KScriptArrayContainer AddArray(string key, ArrayBase val)
+        {
+            Arrays.Add(key, val);
+            return this;
+        }
+
+        public KScriptArrayContainer RemoveArrayIfExists(string key)
+        {
+            if (Arrays.ContainsKey(key))
+            {
+                Arrays.Remove(key);
+            }
+
+            return this;
+        }
 
         public bool ContainsKey(string key) => Arrays.ContainsKey(key);
 
