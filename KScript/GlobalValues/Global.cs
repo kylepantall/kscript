@@ -12,6 +12,14 @@
         public const string NULL = "NULL";
     }
 
+    static class Booleans
+    {
+        public const string YES = "yes";
+        public const string NO = "no";
+        public static readonly string[] YES_VALUES = { "yes", "y", "t", "true", "1" };
+        public static readonly string[] NO_VALUES = { "no", "n", "f", "false", "0" };
+    }
+
     static class GlobalIdentifiers
     {
         // Calls are used to identify any block of script defined within a method container

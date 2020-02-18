@@ -15,6 +15,9 @@ namespace KScript
     [ClassInterface(ClassInterfaceType.None)]
     public abstract class KScriptObject : KScriptBaseObject
     {
+        public const string YES = Global.Booleans.YES;
+        public const string NO = Global.Booleans.NO;
+
         private readonly List<string> Tags;
 
         /// <summary>

@@ -22,17 +22,17 @@ namespace KScript.Arguments.FileHandlers
                 throw new KScriptExceptions.KScriptException(this, "File does not exist.");
             }
 
-            System.IO.FileInfo x = new System.IO.FileInfo(HandleCommands(path));
+            var fileInfo = new System.IO.FileInfo(HandleCommands(path));
 
             ArrayBase values = new ArrayBase(
                new ArrayCollection(new List<IArray>() {
-                   new ArrayItem("Directory", x.Directory.FullName),
-                   new ArrayItem("Extension", x.Extension),
-                   new ArrayItem("Size", x.Length.ToString()),
-                   new ArrayItem("Name", x.Name),
-                   new ArrayItem("ReadOnly", ToBoolString(x.IsReadOnly)),
-                   new ArrayItem("LastWriteTime", x.LastWriteTimeUtc.ToString()),
-                   new ArrayItem("LastAccessTime", x.LastAccessTimeUtc.ToString())
+                   new ArrayItem("Directory", fileInfo.Directory.FullName),
+                   new ArrayItem("Extension", fileInfo.Extension),
+                   new ArrayItem("Size", fileInfo.Length.ToString()),
+                   new ArrayItem("Name", fileInfo.Name),
+                   new ArrayItem("ReadOnly", ToBoolString(fileInfo.IsReadOnly)),
+                   new ArrayItem("LastWriteTime", fileInfo.LastWriteTimeUtc.ToString()),
+                   new ArrayItem("LastAccessTime", fileInfo.LastAccessTimeUtc.ToString())
                })
            );
 
@@ -41,7 +41,8 @@ namespace KScript.Arguments.FileHandlers
             return true;
         }
 
-        public override string UsageInformation() => "Used to return the associated information for the given file.";
+        public override string UsageInformation() => $"Used to return the associated information for the given file." +
+        "Stored as an MArray";
 
         public override void Validate()
         {

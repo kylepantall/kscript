@@ -7,31 +7,31 @@
 -->
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
-
-    <file_info to="fileInfo" path="/home/kylepantall/file.txt" />
+    <!-- <file_info to="fileInfo" path="/home/kylepantall/file.txt" />
     <echo>@pretty_print(~fileInfo)</echo>
-
-
     <echo>File extension is: ~fileInfo['Extension']</echo>
-    <!-- 
-    <for to="i" while="@more_less($i,'lt',@acount(~users))" math="$i->increment()">
-
-        <minsert at="~users[$i]">
-            <item key="uid">@random(0,100000)</item>
-        </minsert>
-
-        <echo>~users[$i]['unique_details']['name_length']\n\n\n\n\n</echo>
-    </for>
-
-    <echo>@pretty_print(~users[2],yes)</echo> -->
 
 
-    <!-- 
-    <echo>~values['likes']['something']%['other_thing] </echo>
-    <echo>~values['name']~values['likes']['something']</echo>
+    <marray id="bob">
+        <item>
 
+        </item>
+    </marray> -->
+    <def id="number">0</def>
 
-    <echo>I want to put $this next to:$this affecting parsing.</echo>
-    <echo>Use space reducers:</echo>
-    <echo>I want to put $this_next to:_$this</echo> -->
+    <forever>
+
+        <echo>Hello</echo>
+        <echo>Yay</echo>
+        <delay interval="1s" />
+
+        <update to="number">$number->increment()</update>
+        <echo>$number</echo>
+
+        <if condition="@equals($number,10)">
+            <echo>GOT TO 10</echo>
+            <break />
+        </if>
+    </forever>
+
 </kscript>

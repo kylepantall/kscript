@@ -5,8 +5,7 @@ namespace KScript.Arguments.Array
     class marray : KScriptObject
     {
         [KScriptProperty(
-            @"Used as a unique identifier for this array.
-            Required if not used in conjuction with 'at'",
+            @"Used as a unique identifier for this array.",
             false
         )]
         public string id { get; set; }

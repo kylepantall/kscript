@@ -264,6 +264,9 @@
     <Compile Include="Commands\datetime.cs" />
     <Compile Include="Commands\to_date.cs" />
     <Compile Include="Arguments\Array\minsert.cs" />
+    <Compile Include="Arguments\Conditional\forever.cs" />
+    <Compile Include="KScriptContainerObjects\KScriptUnconditionalLoop.cs" />
+    <Compile Include="KScriptOperatorHandlers\UnconditionalLoopHandler.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
