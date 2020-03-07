@@ -11,19 +11,41 @@
     <echo>@pretty_print(~fileInfo)</echo>
     <echo>File extension is: ~fileInfo['Extension']</echo>
 
-
     <marray id="bob">
         <item>
 
         </item>
     </marray> -->
-    <def id="number">0</def>
+    <!-- <def id="number">0</def> -->
 
-    <forever>
-        <file_info to="fileInfo" path="/home/kylepantall/file.txt" />
-        <!-- <echo>@pretty_print(~fileInfo)</echo> -->
-        <echo>~fileInfo['LastWriteTime']</echo>
-        <wait interval="2s" />
-    </forever>
+    <!-- <forever> -->
 
+    <!-- <echo>~fileInfo['LastWriteTime']</echo>
+        <wait interval="2s" /> -->
+    <!-- </forever> -->
+
+    <file_info to="fileInfo" path="/home/kylepantall/properties.csv" />
+    <echo>@pretty_print(~fileInfo)</echo>
+
+
+    <marray id="myArray">
+        <item key="bob.roberts">
+            <item key="name">Bob Roberts</item>
+            <item key="contactDetails">
+                <item key="email">bob.roberts@domain.com</item>
+                <item key="phone">01234567891</item>
+                <item key="md5_password">kasiwe8urjwe9dsxn</item>
+            </item>
+        </item>
+        <item key="peter.roberts">
+            <item key="name">Bob Roberts</item>
+            <item key="contactDetails">
+                <item key="email">bob.roberts@domain.com</item>
+                <item key="phone">01234567891</item>
+                <item key="md5_password">kasiwe8urjwe9dsxn</item>
+            </item>
+        </item>
+    </marray>
+
+    <echo>@pretty_print(~myArray)</echo>
 </kscript>

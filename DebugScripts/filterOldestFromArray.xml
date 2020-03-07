@@ -1,0 +1,38 @@
+<kscript throw_exceptions="no" dynamic_defs="yes">
+    <marray id="people">
+        <item>
+            <item key="age">28</item>
+            <item key="name">Joseph</item>
+        </item>
+        <item>
+            <item key="age">67</item>
+            <item key="name">Martin</item>
+        </item>
+        <item>
+            <item key="age">12</item>
+            <item key="name">Ellie</item>
+        </item>
+        <item>
+            <item key="age">32</item>
+            <item key="name">Claire</item>
+        </item>
+        <item>
+            <item key="age">42</item>
+            <item key="name">Simon</item>
+        </item>
+        <item>
+            <item key="age">82</item>
+            <item key="name">Joan</item>
+        </item>
+    </marray>
+
+    <def id="maxPerson">0</def>
+    <for to="i" math="$i->increment()" while="@more_less($i,'lt',@acount('~people'))">
+        <if condition="@more_less(~people[$i]['age'],'mt',$max)">
+            <update to="maxPerson">$i</update>
+        </if>
+    </for>
+
+    <echo>$maxPerson['name'] is the oldest at $maxPerson['age'] years old.</echo>
+    <!-- <echo>@pretty_print(~person[$maxPerson]['name'])</echo> -->
+</kscript>

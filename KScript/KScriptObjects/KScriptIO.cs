@@ -48,14 +48,17 @@ namespace KScript.KScriptTypes
         {
             if (ParentContainer != null)
             {
+
+                if (ParentContainer.Properties.ThrowAllExceptions)
+                    throw ex;
+
                 if (obj != null)
                 {
                     ParentContainer.HandleException(obj, ex);
+                    return;
                 }
-                else
-                {
-                    ParentContainer.HandleException(ex);
-                }
+
+                ParentContainer.HandleException(ex);
             }
         }
 

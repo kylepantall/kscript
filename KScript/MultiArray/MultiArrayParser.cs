@@ -75,7 +75,8 @@ namespace KScript.MultiArray
             }
             catch (System.Exception ex)
             {
-                container.HandleException(ex);
+                if (container.Properties.ThrowAllExceptions)
+                    container.HandleException(ex);
                 return str;
             }
         }

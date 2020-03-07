@@ -16,13 +16,19 @@ namespace KScript.Document
         {
             if (container.Properties.ThrowAllExceptions)
             {
-                Nodes().ForEach(item => item.Run(container, null, null));
+                foreach (var item in Nodes())
+                {
+                    item.Run(container, null, null);
+                }
                 return;
             }
 
             try
             {
-                Nodes().ForEach(item => item.Run(container, null, null));
+                foreach (var item in Nodes())
+                {
+                    item.Run(container, null, null);
+                }
             }
             catch (System.Exception ex)
             {

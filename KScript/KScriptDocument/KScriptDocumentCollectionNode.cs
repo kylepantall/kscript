@@ -33,7 +33,13 @@ namespace KScript.Document
                         @continue = GetValue().Run();
                     }
                     catch (KScriptSkipScriptObject) { }
-                    catch (KScriptException ex) { container.HandleException(ex); }
+                    catch (KScriptException ex)
+                    {
+                        if (container.Properties.ThrowAllExceptions)
+                            throw ex;
+                        container.HandleException(ex);
+
+                    }
                 }
 
                 if (@continue)

@@ -10,7 +10,9 @@ namespace KScript.Commands
 
         public readonly string[] Operators = { "mt", "mte", "lt", "lte" };
         public more_less(string firstNumber, string secondNumber) { firstValue = firstNumber; secondValue = secondNumber; }
-        public more_less(string firstComparison, string middleValue, string finalValue) : this(firstComparison, middleValue) => lastValue = finalValue;
+        public more_less(string firstComparison, string middleValue, string finalValue) : this(firstComparison, middleValue) {
+            lastValue = finalValue;
+        }
 
         public override string Calculate()
         {

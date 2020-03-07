@@ -30,37 +30,43 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
+            if (!KScript().GetDefs().ContainsKey(to))
+            {
+                throw new KScriptExceptions.KScriptDefNotFound(this);
+            }
+
             if (_type == types.replace)
             {
-                Def(to).Contents = HandleCommands(Contents);
+                Def(to).Contents = Format(Contents);
+                return true;
             }
-            else if (_type == types.append)
+
+            if (_type == types.append)
             {
                 string tmp = Def(to).Contents;
-                tmp = tmp + HandleCommands(Contents);
+                tmp = tmp + Format(Contents);
                 Def(to).Contents = tmp;
+                return true;
             }
-            else
-            {
-                int number, otherNumber;
 
-                bool isNumber = int.TryParse(Def(to).Contents, out number);
-                bool newContentsIsNumber = int.TryParse(Contents, out otherNumber);
-                if (isNumber && newContentsIsNumber)
-                {
-                    Def(to).Contents = (otherNumber + number).ToString();
-                }
+            int number, otherNumber;
+            bool isNumber = int.TryParse(Def(to).Contents, out number);
+            bool newContentsIsNumber = int.TryParse(Contents, out otherNumber);
+
+            if (isNumber && newContentsIsNumber)
+            {
+                Def(to).Contents = (otherNumber + number).ToString();
             }
+
             return true;
         }
 
-        public override string UsageInformation() => "Used to update the value stored within a def.";
+        public override string UsageInformation() => "Used to update the value of a stored def.";
 
         public override void Validate()
         {
             KScriptValidator validator = new KScriptValidator(KScript());
             validator.AddValidator(new KScriptValidationObject("type", false, Enum.GetNames(typeof(types))));
-            //validator.AddValidator(new KScriptValidationObject("to", false, KScriptValidator.ExpectedInput.DefID));
             validator.Validate(this);
         }
     }
