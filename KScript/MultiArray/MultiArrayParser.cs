@@ -95,10 +95,12 @@ namespace KScript.MultiArray
                 IArray needle = current.Find(m.Cast<Match>().ToArray());
 
                 return needle;
-
             }
-            catch (System.Exception) { }
-            return null;
+            catch (System.Exception ex)
+            {
+                container.HandleException(ex);
+                return null;
+            }
         }
 
 

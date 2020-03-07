@@ -17,21 +17,29 @@ namespace KScript.Commands
 
         public override string Calculate()
         {
-            int indent = 0;
-
-            System.IO.StringWriter baseTextWriter = new System.IO.StringWriter();
-            IndentedTextWriter builder = new IndentedTextWriter(baseTextWriter);
-            string strippedKey = MultiArray.MultiArrayParser.StripKey(array_id);
-            IArray arrayItem = MultiArray.MultiArrayParser.GetArrayItem(array_id, KScript());
-
-            if (arrayItem is null)
+            try
             {
-                Iterate(KScript().GetMultidimensionalArrays()[strippedKey].GetRoot(), 0, builder, indent, true);
+                int indent = 0;
+
+                System.IO.StringWriter baseTextWriter = new System.IO.StringWriter();
+                IndentedTextWriter builder = new IndentedTextWriter(baseTextWriter);
+                string strippedKey = MultiArray.MultiArrayParser.StripKey(array_id);
+                IArray arrayItem = MultiArray.MultiArrayParser.GetArrayItem(array_id, KScript());
+
+                if (arrayItem is null)
+                {
+                    Iterate(KScript().GetMultidimensionalArrays()[strippedKey].GetRoot(), 0, builder, indent, true);
+                    return baseTextWriter.ToString();
+                }
+
+                Iterate(arrayItem, 0, builder, indent, true);
                 return baseTextWriter.ToString();
             }
-
-            Iterate(arrayItem, 0, builder, indent, true);
-            return baseTextWriter.ToString();
+            catch (System.Exception ex)
+            {
+                HandleException(ex);
+                return ex.Message;
+            }
         }
 
         private string GetKey(string key, int index)
