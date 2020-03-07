@@ -89,7 +89,9 @@ namespace KScript.MultiArray
                 Match item = Regex.Match(str, ArrayMatch);
 
                 MatchCollection m = Regex.Matches(item.Groups[0].Value, RetrieveItems);
-                string id = Regex.Match(item.Groups[0].Value, ArrayMatch).Groups[1].Value;
+
+                var find = Regex.Match(item.Groups[0].Value, ArrayMatch).Groups[1].Value;
+                string id = string.IsNullOrWhiteSpace(find) ? MultiArray.MultiArrayParser.StripKey(str) : find;
 
                 ArrayBase current = container.GetMultidimensionalArrays()[id];
                 IArray needle = current.Find(m.Cast<Match>().ToArray());

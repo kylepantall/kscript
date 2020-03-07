@@ -28,7 +28,13 @@ namespace KScript.Commands
 
                 if (arrayItem is null)
                 {
-                    Iterate(KScript().GetMultidimensionalArrays()[strippedKey].GetRoot(), 0, builder, indent, true);
+                    if (!KScript().GetMultidimensionalArrays().ContainsKey(strippedKey))
+                    {
+                         throw new KScriptExceptions.KScriptArrayNotFound(this);
+                    }
+
+                    var arrays = KScript().GetMultidimensionalArrays()[strippedKey].GetRoot();
+                    Iterate(arrays, 0, builder, indent, true);
                     return baseTextWriter.ToString();
                 }
 

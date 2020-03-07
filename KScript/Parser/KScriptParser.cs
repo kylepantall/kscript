@@ -116,17 +116,17 @@ namespace KScript
                 if (!PrepareProperties(obj, item, container))
                     continue;
 
+                IParserHandler parserHandler = GetParserInterface(obj);
+
+                if (parserHandler != null)
+                {
+                    KScriptDocumentNode collection = new KScriptDocumentNode(parserHandler.GenerateKScriptObject(obj, item));
+                    docNode.Nodes.Add(collection);
+                    continue;
+                }
+
                 if (item.HasChildNodes)
                 {
-                    IParserHandler parserHandler = GetParserInterface(obj);
-
-                    if (parserHandler != null)
-                    {
-                        KScriptDocumentNode collection = new KScriptDocumentNode(parserHandler.GenerateKScriptObject(obj, item));
-                        docNode.Nodes.Add(collection);
-                        continue;
-                    }
-
                     KScriptDocumentCollectionNode withoutParserCollection = new KScriptDocumentCollectionNode(obj);
                     Iterate(item, doc, container, withoutParserCollection);
                     docNode.Nodes.Add(withoutParserCollection);

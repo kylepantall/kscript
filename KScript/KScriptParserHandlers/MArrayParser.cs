@@ -13,7 +13,12 @@ namespace KScript.KScriptParserHandlers
         public MArrayParser(KScriptContainer container) : base(container) { }
         public override KScriptObject GenerateKScriptObject(KScriptObject parentObject, XmlNode node)
         {
-            var collection = MultiArrayParser.ParseNode(node);
+            var collection = new ArrayCollection();
+
+            if (!string.IsNullOrEmpty(node.InnerXml))
+            {
+                collection = MultiArrayParser.ParseNode(node);
+            }
 
             KScript().GetMultidimensionalArrays().AddArray(
                 node.Attributes["id"].Value,
