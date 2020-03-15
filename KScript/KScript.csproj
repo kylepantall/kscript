@@ -267,6 +267,9 @@
     <Compile Include="Arguments\Conditional\forever.cs" />
     <Compile Include="KScriptContainerObjects\KScriptUnconditionalLoop.cs" />
     <Compile Include="KScriptOperatorHandlers\UnconditionalLoopHandler.cs" />
+    <Compile Include="Commands\Encoding\to_base64.cs" />
+    <Compile Include="Commands\Encoding\from_base64.cs" />
+    <Compile Include="Commands\tie.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

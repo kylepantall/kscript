@@ -7,84 +7,38 @@
 -->
 
 <kscript dynamic_defs="yes" throw_exceptions="yes" quiet="no" print_info="no">
-    <marray id="data" />
-    <!-- <file_info to="fileInfo" path="/home/kylepantall/file.txt" />
-    <echo>@pretty_print(~fileInfo)</echo>
-    <echo>File extension is: ~fileInfo['Extension']</echo>
+    <!-- <marray id="data" _insertion="" _retrieval="@from_base64()" />
 
-    <marray id="bob">
-        <item>
+    <closure in="">
 
-        </item>
-    </marray> -->
-    <!-- <def id="number">0</def> -->
+    </closure>
 
-    <!-- <forever> -->
+    <callback name="handler" in="input">
+        <return>@to_base64($input)</return>
+    </callback>
 
-    <!-- <echo>~fileInfo['LastWriteTime']</echo>
-        <wait interval="2s" /> -->
-    <!-- </forever> -->
+    <def id="item">@to_base64('HELLO MY NAME IS $value')</def>
+    <echo>$item</echo>
 
-    <!-- <file_info to="fileInfo" path="/home/kylepantall/properties.csv" />
-    <echo>@pretty_print(~fileInfo)</echo>
+    <echo>@from_base64($item)</echo>
+
+    <minsert at="~data">
+        <item>@to_base64('Welcome')</item>
+    </minsert> -->
+
+    <!-- 
+    <for to="i" while="$i->zero()" math="$i->increment()">
+        <echo trail_newline="no">$i</echo>
+    </for> -->
 
 
-    <marray id="myArray">
-        <item key="bob.roberts">
-            <item key="name">Bob Roberts</item>
-            <item key="contactDetails">
-                <item key="email">bob.roberts@domain.com</item>
-                <item key="phone">01234567891</item>
-                <item key="md5_password">kasiwe8urjwe9dsxn</item>
-            </item>
-        </item>
-        <item key="peter.roberts">
-            <item key="name">Bob Roberts</item>
-            <item key="contactDetails">
-                <item key="email">bob.roberts@domain.com</item>
-                <item key="phone">01234567891</item>
-                <item key="md5_password">kasiwe8urjwe9dsxn</item>
-            </item>
-        </item>
-    </marray>
+    <def id="values">@tie('Hello','Maybe','10','20')</def>
 
-    <echo>@pretty_print(~myArray)</echo> -->
-    <!-- <echo>@pretty_print(~data)</echo>
 
-    <marray id="myArray">
-        <item key="bob.roberts">
-            <item key="name">Bob Roberts</item>
-            <item key="contactDetails">
-                <item key="email">bob.roberts@domain.com</item>
-                <item key="phone">01234567891</item>
-                <item key="md5_password">kasiwe8urjwe9dsxn</item>
-            </item>
-        </item>
-        <item key="peter.roberts">
-            <item key="name">Bob Roberts</item>
-            <item key="contactDetails">
-                <item key="email">bob.roberts@domain.com</item>
-                <item key="phone">01234567891</item>
-                <item key="md5_password">kasiwe8urjwe9dsxn</item>
-            </item>
-        </item>
-    </marray>
+    <!-- <echo>$values->1()</echo>
+    <echo>$values->2()</echo>
+    <echo>$values->3()</echo>
+    <echo>$values->4()</echo> -->
 
-    <echo>Got here</echo>
-
-    <echo>@pretty_print(~myArray)</echo>
-
-<echo>@pretty_print(~data)</echo> -->
-
-    <forever>
-        <input to="name">Enter a user: </input>
-
-        <minsert at="~data">
-            <item>$name</item>
-        </minsert>
-
-        <echo>Yay here too</echo>
-
-        <echo>@pretty_print(~data)</echo>
-    </forever>
+    <echo>$values</echo>
 </kscript>

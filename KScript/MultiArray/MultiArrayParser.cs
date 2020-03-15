@@ -106,23 +106,23 @@ namespace KScript.MultiArray
         }
 
 
-        public static ArrayCollection ParseNode(XmlNode node)
+        public static ArrayCollection ParseNode(XmlNode node, KScriptContainer container)
         {
             XElement xElement = XDocument.Parse(node.OuterXml).Root;
             ArrayCollection collection = new ArrayCollection(true);
-            Iterate(xElement, collection);
+            Iterate(xElement, collection, container);
             return collection;
         }
 
-        public static ArrayCollection ParseString(string xml)
+        public static ArrayCollection ParseString(string xml, KScriptContainer container)
         {
             XElement xElement = XDocument.Parse(xml).Root;
             ArrayCollection collection = new ArrayCollection(true);
-            Iterate(xElement, collection);
+            Iterate(xElement, collection, container);
             return collection;
         }
 
-        private static void Iterate(XElement xElement, ArrayCollection parent)
+        private static void Iterate(XElement xElement, ArrayCollection parent, KScriptContainer container)
         {
             XAttribute key = xElement.Attribute(ARRAY_ITEM_KEY);
 
@@ -135,18 +135,24 @@ namespace KScript.MultiArray
                     collection.SetKey(key.Value);
                 }
 
-                xElement.Elements().ForEach(x => Iterate(x, collection));
+                xElement.Elements().ForEach(x => Iterate(x, collection, container));
                 parent.AddItem(collection);
                 return;
             }
 
             if (key != null)
             {
-                parent.AddItem(new ArrayItem(xElement.Attribute(ARRAY_ITEM_KEY).Value, xElement.Value));
+                parent.AddItem(new ArrayItem(
+                    xElement.Attribute(ARRAY_ITEM_KEY).Value,
+                    container.HandleCommand(xElement.Value))
+                );
+
                 return;
             }
 
-            parent.AddItem(new ArrayItem(xElement.Value));
+            parent.AddItem(new ArrayItem(
+                container.HandleCommand(xElement.Value)
+            ));
         }
 
 

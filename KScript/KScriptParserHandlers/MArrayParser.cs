@@ -17,7 +17,7 @@ namespace KScript.KScriptParserHandlers
 
             if (!string.IsNullOrEmpty(node.InnerXml))
             {
-                collection = MultiArrayParser.ParseNode(node);
+                collection = MultiArrayParser.ParseNode(node, KScript());
             }
 
             KScript().GetMultidimensionalArrays().AddArray(

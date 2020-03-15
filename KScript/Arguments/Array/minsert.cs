@@ -12,7 +12,7 @@ namespace KScript.Arguments.Array
         public minsert(string Contents) => this.Contents = Contents;
         public override bool Run()
         {
-            var array = MultiArray.MultiArrayParser.ParseString(HandleCommands(GetNode().InnerXml));
+            var array = MultiArray.MultiArrayParser.ParseString(GetNode().InnerXml, KScript());
             var arrayItem = MultiArray.MultiArrayParser.GetArrayItem(
                             ReturnFormattedVariables(at),
                             KScript()
