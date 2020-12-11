@@ -31,10 +31,8 @@
             {
                 return GetCommandObject().Command;
             }
-            else
-            {
-                return Value;
-            }
+            
+            return Value;
         }
     }
 }
