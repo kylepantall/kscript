@@ -61,7 +61,10 @@ jobs:
       - name: Smoke test
         if: matrix.rid == 'linux-x64' || matrix.rid == 'osx-arm64' || matrix.rid == 'win-x64'
         shell: bash
-        run: ./dist/kscript${{ matrix.ext }} DebugScripts/filterOldestFromArray.xml -s -nowait
+        run: |
+          printf '<kscript>\n  <def id="n">3</def>\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.xml
+          ./dist/kscript${{ matrix.ext }} smoke.xml -s -nowait | tee smoke.out
+          grep -q "kscript ok: 3" smoke.out
 
       - uses: actions/upload-artifact@v4
         with:
