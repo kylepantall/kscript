@@ -38,10 +38,21 @@ dotnet test KScript.sln
 dotnet run --project KScriptApp -- "path/to/script.xml"
 ```
 
-To produce a standalone executable for a platform:
+<h3>Prebuilt binaries (no .NET needed)</h3>
+
+Each release on the [Releases page](https://github.com/kylepantall/kscript/releases) has a single `kscript` file for `linux-x64`, `linux-arm64`, `osx-arm64` (Apple Silicon), `osx-x64` and `win-x64`. It includes the .NET runtime, so nothing else needs installing:
 
 ```sh
-dotnet publish KScriptApp -c Release -r linux-x64   # or win-x64, osx-arm64, ...
+tar -xzf kscript-osx-arm64.tar.gz
+xattr -d com.apple.quarantine kscript   # macOS only: the binary isn't notarized
+./kscript serve "Example Sites/team"
+```
+
+Pushing a `v*` tag builds and publishes them (`.github/workflows/release.yml`). To build one yourself:
+
+```sh
+dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out
 ```
 
 Command line options:
