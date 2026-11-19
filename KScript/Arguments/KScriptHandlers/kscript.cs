@@ -1,9 +1,12 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 using System.Globalization;
 
 namespace KScript.Arguments
 {
     [KScriptObjects.KScriptHideObject]
+    [KScriptDoc("The root element of a script.", Example = "<kscript>\n  <echo>Hello!</echo>\n</kscript>")]
+    [KScriptElement(KScriptContentKind.Statements, Context = KScriptElementContext.Script)]
     public class kscript : KScriptObject
     {
         [KScriptObjects.KScriptProperty("Used to indicate whether the script is quiet - if false, no script timing is reported to the user.", false)]
@@ -21,6 +24,7 @@ namespace KScript.Arguments
         [KScriptObjects.KScriptProperty("Used to indicate the language of the machine", false)]
         public string language { get; set; }
 
+        [KScriptRetired("Strict checking is always on in KScript 2; declare variables with <let>.")]
         public string dynamic_defs { get; set; } = "no";
 
         public string throw_exceptions { get; set; } = "no";

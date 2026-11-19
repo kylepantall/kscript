@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using System;
 using KScript.Handlers;
 using KScript.KScriptExceptions;
@@ -5,6 +6,10 @@ using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptDoc("Asks for a line of input. The element text is the prompt.", Example = "<input to=\"name\">Your name: </input>")]
+    [KScriptElement(KScriptContentKind.Template, HtmlWins = true)]
+    [KScriptAttribute("to", KScriptValueKind.DeclareVariable, "The variable that receives the answer.", Required = true)]
+    [KScriptAttribute("type", KScriptValueKind.Enum, "Convert the answer, asking again on bad input.", Options = "string, int, float, bool, list, map, fn")]
     public class input : KScriptObject
     {
         private input_types _type = input_types.text;

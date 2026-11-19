@@ -37,6 +37,8 @@ namespace KScript
         static void PrintUsage()
         {
             Console.WriteLine("Usage: kscript <script.xml> [options] [script arguments]");
+            Console.WriteLine("       kscript check <file-or-folder>... [--warnaserror]   Check scripts without running them.");
+            Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
             Console.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
             Console.WriteLine("Options: " + string.Join(" ", Commands()));
@@ -95,7 +97,19 @@ namespace KScript
 
         static int Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "lsp")
+            {
+                // stdout carries the protocol, so nothing else may write to it.
+                return KScript.LanguageServer.KScriptLanguageServer.RunStdioAsync().GetAwaiter().GetResult();
+            }
+
             Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+            if (args.Length > 0 && args[0] == "check")
+            {
+                return KScript.LanguageServer.CheckCommand.Run(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)), Console.Out,
+                    warningsAsErrors: args.Contains("--warnaserror"));
+            }
 
             if (args.Length == 0)
             {

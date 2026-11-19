@@ -1,7 +1,9 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("Lower-cases text.")]
     public class to_lower : KScriptCommand
     {
         private readonly string str;

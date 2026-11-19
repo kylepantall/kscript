@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Handlers;
 using System.Collections.Generic;
 using System.IO;
@@ -8,6 +9,7 @@ namespace KScript.Commands
     /// <summary>
     /// Command used to retrieve files from a given directory.
     /// </summary>
+    [KScriptRetired("Use @files(folder), which returns a list of file values.")]
     public class getfiles : KScriptCommand
     {
         private readonly string directory;

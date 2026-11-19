@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptDoc("The first file in a folder whose name matches a regular expression.")]
     public class find_file : KScriptCommand
     {
         public string directory;

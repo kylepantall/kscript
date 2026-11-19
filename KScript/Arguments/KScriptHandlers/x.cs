@@ -1,5 +1,7 @@
-﻿namespace KScript.Arguments.KScriptHandlers
+﻿using KScript.Metadata;
+namespace KScript.Arguments.KScriptHandlers
 {
+    [KScriptRetired("Not part of KScript 2.")]
     public class x : KScriptObject
     {
         public string command { get; set; }

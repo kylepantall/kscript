@@ -1,4 +1,5 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -6,6 +7,10 @@ using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
+    [KScriptDoc("Raises an error.", Example = "<throw type=\"Validation\" message=\"Age must be positive, got {$age}\" />")]
+    [KScriptElement(KScriptContentKind.Empty)]
+    [KScriptAttribute("type", KScriptValueKind.Text, "The error type, checked with $err.type.")]
+    [KScriptAttribute("message", KScriptValueKind.Template, "The message. { } works here.")]
     public class @throw : KScriptObject
     {
         public string type { get; set; }

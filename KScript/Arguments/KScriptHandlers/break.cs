@@ -1,8 +1,11 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
     [KScriptObjects.KScriptNoInnerObjects()]
+    [KScriptDoc("Leaves the innermost loop.")]
+    [KScriptElement(KScriptContentKind.Empty)]
     class @break : KScriptObject
     {
         public override bool Run()

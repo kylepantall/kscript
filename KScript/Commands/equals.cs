@@ -1,8 +1,10 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
     /// <summary>
     /// Compares values 'a' and 'b' to see if values are equal, returns "yes" if equal, else returns "no".
     /// </summary>
+    [KScriptRetired("Use == (loose) or === (strict).")]
     public class equals : KScriptCommand
     {
         private readonly string a = "", b = "";

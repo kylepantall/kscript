@@ -1,9 +1,12 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 using System.IO;
 
 namespace KScript.Arguments
 {
+    [KScriptDoc("Writes its text to a file.", Example = "<write to=\"notes.txt\">Saved at { @now() }</write>")]
+    [KScriptElement(KScriptContentKind.Template)]
     public class write : KScriptObject
     {
         /// <summary>

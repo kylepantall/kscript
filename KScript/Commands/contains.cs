@@ -1,7 +1,9 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("yes if the first text contains the second.", Returns = "bool")]
     public class contains : KScriptCommand
     {
         private readonly string Arg0;

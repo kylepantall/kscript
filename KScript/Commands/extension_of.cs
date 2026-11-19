@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptDoc("The extension of a file name, such as .txt.")]
     public class extension_of : KScriptCommand
     {
         private readonly string value;

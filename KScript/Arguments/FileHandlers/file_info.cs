@@ -1,8 +1,12 @@
-﻿using KScript.MultiArray;
+﻿using KScript.Metadata;
+using KScript.MultiArray;
 using System.Collections.Generic;
 
 namespace KScript.Arguments.FileHandlers
 {
+    [KScriptDoc("Reads information about a file into a variable.")]
+    [KScriptElement(KScriptContentKind.Empty)]
+    [KScriptAttribute("to", KScriptValueKind.DeclareVariable, "The variable that receives the information.")]
     public class file_info : KScriptObject
     {
         [KScriptObjects.KScriptProperty("The file to obtain the information for.", true)]

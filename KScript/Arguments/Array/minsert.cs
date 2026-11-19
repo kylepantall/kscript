@@ -1,7 +1,9 @@
+using KScript.Metadata;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments.Array
 {
+    [KScriptRetired("Use <do>$map->set($key, $value)</do>.")]
     class minsert : KScriptObject
     {
         [KScriptProperty(

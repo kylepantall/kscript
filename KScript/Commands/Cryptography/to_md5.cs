@@ -1,8 +1,10 @@
-﻿using System.Security.Cryptography;
+﻿using KScript.Metadata;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("The MD5 hash of text.")]
     class to_md5 : KScriptCommand
     {
         private readonly string value;

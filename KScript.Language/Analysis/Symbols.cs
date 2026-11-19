@@ -1,0 +1,264 @@
+using KScript.Language.Catalog;
+using KScript.Language.Markup;
+using KScript.Language.Syntax;
+using KScript.Language.Text;
+
+namespace KScript.Language.Analysis
+{
+    public enum SymbolKind
+    {
+        Variable,
+        Constant,
+        LoopVariable,
+        Parameter,
+        Function,
+        Import,
+        BuiltIn,
+        FrontMatter,
+    }
+
+    /// <summary>What the analyzer knows about a value: its type, and for maps and lists of maps, their fields.</summary>
+    public sealed class TypeShape
+    {
+        /// <summary>The shared "could be anything" shape. It is frozen: give a symbol its own shape before adding fields.</summary>
+        public static readonly TypeShape Unknown = new TypeShape(KType.Any, frozen: true);
+
+        public TypeShape(string type) => Type = type;
+
+        private TypeShape(string type, bool frozen)
+        {
+            Type = type;
+            if (frozen)
+            {
+                Fields = new System.Collections.ObjectModel.ReadOnlyDictionary<string, FieldInfo>(new Dictionary<string, FieldInfo>());
+            }
+        }
+
+        public bool IsFrozen => Fields.IsReadOnly;
+
+        public string Type { get; }
+
+        /// <summary>Known fields of a map (from a literal, or of a built-in type such as $request).</summary>
+        public IDictionary<string, FieldInfo> Fields { get; } = new Dictionary<string, FieldInfo>(StringComparer.Ordinal);
+
+        /// <summary>For lists: the shape of the items.</summary>
+        public TypeShape Element
+        {
+            get => element;
+            set => element = IsFrozen ? throw new InvalidOperationException("TypeShape.Unknown is shared and can't be changed.") : value;
+        }
+
+        private TypeShape element;
+
+        public override string ToString() => Type == KType.List && Element != null && Element.Type != KType.Any ? $"list of {Element.Type}s" : Type;
+    }
+
+    public sealed class FieldInfo
+    {
+        public FieldInfo(string name, TypeShape shape, TextSpan? declaration, string description = null)
+        {
+            Name = name;
+            Shape = shape;
+            Declaration = declaration;
+            Description = description;
+        }
+
+        public string Name { get; }
+        public TypeShape Shape { get; }
+
+        /// <summary>Where the key is written in a map literal, if it came from one.</summary>
+        public TextSpan? Declaration { get; }
+
+        public string Description { get; }
+    }
+
+    /// <summary>A declared name: a variable, parameter, function or import.</summary>
+    public sealed class Symbol
+    {
+        public string Name { get; internal set; }
+        public SymbolKind Kind { get; internal set; }
+
+        /// <summary>The span of the name where it is declared (empty for built-ins).</summary>
+        public TextSpan DeclarationSpan { get; internal set; }
+
+        /// <summary>The element that declares it, if any.</summary>
+        public MarkupElement DeclaringElement { get; internal set; }
+
+        public TypeShape Shape { get; internal set; } = TypeShape.Unknown;
+        public string Description { get; internal set; }
+
+        /// <summary>For functions: their parameters, in order, and how many are required.</summary>
+        public List<FunctionParameter> Parameters { get; } = new List<FunctionParameter>();
+
+        public int RequiredParameterCount => Parameters.Count(p => !p.HasDefault);
+
+        /// <summary>For imports: the file they come from (absolute, when the document has a path).</summary>
+        public string SourcePath { get; internal set; }
+
+        public bool IsConst => Kind == SymbolKind.Constant;
+
+        /// <summary>True if the user can rename it (not a built-in or front matter key).</summary>
+        public bool CanRename => Kind != SymbolKind.BuiltIn;
+
+        public string Signature => Kind == SymbolKind.Function
+            ? $"@{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
+            : "$" + Name;
+
+        public override string ToString() => $"{Kind} {Name}";
+    }
+
+    public sealed class FunctionParameter
+    {
+        public string Name { get; internal set; }
+        public string Type { get; internal set; }
+        public string Default { get; internal set; }
+        public bool HasDefault => Default != null;
+        public TextSpan Span { get; internal set; }
+        public string Label => Name + (Type != null ? ": " + Type : string.Empty) + (HasDefault ? " = " + Default : string.Empty);
+    }
+
+    /// <summary>A use of a symbol in the document.</summary>
+    public sealed class SymbolReference
+    {
+        public SymbolReference(Symbol symbol, TextSpan span, bool isDeclaration, bool isWrite)
+        {
+            Symbol = symbol;
+            Span = span;
+            IsDeclaration = isDeclaration;
+            IsWrite = isWrite;
+        }
+
+        public Symbol Symbol { get; }
+
+        /// <summary>The name only (for variables, without the '$'; for commands, without the '@').</summary>
+        public TextSpan Span { get; }
+
+        public bool IsDeclaration { get; }
+        public bool IsWrite { get; }
+    }
+
+    /// <summary>A region of a scope in which some names are visible.</summary>
+    public sealed class Scope
+    {
+        public Scope(Scope parent, TextSpan span)
+        {
+            Parent = parent;
+            Span = span;
+            parent?.Children.Add(this);
+        }
+
+        public Scope Parent { get; }
+        public TextSpan Span { get; }
+        public List<Scope> Children { get; } = new List<Scope>();
+
+        /// <summary>Symbols declared directly in this scope, with the offset from which each is visible.</summary>
+        public List<(Symbol Symbol, int VisibleFrom)> Symbols { get; } = new List<(Symbol, int)>();
+
+        public void Declare(Symbol symbol, int visibleFrom) => Symbols.Add((symbol, visibleFrom));
+
+        public Symbol Lookup(string name, int offset)
+        {
+            for (Scope s = this; s != null; s = s.Parent)
+            {
+                for (int i = s.Symbols.Count - 1; i >= 0; i--)
+                {
+                    (Symbol sym, int from) = s.Symbols[i];
+                    if (sym.Name == name && from <= offset)
+                    {
+                        return sym;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// <summary>Every symbol visible at the offset, innermost first, without shadowed duplicates.</summary>
+        public IEnumerable<Symbol> VisibleAt(int offset)
+        {
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            for (Scope s = this; s != null; s = s.Parent)
+            {
+                for (int i = s.Symbols.Count - 1; i >= 0; i--)
+                {
+                    (Symbol sym, int from) = s.Symbols[i];
+                    if (from <= offset && seen.Add(sym.Kind + ":" + sym.Name))
+                    {
+                        yield return sym;
+                    }
+                }
+            }
+        }
+
+        /// <summary>The innermost scope containing the offset.</summary>
+        public Scope Innermost(int offset)
+        {
+            foreach (Scope child in Children)
+            {
+                if (child.Span.Contains(offset))
+                {
+                    return child.Innermost(offset);
+                }
+            }
+            return this;
+        }
+    }
+
+    public enum RegionKind
+    {
+        Expression,
+        ExpressionList,
+        Statements,
+        Template,
+    }
+
+    /// <summary>
+    /// A piece of the document that holds KScript expressions (an attribute value, element text, a front matter
+    /// value), kept so editor features can work inside it.
+    /// </summary>
+    public sealed class ExpressionRegion
+    {
+        public RegionKind Kind { get; internal set; }
+        public DecodedText Source { get; internal set; }
+
+        /// <summary>For expression, list and statement regions.</summary>
+        public ParseResult Parse { get; internal set; }
+
+        /// <summary>For template regions.</summary>
+        public Template Template { get; internal set; }
+
+        public MarkupElement Element { get; internal set; }
+
+        /// <summary>The attribute, when the region is an attribute value.</summary>
+        public MarkupAttribute Attribute { get; internal set; }
+
+        /// <summary>The scope that names inside the region resolve in.</summary>
+        public Scope Scope { get; internal set; }
+
+        public TextSpan SourceSpan => Source.SourceSpan;
+
+        /// <summary>Local spans (in <see cref="Source"/>) that hold expression code, as opposed to literal text.</summary>
+        public IEnumerable<TextSpan> CodeSpans
+        {
+            get
+            {
+                if (Kind != RegionKind.Template)
+                {
+                    yield return new TextSpan(0, Source.Value.Length);
+                    yield break;
+                }
+                foreach (TemplateSegment segment in Template.Expressions)
+                {
+                    yield return segment.Kind == TemplateSegmentKind.Reference
+                        ? segment.Span
+                        : TextSpan.FromBounds(segment.Span.Start + (segment.Kind == TemplateSegmentKind.RawInterpolation ? 2 : 1),
+                            Math.Max(segment.Span.Start + 1, segment.Span.End - (segment.Span.End <= Source.Value.Length && segment.Span.End > 0 && Source.Value[segment.Span.End - 1] == '}' ? 1 : 0)));
+                }
+            }
+        }
+
+        /// <summary>All top-level expression nodes in the region.</summary>
+        public IEnumerable<ExprNode> Nodes => Kind == RegionKind.Template
+            ? Template.Expressions.Select(s => s.Node).Where(n => n != null)
+            : Parse.Nodes;
+    }
+}

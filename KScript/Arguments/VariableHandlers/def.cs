@@ -1,10 +1,12 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 using System.Collections.Generic;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <let name=\"...\" value=\"...\" /> instead.", Rename = "let")]
     public class def : KScriptObject
     {
         private string contents;

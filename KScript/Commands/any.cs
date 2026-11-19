@@ -1,9 +1,11 @@
+using KScript.Metadata;
 using System.Collections.Generic;
 using System.Linq;
 using KScript.Handlers;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Use the or operator: $a or $b.")]
     public class any : KScriptCommand
     {
         private readonly string[] conditions;

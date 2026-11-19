@@ -1,5 +1,7 @@
+using KScript.Metadata;
 namespace KScript.Commands
 {
+    [KScriptDoc("Encodes text as Base64.")]
     class to_base64 : KScript.KScriptCommand
     {
         public string input { get; set; }

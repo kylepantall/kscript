@@ -1,0 +1,80 @@
+using KScript.LanguageServer;
+
+namespace KScript.Language.Tests
+{
+    public sealed class CheckCommandTests : IDisposable
+    {
+        private readonly string dir = Path.Combine(Path.GetTempPath(), "kscript-check-" + Guid.NewGuid().ToString("N"));
+
+        public CheckCommandTests() => Directory.CreateDirectory(dir);
+
+        public void Dispose() => Directory.Delete(dir, recursive: true);
+
+        private string Write(string name, string text)
+        {
+            string path = Path.Combine(dir, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, text);
+            return path;
+        }
+
+        private static (int Code, string Output) Run(bool warningsAsErrors, params string[] paths)
+        {
+            StringWriter output = new StringWriter();
+            int code = CheckCommand.Run(paths, output, warningsAsErrors);
+            return (code, output.ToString());
+        }
+
+        [Fact]
+        public void CleanFilesPass()
+        {
+            Write("ok.ks.xml", "<kscript><echo>hi</echo></kscript>");
+            (int code, string output) = Run(false, dir);
+            Assert.Equal(0, code);
+            Assert.Contains("1 file checked: 0 errors, 0 warnings.", output);
+        }
+
+        [Fact]
+        public void ErrorsFailWithCompilerStyleLines()
+        {
+            string path = Write("bad.ks.xml", "<kscript>\n  <echo>$nope</echo>\n</kscript>");
+            (int code, string output) = Run(false, path);
+            Assert.Equal(1, code);
+            Assert.Contains($"{path}(2,10): error KS4001: $nope is not defined.", output);
+        }
+
+        [Fact]
+        public void WarningsFailOnlyWhenAskedTo()
+        {
+            Write("warn.ks.xml", "<kscript><echo colour=\"red\">x</echo></kscript>");
+            Assert.Equal(0, Run(false, dir).Code);
+            Assert.Equal(1, Run(true, dir).Code);
+        }
+
+        [Fact]
+        public void FoldersFindScriptsAndSkipOtherXml()
+        {
+            Write("a.ks.xml", "<kscript></kscript>");
+            Write("sub/b.ks", "<kscript></kscript>");
+            Write("legacy.xml", "<kscript></kscript>");
+            Write("config.xml", "<configuration><ehco /></configuration>");
+            (int code, string output) = Run(false, dir);
+            Assert.Equal(0, code);
+            Assert.Contains("3 files checked", output);
+        }
+
+        [Fact]
+        public void MissingPathsAreUsageErrors()
+        {
+            Assert.Equal(2, Run(false, Path.Combine(dir, "missing.ks.xml")).Code);
+            Assert.Equal(2, Run(false).Code);
+        }
+
+        [Fact]
+        public void TheSamplesAreClean()
+        {
+            (int code, string output) = Run(true, Path.Combine(AppContext.BaseDirectory, "samples"));
+            Assert.True(code == 0, output);
+        }
+    }
+}

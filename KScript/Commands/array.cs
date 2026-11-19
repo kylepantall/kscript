@@ -1,7 +1,9 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Index the list directly: $list[1].")]
     public class array : KScriptCommand
     {
         private readonly string id, index;

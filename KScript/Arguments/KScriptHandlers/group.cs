@@ -1,8 +1,10 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <fn> to group related steps.")]
     public class group : KScriptObject
     {
         public new KScriptObject Contents { get; set; }

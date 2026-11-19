@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptRetired("Use ??: $value ?? 'fallback'.")]
     class ifnull : KScriptCommand
     {
         private readonly string Value;

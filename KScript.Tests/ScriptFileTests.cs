@@ -34,14 +34,9 @@ public class ScriptFileTests
     }
 
     [Fact]
-    public void FilterOldestFromArray()
+    public void FindOldestPerson()
     {
-        Assert.Equal("Joan is the oldest at 82 years old.\n", RunFile(RepoFile("DebugScripts", "filterOldestFromArray.xml")));
+        Assert.Equal("Joan is the oldest at 82 years old.\n", RunFile(RepoFile("Example Scripts", "Find Oldest Person.xml")));
     }
 
-    [Fact]
-    public void Debug()
-    {
-        Assert.Contains("<tie>Hello</tie>", RunFile(RepoFile("DebugScripts", "Debug.xml")));
-    }
 }

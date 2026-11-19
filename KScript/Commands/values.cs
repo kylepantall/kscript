@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptRetired("Index the map directly: $map.key or $map['key'].")]
     public class values : KScriptCommand
     {
         private readonly string id;

@@ -1,7 +1,9 @@
-﻿using KScript.KScriptObjects;
+﻿using KScript.Metadata;
+using KScript.KScriptObjects;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Use <let name=\"...\" const=\"yes\">.")]
     public class constant : KScriptCommand
     {
         private readonly string id;

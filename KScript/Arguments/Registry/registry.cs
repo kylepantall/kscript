@@ -1,3 +1,4 @@
+using KScript.Metadata;
 #pragma warning disable CA1416 // Run() checks OperatingSystem.IsWindows() before touching the registry.
 using KScript.KScriptExceptions;
 using Microsoft.Win32;
@@ -7,6 +8,8 @@ using System.Text;
 
 namespace KScript.Arguments
 {
+    [KScriptDoc("Reads or writes the Windows registry.")]
+    [KScriptElement(KScriptContentKind.Template, Context = KScriptElementContext.Script)]
     public class registry : KScriptObject
     {
         public registry(string Contents) => this.Contents = Contents;

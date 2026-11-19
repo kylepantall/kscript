@@ -1,5 +1,7 @@
-﻿namespace KScript.Arguments.Conditional
+﻿using KScript.Metadata;
+namespace KScript.Arguments.Conditional
 {
+    [KScriptRetired("Use <for each=\"i\" in=\"0..10\">.", Rename = "for")]
     class forxy : KScriptObject
     {
         public string to_x { get; set; }

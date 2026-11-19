@@ -1,7 +1,9 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <do>$list->push($item)</do>.")]
     public class ainsert : KScriptObject
     {
         public ainsert(string contents) => Contents = contents;
