@@ -61,7 +61,7 @@ Anything after the script path is available to the script through `@args()`.
 
 | Path | Contents |
 | --- | --- |
-| `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, and the `kscript serve` page engine (`Pages/`). |
+| `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, the `kscript serve` page engine (`Pages/`) and `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`). |
 | `KScriptApp/` | The `KScript` command line app that runs a script file. |
 | `KScript.Tests/` | xUnit test suite. |
 | `DebugScripts/`, `Example Scripts/` | Sample scripts. |
@@ -182,7 +182,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 | `<while test>` | Loop while true (stopped after 100,000 runs). |
 | `<match value>` with `<case is="1, 2">`, `<case when="$it gt 9">`, `<default>` | Pick one branch. |
 | `<layout src="_layout.html" title="…">` and `<slot />` | Wrap the page in a layout; extra attributes become variables. |
-| `<my-card user="{$u}">` | A component: `_components/my-card.html`, with `<slot />` for its children. Components only see their own attributes. |
+| `<my-card user="{$u}">`, `<hero>` | A component: `_components/my-card.html`, with `<slot />` for its children. Any element that isn't an HTML or KScript element can be a component. Components only see their own attributes. |
 | `<include src="_part.html">` | Insert another template here. |
 | `<markdown>` | Render Markdown, with `{ }` values escaped. |
 | `<respond status json type header-x>` / `<redirect to>` | Send a different response, e.g. JSON or a 404. |
@@ -224,6 +224,47 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
 
 See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter.
+
+## Generating files: kscript make
+
+`kscript make` creates components, pages and scripts from templates, so a new file starts out right:
+
+```sh
+kscript make component Hero --props title,sub-title   # _components/hero.html, used as <hero title="…" sub-title="…" />
+kscript make page about --title "About us"            # about.html, wrapped in _layout.html
+kscript make page "people/[id]"                       # people/[id].html, with $id read from the URL
+kscript make markdown blog/first-post                 # blog/first-post.md with front matter
+kscript make layout main --css /site.css              # _layouts/main.html
+kscript make script tidy-downloads                    # tidy-downloads.xml
+kscript make                                          # list every template
+```
+
+`kscript make:component Hero` works too. Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
+
+**Your own templates.** Templates live in the project's `_templates/` folder, which `kscript serve` never serves. `kscript make templates` copies the built-in ones there to edit. A file there replaces the built-in template of the same name (`_templates/component.html`), and any other file adds a type: `_templates/card.html` gives `kscript make card Profile`.
+
+```html
+--- make
+description: A card with an optional image
+to: _components/{{ kebab }}-card.html
+hint: Use it in a page: <{{ kebab }}-card />
+---
+<article class="card {{ variant ?? plain }}">
+{{#if image}}
+  <img src="{$image}" alt="">
+{{/if}}
+{{#each props}}
+  <p>{${{ item | var }}}</p>
+{{/each}}
+  <slot />
+</article>
+```
+
+- The `--- make` header is optional: `to` is where the file goes (default: the name with the template's extension), `hint` is printed afterwards, `description` shows in `kscript make`.
+- `{{ name }}` is the name as typed; `{{ kebab }}`, `{{ snake }}`, `{{ pascal }}`, `{{ camel }}` and `{{ title }}` are its other spellings; `{{ dir }}` is its folder (`blog/` for `blog/first-post`), `{{ path }}` is folder and kebab name, `{{ url }}` its page URL, and `{{ params }}` lists `[id]` segments.
+- `{{ value | kebab }}` applies a filter (`kebab snake pascal camel title var lower upper trim`; `var` turns `sub-title` into the `sub_title` a component sees), and `{{ value ?? fallback }}` gives a default.
+- `{{#if value}} … {{else}} … {{/if}}`, `{{#unless value}}`, and `{{#each value}} … {{ item }} … {{/each}}` over a comma-separated list (`{{ index }}`, `{{ first }}` and `{{ last }}` are set). A block tag on its own line leaves no blank line behind.
+- Single braces are left alone, so KScript's `{$value}` is written as is.
 
 ## Writing portable scripts
 

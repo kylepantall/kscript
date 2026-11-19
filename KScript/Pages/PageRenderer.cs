@@ -395,7 +395,7 @@ namespace KScript.Pages
                 }
             }
 
-            if (el.Name.Contains('-') && TryComponent(el, scope, sb, state)) return;
+            if (PageElementNames.CanBeComponent(el.Name) && TryComponent(el, scope, sb, state)) return;
 
             RenderHtmlElement(el, scope, sb, state);
         }
