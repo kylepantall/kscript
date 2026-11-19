@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 
-[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
 
 namespace KScript.Tests;
 

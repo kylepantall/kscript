@@ -1,4 +1,4 @@
-﻿using KScript.Handlers;
+using KScript.Handlers;
 using KScript.KScriptExceptions;
 
 namespace KScript.Commands
@@ -18,7 +18,8 @@ namespace KScript.Commands
             {
                 string value = KScriptCommandHandler.HandleCommands(maths, KScript(), GetBaseObject());
 
-                while (KScriptCommandHandler.IsCommand(value))
+                // Commands may return further commands; resolve them, but never loop forever.
+                for (int depth = 0; depth < 32 && KScriptCommandHandler.IsCommand(value); depth++)
                 {
                     value = KScriptCommandHandler.HandleCommands(value, KScript(), GetBaseObject());
                 }

@@ -10,7 +10,7 @@
     <Version>1.1.0</Version>
     <Product>KScript</Product>
     <Description>An XML-based scripting language parser and interpreter.</Description>
-    <NoWarn>$(NoWarn);IDE1006</NoWarn>
+    <NoWarn>$(NoWarn);IDE1006;CS8981</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

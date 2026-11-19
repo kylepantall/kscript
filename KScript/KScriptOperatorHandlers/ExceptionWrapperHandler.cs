@@ -10,7 +10,7 @@ namespace KScript.KScriptOperatorHandlers
 
         public override bool CanRun(KScriptObject obj)
         {
-            return typeof(KScriptExceptionWrapper).IsAssignableFrom(obj.GetType());
+            return obj is KScriptExceptionWrapper;
         }
 
         public override void Execute(KScriptObject obj, List<IKScriptDocumentNode> Nodes, KScriptContainer Container)

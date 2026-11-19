@@ -1,4 +1,4 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 
 namespace KScript
 {
@@ -6,7 +6,19 @@ namespace KScript
     {
         public string condition { get; set; } = "";
 
-        public override bool Run() => true;
+        /// <summary>
+        /// Evaluates the condition. Child objects only run when this returns true.
+        /// </summary>
+        public virtual bool EvaluateCondition() => condition != null && ToBool(HandleCommands(condition));
+
+        public override bool Run()
+        {
+            bool result = EvaluateCondition();
+            GetValueStore()["result"] = result;
+            KScript()?.SetLastConditionResult(GetBaseObject(), result);
+            return result;
+        }
+
         public override void Validate() => throw new KScriptNoValidationNeeded(this);
         public override string UsageInformation() => @"Used to store an array of KScriptObjects.";
     }

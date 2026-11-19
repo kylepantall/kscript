@@ -1,4 +1,4 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments
@@ -13,13 +13,17 @@ namespace KScript.Arguments
         [KScriptExample(@"<if checkfor=""0""> ... </if>")]
         public string checkfor { get; set; } = "yes";
 
-        public override bool Run()
+        public override bool EvaluateCondition()
         {
             bool checkFor = checkfor != null ? ToBool(checkfor) : true;
-            string boolValue = HandleCommands(condition);
-            var result = IsBool(boolValue) ? (!checkFor ? !ToBool(boolValue) : ToBool(boolValue)) : false;
-            GetValueStore()["result"] = result;
-            return result;
+            string boolValue = HandleCommands(condition ?? string.Empty);
+
+            if (!IsBool(boolValue))
+            {
+                return false;
+            }
+
+            return checkFor ? ToBool(boolValue) : !ToBool(boolValue);
         }
 
         public override string UsageInformation() => "Used to only run the inner KScriptObjects if the condition is true.";

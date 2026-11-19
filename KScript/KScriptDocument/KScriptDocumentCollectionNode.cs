@@ -36,7 +36,7 @@ namespace KScript.Document
                     catch (KScriptException ex)
                     {
                         if (container.Properties.ThrowAllExceptions)
-                            throw ex;
+                            throw;
                         container.HandleException(ex);
 
                     }

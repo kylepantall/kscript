@@ -26,13 +26,15 @@
         </item>
     </marray>
 
+    <def id="max">0</def>
     <def id="maxPerson">0</def>
-    <for to="i" math="$i->increment()" while="@more_less($i,'lt',@acount('~people'))">
+    <for to="i" math="@math('$i+1')" while="@more_less($i,'lt',@acount('~people'))">
         <if condition="@more_less(~people[$i]['age'],'mt',$max)">
+            <update to="max">~people[$i]['age']</update>
             <update to="maxPerson">$i</update>
         </if>
     </for>
 
-    <echo>$maxPerson['name'] is the oldest at $maxPerson['age'] years old.</echo>
+    <echo>~people[$maxPerson]['name'] is the oldest at $max years old.</echo>
     <!-- <echo>@pretty_print(~person[$maxPerson]['name'])</echo> -->
 </kscript>

@@ -1,4 +1,5 @@
-﻿using KScript.Document;
+using KScript.Handlers;
+using KScript.Document;
 using KScript.KScriptObjects;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,20 +24,21 @@ namespace KScript.Arguments
 
             if (!string.IsNullOrEmpty(args))
             {
-                string[] _params = args.Split(',').Select(i => HandleCommands(i)).ToArray();
+                // Split on top-level commas only, so quoted strings and nested commands may contain commas.
+                string[] _params = KScriptCommandHandler.EvaluateArgumentList(args, KScript(), this);
 
-                List<string> keys = new List<string>();
-                foreach (KeyValuePair<string, def> item in KScript().GetDefs())
+                // Bind arguments to the method's declared parameter names, in declaration order.
+                string[] names = GetDeclaredParameters(_method);
+
+                if (_params.Length > names.Length)
                 {
-                    if (item.Key.StartsWith(_method) && item.Key.Contains("."))
-                    {
-                        keys.Add(item.Key);
-                    }
+                    throw new KScriptExceptions.KScriptException(this,
+                        $"Method '{_method}' accepts {names.Length} argument(s) but {_params.Length} were given.");
                 }
 
                 for (int i = 0; i < _params.Length; i++)
                 {
-                    KScript().GetDefs()[keys[i]].Contents = _params[i];
+                    KScript()[$"{_method}.{names[i]}"] = new def(_params[i]);
                 }
             }
 
@@ -57,6 +59,18 @@ namespace KScript.Arguments
             }
 
             return true;
+        }
+
+        private string[] GetDeclaredParameters(string methodName)
+        {
+            KScriptMethodWrapper wrapper = KScript().GetObjectStorageContainer().GetObject<KScriptMethodWrapper>($"{Global.GlobalIdentifiers.CALLS}:{methodName}");
+
+            if (wrapper == null || string.IsNullOrWhiteSpace(wrapper.@params))
+            {
+                return new string[0];
+            }
+
+            return wrapper.@params.Split(',').Select(p => p.Trim()).Where(p => p.Length > 0).ToArray();
         }
 
         public override string UsageInformation() => "KScriptObject used to call methods contained using the <method> object";

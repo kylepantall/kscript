@@ -9,8 +9,8 @@
 
   <array id="files_to_move">@getfiles('$old_dir',',','$value','$file_types')</array>
   <afor from="files_to_move" to="item">
-    <move from="$item" to="$new_dir\@path('$item','filename')" />
-    <echo>[Info] Moved '$item' to '$new_dir\@path('$item','filename')'.</echo>
+    <move from="$item" to="@join_path($new_dir, @path('$item','filename'))" />
+    <echo>[Info] Moved '$item' to '@join_path($new_dir, @path('$item','filename'))'.</echo>
   </afor>
 
 </kscript>

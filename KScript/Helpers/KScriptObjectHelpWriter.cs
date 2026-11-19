@@ -38,7 +38,7 @@ namespace KScript
                     indentedTextWriter.Indent = 0;
                     indentedTextWriter.WriteLine();
 
-                    for (int i = 0; i < Console.WindowWidth; i++)
+                    for (int i = 0; i < Helpers.Platform.ConsoleWidth(); i++)
                     {
                         indentedTextWriter.Write("=");
                     }

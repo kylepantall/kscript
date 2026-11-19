@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using KScript.Arguments;
+
 using KScript.Document;
 
 namespace KScript.KScriptOperatorHandlers
@@ -8,44 +8,33 @@ namespace KScript.KScriptOperatorHandlers
     {
         public ObjectLoophandler(KScriptContainer container) : base(container) { }
 
-        public override bool CanRun(KScriptObject obj)
-        {
-            return typeof(KScriptObjectLoop).IsAssignableFrom(obj.GetType());
-        }
+        public override bool CanRun(KScriptObject obj) => obj is KScriptObjectLoop;
 
         public override void Execute(KScriptObject obj, List<IKScriptDocumentNode> Nodes, KScriptContainer Container)
         {
-            KScriptObjectLoop obj_x = obj as KScriptObjectLoop;
+            KScriptObjectLoop obj_x = (KScriptObjectLoop)obj;
 
             var def = Container.GetDef(obj_x.to, "0");
             obj_x.@default = def.Contents;
 
-            do
+            try
             {
-                foreach (IKScriptDocumentNode node in Nodes)
+                // The condition is checked before every iteration (including the first), like a regular for loop.
+                while (Container.AllowExecution && obj.ToBool(obj.HandleCommands(obj_x.@while)))
                 {
-                    if (node.GetValue().GetType().IsAssignableFrom(typeof(@break)))
+                    if (!RunIteration(obj, Nodes, Container))
                     {
-                        Container.StopConditionalLoops();
                         break;
                     }
-                    
-                    if (!Container.GetConditionalLoops())
-                        node.Run(Container, null, obj);
+
+                    Container[obj_x.to].Contents = obj.HandleCommands(obj_x.math);
                 }
-
-                if (Container.GetConditionalLoops())
-                {
-                    Container.AllowConditionalLoops();
-                    break;
-                }
-
-                string val = obj.HandleCommands(obj_x.math);
-                Container[obj_x.to].Contents = val;
-
-            } while (obj.ToBool(obj.HandleCommands(obj_x.@while)));
-
-            Container[obj_x.to].Contents = obj_x.@default;
+            }
+            finally
+            {
+                // The loop variable is scoped to the loop: restore its previous value.
+                Container[obj_x.to].Contents = obj_x.@default;
+            }
         }
     }
 }

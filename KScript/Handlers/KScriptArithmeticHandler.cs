@@ -1,4 +1,4 @@
-﻿using org.mariuszgromada.math.mxparser;
+using org.mariuszgromada.math.mxparser;
 
 namespace KScript.Handlers
 {
@@ -7,6 +7,7 @@ namespace KScript.Handlers
     /// </summary>
     public static class KScriptArithmeticHandler
     {
-        public static string HandleCalculation(string str) => new Expression(str).calculate().ToString();
+        public static string HandleCalculation(string str) =>
+            new Expression(str).calculate().ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 }

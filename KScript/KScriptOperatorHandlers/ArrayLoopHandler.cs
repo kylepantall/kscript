@@ -1,6 +1,7 @@
 using System.Collections.Generic;
-using KScript.Arguments;
+
 using KScript.Document;
+using KScript.KScriptExceptions;
 
 namespace KScript.KScriptOperatorHandlers
 {
@@ -8,37 +9,26 @@ namespace KScript.KScriptOperatorHandlers
     {
         public ArrayLoopHandler(KScriptContainer container) : base(container) { }
 
-        public override bool CanRun(KScriptObject obj)
-        {
-            return typeof(KScriptArrayLoop).IsAssignableFrom(obj.GetType());
-        }
+        public override bool CanRun(KScriptObject obj) => obj is KScriptArrayLoop;
 
         public override void Execute(KScriptObject obj, List<IKScriptDocumentNode> Nodes, KScriptContainer Container)
         {
-            KScriptArrayLoop objX = obj as KScriptArrayLoop;
+            KScriptArrayLoop objX = (KScriptArrayLoop)obj;
+            List<string> items = Container.ArrayGet(obj, objX.from);
 
-            foreach (string item in Container.ArrayGet(obj, objX.from))
+            if (items == null)
+            {
+                return;
+            }
+
+            // Iterate over a copy so the loop body can safely modify the array.
+            foreach (string item in items.ToArray())
             {
                 obj.CreateDef(objX.to, Global.Values.NULL);
                 obj.Def(objX.to).Contents = item;
 
-                foreach (IKScriptDocumentNode node in Nodes)
+                if (!RunIteration(obj, Nodes, Container))
                 {
-                    if (node.GetValue().GetType().IsAssignableFrom(typeof(@break)))
-                    {
-                        Container.StopConditionalLoops();
-                        break;
-                    }
-
-
-                    if (!Container.GetConditionalLoops())
-                    {
-                        node.Run(Container, null, obj);
-                    }
-                }
-                if (Container.GetConditionalLoops())
-                {
-                    Container.AllowConditionalLoops();
                     return;
                 }
             }

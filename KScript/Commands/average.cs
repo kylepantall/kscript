@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 
 namespace KScript.Commands
 {
@@ -11,8 +11,8 @@ namespace KScript.Commands
         public override string Calculate()
         {
             double x = 0.00;
-            args.ToList().ForEach(i => x += double.Parse(i));
-            return (x / args.Count()).ToString();
+            args.ToList().ForEach(i => x += double.Parse(i, System.Globalization.CultureInfo.InvariantCulture));
+            return (x / args.Count()).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         public override void Validate() { }

@@ -23,12 +23,17 @@ namespace KScript.Commands
                 switch (value.ToLower())
                 {
                     case "os.name": return GetOSFriendlyName();
+                    case "os.platform": return GetPlatform();
+                    case "path.separator": return System.IO.Path.DirectorySeparatorChar.ToString();
+                    case "newline": return System.Environment.NewLine;
+                    case "user.home": return System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+                    case "temp.directory": return System.IO.Path.GetTempPath();
                     case "machine.name": return System.Environment.MachineName;
                     case "script.path": return KScript().FilePath;
                     case "script.directory": return KScript().FileDirectory;
                     case "username": return System.Environment.UserName;
-                    case "math.pi": return Math.PI.ToString();
-                    case "math.e": return Math.E.ToString();
+                    case "math.pi": return Math.PI.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    case "math.e": return Math.E.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     case Global.Values.NULL: return NULL;
                     default: return KScript().FileDirectory;
                 }
@@ -40,6 +45,18 @@ namespace KScript.Commands
         /// </summary>
         /// <returns>OS Name</returns>
         public static string GetOSFriendlyName() => RuntimeInformation.OSDescription;
+
+        /// <summary>
+        /// Returns a short platform identifier: windows, linux, macos, freebsd or unknown.
+        /// </summary>
+        public static string GetPlatform()
+        {
+            if (OperatingSystem.IsWindows()) return "windows";
+            if (OperatingSystem.IsMacOS()) return "macos";
+            if (OperatingSystem.IsLinux()) return "linux";
+            if (OperatingSystem.IsFreeBSD()) return "freebsd";
+            return "unknown";
+        }
 
 
         public override void Validate() { }
