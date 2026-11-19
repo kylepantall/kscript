@@ -194,7 +194,11 @@ namespace KScript.Language.Analysis
 
             if (result.IsPartial && !isWrite)
             {
-                // Layouts and components get their variables from the page that uses them.
+                // Layouts and components get their variables from the page that uses them: these are its props.
+                if (!result.Inputs.ContainsKey(name))
+                {
+                    result.Inputs[name] = span;
+                }
                 return null;
             }
 

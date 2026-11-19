@@ -41,10 +41,13 @@ namespace KScript.Language.Analysis
                     return;
 
                 case MethodCallNode m:
+                {
                     AnalyzeExpr(m.Target, region, scope, ExprContext.Value);
-                    AnalyzeArguments(m.Arguments, region, scope);
-                    CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), Infer(m.Target, region), m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false);
+                    TypeShape receiver = Infer(m.Target, region);
+                    AnalyzeArguments(m.Arguments, region, scope, LambdaParameterShapes(m.Name, receiver));
+                    CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false);
                     return;
+                }
 
                 case CallNode call:
                     AnalyzeCall(call, region, scope, piped: false, left: null);
@@ -93,10 +96,34 @@ namespace KScript.Language.Analysis
             }
         }
 
-        private void AnalyzeArguments(IEnumerable<ArgumentNode> args, ExpressionRegion region, Scope scope)
+        /// <summary>
+        /// The shapes of a lambda's parameters when it is passed to a list method: in
+        /// <c>$people-&gt;filter(fn($p) =&gt; $p.age gt 18)</c>, $p is one of $people's items, so $p. completes its fields.
+        /// </summary>
+        private static TypeShape[] LambdaParameterShapes(string method, TypeShape receiver)
+        {
+            if (receiver.Type != KType.List || receiver.Element == null || receiver.Element.Type == KType.Any)
+            {
+                return null;
+            }
+            TypeShape item = receiver.Element;
+            return method switch
+            {
+                "reduce" => new[] { TypeShape.Unknown, item },
+                "sort" => new[] { item, item },
+                _ => new[] { item },
+            };
+        }
+
+        private void AnalyzeArguments(IEnumerable<ArgumentNode> args, ExpressionRegion region, Scope scope, TypeShape[] lambdaParameters = null)
         {
             foreach (ArgumentNode arg in args)
             {
+                if (lambdaParameters != null && arg.Value is LambdaNode lambda)
+                {
+                    AnalyzeLambda(lambda, region, scope, lambdaParameters);
+                    continue;
+                }
                 AnalyzeExpr(arg.Value, region, scope, ExprContext.Argument);
             }
         }
@@ -175,7 +202,8 @@ namespace KScript.Language.Analysis
 
         private void AnalyzeCall(CallNode call, ExpressionRegion region, Scope scope, bool piped, TypeShape left)
         {
-            AnalyzeArguments(call.Arguments, region, scope);
+            AnalyzeArguments(call.Arguments, region, scope,
+                piped && left != null && call.Callee is IdentifierNode method ? LambdaParameterShapes(method.Name, left) : null);
 
             switch (call.Callee)
             {
@@ -257,7 +285,7 @@ namespace KScript.Language.Analysis
                     return;
 
                 case LambdaNode lambda:
-                    AnalyzeLambda(lambda, region, scope);
+                    AnalyzeLambda(lambda, region, scope, new[] { Infer(pipe.Left, region) });
                     if (lambda.Parameters.Count != 1)
                     {
                         Report(region.Source.ToSource(lambda.Span), DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount, "A lambda that is piped into takes exactly one parameter.");
@@ -286,18 +314,20 @@ namespace KScript.Language.Analysis
             }
         }
 
-        private void AnalyzeLambda(LambdaNode lambda, ExpressionRegion region, Scope scope)
+        private void AnalyzeLambda(LambdaNode lambda, ExpressionRegion region, Scope scope, TypeShape[] parameterShapes = null)
         {
             TextSpan span = region.Source.ToSource(lambda.Span);
             Scope inner = new Scope(scope, span);
-            foreach (ParameterNode p in lambda.Parameters)
+            for (int i = 0; i < lambda.Parameters.Count; i++)
             {
+                ParameterNode p = lambda.Parameters[i];
                 TextSpan pSpan = region.Source.ToSource(p.Span);
                 if (region.Source.Value.Length > p.Span.Start && region.Source.Value[p.Span.Start] == '$')
                 {
                     pSpan = TextSpan.FromBounds(pSpan.Start + 1, pSpan.End);
                 }
-                inner.Declare(NewVariable(p.Name, pSpan, region.Element, SymbolKind.Parameter, TypeShape.Unknown), span.Start);
+                TypeShape shape = parameterShapes != null && i < parameterShapes.Length ? parameterShapes[i] : TypeShape.Unknown;
+                inner.Declare(NewVariable(p.Name, pSpan, region.Element, SymbolKind.Parameter, shape), span.Start);
             }
             AnalyzeExpr(lambda.Body, region, inner, ExprContext.Value);
         }

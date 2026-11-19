@@ -49,6 +49,9 @@ namespace KScript.Language.Analysis
 
         public SourceText Source { get; }
 
+        /// <summary>Reads a JSON file named in the document (e.g. by @read_json) and returns its shape, or null.</summary>
+        internal Func<string, TypeShape> JsonFileShape { get; set; }
+
         /// <summary>The file path, or null for unsaved text.</summary>
         public string Path { get; }
 
@@ -64,6 +67,12 @@ namespace KScript.Language.Analysis
 
         /// <summary>True for layouts and components, whose variables are supplied by the page that uses them.</summary>
         public bool IsPartial { get; internal set; }
+
+        /// <summary>
+        /// For a layout or component: the variables it uses without declaring, so the page must pass them
+        /// (a component's props), with where each is first used. In order of first use.
+        /// </summary>
+        public Dictionary<string, TextSpan> Inputs { get; } = new Dictionary<string, TextSpan>(StringComparer.Ordinal);
 
         /// <summary>The innermost expression region containing the offset.</summary>
         public ExpressionRegion RegionAt(int offset) =>

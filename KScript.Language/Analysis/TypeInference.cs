@@ -7,7 +7,7 @@ namespace KScript.Language.Analysis
     /// <summary>Works out the shape of an expression's value from the source (literals, declarations, return types).</summary>
     public sealed class TypeInference
     {
-        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "sort", "sort_by", "reverse", "slice", "unique", "push" };
+        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "where", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip" };
         private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "max_by", "min_by", "pop" };
 
         private readonly LanguageCatalog catalog;
@@ -114,6 +114,11 @@ namespace KScript.Language.Analysis
                     {
                         return TypeShape.Unknown;
                     }
+                    if (command.Name == "read_json" && c.Arguments.Count > 0 && c.Arguments[0].Value is LiteralNode { Kind: LiteralKind.String } file
+                        && result.JsonFileShape?.Invoke(file.Value) is TypeShape json)
+                    {
+                        return json;
+                    }
                     TypeShape shape = new TypeShape(command.ReturnType);
                     if (command.Name == "files")
                     {
@@ -123,7 +128,16 @@ namespace KScript.Language.Analysis
                 }
 
                 case MethodCallNode m:
-                    return InferMethod(m.Name, Infer(m.Target, region), m.Arguments.Count);
+                {
+                    TypeShape receiver = Infer(m.Target, region);
+                    // ->map(fn($p) => $p.name) is a list of whatever the lambda returns.
+                    if (receiver.Type == KType.List && m.Name == "map" && m.Arguments.Count == 1 && m.Arguments[0].Value is LambdaNode lambda)
+                    {
+                        TypeShape item = Infer(lambda.Body, region);
+                        return item.Type == KType.Any ? new TypeShape(KType.List) : new TypeShape(KType.List) { Element = item };
+                    }
+                    return InferMethod(m.Name, receiver, m.Arguments.Count);
+                }
 
                 case PipeNode pipe:
                 {

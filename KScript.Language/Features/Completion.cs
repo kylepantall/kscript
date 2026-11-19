@@ -186,12 +186,16 @@ namespace KScript.Language.Features
                     foreach (string file in Files.ListFiles(dir, "*.html"))
                     {
                         string name = Path.GetFileNameWithoutExtension(file);
+                        List<string> props = ComponentProps(file);
+                        int n = 1;
+                        string propSnippet = string.Concat(props.Select(p => $" {p}=\"${n++}\""));
                         items.Add(new CompletionItem
                         {
                             Label = name,
                             Kind = CompletionKind.Element,
                             Detail = "Component (_components/" + name + ".html)",
-                            InsertText = snippets ? name + " $1/>" : null,
+                            Documentation = props.Count > 0 ? "Props: " + string.Join(", ", props) : null,
+                            InsertText = snippets ? (props.Count > 0 ? name + propSnippet + " />" : name + " $1/>") : null,
                             IsSnippet = snippets,
                             ReplaceSpan = replace,
                             SortText = "0" + name,
@@ -256,6 +260,33 @@ namespace KScript.Language.Features
             return null;
         }
 
+        /// <summary>The component file for a tag such as &lt;person-card&gt;, found in the nearest _components folder.</summary>
+        internal string ComponentFile(string documentPath, string tag)
+        {
+            if (string.IsNullOrEmpty(documentPath) || string.IsNullOrEmpty(tag))
+            {
+                return null;
+            }
+            string dir = FindComponentsFolder(documentPath);
+            if (dir == null)
+            {
+                return null;
+            }
+            string file = Path.Combine(dir, tag.ToLowerInvariant() + ".html");
+            return Files.FileExists(file) ? file : null;
+        }
+
+        /// <summary>A component's props, in the order the component first uses them. $slot and the like are left out.</summary>
+        internal List<string> ComponentProps(string componentFile)
+        {
+            string text = Files.ReadText(componentFile);
+            if (text == null)
+            {
+                return new List<string>();
+            }
+            return Analyze(text, componentFile).Inputs.Keys.ToList();
+        }
+
         internal static string ElementSnippet(ElementInfo e)
         {
             int n = 1;
@@ -279,16 +310,40 @@ namespace KScript.Language.Features
         {
             ElementInfo info = Catalog.GetElement(e.Name);
             List<CompletionItem> items = new List<CompletionItem>();
-            if (info == null)
-            {
-                return items;
-            }
 
             int start = offset;
             string text = analysis.Source.Text;
             while (start > 0 && (Lexer.IsIdentChar(text[start - 1]) || text[start - 1] == '-'))
             {
                 start--;
+            }
+
+            if (info == null)
+            {
+                // A component's props: the variables its file uses without declaring.
+                string file = ComponentFile(analysis.Path, e.Name);
+                if (file != null)
+                {
+                    foreach (string prop in ComponentProps(file))
+                    {
+                        if (e.Attributes.Any(x => x.Name == prop && x.NameSpan.Start != start))
+                        {
+                            continue;
+                        }
+                        items.Add(new CompletionItem
+                        {
+                            Label = prop,
+                            Kind = CompletionKind.Attribute,
+                            Detail = "prop of <" + e.Name + ">",
+                            Documentation = $"Available in _components/{e.Name}.html as ${prop}. Pass a value with {{ }}, e.g. {prop}=\"{{$value}}\".",
+                            InsertText = prop + "=\"$1\"",
+                            IsSnippet = true,
+                            ReplaceSpan = TextSpan.FromBounds(start, offset),
+                            SortText = "0" + prop,
+                        });
+                    }
+                }
+                return items;
             }
 
             foreach (AttributeInfo a in info.Attributes)
