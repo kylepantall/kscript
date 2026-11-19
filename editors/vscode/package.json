@@ -1,10 +1,9 @@
 {
   "name": "kscript",
   "displayName": "KScript",
-  "description": "KScript 2 language support: diagnostics, completion, hover, signature help, go to definition, references, rename, outline, semantic highlighting and quick fixes.",
-  "version": "2.0.0",
-  "publisher": "kscript",
-  "license": "MIT",
+  "description": "KScript language support: errors as you type, completion, hover, go to definition, rename and quick fixes for scripts and kscript serve pages.",
+  "version": "0.1.0",
+  "publisher": "kylepantall",
   "repository": {
     "type": "git",
     "url": "https://github.com/kylepantall/kscript"
@@ -16,9 +15,11 @@
     "Programming Languages",
     "Linters"
   ],
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
   "activationEvents": [
     "onLanguage:kscript",
+    "workspaceContains:**/_components/*.html",
+    "workspaceContains:**/_layout.html",
     "workspaceContains:**/kscript.json"
   ],
   "contributes": {
@@ -43,6 +44,14 @@
         "language": "kscript",
         "scopeName": "source.kscript",
         "path": "./syntaxes/kscript.tmLanguage.json"
+      },
+      {
+        "scopeName": "kscript.pages.injection",
+        "path": "./syntaxes/kscript-pages.injection.json",
+        "injectTo": [
+          "text.html.basic",
+          "text.html.markdown"
+        ]
       }
     ],
     "configuration": {
@@ -51,7 +60,8 @@
         "kscript.server.path": {
           "type": "string",
           "default": "",
-          "description": "Path to the kscript executable, or to KScript.dll (run with dotnet). Empty: use the server bundled with the extension, then `kscript` on the PATH."
+          "scope": "machine-overridable",
+          "markdownDescription": "The `kscript` executable that runs the language server. Leave empty to use the installed KScript (`~/.kscript/bin`, `%LOCALAPPDATA%\\Programs\\kscript`, then your `PATH`). A `KScript.dll` from a source build also works (run with `dotnet`). `~` and `${env:NAME}` are expanded."
         },
         "kscript.server.args": {
           "type": "array",
@@ -61,12 +71,22 @@
           "default": [
             "lsp"
           ],
-          "description": "Arguments that start the language server."
+          "markdownDescription": "Arguments that start the language server."
         },
         "kscript.pages.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Also check .html and .md pages in folders with a kscript.json (kscript serve sites)."
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Check .html and .md files in folders that look like a kscript serve site (_components/, _layout.html, _layouts/ or kscript.json).",
+            "Always check .html and .md files.",
+            "Only check KScript scripts."
+          ],
+          "markdownDescription": "Check KScript in `.html` and `.md` pages (sites run with `kscript serve`)."
         },
         "kscript.trace.server": {
           "type": "string",
@@ -83,20 +103,47 @@
     "commands": [
       {
         "command": "kscript.restartServer",
-        "title": "KScript: Restart Language Server"
+        "title": "Restart Language Server",
+        "category": "KScript"
+      },
+      {
+        "command": "kscript.showOutput",
+        "title": "Show Language Server Output",
+        "category": "KScript"
       }
     ]
   },
   "scripts": {
-    "bundle-server": "dotnet publish ../../KScriptApp/KScriptApp.csproj -c Release -o server",
-    "package": "npm run bundle-server && vsce package",
-    "check": "node --check extension.js",
-    "test": "node test/smoke.js"
+    "check": "node --check extension.js && node --check src/server.js && node --check src/site.js",
+    "test": "node --test test/unit/*.test.js",
+    "smoke": "node test/smoke.js",
+    "package": "vsce package --no-dependencies --skip-license -o kscript-vscode.vsix",
+    "bundle": "esbuild extension.js --bundle --platform=node --target=node18 --format=cjs --external:vscode --outfile=dist/extension.js --minify --sourcemap",
+    "vscode:prepublish": "npm run bundle",
+    "test:vscode": "npm run bundle && node test/integration/run.js"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.2.1"
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.2"
+  },
+  "icon": "icon.png",
+  "homepage": "https://github.com/kylepantall/kscript#readme",
+  "bugs": {
+    "url": "https://github.com/kylepantall/kscript/issues"
+  },
+  "keywords": [
+    "kscript",
+    "xml",
+    "scripting",
+    "lsp",
+    "language server"
+  ],
+  "galleryBanner": {
+    "color": "#2563eb",
+    "theme": "dark"
   }
 }

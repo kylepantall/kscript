@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "scopeName": "kscript.pages.injection",
+  "comment": "Highlights KScript { expressions } in the HTML and Markdown pages that kscript serve renders.",
+  "injectionSelector": "L:text.html.basic -source -comment -string.quoted, L:text.html.markdown -markup.fenced_code -markup.inline.raw -comment",
+  "patterns": [
+    { "include": "#escaped" },
+    { "include": "source.kscript#interpolation" }
+  ],
+  "repository": {
+    "escaped": {
+      "name": "constant.character.escape.kscript",
+      "match": "\\{\\{|\\}\\}"
+    }
+  }
+}

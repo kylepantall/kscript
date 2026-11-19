@@ -75,9 +75,38 @@ jobs:
           name: kscript-${{ matrix.rid }}
           path: kscript-${{ matrix.rid }}.*
 
+  vscode:
+    name: Build the editor extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - name: Package
+        shell: bash
+        run: |
+          npm ci
+          npm test
+          # The extension gets the release's version (v0.2.0 -> 0.2.0), so `kscript ide install` matches them up.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"; fi
+          npm run package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kscript-vscode
+          path: editors/vscode/kscript-vscode.vsix
+
   release:
     name: Publish release
-    needs: build
+    needs: [build, vscode]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -90,6 +119,31 @@ jobs:
         with:
           files: assets/*
           generate_release_notes: true
+
+  marketplace:
+    name: Publish the editor extension
+    needs: release
+    runs-on: ubuntu-latest
+    # Each step runs only when its token is set as a repository secret, so releases work without them.
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: kscript-vscode
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Visual Studio Marketplace
+        if: env.VSCE_PAT != ''
+        run: npx --yes @vscode/vsce@3 publish --packagePath kscript-vscode.vsix --skip-duplicate
+
+      - name: Open VSX
+        if: env.OVSX_PAT != ''
+        run: npx --yes ovsx@0 publish kscript-vscode.vsix --skip-duplicate
 
   verify:
     name: Verify installers (${{ matrix.os }})

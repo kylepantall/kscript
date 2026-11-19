@@ -54,15 +54,47 @@ jobs:
       - name: Check KScript 2 samples
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 --warnaserror
 
+  vscode:
+    name: VS Code extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
       - uses: actions/setup-node@v4
-        if: matrix.name == 'linux'
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
 
-      - name: VS Code extension smoke test
-        if: matrix.name == 'linux'
-        working-directory: editors/vscode
+      - name: Build kscript
+        working-directory: .
+        run: dotnet build KScriptApp/KScriptApp.csproj --configuration Release
+
+      - name: Install
+        run: npm ci
+
+      - name: Check and unit test
         run: |
-          npm ci
           npm run check
-          node test/smoke.js ../../KScriptApp/bin/Release/net8.0/KScript.dll
+          npm test
+
+      - name: Package
+        run: npm run package
+
+      - name: Language server smoke test
+        run: npm run smoke -- ../../KScriptApp/bin/Release/net8.0/KScript.dll
+
+      - name: Run in VS Code
+        run: xvfb-run -a npm run test:vscode -- ../../KScriptApp/bin/Release/net8.0/KScript.dll
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kscript-vscode
+          path: editors/vscode/kscript-vscode.vsix
