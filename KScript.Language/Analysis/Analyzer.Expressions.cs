@@ -1,7 +1,7 @@
 using KScript.Language.Catalog;
-using KScript.Language.Markup;
-using KScript.Language.Syntax;
-using KScript.Language.Text;
+using KScript.Syntax.Markup;
+using KScript.Syntax;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Analysis
 {
@@ -175,9 +175,17 @@ namespace KScript.Language.Analysis
                 return;
             }
 
+            int dot = c.Name.IndexOf('.');
+            if (dot > 0)
+            {
+                AnalyzeAliasCommand(c, dot, nameSpan, scope);
+                return;
+            }
+
             CallableInfo command = catalog.GetCommand(c.Name);
             if (command != null)
             {
+                RequirePackage(command.Package, full, $"@{command.Name}()");
                 if (count >= 0 && command.Signatures.Count > 0 && !command.Signatures.Any(s => count >= s.MinArgs && count <= s.MaxArgs))
                 {
                     Report(full, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
@@ -198,6 +206,29 @@ namespace KScript.Language.Analysis
             Report(full, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand,
                 $"Unknown command @{c.Name}." + (suggestion != null ? $" Did you mean @{suggestion}?" : " Declare it with <fn name=\"" + c.Name + "\">."),
                 suggestion != null ? new[] { new QuickFix($"Change to @{suggestion}", new TextChange(nameSpan, suggestion)) } : null);
+        }
+
+        /// <summary><c>@math.sqrt(2)</c> or <c>@str.slugify($t)</c>: a command of a package or a function of a script imported with as="...".</summary>
+        private void AnalyzeAliasCommand(CommandCallNode c, int dot, TextSpan nameSpan, Scope scope)
+        {
+            string aliasName = c.Name.Substring(0, dot), member = c.Name.Substring(dot + 1);
+            TextSpan aliasSpan = new TextSpan(nameSpan.Start, dot);
+            TextSpan memberSpan = TextSpan.FromBounds(nameSpan.Start + dot + 1, nameSpan.End);
+            Symbol import = scope.Lookup(aliasName, aliasSpan.Start);
+            if (import?.Kind != SymbolKind.Import)
+            {
+                IEnumerable<string> aliases = result.Symbols.Where(s => s.Kind == SymbolKind.Import).Select(s => s.Name);
+                Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
+                    $"Nothing is imported as '{aliasName}'. Import it with <import package=\"...\" as=\"{aliasName}\" /> or <import src=\"...\" as=\"{aliasName}\" />.",
+                    SuggestFix(aliasSpan, aliasName, aliases, n => n));
+                return;
+            }
+            result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+            if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member))
+            {
+                Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{aliasName}' has no '{member}'.",
+                    SuggestFix(memberSpan, member, import.Shape.Fields.Keys, n => n));
+            }
         }
 
         private void AnalyzeCall(CallNode call, ExpressionRegion region, Scope scope, bool piped, TypeShape left)
@@ -357,6 +388,12 @@ namespace KScript.Language.Analysis
             {
                 Report(nameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
                     $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(receiver.ToString())}.");
+                return;
+            }
+
+            if (ChecksImports && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
+            {
+                RequirePackage(applicable[0].Package, nameSpan, $"{arrow}{name}()");
                 return;
             }
 

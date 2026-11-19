@@ -1,0 +1,88 @@
+using System;
+
+namespace KScript.Metadata
+{
+    // The vocabulary that describes elements and commands. Packages (KScript.Core, KScript.Terminal...) describe
+    // what they provide with these, and the language server reads the same descriptions, so the runtime and the
+    // editor can't disagree.
+
+    /// <summary>How an attribute's (or argument's) value is read.</summary>
+    public enum AttributeKind
+    {
+        /// <summary>One expression: <c>test="$n lt 3"</c>.</summary>
+        Expression,
+
+        /// <summary>A comma separated list of expressions: <c>is="2, 3"</c>.</summary>
+        ExpressionList,
+
+        /// <summary>Text with <c>{ }</c> interpolation: <c>href="/people/{$p.id}"</c>.</summary>
+        Template,
+
+        /// <summary>A variable name that the element declares: <c>name="count"</c>.</summary>
+        DeclareVariable,
+
+        /// <summary>One or more variable names the element declares, comma separated: <c>each="key, value"</c>.</summary>
+        DeclareVariables,
+
+        /// <summary>A variable that must already exist: <c>&lt;set name="count"&gt;</c>.</summary>
+        VariableReference,
+
+        /// <summary>Function parameters: <c>params="who, greeting = 'Hello'"</c>.</summary>
+        Parameters,
+
+        /// <summary>The name of a function the element declares.</summary>
+        DeclareFunction,
+
+        /// <summary>The name of a <c>&lt;fn&gt;</c> function.</summary>
+        FunctionReference,
+
+        /// <summary>A comma separated list of function names.</summary>
+        FunctionReferences,
+
+        /// <summary>A file path relative to the document.</summary>
+        Path,
+
+        /// <summary>A CSS selector.</summary>
+        Selector,
+
+        /// <summary>One of a fixed set of words (see the attribute's options).</summary>
+        Enum,
+
+        /// <summary>yes/no (also true/false).</summary>
+        Bool,
+
+        /// <summary>Plain text.</summary>
+        Text,
+    }
+
+    /// <summary>What an element's content holds.</summary>
+    public enum ContentKind
+    {
+        /// <summary>Nothing: the element is normally self-closing.</summary>
+        Empty,
+
+        /// <summary>KScript elements to run.</summary>
+        Statements,
+
+        /// <summary>Text with <c>{ }</c> and bare <c>$name</c> references.</summary>
+        Template,
+
+        /// <summary>A single expression.</summary>
+        Expression,
+
+        /// <summary>Assignment statements separated by <c>;</c>.</summary>
+        AssignmentStatements,
+
+        /// <summary>HTML to output, with KScript elements and <c>{ }</c> inside.</summary>
+        Markup,
+    }
+
+    /// <summary>Where an element can be used.</summary>
+    [Flags]
+    public enum ElementContext
+    {
+        Script = 1,
+        Page = 2,
+        Everywhere = Script | Page,
+    }
+}

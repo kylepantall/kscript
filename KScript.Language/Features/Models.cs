@@ -1,5 +1,5 @@
 using KScript.Language.Analysis;
-using KScript.Language.Text;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Features
 {

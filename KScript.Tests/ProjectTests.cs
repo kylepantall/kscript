@@ -51,6 +51,16 @@ public class ProjectConfigTests
     }
 
     [Fact]
+    public void PackagesAreReadAndUnknownOnesWarn()
+    {
+        ProjectConfig config = Parse("{ \"packages\": [\"KScript.Terminal\", \"Math\", \"KScript.Nope\"] }");
+        Assert.Equal(new[] { "KScript.Terminal", "Math", "KScript.Nope" }, config.Packages);
+        Assert.Single(config.Warnings);
+        Assert.Contains("KScript.Nope", config.Warnings[0]);
+        Assert.Empty(Parse("{}").Packages);
+    }
+
+    [Fact]
     public void TheLongestRulePrefixWins()
     {
         var c = Parse("""{ "lint": { "rules": { "KS*": "hint", "KS3*": "warning", "KS30*": "error" } } }""");
@@ -133,7 +143,7 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,lint,name,serve", Keys(props));
+        Assert.Equal("$schema,lint,name,packages,serve", Keys(props));
         Assert.Equal("host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
 

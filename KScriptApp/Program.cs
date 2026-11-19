@@ -1,42 +1,17 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Security.Principal;
 
-using KScript.KScriptExceptions;
+using KScript.Projects;
+using KScript.Runtime;
 
 namespace KScript
 {
     class Program
     {
-        public static string[] Commands() => new string[] { "-s", "-cai", "-cmds", "-admin", "-colourful", "-root", "-all", "-guid", "-nowait", "-lang=<culture>" };
-
-        /// <summary>
-        /// Method to adjust console appearances.
-        /// </summary>
-        static void SetAppearances()
-        {
-            try
-            {
-                Console.BackgroundColor = ConsoleColor.DarkMagenta;
-                Console.ForegroundColor = ConsoleColor.White;
-
-                if (OperatingSystem.IsWindows())
-                {
-                    Console.Title = "KScript";
-                }
-            }
-            catch (Exception)
-            {
-                // Console appearance is cosmetic - ignore terminals that do not support it.
-            }
-        }
-
         static void PrintUsage()
         {
-            Console.WriteLine("Usage: kscript <script.xml> [options] [script arguments]");
+            Console.WriteLine("Usage: kscript <script.xml> [script arguments]                Run a script ($args holds the arguments).");
             Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
@@ -45,7 +20,6 @@ namespace KScript
             Console.WriteLine("       kscript --version | --help");
             Console.WriteLine("       kscript make project <folder> [--port 8080]       Start a new project with a kscript.json.");
             Console.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
-            Console.WriteLine("Options: " + string.Join(" ", Commands()));
         }
 
         /// <summary>
@@ -124,8 +98,6 @@ namespace KScript
             }
         }
 
-        static bool HasFlag(string[] args, string flag) => args.Any(i => string.Equals(i, flag, StringComparison.OrdinalIgnoreCase));
-
         static int Main(string[] args)
         {
             if (args.Length > 0 && args[0] == "lsp")
@@ -183,49 +155,9 @@ namespace KScript
                 return KScript.Scaffolding.MakeCommand.Run(rest.ToArray(), Console.Out, Console.Error);
             }
 
-            if (HasFlag(args, "-colourful"))
-            {
-                SetAppearances();
-            }
-
-            bool quiet = HasFlag(args, "-s");
-            bool clearAfterInput = HasFlag(args, "-cai");
-            bool adminPriv = HasFlag(args, "-admin");
-            bool generateGuid = HasFlag(args, "-guid");
-            bool root = HasFlag(args, "-root");
-            bool allCommands = HasFlag(args, "-all");
-            bool noWait = HasFlag(args, "-nowait");
-
-            string culture = "auto";
-            string lang = args.FirstOrDefault(i => i.StartsWith("-lang", StringComparison.OrdinalIgnoreCase) && i.Contains('='));
-            if (lang != null)
-            {
-                culture = lang.Split('=')[1];
-            }
-
-            if (generateGuid)
-            {
-                Console.WriteLine("GUID: " + Guid.NewGuid().ToString());
-                return 0;
-            }
-
-            if (root)
-            {
-                OpenInShell(AppContext.BaseDirectory);
-                return 0;
-            }
-
-            if (adminPriv)
-            {
-                RestartWithAdminPriviledges(args);
-            }
-
             if (args[0].StartsWith("-", StringComparison.Ordinal))
             {
-                bool known = Commands().Any(c => string.Equals(c.Split('=')[0], args[0].Split('=')[0], StringComparison.OrdinalIgnoreCase));
-                Console.Error.WriteLine(known
-                    ? $"No script given. The script path comes first, e.g. kscript script.xml {args[0]}"
-                    : $"Unknown option '{args[0]}'.");
+                Console.Error.WriteLine($"Unknown option '{args[0]}'.");
                 Console.Error.WriteLine("Run kscript --help for usage.");
                 return 1;
             }
@@ -233,42 +165,61 @@ namespace KScript
             string path = ResolveScriptPath(args[0]);
             if (path == null)
             {
-                Console.Error.WriteLine(string.Format("File does not exist - '{0}'...", args[0]));
+                Console.Error.WriteLine($"There is no script at '{args[0]}'.");
                 return 2;
             }
 
-            KScriptParser parser = new KScriptParser(path);
+            return RunScript(path, args.Skip(1).ToArray());
+        }
 
-            parser.Properties.Quiet = quiet;
-            parser.Properties.ForceQuiet = quiet;
-            parser.Properties.ClearAfterInput = clearAfterInput;
-            parser.CustomArguments = args.Skip(1).ToArray();
-            parser.Properties.Language = culture;
-            parser.Properties.PrintInfo = allCommands;
+        /// <summary>
+        /// Runs a script. Packages listed in the nearest kscript.json are imported for it.
+        /// </summary>
+        static int RunScript(string path, string[] scriptArgs)
+        {
+            var options = new InterpreterOptions();
+            try
+            {
+                ProjectConfig project = ProjectConfig.FindAndLoad(Path.GetDirectoryName(path));
+                if (project != null)
+                {
+                    foreach (string warning in project.Warnings) Console.Error.WriteLine($"{project.FilePath}: {warning}");
+                    options.DefaultPackages.AddRange(project.Packages);
+                }
+            }
+            catch (ProjectConfigException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+
+            var host = KScriptHost.Console();
+            host.Arguments = scriptArgs;
+
+            using var cancel = new System.Threading.CancellationTokenSource();
+            options.Cancellation = cancel.Token;
+            Console.CancelKeyPress += (_, e) =>
+            {
+                // The first Ctrl+C stops the script cleanly (finally blocks run); a second one ends the process.
+                if (cancel.IsCancellationRequested) return;
+                e.Cancel = true;
+                cancel.Cancel();
+            };
 
             try
             {
-                parser.Parse();
+                return new Interpreter(host, options: options).RunFile(path);
             }
             catch (KScriptException ex)
             {
-                Console.Error.WriteLine($"[error ~{ex.GetExceptionType()}] {ex.Message}");
+                Console.Out.Flush();
+                Console.Error.WriteLine(ex.ToString());
                 return 3;
             }
-
-            // Only wait for a key press when attached to an interactive terminal,
-            // otherwise piping / CI usage would hang or throw.
-            if (parser.Properties.WaitOnFinish && !noWait && !Console.IsInputRedirected)
+            catch (OperationCanceledException)
             {
-                if (!parser.Properties.Quiet)
-                {
-                    Console.WriteLine("Press any key to close...");
-                }
-
-                try { Console.ReadKey(true); } catch (InvalidOperationException) { }
+                return 130;
             }
-
-            return 0;
         }
 
         /// <summary>
@@ -291,61 +242,6 @@ namespace KScript
                 .FirstOrDefault(f => string.Equals(Path.GetFileName(f), arg, StringComparison.OrdinalIgnoreCase));
 
             return match;
-        }
-
-        /// <summary>
-        /// Opens a file or directory using the platform's default handler.
-        /// </summary>
-        static void OpenInShell(string target)
-        {
-            try
-            {
-                if (OperatingSystem.IsWindows())
-                {
-                    Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
-                }
-                else if (OperatingSystem.IsMacOS())
-                {
-                    Process.Start("open", $"\"{target}\"");
-                }
-                else
-                {
-                    Process.Start("xdg-open", $"\"{target}\"");
-                }
-            }
-            catch (Exception)
-            {
-                Console.WriteLine(target);
-            }
-        }
-
-        public static void RestartWithAdminPriviledges(string[] args)
-        {
-            if (!OperatingSystem.IsWindows())
-            {
-                Console.Error.WriteLine("-admin is only supported on Windows. Re-run the command with sudo instead.");
-                return;
-            }
-
-            WindowsIdentity identity = WindowsIdentity.GetCurrent();
-            WindowsPrincipal principal = new WindowsPrincipal(identity);
-
-            if (!principal.IsInRole(WindowsBuiltInRole.Administrator))
-            {
-                ProcessStartInfo proc = new ProcessStartInfo
-                {
-                    UseShellExecute = true,
-                    WorkingDirectory = Environment.CurrentDirectory,
-                    FileName = Environment.ProcessPath,
-                    Verb = "runas",
-                    Arguments = string.Join(" ", args.Where(a => !string.Equals(a, "-admin", StringComparison.OrdinalIgnoreCase)).Select(a => $"\"{a}\""))
-                };
-
-                try { Process.Start(proc); }
-                catch { Console.WriteLine("Could not run with administrator priviledges"); }
-
-                Environment.Exit(0);
-            }
         }
     }
 }

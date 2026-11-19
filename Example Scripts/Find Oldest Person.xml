@@ -1,39 +1,13 @@
-<kscript throw_exceptions="no" dynamic_defs="yes">
-    <marray id="people">
-        <item>
-            <item key="age">28</item>
-            <item key="name">Joseph</item>
-        </item>
-        <item>
-            <item key="age">67</item>
-            <item key="name">Martin</item>
-        </item>
-        <item>
-            <item key="age">12</item>
-            <item key="name">Ellie</item>
-        </item>
-        <item>
-            <item key="age">32</item>
-            <item key="name">Claire</item>
-        </item>
-        <item>
-            <item key="age">42</item>
-            <item key="name">Simon</item>
-        </item>
-        <item>
-            <item key="age">82</item>
-            <item key="name">Joan</item>
-        </item>
-    </marray>
+<kscript>
+  <let name="people">[
+    { name: 'Joseph', age: 28 },
+    { name: 'Martin', age: 67 },
+    { name: 'Ellie',  age: 12 },
+    { name: 'Claire', age: 32 },
+    { name: 'Simon',  age: 42 },
+    { name: 'Joan',   age: 82 }
+  ]</let>
 
-    <def id="max">0</def>
-    <def id="maxPerson">0</def>
-    <for to="i" math="@math('$i+1')" while="@more_less($i,'lt',@acount('~people'))">
-        <if condition="@more_less(~people[$i]['age'],'mt',$max)">
-            <update to="max">~people[$i]['age']</update>
-            <update to="maxPerson">$i</update>
-        </if>
-    </for>
-
-    <echo>~people[$maxPerson]['name'] is the oldest at $max years old.</echo>
+  <let name="oldest" value="$people->max_by(fn($p) => $p.age)" />
+  <echo>{$oldest.name} is the oldest at {$oldest.age} years old.</echo>
 </kscript>

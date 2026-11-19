@@ -2,27 +2,22 @@
 
 [![CI](https://github.com/kylepantall/kscript/actions/workflows/ci.yml/badge.svg)](https://github.com/kylepantall/kscript/actions/workflows/ci.yml)
 
-KScript is a scripting language written in XML. A KScript document is parsed into a tree of objects and run by a small .NET 8 interpreter on Windows, Linux and macOS. `kscript serve` also runs a folder of HTML and Markdown templates as a website.
+KScript is a scripting language written in XML. Scripts run on a small .NET 8 interpreter on Windows, Linux and macOS, and `kscript serve` runs a folder of HTML and Markdown templates as a website.
 
-KScript is still in active development, and its syntax may change between versions.
+This is KScript 2: expressions, `{ }` interpolation, typed values, lambdas and pipes, functions you can call like commands, and packages you import for what a script needs. Scripts written for KScript 1 don't run unchanged; the error for each old element or command names what to write instead.
 
 ## A first script
 
 ```xml
-<kscript dynamic_defs="yes">
-  <!-- With dynamic_defs, variables are created the first time they are used -->
+<kscript>
+  <import package="KScript.Terminal" />
 
-  <!-- Ask a question and store the answer in 'entered_name' -->
-  <input to="entered_name" type="text">What's your name?</input>
-
-  <!-- Trim the answer, capitalise it and print it -->
-  <echo>Hello, $entered_name->trim()->upper()!</echo>
+  <input to="name">What's your name? </input>
+  <echo>Hello, { $name->trim()->title() }!</echo>
 </kscript>
 ```
 
-Add `print_info="yes"` to the `<kscript>` tag to print extra information while the script runs.
-
-More examples live in [`Example Scripts/`](Example%20Scripts).
+Save it as `hello.ks.xml` and run `kscript hello.ks.xml`. More examples live in [`Example Scripts/`](Example%20Scripts) and [`samples/kscript2/`](samples/kscript2).
 
 ## Building and running
 
@@ -78,20 +73,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out
 ```
 
-Command line options:
-
-| Option | Description |
-| --- | --- |
-| `-s` | Quiet: don't print the script timing, even if the script sets `quiet="no"`. |
-| `-nowait` | Don't wait for a key press when the script finishes (never waits when input is piped). |
-| `-cai` | Clear the console after each input. |
-| `-all` | Print information about all available KScript objects. |
-| `-lang=<culture>` | Set the script language/culture. |
-| `-guid` | Print a new GUID and exit. |
-| `-root` | Open the KScript install directory. |
-| `-admin` | Restart with administrator privileges (Windows only; use `sudo` elsewhere). |
-
-Anything after the script path is available to the script through `@args()`.
+Run a script with `kscript script.ks.xml [arguments]`. The arguments are in `$args`, a list. The exit code is 0, the code given to `<exit code="..."/>`, or 3 when the script stops with an error (printed as `file:line:column: Type: message`). Ctrl+C stops a script; `<finally>` blocks still run.
 
 ## Editor support
 
@@ -111,93 +93,140 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 
 | Path | Contents |
 | --- | --- |
-| `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, the `kscript serve` page engine (`Pages/`) and `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`) and `kscript.json` (`Projects/`). |
-| `KScriptApp/` | The `KScript` command line app that runs a script file. |
-| `KScript.Tests/` | xUnit test suite. |
-| `KScript.Language/`, `KScript.LanguageServer/` | The KScript 2 parser, analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. |
-| `KScript.Language.Tests/` | Tests for the language tools, including contract tests that keep them in step with the interpreter. |
+| `KScript.Syntax/` | The parser shared by the interpreter and the editor tools: markup, expressions, `{ }` templates, and the metadata types elements and commands are described with. |
+| `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
+| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/` | Packages: each registers its elements, commands and methods, with their documentation. |
+| `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
+| `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript ide` and `kscript update`. |
+| `KScriptApp/` | The `kscript` command line app. |
+| `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
+| `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |
 | `editors/vscode/` | The VS Code extension. |
-| `samples/kscript2/` | KScript 2 sample scripts and site. |
-| `Example Scripts/` | Sample scripts. |
+| `samples/kscript2/` | Sample scripts. |
+| `Example Scripts/` | More sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 
 ## Tests and CI
 
-`KScript.Tests` is an xUnit project covering the command parser, commands, control flow, variables, value methods, pipes and lambdas, platform helpers, `kscript serve` pages, and the sample scripts. Run it with `dotnet test KScript.sln`. The tests capture console output, so they run one at a time rather than in parallel.
+`KScript.Tests` covers the interpreter, every package, `kscript serve` pages, `kscript make`, `kscript.json` and the sample scripts; `KScript.Language.Tests` covers the analyzer, the editor features and the language server. Run them with `dotnet test KScript.sln`.
 
-Every push to `master` and every pull request runs [the CI workflow](.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode and then runs `Example Scripts/Find Oldest Person.xml` on three platforms:
+Every push to `master` and every pull request runs [the CI workflow](.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `Example Scripts/Find Oldest Person.xml`, and checks the sample scripts with `kscript check`, on three platforms:
 
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
 
-## Elements
+## The language
 
-A script is a `<kscript>` document made of elements. The main groups are:
+### Variables and output
 
-| Group | Elements |
+```xml
+<let name="count" value="0" />                      <!-- declare -->
+<let name="people">[{ name: 'Joan', age: 82 }]</let> <!-- longer values go in the text -->
+<set name="count" value="$count + 1" />             <!-- change; fails if never declared -->
+<set name="count" op="+=" value="1" />
+<do>$total = $price * $qty; $count += 1</do>
+<let name="limit" value="10" const="yes" />
+<let name="n" value="$args[0]" type="int" />        <!-- convert, or stop with a clear error -->
+
+<echo>Hello, {$name}! You have { $count } new { $count eq 1 ? 'message' : 'messages' }.</echo>
+<echo>$person.name is $person.age</echo>           <!-- bare $name works in text too -->
+<echo value="$people" format="json" />
+```
+
+Variables belong to the block they are declared in. `{{` and `}}` are literal braces.
+
+### Expressions
+
+`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `lt le gt ge` (or `> >=`), `eq ne`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn($x) => …`. Use the word forms in attributes, since XML can't hold a raw `<` or `&&` there.
+
+### Control flow
+
+```xml
+<if test="$n lt 10"> … </if>
+<elif test="$n lt 100"> … </elif>
+<else> … </else>
+
+<for each="p" in="$people"> … </for>
+<for each="i" index="n" in="0..10 step 2"> … </for>
+<for each="key, value" in="$map"> … </for>
+<while test="$queue->count() gt 0"> … <break /> … <continue /> … </while>
+
+<match value="$choice">
+  <case is="1"> … </case>
+  <case is="2, 3"> … </case>
+  <case when="$it gt 9"> … </case>
+  <default> … </default>
+</match>
+```
+
+### Functions
+
+```xml
+<fn name="greet" params="who, greeting = 'Hello'">
+  <return value="$greeting + ', ' + $who + '!'" />
+</fn>
+<fn name="square" params="n: number" value="$n * $n" />
+
+<echo>{ @greet('World') } { 4 |> @square() }</echo>
+<call fn="greet" args="'Kyle'" />
+<spawn fn="background_job" />
+```
+
+Functions can be called before they are declared, recurse, and be passed around: `@square` is the function itself. Lambdas are values too: `<let name="by_age" value="fn($a, $b) => $a.age - $b.age" />`.
+
+### Values and methods
+
+Values are strings, numbers, bools, lists, maps, dates, functions and null, plus values packages add (files, HTTP responses). Every value has methods, called with `->` and chained:
+
+```xml
+<echo>{ $name->trim()->upper() }</echo>
+<echo>{ $people->filter(fn($p) => $p.age ge 18)->map(fn($p) => $p.name)->join(', ') }</echo>
+<echo>{ $people |> sort_by(fn($p) => $p.name) |> first() }</echo>
+<echo>{ @now()->add_days(7)->format('d MMMM yyyy') }</echo>
+```
+
+The editor completes the methods for each type and shows what they do. `@json(text)` and `$value->to_json()` convert to and from JSON.
+
+### Errors
+
+```xml
+<try>
+  <let name="data" value="@read_json($path)" />
+  <catch as="err" when="$err.type eq 'FileNotFound'">
+    <echo>No file at {$path}, using defaults.</echo>
+  </catch>
+  <catch as="err"><echo>Failed: {$err.message} (line {$err.line})</echo></catch>
+  <finally><echo>done</echo></finally>
+</try>
+<throw type="Validation" message="Age must be positive, got {$age}" />
+```
+
+Unknown elements, attributes and syntax errors are reported before a script starts, so a typo near the end doesn't leave a job half done.
+
+## Packages
+
+KScript.Core (everything above) is always there. Everything else comes from a package, imported at the top of the script, so a script only loads what it uses: a terminal script never loads the web server.
+
+```xml
+<kscript>
+  <import package="KScript.Terminal" />
+  <import package="KScript.Math" as="math" />      <!-- commands stay under the prefix: @math.sqrt(2) -->
+  <import src="lib/strings.ks.xml" as="str" />      <!-- another script's top-level <fn> and <let const> -->
+  <import src="lib/strings.ks.xml" names="slugify" />
+  …
+</kscript>
+```
+
+| Package | What it adds |
 | --- | --- |
-| Output and input | `echo` `menu` `input` `ginput` `picker` `anykey` `clear` |
-| Variables | `def` `defm` `update` `updateContent` `temp` `guard` |
-| Control flow | `if` `else` `for` `forxy` `dowhile` `forever` `break` `continue` `end` `wait` `group` |
-| Arrays | `array` `marray` `ainsert` `aremove` `minsert` `afor` `aecho` |
-| Errors | `try` `catch` `throw` `onexception` |
-| Methods | `method` `call` `run` `func` |
-| Files and network | `file_info` `move` `new_dir` `write` `download` `loadHtml` |
-| Other | `load` `ref` `thread` `watcher` `watch` `rule` `registry` `languages` `math` |
+| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, 'green')`, `@bold`, `@dim`, `@underline`, `<echo format="markdown">` |
+| `KScript.Math` | `@sqrt` `@pow` `@round(x, digits)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low, high)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
+| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path` `@known_folder('downloads')`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
+| `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
+| `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
+| `KScript.Web` | The elements of `kscript serve` pages (below). Pages don't need imports. |
 
-Run any script with `-all` (for example `dotnet run --project KScriptApp -- script.xml -all`) to print every element and command with its properties and examples.
-
-## Command syntax
-
-Commands are written `@name(argument, argument, ...)`. Arguments can be `'quoted strings'`, nested commands or plain text, and spaces around arguments are ignored:
-
-```xml
-<echo>@to_lower(@split('A,B,C', ',', '1'))</echo>   <!-- b -->
-<echo>@math(2 * (3 + 4))</echo>                     <!-- 14 -->
-```
-
-An `@` that isn't followed by a name and `(` is plain text, so e-mail addresses and apostrophes in text are safe.
-
-## Methods, pipes and lambdas
-
-Any value (a variable, a `'quoted string'`, a number or a command's result) can have methods called on it with `->`. Calls can be chained and can take arguments:
-
-```xml
-<echo>$name->trim()->upper()</echo>
-<echo>'a.b.c'->replace('.', '/')</echo>
-<echo>3.14159->round(2)</echo>
-<echo>@math('2+2')->mul(10)</echo>
-<for to="i" while="$i->lt(10)" math="$i->increment()"> ... </for>
-```
-
-Values are typed on use: a value is a number if it parses as one, a bool if it is yes/no/true/false, and a string otherwise (`$x->type()` tells you which). Calling a number method on text gives a clear error. On a variable, `increment()`/`decrement()` also update the variable; on other values they just return the result.
-
-| Kind | Methods |
-| --- | --- |
-| Any | `type` `length` `is_number` `is_bool` `is_empty` `has_value` `is_url` `equals(x, ignore_case?)` `default(x)` `call(args...)` |
-| String | `upper` `lower` `trim` `trim_start` `trim_end` `reverse` `contains(x)` `starts_with(x)` `ends_with(x)` `index_of(x)` `replace(a, b)` `substring(start, len?)` `char_at(i)` `split(sep, i)` `count(x)` `repeat(n)` `pad_left(w, c?)` `pad_right(w, c?)` |
-| Number | `add` `sub` `mul` `div` `mod` `pow` `round(d?)` `floor` `ceil` `abs` `min` `max` `lt` `lte` `mt` `mte` `between(a, b)` `is_zero` `not_zero` `positive` `negative` `increment(by?)` `decrement(by?)` |
-| Bool | `not` `and(x)` `or(x)` `xor(x)` |
-
-`|>` passes a value on to a method, a command (as its first argument) or a lambda. Lambdas are written `fn($x) => expression`:
-
-```xml
-<echo>$name |> trim() |> upper()</echo>
-<echo>$csv |> @split(',', '1')</echo>
-<echo>$name |> fn($s) => $s->lower()->reverse()</echo>
-```
-
-A lambda stored with `<def>` can be piped into or called later:
-
-```xml
-<def id="shout">fn($s) => $s->upper()->replace('.', '!')</def>
-<echo>'hi.' |> $shout</echo>        <!-- HI! -->
-<echo>$shout->call('hey.')</echo>   <!-- HEY! -->
-```
-
-A lambda body is one expression; use brackets to group: `fn($n) => ($n->mul(2) |> fn($m) => $m->add(1))`. Lambda parameters are only visible inside the lambda.
-
-Variables are resolved after a line is parsed, so values containing `,`, `)` or `'` are always passed through intact and are never run as commands.
+Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).
 
 ## Web pages: kscript serve
 
@@ -299,6 +328,7 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
 ```jsonc
 {
   "name": "my-site",
+  "packages": ["KScript.Terminal", "KScript.IO"],   // imported by every script in the project
   "serve": {
     "root": ".",          // the site folder, relative to kscript.json
     "port": 8080,         // --port and --host on the command line still win
@@ -362,16 +392,11 @@ hint: Use it in a page: <{{ kebab }}-card />
 
 ## Writing portable scripts
 
-- Build paths with `@join_path($dir, 'file.txt')` rather than hard-coding `\` or `/`.
-- `@k('os.platform')` returns `windows`, `linux` or `macos`; `@k('path.separator')`, `@k('user.home')` and `@k('temp.directory')` are also available.
+- Build paths with `@join_path($dir, 'file.txt')` (KScript.IO) rather than hard-coding `\` or `/`.
+- `$os.name` is `windows`, `linux` or `macos`, and `$os.home`, `$os.temp` and `$os.separator` are there too; `$env.HOME` reads an environment variable.
 - Numbers are always parsed and printed with `.` as the decimal separator, whatever the machine's language.
-- `<registry>` and `@registry` only work on Windows and report a clear error elsewhere.
 
 ## Roadmap
 
-Work in progress, not yet on `master`:
+KScript 2 is landing in steps: `kscript migrate` to rewrite KScript 1 scripts, pages running on the same interpreter as scripts, desktop windows (`KScript.UI`), and language models (`KScript.AI`).
 
-- A language server for editor support.
-- A proposal for a cleaner KScript 2 syntax.
-
-Further documentation is still in development.

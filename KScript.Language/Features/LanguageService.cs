@@ -1,8 +1,8 @@
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
-using KScript.Language.Markup;
-using KScript.Language.Syntax;
-using KScript.Language.Text;
+using KScript.Syntax.Markup;
+using KScript.Syntax;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Features
 {

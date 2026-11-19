@@ -1,16 +1,15 @@
 <kscript>
-  <picker to="new_dir" error_prompt="Couldn't find the specified directory, try again: " persist="yes" type="directory">Specify the directory to move files to? </picker>
-  <picker to="old_dir" error_prompt="oops" persist="yes" type="directory">Specify the directory to move files from? </picker>
-  <input to="file_types" type="text">Enter the file types to move separated by commas (e.g. '.exe,.cs'): </input>
+  <import package="KScript.Terminal" />
+  <import package="KScript.IO" />
 
-  <if condition="@not(@dir_exists('$new_dir'))">
-    <new_dir path="$new_dir"/>
-  </if>
+  <picker to="old_dir">Move files from: </picker>
+  <picker to="new_dir">Move files to: </picker>
+  <input to="file_types">File types (comma separated, such as txt, pdf): </input>
 
-  <array id="files_to_move">@getfiles('$old_dir',',','$value','$file_types')</array>
-  <afor from="files_to_move" to="item">
-    <move from="$item" to="@join_path($new_dir, @path('$item','filename'))" />
-    <echo>[Info] Moved '$item' to '@join_path($new_dir, @path('$item','filename'))'.</echo>
-  </afor>
-
+  <let name="types" value="$file_types->split(',')->map(fn($t) => $t->trim()->trim_start('.'))" />
+  <for each="file" in="@files($old_dir) |> filter(fn($f) => $types->contains($f->extension()))">
+    <let name="target" value="@join_path($new_dir, $file->name())" />
+    <move from="$file" to="$target" />
+    <echo>Moved {$file->name()} to {$target}</echo>
+  </for>
 </kscript>

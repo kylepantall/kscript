@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\KScript\KScript.csproj" />
+    <ProjectReference Include="..\KScript.Cli\KScript.Cli.csproj" />
     <ProjectReference Include="..\KScript.LanguageServer\KScript.LanguageServer.csproj" />
   </ItemGroup>
 

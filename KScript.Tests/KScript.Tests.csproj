@@ -19,7 +19,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\KScript\KScript.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+    <ProjectReference Include="..\KScript.Terminal\KScript.Terminal.csproj" />
+    <ProjectReference Include="..\KScript.Math\KScript.Math.csproj" />
+    <ProjectReference Include="..\KScript.IO\KScript.IO.csproj" />
+    <ProjectReference Include="..\KScript.Net\KScript.Net.csproj" />
+    <ProjectReference Include="..\KScript.Markdown\KScript.Markdown.csproj" />
+    <ProjectReference Include="..\KScript.Web\KScript.Web.csproj" />
+    <ProjectReference Include="..\KScript.Cli\KScript.Cli.csproj" />
   </ItemGroup>
 
 </Project>

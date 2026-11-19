@@ -1,7 +1,7 @@
 using KScript.Language.Catalog;
-using KScript.Language.Markup;
-using KScript.Language.Syntax;
-using KScript.Language.Text;
+using KScript.Syntax.Markup;
+using KScript.Syntax;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Analysis
 {
@@ -63,6 +63,7 @@ namespace KScript.Language.Analysis
                 return shape;
             };
 
+            ResolvePackages(root);
             DeclareBuiltIns(root);
             AnalyzeFrontMatter(root);
             HoistFunctions(root);
@@ -87,11 +88,12 @@ namespace KScript.Language.Analysis
         {
             foreach (KeyValuePair<string, (string Type, string Description)> builtIn in catalog.BuiltInVariables)
             {
+                string package = catalog.PackageOfVariable(builtIn.Key);
                 bool applies = builtIn.Key switch
                 {
                     "request" => Kind != DocumentKind.Script,
-                    "args" => Kind == DocumentKind.Script,
-                    _ => false, // $event is declared inside <on>.
+                    "event" => false, // declared inside <on>
+                    _ => Kind == DocumentKind.Script && (package == null || importedPackages.Contains(package)),
                 };
                 if (applies)
                 {
@@ -183,7 +185,7 @@ namespace KScript.Language.Analysis
                     result.References.Add(new SymbolReference(fn, span, true, true));
                     root.Declare(fn, 0);
                 }
-                else if (IsKScriptElementName(e, "import"))
+                else if (IsKScriptElementName(e, "import") && e.GetAttribute("package") == null)
                 {
                     HoistImport(e, root);
                 }
@@ -345,12 +347,14 @@ namespace KScript.Language.Analysis
         /// <summary>The element's definition if it is a KScript element here, or null if it is HTML (or unknown).</summary>
         private ElementInfo ResolveElement(MarkupElement e, bool markupMode)
         {
-            ElementInfo info = catalog.GetElement(e.Name);
+            // <KScript.Window> is <Window> from the package that has it, and imports that package.
+            string name = Kind == DocumentKind.Script && e.Name.StartsWith("KScript.", StringComparison.Ordinal) ? e.Name.Substring(8) : e.Name;
+            ElementInfo info = catalog.GetElement(name);
             if (info == null)
             {
                 return null;
             }
-            if (!string.Equals(info.Name, e.Name, StringComparison.Ordinal) && Kind == DocumentKind.Script)
+            if (!string.Equals(info.Name, name, StringComparison.Ordinal) && Kind == DocumentKind.Script)
             {
                 // XML is case-sensitive; <Echo> is not <echo>.
                 return null;
@@ -381,6 +385,7 @@ namespace KScript.Language.Analysis
 
             CheckAttributes(e, info);
             CheckPlacement(e, info, previous);
+            RequirePackage(info.Package, e.NameSpan, $"<{e.Name}>");
             if (Kind != DocumentKind.Script && !info.Context.HasFlag(ElementContext.Page))
             {
                 Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.MisplacedElement, $"<{e.Name}> only works in scripts, not in pages.");
@@ -715,7 +720,7 @@ namespace KScript.Language.Analysis
                     $"'{value}' isn't a valid {a.Name}. Use one of: {string.Join(", ", a.Options)}.",
                     suggestion != null ? new[] { new QuickFix($"Change to {suggestion}", new TextChange(TrimmedSpan(attr.Value), suggestion)) } : null);
             }
-            else if (a.Kind == AttributeKind.Bool && !KScript.KScriptObjects.KScriptAcceptedOptions.BooleanValues.Contains(value.ToLowerInvariant()))
+            else if (a.Kind == AttributeKind.Bool && KScript.Runtime.Values.ParseBool(value) == null)
             {
                 Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{a.Name}' takes yes or no, not '{value}'.");
             }

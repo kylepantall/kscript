@@ -1,6 +1,6 @@
 using KScript.Language.Analysis;
 using KScript.Language.Features;
-using KScript.Language.Text;
+using KScript.Syntax.Text;
 
 using static KScript.Language.Tests.TestHelpers;
 
@@ -71,7 +71,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void CompletesAttributeValues()
         {
-            Assert.Equal(new[] { "markdown", "text" }, Labels(Script("<echo format=\"‸\">x</echo>")).OrderBy(x => x));
+            Assert.Equal(new[] { "json", "markdown", "text" }, Labels(Script("<echo format=\"‸\">x</echo>")).OrderBy(x => x));
             Assert.Contains("yes", Labels(Script("<let name=\"x\" value=\"1\" const=\"‸\" />")));
             Assert.Contains("greet", Labels(Script("<fn name=\"greet\" /><call fn=\"‸\" />")));
         }

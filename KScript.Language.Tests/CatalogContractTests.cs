@@ -1,9 +1,9 @@
 using System.Reflection;
 
-using KScript.Handlers;
+using KScript.Runtime;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
-using KScript.Language.Syntax;
+using KScript.Syntax;
 using KScript.Metadata;
 
 using static KScript.Language.Tests.TestHelpers;
@@ -23,37 +23,55 @@ namespace KScript.Language.Tests
         public static IEnumerable<object[]> AllCommands() => Catalog.Commands.Select(c => new object[] { c.Name });
 
         [Fact]
-        public void EveryElementClassIsClassified()
+        public void EveryInstalledPackageIsInTheCatalog()
         {
-            Assert.True(Catalog.UnclassifiedElementTypes.Count == 0,
-                "Add [KScriptElement] (with [KScriptDoc]) or [KScriptRetired] to: " + string.Join(", ", Catalog.UnclassifiedElementTypes.Select(t => t.FullName)));
-        }
-
-        [Fact]
-        public void EveryCommandClassIsClassified()
-        {
-            Assert.True(Catalog.UnclassifiedCommandTypes.Count == 0,
-                "Add [KScriptDoc] or [KScriptRetired] to: " + string.Join(", ", Catalog.UnclassifiedCommandTypes.Select(t => t.FullName)));
-        }
-
-        [Fact]
-        public void ElementClassesAreNotBothCurrentAndRetired()
-        {
-            foreach (Type t in LanguageCatalog.InterpreterElementTypes().Concat(LanguageCatalog.InterpreterCommandTypes()))
+            foreach (KScriptPackage package in PackageRegistry.Default.LoadAll())
             {
-                bool current = t.GetCustomAttribute<KScriptElementAttribute>() != null;
-                bool retired = t.GetCustomAttribute<KScriptRetiredAttribute>() != null;
-                Assert.False(current && retired, t.FullName + " is marked both current and retired.");
+                Assert.True(Catalog.Packages.ContainsKey(package.Name), package.Name);
+                foreach (ElementDefinition e in package.Elements.Values)
+                {
+                    Assert.True(Catalog.GetElement(e.Name)?.Package == e.Info.Package, $"<{e.Name}> from {package.Name} is in the catalog as part of {Catalog.GetElement(e.Name)?.Package ?? "nothing"}.");
+                    Assert.True(e.Handler != null, $"<{e.Name}> in {package.Name} has no handler.");
+                }
+                foreach (CommandDefinition c in package.Commands.Values)
+                {
+                    Assert.True(Catalog.GetCommand(c.Name) != null, $"@{c.Name}() from {package.Name} is missing from the catalog.");
+                }
+                foreach (MethodDefinition m in package.Methods)
+                {
+                    Assert.Contains(Catalog.Methods, x => x.Name == m.Name && x.ReceiverType == m.Receiver);
+                }
             }
         }
 
         [Fact]
-        public void CurrentElementClassesHaveDocs()
+        public void TheTerminalOnlyPackagesShipWithKScript()
         {
-            foreach (Type t in LanguageCatalog.InterpreterElementTypes().Where(t => t.GetCustomAttribute<KScriptElementAttribute>() != null))
+            foreach (string name in new[] { "KScript.Core", "KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web" })
             {
-                Assert.True(t.GetCustomAttribute<KScriptDocAttribute>() != null, t.FullName + " needs [KScriptDoc].");
+                Assert.True(PackageRegistry.Default.Get(name) != null, $"{name} doesn't load.");
             }
+        }
+
+        [Fact]
+        public void PackagesDontDefineTheSameElementOrCommand()
+        {
+            var elements = PackageRegistry.Default.LoadAll().SelectMany(p => p.Elements.Keys.Select(k => (Name: k, Package: p.Name))).GroupBy(x => x.Name).Where(g => g.Count() > 1).ToList();
+            Assert.True(elements.Count == 0, "Elements in more than one package: " + string.Join(", ", elements.Select(g => $"<{g.Key}> ({string.Join(", ", g.Select(x => x.Package))})")));
+            var commands = PackageRegistry.Default.LoadAll().SelectMany(p => p.Commands.Keys.Select(k => (Name: k, Package: p.Name))).GroupBy(x => x.Name).Where(g => g.Count() > 1).ToList();
+            Assert.True(commands.Count == 0, "Commands in more than one package: " + string.Join(", ", commands.Select(g => $"@{g.Key} ({string.Join(", ", g.Select(x => x.Package))})")));
+        }
+
+        [Fact]
+        public void PlannedItemsBelongToNoPackage()
+        {
+            Assert.True(Catalog.GetElement("llm").Planned);
+            Assert.Null(Catalog.GetElement("llm").Package);
+            Assert.False(Catalog.GetElement("echo").Planned);
+            Assert.Equal("KScript.Core", Catalog.GetElement("echo").Package);
+            Assert.Equal("KScript.Terminal", Catalog.GetElement("input").Package);
+            Assert.Equal("KScript.IO", Catalog.GetCommand("read_text").Package);
+            Assert.Equal("KScript.Math", Catalog.GetCommand("sqrt").Package);
         }
 
         [Theory]
@@ -76,11 +94,11 @@ namespace KScript.Language.Tests
             {
                 Assert.False(string.IsNullOrWhiteSpace(a.Description), $"<{name} {a.Name}> has no description.");
                 Assert.Matches("^[a-z][a-z0-9_-]*$", a.Name);
-                if (a.Kind == KScriptValueKind.Enum)
+                if (a.Kind == AttributeKind.Enum)
                 {
                     Assert.True(a.Options.Count > 0, $"<{name} {a.Name}> is an enum with no options.");
                 }
-                if (a.Kind == KScriptValueKind.Bool)
+                if (a.Kind == AttributeKind.Bool)
                 {
                     Assert.True(a.Options.Count == 0 || a.Options.SequenceEqual(new[] { "yes", "no" }), $"<{name} {a.Name}> is a bool, so its options are yes/no.");
                 }
@@ -107,14 +125,18 @@ namespace KScript.Language.Tests
             {
                 return;
             }
-            string path = e.Context == KScriptElementContext.Page ? "example.html" : "example.ks.xml";
-            string text = e.Context == KScriptElementContext.Page ? e.Example : Script(e.Example);
+            string path = e.Context == ElementContext.Page ? "example.html" : "example.ks.xml";
+            string text = e.Context == ElementContext.Page ? e.Example : Script(ImportFor(e.Package) + e.Example);
             DocumentAnalysis a = Analyze(text, path);
             // Examples are fragments, so they may use variables and functions from around them. Everything else must be valid.
             string[] contextual = { DiagnosticCodes.UndefinedVariable, DiagnosticCodes.SetUndeclared, DiagnosticCodes.UndefinedFunction };
             List<Diagnostic> errors = a.Errors.Where(d => !contextual.Contains(d.Code)).ToList();
             Assert.True(errors.Count == 0, $"The example for <{name}> has errors:\n{Describe(a)}\n{e.Example}");
         }
+
+        /// <summary>An import of the package, so examples and calls from it are checked as a script using it would be.</summary>
+        private static string ImportFor(string package) =>
+            package == null || package == "KScript.Core" ? string.Empty : $"<import package=\"{package}\" />\n";
 
         [Fact]
         public void LoopsAreMarked()
@@ -142,17 +164,29 @@ namespace KScript.Language.Tests
         [Fact]
         public void RetiredAttributesRenameToRealAttributes()
         {
-            foreach (Type t in LanguageCatalog.InterpreterElementTypes())
+            foreach (var kv in Retired.Attributes)
             {
-                foreach (PropertyInfo p in t.GetProperties())
+                Assert.False(string.IsNullOrWhiteSpace(kv.Value.Replacement), $"{kv.Key}= needs a replacement message.");
+                if (kv.Value.Rename != null)
                 {
-                    KScriptRetiredAttribute retired = p.GetCustomAttribute<KScriptRetiredAttribute>();
-                    if (retired?.Rename == null || t.GetCustomAttribute<KScriptElementAttribute>() == null)
-                    {
-                        continue;
-                    }
-                    ElementInfo e = Catalog.GetElement(t.Name.TrimStart('@'));
-                    Assert.True(e?.GetAttribute(retired.Rename) != null, $"{t.Name}.{p.Name} renames to '{retired.Rename}', which <{e?.Name}> doesn't have.");
+                    Assert.True(Catalog.Elements.Any(e => e.GetAttribute(kv.Value.Rename) != null), $"{kv.Key}= renames to '{kv.Value.Rename}', which no element has.");
+                }
+            }
+        }
+
+        [Fact]
+        public void RetiredCommandsAreGoneOrReplaced()
+        {
+            foreach (var kv in Retired.Commands)
+            {
+                Assert.False(string.IsNullOrWhiteSpace(kv.Value.Replacement), $"@{kv.Key} needs a replacement message.");
+                if (Catalog.GetCommand(kv.Key) == null)
+                {
+                    Assert.NotNull(Catalog.GetRetiredCommand(kv.Key));
+                }
+                if (kv.Value.Rename != null)
+                {
+                    Assert.True(Catalog.GetCommand(kv.Value.Rename) != null, $"@{kv.Key} renames to unknown @{kv.Value.Rename}.");
                 }
             }
         }
@@ -171,7 +205,7 @@ namespace KScript.Language.Tests
                 Assert.Equal(s.Parameters.Count, s.Parameters.Select(p => p.Name).Distinct().Count());
                 // Optional parameters come last.
                 bool optional = false;
-                foreach (KScript.Language.Catalog.ParameterInfo p in s.Parameters)
+                foreach (KScript.Metadata.ParameterInfo p in s.Parameters)
                 {
                     Assert.False(optional && !p.Optional && !p.Variadic, $"{c.Labels.First()}: required '{p.Name}' after an optional parameter.");
                     optional |= p.Optional;
@@ -180,58 +214,8 @@ namespace KScript.Language.Tests
 
             // A call with the minimum number of arguments must not be reported as wrong.
             string args = string.Join(", ", Enumerable.Repeat("'x'", c.MinArgs));
-            DocumentAnalysis a = Analyze(Script($"<echo>@{name}({args})</echo>"));
-            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.ArgumentCount || d.Code == DiagnosticCodes.UnknownCommand);
-        }
-
-        [Fact]
-        public void CommandParamDocsMatchConstructors()
-        {
-            foreach (Type t in LanguageCatalog.InterpreterCommandTypes())
-            {
-                HashSet<string> ctorParams = t.GetConstructors().SelectMany(c => c.GetParameters()).Select(p => p.Name.TrimStart('@')).ToHashSet();
-                foreach (KScriptParamAttribute p in t.GetCustomAttributes<KScriptParamAttribute>())
-                {
-                    Assert.True(ctorParams.Contains(p.Name), $"@{t.Name} documents a parameter '{p.Name}' that no constructor takes ({string.Join(", ", ctorParams)}).");
-                }
-            }
-        }
-
-        [Fact]
-        public void ImplementedCommandsComeFromTheInterpreter()
-        {
-            foreach (Type t in LanguageCatalog.InterpreterCommandTypes().Where(t => t.GetCustomAttribute<KScriptRetiredAttribute>() == null))
-            {
-                CallableInfo c = Catalog.GetCommand(t.Name.TrimStart('@'));
-                Assert.True(c != null, $"@{t.Name} is missing from the catalog.");
-                Assert.Equal(t, c.ImplementedBy);
-                Assert.False(c.Planned);
-            }
-            foreach (Type t in LanguageCatalog.InterpreterCommandTypes().Where(t => t.GetCustomAttribute<KScriptRetiredAttribute>() != null))
-            {
-                // Retired in scripts, unless the page engine reuses the name with a new meaning (@exists(path)).
-                CallableInfo reused = Catalog.GetCommand(t.Name.TrimStart('@'));
-                if (reused != null)
-                {
-                    Assert.Equal(LanguageCatalog.PageEngine, reused.ImplementedBy);
-                    continue;
-                }
-                Assert.NotNull(Catalog.GetRetiredCommand(t.Name.TrimStart('@')));
-            }
-        }
-
-        [Fact]
-        public void EveryInterpreterValueMethodIsInTheCatalog()
-        {
-            foreach (var m in ValueMethods.Catalog())
-            {
-                Assert.False(string.IsNullOrWhiteSpace(m.Description), $"->{m.Name} has no description.");
-                Assert.Contains(m.Category, new[] { "any", "string", "number", "bool" });
-                CallableInfo info = Catalog.Methods.FirstOrDefault(c => c.Name == m.Name && c.ImplementedBy != null);
-                Assert.True(info != null, $"->{m.Name} from ValueMethods is missing from the catalog.");
-                Assert.True(info.MinArgs <= m.MinArgs && (info.MaxArgs >= m.MaxArgs || m.MaxArgs < 0),
-                    $"->{m.Name} takes {m.MinArgs}..{m.MaxArgs} arguments in the interpreter but {info.MinArgs}..{info.MaxArgs} in the catalog.");
-            }
+            DocumentAnalysis a = Analyze(Script(ImportFor(c.Package) + $"<echo>@{name}({args})</echo>"));
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.ArgumentCount || d.Code == DiagnosticCodes.UnknownCommand || d.Code == DiagnosticCodes.MissingImport);
         }
 
         [Fact]
