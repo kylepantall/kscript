@@ -1,0 +1,342 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+
+namespace KScript.Projects
+{
+    /// <summary>A problem with a kscript.json file that makes it unusable, such as invalid JSON.</summary>
+    public sealed class ProjectConfigException : Exception
+    {
+        public ProjectConfigException(string message) : base(message) { }
+    }
+
+    /// <summary>The <c>serve</c> section: what <c>kscript serve</c> uses when no options are given.</summary>
+    public sealed class ServeSettings
+    {
+        /// <summary>The site folder, relative to kscript.json.</summary>
+        public string Root { get; set; } = ".";
+        public int Port { get; set; } = 8080;
+        public string Host { get; set; } = "localhost";
+    }
+
+    /// <summary>The <c>lint</c> section: used by <c>kscript check</c> and by the language server.</summary>
+    public sealed class LintSettings
+    {
+        /// <summary>Files <c>kscript check</c> looks at when given the project folder. Globs relative to kscript.json.</summary>
+        public List<string> Include { get; set; } = new List<string>(DefaultInclude);
+
+        /// <summary>Files and folders that are never checked, by <c>kscript check</c> or the editor.</summary>
+        public List<string> Exclude { get; set; } = new List<string>(DefaultExclude);
+
+        /// <summary>Severity per diagnostic code (KS3003) or code prefix (KS3*): off, hint, info, warning or error.</summary>
+        public Dictionary<string, string> Rules { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        public bool WarningsAsErrors { get; set; }
+
+        public static readonly string[] DefaultInclude = { "**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html", "**/*.md" };
+        public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
+    }
+
+    /// <summary>
+    /// A KScript project's settings, read from <c>kscript.json</c> in the project folder. <c>kscript serve</c>,
+    /// <c>kscript check</c>, <c>kscript make</c> and the language server look for it in the folder they work on and
+    /// its parents, so commands run from a subfolder still find it. Comments and trailing commas are allowed.
+    /// <code>
+    /// {
+    ///   "name": "my-site",
+    ///   "serve": { "root": ".", "port": 8080, "host": "localhost" },
+    ///   "lint": {
+    ///     "exclude": ["_templates", "drafts/**"],
+    ///     "rules": { "KS3003": "off", "KS4*": "error" },
+    ///     "warningsAsErrors": false
+    ///   }
+    /// }
+    /// </code>
+    /// </summary>
+    public sealed class ProjectConfig
+    {
+        public const string FileName = "kscript.json";
+
+        public static readonly string[] Severities = { "off", "hint", "info", "warning", "error" };
+
+        /// <summary>The kscript.json file, or null for the defaults.</summary>
+        public string FilePath { get; private set; }
+
+        /// <summary>The project folder (where kscript.json is).</summary>
+        public string Directory { get; private set; }
+
+        public string Name { get; set; }
+        public ServeSettings Serve { get; } = new ServeSettings();
+        public LintSettings Lint { get; } = new LintSettings();
+
+        /// <summary>Unknown keys and values that were ignored.</summary>
+        public List<string> Warnings { get; } = new List<string>();
+
+        /// <summary>The site folder <c>kscript serve</c> serves.</summary>
+        public string SiteRoot => Path.GetFullPath(Path.Combine(Directory, Serve.Root ?? "."));
+
+        /// <summary>Settings for a folder without a kscript.json.</summary>
+        public static ProjectConfig Default(string directory) => new ProjectConfig { Directory = Path.GetFullPath(directory ?? ".") };
+
+        /// <summary>The nearest kscript.json in <paramref name="start"/> (a file or folder) or a parent folder, or null.</summary>
+        public static string Find(string start)
+        {
+            if (string.IsNullOrEmpty(start)) return null;
+            string dir;
+            try
+            {
+                string full = Path.GetFullPath(start);
+                dir = System.IO.Directory.Exists(full) ? full : Path.GetDirectoryName(full);
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException)
+            {
+                return null;
+            }
+
+            while (!string.IsNullOrEmpty(dir))
+            {
+                string candidate = Path.Combine(dir, FileName);
+                if (File.Exists(candidate)) return candidate;
+                dir = Path.GetDirectoryName(dir);
+            }
+            return null;
+        }
+
+        /// <summary>Loads the nearest kscript.json above <paramref name="start"/>, or returns null when there is none.</summary>
+        public static ProjectConfig FindAndLoad(string start)
+        {
+            string file = Find(start);
+            return file == null ? null : Load(file);
+        }
+
+        public static ProjectConfig Load(string file) => Parse(File.ReadAllText(file), file);
+
+        public static ProjectConfig Parse(string json, string file)
+        {
+            string full = Path.GetFullPath(file);
+            var config = new ProjectConfig { FilePath = full, Directory = Path.GetDirectoryName(full) };
+
+            JsonDocument doc;
+            try
+            {
+                doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+            }
+            catch (JsonException ex)
+            {
+                string where = ex.LineNumber != null ? $" (line {ex.LineNumber + 1})" : "";
+                throw new ProjectConfigException($"{full}{where}: not valid JSON. {FirstSentence(ex.Message)}");
+            }
+
+            using (doc)
+            {
+                if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                    throw new ProjectConfigException($"{full}: should hold an object, e.g. {{ \"name\": \"my-site\" }}.");
+
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    switch (prop.Name)
+                    {
+                        case "$schema":
+                            break;
+                        case "name":
+                            config.Name = String(prop.Value, "name", config);
+                            break;
+                        case "serve":
+                            ReadServe(prop.Value, config);
+                            break;
+                        case "lint":
+                            ReadLint(prop.Value, config);
+                            break;
+                        default:
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, serve or lint).");
+                            break;
+                    }
+                }
+            }
+            return config;
+        }
+
+        private static void ReadServe(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "serve", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "root":
+                        config.Serve.Root = String(p.Value, "serve.root", config) ?? ".";
+                        break;
+                    case "port":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int port) && port > 0 && port < 65536) config.Serve.Port = port;
+                        else config.Warnings.Add($"serve.port should be a number from 1 to 65535.");
+                        break;
+                    case "host":
+                        config.Serve.Host = String(p.Value, "serve.host", config) ?? "localhost";
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port or host).");
+                        break;
+                }
+            }
+        }
+
+        private static void ReadLint(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "lint", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "include":
+                        config.Lint.Include = Strings(p.Value, "lint.include", config) ?? config.Lint.Include;
+                        break;
+                    case "exclude":
+                        config.Lint.Exclude = Strings(p.Value, "lint.exclude", config) ?? config.Lint.Exclude;
+                        break;
+                    case "warningsAsErrors":
+                        if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False) config.Lint.WarningsAsErrors = p.Value.GetBoolean();
+                        else config.Warnings.Add($"lint.warningsAsErrors should be true or false.");
+                        break;
+                    case "rules":
+                        if (!Object(p.Value, "lint.rules", config)) break;
+                        foreach (var rule in p.Value.EnumerateObject())
+                        {
+                            string value = rule.Value.ValueKind == JsonValueKind.String ? rule.Value.GetString().Trim().ToLowerInvariant() : null;
+                            if (value == "information") value = "info";
+                            if (value == null || !Severities.Contains(value))
+                                config.Warnings.Add($"lint.rules.{rule.Name} should be one of {string.Join(", ", Severities)}.");
+                            else if (!Regex.IsMatch(rule.Name, @"^KS\d{0,4}\*?$", RegexOptions.IgnoreCase))
+                                config.Warnings.Add($"lint.rules key '{rule.Name}' should be a code such as KS3003, or a prefix such as KS3*.");
+                            else
+                                config.Lint.Rules[rule.Name] = value;
+                        }
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'lint.{p.Name}' (expected include, exclude, rules or warningsAsErrors).");
+                        break;
+                }
+            }
+        }
+
+        private static bool Object(JsonElement e, string name, ProjectConfig config)
+        {
+            if (e.ValueKind == JsonValueKind.Object) return true;
+            config.Warnings.Add($"{name} should be an object {{ … }}.");
+            return false;
+        }
+
+        private static string String(JsonElement e, string name, ProjectConfig config)
+        {
+            if (e.ValueKind == JsonValueKind.String) return e.GetString();
+            config.Warnings.Add($"{name} should be a string.");
+            return null;
+        }
+
+        private static List<string> Strings(JsonElement e, string name, ProjectConfig config)
+        {
+            if (e.ValueKind == JsonValueKind.Array && e.EnumerateArray().All(i => i.ValueKind == JsonValueKind.String))
+                return e.EnumerateArray().Select(i => i.GetString()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+            config.Warnings.Add($"{name} should be a list of paths, e.g. [\"drafts/**\"].");
+            return null;
+        }
+
+        private static string FirstSentence(string message)
+        {
+            int i = message.IndexOf(". ", StringComparison.Ordinal);
+            return i < 0 ? message : message.Substring(0, i + 1);
+        }
+
+        // ---- rules and paths ---------------------------------------------------------------------------------------
+
+        /// <summary>The configured severity for a diagnostic code (off, hint, info, warning, error), or null to keep the default.</summary>
+        public string SeverityFor(string code)
+        {
+            if (string.IsNullOrEmpty(code) || Lint.Rules.Count == 0) return null;
+            if (Lint.Rules.TryGetValue(code, out string exact)) return exact;
+
+            // The longest matching prefix wins, so KS30* beats KS3*.
+            return Lint.Rules
+                .Where(r => r.Key.EndsWith('*') && code.StartsWith(r.Key.Substring(0, r.Key.Length - 1), StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(r => r.Key.Length)
+                .Select(r => r.Value)
+                .FirstOrDefault();
+        }
+
+        /// <summary>True when the file is under the project folder and matches lint.exclude.</summary>
+        public bool IsExcluded(string path)
+        {
+            string rel = Relative(path);
+            return rel != null && Lint.Exclude.Any(g => GlobMatches(g, rel));
+        }
+
+        /// <summary>True when the file matches lint.include and not lint.exclude.</summary>
+        public bool IsIncluded(string path)
+        {
+            string rel = Relative(path);
+            return rel != null && Lint.Include.Any(g => GlobMatches(g, rel)) && !Lint.Exclude.Any(g => GlobMatches(g, rel));
+        }
+
+        /// <summary>The path relative to the project folder with / separators, or null when it is outside it.</summary>
+        public string Relative(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            string rel = Path.GetRelativePath(Directory, Path.GetFullPath(path)).Replace('\\', '/');
+            return rel == ".." || rel.StartsWith("../", StringComparison.Ordinal) || Path.IsPathRooted(rel) ? null : rel;
+        }
+
+        /// <summary>
+        /// gitignore-style matching: a pattern without a / (such as <c>_templates</c> or <c>*.draft.html</c>) matches a
+        /// file or folder of that name anywhere; otherwise it is matched against the whole relative path, where
+        /// <c>*</c> matches within one folder, <c>**</c> matches any number of folders, and a folder matches everything in it.
+        /// </summary>
+        public static bool GlobMatches(string pattern, string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(pattern) || string.IsNullOrEmpty(relativePath)) return false;
+            string p = pattern.Trim().Replace('\\', '/');
+            if (p.StartsWith("./", StringComparison.Ordinal)) p = p.Substring(2);
+            p = p.TrimStart('/').TrimEnd('/');
+            if (p.Length == 0) return false;
+
+            var options = OperatingSystem.IsLinux() ? RegexOptions.None : RegexOptions.IgnoreCase;
+            if (!p.Contains('/'))
+            {
+                var segment = new Regex("^" + SegmentRegex(p) + "$", options);
+                return relativePath.Split('/').Any(s => segment.IsMatch(s));
+            }
+
+            var whole = new Regex("^" + PathRegex(p) + "(/.*)?$", options);
+            return whole.IsMatch(relativePath);
+        }
+
+        private static string SegmentRegex(string p)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in p)
+            {
+                sb.Append(c switch { '*' => "[^/]*", '?' => "[^/]", _ => Regex.Escape(c.ToString()) });
+            }
+            return sb.ToString();
+        }
+
+        private static string PathRegex(string p)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < p.Length; i++)
+            {
+                if (p[i] == '*' && i + 1 < p.Length && p[i + 1] == '*')
+                {
+                    bool slashAfter = i + 2 < p.Length && p[i + 2] == '/';
+                    sb.Append(slashAfter ? "(.*/)?" : ".*");
+                    i += slashAfter ? 2 : 1;
+                }
+                else if (p[i] == '*') sb.Append("[^/]*");
+                else if (p[i] == '?') sb.Append("[^/]");
+                else sb.Append(Regex.Escape(p[i].ToString()));
+            }
+            return sb.ToString();
+        }
+    }
+}

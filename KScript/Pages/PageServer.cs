@@ -31,7 +31,7 @@ namespace KScript.Pages
     /// <summary>
     /// File-based routing for a site folder: <c>/people</c> is people.html, people.md or people/index.html;
     /// <c>/people/42</c> can match people/[id].html. Files and folders starting with _ or . are never served,
-    /// and KScript sources (.xml, .ks) are never sent as text.
+    /// and KScript sources (.xml, .ks) and kscript.json are never sent as text.
     /// </summary>
     public sealed class PageSite
     {
@@ -52,6 +52,9 @@ namespace KScript.Pages
             var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
 
             if (segments.Any(s => s == ".." || s.StartsWith("_", StringComparison.Ordinal) || s.StartsWith(".", StringComparison.Ordinal)))
+                return NotFound();
+            // The project's settings file is not part of the site.
+            if (segments.Count > 0 && string.Equals(segments[^1], Projects.ProjectConfig.FileName, StringComparison.OrdinalIgnoreCase))
                 return NotFound();
 
             // Exact file

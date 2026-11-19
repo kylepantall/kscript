@@ -22,6 +22,8 @@
     <EmbeddedResource Include="Pages\live.js" LogicalName="KScript.Pages.live.js" />
     <!-- Built-in templates for kscript make -->
     <EmbeddedResource Include="Scaffolding\Templates\*" LogicalName="KScript.Scaffolding.Templates.%(Filename)%(Extension)" />
+    <!-- kscript make project: every file under Scaffolding/Project, by its path (dot-x is written as .x). WithCulture=false: otherwise MSBuild reads hello.ks.xml as a Kashmiri (ks) resource. -->
+    <EmbeddedResource Include="Scaffolding\Project\**\*" WithCulture="false" LogicalName="KScript.Scaffolding.Project/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

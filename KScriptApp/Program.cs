@@ -37,22 +37,26 @@ namespace KScript
         static void PrintUsage()
         {
             Console.WriteLine("Usage: kscript <script.xml> [options] [script arguments]");
-            Console.WriteLine("       kscript check <file-or-folder>... [--warnaserror]   Check scripts without running them.");
+            Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
             Console.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
             Console.WriteLine("       kscript --version | --help");
+            Console.WriteLine("       kscript make project <folder> [--port 8080]       Start a new project with a kscript.json.");
             Console.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
             Console.WriteLine("Options: " + string.Join(" ", Commands()));
         }
 
-        /// <summary>kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder.</summary>
+        /// <summary>
+        /// kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder. In a project, the nearest
+        /// kscript.json gives the defaults (serve.root, serve.port, serve.host); options on the command line win.
+        /// </summary>
         static int Serve(string[] args)
         {
-            string folder = ".";
-            int port = 8080;
-            string host = "localhost";
+            string folder = null;
+            int? port = null;
+            string host = null;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -60,11 +64,12 @@ namespace KScript
                 {
                     case "--port":
                     case "-p":
-                        if (i + 1 >= args.Length || !int.TryParse(args[++i], out port))
+                        if (i + 1 >= args.Length || !int.TryParse(args[++i], out int p))
                         {
                             Console.Error.WriteLine("--port needs a number, e.g. --port 8080");
                             return 1;
                         }
+                        port = p;
                         break;
                     case "--host":
                         if (i + 1 >= args.Length)
@@ -80,9 +85,32 @@ namespace KScript
                 }
             }
 
+            KScript.Projects.ProjectConfig project;
             try
             {
-                return KScript.Pages.PageServer.RunAsync(folder, port, host, Console.Out).GetAwaiter().GetResult();
+                project = KScript.Projects.ProjectConfig.FindAndLoad(folder ?? ".");
+            }
+            catch (KScript.Projects.ProjectConfigException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+
+            if (project != null)
+            {
+                foreach (string warning in project.Warnings) Console.Error.WriteLine($"{project.FilePath}: {warning}");
+                // `kscript serve` (or `kscript serve <project folder>`) serves the project's site root. A folder
+                // inside the project is served as given, with the project's port and host.
+                string given = folder == null ? null : Path.GetFullPath(folder);
+                if (given == null || string.Equals(given.TrimEnd(Path.DirectorySeparatorChar), project.Directory, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase))
+                    folder = project.SiteRoot;
+                port ??= project.Serve.Port;
+                host ??= project.Serve.Host;
+            }
+
+            try
+            {
+                return KScript.Pages.PageServer.RunAsync(folder ?? ".", port ?? 8080, host ?? "localhost", Console.Out).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
             {

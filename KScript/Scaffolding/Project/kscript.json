@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
+  "name": "{{ kebab }}",
+  "serve": {
+    "root": ".",
+    "port": {{ port ?? 8080 }},
+    "host": "localhost"
+  },
+  "lint": {
+    "include": ["**/*.html", "**/*.md", "**/*.ks.xml"],
+    "exclude": ["_templates", "node_modules"],
+    "rules": {},
+    "warningsAsErrors": false
+  }
+}

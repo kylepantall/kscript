@@ -286,6 +286,38 @@ namespace KScript.Language.Tests
             JsonObject d = Assert.Single(Diagnostics()).AsObject();
             Assert.Equal(12, d["range"]["start"]["character"].GetValue<int>());
         }
+
+        [Fact]
+        public void ProjectLintRulesApplyInTheEditor()
+        {
+            Initialize();
+            const string config = "file:///work/kscript.json";
+            Notify("textDocument/didOpen", new JsonObject
+            {
+                ["textDocument"] = new JsonObject
+                {
+                    ["uri"] = config, ["languageId"] = "json", ["version"] = 1,
+                    ["text"] = "{ \"lint\": { \"rules\": { \"KS3001\": \"hint\", \"KS4001\": \"off\" }, \"exclude\": [\"_templates\"] } }",
+                },
+            });
+            Open("<kscript>\n<ehco />\n<echo>$nope</echo>\n</kscript>");
+            JsonObject d = Assert.Single(Diagnostics()).AsObject();
+            Assert.Equal("KS3001", d["code"].GetValue<string>());
+            Assert.Equal(4, d["severity"].GetValue<int>());
+
+            const string template = "file:///work/_templates/page.ks.xml";
+            Open("<kscript><ehco>{{ name }}</ehco></kscript>", template);
+            Assert.Empty(Diagnostics(template));
+
+            // Editing kscript.json takes effect without restarting the server.
+            Notify("textDocument/didChange", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = config, ["version"] = 2 },
+                ["contentChanges"] = new JsonArray { new JsonObject { ["text"] = "{ \"lint\": { \"exclude\": [] } }" } },
+            });
+            Assert.Equal(2, Diagnostics().Count);
+            Assert.NotEmpty(Diagnostics(template));
+        }
     }
 
     internal static class JsonExtensions
