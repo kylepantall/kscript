@@ -1,4 +1,5 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,6 +9,7 @@ using System.Reflection;
 namespace KScript.Arguments
 {
     [KScriptObjects.KScriptNoInnerObjects]
+    [KScriptRetired("Loading plug-in assemblies is not part of KScript 2 yet.")]
     public class @ref : KScriptObject
     {
         [KScriptObjects.KScriptProperty("The directory to look for extensions for KScript.", true)]

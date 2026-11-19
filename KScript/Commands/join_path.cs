@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using System.IO;
 using System.Linq;
 
@@ -7,6 +8,7 @@ namespace KScript.Commands
     /// Joins path segments using the separator of the current operating system,
     /// e.g. <c>@join_path($dir, 'file.txt')</c> gives <c>dir\file.txt</c> on Windows and <c>dir/file.txt</c> elsewhere.
     /// </summary>
+    [KScriptDoc("Joins path parts with the right separator for the platform.")]
     public class join_path : KScriptCommand
     {
         private readonly string[] parts;

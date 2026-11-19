@@ -1,10 +1,12 @@
-﻿using KScript.Handlers;
+﻿using KScript.Metadata;
+using KScript.Handlers;
 
 namespace KScript.Commands
 {
     /// <summary>
     /// The @parse command allows the contents 
     /// </summary>
+    [KScriptRetired("Values are never re-read as script in KScript 2; use { } interpolation.")]
     public class parse : KScriptCommand
     {
         /// <summary>

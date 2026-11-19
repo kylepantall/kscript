@@ -1,8 +1,10 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
     /// <summary>
     /// Returns the result, only if the condition is true
     /// </summary>
+    [KScriptRetired("Use the conditional operator: $test ? 'yes' : 'no'.")]
     public class iftrue : KScriptCommand
     {
         private readonly string condition;

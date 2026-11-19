@@ -1,8 +1,10 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments.Watcher
 {
+    [KScriptRetired("Not part of KScript 2; check the value with <if> where it changes.")]
     public class rule : KScriptConditional
     {
         public rule(KScriptContainer container) => SetContainer(container);

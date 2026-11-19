@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 using System;
 
@@ -7,6 +8,8 @@ namespace KScript.Arguments
     /// KScript object to clear the console.
     /// </summary>
     [KScriptObjects.KScriptNoInnerObjects]
+    [KScriptDoc("Clears the terminal.")]
+    [KScriptElement(KScriptContentKind.Empty, Context = KScriptElementContext.Script)]
     public class clear : KScriptObject
     {
         public override bool Run()

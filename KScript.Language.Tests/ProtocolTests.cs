@@ -1,0 +1,301 @@
+using System.IO.Pipes;
+using System.Text;
+using System.Text.Json.Nodes;
+
+using KScript.Language.Analysis;
+using KScript.LanguageServer;
+
+namespace KScript.Language.Tests
+{
+    /// <summary>Drives the real server over a pipe with LSP framing, the way an editor does.</summary>
+    public sealed class ProtocolTests : IDisposable
+    {
+        private const string Uri = "file:///work/test.ks.xml";
+
+        private readonly AnonymousPipeServerStream toServer = new AnonymousPipeServerStream(PipeDirection.Out);
+        private readonly AnonymousPipeServerStream fromServer = new AnonymousPipeServerStream(PipeDirection.In);
+        private readonly Task<int> server;
+        private readonly List<JsonObject> notifications = new List<JsonObject>();
+        private int nextId = 1;
+
+        public ProtocolTests()
+        {
+            Stream serverIn = new AnonymousPipeClientStream(PipeDirection.In, toServer.ClientSafePipeHandle);
+            Stream serverOut = new AnonymousPipeClientStream(PipeDirection.Out, fromServer.ClientSafePipeHandle);
+            server = Task.Run(() => new KScriptLanguageServer(serverIn, serverOut, EmptyFileSystem.Instance).RunAsync());
+        }
+
+        public void Dispose()
+        {
+            toServer.Dispose();
+            fromServer.Dispose();
+        }
+
+        #region Client
+
+        private void Send(JsonObject message)
+        {
+            message["jsonrpc"] = "2.0";
+            byte[] body = Encoding.UTF8.GetBytes(message.ToJsonString());
+            byte[] header = Encoding.ASCII.GetBytes($"Content-Length: {body.Length}\r\n\r\n");
+            toServer.Write(header);
+            toServer.Write(body);
+            toServer.Flush();
+        }
+
+        private JsonObject Read()
+        {
+            StringBuilder header = new StringBuilder();
+            while (!header.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
+            {
+                int b = fromServer.ReadByte();
+                if (b < 0)
+                {
+                    return null;
+                }
+                header.Append((char)b);
+            }
+            int length = int.Parse(header.ToString().Split("Content-Length:")[1].Split("\r\n")[0].Trim());
+            byte[] body = new byte[length];
+            int read = 0;
+            while (read < length)
+            {
+                read += fromServer.Read(body, read, length - read);
+            }
+            return (JsonObject)JsonNode.Parse(body);
+        }
+
+        private JsonObject Request(string method, JsonNode parameters = null)
+        {
+            int id = nextId++;
+            Send(new JsonObject { ["id"] = id, ["method"] = method, ["params"] = parameters });
+            Task<JsonObject> wait = Task.Run(() =>
+            {
+                while (true)
+                {
+                    JsonObject message = Read();
+                    if (message == null)
+                    {
+                        return null;
+                    }
+                    if (message["id"] != null && message["id"].GetValue<int>() == id)
+                    {
+                        return message;
+                    }
+                    notifications.Add(message);
+                }
+            });
+            Assert.True(wait.Wait(TimeSpan.FromSeconds(20)), method + " timed out.");
+            return wait.Result;
+        }
+
+        private void Notify(string method, JsonNode parameters) => Send(new JsonObject { ["method"] = method, ["params"] = parameters });
+
+        private JsonObject Initialize()
+        {
+            JsonObject response = Request("initialize", new JsonObject { ["processId"] = null, ["rootUri"] = null, ["capabilities"] = new JsonObject() });
+            Notify("initialized", new JsonObject());
+            return response;
+        }
+
+        private void Open(string text, string uri = Uri) => Notify("textDocument/didOpen", new JsonObject
+        {
+            ["textDocument"] = new JsonObject { ["uri"] = uri, ["languageId"] = "kscript", ["version"] = 1, ["text"] = text },
+        });
+
+        /// <summary>The latest diagnostics published for a document (waits for them with a harmless request).</summary>
+        private JsonArray Diagnostics(string uri = Uri)
+        {
+            Request("textDocument/documentSymbol", Doc(uri));
+            JsonObject published = notifications.LastOrDefault(n => n["method"]?.GetValue<string>() == "textDocument/publishDiagnostics" && n["params"]["uri"].GetValue<string>() == uri);
+            Assert.NotNull(published);
+            return published["params"]["diagnostics"].AsArray();
+        }
+
+        private static JsonObject Doc(string uri = Uri) => new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = uri } };
+
+        private static JsonObject At(int line, int character, string uri = Uri) => new JsonObject
+        {
+            ["textDocument"] = new JsonObject { ["uri"] = uri },
+            ["position"] = new JsonObject { ["line"] = line, ["character"] = character },
+        };
+
+        private static JsonObject Range(int line, int start, int endLine, int end) => new JsonObject
+        {
+            ["start"] = new JsonObject { ["line"] = line, ["character"] = start },
+            ["end"] = new JsonObject { ["line"] = endLine, ["character"] = end },
+        };
+
+        #endregion
+
+        [Fact]
+        public void RequestsBeforeInitializeAreRejected()
+        {
+            JsonObject response = Request("textDocument/hover", At(0, 0));
+            Assert.Equal(ErrorCodes.ServerNotInitialized, response["error"]["code"].GetValue<int>());
+        }
+
+        [Fact]
+        public void InitializeAdvertisesCapabilities()
+        {
+            JsonObject caps = Initialize()["result"]["capabilities"].AsObject();
+            Assert.Equal(2, caps["textDocumentSync"]["change"].GetValue<int>());
+            foreach (string provider in new[] { "completionProvider", "hoverProvider", "signatureHelpProvider", "definitionProvider", "referencesProvider",
+                         "renameProvider", "documentSymbolProvider", "semanticTokensProvider", "codeActionProvider", "documentLinkProvider", "documentHighlightProvider" })
+            {
+                Assert.True(caps.ContainsKey(provider), provider);
+            }
+            JsonArray legend = caps["semanticTokensProvider"]["legend"]["tokenTypes"].AsArray();
+            Assert.Equal(KScriptLanguageServer.TokenTypes, legend.Select(t => t.GetValue<string>()));
+            Assert.Equal(Enum.GetNames<Features.SemanticTokenType>().Length, legend.Count);
+        }
+
+        [Fact]
+        public void PublishesDiagnosticsAndFollowsIncrementalEdits()
+        {
+            Initialize();
+            Open("<kscript>\n<ehco>hi</ehco>\n</kscript>");
+            JsonArray diagnostics = Diagnostics();
+            JsonObject d = Assert.Single(diagnostics).AsObject();
+            Assert.Equal("KS3001", d["code"].GetValue<string>());
+            Assert.Equal(1, d["range"]["start"]["line"].GetValue<int>());
+            Assert.Equal(1, d["range"]["start"]["character"].GetValue<int>());
+            Assert.Equal(1, d["severity"].GetValue<int>());
+
+            // Fix both tag names with two incremental edits.
+            Notify("textDocument/didChange", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = Uri, ["version"] = 2 },
+                ["contentChanges"] = new JsonArray
+                {
+                    new JsonObject { ["range"] = Range(1, 10, 1, 14), ["text"] = "echo" },
+                    new JsonObject { ["range"] = Range(1, 1, 1, 5), ["text"] = "echo" },
+                },
+            });
+            Assert.Empty(Diagnostics());
+        }
+
+        [Fact]
+        public void ClosingADocumentClearsItsDiagnostics()
+        {
+            Initialize();
+            Open("<kscript><ehco /></kscript>");
+            Assert.NotEmpty(Diagnostics());
+            Notify("textDocument/didClose", Doc());
+            Request("shutdown");
+            JsonObject last = notifications.Last(n => n["method"]?.GetValue<string>() == "textDocument/publishDiagnostics");
+            Assert.Empty(last["params"]["diagnostics"].AsArray());
+        }
+
+        [Fact]
+        public void AnswersEditorRequests()
+        {
+            Initialize();
+            //    0         1         2         3
+            //    0123456789012345678901234567890123456
+            Open("<kscript>\n" +
+                 "<let name=\"total\" value=\"1\" />\n" +   // line 1
+                 "<echo>{ $total->round() }</echo>\n" +   // line 2
+                 "<echo>@join_path('a', )</echo>\n" +     // line 3
+                 "<if condition=\"true\"></if>\n" +       // line 4
+                 "</kscript>");
+
+            JsonArray items = Request("textDocument/completion", At(2, 16))["result"]["items"].AsArray();
+            Assert.Contains(items, i => i["label"].GetValue<string>() == "round");
+
+            string hover = Request("textDocument/hover", At(2, 10))["result"]["contents"]["value"].GetValue<string>();
+            Assert.Contains("total", hover);
+
+            JsonObject help = Request("textDocument/signatureHelp", At(3, 22))["result"].AsObject();
+            Assert.Equal(1, help["activeParameter"].GetValue<int>());
+
+            JsonArray definition = Request("textDocument/definition", At(2, 10))["result"].AsArray();
+            Assert.Equal(1, Assert.Single(definition)["range"]["start"]["line"].GetValue<int>());
+
+            JsonArray references = Request("textDocument/references", At(2, 10).Also(o => o["context"] = new JsonObject { ["includeDeclaration"] = true }))["result"].AsArray();
+            Assert.Equal(2, references.Count);
+
+            JsonObject prepare = Request("textDocument/prepareRename", At(2, 10))["result"].AsObject();
+            Assert.Equal(9, prepare["start"]["character"].GetValue<int>());
+
+            JsonObject edit = Request("textDocument/rename", At(2, 10).Also(o => o["newName"] = "sum"))["result"].AsObject();
+            Assert.Equal(2, edit["changes"][Uri].AsArray().Count);
+
+            JsonObject badRename = Request("textDocument/rename", At(2, 10).Also(o => o["newName"] = "2x"));
+            Assert.NotNull(badRename["error"]);
+
+            JsonArray symbols = Request("textDocument/documentSymbol", Doc())["result"].AsArray();
+            Assert.Contains(symbols, s => s["name"].GetValue<string>() == "$total");
+
+            JsonArray data = Request("textDocument/semanticTokens/full", Doc())["result"]["data"].AsArray();
+            Assert.True(data.Count > 0 && data.Count % 5 == 0);
+
+            JsonArray actions = Request("textDocument/codeAction", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = Uri },
+                ["range"] = Range(4, 4, 4, 4),
+                ["context"] = new JsonObject { ["diagnostics"] = new JsonArray() },
+            })["result"].AsArray();
+            JsonObject action = Assert.Single(actions).AsObject();
+            Assert.Equal("quickfix", action["kind"].GetValue<string>());
+            Assert.Equal("test", action["edit"]["changes"][Uri][0]["newText"].GetValue<string>());
+
+            JsonArray highlights = Request("textDocument/documentHighlight", At(2, 10))["result"].AsArray();
+            Assert.Equal(2, highlights.Count);
+        }
+
+        [Fact]
+        public void UnknownRequestsGetMethodNotFound()
+        {
+            Initialize();
+            Assert.Equal(ErrorCodes.MethodNotFound, Request("textDocument/frobnicate", Doc())["error"]["code"].GetValue<int>());
+        }
+
+        [Fact]
+        public void RequestsForUnopenedDocumentsDoNotCrash()
+        {
+            Initialize();
+            JsonObject response = Request("textDocument/hover", At(0, 0, "file:///nowhere/x.ks.xml"));
+            Assert.True(response["error"] != null || response["result"] == null);
+            Assert.NotNull(Request("shutdown"));
+        }
+
+        [Fact]
+        public void ExitAfterShutdownReturnsZero()
+        {
+            Initialize();
+            Assert.Null(Request("shutdown")["error"]);
+            Notify("exit", null);
+            Assert.True(server.Wait(TimeSpan.FromSeconds(10)));
+            Assert.Equal(0, server.Result);
+        }
+
+        [Fact]
+        public void ExitWithoutShutdownReturnsOne()
+        {
+            Initialize();
+            Notify("exit", null);
+            Assert.True(server.Wait(TimeSpan.FromSeconds(10)));
+            Assert.Equal(1, server.Result);
+        }
+
+        [Fact]
+        public void PositionsUseUtf16()
+        {
+            Initialize();
+            // The emoji is two UTF-16 code units, so the name in $nope starts at character 12 on line 1.
+            Open("<kscript>\n<echo>😀 { $nope }</echo>\n</kscript>");
+            JsonObject d = Assert.Single(Diagnostics()).AsObject();
+            Assert.Equal(12, d["range"]["start"]["character"].GetValue<int>());
+        }
+    }
+
+    internal static class JsonExtensions
+    {
+        public static JsonObject Also(this JsonObject o, Action<JsonObject> change)
+        {
+            change(o);
+            return o;
+        }
+    }
+}

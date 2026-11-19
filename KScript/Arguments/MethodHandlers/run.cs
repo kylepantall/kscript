@@ -1,9 +1,11 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 using System.Diagnostics;
 
 namespace KScript.Arguments
 {
     [KScriptObjects.KScriptNoInnerObjects]
+    [KScriptRetired("Use <fn> and @name(), or <call fn=\"...\">.")]
     public class run : KScriptObject
     {
         [KScriptObjects.KScriptProperty("The location of the process to run.")]

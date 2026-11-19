@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
@@ -9,6 +10,8 @@ namespace KScript.Arguments
     /// &lt;else&gt; ... &lt;/else&gt;
     /// </code>
     /// </summary>
+    [KScriptDoc("Runs when the earlier <if>/<elif> tests were all false.")]
+    [KScriptElement(KScriptContentKind.Statements, MustFollow = "if, elif")]
     public class @else : KScriptObject
     {
         public override bool Run()

@@ -1,0 +1,102 @@
+{
+  "name": "kscript",
+  "displayName": "KScript",
+  "description": "KScript 2 language support: diagnostics, completion, hover, signature help, go to definition, references, rename, outline, semantic highlighting and quick fixes.",
+  "version": "2.0.0",
+  "publisher": "kscript",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kylepantall/kscript"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:kscript",
+    "workspaceContains:**/kscript.json"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "kscript",
+        "aliases": [
+          "KScript",
+          "kscript"
+        ],
+        "extensions": [
+          ".ks.xml",
+          ".ks",
+          ".kscript"
+        ],
+        "firstLine": "^\\s*(<\\?xml[^>]*>\\s*)?<kscript\\b",
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "kscript",
+        "scopeName": "source.kscript",
+        "path": "./syntaxes/kscript.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "KScript",
+      "properties": {
+        "kscript.server.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the kscript executable, or to KScript.dll (run with dotnet). Empty: use the server bundled with the extension, then `kscript` on the PATH."
+        },
+        "kscript.server.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "lsp"
+          ],
+          "description": "Arguments that start the language server."
+        },
+        "kscript.pages.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also check .html and .md pages in folders with a kscript.json (kscript serve sites)."
+        },
+        "kscript.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Log the messages between VS Code and the language server."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "kscript.restartServer",
+        "title": "KScript: Restart Language Server"
+      }
+    ]
+  },
+  "scripts": {
+    "bundle-server": "dotnet publish ../../KScriptApp/KScriptApp.csproj -c Release -o server",
+    "package": "npm run bundle-server && vsce package",
+    "check": "node --check extension.js",
+    "test": "node test/smoke.js"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.2.1"
+  }
+}

@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using KScript.Metadata;
+using System.Linq;
 using System;
 using System.CodeDom.Compiler;
 using KScript.MultiArray;
@@ -6,6 +7,7 @@ using System.Collections.Generic;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Use $value->to_json().")]
     public class pretty_print : KScriptCommand
     {
         public string array_id { get; set; }

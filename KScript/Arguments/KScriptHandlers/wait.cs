@@ -1,9 +1,12 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 using System;
 
 namespace KScript.Arguments
 {
     [KScriptObjects.KScriptNoInnerObjects]
+    [KScriptDoc("Pauses for a number of milliseconds.")]
+    [KScriptElement(KScriptContentKind.Template)]
     public class wait : KScriptObject
     {
         [KScriptObjects.KScriptProperty("The time to wait.", true)]

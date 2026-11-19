@@ -1,9 +1,11 @@
+using KScript.Metadata;
 using System;
 using System.IO;
 using System.Net.Http;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("The text of a file.")]
     public class read_text : KScriptCommand
     {
         private readonly string path = "";

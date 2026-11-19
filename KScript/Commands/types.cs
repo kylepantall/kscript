@@ -1,8 +1,10 @@
+using KScript.Metadata;
 using System.Linq;
 using System.Text;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Not part of KScript 2.")]
     public class types : KScriptCommand
     {
         public types() { }

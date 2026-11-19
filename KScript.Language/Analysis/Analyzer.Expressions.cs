@@ -1,0 +1,378 @@
+using KScript.Language.Catalog;
+using KScript.Language.Markup;
+using KScript.Language.Syntax;
+using KScript.Language.Text;
+
+namespace KScript.Language.Analysis
+{
+    public sealed partial class Analyzer
+    {
+        private enum ExprContext
+        {
+            Value,
+            Argument,
+        }
+
+
+        #region Checking
+
+        private void AnalyzeExpr(ExprNode node, ExpressionRegion region, Scope scope, ExprContext context)
+        {
+            switch (node)
+            {
+                case null:
+                case LiteralNode _:
+                case ErrorNode _:
+                    return;
+
+                case VariableNode v:
+                {
+                    TextSpan span = VariableNameSpan(v, region);
+                    ReferenceVariable(v.Name, span, scope, isWrite: false, mustBeMutable: false, offset: span.Start);
+                    return;
+                }
+
+                case IdentifierNode id:
+                    AnalyzeBareIdentifier(id, region, scope, context);
+                    return;
+
+                case CommandCallNode c:
+                    AnalyzeCommand(c, region, scope, piped: 0);
+                    return;
+
+                case MethodCallNode m:
+                    AnalyzeExpr(m.Target, region, scope, ExprContext.Value);
+                    AnalyzeArguments(m.Arguments, region, scope);
+                    CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), Infer(m.Target, region), m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false);
+                    return;
+
+                case CallNode call:
+                    AnalyzeCall(call, region, scope, piped: false, left: null);
+                    return;
+
+                case MemberNode member:
+                    if (member.Target is IdentifierNode alias && scope.Lookup(alias.Name, region.Source.ToSource(alias.Span.Start)) is Symbol s && s.Kind == SymbolKind.Import)
+                    {
+                        result.References.Add(new SymbolReference(s, region.Source.ToSource(alias.Span), false, false));
+                    }
+                    else
+                    {
+                        AnalyzeExpr(member.Target, region, scope, ExprContext.Value);
+                        CheckField(member, region);
+                    }
+                    return;
+
+                case IndexNode index:
+                    AnalyzeExpr(index.Target, region, scope, ExprContext.Value);
+                    AnalyzeExpr(index.Index, region, scope, ExprContext.Value);
+                    return;
+
+                case PipeNode pipe:
+                    AnalyzeExpr(pipe.Left, region, scope, ExprContext.Value);
+                    AnalyzePipeTarget(pipe, region, scope);
+                    return;
+
+                case LambdaNode lambda:
+                    AnalyzeLambda(lambda, region, scope);
+                    return;
+
+                case ArgumentNode arg:
+                    AnalyzeExpr(arg.Value, region, scope, ExprContext.Argument);
+                    return;
+
+                case AssignmentNode assign:
+                    AnalyzeExpr(assign.Value, region, scope, ExprContext.Value);
+                    return;
+
+                default:
+                    foreach (ExprNode child in node.Children)
+                    {
+                        AnalyzeExpr(child, region, scope, ExprContext.Value);
+                    }
+                    return;
+            }
+        }
+
+        private void AnalyzeArguments(IEnumerable<ArgumentNode> args, ExpressionRegion region, Scope scope)
+        {
+            foreach (ArgumentNode arg in args)
+            {
+                AnalyzeExpr(arg.Value, region, scope, ExprContext.Argument);
+            }
+        }
+
+        private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context)
+        {
+            if (id.Name == "_" && context == ExprContext.Argument)
+            {
+                return;
+            }
+
+            TextSpan span = region.Source.ToSource(id.Span);
+            Symbol symbol = scope.Lookup(id.Name, span.Start);
+            List<QuickFix> fixes = new List<QuickFix>();
+            string hint;
+            if (symbol != null && symbol.Kind != SymbolKind.Function && symbol.Kind != SymbolKind.Import)
+            {
+                fixes.Add(new QuickFix($"Change to ${id.Name}", new TextChange(span, "$" + id.Name)));
+                hint = $" Did you mean ${id.Name}?";
+            }
+            else if (symbol?.Kind == SymbolKind.Function)
+            {
+                fixes.Add(new QuickFix($"Change to @{id.Name}", new TextChange(span, "@" + id.Name)));
+                hint = $" To pass the function, write @{id.Name}.";
+            }
+            else
+            {
+                fixes.Add(new QuickFix($"Quote as '{id.Name}'", new TextChange(span, "'" + id.Name + "'")));
+                hint = $" Variables start with $ ($" + id.Name + "), and text needs quotes ('" + id.Name + "').";
+            }
+            Report(span, DiagnosticSeverity.Error, DiagnosticCodes.BareIdentifier, $"'{id.Name}' isn't a value." + hint, fixes);
+        }
+
+        private void AnalyzeCommand(CommandCallNode c, ExpressionRegion region, Scope scope, int piped)
+        {
+            AnalyzeArguments(c.Arguments, region, scope);
+            TextSpan full = region.Source.ToSource(c.NameSpan);
+            TextSpan nameSpan = TextSpan.FromBounds(full.Start + 1, full.End);
+            int count = c.ArgumentList == null ? -1 : c.Arguments.Count + piped;
+
+            Symbol fn = scope.Lookup(c.Name, nameSpan.Start);
+            if (fn != null && fn.Kind == SymbolKind.Function)
+            {
+                result.References.Add(new SymbolReference(fn, nameSpan, false, false));
+                if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn)))
+                {
+                    CheckFunctionArgumentCount(fn, count, full);
+                }
+                return;
+            }
+
+            CallableInfo command = catalog.GetCommand(c.Name);
+            if (command != null)
+            {
+                if (count >= 0 && command.Signatures.Count > 0 && !command.Signatures.Any(s => count >= s.MinArgs && count <= s.MaxArgs))
+                {
+                    Report(full, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
+                        $"@{command.Name} doesn't take {count} argument{(count == 1 ? string.Empty : "s")}{(piped > 0 ? " (including the piped value)" : string.Empty)}. Use {string.Join(" or ", command.Labels)}.");
+                }
+                return;
+            }
+
+            RetiredInfo retired = catalog.GetRetiredCommand(c.Name);
+            if (retired != null)
+            {
+                Report(full, DiagnosticSeverity.Error, DiagnosticCodes.RetiredCommand, $"@{c.Name} was removed in KScript 2. {retired.Replacement}");
+                return;
+            }
+
+            IEnumerable<string> candidates = catalog.Commands.Select(x => x.Name).Concat(result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name));
+            string suggestion = Suggestions.Closest(c.Name, candidates);
+            Report(full, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand,
+                $"Unknown command @{c.Name}." + (suggestion != null ? $" Did you mean @{suggestion}?" : " Declare it with <fn name=\"" + c.Name + "\">."),
+                suggestion != null ? new[] { new QuickFix($"Change to @{suggestion}", new TextChange(nameSpan, suggestion)) } : null);
+        }
+
+        private void AnalyzeCall(CallNode call, ExpressionRegion region, Scope scope, bool piped, TypeShape left)
+        {
+            AnalyzeArguments(call.Arguments, region, scope);
+
+            switch (call.Callee)
+            {
+                case IdentifierNode id:
+                {
+                    TextSpan span = region.Source.ToSource(id.Span);
+                    Symbol fn = scope.Lookup(id.Name, span.Start);
+                    if (piped)
+                    {
+                        if (fn != null && fn.Kind == SymbolKind.Function)
+                        {
+                            result.References.Add(new SymbolReference(fn, span, false, false));
+                            CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
+                            return;
+                        }
+                        CheckMethod(id.Name, span, left ?? TypeShape.Unknown, call.Arguments.Count, pipe: true);
+                        return;
+                    }
+
+                    if (fn != null && fn.Kind == SymbolKind.Function)
+                    {
+                        result.References.Add(new SymbolReference(fn, span, false, false));
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Call functions with @: @{id.Name}(...).",
+                            new[] { new QuickFix($"Change to @{id.Name}", new TextChange(new TextSpan(span.Start, 0), "@")) });
+                    }
+                    else if (catalog.GetCommand(id.Name) != null)
+                    {
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Commands start with @: @{id.Name}(...).",
+                            new[] { new QuickFix($"Change to @{id.Name}", new TextChange(new TextSpan(span.Start, 0), "@")) });
+                    }
+                    else if (catalog.GetMethods(id.Name).Any())
+                    {
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod,
+                            $"{id.Name}() is a method: call it on a value ($x->{id.Name}()) or pipe into it ($x |> {id.Name}()).");
+                    }
+                    else
+                    {
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Unknown function '{id.Name}'. Declare it with <fn name=\"{id.Name}\">.");
+                    }
+                    return;
+                }
+
+                case MemberNode member when member.Target is IdentifierNode alias:
+                {
+                    TextSpan aliasSpan = region.Source.ToSource(alias.Span);
+                    Symbol import = scope.Lookup(alias.Name, aliasSpan.Start);
+                    if (import?.Kind == SymbolKind.Import)
+                    {
+                        result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+                        if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member.Name))
+                        {
+                            TextSpan memberSpan = region.Source.ToSource(member.NameSpan);
+                            Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{alias.Name}' has no function '{member.Name}'.",
+                                SuggestFix(memberSpan, member.Name, import.Shape.Fields.Keys, n => n));
+                        }
+                        return;
+                    }
+                    AnalyzeExpr(member, region, scope, ExprContext.Value);
+                    return;
+                }
+
+                default:
+                    // $fn(args): calling a lambda held in a variable.
+                    AnalyzeExpr(call.Callee, region, scope, ExprContext.Value);
+                    return;
+            }
+        }
+
+        private void AnalyzePipeTarget(PipeNode pipe, ExpressionRegion region, Scope scope)
+        {
+            switch (pipe.Right)
+            {
+                case CallNode call:
+                    AnalyzeCall(call, region, scope, piped: true, left: Infer(pipe.Left, region));
+                    return;
+
+                case CommandCallNode command:
+                    AnalyzeCommand(command, region, scope, piped: 1);
+                    return;
+
+                case LambdaNode lambda:
+                    AnalyzeLambda(lambda, region, scope);
+                    if (lambda.Parameters.Count != 1)
+                    {
+                        Report(region.Source.ToSource(lambda.Span), DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount, "A lambda that is piped into takes exactly one parameter.");
+                    }
+                    return;
+
+                case VariableNode _:
+                case MethodCallNode _:
+                case MemberNode _:
+                case IndexNode _:
+                    AnalyzeExpr(pipe.Right, region, scope, ExprContext.Value);
+                    return;
+
+                case IdentifierNode id:
+                    Report(region.Source.ToSource(id.Span), DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax, $"Add parentheses to call it: |> {id.Name}().",
+                        new[] { new QuickFix($"Change to {id.Name}()", new TextChange(new TextSpan(region.Source.ToSource(id.Span.End), 0), "()")) });
+                    return;
+
+                case ErrorNode _:
+                    return;
+
+                default:
+                    Report(region.Source.ToSource(pipe.Right.Span), DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax,
+                        "A pipe needs a method, function, command or lambda on its right, as in |> upper() or |> @json().");
+                    return;
+            }
+        }
+
+        private void AnalyzeLambda(LambdaNode lambda, ExpressionRegion region, Scope scope)
+        {
+            TextSpan span = region.Source.ToSource(lambda.Span);
+            Scope inner = new Scope(scope, span);
+            foreach (ParameterNode p in lambda.Parameters)
+            {
+                TextSpan pSpan = region.Source.ToSource(p.Span);
+                if (region.Source.Value.Length > p.Span.Start && region.Source.Value[p.Span.Start] == '$')
+                {
+                    pSpan = TextSpan.FromBounds(pSpan.Start + 1, pSpan.End);
+                }
+                inner.Declare(NewVariable(p.Name, pSpan, region.Element, SymbolKind.Parameter, TypeShape.Unknown), span.Start);
+            }
+            AnalyzeExpr(lambda.Body, region, inner, ExprContext.Value);
+        }
+
+        private void CheckMethod(string name, TextSpan nameSpan, TypeShape receiver, int count, bool pipe)
+        {
+            if (string.IsNullOrEmpty(name) || name == "call")
+            {
+                return;
+            }
+
+            List<CallableInfo> candidates = catalog.GetMethods(name, receiver.Type).ToList();
+            string arrow = pipe ? "|> " : "->";
+            if (candidates.Count == 0)
+            {
+                IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Select(m => m.Name)
+                    .Concat(pipe ? result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name) : Enumerable.Empty<string>());
+                string suggestion = Suggestions.Closest(name, names);
+                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod,
+                    $"Unknown method {arrow}{name}()." + (suggestion != null ? $" Did you mean {arrow}{suggestion}()?" : string.Empty),
+                    suggestion != null ? new[] { new QuickFix($"Change to {suggestion}", new TextChange(nameSpan, suggestion)) } : null);
+                return;
+            }
+
+            List<CallableInfo> applicable = candidates.Where(m => KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
+            if (applicable.Count == 0)
+            {
+                Report(nameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
+                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(receiver.ToString())}.");
+                return;
+            }
+
+            if (count >= 0 && !applicable.Any(m => count >= m.MinArgs && count <= m.MaxArgs))
+            {
+                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
+                    $"{arrow}{name}() doesn't take {count} argument{(count == 1 ? string.Empty : "s")}. Use {string.Join(" or ", applicable.SelectMany(m => m.Labels).Distinct())}.");
+            }
+        }
+
+        private void CheckField(MemberNode member, ExpressionRegion region)
+        {
+            TypeShape target = Infer(member.Target, region);
+            if ((target.Type == KType.Request || target.Type == KType.Error) && member.Name.Length > 0 && !target.Fields.ContainsKey(member.Name))
+            {
+                TextSpan span = region.Source.ToSource(member.NameSpan);
+                Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownMethod,
+                    $"{(target.Type == KType.Request ? "$request" : "An error")} has no field '{member.Name}'. It has: {string.Join(", ", target.Fields.Keys)}.",
+                    SuggestFix(span, member.Name, target.Fields.Keys, n => n));
+            }
+        }
+
+        private static string Plural(string type) => type switch
+        {
+            KType.Any => "any value",
+            KType.Bool => "bools (yes/no)",
+            _ => type + "s",
+        };
+
+        private static string Article(string type) =>
+            type.Length > 0 && "aeiou".Contains(char.ToLowerInvariant(type[0])) ? "an " + type : "a " + type;
+
+        private static TextSpan VariableNameSpan(VariableNode v, ExpressionRegion region)
+        {
+            TextSpan span = region.Source.ToSource(v.Span);
+            return TextSpan.FromBounds(Math.Min(span.Start + 1, span.End), span.End);
+        }
+
+        #endregion
+
+        #region Types
+
+        internal TypeShape Infer(ExprNode node, ExpressionRegion region) => (types ??= new TypeInference(catalog, result)).Infer(node, region);
+
+        private TypeInference types;
+
+        #endregion
+    }
+}

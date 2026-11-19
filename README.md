@@ -59,6 +59,10 @@ Command line options:
 
 Anything after the script path is available to the script through `@args()`.
 
+<h2>Editor support</h2>
+
+`kscript lsp` runs a language server for KScript 2 (diagnostics, completion, hover, go to definition, rename and more), and `kscript check <folder>` reports the same problems on the command line for CI. A VS Code extension is in `editors/vscode`. See [docs/language-server.md](docs/language-server.md).
+
 <h2>Writing portable scripts</h2>
 
 - Build paths with `@join_path($dir, 'file.txt')` rather than hard-coding `\` or `/`.

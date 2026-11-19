@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptRetired("Use the not operator: not $a.")]
     public class not : KScriptCommand
     {
         public not(string value) => Value = value;

@@ -1,7 +1,9 @@
+using KScript.Metadata;
 using System;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Not part of KScript 2.")]
     public class parent : KScriptCommand
     {
         private readonly string property;

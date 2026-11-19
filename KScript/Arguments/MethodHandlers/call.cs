@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Handlers;
 using KScript.Document;
 using KScript.KScriptObjects;
@@ -7,9 +8,14 @@ using System.Threading;
 
 namespace KScript.Arguments
 {
+    [KScriptDoc("Calls a function as a statement.", Example = "<call fn=\"greet\" args=\"'World'\" />")]
+    [KScriptElement(KScriptContentKind.Empty)]
+    [KScriptAttribute("fn", KScriptValueKind.FunctionReference, "The function to call.", Required = true)]
+    [KScriptAttribute("args", KScriptValueKind.ExpressionList, "Arguments, comma separated.")]
     public class call : KScriptObject
     {
         [KScriptProperty("Used to declare which method to call", true)]
+        [KScriptRetired("Use fn=\"...\" with a <fn> function.", Rename = "fn")]
         public string method { get; set; }
 
 

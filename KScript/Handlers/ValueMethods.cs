@@ -91,8 +91,9 @@ namespace KScript.Handlers
     {
         private sealed class Method
         {
-            public Method(int min, int max, Func<MethodCallContext, string> body, string description)
+            public Method(int min, int max, Func<MethodCallContext, string> body, string description, string category)
             {
+                Category = category;
                 MinArgs = min;
                 MaxArgs = max;
                 Body = body;
@@ -103,12 +104,16 @@ namespace KScript.Handlers
             public int MaxArgs { get; }
             public Func<MethodCallContext, string> Body { get; }
             public string Description { get; }
+            public string Category { get; }
         }
 
         private static readonly Dictionary<string, Method> Methods = new Dictionary<string, Method>(StringComparer.OrdinalIgnoreCase);
 
+        // The section being registered: any, string, number or bool. Used by tooling to offer methods for a value's type.
+        private static string category = "any";
+
         private static void Add(string name, int min, int max, string description, Func<MethodCallContext, string> body) =>
-            Methods[name] = new Method(min, max, body, description);
+            Methods[name] = new Method(min, max, body, description, category);
 
         private static string Num(double d) => ValueTypes.FromNumber(d);
         private static string Bool(bool b) => ValueTypes.FromBool(b);
@@ -132,6 +137,7 @@ namespace KScript.Handlers
             Add("call", 0, int.MaxValue, "call(args...): call a lambda stored in the value", null);
 
             // ---- Strings ----
+            category = "string";
             Add("upper", 0, 0, "upper case", c => c.Value.ToUpperInvariant());
             Add("lower", 0, 0, "lower case", c => c.Value.ToLowerInvariant());
             Add("trim", 0, 0, "remove surrounding whitespace", c => c.Value.Trim());
@@ -171,6 +177,7 @@ namespace KScript.Handlers
             Add("pad_right", 1, 2, "pad_right(width, char?)", c => c.Value.PadRight(c.IntArg(0), PadChar(c)));
 
             // ---- Numbers ----
+            category = "number";
             Add("add", 1, 1, "add(n)", c => Num(c.Number + c.NumberArg(0)));
             Add("sub", 1, 1, "sub(n)", c => Num(c.Number - c.NumberArg(0)));
             Add("mul", 1, 1, "mul(n)", c => Num(c.Number * c.NumberArg(0)));
@@ -204,6 +211,7 @@ namespace KScript.Handlers
             Add("decrement", 0, 1, "decrement(by?): on a variable, also updates it", c => Mutate(c, c.Number - (c.Args.Length > 0 ? c.NumberArg(0) : 1)));
 
             // ---- Bools ----
+            category = "bool";
             Add("not", 0, 0, "negate", c => Bool(!c.Bool));
             Add("and", 1, 1, "and(other)", c => Bool(c.Bool & ValueTypes.ToBool(c.Args[0], c.Method)));
             Add("or", 1, 1, "or(other)", c => Bool(c.Bool | ValueTypes.ToBool(c.Args[0], c.Method)));
@@ -227,6 +235,13 @@ namespace KScript.Handlers
         /// <summary>Names and descriptions of the built-in methods.</summary>
         public static IEnumerable<KeyValuePair<string, string>> Describe() =>
             Methods.OrderBy(m => m.Key).Select(m => new KeyValuePair<string, string>(m.Key, m.Value.Description));
+
+        /// <summary>
+        /// Every built-in method with its argument counts, description and the type it is meant for
+        /// (any, string, number or bool). Used by the language server for completion, hover and checks.
+        /// </summary>
+        public static IEnumerable<(string Name, int MinArgs, int MaxArgs, string Description, string Category)> Catalog() =>
+            Methods.Select(m => (m.Key, m.Value.MinArgs, m.Value.MaxArgs, m.Value.Description, m.Value.Category));
 
         public static bool Exists(string name) => Methods.ContainsKey(name);
 

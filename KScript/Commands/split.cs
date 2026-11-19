@@ -1,7 +1,9 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("One part of text split by a separator.")]
     public class split : KScriptCommand
     {
         private readonly string @string;

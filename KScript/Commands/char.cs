@@ -1,8 +1,10 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("The character with this character code.")]
     class @char : KScriptCommand
     {
         readonly string number;

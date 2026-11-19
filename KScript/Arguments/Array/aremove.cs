@@ -1,8 +1,10 @@
-﻿using KScript.KScriptObjects;
+﻿using KScript.Metadata;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
     [KScriptNoInnerObjects()]
+    [KScriptRetired("Use <do>$list->remove($index)</do>.")]
     public class aremove : KScriptObject
     {
         [KScriptProperty("Defines the array to remove from.", true)]

@@ -1,7 +1,9 @@
+using KScript.Metadata;
 using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("The current date and time, optionally formatted.")]
     public class datetime : KScriptCommand
     {
         public datetime() => format = null;
