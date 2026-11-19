@@ -1,0 +1,420 @@
+using System;
+using System.Diagnostics;
+using System.Formats.Tar;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+namespace KScript.Updates
+{
+    /// <summary>
+    /// <c>kscript update</c>: replaces the running single-file binary with the newest GitHub release.
+    /// Release assets are named <c>kscript-&lt;rid&gt;.tar.gz</c> (<c>.zip</c> on Windows), as built by
+    /// .github/workflows/release.yml.
+    /// </summary>
+    public static class SelfUpdater
+    {
+        public const string DefaultRepository = "kylepantall/kscript";
+
+        /// <summary>The version this binary was built as, e.g. "0.1.0" (release builds pass it from the tag).</summary>
+        public static string CurrentVersion
+        {
+            get
+            {
+                var assembly = Assembly.GetEntryAssembly() ?? typeof(SelfUpdater).Assembly;
+                string informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                    ?? assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+                int plus = informational.IndexOf('+');
+                return plus >= 0 ? informational.Substring(0, plus) : informational;
+            }
+        }
+
+        /// <summary>The release runtime id for this machine, or null when no release is built for it.</summary>
+        public static string RuntimeId(OSPlatform? os = null, Architecture? arch = null)
+        {
+            Architecture a = arch ?? RuntimeInformation.OSArchitecture;
+            bool Is(OSPlatform p) => os.HasValue ? os.Value == p : RuntimeInformation.IsOSPlatform(p);
+
+            if (Is(OSPlatform.Windows))
+            {
+                // Windows on Arm runs the x64 build under emulation.
+                return a == Architecture.X64 || a == Architecture.Arm64 ? "win-x64" : null;
+            }
+
+            string cpu = a switch { Architecture.X64 => "x64", Architecture.Arm64 => "arm64", _ => null };
+            if (cpu == null)
+            {
+                return null;
+            }
+
+            if (Is(OSPlatform.OSX))
+            {
+                return "osx-" + cpu;
+            }
+
+            return Is(OSPlatform.Linux) ? "linux-" + cpu : null;
+        }
+
+        public static string AssetName(string rid) => rid.StartsWith("win-", StringComparison.Ordinal) ? $"kscript-{rid}.zip" : $"kscript-{rid}.tar.gz";
+
+        /// <summary>Parses "v1.2.3", "1.2", "1.2.3-beta.1" (the prerelease part is ignored).</summary>
+        public static bool TryParseVersion(string text, out Version version)
+        {
+            version = null;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            string s = text.Trim();
+            if (s.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            {
+                s = s.Substring(1);
+            }
+
+            int cut = s.IndexOfAny(new[] { '-', '+' });
+            if (cut >= 0)
+            {
+                s = s.Substring(0, cut);
+            }
+
+            if (!Version.TryParse(s.Contains('.') ? s : s + ".0", out var v))
+            {
+                return false;
+            }
+
+            version = new Version(v.Major, v.Minor, Math.Max(v.Build, 0));
+            return true;
+        }
+
+        /// <summary>True when <paramref name="latest"/> is a higher version than <paramref name="current"/>.</summary>
+        public static bool IsNewer(string latest, string current) =>
+            TryParseVersion(latest, out var l) && (!TryParseVersion(current, out var c) || l > c);
+
+        public static int Run(string[] args, TextWriter output, TextWriter error)
+        {
+            bool checkOnly = args.Contains("--check");
+            bool force = args.Contains("--force");
+            string tag = null;
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] == "--version" || args[i] == "--tag")
+                {
+                    if (i + 1 >= args.Length)
+                    {
+                        error.WriteLine($"{args[i]} needs a release tag, e.g. {args[i]} v0.1.0");
+                        return 1;
+                    }
+                    tag = args[++i];
+                    if (!tag.StartsWith("v", StringComparison.Ordinal))
+                    {
+                        tag = "v" + tag;
+                    }
+                }
+                else if (args[i] == "--help" || args[i] == "-h")
+                {
+                    output.WriteLine("Usage: kscript update [--check] [--force] [--version <tag>]");
+                    output.WriteLine("  --check           Only report whether a newer release exists.");
+                    output.WriteLine("  --force           Reinstall even when already up to date.");
+                    output.WriteLine("  --version <tag>   Install a specific release, e.g. v0.1.0.");
+                    return 0;
+                }
+            }
+
+            try
+            {
+                return RunAsync(checkOnly, force, tag, output, error).GetAwaiter().GetResult();
+            }
+            catch (HttpRequestException ex)
+            {
+                error.WriteLine($"Could not reach GitHub: {ex.Message}");
+                return 1;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                error.WriteLine($"No permission to replace the kscript binary: {ex.Message}");
+                error.WriteLine(OperatingSystem.IsWindows()
+                    ? "Re-run from a terminal opened as Administrator, or reinstall with install.ps1."
+                    : "Re-run with sudo, or reinstall into a folder you own with install.sh.");
+                return 1;
+            }
+        }
+
+        static async Task<int> RunAsync(bool checkOnly, bool force, string tag, TextWriter output, TextWriter error)
+        {
+            string repo = Environment.GetEnvironmentVariable("KSCRIPT_REPO") ?? DefaultRepository;
+            string current = CurrentVersion;
+
+            string rid = RuntimeId();
+            if (rid == null)
+            {
+                error.WriteLine($"No kscript release is built for {RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture}).");
+                return 1;
+            }
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("kscript-updater", current));
+            http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            string token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+            if (!string.IsNullOrEmpty(token))
+            {
+                http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            string url = tag == null
+                ? $"https://api.github.com/repos/{repo}/releases/latest"
+                : $"https://api.github.com/repos/{repo}/releases/tags/{Uri.EscapeDataString(tag)}";
+
+            using var response = await http.GetAsync(url);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                error.WriteLine(tag == null ? $"{repo} has no published releases yet." : $"Release {tag} was not found in {repo}.");
+                return 1;
+            }
+            if ((int)response.StatusCode == 403 || (int)response.StatusCode == 429)
+            {
+                error.WriteLine("GitHub refused the request (rate limit). Try again later, or set GITHUB_TOKEN.");
+                return 1;
+            }
+            response.EnsureSuccessStatusCode();
+
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            string latestTag = json.RootElement.GetProperty("tag_name").GetString();
+            string assetName = AssetName(rid);
+            string downloadUrl = json.RootElement.GetProperty("assets").EnumerateArray()
+                .Where(a => a.GetProperty("name").GetString() == assetName)
+                .Select(a => a.GetProperty("browser_download_url").GetString())
+                .FirstOrDefault();
+
+            bool newer = IsNewer(latestTag, current);
+            if (checkOnly)
+            {
+                output.WriteLine(newer
+                    ? $"kscript {latestTag.TrimStart('v')} is available (you have {current}). Run: kscript update"
+                    : $"kscript {current} is up to date (latest release: {latestTag}).");
+                return 0;
+            }
+
+            if (!newer && !force && tag == null)
+            {
+                output.WriteLine($"kscript {current} is up to date.");
+                return 0;
+            }
+
+            if (downloadUrl == null)
+            {
+                error.WriteLine($"Release {latestTag} has no {assetName} download.");
+                return 1;
+            }
+
+            string target = InstalledBinaryPath();
+            if (target == null)
+            {
+                error.WriteLine("This kscript is running from a .NET build, not an installed binary, so it can't update itself.");
+                error.WriteLine("Use git pull to update the source, or install a release with install.sh / install.ps1.");
+                return 1;
+            }
+
+            output.WriteLine($"Downloading kscript {latestTag} ({assetName})...");
+            string dir = Path.GetDirectoryName(target);
+            string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+
+            try
+            {
+                await using (var archive = new MemoryStream())
+                {
+                    await using (var download = await http.GetStreamAsync(downloadUrl))
+                    {
+                        await download.CopyToAsync(archive);
+                    }
+                    archive.Position = 0;
+                    ExtractBinary(archive, assetName, staged);
+                }
+
+                if (!OperatingSystem.IsWindows())
+                {
+                    File.SetUnixFileMode(staged, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                        | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+                }
+
+                string stagedVersion = RunVersion(staged);
+                if (stagedVersion == null)
+                {
+                    error.WriteLine("The downloaded binary didn't start, so the installed kscript was left as it was.");
+                    return 1;
+                }
+
+                ReplaceBinary(staged, target);
+            }
+            finally
+            {
+                TryDelete(staged);
+            }
+
+            output.WriteLine($"Updated kscript {current} -> {latestTag.TrimStart('v')} ({target})");
+            return 0;
+        }
+
+        /// <summary>The path of the running single-file binary, or null when running as a framework-dependent dll.</summary>
+        static string InstalledBinaryPath()
+        {
+            // A single-file app's assemblies have no location on disk.
+            if (!string.IsNullOrEmpty(typeof(SelfUpdater).Assembly.Location))
+            {
+                return null;
+            }
+
+            string path = Environment.ProcessPath;
+            if (path == null)
+            {
+                return null;
+            }
+
+            // Follow a symlink (e.g. /usr/local/bin/kscript -> ~/.kscript/bin/kscript) so the real file is replaced.
+            var info = new FileInfo(path);
+            if (info.LinkTarget != null)
+            {
+                var resolved = info.ResolveLinkTarget(returnFinalTarget: true);
+                if (resolved != null)
+                {
+                    path = resolved.FullName;
+                }
+            }
+
+            return path;
+        }
+
+        internal static void ExtractBinary(Stream archive, string assetName, string destination)
+        {
+            if (assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                using var zip = new ZipArchive(archive, ZipArchiveMode.Read, leaveOpen: true);
+                var entry = zip.Entries.FirstOrDefault(e => string.Equals(e.Name, "kscript.exe", StringComparison.OrdinalIgnoreCase))
+                    ?? throw new InvalidDataException($"{assetName} has no kscript.exe inside.");
+                entry.ExtractToFile(destination, overwrite: true);
+                return;
+            }
+
+            using var gzip = new GZipStream(archive, CompressionMode.Decompress, leaveOpen: true);
+            using var tar = new TarReader(gzip);
+            TarEntry e;
+            while ((e = tar.GetNextEntry()) != null)
+            {
+                if ((e.EntryType is TarEntryType.RegularFile or TarEntryType.V7RegularFile) && Path.GetFileName(e.Name) == "kscript")
+                {
+                    e.ExtractToFile(destination, overwrite: true);
+                    return;
+                }
+            }
+
+            throw new InvalidDataException($"{assetName} has no kscript binary inside.");
+        }
+
+        /// <summary>Runs <c>binary --version</c> and returns its output, or null if it fails to start.</summary>
+        static string RunVersion(string binary)
+        {
+            try
+            {
+                using var p = Process.Start(new ProcessStartInfo(binary, "--version")
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                });
+                string text = p.StandardOutput.ReadToEnd();
+                if (!p.WaitForExit(30000))
+                {
+                    try { p.Kill(); } catch { }
+                    return null;
+                }
+                return p.ExitCode == 0 ? text.Trim() : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Moves <paramref name="staged"/> over <paramref name="target"/>. On Unix a rename replaces the file even while it
+        /// runs. Windows locks a running exe against writes but allows renaming it, so the old exe is moved aside to
+        /// <c>kscript.exe.old</c> and removed by <see cref="CleanupPreviousBinary"/> on the next start.
+        /// </summary>
+        internal static void ReplaceBinary(string staged, string target)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.Move(staged, target, overwrite: true);
+                return;
+            }
+
+            string old = target + ".old";
+            TryDelete(old);
+            if (File.Exists(old))
+            {
+                // A previous update's exe is still running; pick another name for this one.
+                old = target + $".{Guid.NewGuid():N}.old";
+            }
+
+            File.Move(target, old);
+            try
+            {
+                File.Move(staged, target);
+            }
+            catch
+            {
+                File.Move(old, target);
+                throw;
+            }
+        }
+
+        /// <summary>Deletes exes left behind by an earlier update on Windows. Safe to call on every start.</summary>
+        public static void CleanupPreviousBinary()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            try
+            {
+                string path = Environment.ProcessPath;
+                string dir = Path.GetDirectoryName(path);
+                if (dir == null)
+                {
+                    return;
+                }
+
+                foreach (var file in Directory.EnumerateFiles(dir, Path.GetFileName(path) + ".*old"))
+                {
+                    TryDelete(file);
+                }
+            }
+            catch (Exception)
+            {
+                // Best effort only.
+            }
+        }
+
+        static void TryDelete(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (Exception)
+            {
+                // Still locked or already gone.
+            }
+        }
+    }
+}
