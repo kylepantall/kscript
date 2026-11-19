@@ -74,6 +74,28 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void SiteFoldersCheckTheirPages()
+        {
+            Write("_layout.html", "<!doctype html>\n<html><body><main><slot /></main></body></html>");
+            Write("index.html", "<layout src=\"_layout.html\" title=\"Home\">\n  <p class=\"lead\">Hi<br>there</p>\n</layout>");
+            string bad = Write("about.md", "---\ntitle: About\n---\n\n# {$titel}\n");
+            Write(Path.Combine("_templates", "page.html"), "<p>{{ title }} {$nope}</p>");
+            (int code, string output) = Run(false, dir);
+            Assert.Equal(1, code);
+            Assert.Contains("3 files checked: 1 error", output);
+            Assert.Contains($"{bad}(5,", output);
+        }
+
+        [Fact]
+        public void HtmlOutsideASiteIsLeftAlone()
+        {
+            Write("notes.html", "<p>{$nope}</p>");
+            (int code, string output) = Run(false, dir);
+            Assert.Equal(2, code);
+            Assert.Contains("No KScript files found", output);
+        }
+
+        [Fact]
         public void MissingPathsAreUsageErrors()
         {
             Assert.Equal(2, Run(false, Path.Combine(dir, "missing.ks.xml")).Code);

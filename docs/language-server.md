@@ -10,7 +10,7 @@ reported as retired, with the KScript 2 replacement and a quick fix where one is
 | Command | What it does |
 | --- | --- |
 | `kscript lsp` | Runs the server over stdio (LSP 3.17). Any LSP client can use it. |
-| `kscript check <file-or-folder>... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. |
+| `kscript check <file-or-folder>... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. A folder with `_layout.html`, `_components/`, `_layouts/` or `kscript.json` is a site, so its `.html` and `.md` pages are checked too. |
 
 The VS Code extension is in [`editors/vscode`](../editors/vscode). It starts the installed `kscript lsp` (found
 through `kscript.server.path`, then the installers' folders, then `PATH`) and adds a TextMate grammar, plus an injection

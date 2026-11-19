@@ -20,7 +20,11 @@ namespace KScript.Pages
 
     internal sealed class PageAttribute
     {
+        /// <summary>The name in lower case, for matching.</summary>
         public string Name { get; set; }
+
+        /// <summary>The name as written, which is what is output: SVG needs viewBox, not viewbox.</summary>
+        public string SourceName { get; set; }
 
         /// <summary>The attribute value, or null for a bare attribute like <c>disabled</c>.</summary>
         public string Value { get; set; }
@@ -33,7 +37,11 @@ namespace KScript.Pages
 
     internal sealed class PageElement : PageNode
     {
+        /// <summary>The tag name in lower case, for matching.</summary>
         public string Name { get; set; }
+
+        /// <summary>The tag name as written, which is what is output: SVG needs linearGradient, not lineargradient.</summary>
+        public string SourceName { get; set; }
         public List<PageAttribute> Attributes { get; } = new List<PageAttribute>();
         public List<PageNode> Children { get; } = new List<PageNode>();
         public bool SelfClosing { get; set; }
@@ -176,7 +184,8 @@ namespace KScript.Pages
                     int startLine = line;
                     int j = i + 1;
                     while (j < text.Length && IsNameChar(text[j])) j++;
-                    var el = new PageElement { Name = text.Substring(i + 1, j - i - 1).ToLowerInvariant(), Line = startLine };
+                    string tagName = text.Substring(i + 1, j - i - 1);
+                    var el = new PageElement { Name = tagName.ToLowerInvariant(), SourceName = tagName, Line = startLine };
 
                     // Attributes
                     bool closed = false;
@@ -190,7 +199,8 @@ namespace KScript.Pages
                         int ns = j;
                         while (j < text.Length && !char.IsWhiteSpace(text[j]) && text[j] != '=' && text[j] != '>' && !(text[j] == '/' && j + 1 < text.Length && text[j + 1] == '>')) j++;
                         if (j == ns) { j++; continue; }
-                        var attr = new PageAttribute { Name = text.Substring(ns, j - ns).ToLowerInvariant() };
+                        string attrName = text.Substring(ns, j - ns);
+                        var attr = new PageAttribute { Name = attrName.ToLowerInvariant(), SourceName = attrName };
                         while (j < text.Length && char.IsWhiteSpace(text[j])) j++;
                         if (j < text.Length && text[j] == '=')
                         {
@@ -226,6 +236,7 @@ namespace KScript.Pages
 
                     FlushText();
                     Advance(j);
+                    CloseImpliedEnd(stack, el.Name);
                     stack.Peek().Children.Add(el);
 
                     if (VoidElements.Contains(el.Name) && !ControlElements.Contains(el.Name))
@@ -265,6 +276,39 @@ namespace KScript.Pages
             DedentControlBodies(root.Children, null);
             TidyWhitespace(root.Children);
             return root.Children;
+        }
+
+        private static readonly HashSet<string> ClosesParagraph = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "address", "article", "aside", "blockquote", "details", "dialog", "div", "dl", "fieldset", "figcaption", "figure",
+            "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hgroup", "hr", "main", "menu", "nav", "ol", "p",
+            "pre", "section", "table", "ul",
+        };
+
+        /// <summary>
+        /// HTML lets some end tags be left out: a new &lt;li&gt; ends the previous one, a &lt;div&gt; ends an open
+        /// &lt;p&gt;, and so on. Only the element directly open is closed, so nothing is ever moved, and KScript
+        /// elements (e.g. &lt;for&gt; around &lt;li&gt;) keep their place.
+        /// </summary>
+        private static void CloseImpliedEnd(Stack<PageElement> stack, string opening)
+        {
+            string open = stack.Peek().Name;
+            bool close = opening switch
+            {
+                "li" => open == "li",
+                "dt" or "dd" => open == "dt" || open == "dd",
+                "option" => open == "option",
+                "optgroup" => open == "option" || open == "optgroup",
+                "td" or "th" => open == "td" || open == "th",
+                "tr" => open == "td" || open == "th" || open == "tr",
+                "thead" or "tbody" or "tfoot" => open is "td" or "th" or "tr" or "thead" or "tbody",
+                _ => open == "p" && ClosesParagraph.Contains(opening),
+            };
+            if (!close) return;
+            stack.Pop();
+            // </tr> is implied too when a new row or section starts inside a cell.
+            if ((opening == "tr" || opening is "thead" or "tbody" or "tfoot") && stack.Peek().Name == "tr") stack.Pop();
+            if (opening is "thead" or "tbody" or "tfoot" && stack.Peek().Name is "thead" or "tbody") stack.Pop();
         }
 
         /// <summary>
