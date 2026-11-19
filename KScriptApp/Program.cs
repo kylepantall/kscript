@@ -40,6 +40,7 @@ namespace KScript
             Console.WriteLine("       kscript check <file-or-folder>... [--warnaserror]   Check scripts without running them.");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
+            Console.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
             Console.WriteLine("Options: " + string.Join(" ", Commands()));
         }
 
@@ -119,6 +120,13 @@ namespace KScript
             if (args[0] == "serve")
             {
                 return Serve(args.Skip(1).ToArray());
+            }
+
+            // kscript make component Hero, or Artisan-style kscript make:component Hero
+            if (args[0] == "make" || args[0].StartsWith("make:", StringComparison.Ordinal))
+            {
+                var rest = args[0] == "make" ? args.Skip(1) : new[] { args[0].Substring(5) }.Concat(args.Skip(1));
+                return KScript.Scaffolding.MakeCommand.Run(rest.ToArray(), Console.Out, Console.Error);
             }
 
             if (HasFlag(args, "-colourful"))

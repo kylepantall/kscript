@@ -532,10 +532,11 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            bool component = e.Name.Contains('-') && Kind != DocumentKind.Script;
-            if (component)
+            // Same rule as the page engine (KScript.Pages.PageElementNames): any non-HTML, non-KScript element can be a
+            // component. Hyphenated names must have a file; other names (<hero>) are components only when one exists.
+            if (Kind != DocumentKind.Script && global::KScript.Pages.PageElementNames.CanBeComponent(e.Name))
             {
-                CheckComponent(e);
+                CheckComponent(e, required: e.Name.Contains('-'));
             }
 
             foreach (MarkupAttribute attr in e.Attributes)
@@ -597,7 +598,7 @@ namespace KScript.Language.Analysis
             return new QuickFix($"Change to <{name}>", changes.ToArray());
         }
 
-        private void CheckComponent(MarkupElement e)
+        private void CheckComponent(MarkupElement e, bool required)
         {
             string componentDir = FindUpwards("_components");
             if (componentDir == null)
@@ -609,6 +610,10 @@ namespace KScript.Language.Analysis
             if (files.FileExists(file))
             {
                 result.Links.Add(new DocumentLink(e.NameSpan, file, "component"));
+                return;
+            }
+            if (!required)
+            {
                 return;
             }
 

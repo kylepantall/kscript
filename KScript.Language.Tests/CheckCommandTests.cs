@@ -35,6 +35,16 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void FolderChecksSkipMakeTemplates()
+        {
+            Write("ok.ks.xml", "<kscript><echo>hi</echo></kscript>");
+            Write(Path.Combine("_templates", "script.ks.xml"), "<kscript><echo>{{ name }} $nope</echo></kscript>");
+            (int code, string output) = Run(false, dir);
+            Assert.Equal(0, code);
+            Assert.Contains("1 file checked: 0 errors, 0 warnings.", output);
+        }
+
+        [Fact]
         public void ErrorsFailWithCompilerStyleLines()
         {
             string path = Write("bad.ks.xml", "<kscript>\n  <echo>$nope</echo>\n</kscript>");

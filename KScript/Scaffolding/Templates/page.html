@@ -1,0 +1,17 @@
+--- make
+description: An HTML page; its path is its URL (people/[id] matches /people/42)
+to: {{ dir }}{{ kebab }}.html
+hint: Run kscript serve and open /{{ url }}
+---
+{{#if params}}
+{{#each params}}
+<let name="{{ item | var }}" value="$request.params.{{ item | var }}" />
+{{/each}}
+
+{{/if}}
+<layout src="{{ layout ?? _layout.html }}" title="{{ title }}">
+  <h1>{{ title }}</h1>
+{{#each params}}
+  <p>{{ item }}: {${{ item | var }}}</p>
+{{/each}}
+</layout>

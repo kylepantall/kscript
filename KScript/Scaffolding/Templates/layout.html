@@ -1,0 +1,21 @@
+--- make
+description: A page layout; pages use it with <layout src="…" title="…">
+to: _layouts/{{ kebab }}.html
+hint: Use it in a page: <layout src="_layouts/{{ kebab }}.html" title="…"> … </layout>
+---
+<!doctype html>
+<html lang="{{ lang ?? en }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{$title}</title>
+{{#each css}}
+  <link rel="stylesheet" href="{{ item }}">
+{{/each}}
+</head>
+<body>
+  <main>
+    <slot />
+  </main>
+</body>
+</html>

@@ -1,0 +1,15 @@
+--- make
+description: A reusable piece of a page, used as <name /> (saved in _components/)
+to: _components/{{ kebab }}.html
+hint: Use it in a page: <{{ kebab }}{{#each props}} {{ item }}="…"{{/each}} />
+---
+<section class="{{ kebab }}">
+{{#if props}}
+{{#each props}}
+  <p>{${{ item | var }}}</p>
+{{/each}}
+{{else}}
+  <h2>{{ title }}</h2>
+{{/if}}
+  <slot />
+</section>

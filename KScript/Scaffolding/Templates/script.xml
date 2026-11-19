@@ -1,0 +1,8 @@
+--- make
+description: A KScript script, run with kscript <file>
+to: {{ dir }}{{ kebab }}.xml
+hint: Run it: kscript {{ dir }}{{ kebab }}.xml
+---
+<kscript>
+  <echo>Hello from {{ title }}!</echo>
+</kscript>
