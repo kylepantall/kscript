@@ -83,3 +83,15 @@ test('the manifest is consistent', () => {
     assert.ok(used.includes(`'${c.command}'`), `${c.command} is registered`);
   }
 });
+
+test('kscript.json is validated with the bundled schema', () => {
+  const root = path.join(__dirname, '../..');
+  const pkg = require('../../package.json');
+  const ignore = fs.readFileSync(path.join(root, '.vscodeignore'), 'utf8').split(/\r?\n/);
+  for (const v of pkg.contributes.jsonValidation) {
+    const schema = JSON.parse(fs.readFileSync(path.join(root, v.url), 'utf8'));
+    assert.ok(schema.properties.serve && schema.properties.lint, v.url);
+    assert.ok(ignore.includes('!' + path.posix.dirname(v.url.replace(/^\.\//, '')) + '/**'), `${v.url} is packaged`);
+  }
+  assert.ok(pkg.contributes.languages.some((l) => l.id === 'jsonc' && l.filenames.includes('kscript.json')), 'kscript.json allows comments');
+});

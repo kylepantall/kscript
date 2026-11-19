@@ -10,7 +10,11 @@ reported as retired, with the KScript 2 replacement and a quick fix where one is
 | Command | What it does |
 | --- | --- |
 | `kscript lsp` | Runs the server over stdio (LSP 3.17). Any LSP client can use it. |
-| `kscript check <file-or-folder>... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. |
+| `kscript check [file-or-folder]... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. With no path it checks the project the current folder is in. |
+
+Both follow the project's `kscript.json` (see the README): `lint.rules` changes or turns off diagnostics by code, `lint.exclude` silences
+files and folders, and `lint.include` chooses what a folder check covers. The server re-reads `kscript.json` when it changes.
+The rules are applied in `LintRules.Apply` (KScript.Language), after analysis, so the analyzer itself never needs to know about them.
 
 The VS Code extension is in [`editors/vscode`](../editors/vscode). It starts the installed `kscript lsp` (found
 through `kscript.server.path`, then the installers' folders, then `PATH`) and adds a TextMate grammar, plus an injection

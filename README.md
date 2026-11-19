@@ -111,7 +111,7 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 
 | Path | Contents |
 | --- | --- |
-| `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, the `kscript serve` page engine (`Pages/`) and `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`). |
+| `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, the `kscript serve` page engine (`Pages/`) and `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`) and `kscript.json` (`Projects/`). |
 | `KScriptApp/` | The `KScript` command line app that runs a script file. |
 | `KScript.Tests/` | xUnit test suite. |
 | `KScript.Language/`, `KScript.LanguageServer/` | The KScript 2 parser, analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. |
@@ -279,6 +279,46 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 
 See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter.
 
+## Starting a project: kscript make project
+
+`kscript make project` sets up a new site with everything wired together:
+
+```sh
+kscript make project my-site --port 3000
+cd my-site
+kscript serve      # http://localhost:3000, from kscript.json
+kscript check      # checks every page and script in the project
+```
+
+It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_components/site-nav.html`, `site.css`, `scripts/hello.ks.xml` and `.vscode/extensions.json`, which asks VS Code to install the KScript extension. `kscript make project .` sets up the current folder; existing files are never replaced without `--force`.
+
+### Project settings: kscript.json
+
+`kscript serve`, `kscript check`, `kscript make` and the editor read the nearest `kscript.json` in the folder they work on or a parent folder, so they behave the same from anywhere in the project. Every setting is optional:
+
+```jsonc
+{
+  "name": "my-site",
+  "serve": {
+    "root": ".",          // the site folder, relative to kscript.json
+    "port": 8080,         // --port and --host on the command line still win
+    "host": "localhost"
+  },
+  "lint": {
+    "include": ["**/*.html", "**/*.md", "**/*.ks.xml"],   // what `kscript check` looks at
+    "exclude": ["_templates", "node_modules", "drafts/**"], // never checked, on the command line or in the editor
+    "rules": { "KS3003": "off", "KS4*": "error" },          // off, hint, info, warning or error, by code or prefix
+    "warningsAsErrors": false                               // same as kscript check --warnaserror
+  }
+}
+```
+
+- A pattern without a `/` (such as `_templates` or `*.draft.html`) matches a file or folder of that name anywhere. Otherwise it is matched against the path from `kscript.json`: `*` stays within a folder, `**` spans folders, and a folder matches everything in it.
+- `rules` changes how serious a diagnostic is (see [the codes](docs/language-server.md#diagnostic-codes)). The longest match wins, so `"KS3*": "warning"` with `"KS3001": "error"` keeps unknown elements as errors.
+- Comments and trailing commas are allowed. Unknown settings are reported as warnings rather than ignored silently, and the VS Code extension validates the file and completes its settings as you type.
+- Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
+- `kscript serve` never serves `kscript.json`.
+
 ## Generating files: kscript make
 
 `kscript make` creates components, pages and scripts from templates, so a new file starts out right:
@@ -293,7 +333,7 @@ kscript make script tidy-downloads                    # tidy-downloads.xml
 kscript make                                          # list every template
 ```
 
-`kscript make:component Hero` works too. Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
+`kscript make:component Hero` works too. Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
 
 **Your own templates.** Templates live in the project's `_templates/` folder, which `kscript serve` never serves. `kscript make templates` copies the built-in ones there to edit. A file there replaces the built-in template of the same name (`_templates/component.html`), and any other file adds a type: `_templates/card.html` gives `kscript make card Profile`.
 

@@ -12,7 +12,10 @@ namespace KScript.Scaffolding
     /// kscript make component Hero --props title,image
     /// kscript make page "people/[id]"
     /// kscript make templates [type…]        copy the built-in templates to _templates/ to customise them
+    /// kscript make project my-site          a new project folder with kscript.json, pages, a layout and a component
     /// </code>
+    /// Inside a project (a folder with kscript.json, or below one), files are made relative to the project's site root,
+    /// wherever the command is run from.
     /// Options: --dir &lt;project&gt;, --force, --dry-run; any other --key value (or --key=value, or a bare --flag) is
     /// passed to the template as {{ key }}.
     /// </summary>
@@ -22,7 +25,7 @@ namespace KScript.Scaffolding
         {
             var positional = new List<string>();
             var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            string root = ".";
+            string root = null;
             bool force = false, dryRun = false, help = false;
 
             for (int i = 0; i < args.Length; i++)
@@ -60,6 +63,18 @@ namespace KScript.Scaffolding
 
             try
             {
+                string type = positional.Count > 0 ? positional[0] : null;
+
+                if (string.Equals(type, "project", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (root != null && !Directory.Exists(root)) { error.WriteLine($"The folder '{root}' does not exist."); return 1; }
+                    if (positional.Count < 2) { error.WriteLine("Give the project a folder name, e.g. kscript make project my-site (or . for the current folder)."); return 1; }
+                    if (positional.Count > 2) { error.WriteLine($"Unexpected '{positional[2]}'. Put names with spaces in quotes."); return 1; }
+                    return MakeProject(root ?? ".", positional[1], options, force, dryRun, output);
+                }
+
+                bool fromProject = root == null;
+                root ??= ProjectRoot();
                 if (!Directory.Exists(root))
                 {
                     error.WriteLine($"The folder '{root}' does not exist.");
@@ -71,8 +86,6 @@ namespace KScript.Scaffolding
                     PrintTemplates(root, output);
                     return 0;
                 }
-
-                string type = positional[0];
 
                 if (string.Equals(type, "templates", StringComparison.OrdinalIgnoreCase))
                 {
@@ -96,20 +109,27 @@ namespace KScript.Scaffolding
                 }
 
                 var result = Scaffolder.Make(new MakeRequest { Type = type, Name = positional[1], Root = root, Options = options, Force = force, DryRun = dryRun });
+                // In a project, files are made from its site root; show them relative to where the command was run.
+                string shown = !fromProject || root == "." ? result.RelativePath : Path.GetRelativePath(Directory.GetCurrentDirectory(), result.FullPath).Replace('\\', '/');
 
                 if (dryRun)
                 {
-                    output.WriteLine($"Would create {result.RelativePath}{(result.Overwrote ? " (replacing it)" : "")}:");
+                    output.WriteLine($"Would create {shown}{(result.Overwrote ? " (replacing it)" : "")}:");
                     output.WriteLine();
                     output.Write(result.Content);
                     if (!result.Content.EndsWith('\n')) output.WriteLine();
                 }
                 else
                 {
-                    output.WriteLine($"{(result.Overwrote ? "Replaced" : "Created")} {result.RelativePath}{(result.Template.BuiltIn ? "" : $" (from {Scaffolder.TemplatesFolder}/{Path.GetFileName(result.Template.FilePath)})")}");
+                    output.WriteLine($"{(result.Overwrote ? "Replaced" : "Created")} {shown}{(result.Template.BuiltIn ? "" : $" (from {Scaffolder.TemplatesFolder}/{Path.GetFileName(result.Template.FilePath)})")}");
                 }
                 if (!string.IsNullOrEmpty(result.Hint)) output.WriteLine(result.Hint);
                 return 0;
+            }
+            catch (KScript.Projects.ProjectConfigException ex)
+            {
+                error.WriteLine(ex.Message);
+                return 1;
             }
             catch (StubException ex)
             {
@@ -128,10 +148,47 @@ namespace KScript.Scaffolding
             }
         }
 
+        /// <summary>The site root of the project the current folder is in, or "." outside a project.</summary>
+        private static string ProjectRoot()
+        {
+            var project = KScript.Projects.ProjectConfig.FindAndLoad(Directory.GetCurrentDirectory());
+            if (project == null) return ".";
+            string root = project.SiteRoot;
+            return Path.GetFullPath(".") == root ? "." : root;
+        }
+
+        private static int MakeProject(string parent, string name, Dictionary<string, string> options, bool force, bool dryRun, TextWriter output)
+        {
+            var result = ProjectScaffolder.Create(parent, name, options, force, dryRun);
+            string where = result.DisplayDirectory == "." ? "this folder" : result.DisplayDirectory + "/";
+
+            if (dryRun)
+            {
+                output.WriteLine($"Would create a KScript project in {where}:");
+                foreach (var f in result.Files) output.WriteLine($"  {f}");
+                output.WriteLine();
+                output.WriteLine("kscript.json:");
+                output.Write(result.Contents["kscript.json"]);
+                return 0;
+            }
+
+            output.WriteLine($"Created a KScript project in {where}:");
+            foreach (var f in result.Files) output.WriteLine($"  {f}");
+            if (result.Note != null) output.WriteLine(result.Note);
+            output.WriteLine();
+            output.WriteLine("Next:");
+            if (result.DisplayDirectory != ".") output.WriteLine($"  cd {(result.DisplayDirectory.Contains(' ') ? "\"" + result.DisplayDirectory + "\"" : result.DisplayDirectory)}");
+            output.WriteLine("  kscript serve        serve the site (settings in kscript.json)");
+            output.WriteLine("  kscript check        check every page and script");
+            output.WriteLine("  kscript ide install  add the KScript extension to VS Code (the project also recommends it)");
+            return 0;
+        }
+
         private static void PrintTemplates(string root, TextWriter output)
         {
             output.WriteLine("Usage: kscript make <type> <Name> [--key value …] [--dir <project>] [--force] [--dry-run]");
             output.WriteLine("       kscript make templates [type…]   copy the built-in templates to _templates/ to customise them");
+            output.WriteLine("       kscript make project <folder>    start a new project (kscript.json, pages, layout, component)");
             output.WriteLine();
             output.WriteLine("Types:");
             var all = Scaffolder.ListTemplates(root);
@@ -143,6 +200,7 @@ namespace KScript.Scaffolding
             }
             output.WriteLine();
             output.WriteLine("Examples:");
+            output.WriteLine("  kscript make project my-site --port 3000");
             output.WriteLine("  kscript make component Hero --props title,subtitle");
             output.WriteLine("  kscript make page about --title \"About us\"");
             output.WriteLine("  kscript make page \"people/[id]\"");

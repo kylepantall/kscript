@@ -1,0 +1,4 @@
+body { font-family: system-ui, sans-serif; margin: 0; color: #1f2937; }
+main { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+.site-nav { display: flex; gap: 1rem; padding: 1rem; background: #2563eb; }
+.site-nav a { color: white; text-decoration: none; font-weight: 600; }

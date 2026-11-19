@@ -6,3 +6,4 @@
 !language-configuration.json
 !syntaxes/**
 !dist/extension.js
+!schemas/**

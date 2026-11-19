@@ -37,6 +37,10 @@ You can also install this extension from the command line with `kscript ide inst
 | `kscript.pages.enabled` | `auto` | Check `.html` and `.md` pages: `auto` in folders that look like a `kscript serve` site (`_components/`, `_layout.html`, `_layouts/` or `kscript.json`), `always`, or `never`. |
 | `kscript.trace.server` | `off` | Log the messages between VS Code and the language server (`messages` or `verbose`). |
 
+## Project settings
+
+A `kscript.json` at the top of a project (created by `kscript make project`) sets the lint rules the editor uses: `lint.rules` changes or turns off a diagnostic by code (`"KS3003": "off"`), and `lint.exclude` silences files and folders such as `_templates`. The extension validates `kscript.json` and completes its settings. See the KScript README for every setting.
+
 ## Commands
 
 - **KScript: Restart Language Server**: after updating `kscript` or changing settings.

@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
+  "title": "KScript project settings (kscript.json)",
+  "description": "Settings for kscript serve, kscript check and the KScript language server. Commands look for kscript.json in the folder they work on and its parents.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "description": "The project's name." },
+    "serve": {
+      "type": "object",
+      "description": "Defaults for kscript serve. Options on the command line win.",
+      "additionalProperties": false,
+      "properties": {
+        "root": { "type": "string", "default": ".", "description": "The site folder, relative to kscript.json. Its files and folders are the site's URLs." },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8080, "description": "The port to listen on." },
+        "host": { "type": "string", "default": "localhost", "description": "localhost, an IP address to listen on, or * for every address." }
+      }
+    },
+    "lint": {
+      "type": "object",
+      "description": "Used by kscript check and by the editor (language server).",
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html", "**/*.md"],
+          "description": "Files kscript check looks at, as globs relative to kscript.json. .xml files that start with <kscript> are always included."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["_templates", "node_modules", ".git"],
+          "description": "Files and folders that are never checked, by kscript check or the editor. A name without / (such as _templates) matches anywhere; drafts/** matches a folder."
+        },
+        "rules": {
+          "type": "object",
+          "description": "Severity per diagnostic code (KS3003) or code prefix (KS3*). The longest match wins.",
+          "propertyNames": { "pattern": "^[Kk][Ss][0-9]{0,4}\\*?$" },
+          "additionalProperties": { "enum": ["off", "hint", "info", "warning", "error"] },
+          "examples": [{ "KS3003": "off", "KS4*": "error" }]
+        },
+        "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
+      }
+    }
+  }
+}

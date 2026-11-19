@@ -1,0 +1,12 @@
+<layout src="_layout.html" title="Home">
+  <h1>Welcome to {{ title }}</h1>
+  <p>This page is rendered by KScript on each request (today is { @today()->format('d MMMM yyyy') }). Edit index.html and refresh.</p>
+
+  <h2>Next steps</h2>
+  <ul>
+    <li>Add a page: <code>kscript make page contact</code></li>
+    <li>Add a component: <code>kscript make component Hero</code></li>
+    <li>Check the project: <code>kscript check</code></li>
+    <li>Change the port or lint rules in <code>kscript.json</code></li>
+  </ul>
+</layout>
