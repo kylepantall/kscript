@@ -393,7 +393,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void V1ScriptsGetActionableErrors()
         {
-            string path = Path.Combine(AppContext.BaseDirectory, "samples", "..", "..", "..", "..", "..", "DebugScripts", "filterOldestFromArray.xml");
+            string path = Path.Combine(AppContext.BaseDirectory, "samples", "..", "..", "..", "..", "..", "Example Scripts", "Find Oldest Person.xml");
             if (!File.Exists(path))
             {
                 return;
