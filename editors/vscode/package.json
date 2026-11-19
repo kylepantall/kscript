@@ -128,7 +128,7 @@
   "devDependencies": {
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.1",
-    "esbuild": "^0.24.2"
+    "esbuild": "^0.28.1"
   },
   "icon": "icon.png",
   "homepage": "https://github.com/kylepantall/kscript#readme",
