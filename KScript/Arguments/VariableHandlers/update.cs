@@ -1,4 +1,4 @@
-﻿using KScript.KScriptObjects;
+using KScript.KScriptObjects;
 using System;
 
 namespace KScript.Arguments
@@ -37,21 +37,22 @@ namespace KScript.Arguments
 
             if (_type == types.replace)
             {
-                Def(to).Contents = Format(Contents);
+                // Evaluate commands now: storing the raw text meant e.g. @guid() gave a new value every time it was read.
+                Def(to).Contents = HandleCommands(Contents);
                 return true;
             }
 
             if (_type == types.append)
             {
                 string tmp = Def(to).Contents;
-                tmp = tmp + Format(Contents);
+                tmp = tmp + HandleCommands(Contents);
                 Def(to).Contents = tmp;
                 return true;
             }
 
             int number, otherNumber;
             bool isNumber = int.TryParse(Def(to).Contents, out number);
-            bool newContentsIsNumber = int.TryParse(Contents, out otherNumber);
+            bool newContentsIsNumber = int.TryParse(HandleCommands(Contents), out otherNumber);
 
             if (isNumber && newContentsIsNumber)
             {

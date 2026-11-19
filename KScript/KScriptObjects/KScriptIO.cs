@@ -154,8 +154,9 @@ namespace KScript.KScriptTypes
             if (ParentContainer == null)
                 return;
 
-            var value = ParentContainer.GetStringHandler().Format(val);
-            Console.Out.Write(handleCmds ? KScriptCommandHandler.HandleCommands(value, ParentContainer, GetBaseObject()) : value);
+            Console.Out.Write(handleCmds
+                ? KScriptCommandHandler.Interpolate(val, ParentContainer, GetBaseObject())
+                : ParentContainer.GetStringHandler().Format(val));
         }
 
         public void Out(object obj) => Out(obj.ToString());
