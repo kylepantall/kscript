@@ -62,10 +62,12 @@ namespace KScript.Tests
         [Fact]
         public void DetectsEditorsOnThePath()
         {
-            FakeHost host = LinuxWith("/usr/local/bin/code", "/usr/bin/cursor");
+            // Path.Combine, because the test also runs on Windows, where it joins with a backslash.
+            string code = Path.Combine("/usr/local/bin", "code");
+            FakeHost host = LinuxWith(code, Path.Combine("/usr/bin", "cursor"));
             List<DetectedEditor> found = IdeCommand.Detect(host);
             Assert.Equal(new[] { "vscode", "cursor" }, found.Select(d => d.Editor.Id));
-            Assert.Equal("/usr/local/bin/code", found[0].Launcher);
+            Assert.Equal(code, found[0].Launcher);
         }
 
         [Fact]
