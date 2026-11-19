@@ -1,0 +1,20 @@
+<let name="person" value="@read_json('data/people.json')->find(fn($p) => $p.id == $request.params.id)" />
+
+<if test="$person === null">
+  <respond status="404">No one has id {$request.params.id}.</respond>
+</if>
+
+<layout src="_layout.html" title="{$person.name}">
+  <person-card person="{$person}" />
+  <match value="$person.role">
+    <case is="'Founder'">
+      <p>Started the company.</p>
+    </case>
+    <case is="'Developer', 'Designer'">
+      <p>Builds the product.</p>
+    </case>
+    <default>
+      <p>Keeps everything running.</p>
+    </default>
+  </match>
+</layout>
