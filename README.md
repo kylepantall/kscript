@@ -166,5 +166,33 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 
 See `Example Sites/team` for a complete site with a layout, a component, a Markdown page, a dynamic route and a JSON endpoint.
 
+<h3>Reactive pages with &lt;live&gt; (no JavaScript)</h3>
+
+A `<live>` block reacts to clicks and typing without any JavaScript in the page. Its handlers are KScript statements; the server runs them and sends back just that block's new HTML.
+
+```html
+<live id="counter">
+  <state name="count" value="0" />
+  <p>{$count}</p>
+  <button on-click="count -= 1">−</button>
+  <button on-click="count += 1">+</button>
+</live>
+
+<live id="search">
+  <state name="query" value="''" />
+  <input bind="query" placeholder="Search…">
+  <for each="p" in="$people->filter(fn($p) => $p.name->lower()->contains($query->lower()))">
+    <li>{$p.name}</li>
+  </for>
+</live>
+```
+
+- `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server keeps nothing between requests.
+- `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn($i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
+- `bind="name"` ties an input to a state variable both ways and redraws the block as you type.
+- `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
+
+See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter.
+
 <h2>Additional Information</h2>
 Further documentation is still within development. 

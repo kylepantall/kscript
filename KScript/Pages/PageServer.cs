@@ -199,6 +199,17 @@ namespace KScript.Pages
         public static async Task<PageResult> HandleAsync(PageSite site, HttpRequest request, FileExtensionContentTypeProvider types = null)
         {
             types ??= new FileExtensionContentTypeProvider();
+
+            if (request.Path.Value == "/_ks/live.js")
+                return new PageResult { ContentType = "text/javascript; charset=utf-8", Body = PageLive.Script };
+
+            if (request.Path.Value == "/_ks/live")
+            {
+                if (!HttpMethods.IsPost(request.Method)) return new PageResult { Status = 405, Body = "POST only" };
+                using var reader = new StreamReader(request.Body, Encoding.UTF8);
+                return HandleLive(site, await reader.ReadToEndAsync(), await BuildRequestAsync(request));
+            }
+
             var route = site.Resolve(request.Path.Value);
 
             switch (route.Kind)
@@ -228,6 +239,44 @@ namespace KScript.Pages
                     }
                     return new PageResult { Status = 404, Body = $"<!doctype html><title>Not found</title><h1>Not found</h1><p>{PageValues.HtmlEscape(request.Path.Value)}</p>" };
                 }
+            }
+        }
+
+        /// <summary>Re-renders one &lt;live&gt; block after a browser event.</summary>
+        public static PageResult HandleLive(PageSite site, string json, Dictionary<string, object> request)
+        {
+            string page;
+            LiveEvent ev;
+            try
+            {
+                (page, ev) = PageLive.ParseRequest(json);
+            }
+            catch (LiveExpiredException ex)
+            {
+                return new PageResult { Status = 409, ContentType = "text/plain; charset=utf-8", Body = ex.Message };
+            }
+
+            // The handler sees the same $request.query and path as the page it came from.
+            var uri = new Uri(new Uri("http://localhost"), page);
+            request["path"] = uri.AbsolutePath;
+            request["query"] = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query)
+                .ToDictionary(q => q.Key, q => (object)q.Value.ToString());
+
+            var route = site.Resolve(uri.AbsolutePath);
+            if (route.Kind != PageRoute.RouteKind.Page) return new PageResult { Status = 404, Body = "Page not found." };
+
+            var ctx = new PageContext(site.Root, request) { Live = ev };
+            try
+            {
+                return PageRenderer.RenderFile(ctx, route.File, route.Params);
+            }
+            catch (LiveExpiredException ex)
+            {
+                return new PageResult { Status = 409, ContentType = "text/plain; charset=utf-8", Body = ex.Message };
+            }
+            catch (PageException ex)
+            {
+                return new PageResult { Status = 500, ContentType = "text/plain; charset=utf-8", Body = (ex.Location != null ? ex.Location + ": " : string.Empty) + ex.Message };
             }
         }
 

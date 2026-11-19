@@ -384,3 +384,98 @@ public class PageSiteTests
         return port;
     }
 }
+
+public class PageLiveTests
+{
+    private const string Counter = "<live id=\"c\"><state name=\"count\" value=\"0\" /><p>{$count}</p><button on-click=\"count += 1\">+</button><button on-click=\"count = 0\">reset</button></live>";
+
+    private static string Attr(string html, string name)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(html, name + "=\"([^\"]*)\"");
+        return System.Net.WebUtility.HtmlDecode(m.Groups[1].Value);
+    }
+
+    private static PageResult Event(TempSite site, string page, string block, int handler, string state, string args = null, Dictionary<string, object> binds = null)
+    {
+        var json = PageValues.ToJsonString(new Dictionary<string, object>
+        {
+            ["page"] = "/" + Path.GetFileNameWithoutExtension(page),
+            ["block"] = block,
+            ["handler"] = (double)handler,
+            ["state"] = state,
+            ["args"] = args,
+            ["binds"] = binds ?? new Dictionary<string, object>(),
+            ["event"] = new Dictionary<string, object>(),
+        });
+        return PageServer.HandleLive(new PageSite(site.Root), json, new Dictionary<string, object>());
+    }
+
+    [Fact]
+    public void Live_blocks_render_state_and_handlers_and_add_the_runtime()
+    {
+        using var site = new TempSite(("index.html", "<body>" + Counter + "</body>"));
+        string html = site.Render("index.html").Body;
+        Assert.Contains("data-ks-live=\"c\"", html);
+        Assert.Contains("<p>0</p>", html);
+        Assert.Contains("<button data-ks-on-click=\"0\">+</button>", html);
+        Assert.Contains("<script src=\"/_ks/live.js\" defer></script>\n</body>", html);
+        Assert.DoesNotContain("count += 1", html);
+    }
+
+    [Fact]
+    public void Events_run_the_handler_and_return_only_the_block()
+    {
+        using var site = new TempSite(("index.html", "<h1>Title</h1>" + Counter));
+        string state = Attr(site.Render("index.html").Body, "data-ks-state");
+
+        var once = Event(site, "index.html", "c", 0, state);
+        Assert.Equal(200, once.Status);
+        Assert.StartsWith("<div data-ks-live=\"c\"", once.Body);
+        Assert.Contains("<p>1</p>", once.Body);
+        Assert.DoesNotContain("Title", once.Body);
+
+        var twice = Event(site, "index.html", "c", 0, Attr(once.Body, "data-ks-state"));
+        Assert.Contains("<p>2</p>", twice.Body);
+
+        var reset = Event(site, "index.html", "c", 1, Attr(twice.Body, "data-ks-state"));
+        Assert.Contains("<p>0</p>", reset.Body);
+    }
+
+    [Fact]
+    public void Tampered_state_is_rejected()
+    {
+        using var site = new TempSite(("index.html", Counter));
+        string state = Attr(site.Render("index.html").Body, "data-ks-state");
+        string forged = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{\"count\":999}")) + state.Substring(state.LastIndexOf('.'));
+        Assert.Equal(409, Event(site, "index.html", "c", 0, forged).Status);
+    }
+
+    [Fact]
+    public void Loop_variables_are_passed_to_handlers_and_binds_update_state()
+    {
+        const string page = "<live id=\"t\"><state name=\"items\" value=\"['a', 'b', 'c']\" /><state name=\"draft\" value=\"''\" />" +
+                            "<input bind=\"draft\"><button on-click=\"items = $items->push($draft); draft = ''\">add</button>" +
+                            "<for each=\"x\" in=\"$items\"><i on-click=\"items = $items->reject(fn($i) => $i == $x)\">{$x}</i></for></live>";
+        using var site = new TempSite(("index.html", page));
+        string html = site.Render("index.html").Body;
+        Assert.Contains("data-ks-bind=\"draft\" value=\"\" name=\"draft\"", html);
+
+        // Remove "b": the second <i>, whose signed args hold x = 'b'.
+        var args = System.Text.RegularExpressions.Regex.Matches(html, "data-ks-args=\"([^\"]*)\"")[1].Groups[1].Value;
+        var removed = Event(site, "index.html", "t", 1, Attr(html, "data-ks-state"), System.Net.WebUtility.HtmlDecode(args));
+        Assert.Contains("<i data-ks-on-click=\"1\"", removed.Body);
+        Assert.DoesNotContain(">b</i>", removed.Body);
+        Assert.Contains(">c</i>", removed.Body);
+
+        var added = Event(site, "index.html", "t", 0, Attr(removed.Body, "data-ks-state"), binds: new Dictionary<string, object> { ["draft"] = "z" });
+        Assert.Contains(">z</i>", added.Body);
+        Assert.Contains("value=\"\"", added.Body);
+    }
+
+    [Fact]
+    public void Handlers_outside_live_blocks_are_an_error()
+    {
+        var ex = Assert.Throws<PageException>(() => PageRenderer.RenderString("<button on-click=\"x = 1\">x</button>"));
+        Assert.Contains("only works inside a <live> block", ex.Message);
+    }
+}

@@ -41,6 +41,10 @@ namespace KScript.Pages
         /// <summary>Maximum evaluation steps for one request, so an endless loop can't hang the server.</summary>
         public long MaxSteps { get; set; } = 5_000_000;
 
+        /// <summary>Set when re-rendering a &lt;live&gt; block for a browser event.</summary>
+        public LiveEvent Live { get; set; }
+
+        internal int LiveCounter;
         internal long Steps;
         internal int CallDepth;
         internal int IncludeDepth;
@@ -101,6 +105,9 @@ namespace KScript.Pages
 
             /// <summary>Set after an empty slot on its own line, so the line's newline is dropped too.</summary>
             public bool SwallowNewline;
+
+            /// <summary>Inside a &lt;live&gt; block: the block's scope, where its state lives.</summary>
+            public PageScope LiveScope;
         }
 
         /// <summary>Renders a page file (relative to the site folder): .html or .md.</summary>
@@ -110,7 +117,8 @@ namespace KScript.Pages
             try
             {
                 string html = RenderFileInScope(ctx, relativePath, scope, slot: null);
-                return new PageResult { Body = html.TrimStart() };
+                if (ctx.Live != null) throw new PageException($"There is no <live id=\"{ctx.Live.BlockId}\"> block on this page any more. Reload the page.");
+                return new PageResult { Body = AddLiveRuntime(html.TrimStart()) };
             }
             catch (PageResponseSignal signal)
             {
@@ -128,12 +136,21 @@ namespace KScript.Pages
                 string html = markdown
                     ? RenderMarkdownSource(template, fileName, ctx, scope, null)
                     : RenderSource(template, 1, new RenderState { Ctx = ctx, File = fileName }, scope);
-                return new PageResult { Body = html.TrimStart() };
+                return new PageResult { Body = AddLiveRuntime(html.TrimStart()) };
             }
             catch (PageResponseSignal signal)
             {
                 return signal.Result;
             }
+        }
+
+        /// <summary>Pages with &lt;live&gt; blocks get the small runtime that sends their events to the server.</summary>
+        private static string AddLiveRuntime(string html)
+        {
+            if (!html.Contains("data-ks-live=\"", StringComparison.Ordinal)) return html;
+            const string tag = "<script src=\"/_ks/live.js\" defer></script>";
+            int body = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+            return body >= 0 ? html.Insert(body, tag + "\n") : html + "\n" + tag;
         }
 
         private static PageScope NewPageScope(PageContext ctx, Dictionary<string, object> parameters)
@@ -304,6 +321,15 @@ namespace KScript.Pages
                 case "default":
                     throw new PageException($"<{el.Name}> must be inside <match>.");
 
+                case "live":
+                    RenderLive(el, scope, sb, state);
+                    return;
+
+                case "state":
+                    // Handled by the enclosing <live>.
+                    if (state.LiveScope == null) throw new PageException("<state> must be inside a <live> block.");
+                    return;
+
                 case "layout":
                 {
                     string src = el.Attr("src") ?? throw new PageException("<layout> needs a src attribute, e.g. <layout src=\"_layout.html\">.");
@@ -333,7 +359,7 @@ namespace KScript.Pages
                 case "markdown":
                 {
                     var md = new StringBuilder();
-                    RenderNodes(el.Children, scope.Child(), md, new RenderState { Ctx = state.Ctx, File = state.File, Markdown = true, Slot = state.Slot });
+                    RenderNodes(el.Children, scope.Child(), md, new RenderState { Ctx = state.Ctx, File = state.File, Markdown = true, Slot = state.Slot, LiveScope = state.LiveScope });
                     sb.Append(PageMarkdown.ToHtml(PageMarkdown.Dedent(md.ToString())));
                     return;
                 }
@@ -429,8 +455,34 @@ namespace KScript.Pages
         private static void RenderHtmlElement(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
         {
             sb.Append('<').Append(el.Name);
+            bool hasHandler = false;
             foreach (var a in el.Attributes)
             {
+                if (a.Name.StartsWith("on-", StringComparison.Ordinal))
+                {
+                    if (state.LiveScope == null || a.HandlerIndex < 0)
+                        throw new PageException($"{a.Name} only works inside a <live> block, e.g. <live id=\"counter\">…</live>.");
+                    sb.Append(" data-ks-").Append(a.Name).Append("=\"").Append(a.HandlerIndex).Append('"');
+                    hasHandler = true;
+                    continue;
+                }
+                if (a.Name == "bind")
+                {
+                    if (state.LiveScope == null) throw new PageException("bind only works inside a <live> block.");
+                    string name = (a.Value ?? string.Empty).Trim().TrimStart('$');
+                    if (!scope.TryGet(name, out var bound)) throw new PageException($"bind=\"{name}\": ${name} is not defined. Declare it with <state name=\"{name}\" value=\"''\" />.");
+                    sb.Append(" data-ks-bind=\"").Append(PageValues.HtmlEscape(name)).Append('"');
+                    if (el.Name == "input" && string.Equals(el.Attr("type"), "checkbox", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (PageValues.Truthy(bound)) sb.Append(" checked");
+                    }
+                    else if (el.Name != "textarea" && el.Name != "select")
+                    {
+                        sb.Append(" value=\"").Append(PageValues.HtmlEscape(PageValues.ToStr(bound))).Append('"');
+                    }
+                    if (!el.HasAttr("name")) sb.Append(" name=\"").Append(PageValues.HtmlEscape(name)).Append('"');
+                    continue;
+                }
                 if (a.Value == null) { sb.Append(' ').Append(a.Name); continue; }
 
                 if (TryWholeExpression(a.Value, out string expr, out bool raw))
@@ -447,8 +499,19 @@ namespace KScript.Pages
                 sb.Append(' ').Append(a.Name).Append("=\"").Append(value.Replace("\"", "&quot;")).Append('"');
             }
 
+            if (hasHandler)
+            {
+                var locals = LocalVariables(scope, state.LiveScope);
+                if (locals.Count > 0) sb.Append(" data-ks-args=\"").Append(PageValues.HtmlEscape(PageLive.Sign(locals))).Append('"');
+            }
+
             if (el.Void) { sb.Append('>'); return; }
             sb.Append('>');
+            if (el.Name == "textarea" && el.Attr("bind") is string tb && scope.TryGet(tb.Trim().TrimStart('$'), out var tv))
+            {
+                sb.Append(PageValues.HtmlEscape(PageValues.ToStr(tv))).Append("</textarea>");
+                return;
+            }
             RenderNodes(el.Children, scope.Child(), sb, state);
             sb.Append("</").Append(el.Name).Append('>');
         }
@@ -512,6 +575,99 @@ namespace KScript.Pages
                 index++;
             }
             return index > 0;
+        }
+
+        /// <summary>
+        /// A &lt;live&gt; block is re-rendered on the server when its handlers run in the browser.
+        /// Its &lt;state&gt; travels with the page, signed, so the server keeps nothing between requests.
+        /// </summary>
+        private static void RenderLive(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
+        {
+            if (state.LiveScope != null) throw new PageException("<live> blocks can't be nested.");
+            var ctx = state.Ctx;
+            string id = el.Attr("id") ?? $"live-{++ctx.LiveCounter}";
+            var handlers = PageLive.Handlers(el);
+            var liveScope = scope.Child();
+            bool target = ctx.Live != null && ctx.Live.BlockId == id;
+
+            // State: defaults from <state>, or the values the browser sent back.
+            var stateNames = new List<string>();
+            foreach (var st in el.Children.OfType<PageElement>().Where(c => c.Name == "state"))
+            {
+                string name = (st.Attr("name") ?? throw new PageException("<state> needs a name, e.g. <state name=\"count\" value=\"0\" />.")).TrimStart('$');
+                stateNames.Add(name);
+                if (target && ctx.Live.State.TryGetValue(name, out var sent))
+                {
+                    liveScope.Declare(name, sent);
+                    continue;
+                }
+                string expr = st.Attr("value") ?? (st.Children.OfType<PageText>().Any() ? string.Concat(st.Children.OfType<PageText>().Select(t => t.Text)) : null);
+                liveScope.Declare(name, expr == null || expr.Trim().Length == 0 ? null : Eval(expr, liveScope, state));
+            }
+
+            if (target)
+            {
+                foreach (var kv in ctx.Live.Binds)
+                {
+                    if (!stateNames.Contains(kv.Key)) continue;
+                    liveScope.Assign(kv.Key, kv.Value is string sv && liveScope.TryGet(kv.Key, out var old) && old is double && PageValues.TryNumber(sv, out double num) ? num : kv.Value);
+                }
+
+                if (ctx.Live.Handler >= 0)
+                {
+                    if (ctx.Live.Handler >= handlers.Count) throw new LiveExpiredException();
+                    var handlerScope = liveScope.Child();
+                    foreach (var kv in ctx.Live.Args) handlerScope.Declare(kv.Key, kv.Value);
+                    handlerScope.Declare("event", ctx.Live.Event);
+                    RunStatements(handlers[ctx.Live.Handler].Value ?? string.Empty, handlerScope, state, declare: false);
+                }
+            }
+
+            var body = new StringBuilder();
+            var inner = new RenderState { Ctx = ctx, File = state.File, Markdown = state.Markdown, Slot = state.Slot, LiveScope = liveScope };
+            RenderNodes(el.Children, liveScope, body, inner);
+
+            var values = new Dictionary<string, object>();
+            foreach (var name in stateNames)
+            {
+                liveScope.TryGet(name, out var v);
+                if (v is PageLambda) throw new PageException($"State ${name} holds a lambda, which can't be sent to the browser.");
+                values[name] = v;
+            }
+
+            string tag = el.Attr("as") ?? "div";
+            var html = new StringBuilder();
+            html.Append('<').Append(tag).Append(" data-ks-live=\"").Append(PageValues.HtmlEscape(id)).Append('"');
+            html.Append(" data-ks-state=\"").Append(PageValues.HtmlEscape(PageLive.Sign(values))).Append('"');
+            foreach (var a in el.Attributes.Where(a => a.Name != "id" && a.Name != "as"))
+            {
+                if (a.Value == null) html.Append(' ').Append(a.Name);
+                else html.Append(' ').Append(a.Name).Append("=\"").Append(Interpolate(a.Value, scope, ctx, EscapeMode.Html).Replace("\"", "&quot;")).Append('"');
+            }
+            html.Append(" id=\"").Append(PageValues.HtmlEscape(id)).Append("\">");
+            html.Append(body).Append("</").Append(tag).Append('>');
+
+            if (target)
+            {
+                ctx.Live.Output = html.ToString();
+                throw new PageResponseSignal(new PageResult { Body = html.ToString() });
+            }
+            sb.Append(html);
+        }
+
+        /// <summary>Variables declared between a handler's element and its live block, e.g. the loop item.</summary>
+        private static Dictionary<string, object> LocalVariables(PageScope scope, PageScope liveScope)
+        {
+            var locals = new Dictionary<string, object>();
+            for (var s = scope; s != null && s != liveScope; s = s.Parent)
+            {
+                foreach (var kv in s.OwnVariables)
+                {
+                    if (kv.Value is PageLambda || locals.ContainsKey(kv.Key)) continue;
+                    locals[kv.Key] = kv.Value;
+                }
+            }
+            return locals;
         }
 
         private static void RenderMatch(PageElement el, PageScope scope, StringBuilder sb, RenderState state)

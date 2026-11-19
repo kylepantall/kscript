@@ -52,6 +52,8 @@ namespace KScript.Pages
             throw new PageException($"${name} is not defined, so it can't be set. Declare it first with <let name=\"{name}\" ...>.");
         }
 
+        internal IEnumerable<KeyValuePair<string, object>> OwnVariables => _vars;
+
         public IEnumerable<string> Names()
         {
             var seen = new HashSet<string>();

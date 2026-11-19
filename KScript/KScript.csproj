@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Pages\live.js" LogicalName="KScript.Pages.live.js" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="KScript.Tests" />
   </ItemGroup>
 

@@ -26,6 +26,9 @@ namespace KScript.Pages
         public string Value { get; set; }
 
         public char Quote { get; set; }
+
+        /// <summary>For on-* attributes in a &lt;live&gt; block: the handler's number.</summary>
+        public int HandlerIndex { get; set; } = -1;
     }
 
     internal sealed class PageElement : PageNode
@@ -62,7 +65,7 @@ namespace KScript.Pages
         public static readonly HashSet<string> ControlElements = new HashSet<string>(StringComparer.Ordinal)
         {
             "let", "set", "do", "if", "elif", "else", "for", "while", "match", "case", "default",
-            "layout", "slot", "markdown", "respond", "redirect", "include",
+            "layout", "slot", "markdown", "respond", "redirect", "include", "live", "state",
         };
 
         public static List<PageNode> Parse(string text, int firstLine = 1)
@@ -274,7 +277,7 @@ namespace KScript.Pages
             {
                 if (nodes[k] is not PageElement el) continue;
                 DedentControlBodies(el.Children, null);
-                if (!ControlElements.Contains(el.Name) || el.Name == "slot" || el.Name == "let" || el.Name == "set" || el.Name == "do") continue;
+                if (!ControlElements.Contains(el.Name) || el.Name == "slot" || el.Name == "live" || el.Name == "let" || el.Name == "set" || el.Name == "do") continue;
                 if (k == 0 || nodes[k - 1] is not PageText before || before.Raw) continue;
 
                 int lastNl = before.Text.LastIndexOf('\n');
@@ -378,7 +381,7 @@ namespace KScript.Pages
             var ownLine = new bool[nodes.Count];
             for (int k = 0; k < nodes.Count; k++)
             {
-                if (nodes[k] is not PageElement e || !ControlElements.Contains(e.Name) || e.Name == "slot") continue;
+                if (nodes[k] is not PageElement e || !ControlElements.Contains(e.Name) || e.Name == "slot" || e.Name == "live") continue;
                 if (k == 0) { ownLine[k] = true; continue; }
                 if (nodes[k - 1] is PageText prev && !prev.Raw)
                 {
@@ -393,7 +396,7 @@ namespace KScript.Pages
             }
 
             // Blank lines between control elements (a run of <let>s, say) produce no output.
-            bool IsControl(int k) => k >= 0 && k < nodes.Count && nodes[k] is PageElement ce && ControlElements.Contains(ce.Name) && ce.Name != "slot";
+            bool IsControl(int k) => k >= 0 && k < nodes.Count && nodes[k] is PageElement ce && ControlElements.Contains(ce.Name) && ce.Name != "slot" && ce.Name != "live";
             for (int k = 0; k < nodes.Count; k++)
             {
                 if (nodes[k] is PageText ws && !ws.Raw && ws.Text.Trim().Length == 0 && ws.Text.Contains('\n')
@@ -408,7 +411,7 @@ namespace KScript.Pages
             {
                 if (nodes[k] is not PageElement el) continue;
                 TidyWhitespace(el.Children);
-                if (!ControlElements.Contains(el.Name) || el.Name == "slot") continue;
+                if (!ControlElements.Contains(el.Name) || el.Name == "slot" || el.Name == "live") continue;
 
                 if (el.Children.Count > 0 && el.Children[0] is PageText first && !first.Raw)
                 {
