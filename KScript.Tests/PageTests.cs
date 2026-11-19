@@ -149,6 +149,27 @@ public class PageRendererTests
     }
 
     [Fact]
+    public void Html_keeps_the_case_of_svg_names()
+    {
+        Assert.Equal("<svg viewBox=\"0 0 10 10\"><linearGradient id=\"g\" gradientUnits=\"userSpaceOnUse\"></linearGradient><path d=\"M0 0\"></path></svg>",
+            Render("<svg viewBox=\"0 0 10 10\"><linearGradient id=\"g\" gradientUnits=\"userSpaceOnUse\"></linearGradient><path d=\"M0 0\"/></svg>"));
+        Assert.Equal("<DIV Class=\"a\">x</DIV>", Render("<DIV Class=\"a\">x</div>"));
+    }
+
+    [Theory]
+    [InlineData("<ul><li>one<li>two</ul>", "<ul><li>one</li><li>two</li></ul>")]
+    [InlineData("<p>one<p>two", "<p>one</p><p>two</p>")]
+    [InlineData("<p>text<div>block</div>", "<p>text</p><div>block</div>")]
+    [InlineData("<table><tr><td>a<td>b<tr><td>c</table>", "<table><tr><td>a</td><td>b</td></tr><tr><td>c</td></tr></table>")]
+    [InlineData("<dl><dt>term<dd>def<dt>next</dl>", "<dl><dt>term</dt><dd>def</dd><dt>next</dt></dl>")]
+    [InlineData("<select><option>a<option>b</select>", "<select><option>a</option><option>b</option></select>")]
+    [InlineData("<ul><for each=\"x\" in=\"['a', 'b']\"><li>{$x}</for></ul>", "<ul><li>a</li><li>b</li></ul>")]
+    public void Html_end_tags_that_can_be_left_out_are_closed(string page, string html)
+    {
+        Assert.Equal(html, Render(page));
+    }
+
+    [Fact]
     public void If_elif_else()
     {
         const string page = "<if test=\"$n ge 90\">A</if><elif test=\"$n ge 75\">B</elif><else>C</else>";

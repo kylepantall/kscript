@@ -33,6 +33,20 @@ async function run() {
   const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', doc.uri, new vscode.Position(1, 4));
   assert.ok(hovers.length > 0, 'hover on <let>');
 
+  // .html pages keep VS Code's HTML language and grammar; KScript only adds { } expressions on top.
+  const page = await vscode.workspace.openTextDocument(path.join(folder, 'page.html'));
+  assert.strictEqual(page.languageId, 'html', 'a page stays HTML');
+  await vscode.window.showTextDocument(page);
+  const tokens = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', page.uri);
+  const scopeOf = (text) => (tokens.find((t) => t.c === text) || {}).t || '';
+  assert.match(scopeOf('p'), /entity\.name\.tag\.html/, 'HTML tags are highlighted: ' + JSON.stringify(tokens));
+  assert.match(scopeOf('class'), /entity\.other\.attribute-name\.html/, 'HTML attributes are highlighted');
+  assert.match(scopeOf('$title'), /variable\.other\.kscript/, 'KScript expressions are highlighted in pages');
+  const layout = await vscode.workspace.openTextDocument(path.join(folder, '_layout.html'));
+  await vscode.window.showTextDocument(layout);
+  const layoutTokens = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', layout.uri);
+  assert.ok(!layoutTokens.some((t) => /invalid\.illegal/.test(t.t)), '<slot /> is not marked as an error: ' + JSON.stringify(layoutTokens));
+
   console.log('VS Code integration test passed');
 }
 

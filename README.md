@@ -285,7 +285,7 @@ See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and
 
 ```sh
 kscript make component Hero --props title,sub-title   # _components/hero.html, used as <hero title="…" sub-title="…" />
-kscript make page about --title "About us"            # about.html, wrapped in _layout.html
+kscript make page about --title "About us"            # about.html, wrapped in _layout.html (created if missing)
 kscript make page "people/[id]"                       # people/[id].html, with $id read from the URL
 kscript make markdown blog/first-post                 # blog/first-post.md with front matter
 kscript make layout main --css /site.css              # _layouts/main.html

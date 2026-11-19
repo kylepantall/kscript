@@ -1,16 +1,28 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "scopeName": "kscript.pages.injection",
-  "comment": "Highlights KScript { expressions } in the HTML and Markdown pages that kscript serve renders.",
-  "injectionSelector": "L:text.html.basic -source -comment -string.quoted, L:text.html.markdown -markup.fenced_code -markup.inline.raw -comment",
+  "comment": "Highlights KScript { expressions } in the HTML and Markdown pages that kscript serve renders, on top of VS Code's own HTML grammar. VS Code opens .html files with text.html.derivative (which embeds text.html.basic), so the selector uses the shared text.html prefix. <script> and <style> (source.*) and comments are left alone.",
+  "injectionSelector": "L:text.html -source -comment, L:text.html.markdown -markup.fenced_code -markup.inline.raw -comment",
   "patterns": [
-    { "include": "#escaped" },
-    { "include": "source.kscript#interpolation" }
+    {
+      "include": "#escaped"
+    },
+    {
+      "include": "#self-closing"
+    },
+    {
+      "include": "source.kscript#interpolation"
+    }
   ],
   "repository": {
     "escaped": {
       "name": "constant.character.escape.kscript",
       "match": "\\{\\{|\\}\\}"
+    },
+    "self-closing": {
+      "comment": "KScript pages close any element with />, e.g. <slot /> or <hero />. The HTML grammar marks the / on non-void elements as illegal.",
+      "name": "punctuation.definition.tag.end.html",
+      "match": "/(?=>)"
     }
   }
 }
