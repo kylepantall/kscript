@@ -48,6 +48,20 @@ namespace KScript.Language.Analysis
             Scope root = new Scope(null, new TextSpan(0, source.Length));
             result.RootScope = root;
             result.IsPartial = IsPartialPath(result.Path);
+            Dictionary<string, TypeShape> jsonCache = new Dictionary<string, TypeShape>(StringComparer.Ordinal);
+            result.JsonFileShape = relative =>
+            {
+                string full = ResolvePath(relative);
+                if (full == null)
+                {
+                    return null;
+                }
+                if (!jsonCache.TryGetValue(full, out TypeShape shape))
+                {
+                    jsonCache[full] = shape = files.FileExists(full) ? JsonShapes.FromText(files.ReadText(full)) : null;
+                }
+                return shape;
+            };
 
             DeclareBuiltIns(root);
             AnalyzeFrontMatter(root);
