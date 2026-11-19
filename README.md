@@ -1,32 +1,30 @@
-<h1>KScript is a developing project.</h1>
+# KScript
 
-KScript allows the parsing of a XML KScript document into a functional scripting language.
-An example of a KScript document:
+[![CI](https://github.com/kylepantall/kscript/actions/workflows/ci.yml/badge.svg)](https://github.com/kylepantall/kscript/actions/workflows/ci.yml)
 
-<hr />
+KScript is a scripting language written in XML. A KScript document is parsed into a tree of objects and run by a small .NET 8 interpreter on Windows, Linux and macOS. `kscript serve` also runs a folder of HTML and Markdown templates as a website.
 
-<h2>Script Example</h2>
-<p>For additional information, include: print_info="yes" attribute within the <kscript> document open tag.</p>
+KScript is still in active development, and its syntax may change between versions.
 
-<hr />
+## A first script
 
 ```xml
 <kscript dynamic_defs="yes">
-  <!-- By default KScript allows Dynamic defs, meaning they'll be defined automatically if they haven't already upon usage -->
-  <!-- <def id="entered_name"/> -->
-  
-  <!-- Obtains input with the prompt "What's your name?" and stores the text input to variable 'entered_name' -->
-  <input to="entered_name" type="text">What's your name?</input>
-  
-  <!-- Outputs 'entered_name' variable to the console -->
-  <echo>Hello, $entered_name!</echo>
+  <!-- With dynamic_defs, variables are created the first time they are used -->
 
+  <!-- Ask a question and store the answer in 'entered_name' -->
+  <input to="entered_name" type="text">What's your name?</input>
+
+  <!-- Trim the answer, capitalise it and print it -->
+  <echo>Hello, $entered_name->trim()->upper()!</echo>
 </kscript>
 ```
 
-<hr />
+Add `print_info="yes"` to the `<kscript>` tag to print extra information while the script runs.
 
-<h2>Building and running</h2>
+More examples live in [`DebugScripts/`](DebugScripts) and [`Example Scripts/`](Example%20Scripts).
+
+## Building and running
 
 KScript targets .NET 8 and runs on Windows, Linux and macOS. Install the [.NET 8 SDK](https://dotnet.microsoft.com/download), then:
 
@@ -41,7 +39,7 @@ dotnet run --project KScriptApp -- "path/to/script.xml"
 To produce a standalone executable for a platform:
 
 ```sh
-dotnet publish KScriptApp -c Release -r linux-x64   # or win-x64, osx-arm64, ...
+dotnet publish KScriptApp -c Release -r linux-x64   # or win-x64, osx-x64, osx-arm64, ...
 ```
 
 Command line options:
@@ -59,14 +57,43 @@ Command line options:
 
 Anything after the script path is available to the script through `@args()`.
 
-<h2>Writing portable scripts</h2>
+## Repository layout
 
-- Build paths with `@join_path($dir, 'file.txt')` rather than hard-coding `\` or `/`.
-- `@k('os.platform')` returns `windows`, `linux` or `macos`; `@k('path.separator')`, `@k('user.home')` and `@k('temp.directory')` are also available.
-- Numbers are always parsed and printed with `.` as the decimal separator, whatever the machine's language.
-- `<registry>` and `@registry` only work on Windows and report a clear error elsewhere.
+| Path | Contents |
+| --- | --- |
+| `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, and the `kscript serve` page engine (`Pages/`). |
+| `KScriptApp/` | The `KScript` command line app that runs a script file. |
+| `KScript.Tests/` | xUnit test suite. |
+| `DebugScripts/`, `Example Scripts/` | Sample scripts. |
+| `Example Sites/team` | A sample `kscript serve` site. |
 
-<h2>Command syntax</h2>
+## Tests and CI
+
+`KScript.Tests` is an xUnit project covering the command parser, commands, control flow, variables, value methods, pipes and lambdas, platform helpers, `kscript serve` pages, and the sample scripts. Run it with `dotnet test KScript.sln`. The tests capture console output, so they run one at a time rather than in parallel.
+
+Every push to `master` and every pull request runs [the CI workflow](.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode and then runs `DebugScripts/filterOldestFromArray.xml` on three platforms:
+
+- **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
+- **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
+
+## Elements
+
+A script is a `<kscript>` document made of elements. The main groups are:
+
+| Group | Elements |
+| --- | --- |
+| Output and input | `echo` `menu` `input` `ginput` `picker` `anykey` `clear` |
+| Variables | `def` `defm` `update` `updateContent` `temp` `guard` |
+| Control flow | `if` `else` `for` `forxy` `dowhile` `forever` `break` `continue` `end` `wait` `group` |
+| Arrays | `array` `marray` `ainsert` `aremove` `minsert` `afor` `aecho` |
+| Errors | `try` `catch` `throw` `onexception` |
+| Methods | `method` `call` `run` `func` |
+| Files and network | `file_info` `move` `new_dir` `write` `download` `loadHtml` |
+| Other | `load` `ref` `thread` `watcher` `watch` `rule` `registry` `languages` `math` |
+
+Run any script with `-all` (for example `dotnet run --project KScriptApp -- script.xml -all`) to print every element and command with its properties and examples.
+
+## Command syntax
 
 Commands are written `@name(argument, argument, ...)`. Arguments can be `'quoted strings'`, nested commands or plain text, and spaces around arguments are ignored:
 
@@ -77,7 +104,7 @@ Commands are written `@name(argument, argument, ...)`. Arguments can be `'quoted
 
 An `@` that isn't followed by a name and `(` is plain text, so e-mail addresses and apostrophes in text are safe.
 
-<h2>Methods, pipes and lambdas</h2>
+## Methods, pipes and lambdas
 
 Any value (a variable, a `'quoted string'`, a number or a command's result) can have methods called on it with `->`. Calls can be chained and can take arguments:
 
@@ -104,17 +131,21 @@ Values are typed on use: a value is a number if it parses as one, a bool if it i
 <echo>$name |> trim() |> upper()</echo>
 <echo>$csv |> @split(',', '1')</echo>
 <echo>$name |> fn($s) => $s->lower()->reverse()</echo>
+```
 
+A lambda stored with `<def>` can be piped into or called later:
+
+```xml
 <def id="shout">fn($s) => $s->upper()->replace('.', '!')</def>
-<echo>'hi.' |> $shout</echo>
-<echo>$shout->call('hey.')</echo>
+<echo>'hi.' |> $shout</echo>        <!-- HI! -->
+<echo>$shout->call('hey.')</echo>   <!-- HEY! -->
 ```
 
 A lambda body is one expression; use brackets to group: `fn($n) => ($n->mul(2) |> fn($m) => $m->add(1))`. Lambda parameters are only visible inside the lambda.
 
 Variables are resolved after a line is parsed, so values containing `,`, `)` or `'` are always passed through intact and are never run as commands.
 
-<h2>Web pages: kscript serve</h2>
+## Web pages: kscript serve
 
 `kscript serve` runs a folder as a website. Every `.html` and `.md` page is a template: KScript elements sit directly in the HTML, `{ expression }` works in text and attributes, and the visitor gets plain HTML.
 
@@ -166,7 +197,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 
 See `Example Sites/team` for a complete site with a layout, a component, a Markdown page, a dynamic route and a JSON endpoint.
 
-<h3>Reactive pages with &lt;live&gt; (no JavaScript)</h3>
+### Reactive pages with `<live>` (no JavaScript)
 
 A `<live>` block reacts to clicks and typing without any JavaScript in the page. Its handlers are KScript statements; the server runs them and sends back just that block's new HTML.
 
@@ -194,5 +225,18 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 
 See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter.
 
-<h2>Additional Information</h2>
-Further documentation is still within development. 
+## Writing portable scripts
+
+- Build paths with `@join_path($dir, 'file.txt')` rather than hard-coding `\` or `/`.
+- `@k('os.platform')` returns `windows`, `linux` or `macos`; `@k('path.separator')`, `@k('user.home')` and `@k('temp.directory')` are also available.
+- Numbers are always parsed and printed with `.` as the decimal separator, whatever the machine's language.
+- `<registry>` and `@registry` only work on Windows and report a clear error elsewhere.
+
+## Roadmap
+
+Work in progress, not yet on `master`:
+
+- A language server for editor support.
+- A proposal for a cleaner KScript 2 syntax.
+
+Further documentation is still in development.
