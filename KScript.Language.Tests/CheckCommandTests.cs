@@ -87,6 +87,33 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void NestedPagesFindTheLayoutAtTheSiteRoot()
+        {
+            Write("_layout.html", "<html><body><slot /></body></html>");
+            string page = Write(Path.Combine("people", "[id].html"), "<layout src=\"_layout.html\" title=\"Person\"><p>hi</p></layout>");
+            (int code, string output) = Run(true, page);
+            Assert.True(code == 0, output);
+        }
+
+        [Fact]
+        public void ComponentPropsAreKnownWithARelativePath()
+        {
+            Write("_layout.html", "<slot />");
+            Write(Path.Combine("_components", "card.html"), "<div class=\"card\">{$title}</div>");
+            string previous = Directory.GetCurrentDirectory();
+            Directory.SetCurrentDirectory(dir);
+            try
+            {
+                (int code, string output) = Run(true, Path.Combine("_components", "card.html"));
+                Assert.True(code == 0, output);
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(previous);
+            }
+        }
+
+        [Fact]
         public void HtmlOutsideASiteIsLeftAlone()
         {
             Write("notes.html", "<p>{$nope}</p>");

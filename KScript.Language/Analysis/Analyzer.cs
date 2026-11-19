@@ -63,7 +63,8 @@ namespace KScript.Language.Analysis
             {
                 return false;
             }
-            string normalized = path.Replace('\\', '/');
+            // A leading / so relative paths such as _components/card.html match too.
+            string normalized = "/" + path.Replace('\\', '/');
             return System.IO.Path.GetFileName(normalized).StartsWith("_", StringComparison.Ordinal)
                 || normalized.Contains("/_components/", StringComparison.Ordinal);
         }
