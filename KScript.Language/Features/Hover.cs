@@ -195,7 +195,9 @@ namespace KScript.Language.Features
             sb.Append("**<").Append(e.Name).Append(">**");
             if (e.Planned)
             {
-                sb.Append(" (KScript 2, not in the interpreter yet)");
+                sb.Append(LanguageCatalog.Default.PageImplemented.Contains(e.Name)
+                    ? " (runs in pages today; not in the script interpreter yet)"
+                    : " (KScript 2, not in the interpreter yet)");
             }
             sb.Append("\n\n").Append(e.Description);
             if (e.Attributes.Count > 0)

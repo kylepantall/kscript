@@ -39,7 +39,57 @@ namespace KScript
             Console.WriteLine("Usage: kscript <script.xml> [options] [script arguments]");
             Console.WriteLine("       kscript check <file-or-folder>... [--warnaserror]   Check scripts without running them.");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
+            Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
             Console.WriteLine("Options: " + string.Join(" ", Commands()));
+        }
+
+        /// <summary>kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder.</summary>
+        static int Serve(string[] args)
+        {
+            string folder = ".";
+            int port = 8080;
+            string host = "localhost";
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                switch (args[i])
+                {
+                    case "--port":
+                    case "-p":
+                        if (i + 1 >= args.Length || !int.TryParse(args[++i], out port))
+                        {
+                            Console.Error.WriteLine("--port needs a number, e.g. --port 8080");
+                            return 1;
+                        }
+                        break;
+                    case "--host":
+                        if (i + 1 >= args.Length)
+                        {
+                            Console.Error.WriteLine("--host needs a value, e.g. --host 0.0.0.0");
+                            return 1;
+                        }
+                        host = args[++i];
+                        break;
+                    default:
+                        folder = args[i];
+                        break;
+                }
+            }
+
+            try
+            {
+                return KScript.Pages.PageServer.RunAsync(folder, port, host, Console.Out).GetAwaiter().GetResult();
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"Could not start the server: {ex.Message}");
+                return 1;
+            }
         }
 
         static bool HasFlag(string[] args, string flag) => args.Any(i => string.Equals(i, flag, StringComparison.OrdinalIgnoreCase));
@@ -64,6 +114,11 @@ namespace KScript
             {
                 PrintUsage();
                 return 1;
+            }
+
+            if (args[0] == "serve")
+            {
+                return Serve(args.Skip(1).ToArray());
             }
 
             if (HasFlag(args, "-colourful"))

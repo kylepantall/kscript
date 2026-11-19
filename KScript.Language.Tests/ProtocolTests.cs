@@ -261,22 +261,20 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void ExitAfterShutdownReturnsZero()
+        public async Task ExitAfterShutdownReturnsZero()
         {
             Initialize();
             Assert.Null(Request("shutdown")["error"]);
             Notify("exit", null);
-            Assert.True(server.Wait(TimeSpan.FromSeconds(10)));
-            Assert.Equal(0, server.Result);
+            Assert.Equal(0, await server.WaitAsync(TimeSpan.FromSeconds(10)));
         }
 
         [Fact]
-        public void ExitWithoutShutdownReturnsOne()
+        public async Task ExitWithoutShutdownReturnsOne()
         {
             Initialize();
             Notify("exit", null);
-            Assert.True(server.Wait(TimeSpan.FromSeconds(10)));
-            Assert.Equal(1, server.Result);
+            Assert.Equal(1, await server.WaitAsync(TimeSpan.FromSeconds(10)));
         }
 
         [Fact]

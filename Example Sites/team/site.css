@@ -1,0 +1,18 @@
+body { font: 16px/1.5 system-ui, sans-serif; margin: 40px auto; max-width: 720px; padding: 0 20px; }
+nav a { margin-right: 12px; }
+.card { border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+.senior { font-weight: bold; }
+.lead { color: #555; }
+.demo { border: 1px solid #e3e0da; border-radius: 12px; padding: 4px 20px 16px; margin: 20px 0; }
+.demo h2 { font-size: 18px; }
+.big { font-size: 36px; font-weight: 700; margin: 8px 0; }
+.note { color: #666; font-size: 14px; }
+button { font: inherit; padding: 4px 12px; border-radius: 6px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+input { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid #bbb; }
+input[type=range] { width: 100%; margin-top: 8px; }
+.todos { list-style: none; padding: 0; }
+.todos li { display: flex; justify-content: space-between; padding: 4px 0; }
+.todos li.done label { text-decoration: line-through; color: #888; }
+.remove { border: 0; color: #999; }
+[aria-busy=true] { opacity: .85; transition: opacity .2s; }

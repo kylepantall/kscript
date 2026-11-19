@@ -22,6 +22,7 @@ namespace KScript.Language.Tests
         [InlineData("<let name=\"c\" value=\"1\" const=\"maybe\" />", DiagnosticCodes.InvalidAttributeValue, "maybe", "yes or no")]
         [InlineData("<elif test=\"true\"></elif>", DiagnosticCodes.MisplacedElement, "elif", "straight after <if>")]
         [InlineData("<let name=\"a\" value=\"1\" /><else></else>", DiagnosticCodes.MisplacedElement, "else", null)]
+        [InlineData("<while test=\"false\"></while><else></else>", DiagnosticCodes.MisplacedElement, "else", "<for>")]
         [InlineData("<case is=\"1\"></case>", DiagnosticCodes.MisplacedElement, "case", "inside <match>")]
         [InlineData("<return value=\"1\" />", DiagnosticCodes.MisplacedElement, "return", "inside <fn>")]
         [InlineData("<break />", DiagnosticCodes.MisplacedElement, "break", "inside a loop")]
@@ -243,12 +244,73 @@ namespace KScript.Language.Tests
         {
             string page = "<!doctype html>\n<let name=\"min\" value=\"$request.query.min ?? 0\" />\n" +
                           "<layout src=\"_layout.html\" title=\"People\">\n<h1 class=\"{ $min gt 0 ? 'x' : '' }\">Over {$min}</h1>\n" +
-                          "<input type=\"checkbox\" checked=\"{$min gt 0}\"><br>\n<people-card person=\"{ name: 'Joan' }\" />\n" +
+                          "<input type=\"checkbox\" checked=\"{$min gt 0}\"><br>\n<people-card person=\"{ { name: 'Joan' } }\" />\n" +
                           "<script>if (a < b) {}</script>\n</layout>";
             DocumentAnalysis a = Analyze(page, Path.Combine(Site, "people.html"), SiteFiles());
             AssertClean(a);
             Assert.Contains(a.Links, l => l.Kind == "component" && l.TargetPath.EndsWith("people-card.html"));
             Assert.Contains(a.Links, l => l.Kind == "layout");
+        }
+
+        [Fact]
+        public void LiveBlocksDeclareStateAndCheckHandlers()
+        {
+            string page = "<live id=\"todos\">\n<state name=\"items\" value=\"[{ id: 1, text: 'a' }]\" />\n<state name=\"draft\" value=\"''\" />\n" +
+                          "<form on-submit=\"items = $items->push({ id: 2, text: $draft->trim() }); draft = ''\"><input bind=\"draft\"></form>\n" +
+                          "<for each=\"t\" in=\"$items\"><p on-click=\"items = $items->reject(fn($x) => $x.id eq $t.id)\">{$t.text}</p></for>\n" +
+                          "<else><p>Nothing yet.</p></else>\n</live>";
+            AssertClean(Analyze(page, Path.Combine(Site, "todo.html"), SiteFiles()));
+        }
+
+        [Theory]
+        [InlineData("<button on-click=\"n += 1\">+</button>", DiagnosticCodes.MisplacedElement, "on-click")]
+        [InlineData("<input bind=\"q\">", DiagnosticCodes.MisplacedElement, "bind")]
+        [InlineData("<live id=\"x\"><button on-click=\"nope += 1\">+</button></live>", DiagnosticCodes.SetUndeclared, "nope")]
+        [InlineData("<live id=\"x\"><button on-click=\"1 + 2\">+</button></live>", DiagnosticCodes.StatementSyntax, "1 + 2")]
+        [InlineData("<live id=\"x\"><input bind=\"ghost\"></live>", DiagnosticCodes.SetUndeclared, "ghost")]
+        [InlineData("<state name=\"n\" value=\"0\" />", DiagnosticCodes.MisplacedElement, "state")]
+        [InlineData("<live><state name=\"n\" value=\"0\" /></live>", DiagnosticCodes.MissingAttribute, "live")]
+        public void LiveBlockProblems(string page, string code, string marked)
+        {
+            DocumentAnalysis a = Analyze(page, Path.Combine(Site, "p.html"), SiteFiles());
+            Diagnostic d = AssertSingle(a, code);
+            Assert.Equal(marked, a.Source[d.Span]);
+        }
+
+        [Fact]
+        public void MatchProvidesIt()
+        {
+            string page = "<let name=\"c\" value=\"'20'->to_number(0)\" /><match value=\"$c\"><case when=\"$it lt 0\"><p>Cold</p></case><default><p>{ $c->clamp(0, 9) }</p></default></match><p>{$it}</p>";
+            DocumentAnalysis a = Analyze(page, Path.Combine(Site, "p.html"), SiteFiles());
+            Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedVariable);
+            Assert.Equal(page.LastIndexOf("it", StringComparison.Ordinal), d.Span.Start);
+        }
+
+        [Fact]
+        public void ComponentAttributesAreTemplates()
+        {
+            DocumentAnalysis a = Analyze("<let name=\"p\" value=\"{ name: 'J' }\" /><people-card person=\"{$p}\" title=\"Hi {$p.name}\" />", Path.Combine(Site, "p.html"), SiteFiles());
+            AssertClean(a);
+        }
+
+        [Fact]
+        public void TheExampleSiteIsClean()
+        {
+            string site = null;
+            for (string dir = AppContext.BaseDirectory; dir != null && site == null; dir = Path.GetDirectoryName(dir))
+            {
+                string candidate = Path.Combine(dir, "Example Sites", "team");
+                site = File.Exists(Path.Combine(dir, "KScript.sln")) && Directory.Exists(candidate) ? candidate : null;
+            }
+            if (site == null)
+            {
+                return;
+            }
+            foreach (string file in Directory.EnumerateFiles(site, "*.*", SearchOption.AllDirectories).Where(f => f.EndsWith(".html") || f.EndsWith(".md")))
+            {
+                DocumentAnalysis a = Analyzer.Analyze(File.ReadAllText(file), file, DiskFileSystem.Instance);
+                Assert.True(!a.Errors.Any(), file + ":\n" + Describe(a));
+            }
         }
 
         [Fact]

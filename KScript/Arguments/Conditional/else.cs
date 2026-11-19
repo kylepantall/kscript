@@ -11,7 +11,7 @@ namespace KScript.Arguments
     /// </code>
     /// </summary>
     [KScriptDoc("Runs when the earlier <if>/<elif> tests were all false.")]
-    [KScriptElement(KScriptContentKind.Statements, MustFollow = "if, elif")]
+    [KScriptElement(KScriptContentKind.Statements, MustFollow = "if, elif, for")]
     public class @else : KScriptObject
     {
         public override bool Run()

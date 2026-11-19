@@ -385,8 +385,20 @@ namespace KScript.Language.Analysis
             {
                 case "let":
                 case "set":
-                    AnalyzeLetOrSet(e, info.Name == "let", scope, declareAfter);
+                case "state":
+                    AnalyzeLetOrSet(e, info.Name != "set", scope, declareAfter);
                     return;
+
+                case "match":
+                {
+                    // Inside <match>, $it is the value being matched (<case when="$it gt 9">).
+                    AnalyzeAttributes(e, info, scope);
+                    Symbol it = new Symbol { Name = "it", Kind = SymbolKind.BuiltIn, Description = "The value being matched." };
+                    result.Symbols.Add(it);
+                    inner.Declare(it, e.ContentSpan.Start);
+                    WalkChildren(e.Children, inner, markupMode);
+                    return;
+                }
 
                 case "do":
                     AnalyzeStatementsContent(e, scope, declare: false);
@@ -532,12 +544,21 @@ namespace KScript.Language.Analysis
                 {
                     continue;
                 }
-                if (component)
+                if (attr.Name.StartsWith("on-", StringComparison.Ordinal) && Kind != DocumentKind.Script)
                 {
-                    AnalyzeExpressionRegion(attr.Value, RegionKind.Expression, scope, e, attr);
+                    // <button on-click="count += 1">: statements run on the server when the event fires.
+                    RequireLive(e, attr);
+                    AnalyzeStatements(attr.Value, e, attr, scope, declare: false, requireEffect: true);
+                }
+                else if (attr.Name == "bind" && Kind != DocumentKind.Script)
+                {
+                    // <input bind="query">: two-way binding to a <state> variable.
+                    RequireLive(e, attr);
+                    ReferenceVariableByName(attr.Value, scope, isWrite: true, mustBeMutable: true);
                 }
                 else
                 {
+                    // Components get the value of a lone { expr } (person="{$p}"); anything else is text.
                     AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: false);
                 }
             }
@@ -891,6 +912,15 @@ namespace KScript.Language.Analysis
             }
         }
 
+        private void RequireLive(MarkupElement e, MarkupAttribute attr)
+        {
+            if (!e.Ancestors().Any(a => a.Name == "live"))
+            {
+                Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
+                    $"{attr.Name} only works inside a <live> block, e.g. <live id=\"counter\">...</live>.");
+            }
+        }
+
         private void AnalyzeStatementsContent(MarkupElement e, Scope scope, bool declare)
         {
             MarkupText text = e.SingleText;
@@ -902,8 +932,17 @@ namespace KScript.Language.Analysis
                 }
                 return;
             }
+            AnalyzeStatements(text.Content, e, null, scope, declare, requireEffect: e.Name == "do");
+        }
 
-            ExpressionRegion region = NewRegion(RegionKind.Statements, text.Content, e, null, scope, ExpressionParser.ParseStatements(text.Content.Value));
+        /// <summary>Assignments and calls: the content of let/set/do, and on-* handlers in pages.</summary>
+        private void AnalyzeStatements(DecodedText content, MarkupElement e, MarkupAttribute attr, Scope scope, bool declare, bool requireEffect)
+        {
+            if (string.IsNullOrWhiteSpace(content.Value))
+            {
+                return;
+            }
+            ExpressionRegion region = NewRegion(RegionKind.Statements, content, e, attr, scope, ExpressionParser.ParseStatements(content.Value));
             ReportSyntaxErrors(region, region.Parse.Errors);
 
             foreach (ExprNode node in region.Parse.Nodes)
@@ -933,15 +972,15 @@ namespace KScript.Language.Analysis
                 }
                 else
                 {
-                    if (e.Name == "do")
+                    if (requireEffect)
                     {
                         AnalyzeExpr(node, region, scope, ExprContext.Value);
                     }
                     bool isCall = node is CommandCallNode || node is MethodCallNode || node is CallNode || node is PipeNode;
-                    if (e.Name != "do" || !isCall)
+                    if (!requireEffect || !isCall)
                     {
                         Report(region.Source.ToSource(node.Span), DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax,
-                            e.Name == "do" ? "This statement does nothing. Assign it (x = ...) or call something." : "Expected an assignment such as x = 3.");
+                            requireEffect ? "This statement does nothing. Assign it (x = ...) or call something." : "Expected an assignment such as x = 3.");
                     }
                 }
             }

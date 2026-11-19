@@ -7,17 +7,35 @@ on:
 
 jobs:
   test:
-    name: Build and test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Build and test (${{ matrix.name }})
+    # The Linux job runs on home-ci-kscript, a self-hosted runner on home-ci
+    # that is registered to this repository only.
+    # Pull requests from forks always fall back to a GitHub-hosted runner so
+    # untrusted code never executes on home-ci.
+    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON('["self-hosted","Linux","X64","kscript"]') || matrix.hosted }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        include:
+          - name: linux
+            self-hosted: true
+            hosted: ubuntu-latest
+          - name: windows
+            self-hosted: false
+            hosted: windows-latest
+          - name: macos
+            self-hosted: false
+            hosted: macos-latest
 
     steps:
       - uses: actions/checkout@v4
 
+      # home-ci has no system-wide .NET SDK and the runner user can't write to
+      # setup-dotnet's default /usr/share/dotnet, so on the self-hosted job it
+      # installs into the runner's tool cache (kept between jobs) instead.
       - uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ matrix.self-hosted && format('{0}/dotnet', runner.tool_cache) || '' }}
         with:
           dotnet-version: 8.0.x
 
@@ -37,12 +55,12 @@ jobs:
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 --warnaserror
 
       - uses: actions/setup-node@v4
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.name == 'linux'
         with:
           node-version: 20
 
       - name: VS Code extension smoke test
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.name == 'linux'
         working-directory: editors/vscode
         run: |
           npm ci

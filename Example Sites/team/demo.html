@@ -1,0 +1,86 @@
+<let name="people" value="@read_json('data/people.json')" />
+
+<layout src="_layout.html" title="Live demo">
+  <h1>Live demo</h1>
+  <p class="lead">Everything on this page reacts as you use it, and none of it is JavaScript. Each box is a
+    <code>&lt;live&gt;</code> block: KScript handlers like <code>on-click="count += 1"</code> run on the server,
+    and only that block is redrawn.</p>
+
+  <section class="demo">
+    <h2>Counter</h2>
+    <live id="counter">
+      <state name="count" value="0" />
+      <p class="big">{$count}</p>
+      <button on-click="count -= 1">−</button>
+      <button on-click="count = 0">Reset</button>
+      <button on-click="count += 1">+</button>
+      <if test="$count ge 10">
+        <p class="note">Double digits!</p>
+      </if>
+    </live>
+  </section>
+
+  <section class="demo">
+    <h2>Live search</h2>
+    <live id="search">
+      <state name="query" value="''" />
+      <let name="q" value="$query->trim()->lower()" />
+      <let name="found" value="$people |> filter(fn($p) => $p.name->lower()->contains($q) or $p.role->lower()->contains($q))" />
+      <input bind="query" placeholder="Search by name or role…" autocomplete="off">
+      <p class="note">{$found->count()} of {$people->count()} people</p>
+      <ul>
+        <for each="p" in="$found">
+          <li><b>{$p.name}</b> · {$p.role}</li>
+        </for>
+        <else>
+          <li>Nobody matches “{$query}”.</li>
+        </else>
+      </ul>
+    </live>
+  </section>
+
+  <section class="demo">
+    <h2>To-do list</h2>
+    <live id="todos">
+      <state name="todos" value="[{ id: 1, text: 'Try KScript', done: true }, { id: 2, text: 'Build a page with no JavaScript', done: false }]" />
+      <state name="draft" value="''" />
+      <state name="next_id" value="3" />
+      <form on-submit="todos = $draft->trim() eq '' ? $todos : $todos->push({ id: $next_id, text: $draft->trim(), done: false }); next_id += 1; draft = ''">
+        <input bind="draft" placeholder="What needs doing?" autocomplete="off">
+        <button>Add</button>
+      </form>
+      <ul class="todos">
+        <for each="t" in="$todos">
+          <li class="{ $t.done ? 'done' : '' }">
+            <label><input type="checkbox" checked="{$t.done}" on-change="todos = $todos->map(fn($x) => $x.id == $t.id ? $x->set('done', not $x.done) : $x)"> {$t.text}</label>
+            <button class="remove" title="Remove" on-click="todos = $todos->reject(fn($x) => $x.id == $t.id)">✕</button>
+          </li>
+        </for>
+      </ul>
+      <p class="note">{$todos->count(fn($t) => not $t.done)} left</p>
+      <button on-click="todos = $todos->reject(fn($t) => $t.done)" disabled="{ not $todos->any(fn($t) => $t.done) }">Clear done</button>
+    </live>
+  </section>
+
+  <section class="demo">
+    <h2>Temperature converter</h2>
+    <live id="temperature">
+      <state name="celsius" value="20" />
+      <let name="c" value="$celsius->to_number(0)" />
+      <label><input type="number" bind="celsius"> °C</label>
+      <input type="range" min="-30" max="50" bind="celsius">
+      <p class="big">{ ($c * 9 / 5 + 32)->round(1) } °F</p>
+      <match value="$c">
+        <case when="$it lt 0">
+          <p class="note">Freezing.</p>
+        </case>
+        <case when="$it lt 25">
+          <p class="note">Comfortable.</p>
+        </case>
+        <default>
+          <p class="note">Hot!</p>
+        </default>
+      </match>
+    </live>
+  </section>
+</layout>

@@ -209,7 +209,13 @@ namespace KScript.Language.Tests
             }
             foreach (Type t in LanguageCatalog.InterpreterCommandTypes().Where(t => t.GetCustomAttribute<KScriptRetiredAttribute>() != null))
             {
-                Assert.Null(Catalog.GetCommand(t.Name.TrimStart('@')));
+                // Retired in scripts, unless the page engine reuses the name with a new meaning (@exists(path)).
+                CallableInfo reused = Catalog.GetCommand(t.Name.TrimStart('@'));
+                if (reused != null)
+                {
+                    Assert.Equal(LanguageCatalog.PageEngine, reused.ImplementedBy);
+                    continue;
+                }
                 Assert.NotNull(Catalog.GetRetiredCommand(t.Name.TrimStart('@')));
             }
         }

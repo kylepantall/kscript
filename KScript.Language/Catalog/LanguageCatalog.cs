@@ -42,6 +42,7 @@ namespace KScript.Language.Catalog
             AddRetired();
             AddCommands();
             AddMethods();
+            AddPageEngine();
             AddVariables();
         }
 
@@ -421,6 +422,160 @@ namespace KScript.Language.Catalog
 
         #endregion
 
+        #region Page engine
+
+        /// <summary>The <c>kscript serve</c> page engine (KScript/Pages), which implements pages today.</summary>
+        public static readonly Type PageEngine = typeof(KScript.Pages.PageRenderer);
+
+        /// <summary>
+        /// What the page engine adds on top of the interpreter. The engine is plain switch statements, so
+        /// PageEngineContractTests read its source and fail when something here is missing.
+        /// </summary>
+        private void AddPageEngine()
+        {
+            // Elements only the page engine has.
+            AddPageElement(new ElementInfo("live", "A reactive block: its on-* handlers run on the server and only this block is redrawn. No page JavaScript needed.", ContentKind.Markup,
+                new A("id", K.Text, "A name for the block, unique on the page.", required: true))
+            {
+                Context = ElementContext.Page,
+                Example = "<live id=\"counter\">\n  <state name=\"count\" value=\"0\" />\n  <button on-click=\"count += 1\">{$count}</button>\n</live>",
+            });
+            AddPageElement(new ElementInfo("state", "A variable of a <live> block that keeps its value between events.", ContentKind.Empty,
+                new A("name", K.DeclareVariable, "The variable to declare.", required: true),
+                new A("value", K.Expression, "Its starting value.", required: true))
+            {
+                Context = ElementContext.Page,
+                MustBeInside = new[] { "live" },
+                Example = "<live id=\"search\"><state name=\"query\" value=\"''\" /><input bind=\"query\"></live>",
+            });
+            AddPageElement(new ElementInfo("include", "Renders another page file here. Other attributes become its variables.", ContentKind.Empty,
+                new A("src", K.Path, "The file to include, relative to this page.", required: true))
+            {
+                Context = ElementContext.Page,
+                AllowsExtraAttributes = true,
+            });
+
+            // Commands the page engine implements. A planned entry becomes implemented; retired v1 names that pages
+            // reuse with a new meaning (@exists) are un-retired.
+            foreach (CallableInfo c in new[]
+            {
+                Page("read_text", "path", "Reads a site file as text.", KType.String),
+                Page("read_json", "path", "Reads a site JSON file into a value.", KType.Any),
+                Page("read_markdown", "path", "Reads a site Markdown file: $doc.html, $doc.title, $doc.meta.", KType.Map),
+                Page("files", "folder?, pattern?", "The site files in a folder.", KType.List),
+                Page("exists", "path", "yes if the site file exists.", KType.Bool),
+                Page("json", "text", "Parses JSON text into a value.", KType.Any),
+                Page("to_json", "value, indented?", "A value as JSON text.", KType.String),
+                Page("markdown", "text", "Renders Markdown: $doc.html, $doc.title, $doc.meta.", KType.Map),
+                Page("escape", "text", "HTML-escapes text.", KType.String),
+                Page("now", "", "The current date and time.", KType.Date),
+                Page("today", "", "Today's date, at midnight.", KType.Date),
+                Page("date", "text", "Parses a date.", KType.Date),
+                Page("range", "start, end?, step?", "Numbers from start up to (not including) end; one argument counts from 0.", KType.List),
+                Page("random", "min?, max?", "A random number: none = 0..1, a list = one of its items, two numbers = a whole number between them.", KType.Any),
+                Page("guid", "", "A new GUID.", KType.String),
+                Page("number", "value", "Converts a value to a number.", KType.Number),
+                Page("string", "value", "Converts a value to text.", KType.String),
+                Page("type", "value", "The type of a value: string, number, bool, list, map, fn, date or null.", KType.String),
+                Page("join_path", "parts...", "Joins path parts.", KType.String),
+                Page("min", "values...", "The smallest of the arguments (or of one list).", KType.Any),
+                Page("max", "values...", "The largest of the arguments (or of one list).", KType.Any),
+            })
+            {
+                if (commands.TryGetValue(c.Name, out CallableInfo existing) && !existing.Planned)
+                {
+                    continue; // The interpreter has it too; its signature (usually wider) wins.
+                }
+                retiredCommands.Remove(c.Name);
+                AddCommand(c);
+            }
+
+            // Methods the page engine implements that the interpreter doesn't (yet).
+            (string Receiver, string Name, string Params, string Description, string Returns)[] pageMethods =
+            {
+                (KType.Any, "is_null", "", "yes if the value is null.", KType.Bool),
+                (KType.Any, "to_string", "", "The value as text.", KType.String),
+                (KType.Any, "or", "fallback", "The value if it is truthy, otherwise fallback.", KType.Any),
+                (KType.Date, "year", "", "The year.", KType.Number),
+                (KType.Date, "month", "", "The month, 1 to 12.", KType.Number),
+                (KType.Date, "day", "", "The day of the month.", KType.Number),
+                (KType.Date, "hour", "", "The hour, 0 to 23.", KType.Number),
+                (KType.Date, "minute", "", "The minute.", KType.Number),
+                (KType.Date, "weekday", "", "The day of the week, such as Monday.", KType.String),
+                (KType.Date, "add_days", "days", "The date plus a number of days (negative to go back).", KType.Date),
+                (KType.Date, "add_hours", "hours", "The date plus a number of hours.", KType.Date),
+                (KType.Date, "iso", "", "The date in ISO 8601 format.", KType.String),
+                (KType.List, "at", "index", "The item at an index; negative counts from the end.", KType.Any),
+                (KType.List, "where", "fn", "The items for which fn is true (the same as filter).", KType.List),
+                (KType.List, "reject", "fn", "The items for which fn is false.", KType.List),
+                (KType.List, "each", "fn", "Calls fn for each item and returns the list.", KType.List),
+                (KType.List, "find_index", "fn", "The index of the first item for which fn is true, or -1.", KType.Number),
+                (KType.List, "index_of", "item", "The index of an item, or -1.", KType.Number),
+                (KType.List, "sum", "fn?", "The total of the items (or of fn for each item).", KType.Number),
+                (KType.List, "average", "fn?", "The mean of the items (or of fn for each item), or null when empty.", KType.Number),
+                (KType.List, "min", "", "The smallest item.", KType.Any),
+                (KType.List, "max", "", "The largest item.", KType.Any),
+                (KType.List, "group_by", "fn", "A map from fn's result to the items that gave it.", KType.Map),
+                (KType.List, "take", "count", "The first count items.", KType.List),
+                (KType.List, "skip", "count", "All but the first count items.", KType.List),
+                (KType.List, "append", "items...", "A new list with items added to the end (the same as push).", KType.List),
+                (KType.List, "flatten", "", "Lists inside the list are spread into it.", KType.List),
+                (KType.List, "chunk", "size", "The items in lists of size.", KType.List),
+                (KType.Map, "merge", "other", "A new map with other's keys added or replaced.", KType.Map),
+                (KType.Number, "clamp", "min, max", "The number limited to min..max.", KType.Number),
+                (KType.Number, "format", "pattern?", "Formats the number (.NET format, default N0).", KType.String),
+                (KType.Number, "to_number", "default?", "The number itself.", KType.Number),
+                (KType.Number, "to_int", "", "The whole-number part.", KType.Number),
+                (KType.Number, "to_string", "", "The number as text.", KType.String),
+                (KType.Number, "is_even", "", "yes if the number is even.", KType.Bool),
+                (KType.Number, "is_odd", "", "yes if the number is odd.", KType.Bool),
+                (KType.String, "first", "", "The first character.", KType.String),
+                (KType.String, "last", "", "The last character.", KType.String),
+                (KType.String, "slice", "start, end?", "Part of the text; negative positions count from the end.", KType.String),
+                (KType.String, "truncate", "length, suffix?", "Shortens the text to length, adding suffix (default …).", KType.String),
+                (KType.String, "lines", "", "The lines of the text, as a list.", KType.List),
+                (KType.String, "capitalize", "", "The text with its first letter upper-cased.", KType.String),
+                (KType.String, "title", "", "The text in Title Case.", KType.String),
+                (KType.String, "escape", "", "The text HTML-escaped.", KType.String),
+                (KType.String, "url_encode", "", "The text escaped for a URL.", KType.String),
+                (KType.String, "markdown", "", "The text rendered from Markdown to HTML.", KType.String),
+                (KType.String, "json", "", "Parses the text as JSON.", KType.Any),
+                (KType.String, "to_number", "default?", "The text as a number, or default when it isn't one.", KType.Number),
+                (KType.String, "to_int", "default?", "The text as a whole number, or default when it isn't one.", KType.Number),
+                (KType.String, "to_bool", "", "yes/no, true/false, 1/0 as a bool.", KType.Bool),
+                (KType.String, "to_date", "", "Parses the text as a date.", KType.Date),
+            };
+            foreach (var m in pageMethods)
+            {
+                if (methods.Any(x => x.Name == m.Name && x.ReceiverType == m.Receiver))
+                {
+                    continue;
+                }
+                methods.Add(new CallableInfo(CallableKind.Method, m.Name, m.Description, new[] { Signature.Parse(m.Params) })
+                {
+                    ReceiverType = m.Receiver,
+                    ReturnType = m.Returns,
+                    ImplementedBy = PageEngine,
+                });
+            }
+
+            // Elements the page engine already runs in pages are no longer "planned" there.
+            foreach (string name in new[] { "let", "set", "do", "elif", "while", "match", "case", "default", "layout", "slot", "markdown", "respond", "redirect" })
+            {
+                PageImplemented.Add(name);
+            }
+        }
+
+        /// <summary>Elements that are planned for scripts but already run in pages.</summary>
+        public HashSet<string> PageImplemented { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private void AddPageElement(ElementInfo e) => elements[e.Name] = e;
+
+        private static CallableInfo Page(string name, string parameters, string description, string returns) =>
+            new CallableInfo(CallableKind.Command, name, description, new[] { Signature.Parse(parameters) }) { ReturnType = returns, ImplementedBy = PageEngine };
+
+        #endregion
+
         #region Methods
 
         private void AddMethod(string receiver, string name, string parameters, string description, string returns = KType.Any, bool planned = true) =>
@@ -444,7 +599,7 @@ namespace KScript.Language.Catalog
             }
 
             // Lists (KScript 2 proposal, section 5).
-            AddMethod(KType.List, "count", "", "The number of items.", KType.Number);
+            AddMethod(KType.List, "count", "fn?", "The number of items (or of items for which fn is true).", KType.Number);
             AddMethod(KType.List, "first", "", "The first item, or null.");
             AddMethod(KType.List, "last", "", "The last item, or null.");
             AddMethod(KType.List, "push", "item", "Adds an item to the end.", KType.List);

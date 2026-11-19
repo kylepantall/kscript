@@ -48,6 +48,11 @@ Value methods (`->upper()`) come from `ValueMethods.Catalog()`. Parts of the KSc
 doesn't implement yet are described in `LanguageCatalog` itself and marked *planned*; once a class implements one,
 the class wins.
 
+The `kscript serve` page engine (`KScript/Pages`) already runs pages, including `<live>`, `<state>`, `on-*`
+handlers and `bind`. What it adds is described in `LanguageCatalog.AddPageEngine`, and `PageEngineContractTests`
+read the engine's source and fail when one of its methods, commands or elements is missing from the catalog. The
+tests also check that `Example Sites/team` analyzes without errors.
+
 `CatalogContractTests` keep the two in step: every interpreter element and command class must be classified, every
 documented parameter must exist, renames must point at real elements and attributes, examples must analyze cleanly,
 and every `ValueMethods` entry must be in the catalog. When one fails after an interpreter change, the fix is almost
