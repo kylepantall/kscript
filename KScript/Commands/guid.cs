@@ -1,7 +1,9 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("A new GUID.")]
     class guid : KScriptCommand
     {
         public guid() { }

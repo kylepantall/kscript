@@ -1,7 +1,9 @@
-﻿using KScript.KScriptObjects;
+﻿using KScript.Metadata;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <let> inside the block that needs it; KScript 2 variables are scoped.", Rename = "let")]
     class temp : KScriptObject
     {
         public temp(string contents) : base(contents) { }

@@ -1,8 +1,10 @@
-﻿using KScript.Handlers;
+﻿using KScript.Metadata;
+using KScript.Handlers;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments.Arithmetic
 {
+    [KScriptRetired("Write the arithmetic in an expression: <set name=\"x\" value=\"$a + $b\" />.")]
     class math : KScriptObject
     {
         public math(string math) : base(math) { }

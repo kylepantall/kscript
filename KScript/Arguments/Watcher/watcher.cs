@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 using System;
 using System.Collections.Generic;
@@ -7,6 +8,7 @@ using System.Reflection;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Not part of KScript 2; check the value with <if> where it changes.")]
     public class watcher : KScriptObject
     {
         protected List<Watcher.watch> Watches;

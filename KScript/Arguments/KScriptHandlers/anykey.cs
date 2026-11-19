@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 using System;
@@ -5,6 +6,8 @@ using System;
 namespace KScript.Arguments
 {
     [KScriptNoInnerObjects]
+    [KScriptDoc("Waits for a key press.")]
+    [KScriptElement(KScriptContentKind.Template, Context = KScriptElementContext.Script)]
     public class anykey : KScriptObject
     {
         [KScriptProperty("The prompt used to inform the user to press any key.", false)]

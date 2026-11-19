@@ -1,4 +1,5 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments.Prototypes
 {
@@ -6,6 +7,7 @@ namespace KScript.Arguments.Prototypes
      * The auto function is still to be implemented.
      */
     [KScriptObjects.KScriptHideObject()]
+    [KScriptRetired("Not part of KScript 2; build sentences with { } interpolation.")]
     class auto : KScriptObject
     {
         public override bool Run() => throw new KScriptPrototypeException(this);

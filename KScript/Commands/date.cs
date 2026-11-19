@@ -1,7 +1,9 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("Today's date, optionally formatted.")]
     public class date : KScriptCommand
     {
         /// <summary>

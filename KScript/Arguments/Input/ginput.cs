@@ -1,7 +1,9 @@
-﻿using KScript.KScriptObjects;
+﻿using KScript.Metadata;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <input to=\"...\">.", Rename = "input")]
     class ginput : KScriptObject
     {
         public ginput() => SetValidationType(ValidationTypes.DURING_PARSING);

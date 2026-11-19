@@ -1,10 +1,14 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 using System.IO;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptDoc("Lets the user pick a folder or one of several options.")]
+    [KScriptElement(KScriptContentKind.Template, Context = KScriptElementContext.Script, HtmlWins = true)]
+    [KScriptAttribute("to", KScriptValueKind.DeclareVariable, "The variable that receives the choice.", Required = true)]
     public class picker : KScriptObject
     {
         public picker(string Contents) => this.Contents = Contents;

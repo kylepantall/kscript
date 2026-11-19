@@ -1,7 +1,9 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("A random number, optionally between min and max.", Returns = "number")]
     public class random : KScriptCommand
     {
         public int min { get; set; } = -1;

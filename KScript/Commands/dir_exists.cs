@@ -1,7 +1,9 @@
-﻿using System.IO;
+﻿using KScript.Metadata;
+using System.IO;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("yes if a folder exists.", Returns = "bool")]
     class dir_exists : KScriptCommand
     {
         private readonly string dir = "";

@@ -1,9 +1,11 @@
+using KScript.Metadata;
 using System.Linq;
 using System.Text;
 using System;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Use a list or map literal.")]
     public class tie : KScriptCommand
     {
         public tie(params string[] inputs) => this.inputs = inputs;

@@ -1,8 +1,10 @@
-﻿using System.Runtime.CompilerServices;
+﻿using KScript.Metadata;
+using System.Runtime.CompilerServices;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <let ... const=\"yes\">.")]
     class guard : KScriptObject
     {
         [KScriptProperty("The variable ID to check for a value.", true)]

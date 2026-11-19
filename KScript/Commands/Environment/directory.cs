@@ -1,7 +1,9 @@
+using KScript.Metadata;
 using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("A well-known folder such as desktop or documents, or the current folder.")]
     class directory : KScriptCommand
     {
         private readonly string _directory = string.Empty;

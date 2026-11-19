@@ -1,8 +1,10 @@
-﻿using System.Net.Http;
+﻿using KScript.Metadata;
+using System.Net.Http;
 using System.Net.Http.Headers;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("Calls a web API and returns the response text.")]
     public class api : KScriptCommand
     {
         private readonly string api_url = "";

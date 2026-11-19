@@ -1,5 +1,7 @@
+using KScript.Metadata;
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <fn name=\"...\" params=\"...\"> and call it as @name().", Rename = "fn")]
     public class method : KScriptMethodWrapper
     {
         public override bool Run()

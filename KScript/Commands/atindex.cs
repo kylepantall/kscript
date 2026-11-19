@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptRetired("Index the list directly: $list[1].")]
     class atindex : KScriptCommand
     {
         private readonly string str;

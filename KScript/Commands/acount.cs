@@ -1,9 +1,11 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 using System;
 using System.Collections.Generic;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Use ->count(): $list->count().")]
     public class acount : KScriptCommand
     {
         private readonly string id;

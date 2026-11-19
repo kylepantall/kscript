@@ -1,7 +1,9 @@
+using KScript.Metadata;
 using System;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("A part of a path: filename, directory, extension...")]
     public class path : KScriptCommand
     {
         private readonly path_type type = path_type.filename;

@@ -1,8 +1,10 @@
+using KScript.Metadata;
 using KScript.Handlers;
 using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Write the arithmetic directly: $total + $price * $qty.")]
     public class math : KScriptCommand
     {
         public math() { }

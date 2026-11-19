@@ -57,6 +57,10 @@ Command line options:
 
 Anything after the script path is available to the script through `@args()`.
 
+## Editor support
+
+`kscript lsp` runs a language server for KScript 2 (diagnostics, completion, hover, go to definition, rename and more), and `kscript check <folder>` reports the same problems on the command line for CI. A VS Code extension is in `editors/vscode`. See [docs/language-server.md](docs/language-server.md).
+
 ## Repository layout
 
 | Path | Contents |
@@ -64,6 +68,10 @@ Anything after the script path is available to the script through `@args()`.
 | `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, and the `kscript serve` page engine (`Pages/`). |
 | `KScriptApp/` | The `KScript` command line app that runs a script file. |
 | `KScript.Tests/` | xUnit test suite. |
+| `KScript.Language/`, `KScript.LanguageServer/` | The KScript 2 parser, analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. |
+| `KScript.Language.Tests/` | Tests for the language tools, including contract tests that keep them in step with the interpreter. |
+| `editors/vscode/` | The VS Code extension. |
+| `samples/kscript2/` | KScript 2 sample scripts and site. |
 | `DebugScripts/`, `Example Scripts/` | Sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 

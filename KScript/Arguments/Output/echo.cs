@@ -1,10 +1,14 @@
-﻿using KScript.Handlers;
+﻿using KScript.Metadata;
+using KScript.Handlers;
 using KScript.KScriptObjects;
 using System;
 using System.Linq;
 
 namespace KScript.Arguments
 {
+    [KScriptDoc("Prints its text. { expr } inserts a value; $name and $name->method() work directly.", Example = "<echo>You have { $items->count() } items.</echo>")]
+    [KScriptElement(KScriptContentKind.Template, Context = KScriptElementContext.Script)]
+    [KScriptAttribute("format", KScriptValueKind.Enum, "markdown renders Markdown with colours and bold in the terminal.", Options = "text, markdown")]
     public class echo : KScriptObject
     {
         public echo(string Contents) { this.Contents = Contents; }

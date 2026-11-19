@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptDoc("The length of text, or how many times a string occurs in it.", Returns = "number")]
     public class length : KScriptCommand
     {
         private readonly string str = "";

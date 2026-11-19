@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptRetired("Use the conditional operator: $test ? 'yes' : 'no'.")]
     class @if : KScriptCommand
     {
 

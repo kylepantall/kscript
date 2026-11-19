@@ -1,4 +1,5 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,6 +7,7 @@ using System.Xml;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("Selects from XML text with an XPath query.")]
     class xpath : KScriptCommand
     {
         private readonly XmlDocument xmlDocument;

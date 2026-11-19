@@ -1,7 +1,10 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments.Output
 {
+    [KScriptDoc("Shows a numbered menu and runs the chosen entry.")]
+    [KScriptElement(KScriptContentKind.Statements, Context = KScriptElementContext.Script, HtmlWins = true)]
     class menu : KScriptObject
     {
         public override bool Run()

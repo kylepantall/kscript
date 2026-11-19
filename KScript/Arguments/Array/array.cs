@@ -1,10 +1,12 @@
-﻿using KScript.Handlers;
+﻿using KScript.Metadata;
+using KScript.Handlers;
 using KScript.KScriptExceptions;
 using System;
 using System.Collections.Generic;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <let name=\"...\" value=\"['a', 'b']\" /> with a list literal.")]
     public class array : KScriptObject
     {
         public array(string Contents) { this.Contents = Contents; }

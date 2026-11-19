@@ -1,9 +1,11 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 using System;
 using System.Runtime.InteropServices;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("A value about the environment: os.name, os.platform, path.separator, newline, user.home, temp.directory, machine.name, script.path, script.directory, username, math.pi, math.e.")]
     public class k : KScriptCommand
     {
         public string value;
