@@ -24,6 +24,7 @@ namespace KScript.Scaffolding
         public static int Run(string[] args, TextWriter output, TextWriter error)
         {
             var positional = new List<string>();
+            var positionalAt = new HashSet<int>();
             var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             string root = null;
             bool force = false, dryRun = false, help = false;
@@ -35,6 +36,7 @@ namespace KScript.Scaffolding
                 if (!a.StartsWith("--", StringComparison.Ordinal) || a.Length == 2)
                 {
                     positional.Add(a);
+                    positionalAt.Add(i);
                     continue;
                 }
 
@@ -104,7 +106,7 @@ namespace KScript.Scaffolding
                 }
                 if (positional.Count > 2)
                 {
-                    error.WriteLine($"Unexpected '{positional[2]}'. Put names with spaces in quotes, and options after --, e.g. --title \"About us\".");
+                    error.WriteLine(TooManyNames(root, positional, args.Where((_, i) => !positionalAt.Contains(i))));
                     return 1;
                 }
 
@@ -122,6 +124,13 @@ namespace KScript.Scaffolding
                 else
                 {
                     output.WriteLine($"{(result.Overwrote ? "Replaced" : "Created")} {shown}{(result.Template.BuiltIn ? "" : $" (from {Scaffolder.TemplatesFolder}/{Path.GetFileName(result.Template.FilePath)})")}");
+                }
+                // A new page that uses the default _layout.html, in a folder without one, gets one too: otherwise the page
+                // renders without <html>/<head>, kscript check warns, and editors don't see the folder as a site.
+                var layout = Scaffolder.MakeDefaultLayoutIfMissing(root, result, options, dryRun);
+                if (layout != null)
+                {
+                    output.WriteLine(dryRun ? $"Would also create {layout.RelativePath}, the layout pages use by default." : $"Created {layout.RelativePath}, the layout pages use by default");
                 }
                 if (!string.IsNullOrEmpty(result.Hint)) output.WriteLine(result.Hint);
                 return 0;
@@ -183,6 +192,31 @@ namespace KScript.Scaffolding
             output.WriteLine("  kscript ide install  add the KScript extension to VS Code (the project also recommends it)");
             return 0;
         }
+
+        /// <summary>
+        /// Explains a second name, e.g. <c>kscript make markdown page about</c>: a template type given twice is dropped from
+        /// the suggested command, and other words are suggested in quotes.
+        /// </summary>
+        private static string TooManyNames(string root, List<string> positional, IEnumerable<string> options)
+        {
+            string type = positional[0];
+            var names = positional.Skip(1).ToList();
+            var known = Scaffolder.ListTemplates(root).Select(t => t.Type).Concat(new[] { "md", "c" }).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var notTypes = names.Where(n => !known.Contains(n)).ToList();
+
+            string suggestedName = notTypes.Count == 1 ? notTypes[0] : string.Join(" ", names);
+            var rest = options.Select(o => o.StartsWith("--", StringComparison.Ordinal) ? o : Quote(o));
+            string suggestion = string.Join(" ", new[] { "kscript make", type, Quote(suggestedName) }.Concat(rest));
+
+            string given = string.Join(" and ", names.Select(n => $"'{n}'"));
+            string why = notTypes.Count == 1 && names.Count == 2
+                ? $"'{names.First(known.Contains)}' is a type too, but only one type can be given."
+                : "Put a name with spaces in quotes.";
+            return $"kscript make {type} takes one name, but got {given}. {why}\nDid you mean: {suggestion}";
+        }
+
+        private static string Quote(string arg) =>
+            arg.Length > 0 && !arg.Any(c => char.IsWhiteSpace(c) || c == '"' || c == '\'' || c == '[' || c == ']' || c == '*') ? arg : $"\"{arg.Replace("\"", "\\\"")}\"";
 
         private static void PrintTemplates(string root, TextWriter output)
         {

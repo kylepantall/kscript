@@ -29,6 +29,8 @@ namespace KScript.Scaffolding
         public Dictionary<string, string> Options { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public bool Force { get; set; }
         public bool DryRun { get; set; }
+        /// <summary>Where to write the file, relative to the project folder, instead of the template's <c>to:</c>.</summary>
+        public string To { get; set; }
     }
 
     public sealed class MakeResult
@@ -113,7 +115,7 @@ namespace KScript.Scaffolding
             else if (values["kebab"].Length == 0)
                 throw new StubException($"'{request.Name}' has no letters or digits to make a file name from.");
 
-            string to = header.TryGetValue("to", out var t)
+            string to = request.To != null ? request.To : header.TryGetValue("to", out var t)
                 ? StubTemplate.Render(t, values).Trim()
                 : values["dir"] + values["kebab"] + Path.GetExtension(template.FileName);
             to = to.Replace('\\', '/').TrimStart('/');
@@ -137,6 +139,27 @@ namespace KScript.Scaffolding
             }
 
             return new MakeResult { RelativePath = to, FullPath = full, Content = content, Hint = hint, Template = template, Overwrote = exists };
+        }
+
+        public const string DefaultLayout = "_layout.html";
+
+        /// <summary>
+        /// Creates _layout.html from the layout template when a page or Markdown page that uses it was just made and the
+        /// project has none yet. Returns null when nothing was needed.
+        /// </summary>
+        public static MakeResult MakeDefaultLayoutIfMissing(string root, MakeResult page, IReadOnlyDictionary<string, string> options, bool dryRun)
+        {
+            string type = page.Template.Type;
+            if (!string.Equals(type, "page", StringComparison.OrdinalIgnoreCase) && !string.Equals(type, "markdown", StringComparison.OrdinalIgnoreCase)) return null;
+            if (options != null && options.ContainsKey("layout")) return null;
+            if (!page.Content.Contains(DefaultLayout, StringComparison.Ordinal)) return null;
+            root = Path.GetFullPath(string.IsNullOrEmpty(root) ? "." : root);
+            if (File.Exists(Path.Combine(root, DefaultLayout))) return null;
+            if (!ListTemplates(root).Any(t => string.Equals(t.Type, "layout", StringComparison.OrdinalIgnoreCase))) return null;
+
+            var layoutOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (options != null && options.TryGetValue("lang", out var lang)) layoutOptions["lang"] = lang;
+            return Make(new MakeRequest { Type = "layout", Name = "layout", Root = root, Options = layoutOptions, DryRun = dryRun, To = DefaultLayout });
         }
 
         /// <summary>Copies the built-in templates into the project's _templates folder so they can be changed.</summary>

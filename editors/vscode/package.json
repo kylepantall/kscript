@@ -55,6 +55,7 @@
         "scopeName": "kscript.pages.injection",
         "path": "./syntaxes/kscript-pages.injection.json",
         "injectTo": [
+          "text.html.derivative",
           "text.html.basic",
           "text.html.markdown"
         ]

@@ -454,7 +454,7 @@ namespace KScript.Pages
 
         private static void RenderHtmlElement(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
         {
-            sb.Append('<').Append(el.Name);
+            sb.Append('<').Append(el.SourceName ?? el.Name);
             bool hasHandler = false;
             foreach (var a in el.Attributes)
             {
@@ -483,20 +483,20 @@ namespace KScript.Pages
                     if (!el.HasAttr("name")) sb.Append(" name=\"").Append(PageValues.HtmlEscape(name)).Append('"');
                     continue;
                 }
-                if (a.Value == null) { sb.Append(' ').Append(a.Name); continue; }
+                if (a.Value == null) { sb.Append(' ').Append(a.SourceName ?? a.Name); continue; }
 
                 if (TryWholeExpression(a.Value, out string expr, out bool raw))
                 {
                     object v = Eval(expr, scope, state);
                     if (v == null || v is bool b && !b) continue;
-                    if (v is bool) { sb.Append(' ').Append(a.Name); continue; }
+                    if (v is bool) { sb.Append(' ').Append(a.SourceName ?? a.Name); continue; }
                     string s = PageValues.ToStr(v);
-                    sb.Append(' ').Append(a.Name).Append("=\"").Append(raw ? s.Replace("\"", "&quot;") : PageValues.HtmlEscape(s)).Append('"');
+                    sb.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(raw ? s.Replace("\"", "&quot;") : PageValues.HtmlEscape(s)).Append('"');
                     continue;
                 }
 
                 string value = Interpolate(a.Value, scope, state.Ctx, EscapeMode.Html);
-                sb.Append(' ').Append(a.Name).Append("=\"").Append(value.Replace("\"", "&quot;")).Append('"');
+                sb.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(value.Replace("\"", "&quot;")).Append('"');
             }
 
             if (hasHandler)
@@ -513,7 +513,7 @@ namespace KScript.Pages
                 return;
             }
             RenderNodes(el.Children, scope.Child(), sb, state);
-            sb.Append("</").Append(el.Name).Append('>');
+            sb.Append("</").Append(el.SourceName ?? el.Name).Append('>');
         }
 
         /// <summary>Attribute values for layouts, includes and components: a whole <c>{expr}</c> passes the value itself.</summary>
@@ -641,8 +641,8 @@ namespace KScript.Pages
             html.Append(" data-ks-state=\"").Append(PageValues.HtmlEscape(PageLive.Sign(values))).Append('"');
             foreach (var a in el.Attributes.Where(a => a.Name != "id" && a.Name != "as"))
             {
-                if (a.Value == null) html.Append(' ').Append(a.Name);
-                else html.Append(' ').Append(a.Name).Append("=\"").Append(Interpolate(a.Value, scope, ctx, EscapeMode.Html).Replace("\"", "&quot;")).Append('"');
+                if (a.Value == null) html.Append(' ').Append(a.SourceName ?? a.Name);
+                else html.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(Interpolate(a.Value, scope, ctx, EscapeMode.Html).Replace("\"", "&quot;")).Append('"');
             }
             html.Append(" id=\"").Append(PageValues.HtmlEscape(id)).Append("\">");
             html.Append(body).Append("</").Append(tag).Append('>');

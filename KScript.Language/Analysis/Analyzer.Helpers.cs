@@ -423,12 +423,37 @@ namespace KScript.Language.Analysis
             try
             {
                 string trimmed = relative.Trim().TrimStart('/');
-                return System.IO.Path.GetFullPath(System.IO.Path.Combine(directory, trimmed));
+                return System.IO.Path.GetFullPath(System.IO.Path.Combine(Kind == DocumentKind.Script ? directory : SiteRoot(), trimmed));
             }
             catch (ArgumentException)
             {
                 return null;
             }
+        }
+
+        private static readonly string[] SiteMarkers = { "kscript.json", "_layout.html", "_components", "_layouts" };
+
+        private string siteRoot;
+
+        /// <summary>
+        /// kscript serve resolves &lt;layout src&gt; and &lt;include src&gt; against the site's root folder, not the page's
+        /// folder, so people/[id].html still uses _layout.html. The root is the nearest folder above the page with
+        /// kscript.json, _layout.html, _components/ or _layouts/; without one, the page's own folder.
+        /// </summary>
+        private string SiteRoot()
+        {
+            if (siteRoot != null)
+            {
+                return siteRoot;
+            }
+            for (string dir = directory; dir != null; dir = System.IO.Path.GetDirectoryName(dir))
+            {
+                if (SiteMarkers.Any(m => files.FileExists(System.IO.Path.Combine(dir, m)) || files.DirectoryExists(System.IO.Path.Combine(dir, m))))
+                {
+                    return siteRoot = dir;
+                }
+            }
+            return siteRoot = directory;
         }
 
         private void CheckPath(string relative, TextSpan span, string kind)

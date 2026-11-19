@@ -149,6 +149,39 @@ public class ScaffolderTests
     }
 
     [Fact]
+    public void FirstPageInAnEmptyFolderAlsoGetsTheDefaultLayout()
+    {
+        using var site = new TempSite();
+        var (code, output, err) = Make(site.Root, "page", "main");
+        Assert.Equal(0, code);
+        Assert.Equal("", err);
+        Assert.Contains("Created main.html", output);
+        Assert.Contains("Created _layout.html", output);
+        Assert.Contains("<slot />", Read(site, "_layout.html"));
+
+        string html = site.Render("main.html").Body;
+        Assert.Contains("<title>Main</title>", html);
+        Assert.Contains("<h1>Main</h1>", html);
+
+        // The next page reuses it, and an explicit --layout never creates _layout.html.
+        Assert.DoesNotContain("_layout.html", Make(site.Root, "page", "about").Out);
+        using var other = new TempSite();
+        Assert.DoesNotContain("_layout.html", Make(other.Root, "md", "post", "--layout", "_layouts/blog.html").Out);
+        Assert.False(File.Exists(Path.Combine(other.Root, "_layout.html")));
+    }
+
+    [Fact]
+    public void ATypeGivenTwiceSuggestsTheCommand()
+    {
+        using var site = new TempSite();
+        var (code, _, err) = Make(site.Root, "markdown", "page", "about", "--title", "About us");
+        Assert.Equal(1, code);
+        Assert.Contains("kscript make markdown takes one name, but got 'page' and 'about'.", err);
+        Assert.Contains("Did you mean: kscript make markdown about --title \"About us\"", err);
+        Assert.Empty(Directory.GetFiles(site.Root, "*", SearchOption.AllDirectories));
+    }
+
+    [Fact]
     public void DynamicPageReadsItsRouteParameters()
     {
         using var site = new TempSite(("_layout.html", "<slot />"));
@@ -282,7 +315,7 @@ public class ScaffolderTests
     [InlineData(new[] { "widget", "Foo" }, "There is no 'widget' template")]
     [InlineData(new[] { "component" }, "Give the component a name")]
     [InlineData(new[] { "page", "../outside" }, "is not a valid name")]
-    [InlineData(new[] { "page", "a", "b" }, "Unexpected 'b'")]
+    [InlineData(new[] { "page", "about", "us" }, "Did you mean: kscript make page \"about us\"")]
     public void MistakesAreExplained(string[] args, string message)
     {
         using var site = new TempSite();
