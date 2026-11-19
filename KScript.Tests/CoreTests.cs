@@ -144,6 +144,23 @@ public class CoreTests
     }
 
     [Fact]
+    public void DeepRecursionWorksFromASmallStack()
+    {
+        // macOS gives secondary threads 512 KB; the interpreter must not depend on its caller's stack.
+        string output = null;
+        Exception failure = null;
+        var thread = new Thread(() =>
+        {
+            try { output = RunBody("<fn name=\"count\" params=\"n\" value=\"$n le 0 ? 0 : 1 + @count($n - 1)\" /><echo>{ @count(900) }</echo>"); }
+            catch (Exception ex) { failure = ex; }
+        }, 512 * 1024);
+        thread.Start();
+        thread.Join();
+        Assert.Null(failure);
+        Assert.Equal("900\n", output);
+    }
+
+    [Fact]
     public void CallRunsAFunctionForItsEffect()
     {
         Assert.Equal("hi Kyle\n", RunBody("<fn name=\"say\" params=\"who\"><echo>hi $who</echo></fn><call fn=\"say\" args=\"'Kyle'\" />"));

@@ -173,8 +173,7 @@ namespace KScript
         }
 
         /// <summary>
-        /// Runs a script. Packages listed in the nearest kscript.json are imported for it. Scripts run on a thread
-        /// with a large stack, so deep recursion reports KScript's own call depth error instead of crashing.
+        /// Runs a script. Packages listed in the nearest kscript.json are imported for it.
         /// </summary>
         static int RunScript(string path, string[] scriptArgs)
         {
@@ -207,27 +206,20 @@ namespace KScript
                 cancel.Cancel();
             };
 
-            int exitCode = 0;
-            var thread = new System.Threading.Thread(() =>
+            try
             {
-                try
-                {
-                    exitCode = new Interpreter(host, options: options).RunFile(path);
-                }
-                catch (KScriptException ex)
-                {
-                    Console.Out.Flush();
-                    Console.Error.WriteLine(ex.ToString());
-                    exitCode = 3;
-                }
-                catch (OperationCanceledException)
-                {
-                    exitCode = 130;
-                }
-            }, 256 * 1024 * 1024);
-            thread.Start();
-            thread.Join();
-            return exitCode;
+                return new Interpreter(host, options: options).RunFile(path);
+            }
+            catch (KScriptException ex)
+            {
+                Console.Out.Flush();
+                Console.Error.WriteLine(ex.ToString());
+                return 3;
+            }
+            catch (OperationCanceledException)
+            {
+                return 130;
+            }
         }
 
         /// <summary>

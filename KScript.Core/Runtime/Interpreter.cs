@@ -488,6 +488,32 @@ namespace KScript.Runtime
         /// <summary>Runs a loaded script and returns its exit code (0, or the code given to &lt;exit&gt;).</summary>
         public int Run(Module module)
         {
+            if (onRunThread) return RunHere(module);
+
+            // Scripts run on a thread with a large stack, so recursion reaches MaxCallDepth on every platform
+            // (secondary threads get only 512 KB on macOS).
+            int result = 0;
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo failure = null;
+            var thread = new Thread(() =>
+            {
+                onRunThread = true;
+                try { result = RunHere(module); }
+                catch (Exception ex) { failure = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex); }
+                finally { onRunThread = false; }
+            }, RunStackSize);
+            thread.Start();
+            thread.Join();
+            failure?.Throw();
+            return result;
+        }
+
+        private const int RunStackSize = 256 * 1024 * 1024;
+
+        [ThreadStatic]
+        private static bool onRunThread;
+
+        private int RunHere(Module module)
+        {
             try
             {
                 RunModule(module);
@@ -723,8 +749,8 @@ namespace KScript.Runtime
         public object Call(ICallable fn, IReadOnlyList<object> args, IReadOnlyDictionary<string, object> named = null, Scope scope = null, Module module = null)
         {
             int depth = callDepth.Value + 1;
-            if (depth > Options.MaxCallDepth)
-                throw new KScriptException($"Too much recursion: more than {Options.MaxCallDepth} function calls inside each other.", "Limit");
+            if (depth > Options.MaxCallDepth || !System.Runtime.CompilerServices.RuntimeHelpers.TryEnsureSufficientExecutionStack())
+                throw new KScriptException($"Too much recursion: more than {Math.Min(depth - 1, Options.MaxCallDepth)} function calls inside each other.", "Limit");
             callDepth.Value = depth;
             try
             {
