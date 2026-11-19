@@ -1,4 +1,6 @@
 <kscript>
+  <import package="KScript.IO" />
+
   <!-- Expressions, interpolation and variables -->
   <let name="n" value="3" />
   <let name="name" value="'Kyle'" />
@@ -78,9 +80,14 @@
     <finally><echo>done</echo></finally>
   </try>
   <let name="age" value="-1" />
-  <if test="$age lt 0">
-    <throw type="Validation" message="Age must be positive, got {$age}" />
-  </if>
+  <try>
+    <if test="$age lt 0">
+      <throw type="Validation" message="Age must be positive, got {$age}" />
+    </if>
+    <catch as="err" when="$err.type eq 'Validation'">
+      <echo>{$err.type}: {$err.message}</echo>
+    </catch>
+  </try>
 
   <!-- Null handling and membership -->
   <let name="user" value="null" />

@@ -1,4 +1,3 @@
-// The element/attribute vocabulary is defined once, in the interpreter (KScript.Metadata), and shared here.
-global using AttributeKind = KScript.Metadata.KScriptValueKind;
-global using ContentKind = KScript.Metadata.KScriptContentKind;
-global using ElementContext = KScript.Metadata.KScriptElementContext;
+// The element/attribute vocabulary lives in KScript.Syntax (KScript.Metadata), shared with the runtime packages.
+global using KScript.Metadata;
+global using KScript.Syntax;

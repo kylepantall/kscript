@@ -1,5 +1,5 @@
 using KScript.Language.Analysis;
-using KScript.Language.Syntax;
+using KScript.Syntax;
 
 using static KScript.Language.Tests.TestHelpers;
 

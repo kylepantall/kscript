@@ -5,10 +5,10 @@ using KScript.Language.Catalog;
 namespace KScript.Language.Tests
 {
     /// <summary>
-    /// Keeps the language server in step with the <c>kscript serve</c> page engine (KScript/Pages). The engine's
+    /// Keeps the language server in step with the <c>kscript serve</c> page engine (KScript.Web/Pages). The engine's
     /// methods, commands and elements are plain switch statements, so these tests read its source: every
     /// <c>case "name":</c> must be known to the catalog, with a matching receiver type. When one fails after a page
-    /// engine change, add the name to <see cref="LanguageCatalog"/> (AddPageEngine).
+    /// engine change, add it to a package (usually KScript.Core) so scripts and pages agree.
     /// </summary>
     public class PageEngineContractTests
     {
@@ -18,7 +18,7 @@ namespace KScript.Language.Tests
         {
             for (string dir = AppContext.BaseDirectory; dir != null; dir = Path.GetDirectoryName(dir))
             {
-                string candidate = Path.Combine(dir, "KScript", "Pages");
+                string candidate = Path.Combine(dir, "KScript.Web", "Pages");
                 if (File.Exists(Path.Combine(dir, "KScript.sln")) && Directory.Exists(candidate))
                 {
                     return candidate;
@@ -95,7 +95,7 @@ namespace KScript.Language.Tests
         public void EveryPageMethodIsInTheCatalog(string receiver, string name)
         {
             Assert.True(Catalog.GetMethods(name, receiver).Any(m => KType.Accepts(m.ReceiverType, receiver)),
-                $"The page engine has {receiver}->{name}() but the catalog doesn't. Add it in LanguageCatalog.AddPageEngine.");
+                $"The page engine has {receiver}->{name}() but the catalog doesn't. Add it to a package (usually KScript.Core).");
         }
 
         public static IEnumerable<object[]> EngineCommands()
@@ -116,7 +116,7 @@ namespace KScript.Language.Tests
         [MemberData(nameof(EngineCommands))]
         public void EveryPageCommandIsInTheCatalog(string name)
         {
-            Assert.True(Catalog.GetCommand(name) != null, $"The page engine has @{name}() but the catalog doesn't. Add it in LanguageCatalog.AddPageEngine.");
+            Assert.True(Catalog.GetCommand(name) != null, $"The page engine has @{name}() but the catalog doesn't. Add it to a package (usually KScript.Core).");
         }
 
         public static IEnumerable<object[]> EngineElements()
@@ -140,7 +140,7 @@ namespace KScript.Language.Tests
         {
             ElementInfo e = Catalog.GetElement(name);
             Assert.True(e != null, $"The page engine renders <{name}> but the catalog doesn't know it.");
-            Assert.True(e.Context.HasFlag(KScript.Metadata.KScriptElementContext.Page), $"<{name}> works in pages, so its Context must include Page.");
+            Assert.True(e.Context.HasFlag(KScript.Metadata.ElementContext.Page), $"<{name}> works in pages, so its Context must include Page.");
         }
 
         [Fact]

@@ -2,9 +2,9 @@ using System.Text;
 
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
-using KScript.Language.Markup;
-using KScript.Language.Syntax;
-using KScript.Language.Text;
+using KScript.Syntax.Markup;
+using KScript.Syntax;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Features
 {
@@ -195,11 +195,13 @@ namespace KScript.Language.Features
             sb.Append("**<").Append(e.Name).Append(">**");
             if (e.Planned)
             {
-                sb.Append(LanguageCatalog.Default.PageImplemented.Contains(e.Name)
-                    ? " (runs in pages today; not in the script interpreter yet)"
-                    : " (KScript 2, not in the interpreter yet)");
+                sb.Append(" (KScript 2, planned: no package implements it yet)");
             }
             sb.Append("\n\n").Append(e.Description);
+            if (e.Package != null && e.Package != "KScript.Core")
+            {
+                sb.Append("\n\nFrom ").Append(e.Package).Append(e.Context == ElementContext.Page ? " (pages)." : ".");
+            }
             if (e.Attributes.Count > 0)
             {
                 sb.Append("\n\n| Attribute | |\n|---|---|\n");
@@ -248,7 +250,11 @@ namespace KScript.Language.Features
             }
             if (c.Planned)
             {
-                sb.Append("\n\n_KScript 2: not in the interpreter yet._");
+                sb.Append("\n\n_KScript 2, planned: no package implements it yet._");
+            }
+            else if (c.Package != null && c.Package != "KScript.Core")
+            {
+                sb.Append("\n\nFrom ").Append(c.Package).Append('.');
             }
             return sb.ToString();
         }

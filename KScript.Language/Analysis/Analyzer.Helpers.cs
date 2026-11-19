@@ -1,7 +1,7 @@
 using KScript.Language.Catalog;
-using KScript.Language.Markup;
-using KScript.Language.Syntax;
-using KScript.Language.Text;
+using KScript.Syntax.Markup;
+using KScript.Syntax;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Analysis
 {
@@ -199,6 +199,13 @@ namespace KScript.Language.Analysis
                 {
                     result.Inputs[name] = span;
                 }
+                return null;
+            }
+
+            string package = catalog.PackageOfVariable(name);
+            if (!isWrite && ChecksImports && package != null && !importedPackages.Contains(package))
+            {
+                RequirePackage(package, span, $"${name}");
                 return null;
             }
 

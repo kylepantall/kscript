@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\KScript.Language\KScript.Language.csproj" />
     <ProjectReference Include="..\KScript.LanguageServer\KScript.LanguageServer.csproj" />
+    <ProjectReference Include="..\KScript.Cli\KScript.Cli.csproj" />
 
   </ItemGroup>
 

@@ -65,8 +65,8 @@ jobs:
         if: matrix.rid == 'linux-x64' || matrix.rid == 'osx-arm64' || matrix.rid == 'win-x64'
         shell: bash
         run: |
-          printf '<kscript>\n  <def id="n">3</def>\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.xml
-          ./dist/kscript${{ matrix.ext }} smoke.xml -s -nowait | tee smoke.out
+          printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.xml
+          ./dist/kscript${{ matrix.ext }} smoke.xml | tee smoke.out
           grep -q "kscript ok: 3" smoke.out
           ./dist/kscript${{ matrix.ext }} --version
 

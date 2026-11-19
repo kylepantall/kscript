@@ -49,10 +49,10 @@ jobs:
         run: dotnet test KScript.sln --configuration Release --no-build --verbosity normal
 
       - name: Run sample script
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll "Example Scripts/Find Oldest Person.xml" -s -nowait
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll "Example Scripts/Find Oldest Person.xml"
 
       - name: Check KScript 2 samples
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 --warnaserror
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 "Example Scripts" --warnaserror
 
   vscode:
     name: VS Code extension

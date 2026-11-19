@@ -8,6 +8,15 @@
   "properties": {
     "$schema": { "type": "string" },
     "name": { "type": "string", "description": "The project's name." },
+    "packages": {
+      "type": "array",
+      "description": "Packages every script in the project uses without an <import>. KScript.Core is always imported.",
+      "items": {
+        "type": "string",
+        "enum": ["KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web", "KScript.UI", "KScript.AI"]
+      },
+      "uniqueItems": true
+    },
     "serve": {
       "type": "object",
       "description": "Defaults for kscript serve. Options on the command line win.",

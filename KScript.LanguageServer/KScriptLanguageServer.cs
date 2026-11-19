@@ -3,10 +3,12 @@ using System.Text.Json.Nodes;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Language.Features;
-using KScript.Language.Text;
+using KScript.Syntax.Text;
 using KScript.Projects;
 
-using LspDiagnosticSeverity = KScript.Language.Analysis.DiagnosticSeverity;
+using KScript.Syntax;
+
+using LspDiagnosticSeverity = KScript.Syntax.DiagnosticSeverity;
 
 namespace KScript.LanguageServer
 {

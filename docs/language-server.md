@@ -27,8 +27,8 @@ kscript-vscode.vsix` installs a local build.
 
 | Project | Contents |
 | --- | --- |
-| `KScript/Metadata` | The attributes the interpreter uses to describe itself (below). |
-| `KScript.Language` | Tolerant markup parser (XML for scripts, HTML5 rules for pages), the KScript 2 expression and template parsers, the catalog, the analyzer and the editor features. No dependencies beyond `KScript`. |
+| `KScript.Syntax` | Tolerant markup parser (XML for scripts, HTML5 rules for pages), the KScript 2 expression and template parsers, and the metadata types (`ElementInfo`, `CallableInfo`) packages describe themselves with. The interpreter uses the same parsers. |
+| `KScript.Language` | The catalog, the analyzer and the editor features. |
 | `KScript.LanguageServer` | A small JSON-RPC/LSP layer over `KScript.Language`, plus `kscript check`. |
 | `KScript.Language.Tests` | Parser, analyzer, feature, protocol and catalog contract tests. |
 
@@ -38,32 +38,28 @@ and `Analyzer.Analyze`.
 
 ## Describing the language: the catalog
 
-`LanguageCatalog` is the single source of truth for what the tools know. It is built by reflection from the
-interpreter, so a new element, command or method shows up in completion, hover and diagnostics without touching the
-language server:
+`LanguageCatalog` is the single source of truth for what the tools know. It is built from the packages the
+interpreter has (`PackageRegistry`): each package registers its elements, commands, methods and variables with an
+`ElementInfo` or `CallableInfo` that holds the description, attributes, parameters, example and placement rules, so a
+new element, command or method shows up in completion, hover and diagnostics without touching the language server.
+Every entry records its package, which is how the analyzer knows a script needs `<import package="...">`.
 
-| Attribute | Put it on | Meaning |
-| --- | --- | --- |
-| `[KScriptElement(content, ...)]` | An element class | It is a KScript 2 element. Sets the content kind, `Context` (script, page or both), `MustFollow`, `MustBeInside`, `IsLoop`, `HtmlWins`. |
-| `[KScriptAttribute(name, kind, description)]` | An element class | Declares an attribute, its value kind (expression, template, variable to declare, path, enum...) and `Required`/`Options`. |
-| `[KScriptDoc(description)]` | Elements and commands | The hover text; `Example` (checked by tests) and `Returns`. |
-| `[KScriptParam(name, description)]` | A command class | Documents a constructor parameter. |
-| `[KScriptValue(kind)]` | An element property | Overrides the inferred kind of a v1 `[KScriptProperty]`. |
-| `[KScriptRetired(replacement)]` | Classes or properties | Not part of KScript 2. `Rename` names the replacement for an automatic fix. |
+KScript 1 elements, attributes and commands are in `KScript.Runtime.Retired`, with what to write instead; both the
+interpreter and the analyzer report them from there. Parts of the KScript 2 proposal that no package implements yet
+(such as `<llm>`) are described in `LanguageCatalog` itself and marked *planned*; once a package implements one, the
+package wins.
 
-Value methods (`->upper()`) come from `ValueMethods.Catalog()`. Parts of the KScript 2 proposal that the interpreter
-doesn't implement yet are described in `LanguageCatalog` itself and marked *planned*; once a class implements one,
-the class wins.
+A script imports KScript.Core, the packages in the nearest `kscript.json`, the ones named in `<import package>`, and
+the owner of any `<KScript.X>` element. Pages need no imports.
 
-The `kscript serve` page engine (`KScript/Pages`) already runs pages, including `<live>`, `<state>`, `on-*`
-handlers and `bind`. What it adds is described in `LanguageCatalog.AddPageEngine`, and `PageEngineContractTests`
-read the engine's source and fail when one of its methods, commands or elements is missing from the catalog. The
-tests also check that `Example Sites/team` analyzes without errors.
+The `kscript serve` page engine (`KScript.Web/Pages`) runs pages, including `<live>`, `<state>`, `on-*` handlers and
+`bind`. `PageEngineContractTests` read the engine's source and fail when one of its methods, commands or elements is
+missing from the catalog. The tests also check that `Example Sites/team` analyzes without errors.
 
-`CatalogContractTests` keep the two in step: every interpreter element and command class must be classified, every
-documented parameter must exist, renames must point at real elements and attributes, examples must analyze cleanly,
-and every `ValueMethods` entry must be in the catalog. When one fails after an interpreter change, the fix is almost
-always an attribute on the class you touched.
+`CatalogContractTests` keep packages and tools in step: every package element, command and method must be in the
+catalog with a description and a handler, no two packages may define the same name, renames must point at real
+elements and attributes, and examples must analyze cleanly. When one fails after a package change, the fix is almost
+always in the description the package registers.
 
 ## Diagnostic codes
 
@@ -71,7 +67,7 @@ always an attribute on the class you touched.
 | --- | --- |
 | KS1xxx | Markup (malformed XML, unclosed tags, front matter) |
 | KS2xxx | Expressions (syntax, assignment outside `let`/`set`/`do`, bare identifiers) |
-| KS3xxx | Elements and attributes (unknown, retired, missing, invalid values, placement) |
+| KS3xxx | Elements and attributes (unknown, retired, missing, invalid values, placement), imports (KS3009 missing import, KS3010 unknown package) |
 | KS4xxx | Names (undefined variables and functions, constants, duplicates) |
 | KS5xxx | Calls (unknown or retired commands and methods, argument counts, type mismatches) |
 

@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript", "KScript\KScript.csproj", "{A2C5A27C-6750-4678-A08B-19CA62F74C21}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScriptApp", "KScriptApp\KScriptApp.csproj", "{127CE3C1-5BD1-4FCD-98E7-80C7ED9778C2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Tests", "KScript.Tests\KScript.Tests.csproj", "{F6612525-70EF-4CD7-A13A-B65DD4FC9E0A}"
@@ -15,6 +13,24 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.LanguageServer", "K
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Language.Tests", "KScript.Language.Tests\KScript.Language.Tests.csproj", "{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Syntax", "KScript.Syntax\KScript.Syntax.csproj", "{AABF4CBF-0047-43F3-97A0-C5B087A767F6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Core", "KScript.Core\KScript.Core.csproj", "{70FBABCD-2538-4575-AEB4-1F56011856EB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Terminal", "KScript.Terminal\KScript.Terminal.csproj", "{D215E84A-CCD2-46D7-AB54-CDBF8B937DDF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Math", "KScript.Math\KScript.Math.csproj", "{A39C06BB-60FD-4C4D-88F7-8950AC5E12AE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.IO", "KScript.IO\KScript.IO.csproj", "{3A044AEA-910A-45CD-9067-EC0D079A4B00}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Net", "KScript.Net\KScript.Net.csproj", "{DF707796-EDA4-4B7E-9A40-28CBE5EDCF0F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Markdown", "KScript.Markdown\KScript.Markdown.csproj", "{BC7DF380-A5F6-4F13-9E09-952E8AF2554D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Web", "KScript.Web\KScript.Web.csproj", "{D14CB607-FDEF-4A5E-8FA5-37DBD8A65E54}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Cli", "KScript.Cli\KScript.Cli.csproj", "{1DF90953-AF24-4D7A-8C21-66C7503D5C03}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,10 +40,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{A2C5A27C-6750-4678-A08B-19CA62F74C21}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A2C5A27C-6750-4678-A08B-19CA62F74C21}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A2C5A27C-6750-4678-A08B-19CA62F74C21}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A2C5A27C-6750-4678-A08B-19CA62F74C21}.Release|Any CPU.Build.0 = Release|Any CPU
 		{127CE3C1-5BD1-4FCD-98E7-80C7ED9778C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{127CE3C1-5BD1-4FCD-98E7-80C7ED9778C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{127CE3C1-5BD1-4FCD-98E7-80C7ED9778C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -48,5 +60,41 @@ Global
 		{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AABF4CBF-0047-43F3-97A0-C5B087A767F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AABF4CBF-0047-43F3-97A0-C5B087A767F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AABF4CBF-0047-43F3-97A0-C5B087A767F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AABF4CBF-0047-43F3-97A0-C5B087A767F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70FBABCD-2538-4575-AEB4-1F56011856EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70FBABCD-2538-4575-AEB4-1F56011856EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70FBABCD-2538-4575-AEB4-1F56011856EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70FBABCD-2538-4575-AEB4-1F56011856EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D215E84A-CCD2-46D7-AB54-CDBF8B937DDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D215E84A-CCD2-46D7-AB54-CDBF8B937DDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D215E84A-CCD2-46D7-AB54-CDBF8B937DDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D215E84A-CCD2-46D7-AB54-CDBF8B937DDF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A39C06BB-60FD-4C4D-88F7-8950AC5E12AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A39C06BB-60FD-4C4D-88F7-8950AC5E12AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A39C06BB-60FD-4C4D-88F7-8950AC5E12AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A39C06BB-60FD-4C4D-88F7-8950AC5E12AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A044AEA-910A-45CD-9067-EC0D079A4B00}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A044AEA-910A-45CD-9067-EC0D079A4B00}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A044AEA-910A-45CD-9067-EC0D079A4B00}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A044AEA-910A-45CD-9067-EC0D079A4B00}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DF707796-EDA4-4B7E-9A40-28CBE5EDCF0F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF707796-EDA4-4B7E-9A40-28CBE5EDCF0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DF707796-EDA4-4B7E-9A40-28CBE5EDCF0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DF707796-EDA4-4B7E-9A40-28CBE5EDCF0F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BC7DF380-A5F6-4F13-9E09-952E8AF2554D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC7DF380-A5F6-4F13-9E09-952E8AF2554D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC7DF380-A5F6-4F13-9E09-952E8AF2554D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC7DF380-A5F6-4F13-9E09-952E8AF2554D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D14CB607-FDEF-4A5E-8FA5-37DBD8A65E54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D14CB607-FDEF-4A5E-8FA5-37DBD8A65E54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D14CB607-FDEF-4A5E-8FA5-37DBD8A65E54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D14CB607-FDEF-4A5E-8FA5-37DBD8A65E54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1DF90953-AF24-4D7A-8C21-66C7503D5C03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1DF90953-AF24-4D7A-8C21-66C7503D5C03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1DF90953-AF24-4D7A-8C21-66C7503D5C03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1DF90953-AF24-4D7A-8C21-66C7503D5C03}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

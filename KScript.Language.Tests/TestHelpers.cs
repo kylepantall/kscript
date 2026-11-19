@@ -1,7 +1,7 @@
 using System.Text;
 
 using KScript.Language.Analysis;
-using KScript.Language.Syntax;
+using KScript.Syntax;
 
 namespace KScript.Language.Tests
 {

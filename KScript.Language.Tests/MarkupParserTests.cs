@@ -1,5 +1,5 @@
 using KScript.Language.Analysis;
-using KScript.Language.Markup;
+using KScript.Syntax.Markup;
 
 namespace KScript.Language.Tests
 {

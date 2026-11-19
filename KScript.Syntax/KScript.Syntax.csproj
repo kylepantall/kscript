@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>KScript.Syntax</RootNamespace>
+    <AssemblyName>KScript.Syntax</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.0.0</Version>
+    <Product>KScript</Product>
+    <Description>The KScript 2 parsers (markup, expressions, { } templates) and the vocabulary that describes elements and commands. Shared by the runtime and the language server, with no other dependencies.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Core" />
+    <InternalsVisibleTo Include="KScript.Language" />
+    <InternalsVisibleTo Include="KScript.Language.Tests" />
+  </ItemGroup>
+
+</Project>

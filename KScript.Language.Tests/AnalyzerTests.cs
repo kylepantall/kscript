@@ -1,5 +1,5 @@
 using KScript.Language.Analysis;
-using KScript.Language.Markup;
+using KScript.Syntax.Markup;
 
 using static KScript.Language.Tests.TestHelpers;
 
@@ -18,7 +18,7 @@ namespace KScript.Language.Tests
         [InlineData("<for each=\"i\" in=\"0..3\" indx=\"n\"><echo>$i</echo></for>", DiagnosticCodes.UnknownAttribute, "indx", "Did you mean 'index'?")]
         [InlineData("<if condition=\"yes\"></if>", DiagnosticCodes.RetiredAttribute, "condition", "Use test=")]
         [InlineData("<for in=\"0..3\"></for>", DiagnosticCodes.MissingAttribute, "for", "'each'")]
-        [InlineData("<echo format=\"html\">x</echo>", DiagnosticCodes.InvalidAttributeValue, "html", "text, markdown")]
+        [InlineData("<echo format=\"html\">x</echo>", DiagnosticCodes.InvalidAttributeValue, "html", "text, json, markdown")]
         [InlineData("<let name=\"c\" value=\"1\" const=\"maybe\" />", DiagnosticCodes.InvalidAttributeValue, "maybe", "yes or no")]
         [InlineData("<elif test=\"true\"></elif>", DiagnosticCodes.MisplacedElement, "elif", "straight after <if>")]
         [InlineData("<let name=\"a\" value=\"1\" /><else></else>", DiagnosticCodes.MisplacedElement, "else", null)]
@@ -65,7 +65,7 @@ namespace KScript.Language.Tests
         [InlineData("<echo>@join_pth('a')</echo>", DiagnosticCodes.UnknownCommand, "@join_pth", "@join_path")]
         [InlineData("<echo>@more_less(1, 'lt', 2)</echo>", DiagnosticCodes.RetiredCommand, "@more_less", "lt")]
         [InlineData("<echo>@iftrue('yes', 'a')</echo>", DiagnosticCodes.RetiredCommand, "@iftrue", "? 'yes' : 'no'")]
-        [InlineData("<echo>@read_text()</echo>", DiagnosticCodes.ArgumentCount, "@read_text", "@read_text(path)")]
+        [InlineData("<import package=\"KScript.IO\" /><echo>@read_text()</echo>", DiagnosticCodes.ArgumentCount, "@read_text", "@read_text(path)")]
         [InlineData("<fn name=\"greet\" params=\"who\" value=\"$who\" /><echo>@greet()</echo>", DiagnosticCodes.ArgumentCount, "@greet", "takes 1 argument")]
         [InlineData("<fn name=\"greet\" params=\"who, g = 'Hi'\" value=\"$who\" /><echo>@greet(1, 2, 3)</echo>", DiagnosticCodes.ArgumentCount, "@greet", "1 to 2")]
         [InlineData("<fn name=\"greet\" params=\"who\" value=\"$who\" /><call fn=\"greet\" />", DiagnosticCodes.ArgumentCount, "greet", null)]
@@ -110,18 +110,18 @@ namespace KScript.Language.Tests
         [InlineData("<let name=\"names\" value=\"[1, 2] |> map(fn($n) => $n + 1) |> join(', ')\" />")]
         [InlineData("<let name=\"s\" value=\"[3, 1]->sort(fn($a, $b) => $a - $b)->first()\" />")]
         [InlineData("<try><throw type=\"X\" message=\"bad {1}\" /><catch as=\"err\" when=\"$err.type eq 'X'\"><echo>{$err.message} {$err.line}</echo></catch><finally></finally></try>")]
-        [InlineData("<input to=\"name\">Name: </input><echo>Hi $name</echo>")]
+        [InlineData("<import package=\"KScript.Terminal\" /><input to=\"name\">Name: </input><echo>Hi $name</echo>")]
         [InlineData("<echo>email kyle@example.com, it's $args fine</echo>")]
         [InlineData("<echo>Use {{ and }}.</echo>")]
         [InlineData("<let name=\"u\" value=\"null\" /><echo>{ $u?.name ?? 'guest' }</echo>")]
         [InlineData("<let name=\"x\" value=\"match 2 { 1 => 'a', _ => 'b' }\" />")]
         [InlineData("<let name=\"c\" value=\"@chat(system: 'Be kind.')\" /><echo>{ $c->ask('hi') }</echo>")]
         [InlineData("<let name=\"n\" type=\"int\" value=\"'3'\" /><echo>{ $n->round() }</echo>")]
-        [InlineData("<marray id=\"cfg\"><item key=\"a\">1</item></marray><echo>$cfg.a</echo>")]
+        [InlineData("<marray name=\"cfg\"><item key=\"a\">1</item></marray><echo>$cfg.a</echo>")]
         [InlineData("<if test=\"$args->count() gt 0 and 1 &lt; 2\"></if>")]
         [InlineData("<if test=\"'3' == 3 and '3' !== 3\"></if>")]
         [InlineData("<echo><![CDATA[ raw < text ]]></echo>")]
-        [InlineData("<let name=\"f\" value=\"@files('.')\" /><for each=\"x\" in=\"$f\"><echo>{ $x->extension() }</echo></for>")]
+        [InlineData("<import package=\"KScript.IO\" /><let name=\"f\" value=\"@files('.')\" /><for each=\"x\" in=\"$f\"><echo>{ $x->extension() }</echo></for>")]
         [InlineData("<let name=\"x\" value=\"'a'\" /><echo format=\"markdown\">**$x**</echo>")]
         [InlineData("<render into=\"#out\"><li class=\"{ 1 }\">x</li><input type=\"text\"></input></render>")]
         public void AcceptsValidKScript(string body) => AssertClean(Analyze(Script(body)));
@@ -405,12 +405,8 @@ namespace KScript.Language.Tests
         [Fact]
         public void V1ScriptsGetActionableErrors()
         {
-            string path = Path.Combine(AppContext.BaseDirectory, "samples", "..", "..", "..", "..", "..", "Example Scripts", "Find Oldest Person.xml");
-            if (!File.Exists(path))
-            {
-                return;
-            }
-            DocumentAnalysis a = Analyzer.Analyze(File.ReadAllText(path), path);
+            const string v1 = "<kscript throw_exceptions=\"no\">\n  <def id=\"max\">0</def>\n  <for to=\"i\" math=\"@math('$i+1')\" while=\"@more_less($i,'lt',3)\">\n    <update to=\"max\">$i</update>\n  </for>\n  <echo>$max</echo>\n</kscript>";
+            DocumentAnalysis a = Analyzer.Analyze(v1, "old.xml");
             Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.RetiredElement);
             Assert.All(a.Diagnostics.Where(d => d.Code == DiagnosticCodes.RetiredElement || d.Code == DiagnosticCodes.RetiredAttribute),
                 d => Assert.Contains("KScript 2", d.Message));

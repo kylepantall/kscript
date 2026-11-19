@@ -1,6 +1,6 @@
-using KScript.Language.Markup;
-using KScript.Language.Syntax;
-using KScript.Language.Text;
+using KScript.Syntax.Markup;
+using KScript.Syntax;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Analysis
 {
@@ -64,6 +64,9 @@ namespace KScript.Language.Analysis
         public List<DocumentLink> Links { get; } = new List<DocumentLink>();
         public Dictionary<Symbol, ExternalLocation> ExternalDeclarations { get; } = new Dictionary<Symbol, ExternalLocation>();
         public Scope RootScope { get; internal set; }
+
+        /// <summary>The packages a script imports (always KScript.Core). Empty for pages.</summary>
+        public IReadOnlyList<string> ImportedPackages { get; internal set; } = new[] { "KScript.Core" };
 
         /// <summary>True for layouts and components, whose variables are supplied by the page that uses them.</summary>
         public bool IsPartial { get; internal set; }

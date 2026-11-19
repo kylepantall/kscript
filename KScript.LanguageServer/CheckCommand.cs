@@ -1,5 +1,6 @@
 using KScript.Language.Analysis;
-using KScript.Language.Text;
+using KScript.Syntax;
+using KScript.Syntax.Text;
 using KScript.Projects;
 
 namespace KScript.LanguageServer
