@@ -16,7 +16,9 @@ namespace KScript.LanguageServer
                 {
                     files.AddRange(Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories)
                         .Where(f => f.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".ks", StringComparison.OrdinalIgnoreCase)
-                                    || (f.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) && LooksLikeScript(f))));
+                                    || (f.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) && LooksLikeScript(f)))
+                        // _templates/ holds `kscript make` templates ({{ }} placeholders), not runnable files.
+                        .Where(f => !Path.GetRelativePath(path, f).Replace('\\', '/').Split('/').Contains("_templates")));
                 }
                 else if (File.Exists(path))
                 {

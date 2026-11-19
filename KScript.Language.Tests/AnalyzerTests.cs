@@ -236,6 +236,7 @@ namespace KScript.Language.Tests
         {
             [Path.Combine(Site, "_layout.html")] = "<html><slot /></html>",
             [Path.Combine(Site, "_components", "people-card.html")] = "<div>{$person.name}</div>",
+            [Path.Combine(Site, "_components", "hero.html")] = "<header>{$title}</header>",
             [Path.Combine(Site, "lib", "strings.ks.xml")] = "<kscript><fn name=\"slugify\" params=\"text\" value=\"$text\" /></kscript>",
         });
 
@@ -322,6 +323,17 @@ namespace KScript.Language.Tests
             Diagnostic component = a.Diagnostics.Single(d => d.Code == DiagnosticCodes.UnknownElement);
             Assert.Contains("people-card", component.Message);
             AssertSingle(a, DiagnosticCodes.UndefinedVariable);
+        }
+
+        [Fact]
+        public void ComponentsWithoutAHyphenMatchThePageEngine()
+        {
+            // Same rule as kscript serve (PageElementNames): <hero> is a component because _components/hero.html exists;
+            // an unknown hyphenless name is left alone, and HTML or KScript element names are never components.
+            DocumentAnalysis a = Analyze("<hero title=\"Hi\" /><banner /><section><p>x</p></section>", Path.Combine(Site, "x.html"), SiteFiles());
+            AssertClean(a);
+            Assert.Contains(a.Links, l => l.Kind == "component" && l.TargetPath.EndsWith("hero.html"));
+            Assert.Single(a.Links, l => l.Kind == "component");
         }
 
         [Fact]
