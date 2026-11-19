@@ -4,6 +4,7 @@ using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Language.Features;
 using KScript.Language.Text;
+using KScript.Projects;
 
 using LspDiagnosticSeverity = KScript.Language.Analysis.DiagnosticSeverity;
 
@@ -23,6 +24,9 @@ namespace KScript.LanguageServer
         private readonly LanguageService service;
         private bool initialized;
         private bool shutdownRequested;
+
+        // kscript.json files by path, re-parsed when their text changes.
+        private readonly Dictionary<string, (string Text, ProjectConfig Config)> projectConfigs = new Dictionary<string, (string, ProjectConfig)>(StringComparer.Ordinal);
 
         public KScriptLanguageServer(Stream input, Stream output, IFileSystem disk = null)
         {
@@ -232,8 +236,74 @@ namespace KScript.LanguageServer
             {
                 return null;
             }
-            doc.Analysis ??= Analyzer.Analyze(doc.Text, doc.Path, workspace, service.Catalog, doc.Kind);
+            doc.Analysis ??= Analyze(doc);
             return doc.Analysis;
+        }
+
+        /// <summary>Analyzes a document and applies its project's kscript.json lint settings (rule severities, excluded paths).</summary>
+        private DocumentAnalysis Analyze(OpenDocument doc)
+        {
+            DocumentAnalysis analysis = Analyzer.Analyze(doc.Text, doc.Path, workspace, service.Catalog, doc.Kind);
+            LintRules.Apply(analysis.Diagnostics, ProjectFor(doc.Path), doc.Path);
+            return analysis;
+        }
+
+        /// <summary>The nearest kscript.json above a file, or null. A file that doesn't parse is reported once and ignored.</summary>
+        internal ProjectConfig ProjectFor(string path)
+        {
+            if (path == null)
+            {
+                return null;
+            }
+            string dir;
+            try
+            {
+                dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path));
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException)
+            {
+                return null;
+            }
+
+            for (; !string.IsNullOrEmpty(dir); dir = System.IO.Path.GetDirectoryName(dir))
+            {
+                string file = System.IO.Path.Combine(dir, ProjectConfig.FileName);
+                if (!workspace.FileExists(file))
+                {
+                    continue;
+                }
+
+                string text;
+                try
+                {
+                    text = workspace.ReadText(file);
+                }
+                catch (IOException)
+                {
+                    return null;
+                }
+                if (projectConfigs.TryGetValue(file, out var cached) && cached.Text == text)
+                {
+                    return cached.Config;
+                }
+
+                ProjectConfig config = null;
+                try
+                {
+                    config = ProjectConfig.Parse(text, file);
+                    foreach (string warning in config.Warnings)
+                    {
+                        Log($"{file}: {warning}");
+                    }
+                }
+                catch (ProjectConfigException ex)
+                {
+                    Log(ex.Message + " Using the default lint settings until it is fixed.");
+                }
+                projectConfigs[file] = (text, config);
+                return config;
+            }
+            return null;
         }
 
         private static string ApplyChange(string text, JsonNode change)
@@ -255,7 +325,7 @@ namespace KScript.LanguageServer
         {
             foreach (OpenDocument doc in workspace.Documents.ToList())
             {
-                doc.Analysis = Analyzer.Analyze(doc.Text, doc.Path, workspace, service.Catalog, doc.Kind);
+                doc.Analysis = Analyze(doc);
                 JsonArray diagnostics = new JsonArray();
                 foreach (Diagnostic d in doc.Analysis.Diagnostics)
                 {

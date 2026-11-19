@@ -37,6 +37,12 @@
         ],
         "firstLine": "^\\s*(<\\?xml[^>]*>\\s*)?<kscript\\b",
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "jsonc",
+        "filenames": [
+          "kscript.json"
+        ]
       }
     ],
     "grammars": [
@@ -111,6 +117,12 @@
         "command": "kscript.showOutput",
         "title": "Show Language Server Output",
         "category": "KScript"
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "kscript.json",
+        "url": "./schemas/kscript.schema.json"
       }
     ]
   },

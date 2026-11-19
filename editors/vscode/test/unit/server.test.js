@@ -93,3 +93,15 @@ test('page highlighting is injected into the grammar VS Code uses for .html file
   const grammar = JSON.parse(fs.readFileSync(path.join(__dirname, '../..', injection.path), 'utf8'));
   assert.match(grammar.injectionSelector, /^L:text\.html -source/, 'the selector matches both HTML grammars and skips <script>/<style>');
 });
+
+test('kscript.json is validated with the bundled schema', () => {
+  const root = path.join(__dirname, '../..');
+  const pkg = require('../../package.json');
+  const ignore = fs.readFileSync(path.join(root, '.vscodeignore'), 'utf8').split(/\r?\n/);
+  for (const v of pkg.contributes.jsonValidation) {
+    const schema = JSON.parse(fs.readFileSync(path.join(root, v.url), 'utf8'));
+    assert.ok(schema.properties.serve && schema.properties.lint, v.url);
+    assert.ok(ignore.includes('!' + path.posix.dirname(v.url.replace(/^\.\//, '')) + '/**'), `${v.url} is packaged`);
+  }
+  assert.ok(pkg.contributes.languages.some((l) => l.id === 'jsonc' && l.filenames.includes('kscript.json')), 'kscript.json allows comments');
+});
