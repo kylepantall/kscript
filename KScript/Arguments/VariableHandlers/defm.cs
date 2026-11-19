@@ -1,8 +1,10 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <let name=\"...\"> with a map literal { key: value }.", Rename = "let")]
     public class defm : KScriptObject
     {
         [KScriptProperty("The unique ids for several definitions (id's seperated by commas). Must not contain any spaces or $ symbols.", true)]

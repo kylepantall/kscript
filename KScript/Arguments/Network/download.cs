@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.KScriptObjects;
 using System;
 using System.IO;
@@ -6,6 +7,8 @@ using System.Net.Http;
 namespace KScript.Arguments
 {
     [KScriptNoInnerObjects]
+    [KScriptDoc("Downloads a file.")]
+    [KScriptElement(KScriptContentKind.Empty)]
     public class download : KScriptObject
     {
         /// <summary>

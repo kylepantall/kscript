@@ -1,7 +1,9 @@
-﻿using KScript.Handlers;
+﻿using KScript.Metadata;
+using KScript.Handlers;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Compare with null: $x == null, or use $x ?? fallback.")]
     public class @null : KScriptCommand
     {
         private readonly string value = "";

@@ -50,3 +50,19 @@ jobs:
 
       - name: Run sample script
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll "Example Scripts/Find Oldest Person.xml" -s -nowait
+
+      - name: Check KScript 2 samples
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 --warnaserror
+
+      - uses: actions/setup-node@v4
+        if: matrix.name == 'linux'
+        with:
+          node-version: 20
+
+      - name: VS Code extension smoke test
+        if: matrix.name == 'linux'
+        working-directory: editors/vscode
+        run: |
+          npm ci
+          npm run check
+          node test/smoke.js ../../KScriptApp/bin/Release/net8.0/KScript.dll

@@ -1,4 +1,5 @@
-﻿using KScript.Handlers;
+﻿using KScript.Metadata;
+using KScript.Handlers;
 using KScript.KScriptObjects;
 using System.Collections.Generic;
 
@@ -8,6 +9,7 @@ namespace KScript.Arguments
     /// Class used to handle the KScript Object echo of arrays.
     /// </summary>
     [KScriptNoInnerObjects()]
+    [KScriptRetired("Use <echo>{ $list->join(', ') }</echo>.")]
     internal class aecho : KScriptObject
     {
         /// <summary>

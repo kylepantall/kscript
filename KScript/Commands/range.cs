@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptDoc("yes if a number is between min and max (inclusive).", Returns = "bool")]
     public class range : KScriptCommand
     {
         private readonly string check, max, min = "";

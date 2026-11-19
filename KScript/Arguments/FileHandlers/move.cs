@@ -1,8 +1,13 @@
-﻿using System.IO;
+﻿using KScript.Metadata;
+using System.IO;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments.FileHandlers
 {
+    [KScriptDoc("Moves a file or folder.", Example = "<move from=\"$file\" to=\"$target\" />")]
+    [KScriptElement(KScriptContentKind.Empty)]
+    [KScriptAttribute("from", KScriptValueKind.Expression, "What to move.", Required = true)]
+    [KScriptAttribute("to", KScriptValueKind.Expression, "Where to move it.", Required = true)]
     class move : KScriptObject
     {
         public string from { get; set; }

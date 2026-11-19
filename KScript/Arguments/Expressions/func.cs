@@ -1,10 +1,12 @@
-﻿using System;
+﻿using KScript.Metadata;
+using System;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <match value=\"...\"> with <case is=\"...\">.", Rename = "match")]
     public class func : KScriptObject
     {
         private readonly Random rnd;

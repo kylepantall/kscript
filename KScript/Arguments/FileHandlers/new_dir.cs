@@ -1,8 +1,11 @@
-﻿using KScript.KScriptObjects;
+﻿using KScript.Metadata;
+using KScript.KScriptObjects;
 using System.IO;
 
 namespace KScript.Arguments.FileHandlers
 {
+    [KScriptDoc("Creates a folder.")]
+    [KScriptElement(KScriptContentKind.Template)]
     class new_dir : KScriptObject
     {
         public string path { get; set; }

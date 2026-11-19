@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using KScript.Metadata;
+using System.Collections.Generic;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use a map: <let name=\"text\" value=\"{ en: 'Hello', fr: 'Bonjour' }\" />.")]
     public class languages : KScriptObject
     {
         [KScriptObjects.KScriptProperty("Used to define the prefix for variables", false)]

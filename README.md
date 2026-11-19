@@ -36,10 +36,21 @@ dotnet test KScript.sln
 dotnet run --project KScriptApp -- "path/to/script.xml"
 ```
 
-To produce a standalone executable for a platform:
+### Prebuilt binaries (no .NET needed)
+
+Each release on the [Releases page](https://github.com/kylepantall/kscript/releases) has a single `kscript` file for `linux-x64`, `linux-arm64`, `osx-arm64` (Apple Silicon), `osx-x64` and `win-x64`. It includes the .NET runtime, so nothing else needs installing:
 
 ```sh
-dotnet publish KScriptApp -c Release -r linux-x64   # or win-x64, osx-x64, osx-arm64, ...
+tar -xzf kscript-osx-arm64.tar.gz
+xattr -d com.apple.quarantine kscript   # macOS only: the binary isn't notarized
+./kscript serve "Example Sites/team"
+```
+
+Pushing a `v*` tag builds and publishes them (`.github/workflows/release.yml`). To build one yourself:
+
+```sh
+dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out
 ```
 
 Command line options:
@@ -57,6 +68,10 @@ Command line options:
 
 Anything after the script path is available to the script through `@args()`.
 
+## Editor support
+
+`kscript lsp` runs a language server for KScript 2 (diagnostics, completion, hover, go to definition, rename and more), and `kscript check <folder>` reports the same problems on the command line for CI. A VS Code extension is in `editors/vscode`. See [docs/language-server.md](docs/language-server.md).
+
 ## Repository layout
 
 | Path | Contents |
@@ -64,6 +79,10 @@ Anything after the script path is available to the script through `@args()`.
 | `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, and the `kscript serve` page engine (`Pages/`). |
 | `KScriptApp/` | The `KScript` command line app that runs a script file. |
 | `KScript.Tests/` | xUnit test suite. |
+| `KScript.Language/`, `KScript.LanguageServer/` | The KScript 2 parser, analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. |
+| `KScript.Language.Tests/` | Tests for the language tools, including contract tests that keep them in step with the interpreter. |
+| `editors/vscode/` | The VS Code extension. |
+| `samples/kscript2/` | KScript 2 sample scripts and site. |
 | `Example Scripts/` | Sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 

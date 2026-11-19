@@ -1,9 +1,11 @@
+using KScript.Metadata;
 using System.Text.RegularExpressions;
 using System;
 using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("Converts text to a date, optionally adding a calculation such as +1d.")]
     public class to_date : KScriptCommand
     {
         private readonly string dateTime;

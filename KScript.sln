@@ -9,6 +9,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScriptApp", "KScriptApp\KS
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Tests", "KScript.Tests\KScript.Tests.csproj", "{F6612525-70EF-4CD7-A13A-B65DD4FC9E0A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Language", "KScript.Language\KScript.Language.csproj", "{B3EFBE86-CAE1-4038-92B3-95054DDEF06C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.LanguageServer", "KScript.LanguageServer\KScript.LanguageServer.csproj", "{3470F48A-4C4B-4412-B695-DF541A20509B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Language.Tests", "KScript.Language.Tests\KScript.Language.Tests.csproj", "{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +36,17 @@ Global
 		{F6612525-70EF-4CD7-A13A-B65DD4FC9E0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F6612525-70EF-4CD7-A13A-B65DD4FC9E0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F6612525-70EF-4CD7-A13A-B65DD4FC9E0A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3EFBE86-CAE1-4038-92B3-95054DDEF06C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3EFBE86-CAE1-4038-92B3-95054DDEF06C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3EFBE86-CAE1-4038-92B3-95054DDEF06C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3EFBE86-CAE1-4038-92B3-95054DDEF06C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3470F48A-4C4B-4412-B695-DF541A20509B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3470F48A-4C4B-4412-B695-DF541A20509B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3470F48A-4C4B-4412-B695-DF541A20509B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3470F48A-4C4B-4412-B695-DF541A20509B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8915BE8F-1302-4E28-8A56-B3F6F6A27BD6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

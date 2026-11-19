@@ -1,5 +1,7 @@
-﻿namespace KScript.Arguments.Threading
+﻿using KScript.Metadata;
+namespace KScript.Arguments.Threading
 {
+    [KScriptRetired("Use <spawn fn=\"...\" />.", Rename = "spawn")]
     class thread : KScriptMethodWrapper
     {
         public override bool Run()

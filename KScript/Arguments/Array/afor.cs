@@ -1,7 +1,9 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <for each=\"item\" in=\"$list\">.", Rename = "for")]
     public class afor : KScriptArrayLoop
     {
         public override bool Run() => true;

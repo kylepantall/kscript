@@ -1,8 +1,12 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptDoc("Runs its body when the test is true. Follow it with <elif> and <else>.", Example = "<if test=\"$score ge 90\">\n  <echo>A</echo>\n</if>\n<else>\n  <echo>B</echo>\n</else>")]
+    [KScriptElement(KScriptContentKind.Statements)]
+    [KScriptAttribute("test", KScriptValueKind.Expression, "The condition, for example $n lt 10 and $name ne ''.", Required = true)]
     public class @if : KScriptConditional
     {
         [KScriptProperty("Used to signify whether to check for a yes or no value in order to parse inner script objects. By default, checks for true.", false)]
@@ -11,6 +15,7 @@ namespace KScript.Arguments
         [KScriptExample(@"<if checkfor=""no""> ... </if>")]
         [KScriptExample(@"<if checkfor=""1""> ... </if>")]
         [KScriptExample(@"<if checkfor=""0""> ... </if>")]
+        [KScriptRetired("Write the condition with not: test=\"not $x\".")]
         public string checkfor { get; set; } = "yes";
 
         public override bool EvaluateCondition()

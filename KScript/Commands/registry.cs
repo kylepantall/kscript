@@ -1,7 +1,9 @@
+using KScript.Metadata;
 using Microsoft.Win32;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("Reads a registry value (Windows only).")]
     public class registry : KScriptCommand
     {
         private string path { get; set; }

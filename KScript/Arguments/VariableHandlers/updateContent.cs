@@ -1,7 +1,9 @@
-﻿using KScript.KScriptObjects;
+﻿using KScript.Metadata;
+using KScript.KScriptObjects;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <set name=\"...\" value=\"...\" />.", Rename = "set")]
     class updateContent : KScriptObject
     {
         public string id { get; set; }

@@ -1,0 +1,88 @@
+<kscript>
+  <!-- Expressions, interpolation and variables -->
+  <let name="n" value="3" />
+  <let name="name" value="'Kyle'" />
+  <if test="$n lt 10 and $name ne ''">
+    <echo>{ $n eq 1 ? 'item' : 'items' }</echo>
+  </if>
+  <let name="price" value="2.5" />
+  <let name="qty" value="4" />
+  <let name="total" value="0" />
+  <set name="total" value="$total + $price * $qty" />
+  <set name="total" op="+=" value="1" />
+  <let>x = 3</let>
+  <set>x += 1</set>
+  <do>$x = 3; $total += $price * $qty</do>
+  <let name="config" const="yes">{ debug: false, retries: 3 }</let>
+  <echo>Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for braces.</echo>
+
+  <!-- Lists, maps, lambdas and pipes -->
+  <let name="colours" value="['red', 'green', 'blue']" />
+  <echo>{ $colours[1] }</echo>
+  <let name="person" value="{ name: 'Joan', age: 82 }" />
+  <echo>$person.name is { $person['age'] }</echo>
+  <let name="people" value="[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]" />
+  <let name="names" value="$people
+      |> filter(fn($p) => $p.age ge 18)
+      |> map(fn($p) => $p.name)
+      |> join(', ')" />
+  <let name="by_age" value="fn($a, $b) => $a.age - $b.age" />
+  <let name="sorted" value="$people->sort($by_age)" />
+  <echo>{ $names |> @to_lower() |> @greet('Hi') }</echo>
+
+  <!-- Loops -->
+  <for each="i" in="0..10"><echo>$i</echo></for>
+  <for each="i" in="0..100 step 5"><echo>$i</echo></for>
+  <for each="item" index="k" in="$colours"><echo>$k: $item</echo></for>
+  <for each="key, value" in="$config"><echo>$key = $value</echo></for>
+  <while test="$n lt 3"><set name="n" value="$n + 1" /></while>
+
+  <!-- Branches -->
+  <let name="score" value="80" />
+  <if test="$score ge 90">
+    <echo>A</echo>
+  </if>
+  <elif test="$score ge 75">
+    <echo>B</echo>
+  </elif>
+  <else>
+    <echo>C</echo>
+  </else>
+  <let name="choice" value="2" />
+  <match value="$choice">
+    <case is="1"><call fn="greet" args="'settings'" /></case>
+    <case is="2, 3"><echo>Coming soon</echo></case>
+    <case when="$choice gt 9"><echo>Out of range</echo></case>
+    <default><echo>Unknown option</echo></default>
+  </match>
+  <let name="label" value="match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }" />
+
+  <!-- Functions -->
+  <fn name="greet" params="who, greeting = 'Hello'">
+    <return value="$greeting + ', ' + $who + '!'" />
+  </fn>
+  <fn name="double" params="x: int" value="$x * 2" />
+  <echo>@greet('World')</echo>
+  <echo>{ 'Kyle' |> @greet('Hi') } { @double(4) }</echo>
+
+  <!-- Errors -->
+  <let name="path" value="'data.json'" />
+  <try>
+    <let name="data" value="@read_text($path) |> @json()" />
+    <catch as="err" when="$err.type eq 'FileNotFound'">
+      <echo>No file at {$path}, using defaults.</echo>
+    </catch>
+    <catch as="err">
+      <echo>Failed: {$err.message} (line {$err.line})</echo>
+    </catch>
+    <finally><echo>done</echo></finally>
+  </try>
+  <let name="age" value="-1" />
+  <if test="$age lt 0">
+    <throw type="Validation" message="Age must be positive, got {$age}" />
+  </if>
+
+  <!-- Null handling and membership -->
+  <let name="user" value="null" />
+  <echo>{ $user?.name ?? 'guest' } { '.cs' in ['.cs', '.xml'] }</echo>
+</kscript>

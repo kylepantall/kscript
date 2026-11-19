@@ -1,7 +1,9 @@
+using KScript.Metadata;
 using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Use the comparison operators: $a lt $b, le, gt, ge.")]
     public class more_less : KScriptCommand
     {
         private readonly string firstValue = "";

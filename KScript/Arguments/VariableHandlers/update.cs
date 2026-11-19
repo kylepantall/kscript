@@ -1,8 +1,10 @@
+using KScript.Metadata;
 using KScript.KScriptObjects;
 using System;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <set name=\"...\" value=\"...\" />.", Rename = "set")]
     public class update : KScriptObject
     {
         [KScriptProperty("Used to identify the def to update.", true)]

@@ -1,7 +1,9 @@
+using KScript.Metadata;
 using System.Linq;
 
 namespace KScript.Commands
 {
+    [KScriptDoc("The average of the numbers.", Returns = "number")]
     public class average : KScriptCommand
     {
         private readonly string[] args;

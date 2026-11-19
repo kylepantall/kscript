@@ -1,5 +1,7 @@
-﻿namespace KScript.Commands
+﻿using KScript.Metadata;
+namespace KScript.Commands
 {
+    [KScriptRetired("Not part of KScript 2.")]
     class @this : KScriptCommand
     {
         public override string Calculate()

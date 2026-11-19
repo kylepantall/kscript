@@ -1,9 +1,11 @@
-﻿using KScript.Handlers;
+﻿using KScript.Metadata;
+using KScript.Handlers;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Use the and operator: $a and $b.")]
     public class and : KScriptCommand
     {
         private readonly string[] conditions;

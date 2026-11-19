@@ -1,7 +1,9 @@
-﻿using KScript.KScriptExceptions;
+﻿using KScript.Metadata;
+using KScript.KScriptExceptions;
 
 namespace KScript.Arguments
 {
+    [KScriptRetired("Use <import src=\"...\" />.", Rename = "import")]
     public class load : KScriptObject
     {
         [KScriptObjects.KScriptProperty("Used to specify the file location of where to load the script from.", true)]

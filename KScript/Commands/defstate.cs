@@ -1,8 +1,10 @@
+using KScript.Metadata;
 using System;
 using System.Linq;
 
 namespace KScript.Commands
 {
+    [KScriptRetired("Variable history is not part of KScript 2.")]
     public class defstate : KScriptCommand
     {
         private readonly string id;
