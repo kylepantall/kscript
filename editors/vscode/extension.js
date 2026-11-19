@@ -1,76 +1,131 @@
-// KScript for VS Code: starts the KScript language server (`kscript lsp`) and connects it to the editor.
+// KScript for VS Code: starts the installed KScript language server (`kscript lsp`) and connects it to the editor.
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vscode = require('vscode');
-const { LanguageClient, TransportKind } = require('vscode-languageclient/node');
+const { LanguageClient, TransportKind, State } = require('vscode-languageclient/node');
+const { resolveServer, versionOf, supportsLsp } = require('./src/server');
+const { isSiteFolder } = require('./src/site');
+
+const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-needed';
 
 let client;
+let status;
+let output;
 
-/** Works out how to start the server: a configured path, the bundled server, or `kscript` on the PATH. */
-function serverCommand(context) {
-  const config = vscode.workspace.getConfiguration('kscript');
-  const args = config.get('server.args', ['lsp']);
-  let configured = (config.get('server.path') || '').trim();
+function config() {
+  return vscode.workspace.getConfiguration('kscript');
+}
 
-  if (!configured) {
-    const bundled = path.join(context.extensionPath, 'server', 'KScript.dll');
-    if (fs.existsSync(bundled)) {
-      configured = bundled;
+async function pagesEnabled() {
+  const mode = config().get('pages.enabled', 'auto');
+  if (mode === true || mode === 'always') return true;
+  if (mode === false || mode === 'never') return false;
+  // auto: a folder that looks like a `kscript serve` site.
+  for (const folder of vscode.workspace.workspaceFolders || []) {
+    if (await isSiteFolder(folder.uri.fsPath)) return true;
+  }
+  const marker = await vscode.workspace.findFiles('{**/_components/*.html,**/_layout.html,**/_layouts/*.html,**/kscript.json}', '**/node_modules/**', 1);
+  return marker.length > 0;
+}
+
+async function startClient(context) {
+  const server = resolveServer(config().get('server.path', ''), config().get('server.args', ['lsp']));
+  if (server.error) {
+    setStatus('$(warning) KScript', 'The KScript language server was not found. Click to set it up.', 'kscript.showSetup');
+    const choice = await vscode.window.showWarningMessage(
+      `${server.error} Install it to get KScript errors, completion and hover in the editor.`,
+      'Install KScript', 'Set Path…');
+    if (choice === 'Install KScript') vscode.env.openExternal(vscode.Uri.parse(INSTALL_URL));
+    if (choice === 'Set Path…') vscode.commands.executeCommand('workbench.action.openSettings', 'kscript.server.path');
+    return;
+  }
+
+  const version = versionOf(server);
+  output.appendLine(`Using ${server.command}${version ? ` (kscript ${version})` : ''}, found via ${server.source}.`);
+  if (version && !supportsLsp(version)) {
+    const choice = await vscode.window.showWarningMessage(
+      `kscript ${version} is too old for the editor features. Run "kscript update" to get the latest release.`, 'Open Terminal');
+    if (choice === 'Open Terminal') {
+      const terminal = vscode.window.createTerminal('kscript update');
+      terminal.show();
+      terminal.sendText(`"${server.command}" update`);
     }
+    return;
   }
 
-  if (configured.toLowerCase().endsWith('.dll')) {
-    return { command: 'dotnet', args: [configured, ...args] };
-  }
-  return { command: configured || 'kscript', args };
-}
-
-async function hasSiteConfig() {
-  const found = await vscode.workspace.findFiles('**/kscript.json', '**/node_modules/**', 1);
-  return found.length > 0;
-}
-
-async function activate(context) {
-  const { command, args } = serverCommand(context);
   const serverOptions = {
-    run: { command, args, transport: TransportKind.stdio },
-    debug: { command, args, transport: TransportKind.stdio },
+    run: { command: server.command, args: server.args, transport: TransportKind.stdio },
+    debug: { command: server.command, args: server.args, transport: TransportKind.stdio },
   };
 
   const documentSelector = [{ scheme: 'file', language: 'kscript' }, { scheme: 'untitled', language: 'kscript' }];
-  if (vscode.workspace.getConfiguration('kscript').get('pages.enabled', true) && (await hasSiteConfig())) {
+  if (await pagesEnabled()) {
     // Pages served by `kscript serve`: HTML and Markdown with KScript elements inline.
     documentSelector.push({ scheme: 'file', language: 'html' }, { scheme: 'file', language: 'markdown' });
   }
 
-  const clientOptions = {
+  client = new LanguageClient('kscript', 'KScript', serverOptions, {
     documentSelector,
-    synchronize: {
-      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{xml,ks,kscript,html,md}'),
-    },
-  };
-
-  client = new LanguageClient('kscript', 'KScript', serverOptions, clientOptions);
-
-  context.subscriptions.push(vscode.commands.registerCommand('kscript.restartServer', async () => {
-    if (client) {
-      await client.restart();
-    }
-  }));
+    outputChannel: output,
+    synchronize: { fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{xml,ks,kscript,html,md,json}') },
+  });
+  client.onDidChangeState((e) => {
+    if (e.newState === State.Running) setStatus('$(check) KScript', `kscript ${version || ''} language server is running.`, 'kscript.showOutput');
+    if (e.newState === State.Stopped) setStatus('$(error) KScript', 'The KScript language server stopped. Click to see its output.', 'kscript.showOutput');
+  });
 
   try {
     await client.start();
   } catch (err) {
-    vscode.window.showErrorMessage(
-      `Couldn't start the KScript language server (${command} ${args.join(' ')}). ` +
-      'Install KScript and put `kscript` on your PATH, or set "kscript.server.path". ' + (err && err.message ? err.message : ''));
+    vscode.window.showErrorMessage(`Couldn't start the KScript language server (${server.command} ${server.args.join(' ')}): ${err && err.message ? err.message : err}`);
   }
 }
 
-function deactivate() {
-  return client ? client.stop() : undefined;
+async function stopClient() {
+  if (client) {
+    const old = client;
+    client = undefined;
+    try {
+      await old.stop();
+    } catch {
+      // Already stopped.
+    }
+  }
 }
 
-module.exports = { activate, deactivate, serverCommand };
+function setStatus(text, tooltip, command) {
+  status.text = text;
+  status.tooltip = tooltip;
+  status.command = command;
+  status.show();
+}
+
+async function activate(context) {
+  output = vscode.window.createOutputChannel('KScript');
+  status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
+  status.name = 'KScript';
+  context.subscriptions.push(output, status);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('kscript.restartServer', async () => {
+      await stopClient();
+      await startClient(context);
+    }),
+    vscode.commands.registerCommand('kscript.showOutput', () => output.show()),
+    vscode.commands.registerCommand('kscript.showSetup', () => vscode.env.openExternal(vscode.Uri.parse(INSTALL_URL))),
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (e.affectsConfiguration('kscript.server') || e.affectsConfiguration('kscript.pages')) {
+        await stopClient();
+        await startClient(context);
+      }
+    }),
+  );
+
+  await startClient(context);
+}
+
+function deactivate() {
+  return stopClient();
+}
+
+module.exports = { activate, deactivate };

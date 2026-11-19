@@ -95,7 +95,17 @@ Anything after the script path is available to the script through `@args()`.
 
 ## Editor support
 
-`kscript lsp` runs a language server for KScript 2 (diagnostics, completion, hover, go to definition, rename and more), and `kscript check <folder>` reports the same problems on the command line for CI. A VS Code extension is in `editors/vscode`. See [docs/language-server.md](docs/language-server.md).
+Install the KScript extension into VS Code, Cursor, VSCodium or Windsurf:
+
+```sh
+kscript ide install           # every editor it finds; or name one: kscript ide install cursor
+kscript ide                   # list the editors it found
+kscript ide uninstall
+```
+
+The extension shows errors as you type and adds completion, hover, go to definition, rename and highlighting for scripts and `kscript serve` pages. It runs `kscript lsp` from your installed `kscript`, so keep that current with `kscript update`. To use a different `kscript`, set `kscript.server.path` in the editor's settings.
+
+Other editors with LSP support work too: `kscript ide config neovim` (or `helix`, `sublime`, `emacs`) prints the settings to add. `kscript check <folder>` reports the same problems on the command line, for CI. See [docs/language-server.md](docs/language-server.md) for how the language server works.
 
 ## Repository layout
 
