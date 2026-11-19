@@ -30,9 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # home-ci has no system-wide .NET SDK; setup-dotnet installs it into the
-      # runner's tool cache on first use and reuses it afterwards.
+      # home-ci has no system-wide .NET SDK and the runner user can't write to
+      # setup-dotnet's default /usr/share/dotnet, so on the self-hosted job it
+      # installs into the runner's tool cache (kept between jobs) instead.
       - uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ matrix.self-hosted && format('{0}/dotnet', runner.tool_cache) || '' }}
         with:
           dotnet-version: 8.0.x
 
