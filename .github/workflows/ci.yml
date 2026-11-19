@@ -8,10 +8,11 @@ on:
 jobs:
   test:
     name: Build and test (${{ matrix.name }})
-    # The Linux job runs on the home-ci self-hosted runners (waggr-gb org).
+    # The Linux job runs on home-ci-kscript, a self-hosted runner on home-ci
+    # that is registered to this repository only.
     # Pull requests from forks always fall back to a GitHub-hosted runner so
     # untrusted code never executes on home-ci.
-    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON('["self-hosted","Linux","X64","light"]') || matrix.hosted }}
+    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON('["self-hosted","Linux","X64","kscript"]') || matrix.hosted }}
     strategy:
       fail-fast: false
       matrix:
