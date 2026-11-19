@@ -14,12 +14,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- kscript serve runs on Kestrel -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Pages\live.js" LogicalName="KScript.Pages.live.js" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="KScript.Tests" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="MathParser.org-mXparser" Version="4.2.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Markdig" Version="0.38.0" />
   </ItemGroup>
 
 </Project>
