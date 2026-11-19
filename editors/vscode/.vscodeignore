@@ -1,3 +1,8 @@
-node_modules/.cache/**
-**/*.map
-test/**
+**
+!package.json
+!README.md
+!CHANGELOG.md
+!icon.png
+!language-configuration.json
+!syntaxes/**
+!dist/extension.js

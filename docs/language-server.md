@@ -12,9 +12,12 @@ reported as retired, with the KScript 2 replacement and a quick fix where one is
 | `kscript lsp` | Runs the server over stdio (LSP 3.17). Any LSP client can use it. |
 | `kscript check <file-or-folder>... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. |
 
-The VS Code extension is in [`editors/vscode`](../editors/vscode). `npm run package` builds the server into the
-extension and produces a `.vsix`; or set `kscript.server.path` to a `kscript` you have built. `npm test` runs an
-end-to-end smoke test against the real server.
+The VS Code extension is in [`editors/vscode`](../editors/vscode). It starts the installed `kscript lsp` (found
+through `kscript.server.path`, then the installers' folders, then `PATH`) and adds a TextMate grammar, plus an injection
+grammar for `{ expressions }` in pages. In that folder: `npm test` runs the unit tests, `npm run package` builds
+`kscript-vscode.vsix`, `npm run smoke -- <KScript.dll>` checks the protocol against a built server, and
+`npm run test:vscode -- <KScript.dll>` runs the extension inside a downloaded VS Code. `kscript ide install --vsix
+kscript-vscode.vsix` installs a local build.
 
 ## How it is built
 

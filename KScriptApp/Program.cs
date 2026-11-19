@@ -41,6 +41,7 @@ namespace KScript
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
+            Console.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
             Console.WriteLine("       kscript --version | --help");
             Console.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
             Console.WriteLine("Options: " + string.Join(" ", Commands()));
@@ -123,6 +124,11 @@ namespace KScript
             if (args.Length > 0 && args[0] == "update")
             {
                 return KScript.Updates.SelfUpdater.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
+            }
+
+            if (args.Length > 0 && args[0] == "ide")
+            {
+                return KScript.Ide.IdeCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
             }
 
             if (args.Length > 0 && args[0] == "check")
