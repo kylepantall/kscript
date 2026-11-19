@@ -1,6 +1,6 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System;
-using System.Management;
+using System.Runtime.InteropServices;
 
 namespace KScript.Commands
 {
@@ -39,21 +39,7 @@ namespace KScript.Commands
         /// Returns the name of the operating system.
         /// </summary>
         /// <returns>OS Name</returns>
-        public static string GetOSFriendlyName()
-        {
-            string result = string.Empty;
-            try
-            {
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem");
-                foreach (ManagementObject os in searcher.Get())
-                {
-                    result = os["Caption"].ToString();
-                    break;
-                }
-            }
-            catch (Exception) { }
-            return result;
-        }
+        public static string GetOSFriendlyName() => RuntimeInformation.OSDescription;
 
 
         public override void Validate() { }

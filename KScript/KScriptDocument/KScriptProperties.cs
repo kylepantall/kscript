@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace KScript
 {
@@ -6,6 +6,11 @@ namespace KScript
     public class KScriptProperties
     {
         public bool Quiet { get; set; }
+
+        /// <summary>
+        /// Set by the host (e.g. the -s CLI flag) to keep the script quiet regardless of the script's own quiet attribute.
+        /// </summary>
+        public bool ForceQuiet { get; set; }
         public bool ClearAfterInput { get; set; }
         public bool WaitOnFinish { get; set; }
         public bool FullScreen { get; set; }
