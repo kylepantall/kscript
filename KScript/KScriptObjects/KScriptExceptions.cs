@@ -1,4 +1,4 @@
-﻿using KScript.KScriptObjects;
+using KScript.KScriptObjects;
 using System;
 
 namespace KScript.KScriptExceptions
@@ -32,6 +32,7 @@ namespace KScript.KScriptExceptions
 
         public KScriptException(string message) : base(message) => ExceptionType = GetType().Name;
         public KScriptException(KScriptBaseObject obj, string message) : base(message) { KScriptObject = obj; }
+        public KScriptException(KScriptBaseObject obj, string message, Exception inner) : base(message, inner) { KScriptObject = obj; }
 
     }
 

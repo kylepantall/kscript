@@ -1,4 +1,4 @@
-﻿using KScript.Document;
+using KScript.Document;
 using KScript.HTML;
 using KScript.KScriptObjects;
 using System.Collections.Generic;
@@ -59,8 +59,7 @@ namespace KScript.KScriptContainerObjects
 
             Out(string.Format("Local Web Application is running on: {0}\n", WebAddress));
 
-            ProcessStartInfo info = new ProcessStartInfo(WebAddress);
-            Process.Start(info);
+            Helpers.Platform.Open(WebAddress);
 
             return true;
         }

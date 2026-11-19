@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Xml;
 using System.Text.RegularExpressions;
-using CsQuery.ExtensionMethods;
 
 namespace KScript.MultiArray
 {
@@ -135,7 +134,7 @@ namespace KScript.MultiArray
                     collection.SetKey(key.Value);
                 }
 
-                xElement.Elements().ForEach(x => Iterate(x, collection, container));
+                foreach (XElement x in xElement.Elements()) { Iterate(x, collection, container); }
                 parent.AddItem(collection);
                 return;
             }

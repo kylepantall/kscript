@@ -1,4 +1,4 @@
-﻿using KScript.Document;
+using KScript.Document;
 using KScript.Global;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,6 +32,9 @@ namespace KScript.KScriptDocument
          */
         public T GetObjectFromUID<T>(string uid) => (T)ObjectStorage[uid];
 
+        /// <summary>Returns the stored object with the given key, or default when missing or of another type.</summary>
+        public T GetObject<T>(string key) where T : class => ObjectStorage.TryGetValue(key, out object value) ? value as T : null;
+
         public void AddObjectFromUID(string uid, object obj)
         {
             if (!ObjectStorage.ContainsKey(uid))
@@ -43,8 +46,9 @@ namespace KScript.KScriptDocument
          */
         public void Add(string at_parent_key, KScriptObject script_obj, string uid, List<IKScriptDocumentNode> values)
         {
+            // Re-declaring a method / handler replaces the previous declaration instead of throwing.
             if (Value.ContainsKey(at_parent_key))
-                Value[at_parent_key].Add(uid, values);
+                Value[at_parent_key][uid] = values;
 
             if (!Value.ContainsKey(at_parent_key))
             {
@@ -55,7 +59,8 @@ namespace KScript.KScriptDocument
                 Value.Add(at_parent_key, obj);
             }
 
-            ObjectStorage.Add(uid, script_obj);
+            ObjectStorage[$"{at_parent_key}:{uid}"] = script_obj;
+            if (!ObjectStorage.ContainsKey(uid)) ObjectStorage[uid] = script_obj;
         }
 
 

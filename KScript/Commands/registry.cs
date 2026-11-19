@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 
 namespace KScript.Commands
 {
@@ -10,9 +10,14 @@ namespace KScript.Commands
         public registry(string path, string key) { this.path = path; this.key = key; }
         public override string Calculate()
         {
+            if (!System.OperatingSystem.IsWindows())
+            {
+                throw new KScriptExceptions.KScriptException(this, "@registry is only supported on Windows.");
+            }
+
             try
             {
-                return Registry.GetValue(path, key, string.Empty).ToString();
+                return Registry.GetValue(path, key, string.Empty)?.ToString() ?? NULL;
             }
             catch (System.Exception ex)
             {

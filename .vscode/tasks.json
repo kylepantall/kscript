@@ -3,25 +3,26 @@
     "tasks": [
         {
             "label": "build",
-            "command": "msbuild",
+            "command": "dotnet",
             "type": "process",
             "problemMatcher": "$msCompile",
-            "args": [
-                "/t:Rebuild"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
+            "args": [ "build", "${workspaceFolder}/KScript.sln" ],
+            "group": { "kind": "build", "isDefault": true }
+        },
+        {
+            "label": "test",
+            "command": "dotnet",
+            "type": "process",
+            "problemMatcher": "$msCompile",
+            "args": [ "test", "${workspaceFolder}/KScript.sln" ],
+            "group": "test"
         },
         {
             "label": "build_release",
-            "command": "msbuild",
-            "args": [
-                "/p:Configuration=Release"
-            ],
+            "command": "dotnet",
             "type": "process",
-            "problemMatcher": "$msCompile"
+            "problemMatcher": "$msCompile",
+            "args": [ "build", "${workspaceFolder}/KScript.sln", "--configuration", "Release" ]
         }
     ]
 }

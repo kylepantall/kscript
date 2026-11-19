@@ -1,5 +1,7 @@
-﻿using KScript.KScriptObjects;
+using KScript.KScriptObjects;
 using System;
+using System.IO;
+using System.Net.Http;
 
 namespace KScript.Arguments
 {
@@ -40,15 +42,15 @@ namespace KScript.Arguments
             URL = KScriptVariableHandler.ReturnFormattedVariables(KScript(), url);
             DEST = KScriptVariableHandler.ReturnFormattedVariables(KScript(), destination);
 
-            System.Net.WebClient client = new System.Net.WebClient();
-            client.DownloadProgressChanged += Client_DownloadProgressChanged;
-            client.DownloadFileAsync(new Uri(HandleCommands(URL)), HandleCommands(DEST));
-            return true;
-        }
+            // Download synchronously: the previous fire-and-forget WebClient download was lost when the script ended first.
+            using (HttpClient client = new HttpClient())
+            using (Stream source = client.GetStreamAsync(new Uri(HandleCommands(URL))).GetAwaiter().GetResult())
+            using (FileStream target = File.Create(HandleCommands(DEST)))
+            {
+                source.CopyTo(target);
+            }
 
-        private void Client_DownloadProgressChanged(object sender, System.Net.DownloadProgressChangedEventArgs e)
-        {
-            Out(e.ProgressPercentage.ToString() + "%\n");
+            return true;
         }
 
         public override void Validate()

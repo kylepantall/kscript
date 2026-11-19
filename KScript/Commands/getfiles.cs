@@ -1,4 +1,4 @@
-﻿using KScript.Handlers;
+using KScript.Handlers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -54,9 +54,14 @@ namespace KScript.Commands
         /// <returns></returns>
         public override string Calculate()
         {
-            string[] files = Directory.GetFiles(directory);
+            string[] files = Directory.GetFiles(directory).OrderBy(f => f, System.StringComparer.Ordinal).ToArray();
 
-            string[] accepted_types = this.accepted_types.Split(',').Select(i => i.ToLower()).ToArray();
+            // Accept ".exe", "exe" and " .exe" alike.
+            string[] accepted_types = this.accepted_types.Split(',')
+                .Select(i => i.Trim().ToLowerInvariant())
+                .Where(i => i.Length > 0)
+                .Select(i => i == "*" || i.StartsWith(".") ? i : "." + i)
+                .ToArray();
 
             string[] results = files.Where(i => accepted_types.Contains(Path.GetExtension(i).ToLower()) || accepted_types.Contains("*")).ToArray();
 

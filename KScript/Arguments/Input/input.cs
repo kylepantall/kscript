@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using KScript.Handlers;
 using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
@@ -82,7 +82,7 @@ namespace KScript.Arguments
             }
 
             if (KScript().Properties.ClearAfterInput || KScriptBoolHandler.Convert(cai))
-                Console.Clear();
+                Helpers.Platform.ClearConsole();
 
             return true;
         }

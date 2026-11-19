@@ -1,4 +1,4 @@
-﻿using KScript.Handlers;
+using KScript.Handlers;
 using KScript.VariableFunctions;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -54,7 +54,7 @@ namespace KScript
                         {
                             string val = func.Evaluate(null);
                             string replace = string.Format(@"\$(\b{0}\b)\%\$(\b{1}\b)(?:\-\>)(\b{2}\b)\(\)", Regex.Escape(variable_id), Regex.Escape(variable_second_id), Regex.Escape(variable_func));
-                            result = Regex.Replace(contents, replace, val);
+                            result = Regex.Replace(result, replace, _ => val);
                         }
                     }
                 }
@@ -73,11 +73,13 @@ namespace KScript
                     {
                         string val = func.Evaluate(null);
                         string replace = string.Format(@"\$\b{0}\b\-\>\b{1}\b\(\)", Regex.Escape(variable_id), Regex.Escape(variable_func));
-                        result = Regex.Replace(contents, replace, val);
+                        result = Regex.Replace(result, replace, _ => val);
                     }
                 }
             }
-            result = Regex.Replace(result, string.Format(@"\$\b{0}\b(?!\-\>)", Regex.Escape(key)), value, RegexOptions.IgnoreCase);
+            // Use a MatchEvaluator so '$1', '$0' etc. inside values are not treated as regex substitutions.
+            string replacement = value ?? string.Empty;
+            result = Regex.Replace(result, string.Format(@"\$\b{0}\b(?!\-\>)", Regex.Escape(key)), _ => replacement, RegexOptions.IgnoreCase);
             return result;
         }
     }

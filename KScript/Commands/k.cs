@@ -1,6 +1,6 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System;
-using System.Management;
+using System.Runtime.InteropServices;
 
 namespace KScript.Commands
 {
@@ -23,12 +23,17 @@ namespace KScript.Commands
                 switch (value.ToLower())
                 {
                     case "os.name": return GetOSFriendlyName();
+                    case "os.platform": return GetPlatform();
+                    case "path.separator": return System.IO.Path.DirectorySeparatorChar.ToString();
+                    case "newline": return System.Environment.NewLine;
+                    case "user.home": return System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+                    case "temp.directory": return System.IO.Path.GetTempPath();
                     case "machine.name": return System.Environment.MachineName;
                     case "script.path": return KScript().FilePath;
                     case "script.directory": return KScript().FileDirectory;
                     case "username": return System.Environment.UserName;
-                    case "math.pi": return Math.PI.ToString();
-                    case "math.e": return Math.E.ToString();
+                    case "math.pi": return Math.PI.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    case "math.e": return Math.E.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     case Global.Values.NULL: return NULL;
                     default: return KScript().FileDirectory;
                 }
@@ -39,20 +44,18 @@ namespace KScript.Commands
         /// Returns the name of the operating system.
         /// </summary>
         /// <returns>OS Name</returns>
-        public static string GetOSFriendlyName()
+        public static string GetOSFriendlyName() => RuntimeInformation.OSDescription;
+
+        /// <summary>
+        /// Returns a short platform identifier: windows, linux, macos, freebsd or unknown.
+        /// </summary>
+        public static string GetPlatform()
         {
-            string result = string.Empty;
-            try
-            {
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem");
-                foreach (ManagementObject os in searcher.Get())
-                {
-                    result = os["Caption"].ToString();
-                    break;
-                }
-            }
-            catch (Exception) { }
-            return result;
+            if (OperatingSystem.IsWindows()) return "windows";
+            if (OperatingSystem.IsMacOS()) return "macos";
+            if (OperatingSystem.IsLinux()) return "linux";
+            if (OperatingSystem.IsFreeBSD()) return "freebsd";
+            return "unknown";
         }
 
 

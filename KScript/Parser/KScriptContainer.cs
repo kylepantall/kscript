@@ -1,11 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
 using KScript.Arguments;
-using KScript.CommandHandler;
 using KScript.Handlers;
 using KScript.KScriptDocument;
 using KScript.KScriptExceptions;
@@ -38,9 +37,6 @@ namespace KScript
         //Dictionary list of Defs used for retrieval of defs within the script.
         private IDictionary<string, def> defs { get; set; }
 
-        //Stores the commands used for each KScriptObject session.
-        private readonly Dictionary<string, ICommandObject> CommandStore = new Dictionary<string, ICommandObject>();
-
         //Stores all the constant KScriptObject properties - prefixed with '__'.
         private readonly Dictionary<string, string> ConstantProperties = new Dictionary<string, string>();
 
@@ -49,8 +45,7 @@ namespace KScript
 
         public void ClearGlobalValues(string key) => UniqueStore.Remove(key);
 
-        public string HandleCommand(string input) => KScriptCommandHandler.HandleCommands(this.GetStringHandler()
-            .Format(input), this, null);
+        public string HandleCommand(string input) => KScriptCommandHandler.Interpolate(input, this, null);
 
         /// <summary>
         /// Adds a global value at the key and ID
@@ -103,9 +98,6 @@ namespace KScript
             return UniqueStore[key];
         }
         #endregion
-
-        //Method used to obtain the Command store dictionary.
-        public Dictionary<string, ICommandObject> GetCommandStore() => CommandStore;
 
         /// <summary>
         /// Used to retrieve constant KScript Properties - prefixed with '__', registers value + ID.
@@ -163,6 +155,27 @@ namespace KScript
         /// </summary>
         /// <returns></returns>
         internal bool GetConditionalLoops() => !ConditionalLoops;
+
+        /// <summary>
+        /// True when a &lt;break/&gt; has been reached and the innermost loop should stop.
+        /// </summary>
+        internal bool BreakRequested => !ConditionalLoops;
+
+        /// <summary>
+        /// True when a &lt;continue/&gt; has been reached and the rest of the current loop iteration should be skipped.
+        /// </summary>
+        internal bool ContinueRequested { get; set; }
+
+        private readonly Dictionary<object, bool> LastConditionResults = new Dictionary<object, bool>();
+        private static readonly object RootScope = new object();
+
+        /// <summary>
+        /// Records the result of the most recent &lt;if&gt; within a parent, so a following &lt;else&gt; can use it.
+        /// </summary>
+        internal void SetLastConditionResult(object parent, bool result) => LastConditionResults[parent ?? RootScope] = result;
+
+        internal bool? GetLastConditionResult(object parent) =>
+            LastConditionResults.TryGetValue(parent ?? RootScope, out bool result) ? result : (bool?)null;
 
         /// <summary>
         /// Method used to add def to def dictionary
@@ -353,7 +366,7 @@ namespace KScript
         /// Method used to handle exceptions - current purpose is to output the exception message.
         /// </summary>
         /// <param name="ex"></param>
-        internal void HandleException(KScriptBaseObject obj, Exception ex) => HandleException(new KScriptException(obj, ex.Message));
+        internal void HandleException(KScriptBaseObject obj, Exception ex) => HandleException(ex is KScriptException ? ex : new KScriptException(obj, ex.Message, ex));
 
         /// <summary>
         /// Method used to handle exceptions - current purpose is to output the exception message.
@@ -361,7 +374,12 @@ namespace KScript
         /// <param name="ex"></param>
         internal void HandleException(Exception ex)
         {
-            if (!Properties.ThrowAllExceptions)
+            if (Properties.ThrowAllExceptions)
+            {
+                // Previously exceptions were silently swallowed when throw_exceptions was enabled.
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex).Throw();
+            }
+
             {
                 GetObjectStorageContainer().GetExceptionHandlers(ex.GetType().Name)
                            .ForEach(i => i.Run(this, null, i.GetValue()));

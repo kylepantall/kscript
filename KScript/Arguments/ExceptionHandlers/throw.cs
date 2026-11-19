@@ -31,7 +31,7 @@ namespace KScript.Arguments
             }
 
 
-            var qs = from t in typeof(Exception).Assembly.GetTypes() where typeof(_Exception).IsAssignableFrom(t) && t.Name == type select t;
+            var qs = from t in typeof(Exception).Assembly.GetTypes() where typeof(Exception).IsAssignableFrom(t) && t.Name == type select t;
 
             if (qs.FirstOrDefault() != null)
             {

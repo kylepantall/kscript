@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 
 namespace KScript.Commands
 {
@@ -12,8 +12,17 @@ namespace KScript.Commands
 
         public override string Calculate()
         {
-            Uri url = null;
-            return Uri.TryCreate(path, UriKind.RelativeOrAbsolute, out url) ? new WebClient().DownloadString(path) : File.ReadAllText(path);
+            // Previously any path was treated as a URL (Uri.TryCreate with RelativeOrAbsolute accepts almost anything),
+            // so local files could never be read.
+            if (Helpers.Platform.IsHttpUrl(path))
+            {
+                using (HttpClient client = new HttpClient())
+                {
+                    return client.GetStringAsync(path).GetAwaiter().GetResult();
+                }
+            }
+
+            return File.ReadAllText(Helpers.Platform.ResolvePath(path, KScript()?.GetFileDirectory()));
         }
 
         public override void Validate() { }

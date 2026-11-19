@@ -1,4 +1,4 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 
 namespace KScript.Commands
 {
@@ -26,19 +26,28 @@ namespace KScript.Commands
             string firstNumber = KScript().GetStringHandler().Format(firstValue),
                 secondNumber = KScript().GetStringHandler().Format(secondValue);
 
-            switch (lastValue.ToLower())
+            switch ((lastValue ?? "lt").Trim().ToLowerInvariant())
             {
                 case "mt":
-                    return ToBoolString(double.Parse(firstNumber) > double.Parse(secondNumber));
+                    return ToBoolString(ParseNumber(firstNumber) > ParseNumber(secondNumber));
                 case "mte":
-                    return ToBoolString(double.Parse(firstNumber) >= double.Parse(secondNumber));
+                    return ToBoolString(ParseNumber(firstNumber) >= ParseNumber(secondNumber));
                 case "lt":
-                    return ToBoolString(double.Parse(firstNumber) < double.Parse(secondNumber));
+                    return ToBoolString(ParseNumber(firstNumber) < ParseNumber(secondNumber));
                 case "lte":
-                    return ToBoolString(double.Parse(firstNumber) <= double.Parse(secondNumber));
+                    return ToBoolString(ParseNumber(firstNumber) <= ParseNumber(secondNumber));
                 default:
-                    return ToBoolString(double.Parse(firstNumber) < double.Parse(secondNumber));
+                    return ToBoolString(ParseNumber(firstNumber) < ParseNumber(secondNumber));
             }
+        }
+
+        private double ParseNumber(string value)
+        {
+            if (!double.TryParse(value?.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double result))
+            {
+                throw new KScriptExceptions.KScriptException(this, $"@more_less expects numbers but got '{value}'.");
+            }
+            return result;
         }
 
         public override void Validate()

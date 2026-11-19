@@ -1,4 +1,4 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 using KScript.KScriptObjects;
 using System;
 
@@ -14,7 +14,7 @@ namespace KScript.Arguments
         public override bool Run()
         {
             Out(prompt, () => !string.IsNullOrEmpty(prompt));
-            Console.ReadKey(true);
+            Helpers.Platform.WaitForKey();
             return true;
         }
 

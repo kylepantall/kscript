@@ -2,7 +2,6 @@
 using KScript.Arguments.Array;
 using KScript.MultiArray;
 using System.Xml;
-using CsQuery.ExtensionMethods;
 
 namespace KScript.KScriptParserHandlers
 {

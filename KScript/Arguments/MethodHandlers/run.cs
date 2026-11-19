@@ -1,4 +1,4 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System.Diagnostics;
 
 namespace KScript.Arguments
@@ -20,14 +20,9 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            if (string.IsNullOrWhiteSpace(HandleCommands(args)))
-            {
-                Process.Start(HandleCommands(file));
-            }
-            else
-            {
-                Process.Start(HandleCommands(file), args);
-            }
+            // Uses the platform's default handler, so files, directories and URLs open on Windows, Linux and macOS.
+            string target = Helpers.Platform.ResolvePath(HandleCommands(file), KScript().GetFileDirectory());
+            Helpers.Platform.Open(target, HandleCommands(args ?? string.Empty));
 
             return true;
         }

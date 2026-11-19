@@ -24,7 +24,9 @@ namespace KScript.Commands
 
             return KScript().GetDef(this.id).StateLog.FindUsingValue((date) =>
             {
-                return date.ToString("dd/MM/yyyy hh:mm:ss") == DateTime.Parse(timestamp).ToString("dd/MM/yyyy hh:mm:ss");
+                // Compare to the second. The previous "hh" format was 12-hour, so 1 AM and 1 PM compared as equal.
+                DateTime target = DateTime.Parse(timestamp, System.Globalization.CultureInfo.CurrentCulture);
+                return date.ToString("yyyy-MM-dd HH:mm:ss") == target.ToString("yyyy-MM-dd HH:mm:ss");
             });
         }
         public override void Validate() { }

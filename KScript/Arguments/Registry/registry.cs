@@ -1,4 +1,5 @@
-﻿using KScript.KScriptExceptions;
+#pragma warning disable CA1416 // Run() checks OperatingSystem.IsWindows() before touching the registry.
+using KScript.KScriptExceptions;
 using Microsoft.Win32;
 using System;
 using System.Linq;
@@ -29,6 +30,11 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                throw new KScriptException(this, "<registry> is only supported on Windows.");
+            }
+
             Registry.SetValue(key, subkey, Contents, _type);
             return true;
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace KScript.Commands
 {
@@ -24,7 +24,7 @@ namespace KScript.Commands
             }
             else
             {
-                if (Enum.TryParse(type, out value))
+                if (Enum.TryParse(type?.Trim(), true, out value))
                 {
                     this.type = value;
                 }
@@ -39,7 +39,9 @@ namespace KScript.Commands
         {
             filename = 0,
             directory = 1,
-            fullpath = 2
+            fullpath = 2,
+            extension = 3,
+            name = 4
         }
 
 
@@ -53,6 +55,12 @@ namespace KScript.Commands
                     return System.IO.Path.GetFileName(path);
                 case path_type.directory:
                     return System.IO.Path.GetDirectoryName(path);
+                case path_type.fullpath:
+                    return System.IO.Path.GetFullPath(path);
+                case path_type.extension:
+                    return System.IO.Path.GetExtension(path);
+                case path_type.name:
+                    return System.IO.Path.GetFileNameWithoutExtension(path);
                 default:
                     return _path;
             }

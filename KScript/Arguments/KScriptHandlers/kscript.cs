@@ -1,4 +1,4 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System.Globalization;
 
 namespace KScript.Arguments
@@ -27,7 +27,7 @@ namespace KScript.Arguments
 
         public override bool Run()
         {
-            KScript().Properties.Quiet = ToBool(quiet);
+            KScript().Properties.Quiet = KScript().Properties.ForceQuiet || ToBool(quiet);
             KScript().Properties.WaitOnFinish = ToBool(on_finish_wait);
             KScript().Properties.DynamicDefs = ToBool(dynamic_defs);
             KScript().Properties.ThrowAllExceptions = ToBool(throw_exceptions);

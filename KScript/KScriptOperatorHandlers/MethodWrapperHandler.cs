@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using KScript.Arguments;
+
 using KScript.Document;
 
 namespace KScript.KScriptOperatorHandlers
@@ -8,14 +8,13 @@ namespace KScript.KScriptOperatorHandlers
     {
         public MethodWrapperHandler(KScriptContainer container) : base(container) { }
 
-        public override bool CanRun(KScriptObject obj)
-        {
-            return typeof(KScriptObjectLoop).IsAssignableFrom(obj.GetType());
-        }
+        // Previously this matched KScriptObjectLoop, so <method> bodies ran inline and <for> loops
+        // could be dispatched here and crash.
+        public override bool CanRun(KScriptObject obj) => obj is KScriptMethodWrapper;
 
         public override void Execute(KScriptObject obj, List<IKScriptDocumentNode> Nodes, KScriptContainer Container)
         {
-            KScriptMethodWrapper objX = obj as KScriptMethodWrapper;
+            KScriptMethodWrapper objX = (KScriptMethodWrapper)obj;
             Container.GetObjectStorageContainer().Add(Global.GlobalIdentifiers.CALLS, objX, objX.name, Nodes);
         }
     }

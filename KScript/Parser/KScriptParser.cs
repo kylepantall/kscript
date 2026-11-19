@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -241,9 +241,15 @@ namespace KScript
                 {
                     obj["Contents"] = item.ChildNodes.OfType<XmlCDataSection>().ToArray()[0].Data;
                 }
+                else if (item.ChildNodes.OfType<XmlElement>().Any())
+                {
+                    // Keep markup when the def holds XML (e.g. data for @xpath).
+                    obj["Contents"] = item.InnerXml;
+                }
                 else
                 {
-                    obj["Contents"] = item.InnerXml;
+                    // Text only: use the decoded text, so '&gt;' / '&amp;' become '>' / '&' (needed for '=>' and '->').
+                    obj["Contents"] = item.InnerText;
                 }
                 container[((def)obj).id] = obj as def;
             }

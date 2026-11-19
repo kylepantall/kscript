@@ -1,4 +1,4 @@
-﻿using KScript.KScriptExceptions;
+using KScript.KScriptExceptions;
 using System;
 
 namespace KScript.Arguments
@@ -11,7 +11,7 @@ namespace KScript.Arguments
     {
         public override bool Run()
         {
-            Console.Clear();
+            Helpers.Platform.ClearConsole();
             return true;
         }
         public override string UsageInformation() => "Used to clear the console.";

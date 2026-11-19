@@ -1,4 +1,4 @@
-﻿using KScript.Handlers;
+using KScript.Handlers;
 using KScript.KScriptObjects;
 using System;
 using System.Linq;
@@ -130,7 +130,7 @@ namespace KScript.KScriptTypes
         /// </summary>
         /// <param name="input">String to evaluate</param>
         /// <returns>If input is numeric (negatives and positives)</returns>
-        public bool IsNumber(string input) => float.TryParse(input, out _);
+        public bool IsNumber(string input) => double.TryParse(input, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _);
 
         /// <summary>
         /// Checks a haystack for a given value. Determines if value is within the haystack.
@@ -154,8 +154,9 @@ namespace KScript.KScriptTypes
             if (ParentContainer == null)
                 return;
 
-            var value = ParentContainer.GetStringHandler().Format(val);
-            Console.Out.Write(handleCmds ? KScriptCommandHandler.HandleCommands(value, ParentContainer, GetBaseObject()) : value);
+            Console.Out.Write(handleCmds
+                ? KScriptCommandHandler.Interpolate(val, ParentContainer, GetBaseObject())
+                : ParentContainer.GetStringHandler().Format(val));
         }
 
         public void Out(object obj) => Out(obj.ToString());

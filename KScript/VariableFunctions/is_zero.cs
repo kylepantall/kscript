@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 
 namespace KScript.VariableFunctions
 {
@@ -8,7 +8,7 @@ namespace KScript.VariableFunctions
 
         public override string Evaluate(params string[] args)
         {
-            double num = double.Parse(GetDef().Contents);
+            double num = double.Parse(GetDef().Contents, System.Globalization.CultureInfo.InvariantCulture);
             return ToBoolString(num <= 0);
         }
 
