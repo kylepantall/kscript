@@ -13,6 +13,7 @@ namespace KScript
         {
             Console.WriteLine("Usage: kscript <script.xml> [script arguments]                Run a script ($args holds the arguments).");
             Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
+            Console.WriteLine("       kscript migrate <file-or-folder>... [--dry-run]      Rewrite KScript 1 scripts as KScript 2.");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
@@ -129,6 +130,11 @@ namespace KScript
             if (args.Length > 0 && args[0] == "ide")
             {
                 return KScript.Ide.IdeCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
+            }
+
+            if (args.Length > 0 && args[0] == "migrate")
+            {
+                return KScript.Migration.MigrateCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
             }
 
             if (args.Length > 0 && args[0] == "check")

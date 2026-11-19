@@ -4,7 +4,7 @@
 
 KScript is a scripting language written in XML. Scripts run on a small .NET 8 interpreter on Windows, Linux and macOS, and `kscript serve` runs a folder of HTML and Markdown templates as a website.
 
-This is KScript 2: expressions, `{ }` interpolation, typed values, lambdas and pipes, functions you can call like commands, and packages you import for what a script needs. Scripts written for KScript 1 don't run unchanged; the error for each old element or command names what to write instead.
+This is KScript 2: expressions, `{ }` interpolation, typed values, lambdas and pipes, functions you can call like commands, and packages you import for what a script needs. Scripts written for KScript 1 don't run unchanged: `kscript migrate` rewrites them (see [Moving from KScript 1](#moving-from-kscript-1)), and the error for each old element or command names what to write instead.
 
 ## A first script
 
@@ -97,7 +97,7 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 | `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
 | `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/` | Packages: each registers its elements, commands and methods, with their documentation. |
 | `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
-| `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript ide` and `kscript update`. |
+| `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript migrate` (`Migration/`), `kscript ide` and `kscript update`. |
 | `KScriptApp/` | The `kscript` command line app. |
 | `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
 | `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |
@@ -396,7 +396,34 @@ hint: Use it in a page: <{{ kebab }}-card />
 - `$os.name` is `windows`, `linux` or `macos`, and `$os.home`, `$os.temp` and `$os.separator` are there too; `$env.HOME` reads an environment variable.
 - Numbers are always parsed and printed with `.` as the decimal separator, whatever the machine's language.
 
+## Moving from KScript 1
+
+`kscript migrate` rewrites KScript 1 scripts as KScript 2:
+
+```sh
+kscript migrate old-script.xml            # rewrite one script
+kscript migrate scripts/                  # every KScript script under a folder
+kscript migrate old-script.xml --dry-run  # print the result instead of changing the file
+```
+
+Each file is changed in place, and the original is kept next to it as `old-script.xml.v1.bak` (`--no-backup` skips that). Files that already look like KScript 2, and `.xml` files that aren't scripts, are left alone. The rewrite edits the original text, so comments and layout stay as they were. For example:
+
+| KScript 1 | KScript 2 |
+| --- | --- |
+| `<def id="max">0</def>` | `<let name="max" value="0" />` |
+| `<update to="max">~people[$i]['age']</update>` | `<set name="max" value="$people[$i].age" />` |
+| `<if condition="@more_less($n,'mt',$max)">` | `<if test="$n gt $max">` |
+| `<for to="i" math="@math('$i+1')" while="@more_less($i,'lt',@acount('~people'))">` | `<for each="i" in="0..$people->count()">` |
+| `<afor from="files" to="item">` | `<for each="item" in="$files">` |
+| `<method name="greet" params="who">` … `$greet.who` | `<fn name="greet" params="who">` … `$who` |
+| `<call method="greet" args="'Bob'" />` | `<call fn="greet" args="'Bob'" />` |
+| `@getfiles($dir, ',', '$value', '.txt')` | `@files($dir)->filter(fn($f) => ['txt']->contains($f->extension()->lower()))` |
+
+It also adds the `<import>` lines for the packages the script now uses, and declares at the top any variable that a KScript 1 script first set inside a block, since KScript 2 variables belong to the block they are declared in.
+
+Some things have no automatic replacement, such as `<registry>`, `<watcher>`, `<func>` and `@xpath()`. Those are left as they were, with a `<!-- kscript migrate: ... -->` comment above them that says what to do, and the command lists each one with its line number. Run `kscript check` afterwards to look over the result.
+
 ## Roadmap
 
-KScript 2 is landing in steps: `kscript migrate` to rewrite KScript 1 scripts, pages running on the same interpreter as scripts, desktop windows (`KScript.UI`), and language models (`KScript.AI`).
+KScript 2 is landing in steps: pages running on the same interpreter as scripts, desktop windows (`KScript.UI`), and language models (`KScript.AI`).
 
