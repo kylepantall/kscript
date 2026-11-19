@@ -49,4 +49,4 @@ jobs:
         run: dotnet test KScript.sln --configuration Release --no-build --verbosity normal
 
       - name: Run sample script
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll DebugScripts/filterOldestFromArray.xml -s -nowait
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll "Example Scripts/Find Oldest Person.xml" -s -nowait

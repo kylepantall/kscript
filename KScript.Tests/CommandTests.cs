@@ -32,6 +32,12 @@ public class CommandTests
         Assert.Equal(expected, Echo(expression));
     }
 
+    [Fact]
+    public void Tie_WrapsEachValue()
+    {
+        Assert.Contains("<tie>Hello</tie>", Echo("$values", "<def id=\"values\">@tie('Hello','Maybe','10','20')</def>"));
+    }
+
     [Theory]
     [InlineData("@math('1+2')", "3")]
     [InlineData("@math('7/2')", "3.5")]

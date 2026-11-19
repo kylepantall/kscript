@@ -22,7 +22,7 @@ KScript is still in active development, and its syntax may change between versio
 
 Add `print_info="yes"` to the `<kscript>` tag to print extra information while the script runs.
 
-More examples live in [`DebugScripts/`](DebugScripts) and [`Example Scripts/`](Example%20Scripts).
+More examples live in [`Example Scripts/`](Example%20Scripts).
 
 ## Building and running
 
@@ -64,14 +64,14 @@ Anything after the script path is available to the script through `@args()`.
 | `KScript/` | The language: parser, interpreter, elements (`Arguments/`), `@commands` (`Commands/`), value methods, and the `kscript serve` page engine (`Pages/`). |
 | `KScriptApp/` | The `KScript` command line app that runs a script file. |
 | `KScript.Tests/` | xUnit test suite. |
-| `DebugScripts/`, `Example Scripts/` | Sample scripts. |
+| `Example Scripts/` | Sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 
 ## Tests and CI
 
 `KScript.Tests` is an xUnit project covering the command parser, commands, control flow, variables, value methods, pipes and lambdas, platform helpers, `kscript serve` pages, and the sample scripts. Run it with `dotnet test KScript.sln`. The tests capture console output, so they run one at a time rather than in parallel.
 
-Every push to `master` and every pull request runs [the CI workflow](.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode and then runs `DebugScripts/filterOldestFromArray.xml` on three platforms:
+Every push to `master` and every pull request runs [the CI workflow](.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode and then runs `Example Scripts/Find Oldest Person.xml` on three platforms:
 
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.

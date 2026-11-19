@@ -36,5 +36,4 @@
     </for>
 
     <echo>~people[$maxPerson]['name'] is the oldest at $max years old.</echo>
-    <!-- <echo>@pretty_print(~person[$maxPerson]['name'])</echo> -->
 </kscript>
