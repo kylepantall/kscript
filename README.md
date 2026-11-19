@@ -77,5 +77,42 @@ Commands are written `@name(argument, argument, ...)`. Arguments can be `'quoted
 
 An `@` that isn't followed by a name and `(` is plain text, so e-mail addresses and apostrophes in text are safe.
 
+<h2>Methods, pipes and lambdas</h2>
+
+Any value (a variable, a `'quoted string'`, a number or a command's result) can have methods called on it with `->`. Calls can be chained and can take arguments:
+
+```xml
+<echo>$name->trim()->upper()</echo>
+<echo>'a.b.c'->replace('.', '/')</echo>
+<echo>3.14159->round(2)</echo>
+<echo>@math('2+2')->mul(10)</echo>
+<for to="i" while="$i->lt(10)" math="$i->increment()"> ... </for>
+```
+
+Values are typed on use: a value is a number if it parses as one, a bool if it is yes/no/true/false, and a string otherwise (`$x->type()` tells you which). Calling a number method on text gives a clear error. On a variable, `increment()`/`decrement()` also update the variable; on other values they just return the result.
+
+| Kind | Methods |
+| --- | --- |
+| Any | `type` `length` `is_number` `is_bool` `is_empty` `has_value` `is_url` `equals(x, ignore_case?)` `default(x)` `call(args...)` |
+| String | `upper` `lower` `trim` `trim_start` `trim_end` `reverse` `contains(x)` `starts_with(x)` `ends_with(x)` `index_of(x)` `replace(a, b)` `substring(start, len?)` `char_at(i)` `split(sep, i)` `count(x)` `repeat(n)` `pad_left(w, c?)` `pad_right(w, c?)` |
+| Number | `add` `sub` `mul` `div` `mod` `pow` `round(d?)` `floor` `ceil` `abs` `min` `max` `lt` `lte` `mt` `mte` `between(a, b)` `is_zero` `not_zero` `positive` `negative` `increment(by?)` `decrement(by?)` |
+| Bool | `not` `and(x)` `or(x)` `xor(x)` |
+
+`|>` passes a value on to a method, a command (as its first argument) or a lambda. Lambdas are written `fn($x) => expression`:
+
+```xml
+<echo>$name |> trim() |> upper()</echo>
+<echo>$csv |> @split(',', '1')</echo>
+<echo>$name |> fn($s) => $s->lower()->reverse()</echo>
+
+<def id="shout">fn($s) => $s->upper()->replace('.', '!')</def>
+<echo>'hi.' |> $shout</echo>
+<echo>$shout->call('hey.')</echo>
+```
+
+A lambda body is one expression; use brackets to group: `fn($n) => ($n->mul(2) |> fn($m) => $m->add(1))`. Lambda parameters are only visible inside the lambda.
+
+Variables are resolved after a line is parsed, so values containing `,`, `)` or `'` are always passed through intact and are never run as commands.
+
 <h2>Additional Information</h2>
 Further documentation is still within development. 

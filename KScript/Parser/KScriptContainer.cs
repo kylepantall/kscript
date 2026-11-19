@@ -45,8 +45,7 @@ namespace KScript
 
         public void ClearGlobalValues(string key) => UniqueStore.Remove(key);
 
-        public string HandleCommand(string input) => KScriptCommandHandler.HandleCommands(this.GetStringHandler()
-            .Format(input), this, null);
+        public string HandleCommand(string input) => KScriptCommandHandler.Interpolate(input, this, null);
 
         /// <summary>
         /// Adds a global value at the key and ID

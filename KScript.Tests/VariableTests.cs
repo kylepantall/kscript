@@ -94,3 +94,49 @@ public class VariableTests
             ScriptRunner.RunBody("<input to=\"name\" type=\"text\">Name? </input><echo>Hello, $name!</echo>", input: "Kai\n"));
     }
 }
+
+public class ParserResolvedVariableTests
+{
+    [Fact]
+    public void CommasInValues_DoNotSplitArguments()
+    {
+        // Variables used to be substituted as text before parsing, so "a,b,c" became three arguments.
+        Assert.Equal("5\n", ScriptRunner.RunBody("<def id=\"csv\">a,b,c</def><echo>@length($csv)</echo>"));
+        Assert.Equal("b\n", ScriptRunner.RunBody("<def id=\"csv\">a,b,c</def><echo>@split($csv, ',', '1')</echo>"));
+    }
+
+    [Fact]
+    public void QuotesInValues_DoNotBreakCommands()
+    {
+        Assert.Equal("it's\n", ScriptRunner.RunBody("<def id=\"q\">IT'S</def><echo>@to_lower($q)</echo>"));
+        Assert.Equal("it's\n", ScriptRunner.RunBody("<def id=\"q\">IT'S</def><echo>$q->lower()</echo>"));
+    }
+
+    [Fact]
+    public void BracketsInValues_DoNotBreakCommands()
+    {
+        Assert.Equal("a) b\n", ScriptRunner.RunBody("<def id=\"v\">A) B</def><echo>@to_lower($v)</echo>"));
+    }
+
+    [Fact]
+    public void ValuesAreNotReinterpretedAsCommands()
+    {
+        string guid = ScriptRunner.RunBody("<def id=\"n\">0</def><update to=\"n\">@guid()</update><echo>@equals($n, $n)</echo>");
+        Assert.Equal("yes\n", guid);
+    }
+
+    [Fact]
+    public void Update_EvaluatesCommandsOnce()
+    {
+        // <update> used to store the raw command, so @guid() gave a new value each time $n was read.
+        string output = ScriptRunner.RunBody("<def id=\"n\">0</def><update to=\"n\">@guid()</update><echo>$n</echo><echo>$n</echo>");
+        string[] lines = output.Trim().Split('\n');
+        Assert.Equal(lines[0], lines[1]);
+    }
+
+    [Fact]
+    public void XmlEntitiesInDefs_AreDecoded()
+    {
+        Assert.Equal("a &amp; b > c\n".Replace("&amp;", "&"), ScriptRunner.RunBody("<def id=\"v\">a &amp; b &gt; c</def><echo>$v</echo>"));
+    }
+}

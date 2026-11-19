@@ -1,4 +1,4 @@
-﻿using System.Xml;
+using System.Xml;
 using KScript.Arguments;
 using KScript.Handlers;
 using KScript.KScriptExceptions;
@@ -137,7 +137,7 @@ namespace KScript
         /// <returns>String with handled commands</returns>
         public string HandleCommands(string value)
         {
-            return KScriptCommandHandler.HandleCommands(KScript().GetStringHandler().Format(value), KScript(), this);
+            return KScriptCommandHandler.Interpolate(value, KScript(), this);
         }
 
         /// <summary>
