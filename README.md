@@ -36,9 +36,34 @@ dotnet test KScript.sln
 dotnet run --project KScriptApp -- "path/to/script.xml"
 ```
 
-### Prebuilt binaries (no .NET needed)
+### Install (no .NET needed)
 
-Each release on the [Releases page](https://github.com/kylepantall/kscript/releases) has a single `kscript` file for `linux-x64`, `linux-arm64`, `osx-arm64` (Apple Silicon), `osx-x64` and `win-x64`. It includes the .NET runtime, so nothing else needs installing:
+Linux and macOS:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kylepantall/kscript/master/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/kylepantall/kscript/master/install.ps1 | iex
+```
+
+The scripts pick the right build for your OS and CPU, install it to `~/.kscript/bin` (Windows: `%LOCALAPPDATA%\Programs\kscript`) and add that folder to your PATH. On macOS they also clear the quarantine flag, since the binary isn't notarized. Set `KSCRIPT_VERSION=v0.1.0` to install a specific release, `KSCRIPT_INSTALL` to choose the folder, or `KSCRIPT_NO_MODIFY_PATH=1` to leave your PATH alone.
+
+To update later:
+
+```sh
+kscript update                    # install the latest release if it's newer
+kscript update --check            # only report whether there is one
+kscript update --version v0.1.0   # install a specific release
+kscript --version
+```
+
+`kscript update` replaces the binary in place. On Windows the running `kscript.exe` is renamed to `kscript.exe.old` and deleted the next time kscript starts. It uses `GITHUB_TOKEN` if set, to avoid GitHub's rate limit.
+
+You can also download a build by hand from the [Releases page](https://github.com/kylepantall/kscript/releases): `linux-x64`, `linux-arm64`, `osx-arm64` (Apple Silicon), `osx-x64` and `win-x64`. Each is a single `kscript` file that includes the .NET runtime:
 
 ```sh
 tar -xzf kscript-osx-arm64.tar.gz
@@ -46,7 +71,7 @@ xattr -d com.apple.quarantine kscript   # macOS only: the binary isn't notarized
 ./kscript serve "Example Sites/team"
 ```
 
-Pushing a `v*` tag builds and publishes them (`.github/workflows/release.yml`). To build one yourself:
+Pushing a `v*` tag (e.g. `v0.1.0`) builds and publishes them, stamping the tag as the binary's version (`.github/workflows/release.yml`). To build one yourself:
 
 ```sh
 dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \

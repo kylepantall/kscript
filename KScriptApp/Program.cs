@@ -40,6 +40,8 @@ namespace KScript
             Console.WriteLine("       kscript check <file-or-folder>... [--warnaserror]   Check scripts without running them.");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
+            Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
+            Console.WriteLine("       kscript --version");
             Console.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
             Console.WriteLine("Options: " + string.Join(" ", Commands()));
         }
@@ -104,6 +106,18 @@ namespace KScript
             }
 
             Console.OutputEncoding = System.Text.Encoding.UTF8;
+            KScript.Updates.SelfUpdater.CleanupPreviousBinary();
+
+            if (args.Length > 0 && (args[0] == "--version" || args[0] == "version"))
+            {
+                Console.WriteLine(KScript.Updates.SelfUpdater.CurrentVersion);
+                return 0;
+            }
+
+            if (args.Length > 0 && args[0] == "update")
+            {
+                return KScript.Updates.SelfUpdater.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
+            }
 
             if (args.Length > 0 && args[0] == "check")
             {
