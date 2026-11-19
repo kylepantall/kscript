@@ -41,7 +41,7 @@ namespace KScript
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
-            Console.WriteLine("       kscript --version");
+            Console.WriteLine("       kscript --version | --help");
             Console.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
             Console.WriteLine("Options: " + string.Join(" ", Commands()));
         }
@@ -114,6 +114,12 @@ namespace KScript
                 return 0;
             }
 
+            if (args.Length > 0 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help" || args[0] == "-?" || args[0] == "/?"))
+            {
+                PrintUsage();
+                return 0;
+            }
+
             if (args.Length > 0 && args[0] == "update")
             {
                 return KScript.Updates.SelfUpdater.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
@@ -178,6 +184,16 @@ namespace KScript
             if (adminPriv)
             {
                 RestartWithAdminPriviledges(args);
+            }
+
+            if (args[0].StartsWith("-", StringComparison.Ordinal))
+            {
+                bool known = Commands().Any(c => string.Equals(c.Split('=')[0], args[0].Split('=')[0], StringComparison.OrdinalIgnoreCase));
+                Console.Error.WriteLine(known
+                    ? $"No script given. The script path comes first, e.g. kscript script.xml {args[0]}"
+                    : $"Unknown option '{args[0]}'.");
+                Console.Error.WriteLine("Run kscript --help for usage.");
+                return 1;
             }
 
             string path = ResolveScriptPath(args[0]);

@@ -71,7 +71,7 @@ xattr -d com.apple.quarantine kscript   # macOS only: the binary isn't notarized
 ./kscript serve "Example Sites/team"
 ```
 
-Pushing a `v*` tag (e.g. `v0.1.0`) builds and publishes them, stamping the tag as the binary's version (`.github/workflows/release.yml`). To build one yourself:
+To build one yourself from source:
 
 ```sh
 dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
