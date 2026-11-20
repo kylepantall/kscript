@@ -13,6 +13,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
     <ProjectReference Include="..\KScript.Markdown\KScript.Markdown.csproj" />
   </ItemGroup>

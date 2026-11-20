@@ -2,6 +2,7 @@ using System.Text;
 
 using KScript.Markdown;
 
+using Markdig.Extensions.Mathematics;
 using Markdig.Extensions.Tables;
 using Markdig.Extensions.TaskLists;
 using Markdig.Syntax;
@@ -17,7 +18,11 @@ namespace KScript.Terminal
     {
         public static string Render(string markdown, bool colour)
         {
-            MarkdownDocument doc = Markdig.Markdown.Parse(TextLayoutOf(markdown), MarkdownText.Pipeline);
+            return Render(Markdig.Markdown.Parse(TextLayoutOf(markdown), MarkdownText.Pipeline), colour);
+        }
+
+        internal static string Render(MarkdownDocument doc, bool colour)
+        {
             var output = new StringBuilder();
             var r = new Renderer(output, colour);
             r.Blocks(doc, string.Empty);
@@ -164,6 +169,9 @@ namespace KScript.Terminal
                     case CodeInline code:
                         sb.Append(Style(code.Content, "36"));
                         break;
+                    case MathInline math:
+                        sb.Append(Style(math.Content.ToString(), "36"));
+                        break;
                     case EmphasisInline em:
                     {
                         string text = Inlines(em);
@@ -182,7 +190,7 @@ namespace KScript.Terminal
                         sb.Append(Style(auto.Url, "4"));
                         break;
                     case TaskList task:
-                        sb.Append(task.Checked ? "[x] " : "[ ] ");
+                        sb.Append(task.Checked ? "[x]" : "[ ]");
                         break;
                     case LineBreakInline:
                         sb.Append('\n');

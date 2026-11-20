@@ -133,6 +133,15 @@ namespace KScript.Runtime
             return In.ReadLine();
         }
 
+        /// <summary>Waits for a key press without showing it (the terminal's, unless a host stands in for it).</summary>
+        public virtual ConsoleKeyInfo ReadKey() => System.Console.ReadKey(true);
+
+        /// <summary>Clears the terminal.</summary>
+        public virtual void ClearScreen() => System.Console.Clear();
+
+        /// <summary>The width of the terminal in characters.</summary>
+        public virtual int TerminalWidth => System.Console.WindowWidth;
+
         private readonly List<TextWriter> captures = new List<TextWriter>();
         private readonly List<TextReader> inputs = new List<TextReader>();
 
