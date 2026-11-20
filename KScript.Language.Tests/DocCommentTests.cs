@@ -113,5 +113,31 @@ namespace KScript.Language.Tests
             Assert.Contains("nope", AssertSingle(a, "KS4007").Message);
             Assert.Contains("Use @g.", AssertSingle(a, "KS4008").Message);
         }
+
+        [Fact]
+        public void ExamplesCanStartOnTheTagLineAndSeeAlsoIsListed()
+        {
+            DocComment doc = DocComment.Parse("Adds.\n@example @add(1, 2)\n@see sum\n@see total");
+            Assert.Equal("@add(1, 2)", doc.Examples.Single());
+            string md = doc.ToMarkdown();
+            Assert.Contains("**See also** sum, total", md);
+        }
+
+        [Fact]
+        public void ADocumentedLambdaKeepsItsSignatureAndItsDocs()
+        {
+            DocumentAnalysis a = Analyze(Script("<!--- Doubles a number. -->\n<let name=\"twice\" value=\"fn($x) => $x * 2\" />"));
+            Symbol twice = a.Symbols.Single(s => s.Name == "twice");
+            Assert.Equal("fn($x)\n\nDoubles a number.", twice.Description);
+        }
+
+        [Fact]
+        public void APlainCommentHasNoDocText()
+        {
+            MarkupDocument doc = MarkupParser.Parse("<kscript><!-- plain --></kscript>", DocumentKind.Script);
+            MarkupComment comment = doc.RootElements.Single().Children.OfType<MarkupComment>().Single();
+            Assert.False(comment.IsDoc);
+            Assert.Null(comment.DocText);
+        }
     }
 }

@@ -53,9 +53,6 @@ namespace KScript.Http
 
         public Frame Top => frames.Count > 0 ? frames[^1] : throw new KScriptException("Routes must be inside <KScript.Routes>.", "Http");
 
-        /// <summary>True before the file's &lt;KScript.Routes&gt; has started.</summary>
-        public bool AtFileStart => frames.Count == 0;
-
         public void Push(string prefix, string middleware, string namePrefix, bool? api)
         {
             if (frames.Count == 0)
