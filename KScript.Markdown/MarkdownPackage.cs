@@ -97,7 +97,7 @@ namespace KScript.Markdown
             p.Command("markdown", "text", "Renders Markdown: $doc.html, $doc.title, $doc.meta (front matter) and $doc.text.", KType.Map,
                 c => MarkdownText.Document(c.Str(0)), "<let name=\"post\" value=\"@read_text('hello.md') |> @markdown()\" />");
             p.Command("read_markdown", "path", "Reads a Markdown file: $doc.html, $doc.title, $doc.meta (front matter) and $doc.text. Relative paths are from the script's folder.", KType.Map,
-                c => MarkdownText.Document(File.ReadAllText(Path.GetFullPath(Path.Combine(c.Module?.Directory ?? c.Host.WorkingDirectory, c.Str(0))))),
+                c => MarkdownText.Document(File.ReadAllText(c.Host.ResolvePath(c.Str(0), c.Module?.Directory ?? c.Host.WorkingDirectory))),
                 "<let name=\"post\" value=\"@read_markdown('posts/hello.md')\" />");
             p.Method(KType.String, "markdown", "", "The text rendered from Markdown to HTML.", KType.String, (t, c) => MarkdownText.ToHtml((string)t));
             p.Method(KType.String, "markdown_escape", "", "The text escaped so Markdown shows it as written.", KType.String, (t, c) => MarkdownText.Escape((string)t));

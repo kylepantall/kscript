@@ -5,10 +5,10 @@ using KScript.Language.Catalog;
 namespace KScript.Language.Tests
 {
     /// <summary>
-    /// Keeps the language server in step with the <c>kscript serve</c> page engine (KScript.Web/Pages). The engine's
-    /// methods, commands and elements are plain switch statements, so these tests read its source: every
-    /// <c>case "name":</c> must be known to the catalog, with a matching receiver type. When one fails after a page
-    /// engine change, add it to a package (usually KScript.Core) so scripts and pages agree.
+    /// Keeps the language server in step with the <c>kscript serve</c> page engine (KScript.Web/Pages). Pages run their
+    /// expressions on the KScript.Core interpreter, so methods and commands come from packages; the elements the
+    /// renderer handles itself are a switch statement, so these tests read its source: every <c>case "name":</c>
+    /// must be an element the catalog knows works in pages.
     /// </summary>
     public class PageEngineContractTests
     {
@@ -59,66 +59,6 @@ namespace KScript.Language.Tests
             return result;
         }
 
-        public static IEnumerable<object[]> EngineMethods()
-        {
-            string dir = PagesFolder();
-            if (dir == null)
-            {
-                yield break;
-            }
-            Dictionary<string, List<string>> cases = CasesByMethod(File.ReadAllText(Path.Combine(dir, "PageMethods.cs")));
-            (string Method, string Receiver)[] sections =
-            {
-                ("PageMethods.Invoke", KType.Any),
-                ("PageMethods.ListMethod", KType.List),
-                ("PageMethods.MapMethod", KType.Map),
-                ("PageMethods.NumberMethod", KType.Number),
-                ("PageMethods.DateMethod", KType.Date),
-                ("PageMethods.StringMethod", KType.String),
-            };
-            foreach ((string method, string receiver) in sections)
-            {
-                Assert.True(cases.ContainsKey(method), $"{method} not found in PageMethods.cs; update {nameof(PageEngineContractTests)}.");
-                foreach (string name in cases[method].Distinct())
-                {
-                    if (method == "PageMethods.Invoke" && name == "call")
-                    {
-                        continue; // $f->call() is on fn values, checked below.
-                    }
-                    yield return new object[] { receiver, name };
-                }
-            }
-        }
-
-        [Theory]
-        [MemberData(nameof(EngineMethods))]
-        public void EveryPageMethodIsInTheCatalog(string receiver, string name)
-        {
-            Assert.True(Catalog.GetMethods(name, receiver).Any(m => KType.Accepts(m.ReceiverType, receiver)),
-                $"The page engine has {receiver}->{name}() but the catalog doesn't. Add it to a package (usually KScript.Core).");
-        }
-
-        public static IEnumerable<object[]> EngineCommands()
-        {
-            string dir = PagesFolder();
-            if (dir == null)
-            {
-                yield break;
-            }
-            Dictionary<string, List<string>> cases = CasesByMethod(File.ReadAllText(Path.Combine(dir, "PageMethods.cs")));
-            foreach (string name in cases["PageCommands.Invoke"].Distinct())
-            {
-                yield return new object[] { name };
-            }
-        }
-
-        [Theory]
-        [MemberData(nameof(EngineCommands))]
-        public void EveryPageCommandIsInTheCatalog(string name)
-        {
-            Assert.True(Catalog.GetCommand(name) != null, $"The page engine has @{name}() but the catalog doesn't. Add it to a package (usually KScript.Core).");
-        }
-
         public static IEnumerable<object[]> EngineElements()
         {
             string dir = PagesFolder();
@@ -150,8 +90,6 @@ namespace KScript.Language.Tests
             {
                 return;
             }
-            Assert.True(EngineMethods().Count() > 50);
-            Assert.True(EngineCommands().Count() > 10);
             Assert.True(EngineElements().Count() > 10);
         }
     }

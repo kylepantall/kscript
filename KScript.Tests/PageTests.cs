@@ -1,4 +1,5 @@
 using KScript.Pages;
+using KScript.Runtime;
 
 namespace KScript.Tests;
 
@@ -33,8 +34,8 @@ public class PageExpressionTests
 {
     private static object Eval(string expr, params (string Name, object Value)[] vars)
     {
-        var scope = new PageScope();
-        foreach (var (name, value) in vars) scope.Declare(name, PageValues.From(value));
+        var scope = new Scope();
+        foreach (var (name, value) in vars) scope.Declare(name, Values.From(value));
         return PageEvaluator.Evaluate(expr, scope, new PageContext(Path.GetTempPath()));
     }
 
@@ -76,7 +77,7 @@ public class PageExpressionTests
     [Fact]
     public void Lists_maps_lambdas_and_pipes()
     {
-        var people = PageValues.From(Newtonsoft.Json.Linq.JToken.Parse("[{\"name\":\"Joan\",\"age\":82},{\"name\":\"Ellie\",\"age\":12},{\"name\":\"Simon\",\"age\":42}]"));
+        var people = Values.ParseJson("[{\"name\":\"Joan\",\"age\":82},{\"name\":\"Ellie\",\"age\":12},{\"name\":\"Simon\",\"age\":42}]");
         Assert.Equal("Simon, Joan", Eval("$people->filter(fn($p) => $p.age ge 18)->sort_by(fn($p) => $p.age)->map(fn($p) => $p.name)->join(', ')", ("people", people)));
         Assert.Equal("Joan", Eval("($people |> max_by(fn($p) => $p.age)).name", ("people", people)));
         Assert.Equal(3d, Eval("$people |> count()", ("people", people)));
@@ -100,10 +101,10 @@ public class PageExpressionTests
     }
 
     [Theory]
-    [InlineData("$x = 3", "can't be used here")]
+    [InlineData("$x = 3", "Assignment isn't allowed here")]
     [InlineData("$a && $b", "'and'")]
     [InlineData("name", "$name")]
-    [InlineData("1 +", "Unexpected")]
+    [InlineData("1 +", "Expected an expression")]
     public void Helpful_syntax_errors(string expr, string fragment)
     {
         var ex = Assert.Throws<PageException>(() => Eval(expr, ("x", 1d), ("a", true), ("b", true)));
@@ -120,7 +121,7 @@ public class PageExpressionTests
     [Fact]
     public void Runaway_recursion_is_stopped()
     {
-        var scope = new PageScope();
+        var scope = new Scope();
         var ctx = new PageContext(Path.GetTempPath());
         scope.Declare("f", PageEvaluator.Evaluate("fn($n) => @f($n + 1)", scope, ctx));
         var ex = Assert.Throws<PageException>(() => PageEvaluator.Evaluate("@f(0)", scope, ctx));
@@ -138,7 +139,7 @@ public class PageRendererTests
         Assert.Equal("<p>Hello, &lt;b&gt;Kyle&lt;/b&gt;!</p>", Render("<let name=\"who\" value=\"'<b>Kyle</b>'\" /><p>Hello, {$who}!</p>"));
         Assert.Equal("<p><b>raw</b></p>", Render("<p>{! '<b>raw</b>' }</p>"));
         Assert.Equal("<p>{ literal }</p>", Render("<p>{{ literal }}</p>"));
-        Assert.Equal("<p>O&#39;Brien, it's fine</p>", Render("<let name=\"n\" value=\"'O\\'Brien'\" /><p>{$n}, it's fine</p>"));
+        Assert.Equal("<p>O&#39;Brien, it's fine</p>", Render("<let name=\"n\">\"O'Brien\"</let><p>{$n}, it's fine</p>"));
     }
 
     [Fact]
@@ -418,7 +419,7 @@ public class PageLiveTests
 
     private static PageResult Event(TempSite site, string page, string block, int handler, string state, string args = null, Dictionary<string, object> binds = null)
     {
-        var json = PageValues.ToJsonString(new Dictionary<string, object>
+        var json = Values.ToJson(new Dictionary<string, object>
         {
             ["page"] = "/" + Path.GetFileNameWithoutExtension(page),
             ["block"] = block,
@@ -498,5 +499,84 @@ public class PageLiveTests
     {
         var ex = Assert.Throws<PageException>(() => PageRenderer.RenderString("<button on-click=\"x = 1\">x</button>"));
         Assert.Contains("only works inside a <live> block", ex.Message);
+    }
+
+}
+
+/// <summary>Pages run on the same interpreter as scripts: packages and scripts can be imported, and files are sandboxed.</summary>
+public class PageRuntimeTests
+{
+    [Fact]
+    public void Pages_can_import_packages()
+    {
+        using var site = new TempSite(("index.html", "<import package=\"KScript.Math\" as=\"math\" /><p>{ @math.sqrt(16) } { @math.round(2.567, 1) }</p>"));
+        Assert.Equal("<p>4 2.6</p>", site.Render("index.html").Body);
+    }
+
+    [Fact]
+    public void Pages_and_scripts_share_functions()
+    {
+        using var site = new TempSite(
+            ("lib/text.ks.xml", "<kscript>\n  <fn name=\"shout\" params=\"s\" value=\"$s->upper() + '!'\" />\n  <let name=\"greeting\" value=\"'hello'\" const=\"yes\" />\n</kscript>"),
+            ("index.html", "<import src=\"lib/text.ks.xml\" /><p>{ @shout($greeting) }</p>"),
+            ("named.html", "<import src=\"/lib/text.ks.xml\" as=\"text\" /><p>{ @text.shout('hi') }</p>"),
+            ("_components/loud.html", "<import src=\"../lib/text.ks.xml\" names=\"shout\" /><b>{ @shout($word) }</b>"),
+            ("component.html", "<loud word=\"hey\" />"));
+        Assert.Equal("<p>HELLO!</p>", site.Render("index.html").Body);
+        Assert.Equal("<p>HI!</p>", site.Render("named.html").Body);
+        Assert.Equal("<b>HEY!</b>", site.Render("component.html").Body);
+    }
+
+    [Fact]
+    public void Imports_belong_at_the_top_of_a_page()
+    {
+        using var site = new TempSite(("index.html", "<div><import package=\"KScript.Math\" /></div>"));
+        var ex = Assert.Throws<PageException>(() => site.Render("index.html"));
+        Assert.Contains("must be at the top level", ex.Message);
+        Assert.Equal("index.html:1", ex.Location);
+    }
+
+    [Fact]
+    public void Unknown_packages_are_explained()
+    {
+        using var site = new TempSite(("index.html", "<import package=\"KScript.Maths\" />"));
+        var ex = Assert.Throws<PageException>(() => site.Render("index.html"));
+        Assert.Contains("Did you mean KScript.Math?", ex.Message);
+    }
+
+    [Fact]
+    public void Pages_cannot_write_files_or_import_scripts_outside_the_site()
+    {
+        using var site = new TempSite(("write.html", "{ @write_text('x.txt', 'hi') }"), ("import.html", "<import src=\"../lib.ks.xml\" />"), ("file.html", "{ @file('.')->join('..', 'x')->read_text() }"));
+        Assert.Contains("read-only", Assert.Throws<PageException>(() => site.Render("write.html")).Message);
+        Assert.False(File.Exists(Path.Combine(site.Root, "x.txt")));
+        Assert.Contains("outside the site folder", Assert.Throws<PageException>(() => site.Render("import.html")).Message);
+        Assert.Contains("outside the site folder", Assert.Throws<PageException>(() => site.Render("file.html")).Message);
+    }
+
+    [Fact]
+    public void Files_are_read_from_the_site_folder()
+    {
+        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', '*.md')->map(fn($f) => $f->name())->join(', ') } { @exists('posts/a.md') }"));
+        Assert.Equal("a.md, b.md true", site.Render("posts/index.html").Body);
+    }
+
+    [Fact]
+    public void Errors_in_imported_scripts_say_where_they_are()
+    {
+        using var site = new TempSite(
+            ("lib.ks.xml", "<kscript>\n  <fn name=\"bad\" value=\"$nope + 1\" />\n</kscript>"),
+            ("index.html", "<import src=\"lib.ks.xml\" />\n<p>{ @bad() }</p>"));
+        var ex = Assert.Throws<PageException>(() => site.Render("index.html"));
+        Assert.Contains("lib.ks.xml:2", ex.Message);
+        Assert.Equal("index.html:2", ex.Location);
+    }
+
+    [Fact]
+    public void Endless_loops_are_stopped()
+    {
+        using var site = new TempSite(("index.html", "<let name=\"i\" value=\"0\" /><while test=\"true\"><set name=\"i\" op=\"+=\" value=\"1\" /></while>"));
+        var ex = Assert.Throws<PageException>(() => PageRenderer.RenderFile(new PageContext(site.Root) { MaxSteps = 10_000 }, "index.html"));
+        Assert.Contains("endless loop", ex.Message);
     }
 }
