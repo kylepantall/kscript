@@ -1,6 +1,6 @@
 # Routes, controllers and middleware: KScript.Http
 
-KScript.Http gives `kscript serve` a server framework in the spirit of Laravel's `routes/web.php` and `routes/api.php`. Route files map HTTP methods and paths to controllers. Controllers are ordinary `<fn>` functions that return a view, JSON or a response. Middleware runs around them for logging, CORS, auth, rate limits or your own checks.
+KScript.Http gives `kscript serve` a server framework in the spirit of Laravel's `routes/web.php` and `routes/api.php`. Route files map HTTP methods and paths to controllers. Controllers are ordinary `fn` functions that return a view, JSON or a response. Middleware runs around them for logging, CORS, auth, rate limits or your own checks.
 
 The page features you already have keep working. `kscript serve` sends each request to the routes first. Anything no route matches goes on to the site's pages and files.
 
@@ -13,78 +13,62 @@ kscript routes samples/http-app     # print the route table
 
 ## Route files
 
-A file whose root is `<KScript.Routes>` is a route file, the same way `<KScript.Window>` makes a desktop app. The root element imports KScript.Http for you. `kscript serve` loads these files from the site folder:
+A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a route file, the same way `KScript.Window` makes a desktop app. The block imports KScript.Http for you. `kscript serve` loads these files from the site folder:
 
 | File | Routes |
 | --- | --- |
-| `routes.ks.xml` or `routes.kscript` | Web routes, mounted at `/`. |
-| `api.ks.xml` or `api.kscript` | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
+| `routes.kscript` or `routes.ks.xml` | Web routes, mounted at `/`. |
+| `api.kscript` or `api.ks.xml` | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
 
 `http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)).
 
-```xml
-<!-- routes.ks.xml -->
-<KScript.Routes>
-  <import src="controllers/people.ks.xml" as="people" />
-  <import src="middleware/security.ks.xml" />
-
-  <Middleware use="secure_headers" />
-
-  <Get path="/" view="home" name="home" />
-  <Get path="/people" to="people.list" name="people.list" />
-  <Get path="/people/{id}" to="people.page" name="people.page" where="id: int" />
-  <Get path="/team" redirect="/people" status="301" />
-
-  <Get path="/ping">
-    <return value="'pong'" />
-  </Get>
-</KScript.Routes>
-```
-
-The same file in the `.kscript` format:
-
-```
+```kscript
+// routes.kscript
 KScript.Routes {
-  import "controllers/people.ks.xml" as people
-  import "middleware/security.ks.xml"
+  import "controllers/people.kscript" as people
+  import "middleware/security.kscript"
 
   Middleware(use: secure_headers)
-  Get(path: "/", view: home, name: home)
-  Get(path: "/people/{id}", to: people.page, where: "id: int")
-  Group(prefix: "/admin", middleware: "auth, log") {
-    Get(path: "/", to: people.list)
+
+  Get(path: /, view: home, name: home)
+  Get(path: /people, to: people.list, name: people.list)
+  Get(path: /people/{id}, to: people.page, name: people.page, where: id: int)
+  Get(path: /team, redirect: /people, status: 301)
+
+  Get(path: /ping) {
+    return 'pong'
   }
 }
 ```
 
 | Element | Use |
 | --- | --- |
-| `<Get>` `<Post>` `<Put>` `<Patch>` `<Delete>` `<Options>` `<Any>` | A route for that method. `<Get>` answers `HEAD` too. |
-| `<Route methods="get, post">` | A route for several methods. |
-| `<Resource path="/people" to="people">` | The usual JSON resource routes, answered by the controller's `index`, `store`, `show`, `update` and `destroy` functions (see [Resources](#resources)). |
-| `<Group prefix middleware name>` | Routes that share a path prefix, middleware or a name prefix. Groups nest. |
-| `<Middleware use="log, cors">` | Middleware for the routes after it in this file or group. |
+| `Get` `Post` `Put` `Patch` `Delete` `Options` `Any` | A route for that method. `Get` answers `HEAD` too. |
+| `Route(methods: "get, post")` | A route for several methods. |
+| `Resource(path: /people, to: people)` | The usual JSON resource routes, answered by the controller's `index`, `store`, `show`, `update` and `destroy` functions (see [Resources](#resources)). |
+| `Group(prefix, middleware, name)` | Routes that share a path prefix, middleware or a name prefix. Groups nest. |
+| `Middleware(use: "log, cors")` | Middleware for the routes after it in this file or group. |
 
 A route has a `path` and one way to answer:
 
 | Attribute | Use |
 | --- | --- |
 | `path` | `/people/{id}`. `{name?}` is optional and `{name*}` takes the rest of the path (`/files/{path*}`). |
-| `to` | The controller: a function of an imported script (`people.show`) or a `<fn>` in the route file (`show`). |
+| `to` | The controller: a function of an imported script (`people.show`) or an `fn` in the route file (`show`). |
 | `view` | Render this view with the path parameters as its variables. |
 | `redirect`, `status` | Redirect, with 302 by default. |
-| statements inside | The route's own body, like a `<fn>`: `<Get path="/ping"><return value="'pong'" /></Get>`. |
+| a `{ }` block | The route's own body, like an `fn`: `Get(path: /ping) { return 'pong' }`. |
 | `name` | A name for `@route('people.show', id: 3)`. Names must be unique. |
 | `middleware` | Middleware for this route only. |
 | `where` | Rules for parameters: `where="id: int, slug: slug"`. The rules are `number`, `int`, `alpha`, `alnum`, `slug`, `uuid`, or a regular expression in quotes. A request that breaks a rule doesn't match the route. |
 
 Routes are tried in the order they are written, and the first match wins. A path that matches but has no route for the method gets `405 Method Not Allowed` with an `Allow` header. An `OPTIONS` request gets `204` with `Allow`, which is how CORS preflights are answered (see [cors](#built-in-middleware)).
 
-The route file runs on every request, before the route is matched. So it can use `<if>` to add routes only in some cases, and its imports are new for each request, just like pages.
+The route file runs on every request, before the route is matched. So it can use `if` to add routes only in some cases, and its imports are new for each request, just like pages.
 
 ## Controllers
 
-A controller is a plain `<fn>`. Its parameters are filled in by name:
+A controller is a plain `fn`. Its parameters are filled in by name:
 
 - Path parameters: `{id}` becomes `$id`.
 - `request`: the whole request.
@@ -93,46 +77,50 @@ A controller is a plain `<fn>`. Its parameters are filled in by name:
 - `input`: the query, form and JSON fields together.
 - `query`, `form`, `headers`, `cookies`.
 
-A typed parameter is converted, so `params="id: int"` gives a number. A `<type>` maps the request data into a record, so the controller only sees data of the right shape:
+A typed parameter is converted, so `id: int` gives a number. A `type` maps the request data into a record, so the controller only sees data of the right shape:
 
-```xml
-<type name="NewPerson" fields="name: string, age?: int, role?: string" />
+```kscript
+type NewPerson(fields: "name: string, age?: int, role?: string")
 
-<fn name="store" params="json: NewPerson">   <!-- $json is a NewPerson record -->
-  …
-</fn>
+fn store(json: NewPerson) {
+  // $json is a NewPerson record
+  // …
+}
 ```
 
 Data that doesn't fit is the client's mistake, so the controller doesn't run. A body, query or form that doesn't fit gets `422 Unprocessable Entity`. API routes answer with JSON that lists every problem: `{ "error": "...", "status": 422, "problems": [{ "path": "$.age", "field": "age", "message": "..." }] }`. A path parameter that doesn't fit, such as `/people/abc` for `id: int`, gets `404`.
 
-```xml
-<!-- controllers/people.ks.xml -->
-<kscript>
-  <import package="KScript.IO" />
-  <import package="KScript.Http" />
+```kscript
+// controllers/people.kscript
+kscript {
+  import KScript.IO
+  import KScript.Http
 
-  <fn name="all" value="@read_json('data/people.json')" />
-  <fn name="find" params="id" value="@all()->find(fn($p) => $p.id == $id)" />
+  fn all() => @read_json('data/people.json')
+  fn find(id) => @all()->find(fn($p) => $p.id == $id)
 
-  <fn name="index" params="query">                 <!-- GET /api/people?role=Founder -->
-    <return value="@all() |> filter(fn($p) => $query.role == null or $p.role == $query.role)" />
-  </fn>
+  fn index(query) {
+    // GET /api/people?role=Founder
+    return @all() |> filter(fn($p) => $query.role == null or $p.role == $query.role)
+  }
 
-  <fn name="page" params="id">                     <!-- GET /people/2 -->
-    <let name="person" value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
-    <return value="@view('people/show', person: $person)" />
-  </fn>
+  fn page(id) {
+    // GET /people/2
+    person = @find($id) ?? @abort(404, message: 'Nobody has that id.')
+    return @view('people/show', person: $person)
+  }
 
-  <type name="NewPerson" fields="name: string, age?: int, role?: string" />
+  type NewPerson(fields: "name: string, age?: int, role?: string")
 
-  <fn name="store" params="json: NewPerson">       <!-- POST /api/people -->
-    <if $json.name->trim() == ''>
-      <return value="@response({ error: 'A person needs a name.' }, status: 422)" />
-    </if>
-    …
-    <return value="@response($person, status: 201, headers: { Location: @route('people.show', id: $person.id) })" />
-  </fn>
-</kscript>
+  fn store(json: NewPerson) {
+    // POST /api/people
+    if $json.name->trim() == '' {
+      return @response({ error: 'A person needs a name.' }, status: 422)
+    }
+    // …
+    return @response($person, status: 201, headers: { Location: @route('people.show', id: $person.id) })
+  }
+}
 ```
 
 What a controller returns becomes the response:
@@ -146,9 +134,9 @@ What a controller returns becomes the response:
 | `@redirect('/people')`, `@redirect(to: '/new', status: 301)` | A redirect. |
 | nothing (`null`) | `204 No Content`. |
 
-`@abort(404)` or `@abort(403, message: 'Admins only')` stops the request with that status, from anywhere: a controller, a function it calls, or middleware. `<try>` doesn't catch it. An error in a controller answers `500` with the file and line, and the server log shows it too.
+`@abort(404)` or `@abort(403, message: 'Admins only')` stops the request with that status, from anywhere: a controller, a function it calls, or middleware. `try` doesn't catch it. An error in a controller answers `500` with the file and line, and the server log shows it too.
 
-Controllers can read and write files with KScript.IO, but only inside the site folder. Set `"write_files": false` to make them read-only like pages. Anything a controller prints with `<echo>` goes to the server log.
+Controllers can read and write files with KScript.IO, but only inside the site folder. Set `"write_files": false` to make them read-only like pages. Anything a controller prints with `echo` goes to the server log.
 
 ## Views
 
@@ -160,30 +148,30 @@ The `views` folder is never served as pages, because a view needs its controller
 
 Middleware is a function that takes the request and `$next`. It can stop the request by returning a response, or call `$next($request)` and change the response it gets back:
 
-```xml
-<!-- middleware/security.ks.xml -->
-<kscript>
-  <import package="KScript.Http" />
+```kscript
+// middleware/security.kscript
+kscript {
+  import KScript.Http
 
-  <fn name="secure_headers" params="request, next">
-    <return value="$next($request)->with_header('X-Frame-Options', 'DENY')" />
-  </fn>
+  fn secure_headers(request, next) {
+    return $next($request)->with_header('X-Frame-Options', 'DENY')
+  }
 
-  <fn name="json_only" params="request, next">
-    <if $request.method == 'POST' and not ($request.headers['content-type'] ?? '')->contains('json')>
-      <return value="@response({ error: 'Send JSON.' }, status: 415)" />
-    </if>
-    <return value="$next($request)" />
-  </fn>
-</kscript>
+  fn json_only(request, next) {
+    if $request.method == 'POST' and not ($request.headers['content-type'] ?? '')->contains('json') {
+      return @response({ error: 'Send JSON.' }, status: 415)
+    }
+    return $next($request)
+  }
+}
 ```
 
 Middleware applies at four levels, and it runs outermost first:
 
 1. `http.middleware` in `kscript.json`, for every route.
-2. `<KScript.Routes middleware="…">`, for every route in the file. `<Middleware use="…">` adds more for the routes after it.
-3. `<Group middleware="…">`, for the routes inside the group.
-4. `<Get … middleware="…">`, for one route.
+2. `KScript.Routes(middleware: …)`, for every route in the file. `Middleware(use: …)` adds more for the routes after it.
+3. `Group(middleware: …)`, for the routes inside the group.
+4. `Get(…, middleware: …)`, for one route.
 
 A middleware list is comma separated. Each entry can be a built-in, a function, or a group name from `http.groups`. Built-ins take an argument after a colon, such as `throttle:30`.
 
@@ -200,7 +188,7 @@ A function with the same name as a built-in wins, so you can replace one.
 
 ## Resources
 
-`<Resource path="/people" to="people" />` adds these routes for the controller imported as `people`:
+`Resource(path: /people, to: people)` adds these routes for the controller imported as `people`:
 
 | Method | Path | Function | Name |
 | --- | --- | --- | --- |
@@ -239,7 +227,7 @@ Group(middleware: auth) {
 ```jsonc
 {
   "http": {
-    "routes": ["routes.ks.xml", { "file": "api/v1.ks.xml", "prefix": "/api/v1", "api": true }],  // default: routes.* and api.*
+    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes.* and api.*
     "middleware": ["log"],                      // for every route
     "groups": { "api": ["cors", "throttle"] },  // names for lists of middleware
     "views": "views",                           // where @view() looks first; never served
@@ -258,7 +246,7 @@ Route files get the same checking and completion as scripts:
 
 - `to` completes the functions of imported controllers (`people.show`). A name that doesn't exist is an error with a did-you-mean.
 - `middleware` and `use` complete the built-ins too, and accept `http.groups` names.
-- Route elements are only offered inside `<KScript.Routes>` or `<Group>`.
+- Route elements are only offered inside `KScript.Routes` or `Group`.
 - `{id}` in `path` isn't read as a `{ }` expression.
 
 ## How it runs

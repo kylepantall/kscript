@@ -1,140 +1,138 @@
 # Getting started
 
-This page walks through KScript in ten minutes. Every example with a **Run** button runs on your computer when you're reading it with `kscript docs`, so change them and see what happens. Each one can be shown as XML or in the brace-style `.kscript` format: the two are the same language.
+This page walks through KScript in ten minutes. Every example with a **Run** button runs on your computer when you're reading it with `kscript docs`, so change them and see what happens. Examples are shown in the `.kscript` format, and each one can be switched to XML: the two are the same language.
 
 If you don't have `kscript` yet, see [Install](install.md).
 
 ## Your first script
 
-A script is a file that ends in `.ks.xml` (or `.kscript`). Save this as `hello.ks.xml`:
+A script is a file that ends in `.kscript`. Save this as `hello.kscript`:
 
-```xml try
-<kscript>
-  <echo>Hello, World!</echo>
-</kscript>
+```kscript try
+echo "Hello, World!"
 ```
 
 Then run it:
 
 ```sh
-kscript hello.ks.xml
+kscript hello.kscript
 ```
 
-In the examples below the `<kscript>` around the script is left out, since every script has it. The docs add it when you run one.
+A script runs from top to bottom, one statement per line. `//` starts a comment.
 
 ## Variables
 
-`<let>` declares a variable and `<set>` changes it. Values are numbers, text, yes/no, lists, maps and functions. In text, `$name` and `{ }` put a value in.
+`name = value` declares a variable, and assigning to it again changes it. Values are numbers, text, yes/no, lists, maps and functions. Read a variable with `$name`. In text, `$name` and `{ }` put a value in.
 
-```xml try
-<let name="name" value="'Joan'" />
-<let name="age" value="82" />
-<echo>$name is $age.</echo>
+```kscript try
+name = 'Joan'
+age = 82
+echo "$name is $age."
 
-<set name="age" value="$age + 1" />
-<echo>Next year { $name } will be { $age }.</echo>
+age = $age + 1
+echo "Next year { $name } will be { $age }."
 ```
 
-Attribute values are expressions, so text needs quotes inside them: `value="'Joan'"`. Element text, like the text of `<echo>`, is already text.
+After `=`, a value is an expression, so text needs quotes: `'Joan'`. The text after `echo` is a template: `$name` and `{ }` are filled in.
 
 ## Lists and maps
 
 Lists are written `[1, 2, 3]` and maps `{ name: 'Joan', age: 82 }`. Every value has methods, called with `->`.
 
-```xml try
-<let name="people" value="[{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }, { name: 'Ada', age: 36 }]" />
+```kscript try
+people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }, { name: 'Ada', age: 36 }]
 
-<echo>{ $people->count() } people</echo>
-<echo>Oldest: { $people->max_by(fn($p) => $p.age).name }</echo>
-<echo>Names: { $people->map(fn($p) => $p.name)->join(', ') }</echo>
-<echo>Over 35: { $people->filter(fn($p) => $p.age gt 35)->map(fn($p) => $p.name) }</echo>
+echo "{ $people->count() } people"
+echo "Oldest: { $people->max_by(fn($p) => $p.age).name }"
+echo "Names: { $people->map(fn($p) => $p.name)->join(', ') }"
+echo "Over 35: { $people->filter(fn($p) => $p.age gt 35)->map(fn($p) => $p.name) }"
 ```
 
 `fn($p) => $p.age` is a lambda: a small function you pass to a method. `|>` pipes a value into the next call, which reads well for longer chains:
 
-```xml try
-<let name="words" value="'the quick brown fox jumps over the lazy dog'" />
-<echo>{ $words->split(' ') |> unique() |> sort() |> join(', ') }</echo>
+```kscript try
+words = 'the quick brown fox jumps over the lazy dog'
+echo "{ $words->split(' ') |> unique() |> sort() |> join(', ') }"
 ```
 
 The [reference](/reference) lists every method of [strings](/reference/methods/string), [lists](/reference/methods/list), [maps](/reference/methods/map), [numbers](/reference/methods/number) and [dates](/reference/methods/date).
 
 ## Decisions and loops
 
-```xml try
-<for each="n" in="1..16">
-  <if test="$n % 15 eq 0">
-    <echo>FizzBuzz</echo>
-  </if>
-  <elif test="$n % 3 eq 0">
-    <echo>Fizz</echo>
-  </elif>
-  <elif test="$n % 5 eq 0">
-    <echo>Buzz</echo>
-  </elif>
-  <else>
-    <echo>$n</echo>
-  </else>
-</for>
+```kscript try
+for n in 1..16 {
+  if $n % 15 eq 0 {
+    echo "FizzBuzz"
+  } elif $n % 3 eq 0 {
+    echo "Fizz"
+  } elif $n % 5 eq 0 {
+    echo "Buzz"
+  } else {
+    echo "$n"
+  }
+}
 ```
 
-`1..16` counts from 1 up to 15 (the end is left out). Use the word forms `lt`, `le`, `gt`, `ge` and `eq` in attributes, because XML can't hold a raw `<`.
+`1..16` counts from 1 up to 15 (the end is left out). Comparisons can be written as words (`lt`, `le`, `gt`, `ge`, `eq`) or as `<`, `>=` and so on.
 
-`<match>` picks one case:
+`match` picks one case:
 
-```xml try
-<let name="day" value="'Sat'" />
-<match value="$day">
-  <case is="'Sat', 'Sun'"><echo>Weekend</echo></case>
-  <default><echo>Weekday</echo></default>
-</match>
+```kscript try
+day = 'Sat'
+match $day {
+  case 'Sat', 'Sun' {
+    echo "Weekend"
+  }
+  default {
+    echo "Weekday"
+  }
+}
 ```
 
 ## Functions
 
-```xml try
-<fn name="greet" params="who, greeting = 'Hello'">
-  <return value="$greeting + ', ' + $who + '!'" />
-</fn>
-<fn name="square" params="n: number" value="$n * $n" />
+```kscript try
+fn greet(who, greeting = 'Hello') {
+  return $greeting + ', ' + $who + '!'
+}
+fn square(n: number) => $n * $n
 
-<echo>{ @greet('World') }</echo>
-<echo>{ @greet('Kyle', greeting: 'Hi') }</echo>
-<echo>{ 7 |> @square() }</echo>
+echo "{ @greet('World') }"
+echo "{ @greet('Kyle', greeting: 'Hi') }"
+echo "{ 7 |> @square() }"
 ```
 
 Your own functions and the built-in commands are both called with `@`. Arguments can be named, like `greeting: 'Hi'`.
 
 ## Errors
 
-```xml try
-<fn name="check_age" params="age">
-  <if test="$age lt 0">
-    <throw type="Validation" message="Age must be positive, got {$age}" />
-  </if>
-  <return value="$age" />
-</fn>
+```kscript try
+fn check_age(age) {
+  if $age lt 0 {
+    throw Validation "Age must be positive, got {$age}"
+  }
+  return $age
+}
 
-<try>
-  <do>@check_age(-1)</do>
-  <catch as="err">
-    <echo>{ $err.type }: { $err.message }</echo>
-  </catch>
-</try>
+try {
+  @check_age(-1)
+} catch err {
+  echo "{ $err.type }: { $err.message }"
+}
 ```
 
 ## Packages
 
 Everything above is KScript.Core, which every script has. The rest comes in packages you import: files and folders, the terminal, maths, HTTP, web pages, desktop windows and more. See the [package list](/reference#packages).
 
-```xml try
-<import package="KScript.Math" as="math" />
-<import package="KScript.IO" />
+```kscript try
+import KScript.Math as math
+import KScript.IO
 
-<echo>√2 is { @math.sqrt(2)->round(digits: 4) }</echo>
+echo "√2 is { @math.sqrt(2)->round(digits: 4) }"
 
-<do>@write_text('notes.txt', 'Buy milk')</do>
-<echo>notes.txt says: { @read_text('notes.txt') }</echo>
+@write_text('notes.txt', 'Buy milk')
+echo "notes.txt says: { @read_text('notes.txt') }"
 ```
 
 Examples in the docs run in their own empty folder, so writing files here is safe.
@@ -143,16 +141,16 @@ Examples in the docs run in their own empty folder, so writing files here is saf
 
 KScript.Terminal reads from the keyboard. In the docs, click **Input** and type the answers, one per line, before you run.
 
-```xml try
-<import package="KScript.Terminal" />
+```kscript try
+import KScript.Terminal
 
-<input to="name" default="'stranger'">What's your name? </input>
-<echo>Hello, $name!</echo>
+input(to: name, default: 'stranger') "What's your name? "
+echo "Hello, $name!"
 ```
 
-## The .kscript format
+## The .kscript format and XML
 
-The same language can be written with braces and new lines instead of tags. Switch any example above to **.kscript** to see it, or write one directly:
+Everything above can also be written as XML, which looks like HTML: `name = 'Joan'` is `<let name="name" value="'Joan'" />`, and `echo "Hi"` is `<echo>Hi</echo>`. Switch any example to **XML** to see it, or use the switch at the top of the page. XML scripts end in `.ks.xml`, and the two kinds can import each other.
 
 ```kscript try
 people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }]
