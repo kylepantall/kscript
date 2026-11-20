@@ -52,7 +52,7 @@ Inside a function or a loop, end a branch early instead of writing `<else>`: `<r
 `<continue />` or `<break />` in a loop. The main path then stays at the left edge and each special case is dealt with
 first.
 
-```xml
+```xml try
 <fn name="grade" params="score">
   <if test="$score ge 90">
     <return value="'A'" />
@@ -62,6 +62,8 @@ first.
   </if>
   <return value="'C'" />
 </fn>
+
+<echo>{ @grade(82) }</echo>
 ```
 
 `kscript check` and the editor warn about `<else>` and `<elif>` with KS6001 there, and at the top of a script when
@@ -116,7 +118,7 @@ A yes/no parameter can be written as a bare word: `recursive` sets it to yes and
 
 `<enum>` declares a set of named values, and `<const>` a value that can't change.
 
-```xml
+```xml try
 <enum name="Size" values="small, medium, large" />
 <const name="max_items" value="10" />
 <fn name="pack" params="size: Size, gift: bool = false" value="'Packing ' + $size" />

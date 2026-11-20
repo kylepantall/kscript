@@ -162,6 +162,7 @@ kscript fmt                    # tidy every script and page (--check for CI)
 kscript ide install            # add the extension to VS Code, Cursor, VSCodium or Windsurf
 kscript app build              # package a <KScript.Window> script as a desktop app
 kscript update                 # get the latest release
+kscript docs                   # open the docs in your browser, with examples you can run
 ```
 
 The editor extension shows errors as you type and gives completion, hover docs, go to definition, rename, inlay hints for the types you didn't write, and notebook-style dividers between blocks. It reads the same package definitions as the interpreter, so the editor never disagrees with what runs. Neovim, Helix, Sublime Text and Emacs work through `kscript lsp`.
@@ -203,6 +204,9 @@ Then save the first example above as `hello.ks.xml`, run `kscript hello.ks.xml`,
 
 ## Documentation
 
+Run `kscript docs` to open the full documentation in your browser. It is built into kscript, so it works offline and always matches your version: the guides below, a reference for every package, element, command and method, search, light and dark themes, and an editable **Run** box on each example.
+
+- [Getting started](docs/getting-started.md): a ten-minute tour, with examples to run
 - [Installing KScript](docs/install.md): installers, updating, manual downloads and editor setup
 - [The language](docs/language.md): values, expressions, control flow, functions, errors, settings, logging, translations, language models and every package
 - [Web pages and `<live>`](docs/web.md): `kscript serve`, layouts, components, routing and reactive blocks

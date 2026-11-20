@@ -28,6 +28,7 @@ namespace KScript.Runtime
             RegisterConfig(p);
             RegisterLogging(p);
             RegisterI18n(p);
+            RegisterExamples(p);
         }
 
         #region Elements
@@ -128,12 +129,12 @@ namespace KScript.Runtime
                 new A("op", K.Enum, "Update instead of replace: op=\"+=\" value=\"1\".", false, "=", "+=", "-=", "*=", "/=", "??="),
                 new A("type", K.TypeName, "Convert the value to this type, or fail: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes))
             {
-                Example = "<set name=\"total\" value=\"$total + $price * $qty\" />\n<set>count += 1</set>",
+                Example = "<let name=\"total\" value=\"0\" />\n<let name=\"count\" value=\"0\" />\n<set name=\"total\" value=\"$total + 2.50 * 3\" />\n<set>count += 1</set>\n<echo>$count item, $total</echo>",
             }, run => Assign(run, declare: false));
 
             p.Element(new ElementInfo("do", "Runs assignment statements and calls, separated by `;`.", ContentKind.AssignmentStatements)
             {
-                Example = "<do>$x = 3; $total += $price * $qty</do>",
+                Example = "<let name=\"total\" value=\"10\" />\n<do>$total += 5; $total *= 2</do>\n<echo>$total</echo>",
             }, run =>
             {
                 // In a .kscript file x = 3 declares x if it isn't in scope yet.
@@ -146,12 +147,12 @@ namespace KScript.Runtime
                 new A("format", K.Enum, "How to print: text (the default), json (indented and, in a terminal, coloured), or markdown (with KScript.Terminal). A map or nested list on its own is printed as json.", false, "text", "json", "markdown"),
                 new A("newline", K.Bool, "no leaves the cursor at the end of the line."))
             {
-                Example = "<echo>Hello, $name! You have { $items->count() } items.</echo>",
+                Example = "<let name=\"name\" value=\"'Joan'\" />\n<let name=\"items\" value=\"['tea', 'cake']\" />\n<echo>Hello, $name! You have { $items->count() } items.</echo>",
             }, Echo);
 
             p.Element(new ElementInfo("if", "Runs its body when the test is true. Follow it with <elif> and <else> for other cases.", ContentKind.Statements, Test)
             {
-                Example = "<if test=\"$score ge 90\">\n  <echo>A</echo>\n</if>\n<elif test=\"$score ge 75\">\n  <echo>B</echo>\n</elif>\n<else>\n  <echo>C</echo>\n</else>",
+                Example = "<let name=\"score\" value=\"80\" />\n<if test=\"$score ge 90\">\n  <echo>A</echo>\n</if>\n<elif test=\"$score ge 75\">\n  <echo>B</echo>\n</elif>\n<else>\n  <echo>C</echo>\n</else>",
             }, run =>
             {
                 bool ok = Values.Truthy(run.Eval("test"));
@@ -187,13 +188,13 @@ namespace KScript.Runtime
                 new A("index", K.DeclareVariable, "A variable for the position, from 0."))
             {
                 IsLoop = true,
-                Example = "<for each=\"p\" in=\"$people\">\n  <echo>{$p.name}</echo>\n</for>\n<for each=\"i\" in=\"0..10\"><echo>$i</echo></for>\n<for each=\"key, value\" in=\"$config\"><echo>$key = $value</echo></for>",
+                Example = "<let name=\"people\" value=\"[{ name: 'Joan' }, { name: 'Sam' }]\" />\n<for each=\"p\" in=\"$people\">\n  <echo>{$p.name}</echo>\n</for>\n<for each=\"i\" in=\"0..10\"><echo>$i</echo></for>\n<let name=\"settings\" value=\"{ host: 'localhost', port: 8080 }\" />\n<for each=\"key, value\" in=\"$settings\"><echo>$key = $value</echo></for>",
             }, For);
 
             p.Element(new ElementInfo("while", "Loops while the test is true. `test=\"true\"` loops until <break/>.", ContentKind.Statements, Test)
             {
                 IsLoop = true,
-                Example = "<while test=\"$n lt 3\">\n  <set name=\"n\" value=\"$n + 1\" />\n</while>",
+                Example = "<let name=\"n\" value=\"0\" />\n<while test=\"$n lt 3\">\n  <set name=\"n\" value=\"$n + 1\" />\n</while>\n<echo>$n</echo>",
             }, run =>
             {
                 while (Values.Truthy(run.Eval("test")))
@@ -214,7 +215,7 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("match", "Compares one value against several cases. Inside, `$it` is the value.", ContentKind.Statements,
                 new A("value", K.Expression, "The value to compare.", true))
             {
-                Example = "<match value=\"$choice\">\n  <case is=\"1\"><echo>One</echo></case>\n  <case is=\"2, 3\"><echo>Two or three</echo></case>\n  <case when=\"$choice gt 9\"><echo>Big</echo></case>\n  <default><echo>Unknown</echo></default>\n</match>",
+                Example = "<let name=\"choice\" value=\"3\" />\n<match value=\"$choice\">\n  <case is=\"1\"><echo>One</echo></case>\n  <case is=\"2, 3\"><echo>Two or three</echo></case>\n  <case when=\"$choice gt 9\"><echo>Big</echo></case>\n  <default><echo>Unknown</echo></default>\n</match>",
             }, Match);
 
             p.Element(new ElementInfo("case", "A branch of <match>: runs when the value equals one of `is`, or when `when` is true.", ContentKind.Statements,
@@ -254,14 +255,14 @@ namespace KScript.Runtime
                 new A("args", K.ExpressionList, "Arguments, comma separated."),
                 new A("to", K.DeclareVariable, "A variable for the result."))
             {
-                Example = "<call fn=\"greet\" args=\"'World'\" />",
+                Example = "<fn name=\"greet\" params=\"who\"><echo>Hello, $who!</echo></fn>\n<call fn=\"greet\" args=\"'World'\" />",
             }, Call);
 
             p.Element(new ElementInfo("spawn", "Runs a function in the background. The script waits for it before it ends.", ContentKind.Empty,
                 new A("fn", K.FunctionReference, "The function to run.", true),
                 new A("args", K.ExpressionList, "Arguments, comma separated."))
             {
-                Example = "<spawn fn=\"download_all\" args=\"$urls\" />",
+                Example = "<fn name=\"count_to\" params=\"n\"><echo>Counted to { @range(1, $n + 1)->last() }</echo></fn>\n<spawn fn=\"count_to\" args=\"1000\" />\n<echo>Started counting</echo>",
             }, run =>
             {
                 ICallable fn = FindFunction(run, run.RequiredRaw("fn"));
@@ -271,7 +272,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("try", "Runs its body, handing errors to its <catch> elements. <finally> always runs.", ContentKind.Statements)
             {
-                Example = "<try>\n  <let name=\"data\" value=\"@json($text)\" />\n  <catch as=\"err\" when=\"$err.type eq 'Format'\">\n    <echo>That isn't JSON: {$err.message}</echo>\n  </catch>\n  <finally><echo>done</echo></finally>\n</try>",
+                Example = "<let name=\"text\" value=\"'not json'\" />\n<try>\n  <let name=\"data\" value=\"@json($text)\" />\n  <catch as=\"err\" when=\"$err.type eq 'Json'\">\n    <echo>That isn't JSON: {$err.message}</echo>\n  </catch>\n  <finally><echo>done</echo></finally>\n</try>",
             }, Try);
 
             p.Element(new ElementInfo("catch", "Handles an error thrown in the <try> around it. `as` names the error: $err.type, $err.message, $err.line.", ContentKind.Statements,
@@ -291,7 +292,7 @@ namespace KScript.Runtime
                 new A("type", K.Text, "The error type, such as Validation. Defaults to Error."),
                 new A("message", K.Template, "What went wrong. Can be written as the element's text instead.") { SatisfiedByContent = true })
             {
-                Example = "<throw type=\"Validation\" message=\"Age must be positive, got {$age}\" />",
+                Example = "<let name=\"age\" value=\"-1\" />\n<try>\n  <throw type=\"Validation\" message=\"Age must be positive, got {$age}\" />\n  <catch as=\"err\"><echo>{ $err.type }: { $err.message }</echo></catch>\n</try>",
             }, run =>
             {
                 string message = run.Has("message") ? run.Template("message") : run.Text();

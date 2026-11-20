@@ -13,7 +13,7 @@ namespace KScript
         static int Main(string[] args) => new CommandLine().Run(args);
     }
 
-    /// <summary>The kscript command: runs scripts and dispatches check, fmt, lsp, test, css, serve, app, update, ide and make.</summary>
+    /// <summary>The kscript command: runs scripts and dispatches check, fmt, lsp, test, css, serve, docs, app, update, ide and make.</summary>
     internal sealed class CommandLine
     {
         public TextWriter Out { get; init; } = Console.Out;
@@ -40,25 +40,7 @@ namespace KScript
             return true;
         }
 
-        void PrintUsage(TextWriter output)
-        {
-            output.WriteLine("Usage: kscript [--env name] <script.xml> [script arguments]   Run a script ($args holds the arguments; --env picks staging.yaml, .env.staging...).");
-            output.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
-            output.WriteLine("       kscript check --print-config [file-or-folder]      Show the lint and format settings that apply, and which standard set each.");
-            output.WriteLine("       kscript fmt [file-or-folder]... [--check]          Tidy scripts and pages (--check: only report, for CI).");
-            output.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
-            output.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
-            output.WriteLine("       kscript css [file-or-folder]... [--out folder] [--var name=value]   Compile .ks.css, .ks.scss and .ks.sass stylesheets.");
-            output.WriteLine("       kscript convert <file-or-folder>... [--to xml|kscript] [--stdout]   Write the .kscript version of an XML script, or the reverse.");
-            output.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]   Serve pages, and routes.ks.xml / api.ks.xml routes.");
-            output.WriteLine("       kscript routes [site folder]                      List the routes of a site.");
-            output.WriteLine("       kscript app build [script] [--name \"My App\"] [--out folder]   Package a script as a desktop app.");
-            output.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
-            output.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
-            output.WriteLine("       kscript --version | --help");
-            output.WriteLine("       kscript make project <folder> [--port 8080]       Start a new project with a kscript.json.");
-            output.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
-        }
+        void PrintUsage(TextWriter output) => CliReference.PrintUsage(output);
 
         /// <summary>
         /// kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder. In a project, the nearest
@@ -271,6 +253,11 @@ namespace KScript
                 return Serve(args.Skip(1).ToArray());
             }
 
+            if (args[0] == "docs")
+            {
+                return RunDocs(args.Skip(1).ToArray());
+            }
+
             if (args[0] == "css")
             {
                 return KScript.Style.CssCommand.Run(args.Skip(1).ToArray(), Out, Error);
@@ -341,6 +328,25 @@ namespace KScript
                 Error.WriteLine(ex.ToString());
                 ShowError(Path.GetFileName(main), ex.ToString());
                 return 1;
+            }
+        }
+
+        /// <summary>Opens a URL for kscript docs (tests replace it).</summary>
+        public Action<string> OpenBrowser { get; init; }
+
+        /// <summary>kscript docs: Ctrl+C stops the docs server, which then removes its files.</summary>
+        int RunDocs(string[] args)
+        {
+            using var cancel = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            ConsoleCancelEventHandler stop = (_, e) => e.Cancel = StopOnFirstCtrlC(cancel);
+            Console.CancelKeyPress += stop;
+            try
+            {
+                return KScript.Docs.DocsCommand.Run(args, Out, Error, cancel.Token, OpenBrowser);
+            }
+            finally
+            {
+                Console.CancelKeyPress -= stop;
             }
         }
 

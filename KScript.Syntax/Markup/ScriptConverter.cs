@@ -367,6 +367,18 @@ namespace KScript.Syntax.Markup
 
                 switch (e.Name)
                 {
+                    case "const" when Only("name", "value", "type", "description") && Attr("name") != null && !e.ChildElements.Any():
+                        {
+                            // <const name="max" value="10" /> is const max = 10, the same as <let ... const="yes">.
+                            string name = Attr("name").Trim();
+                            string value = Attr("value") ?? TrimLayout(TextOf(e))?.Trim();
+                            WriteDoc(e, indent);
+                            string type = Attr("type") != null ? ": " + Attr("type").Trim() : string.Empty;
+                            sb.Append(pad).Append("const ").Append(name).Append(type).Append(" = ")
+                                .Append(value != null ? Reindent(value.Trim(), Pad(indent)) : "null").Append('\n');
+                            scopes.Declare(name);
+                            return;
+                        }
                     case "let" when Only("name", "value", "const", "type", "description") && !e.ChildElements.Any():
                         {
                             string name = Attr("name")?.Trim();

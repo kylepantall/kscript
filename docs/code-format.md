@@ -5,7 +5,7 @@ every package are the same: the parser (`KScript.Syntax/Markup/CodeParser.cs`) b
 XML parser builds, so `kscript`, `kscript check` and the language server treat both alike. The file extension picks
 the parser; `.ks.xml` scripts are unchanged, and the two kinds can import each other.
 
-```
+```kscript try
 import KScript.IO
 
 /// Lower-cases text and joins words with dashes.

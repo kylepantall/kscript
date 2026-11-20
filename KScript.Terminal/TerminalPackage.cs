@@ -108,6 +108,18 @@ namespace KScript.Terminal
                 c => c.Host.IsInteractive, "<if test=\"@is_terminal()\"><clear /></if>");
 
             p.EchoFormat("markdown", (text, interpreter) => TerminalMarkdown.Render(text, Ansi.Enabled(interpreter.Host)));
+            RegisterExamples(p);
+        }
+
+        /// <summary>Usage examples, shown in hover and run by kscript docs.</summary>
+        private static void RegisterExamples(PackageBuilder p)
+        {
+            p.Examples(
+                ("@bold", "@bold('Important')"),
+                ("@dim", "@dim('(optional)')"),
+                ("@italic", "@italic('emphasis')"),
+                ("@underline", "@underline('a link')"),
+                ("@terminal_width", "@terminal_width()"));
         }
 
         private static string Prompt(ElementRun run)

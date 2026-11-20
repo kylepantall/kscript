@@ -108,6 +108,50 @@ namespace KScript.Mathematics
             p.Method(KType.List, "stdev", "", "The population standard deviation of the list.", KType.Number, (t, c) => StdDev(NonEmpty(c, (List<object>)t)));
             p.Method(KType.Number, "sqrt", "", "The square root.", KType.Number, (t, c) => M.Sqrt(Values.ToNumber(t, "->sqrt()")));
             p.Method(KType.Number, "pow", "exponent", "The number to a power.", KType.Number, (t, c) => M.Pow(Values.ToNumber(t, "->pow()"), c.Num(0)));
+            RegisterExamples(p);
+        }
+
+        /// <summary>Usage examples, shown in hover and run by kscript docs.</summary>
+        private static void RegisterExamples(PackageBuilder p)
+        {
+            p.Examples(
+                ("@cbrt", "@cbrt(27)"),
+                ("@abs", "@abs(-4.5)"),
+                ("@sign", "[@sign(-3), @sign(0), @sign(8)]"),
+                ("@exp", "@exp(1)->round(digits: 5)"),
+                ("@sin", "@sin(@radians(30))->round(digits: 3)"),
+                ("@cos", "@cos(0)"),
+                ("@tan", "@tan(@radians(45))->round(digits: 3)"),
+                ("@asin", "@degrees(@asin(1))"),
+                ("@acos", "@degrees(@acos(0))"),
+                ("@atan", "@degrees(@atan(1))"),
+                ("@radians", "@radians(180)->round(digits: 4)"),
+                ("@degrees", "@degrees($pi)"),
+                ("@floor", "@floor(7.9)"),
+                ("@ceil", "@ceil(7.1)"),
+                ("@trunc", "@trunc(-7.9)"),
+                ("@pow", "@pow(2, exponent: 10)"),
+                ("@atan2", "@degrees(@atan2(1, 1))"),
+                ("@hypot", "@hypot(3, 4)"),
+                ("@log", "@log(8, base: 2)"),
+                ("@log10", "@log10(1000)"),
+                ("@log2", "@log2(1024)"),
+                ("@round", "@round(2.675, digits: 2)"),
+                ("@clamp", "@clamp(120, low: 0, high: 100)"),
+                ("@gcd", "@gcd(12, 18)"),
+                ("@lcm", "@lcm(4, 6)"),
+                ("@factorial", "@factorial(5)"),
+                ("@random_seed", "<do>@random_seed(42)</do>\n<echo>{ @random(low: 1, high: 100) } (the same every run, with seed 42)</echo>"),
+                ("@pick", "@pick(['rock', 'paper', 'scissors'])"),
+                ("@shuffle", "@shuffle([1, 2, 3, 4, 5])"),
+                ("@sum", "@sum(1, 2, 3, 4)"),
+                ("@average", "@average(2, 4, 9)"),
+                ("@median", "@median(3, 1, 4, 1, 5)"),
+                ("@stdev", "@stdev(2, 4, 4, 4, 5, 5, 7, 9)->round(digits: 3)"),
+                ("list->median", "[3, 1, 4, 1, 5]->median()"),
+                ("list->stdev", "[2, 4, 4, 4, 5, 5, 7, 9]->stdev()->round(digits: 3)"),
+                ("number->sqrt", "16->sqrt()"),
+                ("number->pow", "3->pow(4)"));
         }
 
         private static void One(PackageBuilder p, string name, string description, Func<double, double> f, string example = null) =>

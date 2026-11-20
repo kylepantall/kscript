@@ -84,12 +84,46 @@ public sealed class CommandLineTests : IDisposable
     }
 
     [Fact]
+    public void Help_lists_every_command()
+    {
+        string help = Kscript("--help").Out;
+        foreach (CliCommand command in CliReference.Commands)
+        {
+            foreach (string usage in command.Usage.Split('\n')) Assert.Contains(usage, help);
+        }
+        Assert.StartsWith("Usage: kscript [--env name] <script>", help);
+    }
+
+    [Fact]
+    public void Docs_opens_the_browser_and_stops_on_ctrl_c()
+    {
+        using var stop = new CancellationTokenSource();
+        string opened = null;
+        var result = Run(new[] { "docs", "--port", TestServer.FreePort().ToString() }, (o, e) => new CommandLine
+        {
+            AppFolder = dir,
+            Out = o,
+            Error = e,
+            Cancellation = stop.Token,
+            OpenBrowser = url =>
+            {
+                opened = url;
+                stop.Cancel();
+            },
+        });
+        Assert.Equal(0, result.Code);
+        Assert.StartsWith("http://localhost:", opened);
+        Assert.Contains("KScript docs: " + opened, result.Out);
+    }
+
+    [Fact]
     public void Every_subcommand_is_reached()
     {
         string script = Write("ok.ks.xml", "<kscript>\n  <echo>hi</echo>\n</kscript>\n");
         Assert.Contains("Usage: kscript update", Kscript("update", "--help").Out);
         Assert.Contains("kscript ide install", Kscript("ide", "help").Out);
         Assert.Contains("Usage: kscript app build", Kscript("app", "--help").Out);
+        Assert.Contains("Usage: kscript docs", Kscript("docs", "--help").Out);
         Assert.Contains("1 file checked: 0 errors", Kscript("check", script, "--warnaserror").Out);
         Assert.Contains("kscript:recommended", Kscript("check", "--print-config", dir).Out);
         Assert.Contains("1 file checked: all formatted", Kscript("fmt", script, "--check").Out);
