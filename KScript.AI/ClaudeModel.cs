@@ -18,7 +18,12 @@ namespace KScript.AI
     {
         internal const string DefaultModel = "claude-opus-5-5";
 
-        private readonly Lazy<AnthropicClient> client = new Lazy<AnthropicClient>(() => new AnthropicClient());
+        private readonly Lazy<AnthropicClient> client;
+
+        public ClaudeModel(Func<AnthropicClient> create = null)
+        {
+            client = new Lazy<AnthropicClient>(create ?? (() => new AnthropicClient()));
+        }
 
         public AiReply Send(AiRequest request, CancellationToken cancellation)
         {
@@ -132,10 +137,12 @@ namespace KScript.AI
         /// <summary>Thinking and fallback markers go back to the model as they came, so it keeps its reasoning.</summary>
         private static BetaContentBlockParam Echo(BetaContentBlock block, bool before)
         {
-            if (block.TryPickThinking(out BetaThinkingBlock thinking))
-                return before ? null : new BetaThinkingBlockParam { Thinking = thinking.Thinking, Signature = thinking.Signature };
-            if (block.TryPickRedactedThinking(out BetaRedactedThinkingBlock redacted))
-                return before ? null : new BetaRedactedThinkingBlockParam { Data = redacted.Data };
+            // Kept apart from the returns below: "before ? null : new ...Param" would turn null into an empty block.
+            bool isThinking = block.TryPickThinking(out BetaThinkingBlock thinking);
+            bool isRedacted = block.TryPickRedactedThinking(out BetaRedactedThinkingBlock redacted);
+            if ((isThinking || isRedacted) && before) return null;
+            if (isThinking) return new BetaThinkingBlockParam { Thinking = thinking.Thinking, Signature = thinking.Signature };
+            if (isRedacted) return new BetaRedactedThinkingBlockParam { Data = redacted.Data };
             if (block.TryPickFallback(out BetaFallbackBlock fallback))
                 return JsonSerializer.Deserialize<BetaFallbackBlockParam>(JsonSerializer.Serialize(fallback));
             return null;

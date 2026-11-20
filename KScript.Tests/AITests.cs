@@ -182,4 +182,103 @@ public class AITests
         var ex = Assert.Throws<KScriptException>(() => ScriptRunner.RunBody("<echo>{ @llm('x') }</echo>"));
         Assert.Contains("KScript.AI", ex.Message);
     }
+
+    [Fact]
+    public void Chats_describe_themselves_and_can_start_over()
+    {
+        var model = new FakeModel().Says("one").Says("two");
+        string output = Run(model,
+            "<let name=\"chat\" value=\"@chat('Be kind.', { model: 'claude-test' })\" />" +
+            "<echo>{ $chat.model } { $chat.system } { $chat.nothing ?? 'none' } { $chat->model() } {$chat}</echo>" +
+            "<echo>{ $chat->ask('a') } {$chat} { $chat->reset()->history()->count() } { $chat->ask('b') }</echo>");
+        Assert.Equal("claude-test Be kind. none claude-test chat (0 messages)\none chat (1 messages) 0 two\n", output);
+        Assert.Single(model.Sent[1]);
+    }
+
+    [Fact]
+    public void Tool_problems_go_back_to_the_model_as_errors()
+    {
+        var model = new FakeModel()
+            .Calls("nope", new { })
+            .Then(_ => new AiReply
+            {
+                StopReason = "tool_use",
+                Blocks =
+                {
+                    new AiBlock { Kind = AiBlockKind.ToolUse, Id = "c2", Name = "fail", Input = JsonSerializer.SerializeToElement(new { why = "x", extra = 1 }) },
+                    new AiBlock { Kind = AiBlockKind.ToolUse, Id = "c3", Name = "info", Input = JsonSerializer.SerializeToElement(5) },
+                },
+            })
+            .Says("done");
+        string output = Run(model,
+            "<fn name=\"fail\" params=\"why: string\"><throw message=\"broke: {$why}\" /></fn>" +
+            "<fn name=\"info\" params=\"\" value=\"{ ok: true }\" />" +
+            "<echo>{ @llm('go', { tools: [@fail, @info] }) }</echo>");
+        Assert.Equal("done\n", output);
+        Assert.Equal("result call_1: There is no tool called nope. (error)", model.Sent[1][2].Text);
+        Assert.Equal("result c2: broke: x (error) | result c3: {\"ok\":true}", model.Sent[2][4].Text);
+    }
+
+    [Fact]
+    public void Endless_tool_calls_and_bad_answers_are_stopped()
+    {
+        var model = new FakeModel();
+        for (int i = 0; i <= 25; i++) model.Calls("ping", new { });
+        var ex = Assert.Throws<KScriptException>(() => Run(model, "<fn name=\"ping\" value=\"'pong'\" /><echo>{ @llm('go', { tools: @ping }) }</echo>"));
+        Assert.Contains("still calling tools after 25 rounds", ex.Message);
+
+        var bad = Assert.Throws<KScriptException>(() => Run(new FakeModel().Says("not json"), "<echo>{ @llm('go', { schema: { a: 'string' } }) }</echo>"));
+        Assert.Contains("wasn't the JSON the schema asked for", bad.Message);
+
+        var cut = Assert.Throws<KScriptException>(() => Run(new FakeModel().Then(_ => new AiReply { StopReason = "max_tokens" }), "<echo>{ @llm('go', { max_tokens: 1000 }) }</echo>"));
+        Assert.Contains("cut off after 1,000 tokens", cut.Message);
+    }
+
+    [Fact]
+    public void Schemas_and_tool_parameters_become_json_schema()
+    {
+        var model = new FakeModel().Says("{}").Says("ok");
+        Run(model,
+            "<let name=\"r\" value=\"@llm('x', { schema: { s: 'text', n: 'float', i: 'integer', b: 'boolean', d: 'date', c: 'a | b | a', r: 'number 1.5 to 3', k: 'int 1-5', note: 'a one-line note', list: ['string'], nested: { x: 'int' } } })\" />" +
+            "<fn name=\"all\" params=\"s: string, i: int, f: float, n: number, b: bool, l: list, m: map, d: date, a, o = 1\" value=\"1\" />" +
+            "<llm to=\"x\" tools=\"all\">hi</llm>");
+        string schema = JsonSerializer.Serialize(model.Requests[0].Schema);
+        Assert.Contains("\"s\":{\"type\":\"string\"}", schema);
+        Assert.Contains("\"n\":{\"type\":\"number\"}", schema);
+        Assert.Contains("\"i\":{\"type\":\"integer\"}", schema);
+        Assert.Contains("\"b\":{\"type\":\"boolean\"}", schema);
+        Assert.Contains("\"d\":{\"type\":\"string\",\"description\":\"A date, as YYYY-MM-DD.\"}", schema);
+        Assert.Contains("\"c\":{\"type\":\"string\",\"enum\":[\"a\",\"b\"]}", schema);
+        Assert.Contains("\"r\":{\"type\":\"number\",\"description\":\"From 1.5 to 3.\"}", schema);
+        Assert.Contains("\"k\":{\"type\":\"integer\",\"description\":\"From 1 to 5.\"}", schema);
+        Assert.Contains("\"note\":{\"type\":\"string\",\"description\":\"a one-line note\"}", schema);
+        Assert.Contains("\"list\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}", schema);
+        Assert.Contains("\"additionalProperties\":false", schema);
+
+        AiTool tool = model.Requests[1].Tools[0];
+        Assert.Equal("The KScript function all(s, i, f, n, b, l, m, d, a, o).", tool.Description);
+        Assert.Equal(new[] { "s", "i", "f", "n", "b", "l", "m", "d", "a" }, tool.Required);
+        Assert.Equal("{\"type\":\"array\"}", tool.Properties["l"].GetRawText());
+        Assert.Equal("{\"type\":\"object\"}", tool.Properties["m"].GetRawText());
+        Assert.Equal("{}", tool.Properties["a"].GetRawText());
+        Assert.Contains("YYYY-MM-DD", tool.Properties["d"].GetRawText());
+    }
+
+    [Fact]
+    public void Bad_schemas_and_tools_say_what_is_wrong()
+    {
+        string Error(string body) => Assert.Throws<KScriptException>(() => Run(new FakeModel().Says("{}"), body)).Message;
+        Assert.Contains("needs a map of fields", Error("<echo>{ @llm('x', { schema: 'string' }) }</echo>"));
+        Assert.Contains("describes its items with one value", Error("<echo>{ @llm('x', { schema: { a: ['string', 'int'] } }) }</echo>"));
+        Assert.Contains("can't use a number (5) as a field", Error("<echo>{ @llm('x', { schema: { a: 5 } }) }</echo>"));
+        Assert.Contains("needs a map of fields", Error("<let name=\"c\" value=\"@chat()\" /><echo>{ $c->ask('x', [1]) }</echo>"));
+        Assert.Contains("nope", Error("<let name=\"c\" value=\"@chat()\" /><echo>{ $c->nope() }</echo>"));
+        Assert.Contains("there is no function called missing", Error("<llm to=\"x\" tools=\"missing\">hi</llm>"));
+    }
+
+    [Fact]
+    public void Without_a_stand_in_the_model_is_claude()
+    {
+        Assert.IsType<ClaudeModel>(AIPackage.ModelFor(KScriptHost.ForText(new StringWriter())));
+    }
 }
