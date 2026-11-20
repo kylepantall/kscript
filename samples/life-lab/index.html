@@ -30,7 +30,7 @@
           <state name="soup" value="'30'" />
           <let name="s" value="@summary($world)" />
 
-          <if test="$playing">
+          <if $playing>
             <span
               hidden
               on-tick="world = @advance($world, generations: 1); playing = @population($world.grid) gt 0"
@@ -68,7 +68,7 @@
           </section>
 
           <p class="about">
-            <if test="$patterns->has($world.pattern)">{ $patterns[$world.pattern].about }</if>
+            <if $patterns->has($world.pattern)>{ $patterns[$world.pattern].about }</if>
             <else>Your own pattern.</else>
           </p>
 

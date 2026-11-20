@@ -76,3 +76,23 @@ test('the body of <echo format="json"> is JSON', async () => {
   assert.match(scopeOf(tokens, '$x'), /variable\.other\.kscript/, 'the grammar is back to KScript after </echo>');
   assert.doesNotMatch(scopeOf(tokens, '$x'), /json/);
 });
+
+test('shorthand conditions are coloured as expressions inside the start tag', async () => {
+  const grammar = await load();
+  const tokens = tokenize(grammar, '<kscript>\n  <if $user.is_logged_in and $n > 3>\n    <echo>hi</echo>\n  </if>\n  <while $list->count() gt 0><break /></while>\n  <assert $total eq 30 />\n</kscript>');
+  assert.match(scopeOf(tokens, 'if'), /keyword\.control\.flow\.kscript/);
+  assert.match(scopeOf(tokens, '$user'), /meta\.embedded\.expression\.kscript .*variable\.other\.kscript/);
+  assert.match(scopeOf(tokens, 'and'), /keyword\.operator\.word\.kscript/);
+  assert.match(scopeOf(tokens, '3'), /constant\.numeric\.kscript/, 'a spaced > is an operator, not the end of the tag');
+  assert.match(scopeOf(tokens, 'count'), /entity\.name\.function\.method\.kscript/, '-> does not end the tag');
+  assert.match(scopeOf(tokens, '$total'), /variable\.other\.kscript/);
+  assert.match(scopeOf(tokens, 'echo'), /^source\.kscript meta\.tag\.kscript entity\.name\.tag\.kscript$/, 'the tag closes before its body');
+  assert.match(scopeOf(tokens, 'break'), /keyword\.control\.flow\.kscript/);
+});
+
+test('if with a test attribute keeps its attribute colours', async () => {
+  const grammar = await load();
+  const tokens = tokenize(grammar, '<kscript><if test="$ok"><echo>x</echo></if></kscript>');
+  assert.match(scopeOf(tokens, 'test'), /entity\.other\.attribute-name\.kscript/);
+  assert.doesNotMatch(scopeOf(tokens, 'test'), /meta\.embedded\.expression/);
+});

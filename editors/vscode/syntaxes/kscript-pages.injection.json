@@ -8,6 +8,9 @@
       "include": "#escaped"
     },
     {
+      "include": "source.kscript#tag-shorthand"
+    },
+    {
       "include": "#self-closing"
     },
     {

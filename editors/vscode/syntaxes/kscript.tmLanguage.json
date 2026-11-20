@@ -16,6 +16,9 @@
       "include": "#json-block"
     },
     {
+      "include": "#tag-shorthand"
+    },
+    {
       "include": "#tag-control"
     },
     {
@@ -370,6 +373,76 @@
               "name": "entity.name.function.method.kscript"
             }
           }
+        }
+      ]
+    },
+    "tag-shorthand": {
+      "comment": "<if $ready>, <while $n lt 3>, <match $choice>, <assert $total eq 30 />: the start tag holds the expression itself (it means test=\"...\", or value=\"...\" for match). A '>' with a space on both sides and more after it on the line is the greater-than operator, as in KScript's parser.",
+      "begin": "(<)(if|elif|while|match|assert)(?=\\s+(?![A-Za-z_][\\w.:-]*\\s*=(?![=>]))(?!/?>))",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.kscript"
+        },
+        "2": {
+          "name": "keyword.control.flow.kscript entity.name.tag.kscript"
+        }
+      },
+      "end": "(?<![-=])((?<=\\s)>(?![ \\t]+[^\\s<])(?!=)|(?<!\\s)/?>(?!=)|/>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.kscript"
+        }
+      },
+      "name": "meta.tag.kscript",
+      "contentName": "meta.embedded.expression.kscript",
+      "patterns": [
+        {
+          "include": "#entity"
+        },
+        {
+          "include": "#interpolation"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "name": "constant.numeric.kscript",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        },
+        {
+          "name": "variable.other.kscript",
+          "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "entity.name.function.command.kscript",
+          "match": "@[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "match": "(->)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.arrow.kscript"
+            },
+            "2": {
+              "name": "entity.name.function.method.kscript"
+            }
+          }
+        },
+        {
+          "name": "keyword.operator.word.kscript",
+          "match": "\\b(and|or|not|eq|ne|lt|le|gt|ge|in|step)\\b"
+        },
+        {
+          "name": "storage.type.function.kscript",
+          "match": "\\b(fn|match)\\b"
+        },
+        {
+          "name": "constant.language.kscript",
+          "match": "\\b(true|false|null)\\b"
+        },
+        {
+          "name": "keyword.operator.kscript",
+          "match": "\\|>|=>|===|!==|==|!=|\\?\\?=?|\\?\\.|\\.\\.|\\*\\*|[-+*/%]=?|>=?|\\?|:"
         }
       ]
     },

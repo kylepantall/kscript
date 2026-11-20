@@ -1,0 +1,64 @@
+using KScript.Language.Analysis;
+using KScript.Language.Features;
+using KScript.Syntax;
+
+namespace KScript.Language.Tests
+{
+    /// <summary>Messages and quick fixes in .kscript files are written in that format, and declared types are held to.</summary>
+    public class CodeFileDiagnosticsTests
+    {
+        private static readonly LanguageService Service = new LanguageService(files: EmptyFileSystem.Instance);
+
+        private static DocumentAnalysis Analyze(string text, string file) => Service.Analyze(text, Path.Combine(Path.GetTempPath(), file));
+
+        [Fact]
+        public void MissingImportsSuggestTheKscriptWay()
+        {
+            const string text = "// tests\nimport KScript.Math\n\ndescribe(name: x) {\n}\n";
+            Diagnostic d = Analyze(text, "a.kscript").Diagnostics.Single(x => x.Code == DiagnosticCodes.MissingImport);
+            Assert.Contains("Add import KScript.Test at the top", d.Message);
+            Assert.DoesNotContain("<import", d.Message);
+            Assert.Equal("Add import KScript.Test", d.Fixes[0].Title);
+            string fixedText = AnalyzerTests.Apply(text, d.Fixes[0].Changes);
+            Assert.Equal("// tests\nimport KScript.Math\nimport KScript.Test\n\ndescribe(name: x) {\n}\n", fixedText);
+            Assert.DoesNotContain(Analyze(fixedText, "a.kscript").Diagnostics, x => x.Severity == DiagnosticSeverity.Error);
+
+            Diagnostic top = Analyze("describe(name: x) {\n}\n", "b.kscript").Diagnostics.Single(x => x.Code == DiagnosticCodes.MissingImport);
+            Assert.Equal("import KScript.Test\ndescribe(name: x) {\n}\n", AnalyzerTests.Apply("describe(name: x) {\n}\n", top.Fixes[0].Changes));
+        }
+
+        [Fact]
+        public void TestFilesGetKScriptTestWithoutAnImport()
+        {
+            Assert.DoesNotContain(Analyze("describe(name: x) {\n  test(name: y) {\n    expect(value: 1, equals: 1)\n  }\n}\n", "a.test.kscript").Diagnostics,
+                x => x.Severity == DiagnosticSeverity.Error);
+        }
+
+        [Fact]
+        public void UnknownFunctionsAreDeclaredTheKscriptWay()
+        {
+            Diagnostic d = Analyze("@nope()\n", "a.kscript").Diagnostics.First(x => x.Code == DiagnosticCodes.UnknownCommand);
+            Assert.Contains("fn nope()", d.Message);
+            Assert.DoesNotContain("<fn", d.Message);
+            Assert.Contains("<fn name=\"nope\">", Analyze("<kscript><do>@nope()</do></kscript>", "a.ks.xml").Diagnostics.First(x => x.Code == DiagnosticCodes.UnknownCommand).Message);
+        }
+
+        [Theory]
+        [InlineData("fn get(person: int) => $person->trim()->title()\n", "a.kscript")]
+        [InlineData("<kscript><fn name=\"get\" params=\"person: int\" value=\"$person->trim()\" /></kscript>", "a.ks.xml")]
+        [InlineData("count: int = 3\necho $count->upper()\n", "a.kscript")]
+        public void DeclaredNumbersHaveNoStringMethods(string text, string file)
+        {
+            Diagnostic d = Analyze(text, file).Diagnostics.Single(x => x.Code == DiagnosticCodes.TypeMismatch);
+            Assert.Equal(DiagnosticSeverity.Error, d.Severity);
+            Assert.Contains("declared as a number", d.Message);
+        }
+
+        [Fact]
+        public void UndeclaredNumbersStillUseStringMethods()
+        {
+            // A value that came from somewhere (not a written type) may be text, as before.
+            Assert.DoesNotContain(Analyze("n = 3\necho $n->upper()\nfn f(x) => $x->trim()\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
+        }
+    }
+}

@@ -4,7 +4,7 @@
   <!-- Expressions, interpolation and variables -->
   <let name="n" value="3" />
   <let name="name" value="'Kyle'" />
-  <if test="$n lt 10 and $name ne ''">
+  <if $n lt 10 and $name ne ''>
     <echo>{ $n eq 1 ? 'item' : 'items' }</echo>
   </if>
   <let name="price" value="2.5" />
@@ -45,23 +45,23 @@
   <for each="key, value" in="$config">
     <echo>$key = $value</echo>
   </for>
-  <while test="$n lt 3">
+  <while $n lt 3>
     <set name="n" value="$n + 1" />
   </while>
 
   <!-- Branches -->
   <let name="score" value="80" />
-  <if test="$score ge 90">
+  <if $score ge 90>
     <echo>A</echo>
   </if>
-  <elif test="$score ge 75">
+  <elif $score ge 75>
     <echo>B</echo>
   </elif>
   <else>
     <echo>C</echo>
   </else>
   <let name="choice" value="2" />
-  <match value="$choice">
+  <match $choice>
     <case is="1">
       <call fn="greet" args="'settings'" />
     </case>
@@ -101,7 +101,7 @@
   </try>
   <let name="age" value="-1" />
   <try>
-    <if test="$age lt 0">
+    <if $age lt 0>
       <throw type="Validation" message="Age must be positive, got {$age}" />
     </if>
     <catch as="err" when="$err.type eq 'Validation'">

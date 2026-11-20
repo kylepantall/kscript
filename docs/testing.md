@@ -104,7 +104,7 @@ What a test prints with `<echo>` is kept, and shown under the test only when it 
 
 `message="…"` on any check replaces the usual message.
 
-`<assert test="…" />` checks a condition. When a comparison fails it shows the value of each side:
+`<assert … />` checks a condition. When a comparison fails it shows the value of each side:
 
 ```text
 Expected $order.total eq 30 to be true.

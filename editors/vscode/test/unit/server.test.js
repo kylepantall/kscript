@@ -92,6 +92,7 @@ test('page highlighting is injected into the grammar VS Code uses for .html file
   assert.ok(injection.injectTo.includes('text.html.basic'));
   const grammar = JSON.parse(fs.readFileSync(path.join(__dirname, '../..', injection.path), 'utf8'));
   assert.match(grammar.injectionSelector, /^L:text\.html -source/, 'the selector matches both HTML grammars and skips <script>/<style>');
+  assert.ok(grammar.patterns.some((p) => p.include === 'source.kscript#tag-shorthand'), '<if $ready> in pages is coloured as an expression');
 });
 
 test('kscript.json and standard files are validated with the bundled schemas', () => {
