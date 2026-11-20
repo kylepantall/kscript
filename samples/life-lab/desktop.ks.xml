@@ -1,6 +1,6 @@
 <!--
   Life Lab as a desktop app: kscript desktop.ks.xml opens it in a window on macOS, Windows or Linux.
-  kscript app build (in this folder) packages it as "Life Lab.app" on a Mac, or a Life Lab folder elsewhere.
+  kscript compile (in this folder) builds it as a program: "Life Lab.app" for a Mac, "Life Lab.exe" for Windows.
   The rules come from lib/life.ks.xml, the same script the terminal and browser versions use.
 -->
 <KScript.Window title="Life Lab" width="760" height="720" theme="dark" background="#0f172a">

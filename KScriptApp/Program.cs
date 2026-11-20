@@ -10,7 +10,15 @@ namespace KScript
 {
     class Program
     {
-        static int Main(string[] args) => new CommandLine().Run(args);
+        static int Main(string[] args)
+        {
+            // A program built by kscript compile runs its own script and nothing else. This check comes first, and
+            // Run is never reached, because a compiled program leaves out the assemblies Run uses (the command line,
+            // the language server and the packages the script doesn't import).
+            var commandLine = new CommandLine();
+            if (CompiledApp.IsCompiled) return commandLine.RunCompiled(CompiledApp.FindManifest(), args);
+            return commandLine.Run(args);
+        }
     }
 
     /// <summary>The kscript command: runs scripts and dispatches check, fmt, lsp, test, css, serve, app, update, ide and make.</summary>
@@ -23,14 +31,12 @@ namespace KScript
         public Func<Stream> StandardInput { get; init; } = Console.OpenStandardInput;
         public Func<Stream> StandardOutput { get; init; } = Console.OpenStandardOutput;
 
-        /// <summary>The folder kscript runs from, where a packaged app keeps its manifest.</summary>
-        public string AppFolder { get; init; } = AppContext.BaseDirectory;
-
         /// <summary>Stops kscript serve and running scripts, as Ctrl+C does.</summary>
         public System.Threading.CancellationToken Cancellation { get; init; }
 
         /// <summary>Shows why a packaged app's script failed, in a window.</summary>
-        public Action<string, string> ShowError { get; init; } = KScript.UI.DesktopHost.ShowError;
+        /// A lambda, not a method group, so KScript.UI only loads when an error is shown (compiled terminal programs leave it out).
+        public Action<string, string> ShowError { get; init; } = (title, message) => KScript.UI.DesktopHost.ShowError(title, message);
 
         /// <summary>The first Ctrl+C stops the work cleanly (finally blocks run); a second one ends the process.</summary>
         internal static bool StopOnFirstCtrlC(System.Threading.CancellationTokenSource cancel)
@@ -52,7 +58,7 @@ namespace KScript
             output.WriteLine("       kscript convert <file-or-folder>... [--to xml|kscript] [--stdout]   Write the .kscript version of an XML script, or the reverse.");
             output.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]   Serve pages, and routes.ks.xml / api.ks.xml routes.");
             output.WriteLine("       kscript routes [site folder]                      List the routes of a site.");
-            output.WriteLine("       kscript app build [script] [--name \"My App\"] [--out folder]   Package a script as a desktop app.");
+            output.WriteLine("       kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist]   Build programs that run without kscript.");
             output.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
             output.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
             output.WriteLine("       kscript --version | --help");
@@ -193,13 +199,6 @@ namespace KScript
 
         public int Run(string[] args)
         {
-            // Inside an app built by `kscript app build`: run the app's script and nothing else.
-            string appManifest = KScript.Apps.AppLauncher.FindManifest(AppFolder);
-            if (appManifest != null)
-            {
-                return RunApp(appManifest, args);
-            }
-
             if (args.Length > 0 && args[0] == "lsp")
             {
                 // stdout carries the protocol, so nothing else may write to it.
@@ -242,9 +241,9 @@ namespace KScript
                 return KScript.Ide.IdeCommand.Run(args.Skip(1).ToArray(), Out, Error);
             }
 
-            if (args.Length > 0 && args[0] == "app")
+            if (args.Length > 0 && args[0] == "compile")
             {
-                return KScript.Apps.AppCommand.Run(args.Skip(1).ToArray(), Out, Error);
+                return KScript.Compile.CompileCommand.Run(args.Skip(1).ToArray(), Out, Error);
             }
 
             if (args.Length > 0 && args[0] == "check")
@@ -321,17 +320,38 @@ namespace KScript
             return RunScript(path, args.Skip(1).ToArray());
         }
 
-        /// <summary>Runs the script of a packaged app. Opened from Finder or a launcher there is no terminal, so a script that
-        /// fails before its window opens shows why in a window instead.</summary>
-        int RunApp(string manifest, string[] args)
+        /// <summary>
+        /// Runs a program built by kscript compile. Its manifest (extracted by the .NET host next to the program's
+        /// files) says what it is: a script, a desktop window, or a site to serve. The arguments all go to the program.
+        /// </summary>
+        internal int RunCompiled(string manifest, string[] args)
         {
-            string main = KScript.Apps.AppLauncher.MainScript(manifest);
+            if (manifest == null)
+            {
+                Error.WriteLine("This program's files are missing. Delete its folder in the .net folder in your home folder (%TEMP%\\.net on Windows) and start it again.");
+                return 1;
+            }
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            CompiledApp.Manifest app = CompiledApp.Read(manifest);
+            return app.Kind switch
+            {
+                "site" => Serve(new[] { app.Main }.Concat(args).ToArray()),
+                "window" => RunWindow(app.Main, args),
+                _ => RunScript(app.Main, args),
+            };
+        }
+
+        /// <summary>Runs a compiled desktop app. Opened from Finder or the Start menu there is no terminal, so a script that
+        /// fails before its window opens shows why in a window instead.</summary>
+        int RunWindow(string main, string[] args)
+        {
             var host = KScriptHost.Console();
-            host.Arguments = KScript.Apps.AppLauncher.ScriptArguments(args);
+            host.Arguments = CompiledApp.ScriptArguments(args);
             var options = new InterpreterOptions();
             ProjectConfig project = null;
             try { project = ProjectConfig.FindAndLoad(Path.GetDirectoryName(main)); } catch (ProjectConfigException) { }
             if (project != null) options.DefaultPackages.AddRange(project.Packages);
+            host.Config = project?.ConfigOptions(null);
             try
             {
                 return new Interpreter(host, options: options).RunFile(main);

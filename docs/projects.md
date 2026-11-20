@@ -9,7 +9,7 @@ kscript make project my-app --port 3000
 cd my-app
 kscript serve            # http://localhost:3000, from kscript.json
 kscript desktop.kscript  # the desktop app, in a window
-kscript app build        # package it: dist/My App.app on a Mac, dist/My App/ elsewhere
+kscript compile          # build it as a program: dist/mac-arm64/My App.app, dist/win-x64/My App.exe...
 kscript test             # runs the tests in tests/
 kscript check            # checks every page and script in the project
 kscript fmt              # tidies every script and page in the project
@@ -19,7 +19,7 @@ What it makes:
 
 | File | What it is |
 | --- | --- |
-| `kscript.json` | Settings for `serve`, `check`, `test` and, with the desktop app, the `app` section `kscript app build` reads. |
+| `kscript.json` | Settings for `serve`, `check`, `test` and, with the desktop app, the `app` section `kscript compile` reads. |
 | `index.html`, `about.md`, `_layout.html`, `_components/site-nav.html`, `site.css` | The site: two pages, the layout they share and a navigation component. |
 | `tasks.html` | A to-do list in a [`<live>`](web.md#reactive-pages-with-live-no-javascript) block, with no JavaScript. |
 | `lib/tasks.kscript` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app, the API and the tests. |
@@ -107,11 +107,11 @@ kscript make project my-app --template ../starters/api   # any folder
     "exclude": ["vendor"]  // see docs/formatting.md for every format setting
   },
   "app": {
-    "main": "app.ks.xml",       // what `kscript app build` packages (see Desktop apps)
+    "main": "app.ks.xml",       // what `kscript compile` builds (see Programs)
     "name": "My App",           // shown in the Dock, Start menu or launcher (default: the project's name)
     "id": "com.example.myapp",  // the macOS bundle id
     "version": "1.0.0",
-    "icon": "icon.icns"         // .icns for macOS, .ico for Windows, .png for Linux
+    "icon": "icon.png"          // a .png, .ico or .icns, used for every platform
   },
   "config": {
     "environment": "development",           // used when neither --env nor KSCRIPT_ENV names one
@@ -131,7 +131,7 @@ kscript make project my-app --template ../starters/api   # any folder
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
 - `kscript serve` never serves `kscript.json`, or the `config.*`, `.yaml`, `.yml` and `.env` files that `$config` reads.
 - `http` configures route files, middleware, CORS, auth and rate limits for KScript.Http (see [Routes, controllers and middleware](http.md#settings-kscriptjson)).
-- `app` is read by `kscript app build`, which packages a desktop app (see [Desktop apps](desktop.md#packaging-an-app-kscript-app-build)).
+- `app` is read by `kscript compile`, which builds the script (often a desktop app) into a program for macOS, Windows and Linux (see [Programs](compile.md#names-icons-and-versions)).
 
 ## Generating files: kscript make
 

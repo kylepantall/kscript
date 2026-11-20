@@ -22,7 +22,7 @@ namespace KScript.Projects
         public string Host { get; set; } = "localhost";
     }
 
-    /// <summary>The <c>app</c> section: what <c>kscript app build</c> packages and how the app is named.</summary>
+    /// <summary>The <c>app</c> section: what <c>kscript compile</c> builds and how the program is named.</summary>
     /// <summary>The "make" section: settings for <c>kscript make</c>.</summary>
     public sealed class MakeSettings
     {
