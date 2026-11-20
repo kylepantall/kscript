@@ -451,5 +451,5 @@ See [docs/testing.md](docs/testing.md) for every element, check and setting.
 
 ## Roadmap
 
-KScript 2 is landing in steps: `kscript migrate` to rewrite KScript 1 scripts, pages running on the same interpreter as scripts, desktop windows (`KScript.UI`), and language models (`KScript.AI`).
+KScript 2 is landing in steps: pages running on the same interpreter as scripts, desktop windows (`KScript.UI`), and language models (`KScript.AI`).
 
