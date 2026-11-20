@@ -1,13 +1,13 @@
 # KScript for VS Code
 
-Language support for [KScript](https://github.com/kylepantall/kscript): scripts (`.ks.xml`, `.ks`, `.kscript`) and the HTML and Markdown pages that `kscript serve` runs.
+Language support for [KScript](https://github.com/kylepantall/kscript): scripts (`.ks.xml` and `.ks`, plus the brace-style `.kscript` format) and the HTML and Markdown pages that `kscript serve` runs.
 
 - Errors and warnings as you type, with quick fixes
 - Completion for elements, attributes, `$variables`, `@commands` and `->methods`
 - Hover documentation and signature help
 - Go to definition, find references and rename
 - Outline, semantic highlighting and syntax highlighting, including `{ expressions }` in pages
-- Format Document and format on save, using the same formatter as `kscript fmt`
+- Format Document and format on save, using the same formatter as `kscript fmt` (XML scripts and pages; `.kscript` files are left as they are)
 
 ## Requirements
 

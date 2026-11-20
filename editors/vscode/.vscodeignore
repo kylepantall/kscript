@@ -4,6 +4,7 @@
 !CHANGELOG.md
 !icon.png
 !language-configuration.json
+!language-configuration-code.json
 !syntaxes/**
 !dist/extension.js
 !schemas/**
