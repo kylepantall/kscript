@@ -1,0 +1,35 @@
+--- make
+description: A file cache in lib/: remember a slow result (an API call, a big file) for some minutes
+category: Scripts and data
+usage: <name> [--minutes 10] [--file data/cache.json]
+--minutes: How long a value is kept (default 10)
+--file: The JSON file it keeps values in (default data/<name>.json)
+example: kscript make cache api-cache --minutes 30
+example: kscript make cache reports --file data/report-cache.json
+to: {{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Import it with import "{{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}" as {{ snake }}, then: repos = @{{ snake }}.remember('repos', fn() => @fetch($url)->json())
+---
+// {{ title }}: values kept in a JSON file for {{ minutes ?? 10 }} minutes, so slow work runs once.
+import KScript.IO
+
+// File paths are relative to this script, so {{ up }} leads back to the project folder.
+const file = '{{ up }}{{ file }}{{#unless file}}{{ paths.data }}/{{ dir }}{{ kebab }}.json{{/unless}}'
+
+fn saved() => @exists($file) ? @read_json($file) : {}
+
+/// The cached value for key, or what make() returns, which is kept for next time.
+fn remember(key, make, minutes = {{ minutes ?? 10 }}) {
+  entries = @saved()
+  entry = $entries[$key]
+  if $entry != null and @date($entry.expires) gt @now() {
+    return $entry.value
+  }
+  value = $make()
+  @write_json($file, $entries->set($key, { value: $value, expires: @now()->add_minutes($minutes) }))
+  return $value
+}
+
+/// Drops the cached value for key, so the next remember() works it out again.
+fn forget(key) {
+  @write_json($file, @saved()->remove($key))
+}

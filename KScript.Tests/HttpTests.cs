@@ -466,6 +466,42 @@ public class HttpAppTests
         Assert.Equal(200, Send(app, "GET", "/v2/people").Status);
     }
 
+    [Fact]
+    public void ListsCanBeArrays()
+    {
+        // Kyle's case: middleware from an imported .kscript file, named in an array.
+        using var site = Site(null,
+            ("routes.kscript", """
+                KScript.Routes {
+                  import "middleware.kscript"
+                  import "controllers/people.ks.xml" as people
+                  Middleware(use: [stamp, log])
+                  Resource(path: "/people", to: people, only: [index, show])
+                  Route(methods: [get, post], path: "/both", redirect: "/people")
+                  Group(prefix: "/admin", middleware: [admins_only]) {
+                    Get(path: "/", redirect: "/")
+                  }
+                }
+                """),
+            ("middleware.kscript", """
+                import KScript.Http
+                fn stamp(request, next) => $next($request)->with_header('X-Stamp', 'yes')
+                fn admins_only(request, next) {
+                  if $request.query['admin'] != 'yes' {
+                    return @abort(403)
+                  }
+                  return $next($request)
+                }
+                """));
+        var app = App(site);
+        PageResult people = Send(app, "GET", "/people");
+        Assert.True(people.Status == 200, people.Body);
+        Assert.Equal("yes", people.Headers["X-Stamp"]);
+        Assert.Equal(405, Send(app, "DELETE", "/people/1").Status);
+        Assert.Equal(302, Send(app, "POST", "/both").Status);
+        Assert.Equal(403, Send(app, "GET", "/admin").Status);
+    }
+
     [Theory]
     [InlineData("<kscript><echo>hi</echo></kscript>", "starts with <KScript.Routes>")]
     [InlineData("<KScript.Routes><Get path=\"/a\" /></KScript.Routes>", "needs something to answer with")]

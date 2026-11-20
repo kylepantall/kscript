@@ -439,23 +439,13 @@ namespace KScript.Language.Analysis
             return new FunctionParameter { Name = name, Type = type, Default = def, Span = span };
         }
 
-        /// <summary>Splits <c>a, b</c> into names and their document spans.</summary>
+        /// <summary>Splits <c>[a, b]</c> (or <c>a, b</c>) into names and their document spans.</summary>
         private static IEnumerable<(string Name, TextSpan Span)> SplitNames(DecodedText value)
         {
-            string text = value.Value;
-            int i = 0;
-            while (i < text.Length)
+            foreach ((string listed, int at) in KScript.Metadata.NameList.Split(value.Value))
             {
-                while (i < text.Length && (char.IsWhiteSpace(text[i]) || text[i] == ','))
-                {
-                    i++;
-                }
-                int start = i;
-                while (i < text.Length && text[i] != ',')
-                {
-                    i++;
-                }
-                string name = text.Substring(start, i - start).TrimEnd();
+                string name = listed;
+                int start = at;
                 if (name.StartsWith("$", StringComparison.Ordinal) || name.StartsWith("@", StringComparison.Ordinal))
                 {
                     name = name.Substring(1);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+using KScript.Language.Catalog;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
 
@@ -126,7 +127,7 @@ namespace KScript.Conversion
 
                 var notConverted = new List<string>();
                 Func<string, string> importPath = src => ImportPath(file, src, toCode: !isCode, converting, notConverted);
-                ConversionResult result = isCode ? ScriptConverter.ToXml(parsed, importPath) : ScriptConverter.ToCode(parsed, importPath);
+                ConversionResult result = isCode ? ScriptConverter.ToXml(parsed, importPath, LanguageCatalog.Default.IsNameList) : ScriptConverter.ToCode(parsed, importPath, LanguageCatalog.Default.IsNameList);
                 string written = RenameMentions(result.Text, file, toCode: !isCode, converting, roots);
                 foreach (string src in notConverted.Distinct())
                 {

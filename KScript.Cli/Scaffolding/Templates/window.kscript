@@ -1,0 +1,23 @@
+--- make
+description: A desktop window (KScript.Window): a native app on macOS, Windows and Linux
+category: Desktop apps
+usage: <name> [--title "Title"] [--width 480] [--height 360]
+--title: The window title (default from the name)
+--width: The width (default 480)
+--height: The height (default 360)
+example: kscript make window settings --width 400 --height 300
+example: kscript make window windows/about --title "About this app"
+to: {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Open it: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }}. Build a program from it: kscript compile {{ dir }}{{ kebab }}{{ ext }}
+---
+// {{ title }}: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }} opens it, and the script ends when the window closes.
+KScript.Window(title: "{{ title }}", width: {{ width ?? 480 }}, height: {{ height ?? 360 }}, theme: system) {
+  count = 0
+
+  Text(size: 24, weight: bold) "{{ title }}"
+  Text "Clicked {$count} times"
+  Row(gap: 8) {
+    Button(variant: primary, on-click: count += 1) "Click"
+    Button(on-click: count = 0, disabled: $count eq 0) "Reset"
+  }
+}

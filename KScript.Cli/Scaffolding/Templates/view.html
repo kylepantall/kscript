@@ -1,0 +1,20 @@
+--- make
+description: A view in views/ that a controller renders with @view('name', …)
+category: Routes and APIs
+usage: <name> [--vars person,team] [--layout _layout.html] [--title "Title"]
+--vars: The values the controller passes, comma separated; each is shown in the view
+--layout: The layout it uses (default _layout.html)
+--title: The page title (default from the name)
+example: kscript make view people/show --vars person
+example: kscript make view home --title "Welcome"
+to: {{ paths.views }}/{{ dir }}{{ kebab }}.html
+hint: Render it from a controller: return @view('{{ dir }}{{ kebab }}'{{#each vars}}, {{ item | var }}: ${{ item | var }}{{/each}}), or route to it: kscript make route {{ path }} --view {{ dir }}{{ kebab }}
+---
+<layout src="{{ layout ?? _layout.html }}" title="{{ title }}">
+  <h1>{{ title }}</h1>
+{{#each vars}}
+  <p>{{ item | title }}: {${{ item | var }}}</p>
+{{else}}
+  <p>Rendered at { @now()->format(pattern: 'HH:mm') }.</p>
+{{/each}}
+</layout>

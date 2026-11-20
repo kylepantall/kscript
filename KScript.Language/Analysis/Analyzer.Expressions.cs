@@ -124,6 +124,26 @@ namespace KScript.Language.Analysis
                     pendingBare.Add(arg);
                     continue;
                 }
+                if (arg.Value is ListNode list && list.Items.Any(i => i is IdentifierNode))
+                {
+                    // [large, small]: bare words mean something only if the parameter is a list of an enum.
+                    var bare = new List<IdentifierNode>();
+                    foreach (ExprNode item in list.Items)
+                    {
+                        if (item is IdentifierNode id && id.Name != "_" && scope.Lookup(id.Name, region.Source.ToSource(id.Span.Start)) is not { Kind: SymbolKind.Import }
+                            && !ReferenceBareType(id, region, scope))
+                        {
+                            bare.Add(id);
+                            continue;
+                        }
+                        AnalyzeExpr(item, region, scope, ExprContext.Value);
+                    }
+                    if (bare.Count > 0)
+                    {
+                        pendingBareItems[arg] = bare;
+                    }
+                    continue;
+                }
                 if (lambdaParameters != null && arg.Value is LambdaNode lambda)
                 {
                     AnalyzeLambda(lambda, region, scope, lambdaParameters);

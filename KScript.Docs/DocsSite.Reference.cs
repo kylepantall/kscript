@@ -334,7 +334,7 @@ namespace KScript.Docs
             AttributeKind.Parameters => "parameters",
             AttributeKind.DeclareFunction => "a function name",
             AttributeKind.FunctionReference => "a function",
-            AttributeKind.FunctionReferences => "functions, comma separated",
+            AttributeKind.FunctionReferences => "a list of functions: <code>[a, b]</code>",
             AttributeKind.Path => "a file path",
             AttributeKind.Selector => "a CSS selector",
             AttributeKind.Enum => "one of a set of words",

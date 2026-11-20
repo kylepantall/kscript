@@ -17,10 +17,10 @@ A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a rou
 
 | File | Routes |
 | --- | --- |
-| `routes.kscript` or `routes.ks.xml` | Web routes, mounted at `/`. |
-| `api.kscript` or `api.ks.xml` | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
+| `routes/web.kscript`, or `routes.kscript` at the top (or `.ks.xml`) | Web routes, mounted at `/`. |
+| `routes/api.kscript`, or `api.kscript` at the top (or `.ks.xml`) | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
 
-`http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)).
+`http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)). `kscript make route users` adds a route and makes its controller (see [Generating files](projects.md#generating-files-kscript-make)): `kscript make route "people/{id}" --api`, `kscript make route people --resource`, and `kscript make controller`, `request`, `middleware` and `view` for the rest.
 
 ```kscript
 // routes.kscript
@@ -44,10 +44,10 @@ KScript.Routes {
 | Element | Use |
 | --- | --- |
 | `Get` `Post` `Put` `Patch` `Delete` `Options` `Any` | A route for that method. `Get` answers `HEAD` too. |
-| `Route(methods: "get, post")` | A route for several methods. |
+| `Route(methods: [get, post])` | A route for several methods. |
 | `Resource(path: /people, to: people)` | The usual JSON resource routes, answered by the controller's `index`, `store`, `show`, `update` and `destroy` functions (see [Resources](#resources)). |
 | `Group(prefix, middleware, name)` | Routes that share a path prefix, middleware or a name prefix. Groups nest. |
-| `Middleware(use: "log, cors")` | Middleware for the routes after it in this file or group. |
+| `Middleware(use: [log, cors])` | Middleware for the routes after it in this file or group. |
 
 A route has a `path` and one way to answer:
 
@@ -181,7 +181,18 @@ Middleware applies at four levels, and it runs outermost first:
 3. `Group(middleware: …)`, for the routes inside the group.
 4. `Get(…, middleware: …)`, for one route.
 
-A middleware list is comma separated. Each entry can be a built-in, a function, or a group name from `http.groups`. Built-ins take an argument after a colon, such as `throttle:30`.
+A middleware list is an array of names: `[log, secure_headers, throttle:30]`. Each entry can be a built-in, a function (including one from an imported script), or a group name from `http.groups`. Built-ins take an argument after a colon, such as `throttle:30`. A single entry needs no brackets: `middleware: auth`.
+
+```kscript
+// routes.kscript
+KScript.Routes {
+  import "middleware/security.kscript"
+
+  Middleware(use: [secure_headers, json_only])
+}
+```
+
+In XML, attributes are text, so the same list is written `use="secure_headers, json_only"`. In `.kscript` files, a list written as one string (`use: "log, cors"`) still works, but `kscript check` suggests the array with KS6006, and the quick fix rewrites it. The same goes for every list of names: `only`, `except`, `methods`, and `<llm tools>`.
 
 ### Built-in middleware
 
@@ -251,12 +262,12 @@ Put `etag` in `http.middleware` (or in a group) to tag every route at once:
 | PUT, PATCH | /people/{id} | `update` | people.update |
 | DELETE | /people/{id} | `destroy` | people.destroy |
 
-Functions the controller doesn't have get no route. `only="index, show"` and `except="destroy"` pick actions. `name` changes the name prefix, and `param` changes `{id}`. Put the write actions in an auth group:
+Functions the controller doesn't have get no route. `only: [index, show]` and `except: [destroy]` pick actions. `name` changes the name prefix, and `param` changes `{id}`. Put the write actions in an auth group:
 
 ```
-Resource(path: "/people", to: people, only: "index, show")
+Resource(path: "/people", to: people, only: [index, show])
 Group(middleware: auth) {
-  Resource(path: "/people", to: people, only: "store, update, destroy")
+  Resource(path: "/people", to: people, only: [store, update, destroy])
 }
 ```
 
@@ -280,7 +291,7 @@ Group(middleware: auth) {
 ```jsonc
 {
   "http": {
-    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes.* and api.*
+    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes/web.*, routes/api.*, routes.* and api.*
     "middleware": ["log"],                      // for every route
     "groups": { "api": ["cors", "throttle"] },  // names for lists of middleware
     "views": "views",                           // where @view() looks first; never served
@@ -299,6 +310,7 @@ Route files get the same checking and completion as scripts:
 
 - `to` completes the functions of imported controllers (`people.show`). A name that doesn't exist is an error with a did-you-mean.
 - `middleware` and `use` complete the built-ins too, and accept `http.groups` names.
+- Names in a list are checked and completed one by one, inside `[ ]` too.
 - Route elements are only offered inside `KScript.Routes` or `Group`.
 - `{id}` in `path` isn't read as a `{ }` expression.
 

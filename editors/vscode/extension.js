@@ -8,6 +8,7 @@ const { isSiteFolder } = require('./src/site');
 const { registerBlockDividers } = require('./src/blocks');
 const { watchedPath, watchBinary } = require('./src/watch');
 const { commentEnter } = require('./src/comments');
+const { autoCloseChange } = require('./src/autoclose');
 
 const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-needed';
 
@@ -164,6 +165,13 @@ async function activate(context) {
     }),
     vscode.commands.registerCommand('kscript.showOutput', () => output.show()),
     vscode.commands.registerTextEditorCommand('kscript.onEnter', (editor) => commentEnter(vscode, editor)),
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document !== event.document || event.document.languageId !== 'kscript') return;
+      if (!config().get('autoCloseTags', true) || event.contentChanges.length !== 1) return;
+      const close = autoCloseChange(event.document, event.contentChanges[0]);
+      if (close) editor.insertSnippet(new vscode.SnippetString(`$0</${close.name}>`), event.document.positionAt(close.offset), { undoStopBefore: false, undoStopAfter: false });
+    }),
     vscode.commands.registerCommand('kscript.showSetup', () => vscode.env.openExternal(vscode.Uri.parse(INSTALL_URL))),
     vscode.commands.registerCommand('kscript.runTests', () => runTests()),
     vscode.commands.registerCommand('kscript.runTestsInFile', (uri) => {

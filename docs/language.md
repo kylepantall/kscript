@@ -114,6 +114,7 @@ reported).
 | KS6003 | A variable, constant or loop variable whose value is never read, including one that is only ever set. A script's top-level constants are exported like its functions, so they count as used when an importing file uses them. In pages, only a function's own variables are checked, because a layout or component may read the rest. |
 | KS6004 | A function parameter the body never reads. For a lambda, only the parameters after the last one it reads, since the caller decides what it is passed: write `fn($_y) => ...` to keep the position. |
 | KS6005 | An import nothing uses: an `as` alias, a name in `names="..."`, a whole script, or a package none of whose elements, commands, methods or variables appear. |
+| KS6006 | Not unused code, but a style hint: a list of names written as one string in a `.kscript` file (`Middleware(use: "log, cors")`). Write it as an array, `use: [log, cors]`; the quick fix does it for you. XML attributes are text, so `use="log, cors"` is fine there. |
 
 The project is the folder with the nearest `kscript.json` and everything under it (hidden folders, `bin`, `obj` and
 `node_modules` are skipped). A script outside a project is checked against the other files in its own folder. A
@@ -183,7 +184,7 @@ fn pack(size: Size, gift: bool = false) => 'Packing ' + $size
 echo "{ @pack(large) } { @pack(size: small, gift) } { $Size.medium }"
 ```
 
-A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
+A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. A list of an enum takes an array of bare values too: with `fn pack_all(sizes: Size[])`, write `@pack_all([large, small])`. Anywhere else, a bare word in an array is an error, because names of variables start with `$` (`[$max_items, 3]`) and functions are passed with `@` (`[@twice]`). Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
 
 ## Typed data
 
