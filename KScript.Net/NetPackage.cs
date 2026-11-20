@@ -135,7 +135,8 @@ namespace KScript.Net
             }, run =>
             {
                 string url = Values.ToStr(run.Eval("url"));
-                string to = Path.GetFullPath(Path.Combine(run.Module.Directory, Values.ToStr(run.Eval("to"))));
+                string to = run.Host.ResolvePath(Values.ToStr(run.Eval("to")), run.Module.Directory);
+                run.Host.CheckWrite("<download>");
                 if (File.Exists(to) && !run.Flag("overwrite", true)) return null;
                 CheckUrl(url, run.Error);
                 using HttpResponseMessage response = Client.Value.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, run.Interpreter.Options.Cancellation).GetAwaiter().GetResult();
