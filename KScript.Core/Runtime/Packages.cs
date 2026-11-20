@@ -424,6 +424,8 @@ namespace KScript.Runtime
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Testing.TestPackage", "KScript.Test")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.UI.UIPackage", "KScript.UI")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.AI.AIPackage", "KScript.AI")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Documents.DocumentPackage", "KScript.Document")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Auth.AuthPackage", "KScript.Auth")]
         [UnconditionalSuppressMessage("Trimming", "IL2057", Justification = "Built-in package types are kept by the DynamicDependency attributes above.")]
         [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "Built-in package types are kept by the DynamicDependency attributes above.")]
         public KScriptPackage Get(string name)
