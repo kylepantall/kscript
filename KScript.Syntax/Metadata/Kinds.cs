@@ -70,6 +70,19 @@ namespace KScript.Metadata
         ErrorType,
     }
 
+    /// <summary>Which parts of an element's text are used as written rather than interpolated.</summary>
+    public enum TextLiterals
+    {
+        /// <summary>All of it is a template: <c>{ }</c> and <c>$name</c> insert values.</summary>
+        None,
+
+        /// <summary>A template, except LaTeX maths between <c>\(</c> and <c>\)</c> or <c>\[</c> and <c>\]</c>, whose braces are kept.</summary>
+        Maths,
+
+        /// <summary>None of it: the text is used exactly as written (LaTeX maths, source code).</summary>
+        All,
+    }
+
     /// <summary>What an element's content holds.</summary>
     public enum ContentKind
     {

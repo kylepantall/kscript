@@ -80,6 +80,7 @@ namespace KScript.Docs
             new Guide("storage", "storage.md", "Build", "App folders: KScript.Storage", "kscript"),
             new Guide("cache", "cache.md", "Build", "Caching: KScript.Cache", "kscript"),
             new Guide("auth", "auth.md", "Build", "Sign-in: KScript.Auth", "kscript"),
+            new Guide("documents", "documents.md", "Build", "Documents: KScript.Document", "kscript"),
             new Guide("testing", "testing.md", "Build", "Testing"),
             new Guide("projects", "projects.md", "Tools", "Projects and kscript.json"),
             new Guide("formatting", "formatting.md", "Tools", "Formatting"),
@@ -99,7 +100,7 @@ namespace KScript.Docs
             ["language-server.md"] = "how the language server is built, for contributors",
         };
 
-        private static readonly string[] SectionOrder = { "Start here", "Language", "Build", "Tools", "Reference", "Methods by type", "More" };
+        private static readonly string[] SectionOrder = { ProjectSection, "Start here", "Language", "Build", "Tools", "Reference", "Methods by type", "More" };
 
         public List<DocPage> Pages { get; } = new List<DocPage>();
         public List<SearchEntry> Search { get; } = new List<SearchEntry>();

@@ -401,7 +401,7 @@ public sealed class DocsTests
     [Fact]
     public void Playground_has_no_network_servers_windows_or_models()
     {
-        foreach (string package in new[] { "KScript.Net", "KScript.Http", "KScript.UI", "KScript.AI", "KScript.Web", "KScript.Test", "KScript.Storage", "KScript.Cache", "KScript.Auth" })
+        foreach (string package in new[] { "KScript.Net", "KScript.Http", "KScript.UI", "KScript.AI", "KScript.Web", "KScript.Test", "KScript.Storage", "KScript.Cache", "KScript.Document", "KScript.Auth" })
         {
             PlaygroundResult result = Playground.Run($"<import package=\"{package}\" />");
             Assert.Contains("can't run in the docs", result.Error);
@@ -875,7 +875,7 @@ public sealed class DocsTests
         Assert.False(search.Single(e => e.GetProperty("t").GetString() == "@now()").TryGetProperty("c", out _));
         string js = DocsSite.ReadAsset("docs.js");
         Assert.Contains("var text = ks && e.c ? e.c : e.t;", js);
-        Assert.Contains("var kind = ks && e.k === 'element' ? 'statement' : e.k;", js);
+        Assert.Contains("var kind = ks && e.k === 'element' ? 'statement' : e.k === 'project' ? 'yours' : e.k;", js);
     }
 
     #endregion

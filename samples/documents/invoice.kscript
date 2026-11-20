@@ -1,0 +1,23 @@
+import KScript.Document
+
+// An invoice: line items are a list of maps; subtotal, tax and total are worked out for you.
+
+items = [
+  { description: 'Workshop: *Cellular automata for beginners* (half day)', quantity: 2, price: 450 },
+  { description: 'Pattern library design', quantity: 12.5, price: 85 },
+  { description: 'Travel', price: 64.2 },
+]
+
+KScript.Document(template: invoice, to: "invoice.pdf, invoice.docx") {
+  Invoice(
+    number: "INV-2026-042",
+    date: "20 November 2026",
+    due: "20 December 2026",
+    from: "**Life Lab Ltd**\n12 Grid Street\nCambridge CB1 2AB",
+    to: "Example University\nAccounts Payable\nOxford OX1 3QD",
+    items: $items,
+    currency: GBP,
+    tax: 20,
+    notes: "Please pay by bank transfer to sort code 00-00-00, account 12345678, quoting the invoice number."
+  )
+}

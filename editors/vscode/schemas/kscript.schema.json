@@ -40,7 +40,9 @@
       "properties": {
         "root": { "type": "string", "default": ".", "description": "The site folder, relative to kscript.json. Its files and folders are the site's URLs." },
         "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8080, "description": "The port to listen on." },
-        "host": { "type": "string", "default": "localhost", "description": "localhost, an IP address to listen on, or * for every address." }
+        "host": { "type": "string", "default": "localhost", "description": "localhost, an IP address to listen on, or * for every address." },
+        "docs": { "type": "boolean", "default": false, "description": "Also serve the KScript docs, with a page about this project's routes, functions and types, on localhost while you work (like kscript serve --with-docs). Never on for compiled programs or the production environment." },
+        "docs_port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 4180, "description": "The port the docs are served on. Without it, 4180, or a free port if that is in use." }
       }
     },
     "http": {
@@ -183,6 +185,7 @@
         "storage": { "type": "string", "default": "lib", "description": "JSON file stores (kscript make storage)." },
         "jobs": { "type": "string", "default": "jobs", "description": "Jobs (kscript make job)." },
         "windows": { "type": "string", "default": ".", "description": "Desktop windows (kscript make window)." },
+        "documents": { "type": "string", "default": "documents", "description": "Document scripts that write PDF and Word files (kscript make document)." },
         "config": { "type": "string", "default": "config", "description": "Settings files (kscript make config), unless config.root is set." },
         "locales": { "type": "string", "default": "locales", "description": "Translations (kscript make locale)." },
         "logging": { "type": "string", "default": "lib", "description": "Log providers (kscript make logger)." },

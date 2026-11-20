@@ -34,9 +34,10 @@ namespace KScript.Docs
                 {
                     case "--help":
                     case "-h":
-                        output.WriteLine("Usage: kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open]");
+                        output.WriteLine("Usage: kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open] | kscript docs --project");
                         output.WriteLine("Opens the KScript docs in your browser: guides, the reference for every package, and examples you can run.");
                         output.WriteLine("Examples show in the project's make.format (kscript.json), or .kscript outside a project; --format picks one.");
+                        output.WriteLine("kscript docs --project writes .kscript/docs/project.md, the docs of this project's own code, and keeps it up to date from then on.");
                         return 0;
                     case "--port":
                     case "-p":
@@ -59,6 +60,8 @@ namespace KScript.Docs
                     case "--no-open":
                         openBrowser = false;
                         break;
+                    case "--project":
+                        return ProjectDocsOutput.Start(Directory.GetCurrentDirectory(), output, error);
                     default:
                         if (args[i].StartsWith("-", StringComparison.Ordinal) && !args[i].StartsWith("->", StringComparison.Ordinal))
                         {
@@ -102,6 +105,83 @@ namespace KScript.Docs
             finally
             {
                 TryDelete(folder);
+            }
+        }
+
+        /// <summary>
+        /// <c>kscript serve --with-docs</c>: the docs, with a page about the project (<see cref="ProjectGuide"/>), on
+        /// localhost next to the site until <paramref name="stop"/>. The project page is read again when a script
+        /// changes. Returns 1 if the docs couldn't start (the site still runs).
+        /// </summary>
+        public static async Task<int> ServeProjectAsync(string folder, KScript.Projects.ProjectConfig project, int? port, int sitePort, TextWriter output, TextWriter error, CancellationToken stop)
+        {
+            int chosen = port ?? (DefaultPort == sitePort ? AnyFreePort() : FreePort(DefaultPort));
+            if (port != null && (port == sitePort || !IsFree(chosen)))
+            {
+                error.WriteLine($"Docs: port {chosen} is in use, so the docs aren't served. Pick another with --docs-port (or serve.docs_port in kscript.json).");
+                return 1;
+            }
+
+            CleanUpOldSites();
+            string site = Path.Combine(Path.GetTempPath(), "kscript-docs-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var docs = new ProjectDocs(DocsSite.Build(), folder, project, site);
+                return await KScript.Http.HttpServer.RunAsync(site, null, chosen, "localhost", null, stop,
+                    before: request =>
+                    {
+                        docs.Refresh(request.Path.Value);
+                        return HandleApiAsync(request, chosen);
+                    },
+                    started: url => output.WriteLine($"Docs for {docs.Guide.Name}: {url}{DocsSite.ProjectPath} (the KScript docs, with a page about this project)"));
+            }
+            catch (IOException ex)
+            {
+                error.WriteLine($"Could not start the docs server: {ex.Message}");
+                return 1;
+            }
+            finally
+            {
+                TryDelete(site);
+            }
+        }
+
+        /// <summary>The docs site of <c>kscript serve --with-docs</c>, whose project page follows the project as it changes.</summary>
+        internal sealed class ProjectDocs
+        {
+            private readonly object gate = new object();
+            private readonly DocsSite site;
+            private readonly string folder;
+            private readonly KScript.Projects.ProjectConfig project;
+            private readonly string output;
+
+            public ProjectDocs(DocsSite site, string folder, KScript.Projects.ProjectConfig project, string output)
+            {
+                this.site = site;
+                this.folder = folder;
+                this.project = project;
+                this.output = output;
+                Guide = ProjectGuide.Read(folder, project);
+                site.Format = Guide.Format;
+                site.SetProject(Guide);
+                site.WriteTo(output);
+            }
+
+            public ProjectGuide Guide { get; private set; }
+
+            /// <summary>Before the project page or the search index is sent: reads the project again if a script changed.</summary>
+            public bool Refresh(string path)
+            {
+                if (path != DocsSite.ProjectPath && path != "/assets/search.json") return false;
+                lock (gate)
+                {
+                    if (ProjectGuide.Changes(folder, project) == Guide.Stamp) return false;
+                    Guide = ProjectGuide.Read(folder, project);
+                    site.SetProject(Guide);
+                    File.WriteAllText(Path.Combine(output, "_pages", DocsSite.PageFile(DocsSite.ProjectPath)), site.Render(site.Find(DocsSite.ProjectPath)));
+                    File.WriteAllText(Path.Combine(output, "assets", "search.json"), site.SearchJson());
+                    return true;
+                }
             }
         }
 
@@ -149,7 +229,11 @@ namespace KScript.Docs
         /// <summary>The preferred port if nothing is using it, otherwise any free one.</summary>
         internal static int FreePort(int preferred)
         {
-            if (IsFree(preferred)) return preferred;
+            return IsFree(preferred) ? preferred : AnyFreePort();
+        }
+
+        internal static int AnyFreePort()
+        {
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             int port = ((IPEndPoint)listener.LocalEndpoint).Port;

@@ -20,6 +20,12 @@ namespace KScript.Projects
         public string Root { get; set; } = ".";
         public int Port { get; set; } = 8080;
         public string Host { get; set; } = "localhost";
+
+        /// <summary>True to serve the docs, with a page about this project, next to the site (as <c>--with-docs</c> does).</summary>
+        public bool Docs { get; set; }
+
+        /// <summary>The port the docs are served on; null picks 4180, or a free port if that is in use.</summary>
+        public int? DocsPort { get; set; }
     }
 
     /// <summary>The <c>app</c> section: what <c>kscript compile</c> builds and how the program is named.</summary>
@@ -371,6 +377,7 @@ namespace KScript.Projects
             ["storage"] = "lib",
             ["jobs"] = "jobs",
             ["windows"] = ".",
+            ["documents"] = "documents",
             ["config"] = "config",
             ["locales"] = "locales",
             ["logging"] = "lib",
@@ -1039,8 +1046,15 @@ namespace KScript.Projects
                     case "host":
                         config.Serve.Host = String(p.Value, "serve.host", config) ?? "localhost";
                         break;
+                    case "docs":
+                        config.Serve.Docs = Bool(p.Value, "serve.docs", config) ?? false;
+                        break;
+                    case "docs_port":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int docsPort) && docsPort > 0 && docsPort < 65536) config.Serve.DocsPort = docsPort;
+                        else config.Warnings.Add($"serve.docs_port should be a number from 1 to 65535.");
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port or host).");
+                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port, host, docs or docs_port).");
                         break;
                 }
             }

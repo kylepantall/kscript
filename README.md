@@ -127,6 +127,7 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Storage` | Settings, data, caches and logs in the right folders on macOS, Windows and Linux |
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
+| `KScript.Document` | Papers, reports, letters and invoices with LaTeX maths, tables, figures and citations, saved as PDF, Word, LaTeX, Markdown or HTML |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
 
@@ -154,7 +155,7 @@ There is no Swift, C#, XAML or shell script to write, and the programs `kscript 
 ```sh
 kscript make project my-app    # a web app and desktop app with a layout, a live page, scripts, tests and editor settings
 kscript make project my-tool --bare   # just kscript.json, a script and a test
-kscript serve                  # run it
+kscript serve                  # run it (--with-docs also serves the docs, with a page about your project)
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI
 kscript fmt                    # tidy every script and page (--check for CI)
@@ -205,7 +206,7 @@ Then save the first example above as `hello.kscript`, run `kscript hello.kscript
 
 ## Documentation
 
-Run `kscript docs` to open the full documentation in your browser. It is built into kscript, so it works offline and always matches your version: the guides below, a reference for every package, element, command and method, search, light and dark themes, and an editable **Run** box on each example.
+Run `kscript docs` to open the full documentation in your browser. It is built into kscript, so it works offline and always matches your version: the guides below, a reference for every package, element, command and method, search, light and dark themes, and an editable **Run** box on each example. While you work on a site, `kscript serve --with-docs` serves them next to it, with a page about your own project: its conventions, routes, and the functions and types its scripts declare.
 
 - [Getting started](docs/getting-started.md): a ten-minute tour, with examples to run
 - [Installing KScript](docs/install.md): installers, updating, manual downloads and editor setup

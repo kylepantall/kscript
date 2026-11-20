@@ -1,5 +1,6 @@
 using System.Text;
 
+using KScript.Metadata;
 using KScript.Syntax.Text;
 
 namespace KScript.Syntax
@@ -57,7 +58,10 @@ namespace KScript.Syntax
     /// </summary>
     public static class TemplateParser
     {
-        public static Template Parse(string text, bool allowBareReferences)
+        public static Template Parse(string text, bool allowBareReferences) => Parse(text, allowBareReferences, TextLiterals.None);
+
+        /// <summary>As <see cref="Parse(string, bool)"/>, keeping LaTeX maths (or all of the text) as written.</summary>
+        public static Template Parse(string text, bool allowBareReferences, TextLiterals literals)
         {
             Template template = new Template();
             StringBuilder literal = new StringBuilder();
@@ -75,9 +79,26 @@ namespace KScript.Syntax
                 literalStart = end;
             }
 
+            if (literals == TextLiterals.All)
+            {
+                if (text.Length > 0) template.Segments.Add(new TemplateSegment { Kind = TemplateSegmentKind.Text, Text = text, Span = TextSpan.FromBounds(0, text.Length) });
+                return template;
+            }
+
             while (i < text.Length)
             {
                 char c = text[i];
+
+                if (literals == TextLiterals.Maths && c == '\\' && i + 1 < text.Length && (text[i + 1] == '(' || text[i + 1] == '['))
+                {
+                    // \( x^{2} \): LaTeX maths, braces and all, is kept for the document package to read.
+                    string close = text[i + 1] == '(' ? "\\)" : "\\]";
+                    int end = text.IndexOf(close, i + 2, StringComparison.Ordinal);
+                    int stop = end < 0 ? text.Length : end + 2;
+                    literal.Append(text, i, stop - i);
+                    i = stop;
+                    continue;
+                }
 
                 if ((c == '{' || c == '}') && i + 1 < text.Length && text[i + 1] == c)
                 {
