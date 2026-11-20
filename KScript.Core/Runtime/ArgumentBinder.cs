@@ -64,8 +64,9 @@ namespace KScript.Runtime
     public static class ArgumentBinder
     {
         /// <summary>One parameter, as the binder sees it.</summary>
+        /// <remarks><paramref name="RawText"/>: how a bare word for this parameter is read as text: "handle" (<c>@kyle</c> too), "word", or null.</remarks>
         public sealed record Slot(string Name, bool Required, bool Variadic = false, IReadOnlyCollection<string> Values = null, string TypeName = null,
-            IReadOnlyCollection<string> ItemValues = null)
+            IReadOnlyCollection<string> ItemValues = null, string RawText = null)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
 
@@ -333,8 +334,12 @@ namespace KScript.Runtime
         }
 
         /// <summary>The enum value <paramref name="word"/> names (ignoring case and spaces), or null.</summary>
-        private static string EnumValue(Slot slot, string word) =>
-            slot?.IsEnum == true ? slot.Values.FirstOrDefault(v => string.Equals(v, word.Trim(), StringComparison.OrdinalIgnoreCase)) : null;
+        private static string EnumValue(Slot slot, string word)
+        {
+            if (slot?.IsEnum == true) return slot.Values.FirstOrDefault(v => string.Equals(v, word.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (slot?.RawText == null) return null;
+            return slot.RawText == "handle" || !word.StartsWith('@') ? word : null;
+        }
 
         private static string Or(IEnumerable<string> values)
         {

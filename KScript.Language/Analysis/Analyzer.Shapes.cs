@@ -34,7 +34,7 @@ namespace KScript.Language.Analysis
                 }
                 string name = nameAttr.ValueText.Trim().TrimStart('$');
                 TextSpan span = TrimmedSpan(nameAttr.Value);
-                if (BuiltInTypes.Contains(name, StringComparer.OrdinalIgnoreCase))
+                if (IsBuiltInTypeName(name))
                 {
                     Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{name}' is a built-in type, so a <type> can't use it as its name.");
                     continue;
@@ -44,19 +44,86 @@ namespace KScript.Language.Analysis
                     Report(span, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"A type named '{name}' is already declared.");
                     continue;
                 }
-                TypeShape instance = new TypeShape(KType.Map) { Name = name, Closed = e.GetAttributeValue("extra")?.Trim() != "keep" };
+                // A refinement type's values are its root's: an Age is a number, a Username a handle.
+                string refinedRoot = RefinedRoot(e);
+                TypeShape rootShape = refinedRoot != null ? TypeNamed(refinedRoot, 0) : null;
+                TypeShape instance = rootShape != null
+                    ? new TypeShape(rootShape.Type) { Name = name, Declared = rootShape.Declared, Element = rootShape.Element }
+                    : new TypeShape(KType.Map) { Name = name, Closed = e.GetAttributeValue("extra")?.Trim() != "keep" };
                 Symbol symbol = NewVariable(name, span, e, SymbolKind.Constant, new TypeShape(KType.Type) { Name = name, Instance = instance });
                 root.Declare(symbol, 0);
                 declaredTypes[e] = instance;
             }
 
+            var filled = new HashSet<MarkupElement>();
             foreach (KeyValuePair<MarkupElement, TypeShape> type in declaredTypes)
             {
-                FillFields(type.Key, type.Value);
+                FillType(type.Key, type.Value, filled);
+            }
+            foreach (KeyValuePair<MarkupElement, TypeShape> type in declaredTypes)
+            {
                 Symbol symbol = result.Symbols.First(s => s.DeclaringElement == type.Key && s.Shape.Instance == type.Value);
                 string description = type.Key.GetAttributeValue("description");
                 symbol.Description = (description != null ? description + "\n\n" : string.Empty)
                     + "type " + type.Value.Name + " {\n" + string.Concat(type.Value.Fields.Values.Select(f => "  " + f.Name + ": " + f.Shape.Display() + "\n")) + "}";
+            }
+        }
+
+        /// <summary>
+        /// Fills a type's fields and methods: first those of the types it joins (<c>with [User, Auditable]</c>, left to right),
+        /// then its own, which win.
+        /// </summary>
+        private void FillType(MarkupElement e, TypeShape shape, HashSet<MarkupElement> filled)
+        {
+            if (!filled.Add(e))
+            {
+                return;
+            }
+            if (shape.Type == KType.Map)
+            {
+                foreach (string baseName in WithNames(e))
+                {
+                    MarkupElement baseElement = TypeElementNamed(TypeInference.WithoutTypeArguments(baseName));
+                    if (baseElement == null || !declaredTypes.TryGetValue(baseElement, out TypeShape baseShape))
+                    {
+                        continue;
+                    }
+                    FillType(baseElement, baseShape, filled);
+                    foreach (KeyValuePair<string, FieldInfo> f in baseShape.Fields)
+                    {
+                        shape.Fields[f.Key] = f.Value;
+                    }
+                    foreach (KeyValuePair<string, Symbol> m in baseShape.Methods)
+                    {
+                        shape.Methods[m.Key] = m.Value;
+                    }
+                }
+                FillFields(e, shape);
+            }
+            foreach (MarkupElement fn in e.ChildElements.Where(c => IsKScriptElementName(c, "fn")))
+            {
+                MarkupAttribute nameAttr = fn.GetAttribute("name");
+                string fnName = nameAttr?.ValueText?.Trim();
+                if (string.IsNullOrEmpty(fnName))
+                {
+                    continue;
+                }
+                TextSpan span = TrimmedSpan(nameAttr.Value);
+                Symbol method = new Symbol
+                {
+                    Name = fnName,
+                    Kind = SymbolKind.Function,
+                    DeclarationSpan = span,
+                    DeclaringElement = fn,
+                    Description = fn.Documentation,
+                };
+                if (fn.GetAttribute("params")?.Value is DecodedText ps)
+                {
+                    method.Parameters.AddRange(ParseParameters(ps, report: false));
+                }
+                result.Symbols.Add(method);
+                result.References.Add(new SymbolReference(method, span, true, true));
+                shape.Methods[fnName] = method;
             }
         }
 
@@ -174,7 +241,8 @@ namespace KScript.Language.Analysis
         /// <summary>Walks a &lt;type&gt;: checks its fields attribute and its children (which must be &lt;field&gt;s).</summary>
         private void AnalyzeType(MarkupElement e, ElementInfo info, Scope scope, Scope inner, bool markupMode)
         {
-            AnalyzeAttributes(e, info, scope);
+            // parse="..." sees the text being read, so it is analyzed below with $value and $match.
+            AnalyzeAttributes(e, info, scope, skip: "parse");
             var seen = new HashSet<string>(StringComparer.Ordinal);
             MarkupAttribute fields = e.GetAttribute("fields");
             if (fields?.Value != null)
@@ -184,11 +252,23 @@ namespace KScript.Language.Analysis
                     CheckInlineField(part, start, fields.Value, seen);
                 }
             }
+            TypeShape instance = declaredTypes.TryGetValue(e, out TypeShape declared) ? declared : null;
+            bool refined = instance != null && instance.Type != KType.Map;
             foreach (MarkupElement child in e.ChildElements)
             {
+                if (IsKScriptElementName(child, "validate") || IsKScriptElementName(child, "normalize") || IsKScriptElementName(child, "fn"))
+                {
+                    continue;
+                }
                 if (!IsKScriptElementName(child, "field"))
                 {
-                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field> elements, not <{child.Name}>.");
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <{child.Name}>.");
+                    continue;
+                }
+                if (refined)
+                {
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
+                        $"{instance.Name} refines {RefinedRoot(e)}, so it has no fields. Use with [...] with record types to add fields.");
                     continue;
                 }
                 MarkupAttribute nameAttr = child.GetAttribute("name");
@@ -198,7 +278,7 @@ namespace KScript.Language.Analysis
                     Report(TrimmedSpan(nameAttr.Value), DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"The field '{name}' is listed twice.");
                 }
             }
-            bool hasFields = seen.Count > 0 || e.GetAttribute("sample") != null;
+            bool hasFields = seen.Count > 0 || e.GetAttribute("sample") != null || e.GetAttribute("with") != null;
             if (!hasFields)
             {
                 Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "<type> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.");
@@ -208,7 +288,86 @@ namespace KScript.Language.Analysis
             {
                 Report(TrimmedSpan(e.GetAttribute("sample").Value), DiagnosticSeverity.Warning, DiagnosticCodes.InvalidAttributeValue, $"'{sample}' isn't a JSON file the editor can read, so the type's fields from it aren't known.");
             }
-            WalkChildren(e.Children, inner, markupMode);
+            CheckWithNames(e);
+            // Rules and methods see the value: $value in a refinement type, the fields (and $this) in a record type.
+            Scope typeScope = new Scope(inner, e.Span);
+            if (instance != null)
+            {
+                if (refined)
+                {
+                    DeclareImplicit(typeScope, "value", instance, $"The {instance.Name} being checked.", e);
+                }
+                else
+                {
+                    foreach (FieldInfo f in instance.Fields.Values)
+                    {
+                        DeclareImplicit(typeScope, f.Name, f.Shape, f.Description ?? $"The {f.Name} field.", e, f.Declaration);
+                    }
+                    DeclareImplicit(typeScope, "this", instance, $"The {instance.Name} itself.", e);
+                }
+            }
+            if (e.GetAttribute("parse") is { Value: not null } parse)
+            {
+                var parseScope = new Scope(inner, TrimmedSpan(parse.Value));
+                DeclareImplicit(parseScope, "value", new TypeShape(KType.String), "The text being read.", e);
+                DeclareImplicit(parseScope, "match", new TypeShape(KType.Map), "The pattern's match: { text, index, groups, captures }.", e);
+                AnalyzeExpressionRegion(parse.Value, RegionKind.Expression, parseScope, e, parse);
+            }
+            WalkChildren(e.Children, typeScope, markupMode);
+        }
+
+        private void DeclareImplicit(Scope scope, string name, TypeShape shape, string description, MarkupElement e, TextSpan? declaration = null)
+        {
+            Symbol symbol = new Symbol { Name = name, Kind = SymbolKind.Parameter, Shape = shape, Description = description, DeclaringElement = e, DeclarationSpan = declaration ?? default };
+            result.Symbols.Add(symbol);
+            scope.Declare(symbol, e.Span.Start);
+        }
+
+        /// <summary>with="User, Auditable": each name a type; one built-in type at most, and then alone.</summary>
+        private void CheckWithNames(MarkupElement e)
+        {
+            MarkupAttribute with = e.GetAttribute("with");
+            if (with?.Value == null)
+            {
+                return;
+            }
+            List<string> names = WithNames(e);
+            TextSpan span = TrimmedSpan(with.Value);
+            if (names.Count == 0)
+            {
+                Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, "Name the types to build on: with [User, Auditable], or with [int] for a refinement type.");
+                return;
+            }
+            foreach (string n in names)
+            {
+                string bare = TypeInference.WithoutTypeArguments(n).TrimEnd('?');
+                if (IsBuiltInTypeName(bare.Replace("[]", string.Empty)))
+                {
+                    if (names.Count > 1)
+                    {
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"A type built on {bare} refines it, so {bare} must be the only type in with [...].");
+                    }
+                    continue;
+                }
+                if (TypeElementNamed(bare) == null)
+                {
+                    int at = with.Value.Value.IndexOf(n, StringComparison.Ordinal);
+                    TextSpan nameSpan = at >= 0 ? with.Value.ToSource(new TextSpan(at, n.Length)) : span;
+                    Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"Unknown type '{bare}'. Build on a <type> declared in this file or a built-in type such as string, int or email.",
+                        SuggestFix(nameSpan, bare, TypeNames().Concat(BuiltInTypes).Concat(SemanticTypeNames), x => x));
+                    continue;
+                }
+                Symbol symbol = result.Symbols.FirstOrDefault(s => s.Shape?.Type == KType.Type && s.Name == bare);
+                if (symbol != null)
+                {
+                    int at = with.Value.Value.IndexOf(n, StringComparison.Ordinal);
+                    if (at >= 0)
+                    {
+                        result.References.Add(new SymbolReference(symbol, with.Value.ToSource(new TextSpan(at, bare.Length)), false, false));
+                    }
+                }
+            }
         }
 
         private void CheckInlineField(string part, int start, DecodedText value, HashSet<string> seen)
@@ -334,7 +493,8 @@ namespace KScript.Language.Analysis
 
         private void CheckTypeText(string text, TextSpan span, int offset)
         {
-            string name = text.TrimEnd('?').TrimEnd();
+            // Arguments given where the type is used (uuid(v: 4), string(min: 1)) are checked when the script runs.
+            string name = TypeInference.WithoutTypeArguments(text).TrimEnd('?').TrimEnd();
             while (name.EndsWith("[]", StringComparison.Ordinal))
             {
                 name = name.Substring(0, name.Length - 2).TrimEnd();
@@ -346,9 +506,9 @@ namespace KScript.Language.Analysis
             }
             if (TypeNamed(text, offset) == null)
             {
-                IEnumerable<string> known = BuiltInTypes.Concat(TypeNames());
+                IEnumerable<string> known = BuiltInTypes.Concat(SemanticTypeNames).Concat(TypeNames());
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
-                    $"Unknown type '{name}'. Use one of: {string.Join(", ", BuiltInTypes)}, or declare it with <type name=\"{name}\" fields=\"...\" /> or <enum name=\"{name}\" values=\"...\" />.",
+                    $"Unknown type '{name}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <type name=\"{name}\" fields=\"...\" /> or <enum name=\"{name}\" values=\"...\" />.",
                     SuggestFix(span, name, known, n => n));
             }
         }

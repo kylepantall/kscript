@@ -235,6 +235,7 @@ namespace KScript.Runtime
         public static bool StrictEquals(object a, object b)
         {
             if (a == null || b == null) return a == null && b == null;
+            if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
             // A record (a map made by a <type>) equals a plain map with the same keys and values.
             if (a.GetType() != b.GetType() && !(a is Dictionary<string, object> && b is Dictionary<string, object>)) return false;
             switch (a)
@@ -259,6 +260,10 @@ namespace KScript.Runtime
         public static bool LooseEquals(object a, object b)
         {
             if (a == null || b == null) return a == null && b == null;
+            if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
+            // An email or a handle equals text that means the same once normalised: 'Kyle@Example.com' == 'Kyle@example.com'.
+            if (a is ISemanticText ta && b is string tb) return SemanticTypes.TryConvert(ta.TypeName, tb, out object nb, out _) && ta.Equals(nb);
+            if (b is ISemanticText && a is string) return LooseEquals(b, a);
             if (a is List<object> || b is List<object> || a is Dictionary<string, object> || b is Dictionary<string, object> || a is ICallable || b is ICallable)
                 return StrictEquals(a, b);
             if ((a is double || b is double) && TryNumber(a, out double x) && TryNumber(b, out double y)) return x == y;
@@ -268,6 +273,7 @@ namespace KScript.Runtime
 
         public static int Compare(object a, object b, string op)
         {
+            if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
             if (TryNumber(a, out double x) && TryNumber(b, out double y)) return x.CompareTo(y);
             if (a is DateTime da && b is DateTime db) return da.CompareTo(db);
             if (a == null || b == null)
@@ -282,7 +288,7 @@ namespace KScript.Runtime
         #region Conversion for type="..."
 
         /// <summary>The types a <c>type</c> attribute or a parameter can declare.</summary>
-        public static readonly string[] DeclarableTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "any" };
+        public static readonly string[] DeclarableTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "regex", "any" };
 
         /// <summary>Converts a value to a declared type, or fails with a clear message.</summary>
         public static object ConvertTo(object value, string type, string what)
@@ -319,6 +325,16 @@ namespace KScript.Runtime
                     if (value is DateTime) return value;
                     if (value is string ds && DateTime.TryParse(ds, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dt)) return dt;
                     break;
+                case "email":
+                case "password":
+                case "handle":
+                case "uuid":
+                case "regex":
+                {
+                    string semantic = type.Trim().ToLowerInvariant();
+                    if (SemanticTypes.TryConvert(semantic, value, out object converted, out string reason)) return converted;
+                    throw new KScriptException($"{what} {SemanticTypes.Mismatch(semantic, value, reason)}.", "Type");
+                }
                 default:
                     throw new KScriptException($"Unknown type '{type}' for {what}. Use one of: {string.Join(", ", DeclarableTypes)}.", "Type");
             }

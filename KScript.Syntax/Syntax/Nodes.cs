@@ -36,6 +36,15 @@ namespace KScript.Syntax
         String,
         Bool,
         Null,
+
+        /// <summary><c>/pattern/flags</c>: the value is the whole literal.</summary>
+        Regex,
+
+        /// <summary><c>kyle@example.com</c>, written without quotes.</summary>
+        Email,
+
+        /// <summary><c>3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f</c>, written without quotes.</summary>
+        Uuid,
     }
 
     public sealed class LiteralNode : ExprNode
