@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { installLocations, findOnPath, expand, resolveServer, supportsLsp, versionOf } = require('../../src/server');
+const { installLocations, findOnPath, expand, resolveServer, supportsLsp, versionOf, isOlderThan } = require('../../src/server');
 const { isSiteFolder } = require('../../src/site');
 
 const only = (...files) => (p) => files.includes(p);
@@ -118,4 +118,17 @@ test('block dividers go above every block but the first', () => {
   assert.deepStrictEqual(dividerLines([block(1), block(4), block(9)]), [4, 9]);
   assert.deepStrictEqual(dividerLines([]), []);
   assert.deepStrictEqual(dividerLines(undefined), []);
+});
+
+test('a kscript older than the extension', () => {
+  assert.ok(isOlderThan('0.2.0', '0.3.0'));
+  assert.ok(isOlderThan('0.3.0', '1.0.0'));
+  assert.ok(isOlderThan('0.3.0', '0.3.1'));
+  assert.ok(!isOlderThan('0.3.0', '0.3.0'));
+  assert.ok(!isOlderThan('0.4.0', '0.3.9'));
+  assert.ok(!isOlderThan('0.0.0-dev', '0.3.0'), 'a source build is never older');
+  assert.ok(!isOlderThan('0.2.0', '0.0.0'));
+  assert.ok(!isOlderThan(null, '0.3.0'));
+  assert.ok(!isOlderThan('kscript', '0.3.0'));
+  assert.ok(isOlderThan('v0.2.0', '0.3.0-beta.1'));
 });
