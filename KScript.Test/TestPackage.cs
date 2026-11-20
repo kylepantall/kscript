@@ -1,0 +1,509 @@
+using System.Text.RegularExpressions;
+
+using KScript.Metadata;
+using KScript.Runtime;
+using KScript.Syntax;
+using KScript.Syntax.Markup;
+
+using A = KScript.Metadata.AttributeInfo;
+using K = KScript.Metadata.AttributeKind;
+
+namespace KScript.Testing
+{
+    /// <summary>
+    /// KScript.Test: tests for scripts, run with <c>kscript test</c>. Test files (<c>name.test.ks.xml</c>) import it
+    /// without an &lt;import&gt;. &lt;test&gt; and &lt;describe&gt; declare tests; &lt;assert&gt;, &lt;expect&gt; and
+    /// &lt;expect-error&gt; check results; &lt;capture&gt; and <c>@run_script()</c> collect what a script prints.
+    /// </summary>
+    public sealed class TestPackage : KScriptPackage
+    {
+        public override string Name => "KScript.Test";
+
+        public override string Description => "Tests run by kscript test: <test>, <describe>, <expect>, <assert>, <expect-error> and <capture>.";
+
+        /// <summary>The error type of a failed check, as <c>&lt;catch when="$err.type eq 'Assertion'"&gt;</c> sees it.</summary>
+        public const string AssertionType = "Assertion";
+
+        /// <summary>The attributes of &lt;expect&gt; that say what to check, one per element.</summary>
+        internal static readonly string[] Matchers = { "equals", "not-equals", "same", "contains", "not-contains", "matches", "type", "count" };
+
+        protected override void Register(PackageBuilder p)
+        {
+            var skip = new A("skip", K.Template, "Skip it: skip=\"yes\", or a reason such as skip=\"needs a network\".");
+            var only = new A("only", K.Bool, "yes runs only the tests marked only in this file, while you work on them.");
+
+            p.Element(new ElementInfo("test", "A test. Its body runs on its own when kscript test runs the file, and it passes if nothing in it fails. With `each` and `in`, it runs once per item.", ContentKind.Statements,
+                new A("name", K.Template, "What the test checks, shown in the results. With `each`, `{ }` can use the item.", true),
+                new A("each", K.DeclareVariable, "Run the test once for each item of `in`, with the item in this variable."),
+                new A("in", K.Expression, "The items for `each`: a list, or a map (each item is { key, value })."),
+                new A("index", K.DeclareVariable, "With `each`, a variable for the item's position, from 0."),
+                skip, only,
+                new A("timeout", K.Expression, "Fail the test if it runs longer than this many seconds (the default is 10, or test.timeout in kscript.json)."))
+            {
+                Context = ElementContext.Script,
+                Example = "<fn name=\"add\" params=\"a, b\" value=\"$a + $b\" />\n<test name=\"adds two numbers\">\n  <expect value=\"@add(2, 3)\" equals=\"5\" />\n</test>\n<test name=\"doubles {$n}\" each=\"n\" in=\"[1, 2, 3]\">\n  <expect value=\"@add($n, $n)\" equals=\"$n * 2\" />\n</test>",
+            }, Test);
+
+            p.Element(new ElementInfo("describe", "A group of tests. Its name goes in front of each test's name, and its <before-each> and <after-each> apply to every test inside.", ContentKind.Statements,
+                new A("name", K.Template, "What the group is about.", true),
+                skip, only)
+            {
+                Context = ElementContext.Script,
+                Example = "<describe name=\"lists\">\n  <test name=\"push adds to the end\">\n    <expect value=\"[1]->push(2)\" equals=\"[1, 2]\" />\n  </test>\n</describe>",
+            }, Describe);
+
+            p.Element(new ElementInfo("before-each", "Runs before every test in its file or <describe>, in the test's own scope. Use it to reset shared variables with <set>.", ContentKind.Statements)
+            {
+                Context = ElementContext.Script,
+                Example = "<let name=\"cart\" value=\"[]\" />\n<before-each>\n  <set name=\"cart\" value=\"[]\" />\n</before-each>",
+            }, run => Hook(run, before: true));
+
+            p.Element(new ElementInfo("after-each", "Runs after every test in its file or <describe>, even when the test fails. Use it to tidy up files a test made.", ContentKind.Statements)
+            {
+                Context = ElementContext.Script,
+                Example = "<after-each>\n  <set name=\"cart\" value=\"[]\" />\n</after-each>",
+            }, run => Hook(run, before: false));
+
+            p.Element(new ElementInfo("assert", "Fails the test unless the condition is true. A failed comparison shows the value of each side.", ContentKind.Empty,
+                new A("test", K.Expression, "The condition, for example `$total eq 30` or `$names->contains('Joan')`.", true),
+                new A("message", K.Template, "What to say when it fails, instead of the condition and its values."))
+            {
+                Context = ElementContext.Script,
+                Example = "<assert test=\"$order.total eq 30\" />\n<assert test=\"$items->count() gt 0\" message=\"The cart should not be empty\" />",
+            }, Assert);
+
+            p.Element(new ElementInfo("expect", "Checks a value and fails the test if the check doesn't hold. Give the value and one check, such as equals=\"5\".", ContentKind.Empty,
+                new A("value", K.Expression, "The value to check.", true),
+                new A("equals", K.Expression, "It equals this (== for text and numbers, item by item for lists and maps)."),
+                new A("not-equals", K.Expression, "It doesn't equal this."),
+                new A("same", K.Expression, "It is strictly equal (===): same type and value."),
+                new A("contains", K.Expression, "A list has this item, text has this text, or a map has this key."),
+                new A("not-contains", K.Expression, "A list doesn't have this item, text doesn't have this text, or a map doesn't have this key."),
+                new A("matches", K.Expression, "Text matches this regular expression, such as '^\\d+$'."),
+                new A("type", K.Enum, "Its type is this.", false, "string", "number", "bool", "list", "map", "date", "fn", "null"),
+                new A("count", K.Expression, "A list, map or text has this many items or characters."),
+                new A("message", K.Template, "What to say when it fails, instead of the usual message."))
+            {
+                Context = ElementContext.Script,
+                Example = "<expect value=\"2 + 3\" equals=\"5\" />\n<expect value=\"$names\" contains=\"'Joan'\" />\n<expect value=\"$id\" matches=\"'^[a-z0-9-]+$'\" />",
+            }, Expect);
+
+            p.Element(new ElementInfo("expect-error", "Fails the test unless its body stops with an error. `type` and `contains` check which error; `as` keeps it for more checks.", ContentKind.Statements,
+                new A("type", K.Text, "The error type it should be, such as Validation, Type or FileNotFound."),
+                new A("contains", K.Template, "Text the error message should contain."),
+                new A("as", K.DeclareVariable, "A variable for the error (type, message, line, and the fields of <throw>), declared after the element."))
+            {
+                Context = ElementContext.Script,
+                Example = "<expect-error type=\"Validation\" contains=\"positive\">\n  <call fn=\"set_age\" args=\"-1\" />\n</expect-error>",
+            }, ExpectError);
+
+            p.Element(new ElementInfo("capture", "Runs its body and keeps what it prints in a variable instead of showing it. `input` gives it lines to read.", ContentKind.Statements,
+                new A("to", K.DeclareVariable, "The variable that receives the output (line endings are \\n, without the last one).", true),
+                new A("input", K.Expression, "What <input> and other prompts read: text, or a list of lines."))
+            {
+                Context = ElementContext.Script,
+                Example = "<capture to=\"out\">\n  <call fn=\"greet\" args=\"'Joan'\" />\n</capture>\n<expect value=\"$out\" equals=\"'Hello, Joan!'\" />",
+            }, Capture);
+
+            p.Command("fail", "message?", "Fails the test now.", KType.Null, c =>
+                throw new KScriptException(c.Has(0) ? c.Str(0) : "@fail() was called.", AssertionType));
+
+            p.Command("assert", "condition, message?", "Fails the test unless the condition is true. Works anywhere an expression does, such as in a lambda.", KType.Bool, c =>
+            {
+                if (Values.Truthy(c.Arg(0))) return true;
+                throw new KScriptException(c.Has(1) ? c.Str(1) : $"@assert() got {Show(c.Arg(0))}, which isn't true.", AssertionType);
+            });
+
+            p.Command(new CallableInfo(CallableKind.Command, "run_script", "Runs another script on its own and returns what happened: { output, code, error }. `output` is what it printed, `code` its exit code (3 when it stopped with an error) and `error` the error, or null.",
+                new[] { Signature.Parse("path, options?") })
+            {
+                ReturnType = KType.Map,
+                Example = "<let name=\"result\" value=\"@run_script('../scripts/hello.ks.xml', { args: ['Joan'], input: ['yes'] })\" />\n<expect value=\"$result.output\" contains=\"'Hello, Joan'\" />\n<expect value=\"$result.code\" equals=\"0\" />",
+            }, RunScript);
+        }
+
+        #region Collecting tests
+
+        private static TestSession Session(ElementRun run)
+        {
+            TestSession session = TestSession.Of(run.Host);
+            if (session == null)
+                throw run.Error($"<{run.Name}> only works in a test file run by kscript test. Run: kscript test {(run.Module.Path != null ? Path.GetFileName(run.Module.Path) : "<file>")}", null, "Syntax");
+            if (session.Running != null)
+                throw run.Error($"<{run.Name}> can't be inside a test. Put it at the top of the file or in a <describe>.", null, "Syntax");
+            return session;
+        }
+
+        /// <summary>skip="yes" gives "", skip="no" gives null, and any other text is the reason.</summary>
+        private static string SkipReason(ElementRun run)
+        {
+            if (!run.Has("skip")) return null;
+            string text = run.Template("skip")?.Trim() ?? string.Empty;
+            return Values.ParseBool(text) switch
+            {
+                true => string.Empty,
+                false => null,
+                _ => text,
+            };
+        }
+
+        private static bool? Describe(ElementRun run)
+        {
+            TestSession session = Session(run);
+            var group = new TestGroup(run.RequiredTemplate("name"), session.Current)
+            {
+                Skip = SkipReason(run) ?? session.Current.Skip,
+                Only = run.Flag("only") || session.Current.Only,
+            };
+            session.Current = group;
+            try
+            {
+                run.RunChildren();
+            }
+            finally
+            {
+                session.Current = group.Parent;
+            }
+            return null;
+        }
+
+        private static bool? Hook(ElementRun run, bool before)
+        {
+            TestSession session = Session(run);
+            var hook = new TestHook { Element = run.Element, Module = run.Module };
+            (before ? session.Current.BeforeEach : session.Current.AfterEach).Add(hook);
+            return null;
+        }
+
+        private static bool? Test(ElementRun run)
+        {
+            TestSession session = Session(run);
+            TestGroup group = session.Current;
+            string skip = SkipReason(run) ?? group.Skip;
+            bool only = run.Flag("only") || group.Only;
+            double? timeout = run.Has("timeout") ? run.Number("timeout", 0) : null;
+            int line = run.Module.PositionOf(run.Element.Span.Start).Line;
+            List<string> groups = group.Chain().Where(g => g.Name != null).Select(g => g.Name).ToList();
+
+            void Add(Scope scope, string name) => session.Tests.Add(new TestCase
+            {
+                Name = name,
+                Groups = groups,
+                Skip = skip,
+                Only = only,
+                Timeout = timeout,
+                Line = line,
+                Element = run.Element,
+                Scope = scope,
+                Module = run.Module,
+                Group = group,
+            });
+
+            if (!run.Has("each"))
+            {
+                if (run.Has("in") || run.Has("index")) throw run.Error("in=\"...\" and index=\"...\" go with each=\"item\".", run.Has("in") ? "in" : "index", "Syntax");
+                Add(run.Scope, run.RequiredTemplate("name"));
+                return null;
+            }
+
+            string each = run.VariableName("each");
+            string indexName = run.VariableName("index", required: false);
+            if (!run.Has("in")) throw run.Error("<test each> needs in=\"...\": the items to run the test with.", "each", "Syntax");
+            object source = run.Eval("in");
+            List<object> items = source switch
+            {
+                null => new List<object>(),
+                List<object> list => list,
+                Dictionary<string, object> map => map.Select(kv => (object)new Dictionary<string, object> { ["key"] = kv.Key, ["value"] = kv.Value }).ToList(),
+                _ => throw run.Error($"<test each> runs over a list or a map, but in=\"...\" is {Values.Describe(source)}.", "in", "Type"),
+            };
+            MarkupAttribute nameAttr = run.Element.GetAttribute("name");
+            for (int i = 0; i < items.Count; i++)
+            {
+                Scope scope = run.Scope.Child();
+                scope.Declare(each, items[i]);
+                if (indexName != null) scope.Declare(indexName, (double)i);
+                string name = nameAttr?.Value == null ? $"#{i + 1}" : run.Interpreter.Interpolate(nameAttr.Value, scope, run.Module, bareReferences: false);
+                Add(scope, name);
+            }
+            return null;
+        }
+
+        #endregion
+
+        #region Checks
+
+        private static KScriptException Failure(ElementRun run, string message, string attribute = null) =>
+            run.Error(run.Template("message") is string custom && custom.Length > 0 ? custom : message, attribute, AssertionType);
+
+        private static readonly HashSet<string> Comparisons = new HashSet<string>(StringComparer.Ordinal) { "==", "!=", "===", "!==", "<", "<=", ">", ">=", "in" };
+
+        private static bool? Assert(ElementRun run)
+        {
+            if (Values.Truthy(run.Eval("test"))) return null;
+            throw Failure(run, ExplainFalse(run, "test"), "test");
+        }
+
+        /// <summary>"Expected $total eq 30 to be true, but $total is 25." A comparison shows both sides.</summary>
+        private static string ExplainFalse(ElementRun run, string attribute)
+        {
+            DecodedText text = run.Element.GetAttribute(attribute).Value;
+            string source = text.Value.Trim();
+            var lines = new List<string> { $"Expected {source} to be true." };
+            ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
+            if (!parsed.Success || parsed.Root == null) return lines[0];
+
+            var ctx = new EvalContext(run.Module, text);
+            IEnumerable<ExprNode> sides = parsed.Root is BinaryNode b && Comparisons.Contains(b.Operator) ? new[] { b.Left, b.Right }
+                : parsed.Root is UnaryNode u ? new[] { u.Operand }
+                : parsed.Root is BinaryNode logical && (logical.Operator == "and" || logical.Operator == "&&" || logical.Operator == "or" || logical.Operator == "||") ? new[] { logical.Left, logical.Right }
+                : new[] { parsed.Root };
+            foreach (ExprNode side in sides)
+            {
+                if (side == null || side is LiteralNode) continue;
+                string what = text.Value.Substring(side.Span.Start, side.Span.Length).Trim();
+                object value;
+                try
+                {
+                    value = run.Interpreter.Evaluate(side, run.Scope, ctx);
+                }
+                catch (KScriptException ex)
+                {
+                    lines.Add($"  {what} fails: {ex.Message}");
+                    continue;
+                }
+                lines.Add($"  {what} is {Show(value)}");
+            }
+            return string.Join("\n", lines);
+        }
+
+        private static bool? Expect(ElementRun run)
+        {
+            string[] given = Matchers.Where(run.Has).ToArray();
+            if (given.Length != 1)
+                throw run.Error(given.Length == 0
+                    ? $"<expect> needs one check, such as equals=\"5\". Checks: {string.Join(", ", Matchers)}."
+                    : $"<expect> takes one check, but has {string.Join(" and ", given)}. Write one <expect> for each.", given.Length > 1 ? given[1] : null, "Syntax");
+            string matcher = given[0];
+            object actual = run.Eval("value");
+            string subject = run.Raw("value").Trim();
+            string got = $"but it was {Show(actual)}";
+
+            switch (matcher)
+            {
+                case "equals":
+                {
+                    object expected = run.Eval("equals");
+                    if (!Values.LooseEquals(actual, expected)) throw Failure(run, $"Expected {subject} to equal {Show(expected)}, {got}.{Difference(actual, expected)}", "value");
+                    break;
+                }
+                case "not-equals":
+                {
+                    object expected = run.Eval("not-equals");
+                    if (Values.LooseEquals(actual, expected)) throw Failure(run, $"Expected {subject} not to equal {Show(expected)}.", "value");
+                    break;
+                }
+                case "same":
+                {
+                    object expected = run.Eval("same");
+                    if (!Values.StrictEquals(actual, expected))
+                        throw Failure(run, $"Expected {subject} to be {Show(expected)} ({Values.TypeOf(expected)}), {got} ({Values.TypeOf(actual)}).", "value");
+                    break;
+                }
+                case "contains":
+                case "not-contains":
+                {
+                    object item = run.Eval(matcher);
+                    bool has = Contains(run, actual, item, matcher);
+                    if (matcher == "contains" && !has) throw Failure(run, $"Expected {subject} to contain {Show(item)}, {got}.", "value");
+                    if (matcher == "not-contains" && has) throw Failure(run, $"Expected {subject} not to contain {Show(item)}, {got}.", "value");
+                    break;
+                }
+                case "matches":
+                {
+                    string pattern = Values.ToStr(run.Eval("matches"));
+                    Regex regex;
+                    try
+                    {
+                        regex = new Regex(pattern, RegexOptions.None, TimeSpan.FromSeconds(2));
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        throw run.Error($"matches=\"...\" isn't a valid regular expression: {ex.Message}", "matches", "Syntax");
+                    }
+                    if (actual is not string s || !regex.IsMatch(s)) throw Failure(run, $"Expected {subject} to match /{pattern}/, {got}.", "value");
+                    break;
+                }
+                case "type":
+                {
+                    string expected = run.Raw("type").Trim();
+                    string type = Values.TypeOf(actual);
+                    if (!string.Equals(type, expected, StringComparison.OrdinalIgnoreCase)) throw Failure(run, $"Expected {subject} to be a {expected}, but it was {Show(actual)}, a {type}.", "value");
+                    break;
+                }
+                case "count":
+                {
+                    double expected = Values.ToNumber(run.Eval("count"), "<expect count>");
+                    int? count = actual switch
+                    {
+                        List<object> l => l.Count,
+                        Dictionary<string, object> m => m.Count,
+                        string s => s.Length,
+                        _ => null,
+                    };
+                    if (count == null) throw Failure(run, $"Expected {subject} to have {Values.FormatNumber(expected)} items, but it was {Show(actual)}, which has no count.", "value");
+                    if (count != expected) throw Failure(run, $"Expected {subject} to have {Values.FormatNumber(expected)} {(actual is string ? "characters" : "items")}, but it has {count}: {Show(actual)}.", "value");
+                    break;
+                }
+            }
+            return null;
+        }
+
+        private static bool Contains(ElementRun run, object container, object item, string matcher) => container switch
+        {
+            List<object> list => list.Any(x => Values.LooseEquals(x, item)),
+            string s => s.Contains(Values.ToStr(item), StringComparison.Ordinal),
+            Dictionary<string, object> map => map.ContainsKey(Values.ToStr(item)),
+            _ => throw Failure(run, $"{matcher}=\"...\" checks a list, text or a map, but {run.Raw("value").Trim()} is {Show(container)}.", "value"),
+        };
+
+        /// <summary>For lists and maps, the first place they differ.</summary>
+        private static string Difference(object actual, object expected)
+        {
+            if (actual is List<object> a && expected is List<object> e)
+            {
+                for (int i = 0; i < Math.Max(a.Count, e.Count); i++)
+                {
+                    if (i >= a.Count) return $"\n  It is missing item {i}: {Show(e[i])}";
+                    if (i >= e.Count) return $"\n  It has an extra item {i}: {Show(a[i])}";
+                    if (!Values.LooseEquals(a[i], e[i])) return $"\n  Item {i} is {Show(a[i])}, not {Show(e[i])}";
+                }
+            }
+            if (actual is Dictionary<string, object> am && expected is Dictionary<string, object> em)
+            {
+                foreach (var kv in em)
+                {
+                    if (!am.TryGetValue(kv.Key, out object v)) return $"\n  It has no '{kv.Key}' (expected {Show(kv.Value)})";
+                    if (!Values.LooseEquals(v, kv.Value)) return $"\n  '{kv.Key}' is {Show(v)}, not {Show(kv.Value)}";
+                }
+                string extra = am.Keys.FirstOrDefault(k => !em.ContainsKey(k));
+                if (extra != null) return $"\n  It has an extra '{extra}': {Show(am[extra])}";
+            }
+            return string.Empty;
+        }
+
+        private static bool? ExpectError(ElementRun run)
+        {
+            string type = run.Raw("type")?.Trim();
+            string contains = run.Template("contains");
+            string asName = run.VariableName("as", required: false);
+            KScriptException caught = null;
+            try
+            {
+                run.RunChildren();
+            }
+            catch (KScriptException ex) when (ex.Type != AssertionType || string.Equals(type, AssertionType, StringComparison.OrdinalIgnoreCase))
+            {
+                caught = ex;
+            }
+
+            string wanted = string.IsNullOrEmpty(type) ? "an error" : $"a {type} error";
+            if (caught == null) throw Failure(run, $"Expected {wanted}, but the body ran without one.");
+            if (!string.IsNullOrEmpty(type) && !string.Equals(caught.Type, type, StringComparison.OrdinalIgnoreCase))
+                throw Failure(run, $"Expected {wanted}, but got {caught.Type}: {caught.Message}");
+            if (!string.IsNullOrEmpty(contains) && !caught.Message.Contains(contains, StringComparison.Ordinal))
+                throw Failure(run, $"Expected the error message to contain '{contains}', but it was: {caught.Message}");
+            if (asName != null) run.Scope.Declare(asName, caught.ToValue());
+            return null;
+        }
+
+        private static bool? Capture(ElementRun run)
+        {
+            string name = run.VariableName("to");
+            TextReader input = run.Has("input") ? InputReader(run.Eval("input")) : null;
+            var output = new StringWriter();
+            using (run.Host.CaptureOutput(output))
+            using (input != null ? run.Host.ProvideInput(input) : null)
+            {
+                run.RunChildren();
+            }
+            run.Scope.Declare(name, Tidy(output.ToString()));
+            return null;
+        }
+
+        private static TextReader InputReader(object input) => new StringReader(input switch
+        {
+            null => string.Empty,
+            List<object> lines => string.Join("\n", lines.Select(Values.ToStr)) + "\n",
+            _ => Values.ToStr(input),
+        });
+
+        /// <summary>\n line endings, without the newline at the end.</summary>
+        internal static string Tidy(string output) => output.Replace("\r\n", "\n").TrimEnd('\n');
+
+        #endregion
+
+        #region @run_script
+
+        private static object RunScript(CallContext c)
+        {
+            string path = c.Str(0);
+            string full = Path.GetFullPath(Path.Combine(c.Module?.Directory ?? c.Host.WorkingDirectory, path));
+            var options = c.Has(1) && c.Arg(1) is Dictionary<string, object> map ? map : new Dictionary<string, object>();
+            if (c.Has(1) && c.Arg(1) is not Dictionary<string, object>)
+                throw new KScriptException($"@run_script() takes its options as a map, such as {{ args: ['a'], input: 'yes' }}, but got {Values.Describe(c.Arg(1))}.", "Argument");
+            foreach (string key in options.Keys)
+            {
+                if (key != "args" && key != "input")
+                    throw new KScriptException($"@run_script() has no option '{key}'. Options: args, input.", "Argument");
+            }
+
+            var output = new StringWriter();
+            var host = new KScriptHost(output, output, InputReader(options.TryGetValue("input", out object input) ? input : null))
+            {
+                Arguments = options.TryGetValue("args", out object args) && args is List<object> list ? list.Select(Values.ToStr).ToList()
+                    : args == null ? Array.Empty<string>() : new[] { Values.ToStr(args) },
+                WorkingDirectory = Path.GetDirectoryName(full),
+            };
+            var runOptions = new InterpreterOptions { Cancellation = c.Interpreter.Options.Cancellation, MaxCallDepth = c.Interpreter.Options.MaxCallDepth };
+            runOptions.DefaultPackages.AddRange(c.Interpreter.Options.DefaultPackages.Where(n => !string.Equals(PackageRegistry.Normalise(n), "KScript.Test", StringComparison.OrdinalIgnoreCase)));
+
+            int code;
+            object error = null;
+            try
+            {
+                code = new Interpreter(host, c.Interpreter.Packages, runOptions).RunFile(full);
+            }
+            catch (KScriptException ex) when (ex.Type != "Cancelled")
+            {
+                code = 3;
+                error = ex.ToValue();
+            }
+            return new Dictionary<string, object>
+            {
+                ["output"] = Tidy(output.ToString()),
+                ["code"] = (double)code,
+                ["error"] = error,
+            };
+        }
+
+        #endregion
+
+        /// <summary>A value as it would be written in a script: 'text', 42, [1, 2], { a: 1 }, null.</summary>
+        internal static string Show(object value)
+        {
+            string text = value switch
+            {
+                null => "null",
+                string s => "'" + s.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n") + "'",
+                bool b => b ? "true" : "false",
+                double d => Values.FormatNumber(d),
+                List<object> l => "[" + string.Join(", ", l.Select(Show)) + "]",
+                Dictionary<string, object> m => m.Count == 0 ? "{}" : "{ " + string.Join(", ", m.Select(kv => $"{kv.Key}: {Show(kv.Value)}")) + " }",
+                ICallable fn => $"fn {fn.Name}",
+                _ => Values.ToStr(value),
+            };
+            return text.Length > 300 ? text.Substring(0, 300) + "…" : text;
+        }
+    }
+}

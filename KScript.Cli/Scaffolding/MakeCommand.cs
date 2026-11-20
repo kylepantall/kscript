@@ -214,6 +214,7 @@ namespace KScript.Scaffolding
             if (result.DisplayDirectory != ".") output.WriteLine($"  cd {(result.DisplayDirectory.Contains(' ') ? "\"" + result.DisplayDirectory + "\"" : result.DisplayDirectory)}");
             output.WriteLine("  kscript serve        serve the site (settings in kscript.json)");
             output.WriteLine("  kscript check        check every page and script");
+            output.WriteLine("  kscript test         run the tests in tests/");
             output.WriteLine("  kscript ide install  add the KScript extension to VS Code (the project also recommends it)");
             return 0;
         }

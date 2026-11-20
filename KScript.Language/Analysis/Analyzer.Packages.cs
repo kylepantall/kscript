@@ -35,7 +35,14 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            foreach (string package in ProjectPackages())
+            // Test files (greet.test.ks.xml) get KScript.Test, as kscript test gives it to them.
+            bool isTestFile = TestSettings.IsTestFileName(result.Path);
+            if (isTestFile)
+            {
+                ImportPackage("KScript.Test");
+            }
+
+            foreach (string package in ProjectPackages(isTestFile))
             {
                 string known = catalog.FindPackage(package);
                 if (known != null) ImportPackage(known);
@@ -106,8 +113,8 @@ namespace KScript.Language.Analysis
             root.Declare(alias, 0);
         }
 
-        /// <summary>The packages listed in the nearest kscript.json.</summary>
-        private IEnumerable<string> ProjectPackages()
+        /// <summary>The packages listed in the nearest kscript.json (with test.packages for a test file).</summary>
+        private IEnumerable<string> ProjectPackages(bool isTestFile)
         {
             for (string dir = directory; dir != null; dir = System.IO.Path.GetDirectoryName(dir))
             {
@@ -123,7 +130,8 @@ namespace KScript.Language.Analysis
                 }
                 try
                 {
-                    return ProjectConfig.Parse(text, file).Packages;
+                    ProjectConfig config = ProjectConfig.Parse(text, file);
+                    return isTestFile ? config.Packages.Concat(config.Test.Packages).ToList() : config.Packages;
                 }
                 catch (ProjectConfigException)
                 {

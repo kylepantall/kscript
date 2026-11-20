@@ -11,5 +11,9 @@
     "exclude": ["_templates", "node_modules"],
     "rules": {},
     "warningsAsErrors": false
+  },
+  "test": {
+    "include": ["tests/**/*.test.ks.xml"],
+    "timeout": 10
   }
 }
