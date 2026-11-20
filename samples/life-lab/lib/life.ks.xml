@@ -57,15 +57,30 @@
     <return value="(0..$height)->map(fn($y) => $dead_cell->repeat($width))" />
   </fn>
 
-  <fn name="width" params="grid" value="$grid->is_empty() ? 0 : $grid[0]->length()" description="How many cells wide a grid is." />
+  <fn
+    name="width"
+    params="grid"
+    value="$grid->is_empty() ? 0 : $grid[0]->length()"
+    description="How many cells wide a grid is." />
 
   <fn name="height" params="grid" value="$grid->count()" description="How many cells high a grid is." />
 
-  <fn name="is_alive" params="grid, x, y" value="$grid[$y][$x] eq $alive_cell" description="yes if the cell at x, y is alive." />
+  <fn
+    name="is_alive"
+    params="grid, x, y"
+    value="$grid[$y][$x] eq $alive_cell"
+    description="yes if the cell at x, y is alive." />
 
-  <fn name="population" params="grid" value="$grid->sum(fn($row) => $row->count($alive_cell))" description="How many cells are alive." />
+  <fn
+    name="population"
+    params="grid"
+    value="$grid->sum(fn($row) => $row->count($alive_cell))"
+    description="How many cells are alive." />
 
-  <fn name="set_cell" params="grid, x: int, y: int, alive" description="A copy of the grid with one cell made alive or dead.">
+  <fn
+    name="set_cell"
+    params="grid, x: int, y: int, alive"
+    description="A copy of the grid with one cell made alive or dead.">
     <let name="row" value="$grid[$y]" />
     <let name="cell" value="$alive ? $alive_cell : $dead_cell" />
     <return value="$grid->map(fn($r, $i) => $i eq $y ? $row->slice(start: 0, end: $x) + $cell + $row->slice(start: $x + 1) : $r)" />
@@ -75,7 +90,10 @@
     <return value="@set_cell($grid, x: $x, y: $y, alive: not @is_alive($grid, x: $x, y: $y))" />
   </fn>
 
-  <fn name="place" params="grid, rows, left = null, top = null" description="Draws a pattern onto a grid, centred unless left and top are given. Cells off the edge are dropped.">
+  <fn
+    name="place"
+    params="grid, rows, left = null, top = null"
+    description="Draws a pattern onto a grid, centred unless left and top are given. Cells off the edge are dropped.">
     <let name="x0" value="$left ?? ((@width($grid) - @width($rows)) / 2)->floor()" />
     <let name="y0" value="$top ?? ((@height($grid) - @height($rows)) / 2)->floor()" />
     <let name="out" value="$grid" />
@@ -91,11 +109,17 @@
     <return value="$out" />
   </fn>
 
-  <fn name="random_grid" params="width: int, height: int, density = 30" description="A grid where about density percent of the cells are alive.">
+  <fn
+    name="random_grid"
+    params="width: int, height: int, density = 30"
+    description="A grid where about density percent of the cells are alive.">
     <return value="(0..$height)->map(fn($y) => (0..$width)->map(fn($x) => @random(low: 1, high: 100) le $density ? $alive_cell : $dead_cell)->join(''))" />
   </fn>
 
-  <fn name="parse_cells" params="text" description="Reads a pattern in the plaintext .cells format: lines of O and ., with ! comment lines. Any of O, o, *, # or X counts as alive.">
+  <fn
+    name="parse_cells"
+    params="text"
+    description="Reads a pattern in the plaintext .cells format: lines of O and ., with ! comment lines. Any of O, o, *, # or X counts as alive.">
     <let name="lines" value="$text->lines()->map(fn($l) => $l->trim_end())->reject(fn($l) => $l->starts_with('!'))" />
     <let name="w" value="$lines->map(fn($l) => $l->length())->max() ?? 0" />
     <if test="$w eq 0">
@@ -106,7 +130,10 @@
 
   <!-- The rules -->
 
-  <fn name="neighbours" params="grid, x, y, wrap = true" description="How many of the 8 cells around x, y are alive. With wrap, the edges join up like a torus.">
+  <fn
+    name="neighbours"
+    params="grid, x, y, wrap = true"
+    description="How many of the 8 cells around x, y are alive. With wrap, the edges join up like a torus.">
     <let name="w" value="@width($grid)" />
     <let name="h" value="@height($grid)" />
     <let name="count" value="0" />
@@ -127,7 +154,10 @@
     <return value="$count" />
   </fn>
 
-  <fn name="next_state" params="alive, neighbours" description="Conway's rule: a live cell with 2 or 3 neighbours lives on; a dead cell with exactly 3 comes alive.">
+  <fn
+    name="next_state"
+    params="alive, neighbours"
+    description="Conway's rule: a live cell with 2 or 3 neighbours lives on; a dead cell with exactly 3 comes alive.">
     <return value="$neighbours eq 3 or ($alive and $neighbours eq 2)" />
   </fn>
 
@@ -141,7 +171,10 @@
     <return value="(0..$h)->map(fn($y) => @next_row(above: $row_at($y - 1), row: $ones[$y], below: $row_at($y + 1), w: $w, wrap: $wrap))" />
   </fn>
 
-  <fn name="next_row" params="above, row, below, w, wrap" description="One row of the next generation, from the rows above and below it.">
+  <fn
+    name="next_row"
+    params="above, row, below, w, wrap"
+    description="One row of the next generation, from the rows above and below it.">
     <let name="sums" value="(0..$w)->map(fn($x) => $above[$x] + $row[$x] + $below[$x])" />
     <let name="sum_at" value="fn($x) => $wrap ? $sums[($x + $w) % $w] : ($x ge 0 and $x lt $w ? $sums[$x] : 0)" />
     <return value="(0..$w)->map(fn($x) =>
@@ -155,18 +188,29 @@
     <return value="{ grid: $grid, generation: 0, history: [$grid->join('')], wrap: $wrap, pattern: $pattern, births: 0, deaths: 0 }" />
   </fn>
 
-  <fn name="pattern_world" params="name, width: int, height: int, wrap = true" description="A world with a named pattern from $patterns in the middle.">
+  <fn
+    name="pattern_world"
+    params="name, width: int, height: int, wrap = true"
+    description="A world with a named pattern from $patterns in the middle.">
     <if test="not $patterns->has($name)">
-      <throw type="Pattern" message="There's no pattern called '{$name}'. Try one of: { $patterns->keys()->join(', ') }." />
+      <throw
+        type="Pattern"
+        message="There's no pattern called '{$name}'. Try one of: { $patterns->keys()->join(', ') }." />
     </if>
     <return value="@new_world(@place(@blank(width: $width, height: $height), rows: $patterns[$name].rows), wrap: $wrap, pattern: $name)" />
   </fn>
 
-  <fn name="edit_world" params="world, grid" description="The world with its grid replaced by hand (a click or a typed cell). Starts the history again.">
+  <fn
+    name="edit_world"
+    params="world, grid"
+    description="The world with its grid replaced by hand (a click or a typed cell). Starts the history again.">
     <return value="$world->merge({ grid: $grid, history: [$grid->join('')], pattern: 'custom' })" />
   </fn>
 
-  <fn name="flip" params="world, where" description="The world with one cell flipped, where is &quot;column,row&quot; from 0 (what a board button sends). Anything else leaves the world as it is.">
+  <fn
+    name="flip"
+    params="world, where"
+    description="The world with one cell flipped, where is &quot;column,row&quot; from 0 (what a board button sends). Anything else leaves the world as it is.">
     <let name="xy" value="($where ?? '')->split(',')->map(fn($p) => $p->trim()->to_int(default: -1))" />
     <if test="$xy->count() ne 2 or $xy[0] lt 0 or $xy[1] lt 0 or $xy[0] ge @width($world.grid) or $xy[1] ge @height($world.grid)">
       <return value="$world" />
@@ -174,7 +218,10 @@
     <return value="@edit_world($world, grid: @toggle($world.grid, x: $xy[0], y: $xy[1]))" />
   </fn>
 
-  <fn name="advance" params="world, generations: int = 1" description="Runs a world forward, counting births and deaths and keeping a short history for spotting cycles. Stops early once nothing is left alive.">
+  <fn
+    name="advance"
+    params="world, generations: int = 1"
+    description="Runs a world forward, counting births and deaths and keeping a short history for spotting cycles. Stops early once nothing is left alive.">
     <let name="w" value="$world" />
     <for each="i" in="0..$generations">
       <if test="@population($w.grid) eq 0">
@@ -183,8 +230,12 @@
       <let name="before" value="$w.grid->join('')" />
       <let name="next" value="@next_generation($w.grid, wrap: $w.wrap)" />
       <let name="after" value="$next->join('')" />
-      <let name="born" value="(0..$after->length())->count(fn($k) => $after[$k] eq $alive_cell and $before[$k] ne $alive_cell)" />
-      <let name="died" value="(0..$after->length())->count(fn($k) => $before[$k] eq $alive_cell and $after[$k] ne $alive_cell)" />
+      <let
+        name="born"
+        value="(0..$after->length())->count(fn($k) => $after[$k] eq $alive_cell and $before[$k] ne $alive_cell)" />
+      <let
+        name="died"
+        value="(0..$after->length())->count(fn($k) => $before[$k] eq $alive_cell and $after[$k] ne $alive_cell)" />
       <set name="w" value="$w->merge({
           grid: $next,
           generation: $w.generation + 1,
@@ -195,7 +246,10 @@
     <return value="$w" />
   </fn>
 
-  <fn name="period" params="world" description="The length of the cycle the world is in (1 for a still life), or 0 if it hasn't repeated within the history.">
+  <fn
+    name="period"
+    params="world"
+    description="The length of the cycle the world is in (1 for a still life), or 0 if it hasn't repeated within the history.">
     <let name="h" value="$world.history" />
     <let name="now" value="$h->last()" />
     <for each="back" in="1..$h->count()">
@@ -231,7 +285,10 @@
       }" />
   </fn>
 
-  <fn name="to_text" params="grid, alive = '█', dead = '·'" description="The grid as lines of text, for terminals and tests.">
+  <fn
+    name="to_text"
+    params="grid, alive = '█', dead = '·'"
+    description="The grid as lines of text, for terminals and tests.">
     <return value="$grid->map(fn($row) => $row->replace(old: $alive_cell, new: $alive)->replace(old: $dead_cell, new: $dead))->join(@char_of(10))" />
   </fn>
 </kscript>

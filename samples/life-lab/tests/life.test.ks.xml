@@ -18,7 +18,9 @@
     </test>
 
     <test name="patterns are centred">
-      <expect value="@place(@blank(width: 5, height: 5), rows: ['OOO'])" equals="['.....', '.....', '.OOO.', '.....', '.....']" />
+      <expect
+        value="@place(@blank(width: 5, height: 5), rows: ['OOO'])"
+        equals="['.....', '.....', '.OOO.', '.....', '.....']" />
     </test>
 
     <test name="cells placed off the edge are dropped">
@@ -27,7 +29,9 @@
 
     <test name="the .cells format is read, comments and all">
       <let name="nl" value="@char_of(10)" />
-      <expect value="@parse_cells('!Name: glider' + $nl + '.O' + $nl + '..*' + $nl + 'ooo')" equals="['.O.', '..O', 'OOO']" />
+      <expect
+        value="@parse_cells('!Name: glider' + $nl + '.O' + $nl + '..*' + $nl + 'ooo')"
+        equals="['.O.', '..O', 'OOO']" />
     </test>
 
     <test name="an empty pattern is an error">
@@ -67,7 +71,9 @@
     <test name="a glider moves one cell diagonally every 4 generations">
       <let name="w" value="@pattern_world('glider', width: 8, height: 8)" />
       <let name="moved" value="@advance($w, generations: 4)" />
-      <expect value="$moved.grid" equals="@place(@blank(width: 8, height: 8), rows: $patterns.glider.rows, left: 3, top: 3)" />
+      <expect
+        value="$moved.grid"
+        equals="@place(@blank(width: 8, height: 8), rows: $patterns.glider.rows, left: 3, top: 3)" />
       <expect value="$moved.generation" equals="4" />
     </test>
 
@@ -88,9 +94,15 @@
     </test>
 
     <test name="status spots still lifes, oscillators and extinction">
-      <expect value="@status(@advance(@new_world(['....', '.OO.', '.OO.', '....']), generations: 2))" equals="'Still life'" />
-      <expect value="@status(@advance(@pattern_world('blinker', width: 5, height: 5), generations: 3))" equals="'Oscillating, period 2'" />
-      <expect value="@status(@advance(@pattern_world('pulsar', width: 17, height: 17), generations: 4))" equals="'Oscillating, period 3'" />
+      <expect
+        value="@status(@advance(@new_world(['....', '.OO.', '.OO.', '....']), generations: 2))"
+        equals="'Still life'" />
+      <expect
+        value="@status(@advance(@pattern_world('blinker', width: 5, height: 5), generations: 3))"
+        equals="'Oscillating, period 2'" />
+      <expect
+        value="@status(@advance(@pattern_world('pulsar', width: 17, height: 17), generations: 4))"
+        equals="'Oscillating, period 3'" />
       <expect value="@status(@advance(@new_world(['...', '.O.', '...']), generations: 1))" equals="'Extinct'" />
       <expect value="@status(@pattern_world('glider', width: 10, height: 10))" equals="'Evolving'" />
     </test>
@@ -126,7 +138,9 @@
     </test>
 
     <test name="the menu works with typed answers">
-      <let name="run" value="@run_script('../life.ks.xml', options: { input: '4' + @char_of(10) + '2' + @char_of(10) + '1' + @char_of(10) + '10' + @char_of(10) })" />
+      <let
+        name="run"
+        value="@run_script('../life.ks.xml', options: { input: '4' + @char_of(10) + '2' + @char_of(10) + '1' + @char_of(10) + '10' + @char_of(10) })" />
       <expect value="$run.code" equals="0" />
       <expect value="$run.output" contains="'Life Lab · blinker'" />
       <expect value="$run.output" contains="'Bye!'" />

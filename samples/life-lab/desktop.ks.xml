@@ -14,7 +14,9 @@
   <let name="pattern" value="'glider_gun'" />
   <let name="soup" value="30" />
   <let name="wrap" value="true" />
-  <let name="pattern_choices" value="$patterns->keys()->map(fn($k) => { label: $k->replace(old: '_', new: ' ')->capitalize(), value: $k })" />
+  <let
+    name="pattern_choices"
+    value="$patterns->keys()->map(fn($k) => { label: $k->replace(old: '_', new: ' ')->capitalize(), value: $k })" />
 
   <fn name="tick">
     <set name="world" value="@advance($world, generations: 1)" />
@@ -37,7 +39,10 @@
     <Text color="#94a3b8">Speed</Text>
     <Select bind="speed" options="{ Slow: 400, Normal: 150, Fast: 40 }" />
     <Text color="#94a3b8">Pattern</Text>
-    <Select bind="pattern" options="$pattern_choices" on-change="world = @pattern_world($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false" />
+    <Select
+      bind="pattern"
+      options="$pattern_choices"
+      on-change="world = @pattern_world($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false" />
   </Row>
 
   <Row gap="8" wrap="yes">
@@ -54,7 +59,12 @@
     <Grid columns="$cols" gap="1">
       <for each="row" index="y" in="$world.grid">
         <for each="c" index="x" in="$row">
-          <Box width="16" height="16" radius="2" background="{ $c eq $alive_cell ? '#4ade80' : '#0b1220' }" on-click="world = @flip($world, where: $x + ',' + $y)" />
+          <Box
+            width="16"
+            height="16"
+            radius="2"
+            background="{ $c eq $alive_cell ? '#4ade80' : '#0b1220' }"
+            on-click="world = @flip($world, where: $x + ',' + $y)" />
         </for>
       </for>
     </Grid>
@@ -62,7 +72,9 @@
 
   <Row gap="24" wrap="yes">
     <let name="s" value="@summary($world)" />
-    <for each="stat" in="[['Generation', $s.generation], ['Alive', $s.population + ' (' + $s.density + '%)'], ['Born', $s.births], ['Died', $s.deaths], ['Status', $s.status]]">
+    <for
+      each="stat"
+      in="[['Generation', $s.generation], ['Alive', $s.population + ' (' + $s.density + '%)'], ['Born', $s.births], ['Died', $s.deaths], ['Status', $s.status]]">
       <Column gap="2">
         <Text size="11" color="#64748b">{ $stat[0]->upper() }</Text>
         <Text size="16" weight="bold" color="#e2e8f0">{ $stat[1] }</Text>

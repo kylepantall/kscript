@@ -3,95 +3,116 @@
 <let name="rows" value="24" />
 <!DOCTYPE html>
 <html lang="en">
-<!--
-  Life Lab in the browser: kscript serve samples/life-lab, then open http://localhost:8080.
-  The rules come from lib/life.ks.xml, the same script the terminal version (life.ks.xml) imports.
-  There is no JavaScript here: every button runs KScript on the server and the board is redrawn.
--->
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Life Lab</title>
-  <link rel="stylesheet" href="/site.css">
-</head>
-<body>
-  <main>
-    <header>
-      <h1>Life Lab</h1>
-      <p class="lead">Conway's Game of Life, written in KScript. Click cells to draw, then press Play.</p>
-    </header>
+  <!--
+    Life Lab in the browser: kscript serve samples/life-lab, then open http://localhost:8080.
+    The rules come from lib/life.ks.xml, the same script the terminal version (life.ks.xml) imports.
+    There is no JavaScript here: every button runs KScript on the server and the board is redrawn.
+  -->
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Life Lab</title>
+    <link rel="stylesheet" href="/site.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Life Lab</h1>
+        <p class="lead">Conway's Game of Life, written in KScript. Click cells to draw, then press Play.</p>
+      </header>
 
-    <div class="lab">
-      <live id="lab">
-        <state name="world" value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
-        <state name="playing" value="false" />
-        <state name="speed" value="'150'" />
-        <state name="pattern" value="'glider_gun'" />
-        <state name="soup" value="'30'" />
-        <let name="s" value="@summary($world)" />
+      <div class="lab">
+        <live id="lab">
+          <state name="world" value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
+          <state name="playing" value="false" />
+          <state name="speed" value="'150'" />
+          <state name="pattern" value="'glider_gun'" />
+          <state name="soup" value="'30'" />
+          <let name="s" value="@summary($world)" />
 
-        <if test="$playing">
-          <span hidden on-tick="world = @advance($world, generations: 1); playing = @population($world.grid) gt 0" every="{$speed}"></span>
-        </if>
+          <if test="$playing">
+            <span
+              hidden
+              on-tick="world = @advance($world, generations: 1); playing = @population($world.grid) gt 0"
+              every="{$speed}"></span>
+          </if>
 
-        <section class="controls">
-          <div class="group">
-            <button class="primary" on-click="playing = not $playing">{ $playing ? 'Pause' : 'Play' }</button>
-            <button on-click="world = @advance($world, generations: 1); playing = false">Step</button>
-            <button on-click="world = @advance($world, generations: 10)">+10</button>
-            <button on-click="world = @advance($world, generations: 50)">+50</button>
-          </div>
-          <label>Speed
-            <select bind="speed">
-              <option value="400" selected="{$speed eq '400'}">Slow</option>
-              <option value="150" selected="{$speed eq '150'}">Normal</option>
-              <option value="40" selected="{$speed eq '40'}">Fast</option>
-            </select>
-          </label>
-          <label>Pattern
-            <select bind="pattern" on-change="world = @pattern_world($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false">
-              <for each="name" in="$patterns->keys()">
-                <option value="{$name}" selected="{$name eq $pattern}">{ $name->replace(old: '_', new: ' ')->capitalize() }</option>
+          <section class="controls">
+            <div class="group">
+              <button class="primary" on-click="playing = not $playing">{ $playing ? 'Pause' : 'Play' }</button>
+              <button on-click="world = @advance($world, generations: 1); playing = false">Step</button>
+              <button on-click="world = @advance($world, generations: 10)">+10</button>
+              <button on-click="world = @advance($world, generations: 50)">+50</button>
+            </div>
+            <label>Speed
+              <select bind="speed">
+                <option value="400" selected="{$speed eq '400'}">Slow</option>
+                <option value="150" selected="{$speed eq '150'}">Normal</option>
+                <option value="40" selected="{$speed eq '40'}">Fast</option>
+              </select>
+            </label>
+            <label>Pattern
+              <select bind="pattern" on-change="world = @pattern_world($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false">
+                <for each="name" in="$patterns->keys()">
+                  <option value="{$name}" selected="{$name eq $pattern}">{ $name->replace(old: '_', new: ' ')->capitalize() }</option>
+                </for>
+              </select>
+            </label>
+            <div class="group">
+              <button on-click="world = @new_world(@random_grid(width: $cols, height: $rows, density: $soup->to_number(default: 30)), wrap: $world.wrap, pattern: 'random soup'); playing = false">Random soup</button>
+              <input type="range" min="5" max="80" step="5" bind="soup" aria-label="How full the soup is">
+              <span class="muted">{$soup}%</span>
+            </div>
+            <label class="check"><input type="checkbox" checked="{$world.wrap}" on-change="world = $world->merge({ wrap: $event.checked })"> Wrap edges</label>
+            <button on-click="world = @new_world(@blank(width: $cols, height: $rows), wrap: $world.wrap); playing = false">Clear</button>
+          </section>
+
+          <p class="about">
+            <if test="$patterns->has($world.pattern)">{ $patterns[$world.pattern].about }</if>
+            <else>Your own pattern.</else>
+          </p>
+
+          <!-- One handler for the whole board: the clicked cell's value is "column,row". -->
+          <div class="board" style="--cols: {$cols}" on-click="world = @flip($world, where: $event.value)">
+            <for each="row" index="y" in="$world.grid">
+              <for each="c" index="x" in="$row">
+                <button class="{ $c eq 'O' ? 'cell on' : 'cell' }" value="{$x},{$y}"></button>
               </for>
-            </select>
-          </label>
-          <div class="group">
-            <button on-click="world = @new_world(@random_grid(width: $cols, height: $rows, density: $soup->to_number(default: 30)), wrap: $world.wrap, pattern: 'random soup'); playing = false">Random soup</button>
-            <input type="range" min="5" max="80" step="5" bind="soup" aria-label="How full the soup is">
-            <span class="muted">{$soup}%</span>
-          </div>
-          <label class="check"><input type="checkbox" checked="{$world.wrap}" on-change="world = $world->merge({ wrap: $event.checked })"> Wrap edges</label>
-          <button on-click="world = @new_world(@blank(width: $cols, height: $rows), wrap: $world.wrap); playing = false">Clear</button>
-        </section>
-
-        <p class="about">
-          <if test="$patterns->has($world.pattern)">{ $patterns[$world.pattern].about }</if>
-          <else>Your own pattern.</else>
-        </p>
-
-        <!-- One handler for the whole board: the clicked cell's value is "column,row". -->
-        <div class="board" style="--cols: {$cols}" on-click="world = @flip($world, where: $event.value)">
-          <for each="row" index="y" in="$world.grid">
-            <for each="c" index="x" in="$row">
-              <button class="{ $c eq 'O' ? 'cell on' : 'cell' }" value="{$x},{$y}"></button>
             </for>
-          </for>
-        </div>
+          </div>
 
-        <dl class="stats">
-          <div><dt>Generation</dt><dd>{$s.generation}</dd></div>
-          <div><dt>Alive</dt><dd>{$s.population} <small>({$s.density}%)</small></dd></div>
-          <div><dt>Born</dt><dd>{$s.births}</dd></div>
-          <div><dt>Died</dt><dd>{$s.deaths}</dd></div>
-          <div><dt>Status</dt><dd class="status { $s.status->lower()->replace(old: ' ', new: '-')->replace(old: ',', new: '') }">{$s.status}</dd></div>
-          <div><dt>Board</dt><dd>{$s.size}, {$s.edges}</dd></div>
-        </dl>
-      </live>
-    </div>
+          <dl class="stats">
+            <div>
+              <dt>Generation</dt>
+              <dd>{$s.generation}</dd>
+            </div>
+            <div>
+              <dt>Alive</dt>
+              <dd>{$s.population} <small>({$s.density}%)</small></dd>
+            </div>
+            <div>
+              <dt>Born</dt>
+              <dd>{$s.births}</dd>
+            </div>
+            <div>
+              <dt>Died</dt>
+              <dd>{$s.deaths}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd class="status { $s.status->lower()->replace(old: ' ', new: '-')->replace(old: ',', new: '') }">{$s.status}</dd>
+            </div>
+            <div>
+              <dt>Board</dt>
+              <dd>{$s.size}, {$s.edges}</dd>
+            </div>
+          </dl>
+        </live>
+      </div>
 
-    <footer>
-      Also runs in a terminal (<code>kscript life.ks.xml</code>) and as a Mac app. Same rules, one script: <code>lib/life.ks.xml</code>.
-    </footer>
-  </main>
-</body>
+      <footer>
+        Also runs in a terminal (<code>kscript life.ks.xml</code>) and as a Mac app. Same rules, one script: <code>lib/life.ks.xml</code>.
+      </footer>
+    </main>
+  </body>
 </html>

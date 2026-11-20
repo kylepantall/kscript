@@ -49,7 +49,9 @@
       <return value="@pattern_world($name_or_path, width: $board_w, height: $board_h, wrap: $wrap)" />
     </if>
     <if test="not @exists($name_or_path)">
-      <throw type="Pattern" message="'{$name_or_path}' isn't a pattern name or a file. Patterns: { $patterns->keys()->join(', ') }." />
+      <throw
+        type="Pattern"
+        message="'{$name_or_path}' isn't a pattern name or a file. Patterns: { $patterns->keys()->join(', ') }." />
     </if>
     <let name="rows" value="@parse_cells(@read_text($name_or_path))" />
     <return value="@new_world(@place(@blank(width: @max($board_w, @width($rows) + 2), height: @max($board_h, @height($rows) + 2)), rows: $rows), wrap: $wrap, pattern: @file($name_or_path)->name())" />
@@ -83,9 +85,15 @@
     <echo />
     <menu to="action" options="$actions">What next?</menu>
     <match value="$action">
-      <case is="'step'"><set name="world" value="@advance($world, generations: 1)" /></case>
-      <case is="'play25'"><set name="world" value="@play($world, generations: 25)" /></case>
-      <case is="'play100'"><set name="world" value="@play($world, generations: 100)" /></case>
+      <case is="'step'">
+        <set name="world" value="@advance($world, generations: 1)" />
+      </case>
+      <case is="'play25'">
+        <set name="world" value="@play($world, generations: 25)" />
+      </case>
+      <case is="'play100'">
+        <set name="world" value="@play($world, generations: 100)" />
+      </case>
       <case is="'pattern'">
         <menu to="name" options="$patterns->keys()">Which pattern?</menu>
         <echo>{ @dim($patterns[$name].about) }</echo>
@@ -93,11 +101,15 @@
       </case>
       <case is="'random'">
         <input to="density" type="number" default="30">How full, in percent? [30] </input>
-        <set name="world" value="@new_world(@random_grid(width: $board_w, height: $board_h, density: $density->clamp(min: 1, max: 100)), wrap: $world.wrap, pattern: 'random ' + $density + '%')" />
+        <set
+          name="world"
+          value="@new_world(@random_grid(width: $board_w, height: $board_h, density: $density->clamp(min: 1, max: 100)), wrap: $world.wrap, pattern: 'random ' + $density + '%')" />
       </case>
       <case is="'edit'">
         <input to="where">Cell to flip, as column row (from 1, e.g. 5 3): </input>
-        <let name="xy" value="$where->trim()->split(' ')->reject(fn($p) => $p eq '')->map(fn($p) => $p->to_int(default: 0) - 1)" />
+        <let
+          name="xy"
+          value="$where->trim()->split(' ')->reject(fn($p) => $p eq '')->map(fn($p) => $p->to_int(default: 0) - 1)" />
         <if test="$xy->count() eq 2 and $xy[0] ge 0 and $xy[1] ge 0 and $xy[0] lt @width($world.grid) and $xy[1] lt @height($world.grid)">
           <set name="world" value="@edit_world($world, grid: @toggle($world.grid, x: $xy[0], y: $xy[1]))" />
         </if>
@@ -116,9 +128,17 @@
           </catch>
         </try>
       </case>
-      <case is="'edges'"><set name="world" value="$world->merge({ wrap: not $world.wrap })" /></case>
-      <case is="'clear'"><set name="world" value="@new_world(@blank(width: @width($world.grid), height: @height($world.grid)), wrap: $world.wrap)" /></case>
-      <case is="'quit'"><break /></case>
+      <case is="'edges'">
+        <set name="world" value="$world->merge({ wrap: not $world.wrap })" />
+      </case>
+      <case is="'clear'">
+        <set
+          name="world"
+          value="@new_world(@blank(width: @width($world.grid), height: @height($world.grid)), wrap: $world.wrap)" />
+      </case>
+      <case is="'quit'">
+        <break />
+      </case>
     </match>
   </while>
   <echo>Bye!</echo>

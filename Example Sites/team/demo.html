@@ -25,7 +25,9 @@
     <live id="search">
       <state name="query" value="''" />
       <let name="q" value="$query->trim()->lower()" />
-      <let name="found" value="$people |> filter(fn($p) => $p.name->lower()->contains($q) or $p.role->lower()->contains($q))" />
+      <let
+        name="found"
+        value="$people |> filter(fn($p) => $p.name->lower()->contains($q) or $p.role->lower()->contains($q))" />
       <input bind="query" placeholder="Search by name or role…" autocomplete="off">
       <p class="note">{$found->count()} of {$people->count()} people</p>
       <ul>
@@ -42,7 +44,9 @@
   <section class="demo">
     <h2>To-do list</h2>
     <live id="todos">
-      <state name="todos" value="[{ id: 1, text: 'Try KScript', done: true }, { id: 2, text: 'Build a page with no JavaScript', done: false }]" />
+      <state
+        name="todos"
+        value="[{ id: 1, text: 'Try KScript', done: true }, { id: 2, text: 'Build a page with no JavaScript', done: false }]" />
       <state name="draft" value="''" />
       <state name="next_id" value="3" />
       <form on-submit="todos = $draft->trim() eq '' ? $todos : $todos->push({ id: $next_id, text: $draft->trim(), done: false }); next_id += 1; draft = ''">
