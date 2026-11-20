@@ -2,11 +2,9 @@
 
 [![CI](https://github.com/kylepantall/kscript/actions/workflows/ci.yml/badge.svg)](https://github.com/kylepantall/kscript/actions/workflows/ci.yml)
 
-KScript is a scripting language written in XML. Scripts run on a small .NET 8 interpreter on Windows, Linux and macOS, and `kscript serve` runs a folder of HTML and Markdown templates as a website.
+**One readable language for your scripts, your websites and your desktop apps.**
 
-This is KScript 2: expressions, `{ }` interpolation, typed values, lambdas and pipes, functions you can call like commands, and packages you import for what a script needs. Scripts written for KScript 1 don't run unchanged; the error for each old element or command names what to write instead.
-
-## A first script
+KScript is an open source language that looks like the HTML you already know. The same elements, expressions and functions run a terminal script, render a web page, update that page live as people click and type, and draw native desktop windows, all from one small binary on Windows, macOS and Linux. There is no JavaScript to write, no build step, no `node_modules` and no virtual environment.
 
 ```xml
 <kscript>
@@ -17,23 +15,165 @@ This is KScript 2: expressions, `{ }` interpolation, typed values, lambdas and p
 </kscript>
 ```
 
-Save it as `hello.ks.xml` and run `kscript hello.ks.xml`. More examples live in [`Example Scripts/`](Example%20Scripts) and [`samples/kscript2/`](samples/kscript2), and [`samples/life-lab/`](samples/life-lab) is a complete program (Conway's Game of Life) that runs in a terminal, in the browser and as a desktop app from one shared script.
-
-## Building and running
-
-KScript targets .NET 8 and runs on Windows, Linux and macOS. Install the [.NET 8 SDK](https://dotnet.microsoft.com/download), then:
-
 ```sh
-dotnet build KScript.sln
-dotnet test KScript.sln
-
-# Run a script
-dotnet run --project KScriptApp -- "path/to/script.xml"
+kscript hello.ks.xml
 ```
 
-### Install (no .NET needed)
+## Why KScript
 
-Linux and macOS:
+- **Learn it once, use it everywhere.** Scripts and web pages run on the same interpreter, so a function you write for a script works in a page unchanged. Import it with `<import src="lib/text.ks.xml" />` and call it.
+- **Interactive pages with no JavaScript.** Put a `<live>` block in a page and its buttons, inputs and forms run KScript handlers like `on-click="count += 1"` on the server. Only that block is redrawn. You write no JavaScript and no API, and there is no build step.
+- **Mistakes show up before anything runs.** Unknown elements, bad attributes, missing imports and syntax errors are reported before the first line runs, so a typo near the end can't leave a job half done. The errors say what to write instead.
+- **An editor that understands your code.** The VS Code extension knows the type of every value, so `$person.` offers that person's fields and `$name->` offers string methods, including what your own functions return.
+- **Batteries included, loaded only when used.** Files, HTTP, maths, Markdown, terminal prompts and web pages come as packages. A script imports the ones it needs, and a terminal script never loads the web server.
+- **One binary, every OS.** Install a single file that has the .NET runtime built in. The same script behaves the same on all three platforms, down to how numbers are printed.
+- **Everything else you need is built in.** `kscript make` scaffolds projects and files, `kscript test` runs your tests, `kscript check` lints for CI, and `kscript serve` runs your site.
+
+## Scripts that read like what they do
+
+Find everything over 1 MB in a folder, list it largest first, and offer to move it into an archive:
+
+```xml
+<kscript>
+  <import package="KScript.IO" />
+  <import package="KScript.Terminal" />
+
+  <let name="folder" value="$args[0] ?? @known_folder('downloads')" />
+  <let name="big" value="@files($folder, '*', true)
+      |> filter(fn($f) => $f->size() gt 1000000)
+      |> sort_by(fn($f) => -$f->size())" />
+
+  <for each="f" in="$big">
+    <echo>{ @bold($f->name()) }  { ($f->size() / 1000000)->round(1) } MB</echo>
+  </for>
+  <else>
+    <echo>Nothing over 1 MB in {$folder}.</echo>
+  </else>
+
+  <if test="$big->count() gt 0">
+    <confirm to="ok">Move them to an archive folder?</confirm>
+    <if test="$ok">
+      <for each="f" in="$big">
+        <move from="$f" to="@join_path($folder, 'archive', $f->name())" />
+      </for>
+    </if>
+  </if>
+</kscript>
+```
+
+You get real values (strings, numbers, lists, maps, dates, files), methods on all of them with `->`, pipes with `|>`, lambdas with `fn($x) => …`, `try`/`catch`, and functions you call like commands. Calling an API takes one line too:
+
+```xml
+<import package="KScript.Net" />
+<let name="repo" value="@fetch('https://api.github.com/repos/kylepantall/kscript')->check()->json()" />
+<echo>{$repo.full_name} has {$repo.stargazers_count} stars</echo>
+```
+
+## Web pages that react without JavaScript
+
+`kscript serve` turns a folder of `.html` and `.md` files into a website. KScript elements go straight into the HTML and `{ }` works in text and attributes. Add `<live>` and the page becomes interactive:
+
+```html
+<live id="todos">
+  <state name="todos" value="[]" />
+  <state name="draft" value="''" />
+
+  <form on-submit="todos = $todos->push($draft); draft = ''">
+    <input bind="draft" placeholder="What needs doing?">
+    <button>Add</button>
+  </form>
+
+  <ul>
+    <for each="t" in="$todos"><li>{$t}</li></for>
+    <else><li>Nothing yet.</li></else>
+  </ul>
+  <p>{ $todos->count() } to do</p>
+</live>
+```
+
+That's a working to-do list. The state travels with the page and is signed so the browser can't change it, so the server keeps nothing between requests. `kscript serve` adds its own small runtime to the page. Layouts, components, Markdown pages with front matter, dynamic routes like `people/[id].html` and JSON endpoints are all built in. Values are HTML-escaped by default.
+
+```sh
+kscript serve "Example Sites/team"    # then open http://localhost:8080/demo
+```
+
+## Packages: import what you use
+
+```xml
+<import package="KScript.Math" as="math" />    <!-- then @math.sqrt(2) -->
+<import src="lib/strings.ks.xml" />            <!-- your own functions -->
+```
+
+| Package | What it gives you |
+| --- | --- |
+| `KScript.Core` | The language itself, always there: variables, loops, `match`, functions, errors, strings, lists, maps, JSON and dates |
+| `KScript.Terminal` | Prompts, menus, confirmations, file pickers, colours |
+| `KScript.IO` | Files, folders and paths |
+| `KScript.Net` | HTTP requests and downloads |
+| `KScript.Math` | Maths, random numbers and statistics |
+| `KScript.Markdown` | Markdown to HTML |
+| `KScript.Web` | Pages, layouts, components and `<live>` blocks for `kscript serve` |
+| `KScript.Test` | Tests for `kscript test` |
+| `KScript.UI` | Native desktop windows, and `kscript app build` to package them |
+| `KScript.AI` | Language models: `@llm`, `@chat` and `<llm>`. **Coming soon** |
+
+If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
+
+## Desktop apps, still just KScript
+
+A script whose root is `<KScript.Window>` opens a native window on macOS, Windows or Linux. It works like `<live>`: the `<let>` elements hold the state, the rest is the layout, and the window is redrawn after every handler.
+
+```xml
+<KScript.Window title="Counter" width="320" height="200">
+  <let name="count" value="0" />
+  <Text size="32">{$count}</Text>
+  <Button variant="primary" on-click="count += 1">Add one</Button>
+</KScript.Window>
+```
+
+```sh
+kscript counter.ks.xml           # opens the window
+kscript app build counter.ks.xml # packages it: Counter.app on a Mac, Counter/Counter.exe on Windows
+```
+
+There is no Swift, C#, XAML or shell script to write. [`samples/life-lab`](samples/life-lab) is Conway's Game of Life with one rules script shared by a terminal version, a web page and a desktop app.
+
+## Tooling that comes with it
+
+```sh
+kscript make project my-site   # a site with a layout, a component, a script, tests and editor settings
+kscript serve                  # run it
+kscript test                   # run the tests in tests/
+kscript check                  # report problems in every script and page, for CI
+kscript ide install            # add the extension to VS Code, Cursor, VSCodium or Windsurf
+kscript app build              # package a <KScript.Window> script as a desktop app
+kscript update                 # get the latest release
+```
+
+The editor extension shows errors as you type and gives completion, hover docs, go to definition, rename, inlay hints for the types you didn't write, and notebook-style dividers between blocks. It reads the same package definitions as the interpreter, so the editor never disagrees with what runs. Neovim, Helix, Sublime Text and Emacs work through `kscript lsp`.
+
+Tests are KScript too:
+
+```xml
+<test name="greets by name">
+  <expect value="@greeting('Joan')" equals="'Hello, Joan!'" />
+</test>
+```
+
+## How it compares
+
+| If you'd normally use | KScript gives you |
+| --- | --- |
+| Bash or PowerShell | One syntax on every OS, real lists and maps instead of string juggling, and errors caught before the script starts |
+| Python or Node for small tools | Nothing to set up: no interpreter version, no `pip`, `venv` or `npm install`. One binary runs the script |
+| PHP, Jinja or Liquid templates | The same language in templates and scripts, typed values, components, and live updates without writing JavaScript |
+| React or Vue for a small interactive page | No bundler, no build, no client state to sync and no API to write. The handler runs where the data is |
+
+**When KScript isn't the right fit (yet):** large applications that need a big library ecosystem, heavy number crunching, or rich client-side interactions that need to work offline. KScript is young, and it is aimed at the scripts, internal tools and small sites that usually end up spread across three languages.
+
+## Get started
+
+macOS and Linux:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kylepantall/kscript/master/install.sh | sh
@@ -45,472 +185,17 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/kylepantall/kscript/master/install.ps1 | iex
 ```
 
-The scripts pick the right build for your OS and CPU, install it to `~/.kscript/bin` (Windows: `%LOCALAPPDATA%\Programs\kscript`) and add that folder to your PATH. On macOS they also clear the quarantine flag, since the binary isn't notarized. Set `KSCRIPT_VERSION=v0.1.0` to install a specific release, `KSCRIPT_INSTALL` to choose the folder, or `KSCRIPT_NO_MODIFY_PATH=1` to leave your PATH alone.
-
-To update later:
-
-```sh
-kscript update                    # install the latest release if it's newer
-kscript update --check            # only report whether there is one
-kscript update --version v0.1.0   # install a specific release
-kscript --version
-```
-
-`kscript update` replaces the binary in place. On Windows the running `kscript.exe` is renamed to `kscript.exe.old` and deleted the next time kscript starts. It uses `GITHUB_TOKEN` if set, to avoid GitHub's rate limit.
-
-You can also download a build by hand from the [Releases page](https://github.com/kylepantall/kscript/releases): `linux-x64`, `linux-arm64`, `osx-arm64` (Apple Silicon), `osx-x64` and `win-x64`. Each is a single `kscript` file that includes the .NET runtime:
-
-```sh
-tar -xzf kscript-osx-arm64.tar.gz
-xattr -d com.apple.quarantine kscript   # macOS only: the binary isn't notarized
-./kscript serve "Example Sites/team"
-```
-
-To build one yourself from source:
-
-```sh
-dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out
-```
-
-Run a script with `kscript script.ks.xml [arguments]`. The arguments are in `$args`, a list. The exit code is 0, the code given to `<exit code="..."/>`, or 3 when the script stops with an error (printed as `file:line:column: Type: message`). Ctrl+C stops a script; `<finally>` blocks still run.
-
-## Editor support
-
-Install the KScript extension into VS Code, Cursor, VSCodium or Windsurf:
-
-```sh
-kscript ide install           # every editor it finds; or name one: kscript ide install cursor
-kscript ide                   # list the editors it found
-kscript ide uninstall
-```
-
-The extension shows errors as you type and adds completion, hover, go to definition, rename and highlighting for scripts and `kscript serve` pages. It works out types as it goes: `$person.` and `$name->` offer the fields and methods of that value (including what your own functions return), inlay hints show the types you didn't write, and thin lines divide a script into blocks like a notebook. It runs `kscript lsp` from your installed `kscript`, so keep that current with `kscript update`. To use a different `kscript`, set `kscript.server.path` in the editor's settings.
-
-Other editors with LSP support work too: `kscript ide config neovim` (or `helix`, `sublime`, `emacs`) prints the settings to add. `kscript check <folder>` reports the same problems on the command line, for CI. See [docs/language-server.md](docs/language-server.md) for how the language server works.
-
-## Repository layout
-
-| Path | Contents |
-| --- | --- |
-| `KScript.Syntax/` | The parser shared by the interpreter and the editor tools: markup, expressions, `{ }` templates, and the metadata types elements and commands are described with. |
-| `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
-| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/` | Packages: each registers its elements, commands and methods, with their documentation. |
-| `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
-| `KScript.UI/` | Desktop windows: the KScript.UI package, the redraw model (`UISession`) and the Avalonia host that shows it on macOS, Windows and Linux. |
-| `KScript.Test/` | The KScript.Test package and `kscript test`: finding test files, running them, and the console and JUnit reports. |
-| `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript ide`, `kscript update` and `kscript app build` (`Apps/`). |
-| `KScriptApp/` | The `kscript` command line app. |
-| `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
-| `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |
-| `editors/vscode/` | The VS Code extension. |
-| `samples/kscript2/` | Sample scripts. |
-| `samples/life-lab/` | Life Lab: one KScript program that runs in a terminal, in the browser and as a desktop app (`KScript.UI`). |
-| `Example Scripts/` | More sample scripts. |
-| `Example Sites/team` | A sample `kscript serve` site. |
-
-## Tests and CI
-
-`KScript.Tests` covers the interpreter, every package, `kscript serve` pages, `kscript make`, `kscript.json` and the sample scripts; `KScript.Language.Tests` covers the analyzer, the editor features and the language server. Run them with `dotnet test KScript.sln`.
-
-Every push to `master` and every pull request runs [the CI workflow](.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `Example Scripts/Find Oldest Person.xml`, checks the sample scripts with `kscript check` and runs their KScript tests with `kscript test`, on three platforms:
-
-- **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
-- **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
-
-## The language
-
-### Variables and output
-
-```xml
-<let name="count" value="0" />                      <!-- declare -->
-<let name="people">[{ name: 'Joan', age: 82 }]</let> <!-- longer values go in the text -->
-<set name="count" value="$count + 1" />             <!-- change; fails if never declared -->
-<set name="count" op="+=" value="1" />
-<do>$total = $price * $qty; $count += 1</do>
-<let name="limit" value="10" const="yes" />
-<let name="n" value="$args[0]" type="int" />        <!-- convert, or stop with a clear error -->
-
-<echo>Hello, {$name}! You have { $count } new { $count eq 1 ? 'message' : 'messages' }.</echo>
-<echo>$person.name is $person.age</echo>           <!-- bare $name works in text too -->
-<echo>$people</echo>                               <!-- a map or list of maps prints as indented JSON -->
-```
-
-A map, or a list of maps, on its own in `<echo>` prints as indented JSON, coloured in a terminal (unless `NO_COLOR` is set). Inside text it stays on one line. `<echo format="json">` reformats JSON text, and `->to_json()` gives compact JSON.
-
-Variables belong to the block they are declared in. `{{` and `}}` are literal braces.
-
-### Expressions
-
-`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `lt le gt ge` (or `> >=`), `eq ne`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn($x) => …`. Use the word forms in attributes, since XML can't hold a raw `<` or `&&` there.
-
-### Control flow
-
-```xml
-<if test="$n lt 10"> … </if>
-<elif test="$n lt 100"> … </elif>
-<else> … </else>
-
-<for each="p" in="$people"> … </for>
-<for each="i" index="n" in="0..10 step 2"> … </for>
-<for each="key, value" in="$map"> … </for>
-<while test="$queue->count() gt 0"> … <break /> … <continue /> … </while>
-
-<match value="$choice">
-  <case is="1"> … </case>
-  <case is="2, 3"> … </case>
-  <case when="$it gt 9"> … </case>
-  <default> … </default>
-</match>
-```
-
-### Functions
-
-```xml
-<fn name="greet" params="who, greeting = 'Hello'">
-  <return value="$greeting + ', ' + $who + '!'" />
-</fn>
-<fn name="square" params="n: number" value="$n * $n" />
-
-<echo>{ @greet('World') } { 4 |> @square() }</echo>
-<call fn="greet" args="'Kyle'" />
-<spawn fn="background_job" />
-```
-
-Functions can be called before they are declared, recurse, and be passed around: `@square` is the function itself. Lambdas are values too: `<let name="by_age" value="fn($a, $b) => $a.age - $b.age" />`.
-
-### Values and methods
-
-Values are strings, numbers, bools, lists, maps, dates, functions and null, plus values packages add (files, HTTP responses). Every value has methods, called with `->` and chained:
-
-```xml
-<echo>{ $name->trim()->upper() }</echo>
-<echo>{ $people->filter(fn($p) => $p.age ge 18)->map(fn($p) => $p.name)->join(', ') }</echo>
-<echo>{ $people |> sort_by(fn($p) => $p.name) |> first() }</echo>
-<echo>{ @now()->add_days(7)->format('d MMMM yyyy') }</echo>
-```
-
-The editor completes the methods for each type and shows what they do. `@json(text)` and `$value->to_json()` convert to and from JSON.
-
-### Errors
-
-```xml
-<try>
-  <let name="data" value="@read_json($path)" />
-  <catch as="err" when="$err.type eq 'FileNotFound'">
-    <echo>No file at {$path}, using defaults.</echo>
-  </catch>
-  <catch as="err"><echo>Failed: {$err.message} (line {$err.line})</echo></catch>
-  <finally><echo>done</echo></finally>
-</try>
-<throw type="Validation" message="Age must be positive, got {$age}" />
-```
-
-Unknown elements, attributes and syntax errors are reported before a script starts, so a typo near the end doesn't leave a job half done.
-
-## Packages
-
-KScript.Core (everything above) is always there. Everything else comes from a package, imported at the top of the script, so a script only loads what it uses: a terminal script never loads the web server.
-
-```xml
-<kscript>
-  <import package="KScript.Terminal" />
-  <import package="KScript.Math" as="math" />      <!-- commands stay under the prefix: @math.sqrt(2) -->
-  <import src="lib/strings.ks.xml" as="str" />      <!-- another script's top-level <fn> and <let const> -->
-  <import src="lib/strings.ks.xml" names="slugify" />
-  …
-</kscript>
-```
-
-| Package | What it adds |
-| --- | --- |
-| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `<echo format="markdown">` |
-| `KScript.Math` | `@sqrt` `@pow` `@round(x, digits)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low, high)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
-| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path` `@known_folder('downloads')`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
-| `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
-| `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
-| `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
-| `KScript.UI` | Desktop windows: a script whose root is `<KScript.Window>` opens one. `<Column>` `<Row>` `<Grid>` `<Text>` `<Button>` `<TextBox>` `<CheckBox>` `<Select>` `<Slider>` `<Box>` `<Spacer>` `<Timer>`, `@close_window()`. See [Desktop apps](#desktop-apps-kscriptui). |
-| `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](#testing-scripts-kscript-test)). |
-
-Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).
-
-## Web pages: kscript serve
-
-`kscript serve` runs a folder as a website. Every `.html` and `.md` page is a template: KScript elements sit directly in the HTML, `{ expression }` works in text and attributes, and the visitor gets plain HTML.
-
-```sh
-kscript serve "Example Sites/team" --port 8080     # then open http://localhost:8080
-```
-
-```html
-<!-- people.html -->
-<let name="people" value="@read_json('data/people.json')" />
-<let name="min" value="($request.query.min_age ?? '0')->to_number(0)" />
-
-<layout src="_layout.html" title="People">
-  <h1>People aged {$min} and over</h1>
-  <ul>
-    <for each="p" in="$people |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)">
-      <li class="{ $p.age ge 65 ? 'senior' : '' }">
-        <a href="/people/{$p.id}">{$p.name}</a> ({$p.age})
-      </li>
-    </for>
-    <else>
-      <li>Nobody matches.</li>
-    </else>
-  </ul>
-</layout>
-```
-
-| Element | Use |
-| --- | --- |
-| `<let name value>` / `<let>x = 3</let>` | Declare a variable in the current block. |
-| `<set name value op>` / `<set>x += 1</set>` / `<do>$a = 1; $b += 2</do>` | Change existing variables. |
-| `<if test>`, `<elif test>`, `<else>` | Branches. `<else>` after a `<for>` runs when the loop had nothing to loop over. |
-| `<for each="p" in="$list" index="i">`, `<for each="key, value" in="$map">` | Loops. `$loop.index` and `$loop.first` are set too. |
-| `<while test>` | Loop while true (stopped after 100,000 runs). |
-| `<match value>` with `<case is="1, 2">`, `<case when="$it gt 9">`, `<default>` | Pick one branch. |
-| `<layout src="_layout.html" title="…">` and `<slot />` | Wrap the page in a layout; extra attributes become variables. |
-| `<my-card user="{$u}">`, `<hero>` | A component: `_components/my-card.html`, with `<slot />` for its children. Any element that isn't an HTML or KScript element can be a component. Components only see their own attributes. |
-| `<include src="_part.html">` | Insert another template here. |
-| `<markdown>` | Render Markdown, with `{ }` values escaped. |
-| `<respond status json type header-x>` / `<redirect to>` | Send a different response, e.g. JSON or a 404. |
-
-- **Expressions**: `+ - * / %`, `== !=` (loose: `'3' == 3`), `=== !==` (strict: type and value), `lt le gt ge` (or `> >=`), `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]`, `->method()`, `|>` and `fn($x) => …`. Use the words `lt`, `le`, `and`, `or` in attributes, since XML can't hold a raw `<` or `&&` there.
-- **Escaping**: `{ value }` is HTML-escaped (Markdown-escaped in `.md` pages); `{! value }` outputs trusted HTML; `{{` and `}}` are literal braces. An attribute that is exactly `{ value }` is left out when the value is `false` or `null`, so `checked="{$done}"` just works.
-- **Markdown pages**: `.md` files can start with `---` front matter (`title: About`, `layout: _layout.html`); its keys become variables.
-- **Routing**: `/people` serves `people.html`, `people.md` or `people/index.html`; `/people/42` can match `people/[id].html` (`$request.params.id`). Files and folders starting with `_` or `.` and KScript sources (`.xml`) are never served. `_404.html` is used for missing pages.
-- **`$request`**: `method`, `path`, `query`, `form`, `headers`, `cookies`, `params` and `body`.
-- **Same language as scripts**: pages run on the KScript 2 interpreter, so every KScript.Core command and method works in them. Pages also get KScript.IO, KScript.Markdown and KScript.Web without importing them: `@read_json`, `@read_text`, `@read_markdown` (gives `html`, `title` and `meta`), `@files`, `@exists`, `@markdown`. Other packages are imported at the top of the page, as in a script: `<import package="KScript.Math" as="math" />` and then `{ @math.sqrt(2) }`.
-- **Sharing code with scripts**: `<import src="lib/text.ks.xml" />` at the top of a page gives it that script's top-level `<fn>` functions and `<let const="yes">` values. `as="text"` (then `@text.shout(...)`) and `names="shout"` work as they do in scripts.
-- **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
-- **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
-
-See `Example Sites/team` for a complete site with a layout, a component, a Markdown page, a dynamic route and a JSON endpoint.
-
-### Reactive pages with `<live>` (no JavaScript)
-
-A `<live>` block reacts to clicks and typing without any JavaScript in the page. Its handlers are KScript statements; the server runs them and sends back just that block's new HTML.
-
-```html
-<live id="counter">
-  <state name="count" value="0" />
-  <p>{$count}</p>
-  <button on-click="count -= 1">−</button>
-  <button on-click="count += 1">+</button>
-</live>
-
-<live id="search">
-  <state name="query" value="''" />
-  <input bind="query" placeholder="Search…">
-  <for each="p" in="$people->filter(fn($p) => $p.name->lower()->contains($query->lower()))">
-    <li>{$p.name}</li>
-  </for>
-</live>
-```
-
-- `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server keeps nothing between requests.
-- `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn($i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
-- `bind="name"` ties an input to a state variable both ways and redraws the block as you type.
-- `on-tick="…" every="200"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if test="$playing"><span on-tick="frame += 1" every="100"></span></if>`.
-- `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
-
-See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter, and [`samples/life-lab`](samples/life-lab) for a game whose rules are a KScript script shared with a terminal version and a desktop app.
-
-## Desktop apps: KScript.UI
-
-A script whose root element is `<KScript.Window>` opens a native window on macOS, Windows or Linux. There is nothing else to write: no Swift, C#, XAML or shell scripts.
-
-```xml
-<KScript.Window title="Counter" width="320" height="200">
-  <let name="count" value="0" />
-
-  <Text size="32">{$count}</Text>
-  <Row>
-    <Button variant="primary" on-click="count += 1">Add one</Button>
-    <Button on-click="count = 0" disabled="$count eq 0">Reset</Button>
-  </Row>
-</KScript.Window>
-```
-
-`kscript counter.ks.xml` opens it, and the script ends when the window is closed. It works like a `<live>` block on a page:
-
-- The `<let>`, `<fn>` and `<import>` elements directly inside `<KScript.Window>` run once and hold the window's state.
-- Everything else is the layout. After every `on-click`, `on-change`, `on-enter` or `on-tick`, the layout is drawn again from the variables. `<if>`, `<for>` and `{ }` work as they do anywhere else. Controls stay the same object from one draw to the next, so typing and focus aren't lost.
-- `bind="name"` ties a `<TextBox>`, `<CheckBox>`, `<Select>` or `<Slider>` to a state variable. `$event.value` holds the new value in `on-change`.
-- `<Timer every="100" when="$playing" on-tick="...">` runs on a timer while `when` is true.
-- If a handler fails, the error is shown at the top of the window and the window carries on.
-- `<KScript.Window>` can also go inside a `<kscript>` script. The script waits while the window is open, then carries on with the window's changes.
-
-| Element | What it is |
-| --- | --- |
-| `<Column gap align scroll>`, `<Row gap align wrap>`, `<Grid columns gap>` | Layout: top to bottom, side by side, or equal columns. |
-| `<Text size weight color wrap>` | Text. |
-| `<Button on-click variant="primary" disabled>` | A button. |
-| `<TextBox bind placeholder on-enter multiline>`, `<CheckBox bind>`, `<Select bind options>`, `<Slider bind min max step>` | Inputs, each tied to a variable. `options` is a list, a list of `{ label, value }` maps, or a map from label to value. |
-| `<Box on-click border>` | A rectangle: a cell, a card or a panel. It can hold other elements. |
-| `<Spacer size>`, `<Timer every when on-tick>` | Space, and a timer. |
-
-Every element takes `width`, `height`, `padding`, `margin`, `background`, `radius` and `tooltip`. Colours are names such as `teal` or `#rrggbb`. `<KScript.Window>` takes `title`, `width`, `height`, `theme` (`dark`, `light` or `system`), `background`, `padding`, `gap` and `resizable`.
-
-### Packaging an app: kscript app build
-
-```sh
-kscript app build counter.ks.xml --name "Counter"
-```
-
-This builds `dist/Counter.app` on a Mac, and `dist/Counter/` with `Counter.exe` on Windows or a launcher and a `.desktop` file on Linux. It builds for the computer it runs on. The app holds the script's folder (or its whole `kscript.json` project, so imports and data files come along) and its own copy of `kscript`. Built with a release `kscript`, it runs on computers that don't have kscript or .NET. In a project, the `app` section of `kscript.json` names the main script, the app's name and its icon, so `kscript app build` needs no arguments. Mac apps are signed ad hoc, not notarized: macOS opens them on the Mac that built them, and elsewhere after right-clicking and choosing **Open**.
-
-[`samples/life-lab/desktop.ks.xml`](samples/life-lab/desktop.ks.xml) is a complete example: the Game of Life with a clickable board, a timer and controls, sharing its rules with a terminal and a browser version.
-
-## Starting a project: kscript make project
-
-`kscript make project` sets up a new site with everything wired together:
-
-```sh
-kscript make project my-site --port 3000
-cd my-site
-kscript serve      # http://localhost:3000, from kscript.json
-kscript check      # checks every page and script in the project
-kscript test       # runs the tests in tests/
-```
-
-It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_components/site-nav.html`, `site.css`, `lib/greeting.ks.xml` (a function), `scripts/hello.ks.xml` (a script that uses it), `tests/greeting.test.ks.xml` (tests for both, run with `kscript test`) and `.vscode/extensions.json`, which asks VS Code to install the KScript extension. `kscript make project .` sets up the current folder; existing files are never replaced without `--force`.
-
-### Project settings: kscript.json
-
-`kscript serve`, `kscript check`, `kscript make` and the editor read the nearest `kscript.json` in the folder they work on or a parent folder, so they behave the same from anywhere in the project. Every setting is optional:
-
-```jsonc
-{
-  "name": "my-site",
-  "packages": ["KScript.Terminal", "KScript.IO"],   // imported by every script in the project
-  "serve": {
-    "root": ".",          // the site folder, relative to kscript.json
-    "port": 8080,         // --port and --host on the command line still win
-    "host": "localhost"
-  },
-  "lint": {
-    "include": ["**/*.html", "**/*.md", "**/*.ks.xml"],   // what `kscript check` looks at
-    "exclude": ["_templates", "node_modules", "drafts/**"], // never checked, on the command line or in the editor
-    "rules": { "KS3003": "off", "KS4*": "error" },          // off, hint, info, warning or error, by code or prefix
-    "warningsAsErrors": false                               // same as kscript check --warnaserror
-  },
-  "test": {
-    "include": ["tests/**/*.test.ks.xml"],  // what `kscript test` runs (default: **/*.test.ks.xml and **/*.test.xml)
-    "exclude": ["tests/slow"],
-    "timeout": 10,                          // seconds per test, 0 for no limit
-    "packages": ["KScript.Terminal"]        // imported by test files only
-  },
-  "app": {
-    "main": "app.ks.xml",       // what `kscript app build` packages (see Desktop apps)
-    "name": "My App",           // shown in the Dock, Start menu or launcher (default: the project's name)
-    "id": "com.example.myapp",  // the macOS bundle id
-    "version": "1.0.0",
-    "icon": "icon.icns"         // .icns for macOS, .ico for Windows, .png for Linux
-  }
-}
-```
-
-- A pattern without a `/` (such as `_templates` or `*.draft.html`) matches a file or folder of that name anywhere. Otherwise it is matched against the path from `kscript.json`: `*` stays within a folder, `**` spans folders, and a folder matches everything in it.
-- `rules` changes how serious a diagnostic is (see [the codes](docs/language-server.md#diagnostic-codes)). The longest match wins, so `"KS3*": "warning"` with `"KS3001": "error"` keeps unknown elements as errors.
-- Comments and trailing commas are allowed. Unknown settings are reported as warnings rather than ignored silently, and the VS Code extension validates the file and completes its settings as you type.
-- Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
-- `kscript serve` never serves `kscript.json`.
-
-## Generating files: kscript make
-
-`kscript make` creates components, pages and scripts from templates, so a new file starts out right:
-
-```sh
-kscript make component Hero --props title,sub-title   # _components/hero.html, used as <hero title="…" sub-title="…" />
-kscript make page about --title "About us"            # about.html, wrapped in _layout.html (created if missing)
-kscript make page "people/[id]"                       # people/[id].html, with $id read from the URL
-kscript make markdown blog/first-post                 # blog/first-post.md with front matter
-kscript make layout main --css /site.css              # _layouts/main.html
-kscript make script tidy-downloads                    # tidy-downloads.xml
-kscript make test checkout                            # tests/checkout.test.ks.xml, in the project folder
-kscript make                                          # list every template
-```
-
-`kscript make:component Hero` works too. Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
-
-**Your own templates.** Templates live in the project's `_templates/` folder, which `kscript serve` never serves. `kscript make templates` copies the built-in ones there to edit. A file there replaces the built-in template of the same name (`_templates/component.html`), and any other file adds a type: `_templates/card.html` gives `kscript make card Profile`.
-
-```html
---- make
-description: A card with an optional image
-to: _components/{{ kebab }}-card.html
-hint: Use it in a page: <{{ kebab }}-card />
----
-<article class="card {{ variant ?? plain }}">
-{{#if image}}
-  <img src="{$image}" alt="">
-{{/if}}
-{{#each props}}
-  <p>{${{ item | var }}}</p>
-{{/each}}
-  <slot />
-</article>
-```
-
-- The `--- make` header is optional: `to` is where the file goes (default: the name with the template's extension), `hint` is printed afterwards, `description` shows in `kscript make`. `base: project` makes `to` relative to the project folder (where `kscript.json` is) rather than the site root, as the `test` template does.
-- `{{ name }}` is the name as typed; `{{ kebab }}`, `{{ snake }}`, `{{ pascal }}`, `{{ camel }}` and `{{ title }}` are its other spellings; `{{ dir }}` is its folder (`blog/` for `blog/first-post`), `{{ path }}` is folder and kebab name, `{{ url }}` its page URL, and `{{ params }}` lists `[id]` segments.
-- `{{ value | kebab }}` applies a filter (`kebab snake pascal camel title var lower upper trim`; `var` turns `sub-title` into the `sub_title` a component sees), and `{{ value ?? fallback }}` gives a default.
-- `{{#if value}} … {{else}} … {{/if}}`, `{{#unless value}}`, and `{{#each value}} … {{ item }} … {{/each}}` over a comma-separated list (`{{ index }}`, `{{ first }}` and `{{ last }}` are set). A block tag on its own line leaves no blank line behind.
-- Single braces are left alone, so KScript's `{$value}` is written as is.
-
-## Testing scripts: kscript test
-
-Tests are scripts named `name.test.ks.xml`, usually in a `tests/` folder. `kscript test` runs every one in the project, prints each result, and exits with 1 if any test failed, so it can gate CI.
-
-```xml
-<!-- tests/greeting.test.ks.xml -->
-<kscript>
-  <import src="../lib/greeting.ks.xml" />
-
-  <describe name="greeting">
-    <test name="says hello">
-      <expect value="@greeting('Joan')" equals="'Hello, Joan!'" />
-    </test>
-
-    <test name="tidies '{$name}'" each="name" in="['  joan ', 'JOAN']">
-      <expect value="@greeting($name)" equals="'Hello, Joan!'" />
-    </test>
-  </describe>
-
-  <test name="hello.ks.xml greets the name it is given">
-    <let name="run" value="@run_script('../scripts/hello.ks.xml', { args: ['ellie'] })" />
-    <expect value="$run.output" equals="'Hello, Ellie!'" />
-    <assert test="$run.code eq 0" />
-  </test>
-</kscript>
-```
-
-```sh
-kscript test                            # every test in the project
-kscript test tests/cart                 # a folder, or name one or more files
-kscript test --filter "greeting › says" # tests whose full name contains the text
-kscript test --junit test-results.xml   # a JUnit XML report for CI
-kscript make test checkout              # start tests/checkout.test.ks.xml
-```
-
-- A file's top-level code (imports, variables, functions, `<describe>`) runs once; then each `<test>` runs on its own, so one failing test doesn't stop the others. `<before-each>` and `<after-each>` run around every test in their file or `<describe>`.
-- `<expect value="…">` takes one check: `equals`, `not-equals`, `same` (`===`), `contains`, `not-contains`, `matches`, `type` or `count`. `<assert test="$total eq 30" />` shows the value of each side when it fails.
-- `<expect-error type contains as>` expects its body to stop with an error, `<capture to input>` collects what its body prints (and answers its prompts), and `@run_script(path, { args, input })` runs a whole script and returns `{ output, code, error }`.
-- `skip="reason"` and `only="yes"` go on a `<test>` or `<describe>`, and `timeout="30"` on a test (10 seconds by default).
-- Test files get KScript.Test without an `<import>`, in the runner and in the editor. In VS Code, **KScript: Run Tests** runs them.
-
-See [docs/testing.md](docs/testing.md) for every element, check and setting.
-
-## Writing portable scripts
-
-- Build paths with `@join_path($dir, 'file.txt')` (KScript.IO) rather than hard-coding `\` or `/`.
-- `$os.name` is `windows`, `linux` or `macos`, and `$os.home`, `$os.temp` and `$os.separator` are there too; `$env.HOME` reads an environment variable.
-- Numbers are always parsed and printed with `.` as the decimal separator, whatever the machine's language.
-
-## Roadmap
-
-KScript 2 is landing in steps. Scripts, `kscript serve` pages and desktop windows (`KScript.UI`) already share one interpreter; language models (`KScript.AI`) come next.
-
+Then save the first example above as `hello.ks.xml`, run `kscript hello.ks.xml`, and run `kscript ide install` to set up your editor. [`samples/kscript2/`](samples/kscript2) and [`Example Sites/team`](Example%20Sites/team) have more to read and run.
+
+## Documentation
+
+- [Installing KScript](docs/install.md): installers, updating, manual downloads and editor setup
+- [The language](docs/language.md): values, expressions, control flow, functions, errors and every package
+- [Web pages and `<live>`](docs/web.md): `kscript serve`, layouts, components, routing and reactive blocks
+- [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
+- [Desktop apps](docs/desktop.md): `<KScript.Window>`, its elements, and `kscript app build`
+- [Testing](docs/testing.md): `kscript test` and every check
+- [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
+- [Working on KScript](docs/contributing.md): building from source, the repository layout and CI
+
+KScript is open source and contributions are welcome. Start with [Working on KScript](docs/contributing.md).

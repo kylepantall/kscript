@@ -12,7 +12,7 @@ reported as retired, with the KScript 2 replacement and a quick fix where one is
 | `kscript lsp` | Runs the server over stdio (LSP 3.17). Any LSP client can use it. |
 | `kscript check [file-or-folder]... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. With no path it checks the project the current folder is in. A folder with `_layout.html`, `_components/`, `_layouts/` or `kscript.json` is a site, so its `.html` and `.md` pages are checked too. |
 
-Both follow the project's `kscript.json` (see the README): `lint.rules` changes or turns off diagnostics by code, `lint.exclude` silences
+Both follow the project's `kscript.json` (see [Project settings](projects.md#project-settings-kscriptjson)): `lint.rules` changes or turns off diagnostics by code, `lint.exclude` silences
 files and folders, and `lint.include` chooses what a folder check covers. The server re-reads `kscript.json` when it changes.
 The rules are applied in `LintRules.Apply` (KScript.Language), after analysis, so the analyzer itself never needs to know about them.
 
