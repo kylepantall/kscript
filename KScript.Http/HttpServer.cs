@@ -26,6 +26,7 @@ namespace KScript.Http
                 {
                     RouteTable table = app.Table();
                     log?.WriteLine($"Routes: {table.Routes.Count} from {string.Join(", ", app.Files.Select(f => Path.GetFileName(f.Path)))} (kscript routes lists them).");
+                    if (app.Settings.OpenApi.Enabled) log?.WriteLine("API docs: /_api, made from the routes (/_openapi.json and /_openapi.yaml for tools).");
                 }
                 catch (KScriptException ex)
                 {
@@ -36,6 +37,44 @@ namespace KScript.Http
             Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> handler = before == null ? routes : async request =>
                 await before(request) ?? (routes == null ? null : await routes(request));
             return PageServer.RunAsync(site, port, host, log, handler, stop, onStarted: started);
+        }
+
+        /// <summary>kscript openapi: the OpenAPI document for a site's routes, to the output or a file.</summary>
+        public static int WriteOpenApi(string siteFolder, ProjectConfig project, bool yaml, string outFile, TextWriter output, TextWriter error)
+        {
+            HttpApp app;
+            try
+            {
+                app = new HttpApp(siteFolder, project);
+            }
+            catch (FileNotFoundException ex)
+            {
+                error.WriteLine(ex.Message);
+                return 1;
+            }
+            if (!app.HasRoutes)
+            {
+                error.WriteLine($"There are no route files in {app.SiteRoot}, so there is no API to describe. Add api.kscript (or routes.kscript) starting with KScript.Routes {{ }}.");
+                return 1;
+            }
+            try
+            {
+                Dictionary<string, object> document = OpenApi.Document(app, app.LoadRoutes(), project);
+                string text = yaml ? OpenApi.ToYaml(document) : OpenApi.ToJson(document);
+                if (outFile == null)
+                {
+                    output.Write(text);
+                    return 0;
+                }
+                File.WriteAllText(outFile, text);
+                output.WriteLine($"Wrote {outFile} ({((Dictionary<string, object>)document["paths"]).Count} paths).");
+                return 0;
+            }
+            catch (KScriptException ex)
+            {
+                error.WriteLine((ex.Location != null ? ex.Location + ": " : string.Empty) + ex.Message);
+                return 1;
+            }
         }
 
         /// <summary>kscript routes [folder]: prints every route, its name, what answers it and its middleware.</summary>
