@@ -238,6 +238,7 @@ jobs:
 
   native-aot:
     name: Native AOT (linux, experimental)
+    timeout-minutes: 25
     # Checks that kscript still builds and runs as a Native AOT binary: no new trim or AOT warnings, and the
     # commands that matter work. Releases still ship the single-file build; this job only keeps the AOT path open.
     runs-on: ubuntu-latest
@@ -274,14 +275,15 @@ jobs:
           time "$k" --version
 
       - name: Serve a site, the docs and MCP
+        timeout-minutes: 5
         run: |
           k="$PWD/aot/KScript"
           (cd samples/http-app && "$k" serve --port 8092 > ../../serve.log 2>&1 &)
           "$k" docs --no-open --port 8098 > docs.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://localhost:8092/people > people.html && curl -sf http://localhost:8098/ > docs.html && break; sleep 1; done
-          curl -sf http://localhost:8092/_openapi.json | grep -q '"openapi"'
-          curl -sf http://localhost:8098/assets/search.json | grep -q '"t":'
-          curl -sf -X POST http://localhost:8098/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
+          for i in $(seq 1 30); do curl -sf --max-time 10 http://localhost:8092/people > people.html && curl -sf --max-time 10 http://localhost:8098/ > docs.html && break; sleep 1; done
+          curl -sf --max-time 10 http://localhost:8092/_openapi.json | grep -q '"openapi"'
+          curl -sf --max-time 10 http://localhost:8098/assets/search.json | grep -q '"t":'
+          curl -sf --max-time 10 -X POST http://localhost:8098/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
             -d '{"code":"<echo>docs ok</echo>"}' | grep -q "docs ok"
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
             '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | "$k" mcp | tee mcp.out
@@ -295,6 +297,7 @@ jobs:
           cache-dependency-path: editors/vscode/package-lock.json
 
       - name: Language server smoke test
+        timeout-minutes: 5
         working-directory: editors/vscode
         run: |
           npm ci
