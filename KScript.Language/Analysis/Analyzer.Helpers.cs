@@ -468,19 +468,13 @@ namespace KScript.Language.Analysis
 
         private string ResolvePath(string relative)
         {
-            if (string.IsNullOrWhiteSpace(relative) || directory == null || relative.Contains('{'))
+            // GetFullPath only rejects a path with a NUL in it.
+            if (string.IsNullOrWhiteSpace(relative) || directory == null || relative.Contains('{') || relative.Contains('\0'))
             {
                 return null;
             }
-            try
-            {
-                string trimmed = relative.Trim().TrimStart('/');
-                return System.IO.Path.GetFullPath(System.IO.Path.Combine(Kind == DocumentKind.Script ? directory : SiteRoot(), trimmed));
-            }
-            catch (ArgumentException)
-            {
-                return null;
-            }
+            string trimmed = relative.Trim().TrimStart('/');
+            return System.IO.Path.GetFullPath(System.IO.Path.Combine(Kind == DocumentKind.Script ? directory : SiteRoot(), trimmed));
         }
 
         private static readonly string[] SiteMarkers = { "kscript.json", "_layout.html", "_components", "_layouts" };

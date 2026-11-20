@@ -27,11 +27,7 @@ namespace KScript.Language.Analysis
             {
                 return File.Exists(path) ? File.ReadAllText(path) : null;
             }
-            catch (IOException)
-            {
-                return null;
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
                 return null;
             }
@@ -43,11 +39,7 @@ namespace KScript.Language.Analysis
             {
                 return Directory.Exists(directory) ? Directory.GetFiles(directory, pattern) : Array.Empty<string>();
             }
-            catch (IOException)
-            {
-                return Array.Empty<string>();
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
                 return Array.Empty<string>();
             }

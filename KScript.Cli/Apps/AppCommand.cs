@@ -25,7 +25,10 @@ namespace KScript.Apps
 
         private static readonly string[] SkippedFolders = { ".git", "node_modules", "bin", "obj", "dist", ".vscode", ".idea" };
 
-        public static int Run(string[] args, TextWriter output, TextWriter error)
+        public static int Run(string[] args, TextWriter output, TextWriter error) => Run(args, output, error, null, CurrentPlatform);
+
+        /// <summary>For tests: a stand-in kscript (null finds the running one) and the platform to build for.</summary>
+        internal static int Run(string[] args, TextWriter output, TextWriter error, KScriptRuntime runtime, Platform platform)
         {
             if (args.Length == 0 || args[0] is "--help" or "-h" or "help")
             {
@@ -67,10 +70,10 @@ namespace KScript.Apps
 
             try
             {
-                string built = Build(script, name, outDir, output);
+                string built = Build(script, name, outDir, output, runtime ?? KScriptRuntime.Current(), platform);
                 output.WriteLine($"Built {built}");
-                output.WriteLine(OperatingSystem.IsMacOS() ? $"Open it from Finder, or run: open \"{built}\""
-                    : OperatingSystem.IsWindows() ? $"Run {Path.Combine(built, Path.GetFileName(built) + ".exe")}"
+                output.WriteLine(platform == Platform.MacOS ? $"Open it from Finder, or run: open \"{built}\""
+                    : platform == Platform.Windows ? $"Run {Path.Combine(built, Path.GetFileName(built) + ".exe")}"
                     : $"Run \"{Path.Combine(built, Path.GetFileName(built).Replace(' ', '-'))}\", or add {Path.GetFileName(built).Replace(' ', '-')}.desktop to ~/.local/share/applications");
                 return 0;
             }
@@ -86,13 +89,11 @@ namespace KScript.Apps
             }
         }
 
-        /// <summary>Builds the app and returns its path.</summary>
-        public static string Build(string script, string name, string outDir, TextWriter log) => Build(script, name, outDir, log, KScriptRuntime.Current(), CurrentPlatform);
-
         internal enum Platform { MacOS, Windows, Linux }
 
         private static Platform CurrentPlatform => OperatingSystem.IsMacOS() ? Platform.MacOS : OperatingSystem.IsWindows() ? Platform.Windows : Platform.Linux;
 
+        /// <summary>Builds the app and returns its path.</summary>
         internal static string Build(string script, string name, string outDir, TextWriter log, KScriptRuntime runtime, Platform platform)
         {
             ProjectConfig project = ProjectConfig.FindAndLoad(script ?? ".");
@@ -245,11 +246,11 @@ namespace KScript.Apps
         }
 
         /// <summary>Ad-hoc signs a macOS app, which Apple Silicon needs before it will run an edited bundle.</summary>
-        private static void Sign(string app, TextWriter log)
+        internal static void Sign(string app, TextWriter log, string codesign = "codesign")
         {
             try
             {
-                using var p = Process.Start(new ProcessStartInfo("codesign", $"--force --deep --sign - \"{app}\"") { RedirectStandardError = true, RedirectStandardOutput = true });
+                using var p = Process.Start(new ProcessStartInfo(codesign, $"--force --deep --sign - \"{app}\"") { RedirectStandardError = true, RedirectStandardOutput = true });
                 p.WaitForExit();
                 if (p.ExitCode != 0) log.WriteLine($"codesign failed, so macOS may refuse to open the app: {p.StandardError.ReadToEnd().Trim()}");
             }
@@ -287,10 +288,8 @@ namespace KScript.Apps
         private static string TitleFromFile(string script)
         {
             string stem = Path.GetFileName(script);
-            foreach (string ext in new[] { ".app.ks.xml", ".ks.xml", ".xml" })
-            {
-                if (stem.EndsWith(ext, StringComparison.OrdinalIgnoreCase)) { stem = stem[..^ext.Length]; break; }
-            }
+            string ext = new[] { ".app.ks.xml", ".ks.xml", ".xml", ".ks", ".kscript" }.FirstOrDefault(e => stem.EndsWith(e, StringComparison.OrdinalIgnoreCase));
+            if (ext != null) stem = stem[..^ext.Length];
             var words = stem.Split(new[] { '-', '_', '.', ' ' }, StringSplitOptions.RemoveEmptyEntries);
             return string.Join(' ', words.Select(w => char.ToUpperInvariant(w[0]) + w[1..]));
         }
@@ -333,14 +332,15 @@ namespace KScript.Apps
         public string Folder { get; }
         public bool SingleFile { get; }
 
-        public static KScriptRuntime Current()
+        public static KScriptRuntime Current() =>
+            Current(AppContext.BaseDirectory, string.IsNullOrEmpty(typeof(KScriptRuntime).Assembly.Location), Environment.ProcessPath, OperatingSystem.IsWindows());
+
+        internal static KScriptRuntime Current(string baseDir, bool singleFile, string processPath, bool windows)
         {
-            string baseDir = AppContext.BaseDirectory;
-            bool singleFile = string.IsNullOrEmpty(typeof(KScriptRuntime).Assembly.Location);
-            if (singleFile) return new KScriptRuntime(Environment.ProcessPath, null, true);
+            if (singleFile) return new KScriptRuntime(processPath, null, true);
 
             // `dotnet KScript.dll` or the KScript apphost next to it: copy the whole build output.
-            string apphost = Path.Combine(baseDir, OperatingSystem.IsWindows() ? "KScript.exe" : "KScript");
+            string apphost = Path.Combine(baseDir, windows ? "KScript.exe" : "KScript");
             if (!File.Exists(apphost))
                 throw new AppBuildException($"This copy of kscript has no launcher ({apphost}), so it can't be put in an app. Use a release build of kscript.");
             return new KScriptRuntime(apphost, baseDir, false);
@@ -378,9 +378,11 @@ namespace KScript.Apps
     public static class AppLauncher
     {
         /// <summary>The manifest of the app this kscript is inside, or null when it is plain kscript.</summary>
-        public static string FindManifest()
+        public static string FindManifest() => FindManifest(AppContext.BaseDirectory);
+
+        /// <summary>The manifest of the app whose kscript runs from <paramref name="baseDir"/>, or null.</summary>
+        public static string FindManifest(string baseDir)
         {
-            string baseDir = AppContext.BaseDirectory;
             foreach (string candidate in new[]
             {
                 Path.Combine(baseDir, "..", "Resources", "app", AppCommand.ManifestName), // macOS: Name.app/Contents/MacOS/kscript

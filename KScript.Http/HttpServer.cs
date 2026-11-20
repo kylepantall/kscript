@@ -10,7 +10,7 @@ namespace KScript.Http
     /// </summary>
     public static class HttpServer
     {
-        public static Task<int> RunAsync(string siteFolder, ProjectConfig project, int port, string host, TextWriter log)
+        public static Task<int> RunAsync(string siteFolder, ProjectConfig project, int port, string host, TextWriter log, CancellationToken stop = default)
         {
             var site = new PageSite(siteFolder);
             var app = new HttpApp(site.Root, project, log);
@@ -27,7 +27,7 @@ namespace KScript.Http
                     log?.WriteLine($"Route error: {(ex.Location != null ? ex.Location + ": " : string.Empty)}{ex.Message}");
                 }
             }
-            return PageServer.RunAsync(site, port, host, log, app.HasRoutes ? app.HandleAsync : null);
+            return PageServer.RunAsync(site, port, host, log, app.HasRoutes ? app.HandleAsync : null, stop);
         }
 
         /// <summary>kscript routes [folder]: prints every route, its name, what answers it and its middleware.</summary>

@@ -90,6 +90,23 @@ namespace KScript.Runtime
             if (!CanWriteFiles) throw new KScriptException($"{what} can't change files here: files are read-only.", "Permission");
         }
 
+        /// <summary>Where <c>$config</c> reads settings from (kscript --env, kscript.json's config section). Null for the defaults.</summary>
+        public ConfigOptions Config { get; set; }
+
+        /// <summary>The run's logging: providers and levels, set up from $config.logging on first use.</summary>
+        public LogHub Logs
+        {
+            get
+            {
+                lock (Items) return logs ??= new LogHub(this);
+            }
+        }
+
+        private LogHub logs;
+
+        /// <summary>Writes out log entries that providers hold back. The interpreter calls it when a run ends.</summary>
+        public void FlushLogs() => logs?.Flush();
+
         /// <summary>State that packages keep for the length of a run, by key.</summary>
         public Dictionary<string, object> Items { get; } = new Dictionary<string, object>();
 
@@ -115,6 +132,15 @@ namespace KScript.Runtime
             }
             return In.ReadLine();
         }
+
+        /// <summary>Waits for a key press without showing it (the terminal's, unless a host stands in for it).</summary>
+        public virtual ConsoleKeyInfo ReadKey() => System.Console.ReadKey(true);
+
+        /// <summary>Clears the terminal.</summary>
+        public virtual void ClearScreen() => System.Console.Clear();
+
+        /// <summary>The width of the terminal in characters.</summary>
+        public virtual int TerminalWidth => System.Console.WindowWidth;
 
         private readonly List<TextWriter> captures = new List<TextWriter>();
         private readonly List<TextReader> inputs = new List<TextReader>();

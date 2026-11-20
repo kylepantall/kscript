@@ -37,6 +37,9 @@ namespace KScript.UI
             started = true;
         }
 
+        /// <summary>For tests: called with each window <see cref="ShowError"/> and <see cref="Show"/> open, once it is showing.</summary>
+        internal static Action<Window> Opened;
+
         /// <summary>Shows an error in a window of its own and waits for it to be closed: for apps, which have no terminal.</summary>
         public static void ShowError(string title, string message)
         {
@@ -44,11 +47,7 @@ namespace KScript.UI
             {
                 Start();
                 var text = new SelectableTextBlock { Text = message, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Menlo, Consolas, monospace"), Margin = new Thickness(16) };
-                var window = new Window { Title = title + " stopped", Width = 640, Height = 320, Content = new ScrollViewer { Content = text }, WindowStartupLocation = WindowStartupLocation.CenterScreen };
-                using var closed = new CancellationTokenSource();
-                window.Closed += (_, _) => closed.Cancel();
-                window.Show();
-                Dispatcher.UIThread.MainLoop(closed.Token);
+                RunUntilClosed(new Window { Title = title + " stopped", Width = 640, Height = 320, Content = new ScrollViewer { Content = text }, WindowStartupLocation = WindowStartupLocation.CenterScreen });
             }
             catch (Exception)
             {
@@ -61,20 +60,26 @@ namespace KScript.UI
         {
             Start();
             var view = new WindowView(session);
-            using var closed = new CancellationTokenSource();
-            view.Window.Closed += (_, _) => closed.Cancel();
             UIElements.CloseRequested = () => view.Window.Close();
             try
             {
-                view.Window.Show();
-                view.Window.Activate();
-                Dispatcher.UIThread.MainLoop(closed.Token);
+                RunUntilClosed(view.Window);
             }
             finally
             {
                 UIElements.CloseRequested = null;
                 view.StopTimers();
             }
+        }
+
+        private static void RunUntilClosed(Window window)
+        {
+            using var closed = new CancellationTokenSource();
+            window.Closed += (_, _) => closed.Cancel();
+            window.Show();
+            window.Activate();
+            Opened?.Invoke(window);
+            Dispatcher.UIThread.MainLoop(closed.Token);
         }
     }
 
@@ -252,10 +257,8 @@ namespace KScript.UI
                     };
                     return b;
                 }
-                case "Spacer":
-                    return new Control();
                 default:
-                    return new TextBlock { Text = $"<{node.Type}>" };
+                    return new Control(); // Spacer: Timer nodes are never drawn
             }
         }
 
@@ -378,14 +381,13 @@ namespace KScript.UI
                     break;
                 }
 
-                default:
-                    if (n.Type == "Spacer")
-                    {
-                        double size = n.Number("size") ?? 12;
-                        control.Width = size;
-                        control.Height = size;
-                    }
+                default: // Spacer
+                {
+                    double size = n.Number("size") ?? 12;
+                    control.Width = size;
+                    control.Height = size;
                     break;
+                }
             }
         }
 

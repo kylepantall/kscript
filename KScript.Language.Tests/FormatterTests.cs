@@ -623,6 +623,13 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void Empty_documents_and_inline_tags_at_the_top_of_a_page()
+        {
+            Assert.Equal(string.Empty, Formatter.Format(string.Empty, "test.ks.xml").Text);
+            Assert.Equal("<b>a</b><i>b</i>\n", Formatter.Format("<b>a</b><i>b</i>", "page.html").Text);
+        }
+
+        [Fact]
         public void FormatSettingsAreRead()
         {
             ProjectConfig config = ProjectConfig.Parse(
@@ -648,6 +655,13 @@ namespace KScript.Language.Tests
             Assert.Contains(rules.Warnings, w => w.Contains("no rule 'bogus'"));
             Assert.Contains(rules.Warnings, w => w.Contains("format.rules.indent should be true or false"));
 
+            ProjectConfig off = ProjectConfig.Parse(
+                "{ \"format\": { \"endOfLine\": \"lf\", \"rules\": { \"indent\": false, \"wrapAttributes\": \"off\", \"trimTrailingWhitespace\": false, \"collapseBlankLines\": false, \"finalNewline\": false } } }",
+                Path.Combine(dir, "kscript.json"));
+            FormatOptions allOff = FormatOptions.From(off);
+            Assert.Equal(EndOfLine.Lf, allOff.EndOfLine);
+            Assert.False(allOff.Indent || allOff.WrapAttributes || allOff.TrimTrailingWhitespace || allOff.CollapseBlankLines || allOff.FinalNewline);
+
             // Without a "format" section the editor's settings are used.
             FormatOptions editor = FormatOptions.From(null, editorTabSize: 4, editorInsertSpaces: false);
             Assert.Equal(4, editor.IndentSize);
@@ -663,6 +677,59 @@ namespace KScript.Language.Tests
             Assert.True(change.Span.End < before.Length - 5);
             Assert.Equal(after, before.Substring(0, change.Span.Start) + change.NewText + before.Substring(change.Span.End));
             Assert.Null(KScriptLanguageServer.MinimalChange("x", "x"));
+        }
+
+        [Fact]
+        public void Usage_and_unusual_paths()
+        {
+            Assert.Equal(0, Run("--help").Code);
+            Assert.Contains("Unknown option --nope", Run("--nope").Output);
+            Assert.Contains("file not found", Run(Path.Combine(dir, "missing.ks.xml")).Output);
+            Assert.Contains("No KScript files found", Run(dir).Output);
+
+            string md = Write("notes.md", "# Hi  \n");
+            Assert.Contains("notes.md: skipped (Markdown pages", Run(md).Output);
+
+            Write("_templates/t.ks.xml", Messy);
+            string xml = Write("plain.xml", Messy);
+            Write("data.xml", "<data />");
+            File.CreateSymbolicLink(Path.Combine(dir, "gone.xml"), Path.Combine(dir, "nowhere.xml"));
+            (int code, string output) = Run(dir);
+            Assert.Equal(0, code);
+            Assert.Contains("1 file checked: 1 formatted.", output);
+            Assert.Equal(Tidy, File.ReadAllText(xml));
+        }
+
+        [Fact]
+        public void Runs_on_the_current_project()
+        {
+            string previous = Directory.GetCurrentDirectory();
+            try
+            {
+                Directory.SetCurrentDirectory(dir);
+                Assert.Contains("run it in a project with a kscript.json", Run().Output);
+
+                Write("kscript.json", "{ \"nope\": 1 }");
+                string script = Write("a.ks.xml", Messy);
+                (int code, string output) = Run();
+                Assert.Equal(0, code);
+                Assert.Contains("warning unknown setting 'nope'", output);
+                Assert.Equal(Tidy, File.ReadAllText(script));
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(previous);
+            }
+        }
+
+        [Fact]
+        public void A_broken_project_file_stops_the_run()
+        {
+            Write("kscript.json", "{ nope");
+            string script = Write("a.ks.xml", Messy);
+            Assert.Equal(2, Run(dir).Code);
+            Assert.Equal(2, Run(script).Code);
+            Assert.Equal(Messy, File.ReadAllText(script));
         }
     }
 }

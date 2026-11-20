@@ -176,6 +176,8 @@ namespace KScript.Testing
             }, 256 * 1024 * 1024) { Name = "kscript test " + System.IO.Path.GetFileName(full) };
             thread.Start();
             thread.Join();
+            // Stopped (Ctrl+C): the whole run stops, rather than this file reporting that it couldn't run.
+            settings.Cancellation.ThrowIfCancellationRequested();
             if (crash != null) result.Error ??= $"{crash.GetType().Name}: {crash.Message}";
             result.Duration = clock.Elapsed;
             return result;

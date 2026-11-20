@@ -65,8 +65,10 @@ namespace KScript.Language.Tests
         [Fact]
         public void PlannedItemsBelongToNoPackage()
         {
-            Assert.True(Catalog.GetElement("llm").Planned);
-            Assert.Null(Catalog.GetElement("llm").Package);
+            Assert.True(Catalog.GetElement("render").Planned);
+            Assert.Null(Catalog.GetElement("render").Package);
+            Assert.Equal("KScript.AI", Catalog.GetElement("llm").Package);
+            Assert.Equal("KScript.AI", Catalog.GetCommand("chat").Package);
             Assert.False(Catalog.GetElement("echo").Planned);
             Assert.Equal("KScript.Core", Catalog.GetElement("echo").Package);
             Assert.Equal("KScript.Terminal", Catalog.GetElement("input").Package);

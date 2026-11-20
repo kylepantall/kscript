@@ -197,7 +197,8 @@ namespace KScript.Runtime
                     if (command.ArgumentList == null)
                     {
                         // @greet without parentheses is the function itself: $people->map(@greet).
-                        return ResolveCallable(command.Name, scope, ctx, command);
+                        object found = ResolveCallable(command.Name, scope, ctx, command);
+                        return found is CommandDefinition cmd ? new NativeFunction(cmd.Name, call => InvokeCommand(cmd, call)) : found;
                     }
                     (List<object> args, Dictionary<string, object> named) = EvaluateArguments(command.Arguments, scope, ctx);
                     return CallCommand(command.Name, args, named, scope, ctx, command);
@@ -425,8 +426,6 @@ namespace KScript.Runtime
                     }
                 case Dictionary<string, object> map:
                     return map.TryGetValue(name, out object v) ? v : null;
-                case List<object> list when int.TryParse(name, out int i):
-                    return i >= 0 && i < list.Count ? list[i] : null;
                 case List<object> list when name == "count" || name == "length":
                     return (double)list.Count;
                 case string s when name == "length":
@@ -479,7 +478,7 @@ namespace KScript.Runtime
 
         #region Assignment
 
-        private void Assign(AssignmentNode node, Scope scope, EvalContext ctx, bool declare)
+        internal void Assign(AssignmentNode node, Scope scope, EvalContext ctx, bool declare)
         {
             object value = Evaluate(node.Value, scope, ctx);
             ExprNode target = node.Target;
@@ -497,11 +496,6 @@ namespace KScript.Runtime
                 if (declare) scope.Declare(name, value);
                 else scope.Assign(name, value);
                 return;
-            }
-
-            if (declare && node.Operator == "=")
-            {
-                // <let>$point.x = 3</let>: the variable must exist, the field is set.
             }
 
             if (scope.IsConst(node.Name)) throw Fail(target, ctx, $"${node.Name} is const, so it can't be changed.", "Const");

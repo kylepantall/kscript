@@ -4,12 +4,14 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace KScript.Pages
@@ -17,12 +19,15 @@ namespace KScript.Pages
     /// <summary>What a URL maps to in a site folder.</summary>
     public sealed class PageRoute
     {
-        public enum RouteKind { Page, Static, NotFound }
+        public enum RouteKind { Page, Static, NotFound, Stylesheet }
 
         public RouteKind Kind { get; init; }
 
         /// <summary>The file, relative to the site folder, with forward slashes.</summary>
         public string File { get; init; }
+
+        /// <summary>The locale from a /fr/... path prefix, when the site has translations for it.</summary>
+        public string Locale { get; init; }
 
         /// <summary>Values captured by [name] segments, e.g. people/[id].html.</summary>
         public Dictionary<string, object> Params { get; init; } = new Dictionary<string, object>();
@@ -46,6 +51,25 @@ namespace KScript.Pages
 
         public string Root { get; }
 
+        /// <summary>The folder of translation files that /fr/... prefixes are checked against.</summary>
+        public string LocalesFolder { get; set; } = "locales";
+
+        private bool IsLocalePrefix(string segment)
+        {
+            if (segment.Length < 2 || segment.Length > 12 || !segment.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')) return false;
+            if (File.Exists(Path.Combine(Root, segment)) || Directory.Exists(Path.Combine(Root, segment))) return false;
+            string folder = Path.Combine(Root, LocalesFolder);
+            return Directory.Exists(Path.Combine(folder, segment)) || new[] { ".json", ".yaml", ".yml" }.Any(e => File.Exists(Path.Combine(folder, segment + e)));
+        }
+
+        /// <summary>config.json, config.staging.json, and any .yaml, .yml or .env file: never served.</summary>
+        internal static bool IsConfigFile(string name)
+        {
+            string ext = Path.GetExtension(name).ToLowerInvariant();
+            if (ext == ".yaml" || ext == ".yml" || ext == ".env") return true;
+            return ext == ".json" && name.StartsWith("config.", StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// Top-level folders that are never served, such as the views folder of KScript.Http (views are only
         /// rendered by controllers, with their data).
@@ -64,6 +88,27 @@ namespace KScript.Pages
             // The project's settings file is not part of the site.
             if (segments.Count > 0 && string.Equals(segments[^1], Projects.ProjectConfig.FileName, StringComparison.OrdinalIgnoreCase))
                 return NotFound();
+            // Nor are the settings $config reads (config.json, config.staging.yaml), which may hold secrets.
+            if (segments.Count > 0 && IsConfigFile(segments[^1]))
+                return NotFound();
+
+            // /fr/about is the about page in French when locales/fr.json (or .yaml, or a locales/fr folder) exists.
+            if (segments.Count > 0 && IsLocalePrefix(segments[0]))
+            {
+                PageRoute inner = Resolve("/" + string.Join("/", segments.Skip(1)));
+                return new PageRoute { Kind = inner.Kind, File = inner.File, Params = inner.Params, Locale = segments[0] };
+            }
+
+            // Stylesheets written in KScript are served compiled (theme.css from theme.ks.css), never as written.
+            if (segments.Count > 0 && KScript.Style.Stylesheets.IsStylesheet(segments[^1]))
+                return NotFound();
+            if (segments.Count > 0 && segments[^1].EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+            {
+                string rel = string.Join("/", segments);
+                string source = rel.Substring(0, rel.Length - 4) + ".ks.css";
+                if (!File.Exists(Path.Combine(Root, rel)) && File.Exists(Path.Combine(Root, source)))
+                    return new PageRoute { Kind = PageRoute.RouteKind.Stylesheet, File = source };
+            }
 
             // Exact file
             if (segments.Count > 0)
@@ -157,14 +202,14 @@ namespace KScript.Pages
     /// <summary><c>kscript serve</c>: serves a site folder, rendering KScript pages on each request.</summary>
     public static class PageServer
     {
-        public static Task<int> RunAsync(string siteFolder, int port, string host, TextWriter log) =>
-            RunAsync(new PageSite(siteFolder), port, host, log, handler: null);
+        public static Task<int> RunAsync(string siteFolder, int port, string host, TextWriter log, CancellationToken stop = default) =>
+            RunAsync(new PageSite(siteFolder), port, host, log, handler: null, stop);
 
         /// <summary>
         /// Serves a site. <paramref name="handler"/> (from KScript.Http) sees each request first; when it returns
         /// null, the request goes to the site's pages and files.
         /// </summary>
-        public static async Task<int> RunAsync(PageSite site, int port, string host, TextWriter log, Func<HttpRequest, Task<PageResult>> handler)
+        public static async Task<int> RunAsync(PageSite site, int port, string host, TextWriter log, Func<HttpRequest, Task<PageResult>> handler, CancellationToken stop = default)
         {
 
             var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = site.Root });
@@ -208,7 +253,9 @@ namespace KScript.Pages
             string url = host == "localhost" ? $"http://localhost:{port}" : $"http://{host}:{port}";
             log?.WriteLine($"Serving {site.Root} on {url}");
             log?.WriteLine("Press Ctrl+C to stop.");
-            await app.RunAsync();
+            await app.StartAsync(stop);
+            await app.WaitForShutdownAsync(stop);
+            await app.StopAsync();
             return 0;
         }
 
@@ -238,9 +285,30 @@ namespace KScript.Pages
                     return new PageResult { ContentType = contentType, FilePath = full };
                 }
 
+                case PageRoute.RouteKind.Stylesheet:
+                {
+                    try
+                    {
+                        string css = KScript.Style.Stylesheets.Compile(Path.Combine(site.Root, route.File), null, h =>
+                        {
+                            h.FileRoot = site.Root;
+                            h.FileRootName = "the site folder";
+                            h.CanWriteFiles = false;
+                        });
+                        return new PageResult { ContentType = "text/css; charset=utf-8", Body = css };
+                    }
+                    catch (KScript.Runtime.KScriptException ex)
+                    {
+                        // The browser ignores a broken stylesheet, so the error goes into it as a comment too.
+                        return new PageResult { Status = 500, ContentType = "text/css; charset=utf-8", Body = $"/* {ex.ToString().Replace("*/", "* /")} */" };
+                    }
+                }
+
                 case PageRoute.RouteKind.Page:
                 {
-                    var ctx = new PageContext(site.Root, await BuildRequestAsync(request));
+                    var built = await BuildRequestAsync(request);
+                    if (route.Locale != null) built["locale"] = route.Locale;
+                    var ctx = new PageContext(site.Root, built);
                     return PageRenderer.RenderFile(ctx, route.File, route.Params);
                 }
 
@@ -281,6 +349,7 @@ namespace KScript.Pages
 
             var route = site.Resolve(uri.AbsolutePath);
             if (route.Kind != PageRoute.RouteKind.Page) return new PageResult { Status = 404, Body = "Page not found." };
+            if (route.Locale != null) request["locale"] = route.Locale;
 
             var ctx = new PageContext(site.Root, request) { Live = ev };
             try

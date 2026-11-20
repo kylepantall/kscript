@@ -354,7 +354,8 @@ namespace KScript.Http
                     result.AddRange(ResolveMiddleware(run, string.Join(",", group)));
                     continue;
                 }
-                if (BuiltInMiddleware.Contains(name) && !run.Scope.Has(name))
+                // A <fn> of the same name replaces a built-in; a variable such as $log does not.
+                if (BuiltInMiddleware.Contains(name) && !(run.Scope.TryGet(name, out object own) && own is ICallable))
                 {
                     result.Add(new MiddlewareRef(name, argument, null));
                     continue;

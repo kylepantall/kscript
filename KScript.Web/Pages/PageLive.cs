@@ -37,16 +37,13 @@ namespace KScript.Pages
     /// <summary>Signing, handler numbering and the browser runtime for &lt;live&gt; blocks.</summary>
     public static class PageLive
     {
-        private static byte[] _key = LoadKey();
+        private static readonly byte[] _key = LoadKey();
 
         private static byte[] LoadKey()
         {
             string secret = Environment.GetEnvironmentVariable("KSCRIPT_SECRET");
             return string.IsNullOrEmpty(secret) ? RandomNumberGenerator.GetBytes(32) : SHA256.HashData(Encoding.UTF8.GetBytes(secret));
         }
-
-        /// <summary>For tests: use a fixed signing key.</summary>
-        internal static void SetKey(string secret) => _key = SHA256.HashData(Encoding.UTF8.GetBytes(secret));
 
         public static string Sign(Dictionary<string, object> values)
         {

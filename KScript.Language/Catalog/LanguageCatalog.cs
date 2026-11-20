@@ -176,16 +176,6 @@ namespace KScript.Language.Catalog
 
         private void AddPlanned()
         {
-            AddPlannedElement(new ElementInfo("llm", "Sends its text as a prompt to a language model and stores the answer.", ContentKind.Template,
-                new A("to", K.DeclareVariable, "The variable that receives the answer."),
-                new A("system", K.Template, "The system prompt."),
-                new A("schema", K.Expression, "Ask for structured output: a map describing the fields, such as `{ category: 'bug|feature', urgency: 'int 1-5' }`."),
-                new A("tools", K.FunctionReferences, "<fn> functions the model may call, comma separated."),
-                new A("model", K.Text, "The model to use."),
-                new A("stream-into", K.Selector, "Stream the answer into this page element as it is generated."))
-            {
-                Example = "<llm to=\"reply\" system=\"Answer in Markdown.\">\n  Customer {$customer.name} wrote: {$message}\n</llm>",
-            });
             AddPlannedElement(new ElementInfo("render", "Replaces the content of a page element. Non-KScript elements inside are output as HTML, with `{ }` values escaped.", ContentKind.Markup,
                 new A("into", K.Selector, "The element to fill, as a CSS selector.", true),
                 new A("raw", K.Bool, "yes outputs values without HTML escaping.")));
@@ -193,11 +183,8 @@ namespace KScript.Language.Catalog
                 new A("event", K.Text, "The event name, such as click or input.", true),
                 new A("target", K.Selector, "The element to listen on.", true)));
 
-            AddPlannedCommand("llm", "prompt, model?", "Asks a language model and returns its answer.", KType.String);
-            AddPlannedCommand("chat", "system?", "A conversation with a language model that keeps history: $chat->ask(text).", KType.Chat);
             AddPlannedCommand("dom", "selector", "A page element (browser): ->value(), ->text(), ->add_class()...", KType.Element);
 
-            AddPlannedMethod(KType.Chat, "ask", "message", "Sends a message and returns the answer, keeping the history.", KType.String);
             AddPlannedMethod(KType.Element, "value", "", "The value of an input.", KType.String);
             AddPlannedMethod(KType.Element, "text", "", "The text content.", KType.String);
             AddPlannedMethod(KType.Element, "attr", "name, value?", "Reads or sets an attribute.", KType.String);

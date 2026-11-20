@@ -230,6 +230,125 @@ The editor completes the methods for each type and shows what they do. `@json(te
 
 Unknown elements, attributes and syntax errors are reported before a script starts, so a typo near the end doesn't leave a job half done.
 
+## Settings: $config
+
+Every script can read settings without an import. `$config` reads `config.json`, `config.yaml` (or `config.yml`) and `.env` from the script's folder the first time it is used:
+
+```yaml
+# config.yaml
+database:
+  host: localhost
+  port: 5432
+features: [search, cart]
+```
+
+```xml
+<echo>{$config.database.host}:{$config.database.port}</echo>
+<let name="timeout" value="@config('http.timeout', 30)" />      <!-- a path, and a default when it isn't set -->
+<if test="$config->has('features')"><echo>{ $config.features->join(', ') }</echo></if>
+<let name="key" value="$config->require('api.key')" />         <!-- stops with a clear message when it's missing -->
+```
+
+**Environments.** `kscript --env staging script.ks.xml` (or `KSCRIPT_ENV=staging`, or `<config env="staging" />`) layers the environment's files over the base files. Later files win, and maps merge field by field:
+
+1. `config.json`, `config.yaml`, `config.yml`, then `.env`
+2. `config.staging.json`, `config.staging.yaml`, `config.staging.yml`, then `.env.staging`
+3. `staging.json`, `staging.yaml`, `staging.yml`
+4. environment variables with the prefix, when there is one
+
+**Environment variables.** With a prefix, variables override the files, and `__` nests: with `<config prefix="APP_" />`, `APP_DATABASE__HOST=db.internal` sets `database.host`. Names don't depend on case, so `$config.database.host` and `$config.DATABASE.HOST` are the same setting. Values such as `true`, `false` and `8080` become booleans and numbers.
+
+**.env files** hold `NAME=value` lines, with `#` comments, `export` in front if you like, `'single quotes'` taken as written, and `"double quotes"` that allow `\n` and can span lines. `${NAME}` and `${NAME:-default}` use another variable, in .env files and in text in JSON and YAML files. Values from .env files also become environment variables unless one is already set, so `@env('ANTHROPIC_API_KEY')` and KScript.AI find a key kept in `.env`.
+
+**`<config>`** reads the settings again with other options. Without `to`, it changes `$config`:
+
+```xml
+<config env="production" prefix="SHOP_" files="settings, secrets.yaml?, .env"
+        root="conf" defaults="{ server: { port: 8080 } }" require="database.host, api.key" />
+<config files="themes/dark.json" to="theme" />   <!-- a separate set of settings in $theme -->
+```
+
+`files` lists the base files (a name without an extension means .json, .yaml and .yml, and a name ending in `?` may be missing). `$config->environment()` gives the environment, `$config->sources()` lists the files that were read, `$config->all()` gives every setting as a map, and `$config->reload()` reads them again. `@yaml(text)`, `@to_yaml(value)` and `@parse_env(text)` work on text, and KScript.IO adds `@read_yaml(path)`, `@read_env(path)` and `@write_yaml(path, value)`.
+
+Pages served by `kscript serve` read settings from the site folder. They never change environment variables, and `kscript serve` never serves `config.*` files or any `.yaml`, `.yml` or `.env` file. Keep secrets in `.env` or in YAML, because a JSON file named after an environment (such as `staging.json`) is served like any other file.
+
+## Logging: $log
+
+Every script has a logger. Entries at `info` and above go to the terminal (stderr) until you set up somewhere else for them:
+
+```xml
+<log>Import started</log>
+<log level="warn" category="payments" fields="{ order: $order.id }">Card declined for {$customer.name}</log>
+<do>$log->info('Saved', { id: $id, size: $bytes })</do>
+
+<let name="db" value="$log->named('db')->with({ host: $config.database.host })" />
+<do>$db->debug('Connected')</do>                       <!-- category db, with a host field -->
+<if test="$log->enabled('debug')"><do>$log->debug(@to_json($everything))</do></if>
+
+<try>
+  <do>@read_json('missing.json')</do>
+  <catch as="err"><do>$log->error('Could not read the file', $err)</do></catch>   <!-- error, error_type and error_line fields -->
+</try>
+```
+
+Levels are `trace`, `debug`, `info`, `warn`, `error` and `fatal`. **Providers** decide where entries go, and are usually set in config:
+
+```yaml
+# config.yaml
+logging:
+  level: info                 # the lowest level written (default info)
+  levels:
+    db: debug                 # per category; db also covers db.queries
+  providers:
+    - type: console           # stderr, coloured at a terminal; stream: stdout, format: json, time: HH:mm:ss.fff
+      level: warn
+    - type: file              # text, or json lines; roll: daily writes app-2026-11-20.log
+      path: logs/app.log
+      format: json
+    - fn: notify              # a <fn> in the script, called with each entry
+      level: error
+    - type: http              # from KScript.Net: POSTs entries as JSON, batch at a time
+      url: https://logs.example.com/ingest
+      headers: { Authorization: "Bearer ${LOG_TOKEN}" }
+      batch: 20
+```
+
+`<log-provider>` adds one from a script, with the same options as attributes (`replace="yes"` removes the ones already set up, including the default console one). A `memory` provider keeps entries for `$log->entries()`, which is handy in tests. Entries that a provider holds back, such as an http batch, are sent when the script ends or on `$log->flush()`. A provider that fails is reported once on stderr, and the others carry on.
+
+Packages add provider types with `p.LogProvider("type", description, create)`, and programs that run KScript can add their own with `host.Logs.AddProvider(provider, level)`, where a provider implements `ILogProvider`.
+
+## Translations: @t()
+
+Put translations in a `locales` folder next to the script (or in the site folder): `locales/en.json`, `locales/fr.yaml`, or a folder per locale such as `locales/de/shop.json`, whose keys start with `shop.`.
+
+```yaml
+# locales/fr.yaml
+hello: Bonjour, {name} !
+cart:
+  items:
+    "=0": Votre panier est vide
+    one: "{count} article"
+    other: "{count} articles"
+```
+
+```xml
+<locale set="fr" />
+<echo>{ @t('hello', { name: $user.name }) }</echo>              <!-- Bonjour, Ann ! -->
+<echo>{ @t('cart.items', { count: $cart->count() }) }</echo>   <!-- 3 articles -->
+<echo>{ @format_currency($total, 'EUR') } { @format_date(@today(), 'long') }</echo>   <!-- 9,50 € 20 novembre 2026 -->
+```
+
+- **Plurals.** With a `count`, `@t()` picks `zero`, `one`, `two`, `few`, `many` or `other` by the language's own rules. These are the CLDR rules for English, French, Portuguese, Russian, Ukrainian, Polish, Czech, Arabic, Hebrew, Irish, Welsh, Japanese, Chinese, Korean and more. An exact form such as `=0` wins.
+- **Fallbacks.** A missing translation is looked for in `fr-CA`, then `fr`, then the default locale (`en` unless set). If it isn't anywhere, you get the key itself, and a warning is logged once under the `i18n` category.
+- **The locale** comes from `<locale set="fr" />`, from `<locale from="...">` (the best available match for a list or an Accept-Language header), from `$config.i18n.locale`, from `KSCRIPT_LOCALE`, or from the computer's language. `@locale()` gives it, and `@locales()` lists the locales there are files for.
+- **Pages** pick it in this order: a path prefix (`/fr/about` serves `about.html` in French when there are French translations), `?lang=fr`, a `lang` cookie, and then the browser's Accept-Language. `@locale_path($request.path, 'de')` gives the link to the same page in German. The default locale has no prefix.
+- **Formatting.** These follow the locale, or one you pass as the last argument:
+  - `@format_number(1234.5)` gives 1,234.5 or 1 234,5;
+  - `@format_percent(0.25)`;
+  - `@format_currency(9.5, 'GBP')`;
+  - `@format_date(date, 'short' | 'medium' | 'long' | 'full' | 'time' | 'datetime' | 'd MMMM yyyy')`.
+- **Settings:** `i18n: { folder: lang, default: en-GB, locale: fr }` in config, or `<translations folder="lang" default="en-GB" />`. `@has_t(key)` checks whether a key has a translation, and `@plural(count)` gives the plural category.
+
 ## Packages
 
 KScript.Core (everything above) is always there. Everything else comes from a package, imported at the top of the script, so a script only loads what it uses: a terminal script never loads the web server.
@@ -252,11 +371,54 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 | `KScript.Net` | `@fetch(url, options: { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
+| `KScript.AI` | `@llm(prompt, options)`, `<llm to system schema tools>`, `@chat(system)` with `->ask()` `->history()` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
+| `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast`, `@css_var`, `@css_vars`; `<stylesheet src to vars>` (see [Stylesheets](stylesheets.md)). |
 | `KScript.Http` | Routes, controllers and middleware for `kscript serve`: a file whose root is `<KScript.Routes>` holds `<Get>` `<Post>` `<Put>` `<Patch>` `<Delete>` `<Any>` `<Route>` `<Resource>` `<Group>` `<Middleware>`. Controllers use `@view`, `@response`, `@redirect`, `@abort` and `@route`. See [Routes, controllers and middleware](http.md). |
 | `KScript.UI` | Desktop windows: a script whose root is `<KScript.Window>` opens one. `<Column>` `<Row>` `<Grid>` `<Text>` `<Button>` `<TextBox>` `<CheckBox>` `<Select>` `<Slider>` `<Box>` `<Spacer>` `<Timer>`, `@close_window()`. See [Desktop apps](desktop.md). |
 | `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](testing.md)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).
+
+## Language models: KScript.AI
+
+`KScript.AI` lets a script ask Claude. The API key comes from the `ANTHROPIC_API_KEY` environment variable (or a profile saved by `ant auth login`), never from the script. Scripts use `claude-opus-5-5` unless they ask for another model, or `KSCRIPT_AI_MODEL` names one.
+
+```xml
+<kscript>
+  <import package="KScript.AI" />
+
+  <!-- One question, one answer. -->
+  <echo>{ @llm('Write a haiku about XML.') }</echo>
+
+  <!-- A prompt written as a template, with a system prompt. -->
+  <let name="customer" value="{ name: 'Ann' }" />
+  <let name="message" value="'My order is late arrived.'" />
+  <llm to="reply" system="You answer customer emails politely and briefly.">
+    {$customer.name} wrote: {$message}
+  </llm>
+
+  <!-- Structured output: the answer is a map with these fields. -->
+  <let name="report" value="'The login page spins forever on Safari.'" />
+  <llm to="ticket" schema="{ category: 'bug|feature|question', urgency: 'int 1-5', summary: 'one line' }">
+    Triage this report: {$report}
+  </llm>
+  <echo>{$ticket.category} ({$ticket.urgency}): {$ticket.summary}</echo>
+
+  <!-- Tools: the model may call your <fn> functions, and sees what they return. -->
+  <fn name="order_status" params="id: int" description="The shipping status of an order." value="$id == 42 ? 'shipped' : 'unknown'" />
+  <llm to="answer" tools="order_status">Where is order 42?</llm>
+
+  <!-- A conversation that remembers what was said. -->
+  <let name="chat" value="@chat('You are a patient maths tutor.')" />
+  <echo>{ $chat->ask('What is a prime number?') }</echo>
+  <echo>{ $chat->ask('Is 91 one?') }</echo>
+</kscript>
+```
+
+- **`@llm(prompt, options)`**: `options` is a model name, or a map with `model`, `system`, `schema`, `tools` (a list such as `[@order_status]`) and `max_tokens` (16,000 by default).
+- **Schemas**: each field is required. `'string'`, `'number'`, `'int'`, `'bool'` and `'date'` name a type, `'int 1-5'` gives a range, `'a|b|c'` lists the choices, a map is a nested object, `['string']` is a list, and any other text describes a string field.
+- **Tools** are `<fn>` functions. Their `params` (with types such as `id: int`) and `description` tell the model how to call them. If a tool fails, the model is told the error and can carry on.
+- **Errors** have the type `AI`, so a `<try>` with `<catch as="e">` can check `$e.type` and handle a missing key, a refusal, or an answer cut off by `max_tokens`. When Claude's safety checks decline a request, the API first retries it on a fallback model.
 
 ## Writing portable scripts
 

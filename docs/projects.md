@@ -103,6 +103,13 @@ kscript make project my-app --template ../starters/api   # any folder
     "id": "com.example.myapp",  // the macOS bundle id
     "version": "1.0.0",
     "icon": "icon.icns"         // .icns for macOS, .ico for Windows, .png for Linux
+  },
+  "config": {
+    "environment": "development",           // used when neither --env nor KSCRIPT_ENV names one
+    "files": ["config", ".env"],            // the base files $config reads (the default)
+    "prefix": "APP_",                       // APP_DATABASE__HOST overrides database.host
+    "root": "settings",                     // where the files are, relative to kscript.json (default: each script's folder)
+    "required": ["database.host"]           // scripts stop with a clear message when one is missing
   }
 }
 ```
@@ -113,7 +120,7 @@ kscript make project my-app --template ../starters/api   # any folder
 - Comments and trailing commas are allowed. Unknown settings are reported as warnings rather than ignored silently, and the VS Code extension validates the file and completes its settings as you type.
 - `format` sets the style for `kscript fmt` and the editor's Format Document, and `format.rules` turns individual rules off. See [Formatting](formatting.md) for every setting and the ignore comments.
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
-- `kscript serve` never serves `kscript.json`.
+- `kscript serve` never serves `kscript.json`, or the `config.*`, `.yaml`, `.yml` and `.env` files that `$config` reads.
 - `http` configures route files, middleware, CORS, auth and rate limits for KScript.Http (see [Routes, controllers and middleware](http.md#settings-kscriptjson)).
 - `app` is read by `kscript app build`, which packages a desktop app (see [Desktop apps](desktop.md#packaging-an-app-kscript-app-build)).
 

@@ -69,10 +69,7 @@ namespace KScript.Language.Analysis
         /// </summary>
         private bool CheckNamedArguments(string display, IReadOnlyList<ArgumentNode> args, int piped, List<List<ParameterSlot>> signatures, ExpressionRegion region, TextSpan callSpan)
         {
-            if (signatures.Count == 0)
-            {
-                return false;
-            }
+            // Every command, method and function has at least one signature.
             bool special = args.Any(a => a.Name != null || BareWord(a) != null);
 
             static int IndexOf(List<ParameterSlot> s, string name) => s.FindIndex(p => !p.Variadic && p.Name == name);

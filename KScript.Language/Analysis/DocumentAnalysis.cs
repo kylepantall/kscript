@@ -63,6 +63,9 @@ namespace KScript.Language.Analysis
         public List<ExpressionRegion> Regions { get; } = new List<ExpressionRegion>();
         public List<DocumentLink> Links { get; } = new List<DocumentLink>();
         public Dictionary<Symbol, ExternalLocation> ExternalDeclarations { get; } = new Dictionary<Symbol, ExternalLocation>();
+
+        /// <summary>Where the members of an <c>&lt;import as="..."&gt;</c> alias are declared in the imported file: lib.slugify.</summary>
+        public Dictionary<(Symbol Alias, string Member), ExternalLocation> ExternalMembers { get; } = new Dictionary<(Symbol, string), ExternalLocation>();
         public Scope RootScope { get; internal set; }
 
         /// <summary>The packages a script imports (always KScript.Core). Empty for pages.</summary>

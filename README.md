@@ -127,7 +127,8 @@ kscript serve "Example Sites/team"    # then open http://localhost:8080/demo
 | `KScript.Web` | Pages, layouts, components and `<live>` blocks for `kscript serve` |
 | `KScript.Test` | Tests for `kscript test` |
 | `KScript.UI` | Native desktop windows, and `kscript app build` to package them |
-| `KScript.AI` | Language models: `@llm`, `@chat` and `<llm>`. **Coming soon** |
+| `KScript.AI` | Language models: `@llm`, `@chat` and `<llm>`, with Claude |
+| `KScript.Style` | Stylesheets written in KScript: themes from JSON, breakpoints, fluid sizes and colours |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
 
@@ -203,8 +204,9 @@ Then save the first example above as `hello.ks.xml`, run `kscript hello.ks.xml`,
 ## Documentation
 
 - [Installing KScript](docs/install.md): installers, updating, manual downloads and editor setup
-- [The language](docs/language.md): values, expressions, control flow, functions, errors and every package
+- [The language](docs/language.md): values, expressions, control flow, functions, errors, settings, logging, translations, language models and every package
 - [Web pages and `<live>`](docs/web.md): `kscript serve`, layouts, components, routing and reactive blocks
+- [Stylesheets](docs/stylesheets.md): `.ks.css`, `.ks.scss` and `.ks.sass`, and `kscript css`
 - [Routes, controllers and middleware](docs/http.md): KScript.Http route files, JSON APIs, views and middleware
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
 - [Desktop apps](docs/desktop.md): `<KScript.Window>`, its elements, and `kscript app build`

@@ -8,7 +8,16 @@ namespace KScript.Runtime
 {
     public sealed partial class CorePackage
     {
-        private static object Apply(CallContext c, ICallable f, object item, int index) => c.Call(f, item, (double)index);
+        /// <summary>Calls f with an item, and its index too when f can take one: @greet(who) gets only the item.</summary>
+        private static object Apply(CallContext c, ICallable f, object item, int index) =>
+            TakesIndex(f) ? c.Call(f, item, (double)index) : c.Call(f, item);
+
+        private static bool TakesIndex(ICallable f) => f switch
+        {
+            UserFunction u => u.Parameters.Count >= 2,
+            NativeFunction => false,
+            _ => true,
+        };
 
         private static List<object> L(object target) => (List<object>)target;
         private static Dictionary<string, object> M(object target) => (Dictionary<string, object>)target;

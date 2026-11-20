@@ -64,7 +64,7 @@ namespace KScript.Terminal
             {
                 if (run.Host.IsInteractive)
                 {
-                    try { Console.Clear(); }
+                    try { run.Host.ClearScreen(); }
                     catch (IOException) { run.Host.Write("\u001b[2J\u001b[H"); }
                 }
                 return null;
@@ -80,7 +80,7 @@ namespace KScript.Terminal
                 run.Host.Write(prompt);
                 if (run.Host.IsInteractive)
                 {
-                    try { Console.ReadKey(true); }
+                    try { run.Host.ReadKey(); }
                     catch (InvalidOperationException) { run.Host.ReadLine(); }
                 }
                 else
@@ -100,7 +100,7 @@ namespace KScript.Terminal
             p.Command("underline", "text", "Underlined text.", KType.String, c => Ansi.Style(c.Host, c.Str(0), "4"));
             p.Command("terminal_width", "", "The width of the terminal in characters (80 when it isn't a terminal).", KType.Number, c =>
             {
-                try { return c.Host.IsInteractive ? (double)Console.WindowWidth : 80d; }
+                try { return c.Host.IsInteractive ? (double)c.Host.TerminalWidth : 80d; }
                 catch (IOException) { return 80d; }
             });
 
@@ -124,7 +124,7 @@ namespace KScript.Terminal
                 var sb = new StringBuilder();
                 while (true)
                 {
-                    ConsoleKeyInfo key = Console.ReadKey(true);
+                    ConsoleKeyInfo key = run.Host.ReadKey();
                     if (key.Key == ConsoleKey.Enter) break;
                     if (key.Key == ConsoleKey.Backspace) { if (sb.Length > 0) sb.Length--; continue; }
                     if (!char.IsControl(key.KeyChar)) sb.Append(key.KeyChar);
@@ -150,13 +150,9 @@ namespace KScript.Terminal
                 object value;
                 if (answer == null || answer.Length == 0 && hasDefault)
                 {
-                    if (hasDefault)
-                    {
-                        value = run.Eval("default");
-                        run.Scope.Declare(name, value);
-                        return null;
-                    }
-                    if (answer == null) throw run.Error($"<input to=\"{name}\"> reached the end of the input with no answer. Give it a default=\"...\".", null, "Input");
+                    if (!hasDefault) throw run.Error($"<input to=\"{name}\"> reached the end of the input with no answer. Give it a default=\"...\".", null, "Input");
+                    run.Scope.Declare(name, run.Eval("default"));
+                    return null;
                 }
 
                 try

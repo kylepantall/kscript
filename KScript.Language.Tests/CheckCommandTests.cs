@@ -261,5 +261,21 @@ namespace KScript.Language.Tests
             Assert.True(code == 0, output);
             Assert.Contains("13 files checked: 0 errors, 0 warnings.", output);
         }
+
+        [Fact]
+        public void Broken_project_files_info_and_hints()
+        {
+            Write("kscript.json", "{ \"lint\": { \"rules\": { \"KS3001\": \"info\", \"KS4001\": \"hint\" } } }");
+            string path = Write("a.ks.xml", "<kscript>\n<ehco />\n<echo>$nope</echo>\n</kscript>");
+            File.CreateSymbolicLink(Path.Combine(dir, "gone.xml"), Path.Combine(dir, "nowhere.xml"));
+            (int code, string output) = Run(false, dir);
+            Assert.Equal(0, code);
+            Assert.Contains(": info KS3001:", output);
+            Assert.Contains(": hint KS4001:", output);
+            Assert.Contains("1 file checked", output);
+
+            Write("kscript.json", "{ nope");
+            Assert.Equal(2, Run(false, path).Code);
+        }
     }
 }

@@ -128,12 +128,7 @@ namespace KScript.Language.Features
                 case MethodCallNode m when m.NameSpan.Contains(index):
                     return MethodHover(analysis, region, m.Name, m.Target, m.NameSpan);
 
-                case CallNode call when call.Callee is IdentifierNode id && id.Span.Contains(index):
-                {
-                    PipeNode pipe = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<PipeNode>().FirstOrDefault(p => p.Right == call);
-                    return pipe != null ? MethodHover(analysis, region, id.Name, pipe.Left, id.Span) : null;
-                }
-
+                // In |> upper(), the node under the cursor is the identifier, not the call around it.
                 case IdentifierNode id2:
                 {
                     PipeNode pipe = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<PipeNode>().FirstOrDefault(p => p.Right is CallNode cn && cn.Callee == id2);
@@ -249,10 +244,6 @@ namespace KScript.Language.Features
                     sb.Append("; this value is ").Append(receiver);
                 }
                 sb.Append('.');
-            }
-            foreach (ParameterInfo p in c.Signatures.SelectMany(s => s.Parameters).Where(p => p.Description != null).GroupBy(p => p.Name).Select(g => g.First()))
-            {
-                sb.Append("\n\n`").Append(p.Name).Append("`: ").Append(p.Description);
             }
             if (c.Planned)
             {

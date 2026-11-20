@@ -109,13 +109,15 @@ namespace KScript.Language.Analysis
             {
                 DocumentAnalysis other = Analyze(text, path, files, catalog);
                 Dictionary<string, (SymbolKind, TypeShape)> exports = new Dictionary<string, (SymbolKind, TypeShape)>(StringComparer.Ordinal);
+                // Top-level names live in the scope of the <kscript> element's content.
+                HashSet<Scope> topLevel = new HashSet<Scope>(other.RootScope.Children.Where(c => other.Markup.RootElements.Any(r => r.ContentSpan.Equals(c.Span)))) { other.RootScope };
                 foreach (Symbol s in other.Symbols.Where(s => s.SourcePath == null && s.DeclaringElement != null))
                 {
                     if (s.Kind == SymbolKind.Function)
                     {
                         exports.TryAdd(s.Name, (SymbolKind.Function, s.ReturnShape));
                     }
-                    else if ((s.Kind == SymbolKind.Constant || s.Kind == SymbolKind.Variable) && other.RootScope.Symbols.Any(r => r.Symbol == s))
+                    else if ((s.Kind == SymbolKind.Constant || s.Kind == SymbolKind.Variable) && topLevel.Any(scope => scope.Symbols.Any(r => r.Symbol == s)))
                     {
                         exports.TryAdd(s.Name, (s.Kind, s.Shape));
                     }

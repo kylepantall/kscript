@@ -179,6 +179,36 @@
         }
       }
     },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where $config reads each script's settings from.",
+      "properties": {
+        "environment": {
+          "type": "string",
+          "description": "The environment used when neither kscript --env nor KSCRIPT_ENV names one. Its files (staging.yaml, config.staging.json, .env.staging) are layered over the base files."
+        },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["config", ".env"],
+          "description": "The base files, in order. A name without an extension means .json, .yaml and .yml; end a name with ? if it may be missing."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Environment variables with this prefix override the files: with APP_, APP_DATABASE__HOST sets database.host."
+        },
+        "root": {
+          "type": "string",
+          "description": "The folder the files are in, relative to kscript.json. Default: each script's own folder."
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Settings that must be set, such as database.host. A script stops with a clear message when one is missing."
+        }
+      }
+    },
     "format": {
       "type": "object",
       "description": "Used by kscript fmt and the editor's Format Document. Values set here win over the editor's tab settings.",

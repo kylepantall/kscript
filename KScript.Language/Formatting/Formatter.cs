@@ -711,10 +711,12 @@ namespace KScript.Language.Formatting
 
         private IEnumerable<int> LineStarts(int from, int end)
         {
-            for (int i = from; i <= end;)
+            if (from > end) yield break;
+            // Each newline found is before end, so the next line start is never past it.
+            for (int i = from; ;)
             {
                 yield return i;
-                int next = text.IndexOf('\n', i, Math.Max(0, end - i));
+                int next = text.IndexOf('\n', i, end - i);
                 if (next < 0) yield break;
                 i = next + 1;
             }

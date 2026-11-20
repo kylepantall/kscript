@@ -16,9 +16,6 @@ namespace KScript.Language.Analysis
 
         private bool ChecksImports => Kind == DocumentKind.Script;
 
-        /// <summary>The packages this script imports, for completion and hover.</summary>
-        internal IReadOnlyCollection<string> ImportedPackages => importedPackages;
-
         private void ImportPackage(string package)
         {
             foreach (string p in catalog.WithRequired(package))

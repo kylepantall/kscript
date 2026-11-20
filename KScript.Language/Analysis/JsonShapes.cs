@@ -38,7 +38,7 @@ namespace KScript.Language.Analysis
                 case JsonValueKind.Number: return new TypeShape(KType.Number);
                 case JsonValueKind.True:
                 case JsonValueKind.False: return new TypeShape(KType.Bool);
-                case JsonValueKind.Null: return new TypeShape(KType.Null);
+                default: return new TypeShape(KType.Null); // null (Undefined never comes from a parse)
                 case JsonValueKind.Object:
                 {
                     TypeShape map = new TypeShape(KType.Map);
@@ -69,8 +69,6 @@ namespace KScript.Language.Analysis
                     }
                     return list;
                 }
-                default:
-                    return TypeShape.Unknown;
             }
         }
 

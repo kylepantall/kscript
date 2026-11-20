@@ -19,4 +19,8 @@
     <ProjectReference Include="..\KScript.UI\KScript.UI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Tests" />
+  </ItemGroup>
+
 </Project>

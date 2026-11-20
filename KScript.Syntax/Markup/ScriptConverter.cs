@@ -280,20 +280,20 @@ namespace KScript.Syntax.Markup
                             {
                                 blankRuns++;
                             }
-                            continue;
+                            break;
                         case MarkupText t:
                             Result.Warnings.Add($"Text outside an element was kept as a comment: \"{t.Value.Trim()}\".");
                             Line(indent, "// " + t.Value.Trim().Replace("\n", " "));
-                            continue;
+                            break;
                         case MarkupComment c:
                             if (c.IsDoc && NextElement(nodes, i) is MarkupElement documented && documented.GetAttribute("description") == null)
                             {
-                                continue;
+                                break;
                             }
                             FlushBlank(ref blankRuns);
                             WriteComment(c, indent);
                             previous = null;
-                            continue;
+                            break;
                         case MarkupElement e:
                             bool chained = previous != null && sb.Length > 0 && sb[sb.Length - 1] == '\n' && sb.ToString().TrimEnd('\n').EndsWith("}", StringComparison.Ordinal)
                                 && ((e.Name == "elif" && previous.Name is "if" or "elif")
@@ -310,7 +310,7 @@ namespace KScript.Syntax.Markup
                             }
                             WriteElement(e, indent, chained);
                             previous = e;
-                            continue;
+                            break;
                     }
                 }
             }
@@ -867,22 +867,6 @@ namespace KScript.Syntax.Markup
 
             private static string Pad(int indent) => new string(' ', indent * 2);
 
-            private void WriteComment(MarkupComment c, int indent)
-            {
-                string body = (c.IsDoc ? c.DocText : c.Text).Replace("--", "- -");
-                if (!body.Contains('\n'))
-                {
-                    sb.Append(Pad(indent)).Append("<!-- ").Append(body.Trim()).Append(" -->\n");
-                    return;
-                }
-                sb.Append(Pad(indent)).Append("<!--\n");
-                foreach (string line in body.Split('\n'))
-                {
-                    sb.Append(line.Length > 0 ? Pad(indent + 1) + line : string.Empty).Append('\n');
-                }
-                sb.Append(Pad(indent)).Append("-->\n");
-            }
-
             private void WriteChildren(MarkupElement e, int indent) => WriteNodes(e.Children, indent);
 
             private void WriteNodes(IReadOnlyList<MarkupNode> nodes, int indent)
@@ -902,13 +886,9 @@ namespace KScript.Syntax.Markup
                 {
                     switch (nodes[i])
                     {
-                        case MarkupComment c when !c.IsDoc:
-                            // Consecutive // lines become one XML comment.
-                            comment.AddRange(c.Text.Replace("\r\n", "\n").Split('\n'));
-                            break;
                         case MarkupComment c:
-                            FlushComment();
-                            WriteComment(c, indent);
+                            // Consecutive // lines become one XML comment. (/// lines are descriptions, not comments.)
+                            comment.AddRange(c.Text.Replace("\r\n", "\n").Split('\n'));
                             break;
                         case MarkupText t when t.IsWhitespace && t.Value.Count(ch => ch == '\n') > 1:
                             FlushComment();
@@ -953,7 +933,7 @@ namespace KScript.Syntax.Markup
                             scopes.Declare(declared);
                         }
                         break;
-                    case "do":
+                    case "do" when TextOf(e) != null:
                         WriteAssignment(e, indent);
                         return;
                 }

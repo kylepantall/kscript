@@ -308,6 +308,8 @@ namespace KScript.Pages
             stack.Pop();
             // </tr> is implied too when a new row or section starts inside a cell.
             if ((opening == "tr" || opening is "thead" or "tbody" or "tfoot") && stack.Peek().Name == "tr") stack.Pop();
+            // So is </optgroup> when the next group starts inside an option.
+            if (opening == "optgroup" && open == "option" && stack.Peek().Name == "optgroup") stack.Pop();
             if (opening is "thead" or "tbody" or "tfoot" && stack.Peek().Name is "thead" or "tbody") stack.Pop();
         }
 

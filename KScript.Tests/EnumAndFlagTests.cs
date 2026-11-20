@@ -33,9 +33,23 @@ public class EnumAndFlagTests
     [InlineData("@pack(large, giift)", "no flag 'giift'. Did you mean gift?")]
     [InlineData("@pack(large, not gfit)", "no flag 'gfit'")]
     [InlineData("@pack(large, gift, gift)", "twice")]
+    [InlineData("@pack(gift: 1, large, 5)", "takes 2 arguments, and has no parameter left for a number (5)")]
+    [InlineData("@pack(gift: 1, huge)", "has no flag 'huge'")]
+    [InlineData("@pack(5)", "The 'size' argument of @pack() must be a Size: small, medium, large. It was a number (5).")]
+    [InlineData("@wrap()", "must be a Size: small, medium, large. It was the string 'smal'. Did you mean small?")]
+    [InlineData("@round(1.5, digits: two)", "Unknown name 'two' in @round()")]
+    [InlineData("@round(1.5, zzzzqq)", "a bare word must be one of its parameters (number, digits) used as a flag.")]
+    [InlineData("@files('.', pattern: '*', recursive, recursive)", "@files() was given 'recursive' twice.")]
     public void EnumAndFlagMistakesAreExplained(string expression, string expected)
     {
-        Assert.Contains(expected, Fails(Pack + $"<echo>{{ {expression} }}</echo>").Message);
+        Assert.Contains(expected, Fails(Pack + "<fn name=\"wrap\" params=\"size: Size = 'smal'\" value=\"$size\" />" + $"<echo>{{ {expression} }}</echo>", "KScript.Math", "KScript.IO").Message);
+    }
+
+    [Fact]
+    public void Late_enum_values_and_bare_words_print_as_written()
+    {
+        Assert.Equal("1large\n", RunBody(Pack + "<fn name=\"f\" params=\"a, size: Size\" value=\"$a + $size\" /><echo>{ @f(a: 1, large) }</echo>"));
+        Assert.Equal("not recursive", new BareWord("recursive", negated: true, afterNamed: false).ToString());
     }
 
     [Fact]
