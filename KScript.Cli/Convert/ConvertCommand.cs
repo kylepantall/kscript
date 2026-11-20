@@ -206,6 +206,14 @@ namespace KScript.Conversion
                     output.WriteLine($"{page}: now names the converted files");
                 }
             }
+
+            // Agent docs describe the converted scripts, in the new format.
+            bool code = files.Any(f => !MarkupParser.IsCodePath(f));
+            foreach (string root in projects.Select(Path.GetDirectoryName).Where(global::KScript.Language.Agents.AgentDocs.IsEnabled))
+            {
+                if (global::KScript.Language.Agents.AgentDocs.Write(root, format: code ? "kscript" : "xml", skip: converting).Count > 0)
+                    output.WriteLine($"{Path.Combine(root, global::KScript.Language.Agents.AgentDocs.AgentsFile)}: updated for the converted files");
+            }
         }
 
         private static readonly System.Text.RegularExpressions.Regex Glob = new System.Text.RegularExpressions.Regex(@"""([^""\s]*)\*\.((?:test\.)?)ks\.xml""");

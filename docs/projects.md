@@ -29,6 +29,7 @@ What it makes:
 | `lib/greeting.kscript`, `scripts/hello.kscript` | A function and a command-line script that uses it. |
 | `tests/tasks.test.kscript`, `tests/greeting.test.kscript` | Tests for the rules and the script, run with `kscript test`. |
 | `.vscode/extensions.json`, `.gitignore` | Asks VS Code to install the KScript extension; keeps built apps (`dist/`) out of git. |
+| `AGENTS.md`, `CLAUDE.md`, `.kscript/agents/` | Docs for coding agents, made from the project's code and kept up to date by the editor (see [Coding agents](agents.md)). |
 
 Scripts, tests, routes and the desktop app are written in the [.kscript format](code-format.md). `--format xml` writes them as XML (`.ks.xml`) instead, and records `"make": { "format": "xml" }` in `kscript.json` so that later `kscript make script` and `kscript make test` follow suit. Pages stay HTML either way.
 
@@ -36,7 +37,7 @@ Scripts, tests, routes and the desktop app are written in the [.kscript format](
 
 ### A bare project: --bare
 
-`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.yaml`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation: no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
+`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.yaml`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation and the [agent docs](agents.md) (`AGENTS.md`): no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
 
 Add pieces to a bare project with options, in any mix:
 
@@ -50,7 +51,7 @@ kscript make project my-app --bare --desktop     # a script plus an empty KScrip
 
 ### The Makefile
 
-Every new project has a `Makefile`, so common commands are short: `make serve`, `make test`, `make check`, `make fmt`, `make compile`, and `make routes`, `make desktop` and `make app` when the project has an API or desktop app. Any other target is passed to `kscript make`, with `name=` as the name and `args=` for options:
+Every new project has a `Makefile`, so common commands are short: `make serve`, `make test`, `make check`, `make fmt`, `make agents`, `make compile`, and `make routes`, `make desktop` and `make app` when the project has an API or desktop app. Any other target is passed to `kscript make`, with `name=` as the name and `args=` for options:
 
 ```sh
 make page name=contact                          # kscript make page contact

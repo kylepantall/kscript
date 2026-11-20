@@ -111,6 +111,9 @@ namespace KScript.Metadata
         /// <summary>Set when the command or method is deprecated; it still works, with a warning.</summary>
         public Deprecation Deprecated { get; internal set; }
 
+        /// <summary>Notes for coding agents (<c>kscript agents</c>), or null.</summary>
+        public AgentNotes Agent { get; set; }
+
         /// <summary>For methods: the type the method is for.</summary>
         public string ReceiverType { get; init; } = KType.Any;
 

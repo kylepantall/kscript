@@ -1102,7 +1102,7 @@ namespace KScript.Projects
         public bool IsFormatIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Format.Include.Any(g => GlobMatches(g, rel)) && !Format.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Format.Include.Any(g => GlobMatches(g, rel)) && !Format.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>True when the file or folder is under the project folder and matches format.exclude.</summary>
@@ -1116,7 +1116,7 @@ namespace KScript.Projects
         public bool IsTestIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Test.Include.Any(g => GlobMatches(g, rel)) && !Test.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Test.Include.Any(g => GlobMatches(g, rel)) && !Test.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>True when the file or folder is under the project folder and matches test.exclude.</summary>
@@ -1170,6 +1170,20 @@ namespace KScript.Projects
                 .FirstOrDefault();
         }
 
+        /// <summary>
+        /// The folder kscript writes generated files into, such as the agent docs in .kscript/agents. It is never
+        /// checked, formatted or tested, whatever lint.include says.
+        /// </summary>
+        public const string GeneratedFolder = ".kscript";
+
+        private static bool IsGenerated(string relative) => relative.StartsWith(GeneratedFolder + "/", StringComparison.Ordinal) || IsAgentFile(relative);
+
+        /// <summary>
+        /// True for the project's notes for coding agents (AGENTS.md and CLAUDE.md at the root): Markdown for tools,
+        /// not pages, so they are never checked or served.
+        /// </summary>
+        public static bool IsAgentFile(string relative) => relative is "AGENTS.md" or "CLAUDE.md";
+
         /// <summary>True when the file is under the project folder and matches lint.exclude.</summary>
         public bool IsExcluded(string path)
         {
@@ -1181,7 +1195,7 @@ namespace KScript.Projects
         public bool IsIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Lint.Include.Any(g => GlobMatches(g, rel)) && !Lint.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Lint.Include.Any(g => GlobMatches(g, rel)) && !Lint.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>The path relative to the project folder with / separators, or null when it is outside it.</summary>

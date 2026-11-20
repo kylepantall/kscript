@@ -197,17 +197,42 @@ namespace KScript.Runtime
             {
                 foreach (var (key, example) in examples)
                 {
-                    CallableInfo info;
-                    int arrow = key.IndexOf("->", StringComparison.Ordinal);
-                    if (key.StartsWith("@", StringComparison.Ordinal))
-                        info = package.commands.TryGetValue(key.Substring(1), out CommandDefinition c) ? c.Info : null;
-                    else if (arrow > 0)
-                        info = package.methods.FirstOrDefault(m => m.Receiver == key.Substring(0, arrow) && m.Name == key.Substring(arrow + 2))?.Info;
-                    else
-                        info = null;
-                    if (info == null) throw new InvalidOperationException($"{package.Name} has no command or method {key} to give an example to.");
-                    info.Example = example;
+                    Find(key, "an example").Example = example;
                 }
+            }
+
+            /// <summary>
+            /// Adds notes for coding agents to commands, methods and elements registered above, keyed like
+            /// <see cref="Examples"/> (<c>"@read_json"</c>, <c>"list->map"</c>) or <c>"&lt;each&gt;"</c> for an element.
+            /// <c>kscript agents</c> writes them into AGENTS.md and .kscript/agents. Keep each note to one short line:
+            /// agents read every one, so they cost tokens. A key that names nothing is an error here.
+            /// </summary>
+            public void AgentNotes(params (string Key, AgentNotes Notes)[] notes)
+            {
+                foreach (var (key, value) in notes)
+                {
+                    if (key.StartsWith("<", StringComparison.Ordinal) && key.EndsWith(">", StringComparison.Ordinal))
+                    {
+                        ElementInfo element = package.elements.TryGetValue(key.Substring(1, key.Length - 2), out ElementDefinition e) ? e.Info : null;
+                        if (element == null) throw new InvalidOperationException($"{package.Name} has no element {key} to give agent notes to.");
+                        element.Agent = value;
+                        continue;
+                    }
+                    Find(key, "agent notes").Agent = value;
+                }
+            }
+
+            private CallableInfo Find(string key, string what)
+            {
+                CallableInfo info;
+                int arrow = key.IndexOf("->", StringComparison.Ordinal);
+                if (key.StartsWith("@", StringComparison.Ordinal))
+                    info = package.commands.TryGetValue(key.Substring(1), out CommandDefinition c) ? c.Info : null;
+                else if (arrow > 0)
+                    info = package.methods.FirstOrDefault(m => m.Receiver == key.Substring(0, arrow) && m.Name == key.Substring(arrow + 2))?.Info;
+                else
+                    info = null;
+                return info ?? throw new InvalidOperationException($"{package.Name} has no command or method {key} to give {what} to.");
             }
 
             /// <summary>
