@@ -136,7 +136,7 @@ namespace KScript.LanguageServer
                     string shown = file.StartsWith("./", StringComparison.Ordinal) || file.StartsWith(".\\", StringComparison.Ordinal) ? file.Substring(2) : file;
                     if (report != null)
                     {
-                        report.Problems.Add(ProblemJson(shown.Replace('\\', '/'), analysis.Source, d, severity));
+                        report.Problems.Add((System.Text.Json.Nodes.JsonNode)ProblemJson(shown.Replace('\\', '/'), analysis.Source, d, severity));
                     }
                     else
                     {
@@ -172,9 +172,9 @@ namespace KScript.LanguageServer
                 var edits = new System.Text.Json.Nodes.JsonArray();
                 foreach (TextChange change in fix.Changes)
                 {
-                    edits.Add(Range(change.Span, new System.Text.Json.Nodes.JsonObject()).Also(e => e["newText"] = change.NewText));
+                    edits.Add((System.Text.Json.Nodes.JsonNode)Range(change.Span, new System.Text.Json.Nodes.JsonObject()).Also(e => e["newText"] = change.NewText));
                 }
-                fixes.Add(new System.Text.Json.Nodes.JsonObject { ["title"] = fix.Title, ["edits"] = edits });
+                fixes.Add((System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject { ["title"] = fix.Title, ["edits"] = edits });
             }
 
             var problem = new System.Text.Json.Nodes.JsonObject { ["file"] = file };
