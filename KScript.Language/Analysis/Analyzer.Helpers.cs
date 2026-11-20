@@ -213,7 +213,7 @@ namespace KScript.Language.Analysis
                 .Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import).Select(s => s.Name);
             string suggestion = Suggestions.Closest(name, candidates);
             string message = isWrite
-                ? (result.Markup.Syntax == SourceSyntax.Code
+                ? (IsCode
                     ? $"${name} is not defined, so it can't be updated. Give it a starting value first: {name} = ..."
                     : $"${name} is not defined. Declare it first with <let name=\"{name}\" ... />.")
                 : $"${name} is not defined." + (suggestion != null ? $" Did you mean ${suggestion}?" : string.Empty);
@@ -274,7 +274,7 @@ namespace KScript.Language.Analysis
             IEnumerable<string> candidates = result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name);
             string suggestion = Suggestions.Closest(name, candidates);
             Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
-                $"No function named '{name}'. Declare it with <fn name=\"{name}\">." + (suggestion != null ? $" Did you mean '{suggestion}'?" : string.Empty),
+                $"No function named '{name}'. Declare it with {FnHint(name)}." + (suggestion != null ? $" Did you mean '{suggestion}'?" : string.Empty),
                 SuggestFix(span, name, candidates, n => n));
             return null;
         }
@@ -290,7 +290,7 @@ namespace KScript.Language.Analysis
             {
                 IEnumerable<string> aliases = result.Symbols.Where(s => s.Kind == SymbolKind.Import).Select(s => s.Name);
                 Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
-                    $"Nothing is imported as '{aliasName}'. Import it with <import src=\"...\" as=\"{aliasName}\" />.",
+                    $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode ? $"import \"...\" as {aliasName}." : $"<import src=\"...\" as=\"{aliasName}\" />."),
                     SuggestFix(aliasSpan, aliasName, aliases, n => n));
                 return;
             }

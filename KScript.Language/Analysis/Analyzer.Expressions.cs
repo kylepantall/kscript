@@ -215,7 +215,7 @@ namespace KScript.Language.Analysis
             IEnumerable<string> candidates = catalog.Commands.Select(x => x.Name).Concat(result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name));
             string suggestion = Suggestions.Closest(c.Name, candidates);
             Report(full, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand,
-                $"Unknown command @{c.Name}." + (suggestion != null ? $" Did you mean @{suggestion}?" : " Declare it with <fn name=\"" + c.Name + "\">."),
+                $"Unknown command @{c.Name}." + (suggestion != null ? $" Did you mean @{suggestion}?" : " Declare it with " + FnHint(c.Name) + "."),
                 suggestion != null ? new[] { new QuickFix($"Change to @{suggestion}", new TextChange(nameSpan, suggestion)) } : null);
         }
 
@@ -230,7 +230,9 @@ namespace KScript.Language.Analysis
             {
                 IEnumerable<string> aliases = result.Symbols.Where(s => s.Kind == SymbolKind.Import).Select(s => s.Name);
                 Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
-                    $"Nothing is imported as '{aliasName}'. Import it with <import package=\"...\" as=\"{aliasName}\" /> or <import src=\"...\" as=\"{aliasName}\" />.",
+                    $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode
+                        ? $"import KScript.Name as {aliasName} or import \"...\" as {aliasName}."
+                        : $"<import package=\"...\" as=\"{aliasName}\" /> or <import src=\"...\" as=\"{aliasName}\" />."),
                     SuggestFix(aliasSpan, aliasName, aliases, n => n));
                 return;
             }
@@ -288,7 +290,7 @@ namespace KScript.Language.Analysis
                     }
                     else
                     {
-                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Unknown function '{id.Name}'. Declare it with <fn name=\"{id.Name}\">.");
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Unknown function '{id.Name}'. Declare it with {FnHint(id.Name)}.");
                     }
                     return;
                 }
@@ -406,8 +408,17 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            List<CallableInfo> applicable = candidates.Where(m => KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
+            // A declared type is held to: an int parameter has no string methods.
+            List<CallableInfo> applicable = candidates.Where(m => receiver.Declared
+                ? m.ReceiverType == KType.Any || m.ReceiverType == receiver.Type
+                : KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
             usedPackages.UnionWith(applicable.Select(m => m.Package).Where(p => p != null));
+            if (applicable.Count == 0 && receiver.Declared)
+            {
+                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is declared as {Article(receiver.Type)}.");
+                return;
+            }
             if (applicable.Count == 0)
             {
                 Report(nameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,

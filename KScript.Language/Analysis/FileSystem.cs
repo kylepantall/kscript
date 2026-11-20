@@ -12,7 +12,7 @@ namespace KScript.Language.Analysis
 
         IEnumerable<string> ListFiles(string directory, string pattern);
 
-        /// <summary>The folders directly inside a folder, used to look through a whole project. None by default.</summary>
+        /// <summary>The folders directly inside a folder (for path completion and project-wide checks). None by default.</summary>
         IEnumerable<string> ListDirectories(string directory) => Array.Empty<string>();
     }
 

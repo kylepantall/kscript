@@ -33,6 +33,10 @@ Scripts, tests, routes and the desktop app are written in the [.kscript format](
 
 `--no-desktop` leaves out `desktop.kscript` and the `app` section, for a web site only. `--no-http` leaves out the API. `kscript make project .` sets up the current folder; existing files are never replaced without `--force`. `kscript make project --help` lists the template's options.
 
+### A bare project: --bare
+
+`kscript make project my-tool --bare` makes just `kscript.json`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation: no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
+
 ### Changing what new projects get
 
 Every file `kscript make project` writes comes from a project template, and you can change it:
@@ -41,10 +45,11 @@ Every file `kscript make project` writes comes from a project template, and you 
 kscript make templates project            # outside a project: copies it to ~/.kscript/templates/project
 kscript make templates project --global   # the same, from inside a project
 kscript make templates project            # inside a project: copies it to _templates/project
+kscript make templates project bare       # the bare template, to project-bare instead of project
 kscript make project my-app --template ../starters/api   # any folder
 ```
 
-`kscript make project` uses the first template it finds: the `--template` folder, then `_templates/project` in the project the new one is made inside (handy for a folder of several apps), then `~/.kscript/templates/project` (or `$KSCRIPT_TEMPLATES/project`), then the built-in one. Edit, add or delete files in the template folder to change what new projects get.
+`--template` takes a folder or a template name. A name such as `bare` (or your own, such as `api`) is looked up as `project-<name>` in the same places as the default template, which lives in `project`, and then among the built-in templates (`web` and `bare`). `kscript make project` uses the first template it finds: the `--template` folder, then `_templates/project` in the project the new one is made inside (handy for a folder of several apps), then `~/.kscript/templates/project` (or `$KSCRIPT_TEMPLATES/project`), then the built-in one. Edit, add or delete files in the template folder to change what new projects get.
 
 - Write scripts as `.kscript` files and refer to other scripts with `{{ ext }}` (`import "lib/tasks{{ ext }}"`). With `--format xml`, each `.kscript` file is converted to XML and named `.ks.xml`, and `{{ ext }}` is `.ks.xml`; `{{#if xml}}` tells the formats apart. A `.ks.xml` file in the template is copied as it is.
 - Each file is a template with the same `{{ }}` placeholders as [`kscript make` templates](#your-own-templates): `{{ title }}` is the project name as a title (`My App`), `{{ kebab }}` is `my-app`, and every option is a value (`{{ port }}`, `{{#if desktop}} … {{/if}}`).
