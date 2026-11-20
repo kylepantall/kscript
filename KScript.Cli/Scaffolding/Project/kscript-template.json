@@ -5,7 +5,7 @@
   "options": {
     "desktop": {
       "default": true,
-      "description": "Add desktop.ks.xml (the app in a <KScript.Window>) and the kscript.json app settings kscript app build uses. --no-desktop leaves them out."
+      "description": "Add desktop.ks.xml (the app in a <KScript.Window>) and the kscript.json app settings kscript compile uses. --no-desktop leaves them out."
     },
     "http": {
       "default": true,
@@ -19,7 +19,7 @@
   // Printed after the project is made, under "Next:". Lines that come out empty are left out.
   "next": [
     "kscript serve           serve the site at http://localhost:{{ port }} (settings in kscript.json)",
-    "{{#if desktop}}kscript desktop.ks.xml  open the desktop app; kscript app build packages it{{/if}}",
+    "{{#if desktop}}kscript desktop.ks.xml  open the desktop app; kscript compile builds it as a program{{/if}}",
     "{{#if http}}kscript routes          list the API routes in api.ks.xml (GET http://localhost:{{ port }}/api/tasks){{/if}}",
     "kscript test            run the tests in tests/",
     "kscript check           check every page and script",

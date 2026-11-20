@@ -34,13 +34,14 @@ A script whose root element is `<KScript.Window>` opens a native window on macOS
 
 Every element takes `width`, `height`, `padding`, `margin`, `background`, `radius` and `tooltip`. Colours are names such as `teal` or `#rrggbb`. `<KScript.Window>` takes `title`, `width`, `height`, `theme` (`dark`, `light` or `system`), `background`, `padding`, `gap` and `resizable`.
 
-## Packaging an app: kscript app build
+## Building the app: kscript compile
 
 ```sh
-kscript app build counter.ks.xml --name "Counter"
+kscript compile counter.ks.xml --name "Counter"      # for this computer
+kscript compile counter.ks.xml --target all          # for every platform
 ```
 
-This builds `dist/Counter.app` on a Mac, and `dist/Counter/` with `Counter.exe` on Windows or a launcher and a `.desktop` file on Linux. It builds for the computer it runs on. The app holds the script's folder (or its whole `kscript.json` project, so imports and data files come along) and its own copy of `kscript`. Built with a release `kscript`, it runs on computers that don't have kscript or .NET. In a project, the [`app` section of `kscript.json`](projects.md#project-settings-kscriptjson) names the main script, the app's name and its icon, so `kscript app build` needs no arguments. Mac apps are signed ad hoc, not notarized: macOS opens them on the Mac that built them, and elsewhere after right-clicking and choosing **Open**.
+This builds `dist/mac-arm64/Counter.app` for a Mac, `dist/win-x64/Counter.exe` for Windows (with the app's icon, and no console window), and `dist/linux-x64/Counter` with a `.desktop` file for Linux. Each one holds the script's folder (or its whole `kscript.json` project, so imports and data files come along) and only the parts of kscript the app uses, so it runs on computers without kscript or .NET. In a project, the [`app` section of `kscript.json`](projects.md#project-settings-kscriptjson) names the main script, the app's name, version and icon, so `kscript compile` needs no arguments. See [Programs](compile.md) for the targets, icons and signing.
 
 `kscript make project my-app` starts a project with a desktop app already set up: `desktop.ks.xml` and the `app` section of `kscript.json` (leave them out with `--no-desktop`).
 

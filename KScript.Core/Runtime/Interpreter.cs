@@ -36,6 +36,9 @@ namespace KScript.Runtime
         #region Loading
 
         /// <summary>Loads and checks a script file. Throws <see cref="KScriptException"/> (with a line and column) for any mistake.</summary>
+        /// <summary>Every script loaded so far, imports included, such as what kscript compile embeds.</summary>
+        public IEnumerable<Module> LoadedModules => modulesByPath.Values;
+
         public Module Load(string path)
         {
             string full = System.IO.Path.GetFullPath(path);

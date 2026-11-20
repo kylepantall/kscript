@@ -20,4 +20,6 @@ The plan:
 - **More targets later.** Once the TypeScript target is solid, the same design could add Python, C# or Go. Each target would be a separate emitter behind `--to`.
 - **Tested both ways.** Every sample and the language test suite would run both through the interpreter and as compiled output, and the results would have to match.
 
+`kscript compile` already builds programs (`--to exe`, the default; see [Programs](compile.md)), so converters are new `--to` targets of the same command.
+
 This is separate from `kscript convert`, which only switches a script between the XML and `.kscript` formats of KScript itself.

@@ -22,7 +22,7 @@ namespace KScript.Projects
         public string Host { get; set; } = "localhost";
     }
 
-    /// <summary>The <c>app</c> section: what <c>kscript app build</c> packages and how the app is named.</summary>
+    /// <summary>The <c>app</c> section: what <c>kscript compile</c> builds and how the program is named.</summary>
     public sealed class AppSettings
     {
         /// <summary>The script the app runs, relative to kscript.json (usually one whose root is &lt;KScript.Window&gt;).</summary>

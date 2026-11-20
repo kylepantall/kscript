@@ -135,7 +135,7 @@
     },
     "app": {
       "type": "object",
-      "description": "Used by kscript app build, which packages a script as a desktop app.",
+      "description": "Used by kscript compile, which builds a script, desktop app or site into a program for macOS, Windows and Linux.",
       "additionalProperties": false,
       "properties": {
         "main": { "type": "string", "description": "The script the app runs, relative to kscript.json. Usually one whose root is <KScript.Window>." },
