@@ -58,8 +58,8 @@ namespace KScript.Language.Features
                     c.InElementName = offset >= e.NameSpan.Start && offset <= e.NameSpan.End;
                     foreach (MarkupAttribute a in e.Attributes)
                     {
-                        // An attribute a keyword implies (a field's type after ':') has no name to complete.
-                        if (offset >= a.NameSpan.Start && offset <= a.NameSpan.End && (a.NameSpan.Length > 0 || a.Value == null || !code))
+                        // An attribute a keyword implies (a field's type after ':', or <if $ready>'s test) has no name to complete.
+                        if (offset >= a.NameSpan.Start && offset <= a.NameSpan.End && (a.NameSpan.Length > 0 || a.Value == null || !(code || a.IsShorthand)))
                         {
                             c.Attribute = a;
                             c.InAttributeName = true;

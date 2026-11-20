@@ -292,6 +292,12 @@ namespace KScript.Language.Features
             int n = 1;
             string attrs = string.Concat(e.Attributes.Where(a => a.Required || (e.Name == "let" && a.Name == "value") || (e.Name == "set" && a.Name == "value"))
                 .Select(a => $" {a.Name}=\"${n++}\""));
+            string shorthand = ShorthandCondition.AttributeFor(e.Name);
+            if (shorthand != null && attrs == $" {shorthand}=\"$1\"")
+            {
+                // <if $1>: the condition goes straight in the start tag.
+                attrs = " $1";
+            }
             switch (e.Content)
             {
                 case ContentKind.Empty:

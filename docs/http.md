@@ -126,7 +126,7 @@ Data that doesn't fit is the client's mistake, so the controller doesn't run. A 
   <type name="NewPerson" fields="name: string, age?: int, role?: string" />
 
   <fn name="store" params="json: NewPerson">       <!-- POST /api/people -->
-    <if test="$json.name->trim() == ''">
+    <if $json.name->trim() == ''>
       <return value="@response({ error: 'A person needs a name.' }, status: 422)" />
     </if>
     …
@@ -170,7 +170,7 @@ Middleware is a function that takes the request and `$next`. It can stop the req
   </fn>
 
   <fn name="json_only" params="request, next">
-    <if test="$request.method == 'POST' and not ($request.headers['content-type'] ?? '')->contains('json')">
+    <if $request.method == 'POST' and not ($request.headers['content-type'] ?? '')->contains('json')>
       <return value="@response({ error: 'Send JSON.' }, status: 415)" />
     </if>
     <return value="$next($request)" />

@@ -23,7 +23,7 @@
 
   <fn name="page" params="id">
     <let name="person" value="@find($id)" />
-    <if test="$person == null">
+    <if $person == null>
       <do>@abort(404, message: 'Nobody has that id.')</do>
     </if>
     <return value="@view('people/show', person: $person)" />
@@ -42,7 +42,7 @@
   </fn>
 
   <fn name="store" params="json: NewPerson">
-    <if test="$json.name->trim() == ''">
+    <if $json.name->trim() == ''>
       <return value="@response({ error: 'A person needs a name.' }, status: 422)" />
     </if>
     <let name="people" value="@all()" />

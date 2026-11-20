@@ -10,7 +10,7 @@
   <!-- Or the loop, if you want one -->
   <let name="eldest" value="$people[0]" />
   <for each="p" in="$people">
-    <if test="$p.age gt $eldest.age">
+    <if $p.age gt $eldest.age>
       <set name="eldest" value="$p" />
     </if>
   </for>

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Shorthand conditions: `<if $user.is_logged_in>`, `<elif …>`, `<while …>`, `<match …>` and `<assert … />` are highlighted, checked and completed like `test="…"`, in scripts and pages. The `<if>`, `<elif>`, `<while>` and `<match>` snippets use the short form.
 - The language server restarts by itself when the `kscript` binary changes (after `kscript update`, a reinstall, or a rebuild of a source `KScript.dll`), so the editor stops showing errors from the old version. A notice names the new version.
 - When the `kscript` it finds is an older release than the extension, the extension says so and offers to run `kscript update`.
 - Standards: `kscript.json` and standard files (`kscript-standard.json`, `*.kscript-standard.json`) are validated and completed, including `"standard"`, `"extends"` and the built-in `kscript:recommended` and `kscript:strict`. Editing a standard file re-checks open files straight away.
