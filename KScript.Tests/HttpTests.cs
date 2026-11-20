@@ -371,7 +371,11 @@ public class HttpAppTests
             </KScript.Routes>
             """);
         var app = App(site);
-        PageResult none = Send(app, "GET", "/secret");
+        // A browser is sent to sign in (KScript.Auth); a program that wants JSON gets a 401.
+        PageResult browser = Send(app, "GET", "/secret");
+        Assert.Equal(302, browser.Status);
+        Assert.Equal("/login", browser.Headers["Location"]);
+        PageResult none = Send(app, "GET", "/secret", headers: new() { ["accept"] = "application/json" });
         Assert.Equal(401, none.Status);
         Assert.Equal("Bearer", none.Headers["WWW-Authenticate"]);
         Assert.Equal(401, Send(app, "GET", "/secret", headers: new() { ["authorization"] = "Bearer wrong" }).Status);

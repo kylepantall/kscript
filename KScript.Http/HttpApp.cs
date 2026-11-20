@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
+using KScript.Auth;
 using KScript.Pages;
 using KScript.Projects;
 using KScript.Runtime;
@@ -38,11 +39,18 @@ namespace KScript.Http
             SiteRoot = Path.GetFullPath(siteRoot);
             Settings = project?.Http ?? new HttpSettings();
             Project = project;
+            projectRoot = project?.FilePath != null ? Path.GetDirectoryName(Path.GetFullPath(project.FilePath)) : SiteRoot;
             Log = log;
             Files = FindRouteFiles();
         }
 
         public string SiteRoot { get; }
+
+        private readonly string projectRoot;
+        private AuthApp auth;
+
+        /// <summary>The app's users, sessions and tokens (KScript.Auth), with http.auth's settings.</summary>
+        public AuthApp Auth => auth ??= AuthApp.For(projectRoot, Settings.Auth);
         public HttpSettings Settings { get; }
 
         /// <summary>The project, or null; the OpenAPI document takes its title and version from it.</summary>
@@ -175,6 +183,7 @@ namespace KScript.Http
                 CanWriteFiles = Settings.WriteFiles,
             };
             host.Items[HttpPackage.ContextKey] = ctx;
+            host.Items[AuthRequest.HostKey] = ctx.Auth;
             return new Interpreter(host, options: new InterpreterOptions { MaxSteps = MaxSteps, MaxCallDepth = 200 });
         }
 
@@ -248,6 +257,9 @@ namespace KScript.Http
             Complete(request);
             PageResult result = null;
             OnBigStack(() => result = HandleHere(request));
+            // The session (KScript.Auth) is saved once the request is answered, and its cookie sent.
+            List<string> cookies = RequestHooks.Finish(request);
+            result?.Cookies.AddRange(cookies);
             return result;
         }
 
@@ -341,10 +353,16 @@ namespace KScript.Http
         {
             Log?.WriteLine($"  {status} {ex.Type}: {ex.Message}");
             HttpResponse response = ctx.ErrorResponse(status, ex.Message);
-            if (!response.ContentType.StartsWith("application/json", StringComparison.Ordinal)) return response;
-            var body = new Dictionary<string, object> { ["error"] = ex.Message, ["status"] = (double)status, ["type"] = ex.Type };
-            foreach (var kv in ex.Fields) body.TryAdd(kv.Key, kv.Value);
-            return HttpResponse.Json(body, status);
+            if (response.ContentType.StartsWith("application/json", StringComparison.Ordinal))
+            {
+                var body = new Dictionary<string, object> { ["error"] = ex.Message, ["status"] = (double)status, ["type"] = ex.Type };
+                foreach (var kv in ex.Fields) body.TryAdd(kv.Key, kv.Value);
+                response = HttpResponse.Json(body, status);
+            }
+            // A TooManyRequests error with retry_after says when to come back; a 401 says how to sign in.
+            if (ex.Fields.TryGetValue("retry_after", out object wait)) response.Headers["Retry-After"] = Values.ToStr(wait);
+            if (status == 401) response.Headers["WWW-Authenticate"] = "Bearer";
+            return response;
         }
 
         private HttpResponse Failure(RequestContext ctx, string message)

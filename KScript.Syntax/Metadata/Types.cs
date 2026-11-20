@@ -33,6 +33,8 @@ namespace KScript.Metadata
         public const string HttpResponse = "http_response";
         public const string Storage = "storage";
         public const string Cache = "cache";
+        public const string Session = "session";
+        public const string Users = "users";
         public const string Document = "document";
 
         /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>

@@ -1,0 +1,33 @@
+--- make
+to: {{ paths.views }}/auth/account.html
+---
+<import package="KScript.Auth" />
+<layout src="{{ layout }}" title="Your account">
+  <h1>Your account</h1>
+  <if test="$session->has('status')"><p class="status">{ $session->get('status') }</p></if>
+  <p>Signed in as <strong>{ $data.user.name ?? $data.user.email }</strong> ({ $data.user.email }).</p>
+  <form method="post" action="/logout">
+    {! @csrf_field() }
+    <button>Sign out</button>
+  </form>
+
+  <h2>API tokens</h2>
+  <p>Programs send a token as <code>Authorization: Bearer &lt;token&gt;</code> to act as you.</p>
+  <if test="$data.new_token != null"><p class="status">Your new token is <code>{ $data.new_token }</code>. Copy it now: it won't be shown again.</p></if>
+  <ul>
+    <for each="t" in="$data.tokens ?? []">
+      <li>
+        { $t.name }, made { $t.created_at }
+        <form method="post" action="/account/tokens/{ $t.id }/delete">
+          {! @csrf_field() }
+          <button>Revoke</button>
+        </form>
+      </li>
+    </for>
+  </ul>
+  <form method="post" action="/account/tokens">
+    {! @csrf_field() }
+    <p><label>Name<br><input name="name" placeholder="laptop" required></label></p>
+    <p><button>Make a token</button></p>
+  </form>
+</layout>

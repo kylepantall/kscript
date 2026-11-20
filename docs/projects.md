@@ -191,6 +191,7 @@ kscript make document annual-report                   # documents/annual-report.
 kscript make config staging                           # config/config.staging.yaml
 kscript make test checkout                            # tests/checkout.test.kscript
 kscript make error PaymentFailed --status 402 --fields "order: int"   # errors/payment-failed.kscript
+kscript make auth --api                               # sign up, sign in, resets and API tokens (see Sign-in)
 kscript make                                          # list every type
 ```
 

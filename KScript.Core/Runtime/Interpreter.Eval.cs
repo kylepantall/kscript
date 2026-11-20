@@ -190,6 +190,8 @@ namespace KScript.Runtime
 
                 case VariableNode v:
                     if (scope.TryGet(v.Name, out object value)) return value;
+                    // A package's variable ($config, $session) in a page or other document that isn't run as a script.
+                    if (ctx.Module != null && ctx.Module.Variables.TryGetValue(v.Name, out VariableDefinition packageVariable)) return packageVariable.Value(this, ctx.Module);
                     throw Fail(node, ctx, UndefinedMessage(v.Name, scope), "Name");
 
                 case IdentifierNode id:

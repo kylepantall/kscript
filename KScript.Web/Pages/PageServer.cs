@@ -242,6 +242,7 @@ namespace KScript.Pages
 
                 http.Response.StatusCode = result.Status;
                 foreach (var h in result.Headers) http.Response.Headers[h.Key] = h.Value;
+                foreach (string cookie in result.Cookies) http.Response.Headers.Append("Set-Cookie", cookie);
                 if (result.Status != 304 && !(result.Status >= 300 && result.Status < 400 && result.Body.Length == 0))
                 {
                     http.Response.ContentType = result.ContentType;
@@ -324,7 +325,10 @@ namespace KScript.Pages
                     var built = await BuildRequestAsync(request);
                     if (route.Locale != null) built["locale"] = route.Locale;
                     var ctx = new PageContext(site.Root, built);
-                    return PageRenderer.RenderFile(ctx, route.File, route.Params);
+                    PageResult rendered = PageRenderer.RenderFile(ctx, route.File, route.Params);
+                    // A page that started a session (KScript.Auth's @csrf_field(), say) sends its cookie.
+                    rendered.Cookies.AddRange(KScript.Runtime.RequestHooks.Finish(built));
+                    return rendered;
                 }
 
                 default:
@@ -404,6 +408,7 @@ namespace KScript.Pages
             return new Dictionary<string, object>
             {
                 ["method"] = request.Method,
+                ["scheme"] = request.Scheme,
                 ["path"] = request.Path.Value ?? "/",
                 ["query"] = query,
                 ["form"] = form,

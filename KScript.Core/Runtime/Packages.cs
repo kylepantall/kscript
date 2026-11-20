@@ -330,6 +330,7 @@ namespace KScript.Runtime
             ("KScript.Document", "KScript.Documents.DocumentPackage, KScript.Document", "Scientific and professional documents (papers, reports, letters, invoices) with LaTeX maths, citations and tables, saved as PDF, Word, LaTeX, Markdown or HTML."),
             ("KScript.Cache", "KScript.Caching.CachePackage, KScript.Cache", "A cache of values by key, with time limits: in memory, or in files in the app's cache folder."),
             ("KScript.Http", "KScript.Http.HttpPackage, KScript.Http", "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve."),
+            ("KScript.Auth", "KScript.Auth.AuthPackage, KScript.Auth", "Sign-in for kscript serve apps: users, sessions, the auth and guest middleware, CSRF, password resets and API tokens."),
             ("KScript.Test", "KScript.Testing.TestPackage, KScript.Test", "Tests run by kscript test: <test>, <describe>, <expect>, <assert> and <capture>."),
             ("KScript.UI", "KScript.UI.UIPackage, KScript.UI", "Desktop windows with buttons, text and inputs."),
             ("KScript.AI", "KScript.AI.AIPackage, KScript.AI", "Language models: @llm, @chat and <llm>."),

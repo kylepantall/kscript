@@ -21,7 +21,7 @@ namespace KScript.Http
         public const string ContextKey = "KScript.Http.Request";
 
         /// <summary>The middleware that ship with KScript.Http.</summary>
-        public static readonly string[] BuiltInMiddleware = { "log", "cors", "auth", "throttle", "etag", "cache_control", "cache_response" };
+        public static readonly string[] BuiltInMiddleware = { "log", "cors", "auth", "guest", "csrf", "throttle", "etag", "cache_control", "cache_response" };
 
         /// <summary>The method elements: &lt;Get&gt;, &lt;Post&gt;... and the HTTP method each answers.</summary>
         public static readonly (string Element, string Method)[] MethodElements =
@@ -230,7 +230,9 @@ namespace KScript.Http
                 throw run.Error(ex.Message, "path", "Http");
             }
 
-            var middleware = ctx.MiddlewareFor(run).Concat(ResolveMiddleware(run, run.Raw("middleware"))).ToList();
+            var middleware = ctx.MiddlewareFor(run).ToList();
+            AddCsrf(run, ctx, middleware);
+            middleware.AddRange(ResolveMiddleware(run, run.Raw("middleware")));
             AddCaching(run, middleware);
             string name = run.Raw("name")?.Trim();
             ctx.Add(run, new Route
@@ -253,6 +255,17 @@ namespace KScript.Http
                 Line = run.Module.Source.GetPosition(run.Element.Span.Start).Line + 1,
             });
             return null;
+        }
+
+        /// <summary>
+        /// Web routes in a file that imports KScript.Auth check the CSRF token of forms (POST, PUT, PATCH, DELETE), so
+        /// another site can't submit them with the visitor's session. http.auth.csrf: false turns it off; API routes
+        /// don't get it, since they are signed in with tokens, not cookies.
+        /// </summary>
+        private static void AddCsrf(ElementRun run, RequestContext ctx, List<MiddlewareRef> middleware)
+        {
+            if (ctx.Api || !ctx.Settings.Auth.Csrf || !run.Module.Imports("KScript.Auth") || middleware.Any(m => m.Function == null && m.Name == "csrf")) return;
+            middleware.Add(new MiddlewareRef("csrf", null, null));
         }
 
         /// <summary>A route's etag and cache attributes, as the etag and cache_control middleware closest to the controller.</summary>
@@ -293,7 +306,9 @@ namespace KScript.Http
 
             string param = run.Raw("param")?.Trim() ?? "id";
             string prefix = (run.Raw("name")?.Trim() ?? to) + ".";
-            var middleware = ctx.MiddlewareFor(run).Concat(ResolveMiddleware(run, run.Raw("middleware"))).ToList();
+            var middleware = ctx.MiddlewareFor(run).ToList();
+            AddCsrf(run, ctx, middleware);
+            middleware.AddRange(ResolveMiddleware(run, run.Raw("middleware")));
             string basePath = RoutePattern.Join(ctx.Prefix, run.RequiredRaw("path"));
             foreach (var (action, methods, member) in ResourceActions)
             {
@@ -425,6 +440,6 @@ namespace KScript.Http
         }
 
         internal static string ReasonPhrase(int status) =>
-            Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(status) is { Length: > 0 } phrase ? phrase : "Error " + status;
+            status == 419 ? "Page Expired" : Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(status) is { Length: > 0 } phrase ? phrase : "Error " + status;
     }
 }
