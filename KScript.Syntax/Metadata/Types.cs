@@ -22,6 +22,9 @@ namespace KScript.Metadata
         public const string Request = "request";
         public const string HttpResponse = "http_response";
 
+        /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>
+        public const string Type = "type";
+
         public static readonly string[] Declarable = { "string", "int", "float", "bool", "list", "map", "fn" };
 
         /// <summary>True if a method declared for <paramref name="receiver"/> can be called on a value of type <paramref name="actual"/>.</summary>

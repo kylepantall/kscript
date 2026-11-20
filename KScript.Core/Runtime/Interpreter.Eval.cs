@@ -153,6 +153,8 @@ namespace KScript.Runtime
 
                 case IdentifierNode id:
                     if (ctx.Module != null && ctx.Module.Aliases.TryGetValue(id.Name, out ImportNamespace ns)) return ns;
+                    // A <type> can be named without $: as: Repo.
+                    if (scope.TryGet(id.Name, out object declaredType) && declaredType is RecordType) return declaredType;
                     throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
 
                 case ListNode list:
@@ -293,7 +295,8 @@ namespace KScript.Runtime
                 node = inner;
                 negated = true;
             }
-            if (node is IdentifierNode id && id.Name != "_" && !(ctx.Module != null && ctx.Module.Aliases.ContainsKey(id.Name)))
+            if (node is IdentifierNode id && id.Name != "_" && !(ctx.Module != null && ctx.Module.Aliases.ContainsKey(id.Name))
+                && !(!negated && scope.TryGet(id.Name, out object value) && value is RecordType))
             {
                 return new BareWord(id.Name, negated, afterNamed);
             }
@@ -411,6 +414,15 @@ namespace KScript.Runtime
         {
             switch (target)
             {
+                case Record record:
+                    try
+                    {
+                        return record.Get(name);
+                    }
+                    catch (KScriptException ex)
+                    {
+                        throw Fail(node, ctx, ex.Message, ex.Type);
+                    }
                 case Dictionary<string, object> map:
                     return map.TryGetValue(name, out object v) ? v : null;
                 case List<object> list when int.TryParse(name, out int i):
@@ -502,7 +514,7 @@ namespace KScript.Runtime
                     if (container is not Dictionary<string, object> map)
                         throw Fail(member, ctx, $"Only map fields can be set, but {SourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
                     if (node.Operator != "=") value = Combine(map.TryGetValue(member.Name, out object cur) ? cur : null, node.Operator, value, node, ctx);
-                    map[member.Name] = value;
+                    SetKey(map, member.Name, value, member, ctx);
                     return;
                 }
                 case IndexNode index:
@@ -515,7 +527,7 @@ namespace KScript.Runtime
                         {
                             string k = Values.ToStr(key);
                             if (node.Operator != "=") value = Combine(map.TryGetValue(k, out object cur) ? cur : null, node.Operator, value, node, ctx);
-                            map[k] = value;
+                            SetKey(map, k, value, index, ctx);
                             return;
                         }
                         case List<object> list:
@@ -533,6 +545,24 @@ namespace KScript.Runtime
                 }
             }
             throw Fail(target, ctx, "Only a variable, a map field or a list item can be assigned to.", "Syntax");
+        }
+
+        /// <summary>Sets a map key. A record checks the key is one of its fields and converts the value.</summary>
+        private void SetKey(Dictionary<string, object> map, string key, object value, ExprNode node, EvalContext ctx)
+        {
+            if (map is not Record record)
+            {
+                map[key] = value;
+                return;
+            }
+            try
+            {
+                record.Set(this, key, value);
+            }
+            catch (KScriptException ex)
+            {
+                throw Fail(node, ctx, ex.Message, ex.Type);
+            }
         }
 
         internal object Combine(object current, string op, object value, ExprNode node, EvalContext ctx)

@@ -683,7 +683,7 @@ namespace KScript.Runtime
             {
                 string name = e.GetAttributeValue("name")?.Trim().TrimStart('$');
                 if (name == null) continue;
-                bool export = e.Name == "fn" || e.Name == "const" || e.Name == "enum" || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
+                bool export = e.Name == "fn" || e.Name == "const" || e.Name == "enum" || e.Name == "type" || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
                 if (export && module.Globals.TryGet(name, out object value)) module.Exports[name] = value;
             }
         }
@@ -705,7 +705,7 @@ namespace KScript.Runtime
                 {
                     string close = Values.Closest(name, imported.Exports.Keys);
                     throw new KScriptException($"{imported.DisplayName} doesn't export '{name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                        + " Scripts export their top-level <fn> functions, <const> values and <enum> types.", "Import");
+                        + " Scripts export their top-level <fn> functions, <const> values, <enum>s and <type>s.", "Import");
                 }
                 scope.Declare(name, value);
             }
@@ -735,12 +735,18 @@ namespace KScript.Runtime
                 }
             }
 
+            // <type> declarations are hoisted too, so data can be mapped to a type declared further down.
+            foreach (MarkupNode node in nodes)
+            {
+                if (node is MarkupElement type && IsTypeDeclaration(module, type)) ExecuteElement(type, scope, module, null);
+            }
+
             bool? chain = null;
             foreach (MarkupNode node in nodes)
             {
                 if (node is MarkupElement e)
                 {
-                    if (IsFunctionDeclaration(module, e))
+                    if (IsFunctionDeclaration(module, e) || IsTypeDeclaration(module, e))
                     {
                         chain = null;
                         continue;
@@ -752,6 +758,9 @@ namespace KScript.Runtime
 
         private bool IsFunctionDeclaration(Module module, MarkupElement e) =>
             e.Name == "fn" && module.DefinitionOf(e)?.Package is CorePackage;
+
+        private bool IsTypeDeclaration(Module module, MarkupElement e) =>
+            e.Name == "type" && module.DefinitionOf(e)?.Package is CorePackage;
 
         /// <summary>Runs one element. <paramref name="chain"/> is the result of the element before it, for &lt;elif&gt; and &lt;else&gt;.</summary>
         public bool? ExecuteElement(MarkupElement e, Scope scope, Module module, bool? chain)

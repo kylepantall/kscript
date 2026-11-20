@@ -241,7 +241,7 @@ namespace KScript.Scaffolding
         private static string Lookup(string name, Dictionary<string, string> values) =>
             values.TryGetValue(name.Trim(), out var v) ? v : null;
 
-        private static bool IsSet(string value) =>
+        internal static bool IsSet(string value) =>
             !string.IsNullOrEmpty(value) && !string.Equals(value, "false", StringComparison.OrdinalIgnoreCase);
 
         private static List<string> List(string value) =>

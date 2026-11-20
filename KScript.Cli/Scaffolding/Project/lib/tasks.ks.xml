@@ -1,0 +1,39 @@
+<kscript>
+  <!--
+    The app's rules. The web page (tasks.html), the desktop window (desktop.ks.xml) and the tests
+    (tests/tasks.test.ks.xml) all import this file, so the logic is written once.
+    A task is a map: { id: 1, title: 'Buy milk', done: false }.
+  -->
+  <fn
+    name="add_task"
+    params="tasks, title"
+    description="The list with a new task at the end. A blank title leaves the list as it is.">
+    <let name="clean" value="$title->trim()" />
+    <if test="$clean eq ''">
+      <return value="$tasks" />
+    </if>
+    <let name="id" value="$tasks->count() eq 0 ? 1 : $tasks->map(fn($t) => $t.id)->max() + 1" />
+    <return value="$tasks->push({ id: $id, title: $clean, done: false })" />
+  </fn>
+
+  <fn name="toggle_task" params="tasks, id" description="The list with one task ticked or unticked.">
+    <return value="$tasks->map(fn($t) => $t.id eq $id ? $t->set(key: 'done', value: not $t.done) : $t)" />
+  </fn>
+
+  <fn name="remove_task" params="tasks, id" description="The list without one task.">
+    <return value="$tasks->reject(fn($t) => $t.id eq $id)" />
+  </fn>
+
+  <fn name="clear_done" params="tasks" description="The list without the finished tasks.">
+    <return value="$tasks->reject(fn($t) => $t.done)" />
+  </fn>
+
+  <fn name="tasks_left" params="tasks" description="How many tasks are not done yet, as text: '1 task left'.">
+    <let name="n" value="$tasks->count(fn($t) => not $t.done)" />
+    <return value="$n + ($n eq 1 ? ' task left' : ' tasks left')" />
+  </fn>
+
+  <fn name="starter_tasks" description="The tasks a new list starts with.">
+    <return value="@add_task(@add_task([], title: 'Try the web app: kscript serve'), title: 'Try the desktop app: kscript desktop.ks.xml')" />
+  </fn>
+</kscript>

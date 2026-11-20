@@ -18,6 +18,7 @@
   "main": "./dist/extension.js",
   "activationEvents": [
     "onLanguage:kscript",
+    "onLanguage:kscript-code",
     "workspaceContains:**/_components/*.html",
     "workspaceContains:**/_layout.html",
     "workspaceContains:**/kscript.json"
@@ -32,11 +33,20 @@
         ],
         "extensions": [
           ".ks.xml",
-          ".ks",
-          ".kscript"
+          ".ks"
         ],
         "firstLine": "^\\s*(<\\?xml[^>]*>\\s*)?<kscript\\b",
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "kscript-code",
+        "aliases": [
+          "KScript (code)"
+        ],
+        "extensions": [
+          ".kscript"
+        ],
+        "configuration": "./language-configuration-code.json"
       },
       {
         "id": "jsonc",
@@ -50,6 +60,11 @@
         "language": "kscript",
         "scopeName": "source.kscript",
         "path": "./syntaxes/kscript.tmLanguage.json"
+      },
+      {
+        "language": "kscript-code",
+        "scopeName": "source.kscript-code",
+        "path": "./syntaxes/kscript-code.tmLanguage.json"
       },
       {
         "scopeName": "kscript.pages.injection",
@@ -188,11 +203,44 @@
         },
         "editor.suggest.showStatusBar": true,
         "editor.wordBasedSuggestions": "off"
+      },
+      "[kscript-code]": {
+        "editor.semanticHighlighting.enabled": true,
+        "editor.quickSuggestions": {
+          "other": "on",
+          "comments": "off",
+          "strings": "on"
+        },
+        "editor.suggest.showStatusBar": true,
+        "editor.wordBasedSuggestions": "off"
       }
     },
     "semanticTokenScopes": [
       {
         "language": "kscript",
+        "scopes": {
+          "type": [
+            "support.type.kscript"
+          ],
+          "variable.readonly": [
+            "variable.other.constant.kscript"
+          ],
+          "parameter": [
+            "variable.parameter.kscript"
+          ],
+          "property": [
+            "variable.other.property.kscript"
+          ],
+          "method.defaultLibrary": [
+            "support.function.kscript"
+          ],
+          "function.defaultLibrary": [
+            "support.function.kscript"
+          ]
+        }
+      },
+      {
+        "language": "kscript-code",
         "scopes": {
           "type": [
             "support.type.kscript"

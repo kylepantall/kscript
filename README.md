@@ -69,6 +69,18 @@ You get real values (strings, numbers, lists, maps, dates, files), methods on al
 <echo>{$repo.full_name} has {$repo.stargazers_count} stars</echo>
 ```
 
+Declare the shape of the data once and the response is checked and turned into records your editor knows the fields of. Every mismatch is reported at once, with its JSON path:
+
+```xml
+<type name="Repo">
+  <field name="name" type="string" />
+  <field name="stars" type="int" from="stargazers_count" />
+  <field name="owner" type="string" from="owner.login" />
+</type>
+<let name="repo" value="@fetch($url)->check()->json(as: Repo)" />
+<echo>{$repo.name} by {$repo.owner} has {$repo.stars} stars</echo>
+```
+
 ## Web pages that react without JavaScript
 
 `kscript serve` turns a folder of `.html` and `.md` files into a website. KScript elements go straight into the HTML and `{ }` works in text and attributes. Add `<live>` and the page becomes interactive:
@@ -141,7 +153,7 @@ There is no Swift, C#, XAML or shell script to write. [`samples/life-lab`](sampl
 ## Tooling that comes with it
 
 ```sh
-kscript make project my-site   # a site with a layout, a component, a script, tests and editor settings
+kscript make project my-app    # a web app and desktop app with a layout, a live page, scripts, tests and editor settings
 kscript serve                  # run it
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI

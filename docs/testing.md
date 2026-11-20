@@ -43,7 +43,7 @@ The exit code is 0 when every test passed and 1 when any test failed, a test fil
 - A test file is a normal script named `name.test.ks.xml` (or `name.test.xml`). Test files can use KScript.Test without an `<import>`, and so can the editor.
 - `kscript test` with no paths runs every test file in the current project: the folder of the nearest `kscript.json`, or the current folder if there isn't one. Folders whose names start with `.`, and `node_modules`, `bin` and `obj`, are skipped.
 - `kscript test tests/cart` runs the test files in a folder, and `kscript test tests/cart.test.ks.xml` (or just `kscript tests/cart.test.ks.xml`) runs one file. You can give several paths.
-- `kscript make test checkout` creates `tests/checkout.test.ks.xml` in the project, and `kscript make project` starts new projects with a `lib/` function, a script that uses it, and a test for both.
+- `kscript make test checkout` creates `tests/checkout.test.ks.xml` in the project, and `kscript make project` starts new projects with the rules of a small to-do app in `lib/`, a script, and tests for both.
 
 ## How a test file runs
 
