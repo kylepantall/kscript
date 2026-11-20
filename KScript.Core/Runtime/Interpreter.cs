@@ -192,8 +192,6 @@ namespace KScript.Runtime
         {
             CheckAlias(alias);
             string full = System.IO.Path.GetFullPath(path);
-            if (loading.Contains(full))
-                throw new KScriptException($"{System.IO.Path.GetFileName(full)} imports itself (directly or through other scripts). Imports can't go round in a circle.", "Import");
             if (!modulesByPath.TryGetValue(full, out Module imported))
             {
                 if (!File.Exists(full)) throw new KScriptException($"There is no script at {path}.", "FileNotFound") { File = full };
@@ -365,12 +363,8 @@ namespace KScript.Runtime
 
         private void CheckAttributes(Module module, MarkupElement e, ElementInfo info)
         {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (MarkupAttribute a in e.Attributes)
             {
-                if (!seen.Add(a.Name))
-                    throw Located(new KScriptException($"<{info.Name}> has {a.Name}=\"...\" twice.", "Syntax"), module, a.NameSpan.Start);
-
                 AttributeInfo spec = info.GetAttribute(a.Name);
                 if (spec == null)
                 {
@@ -440,10 +434,6 @@ namespace KScript.Runtime
                 SyntaxError error = result.Errors[0];
                 throw Located(new KScriptException(error.Message, "Syntax"), module, text.ToSource(error.Span.Start));
             }
-            if (mode == ParseMode.Expression && result.Root == null)
-            {
-                throw Located(new KScriptException("Expected an expression here.", "Syntax"), module, text.SourceSpan.Start);
-            }
             return result;
         }
 
@@ -506,21 +496,14 @@ namespace KScript.Runtime
         internal static KScriptException Located(KScriptException ex, Module module, int? offset)
         {
             if (ex.HasLocation) return ex;
-            Module owner = ex.OffsetModule ?? module;
-            int? at = ex.Offset ?? (owner == module ? offset : null);
+            // The error's own position (in the module it came from), or else this one.
+            (Module owner, int? at) = ex.Offset != null ? (ex.OffsetModule ?? module, ex.Offset) : (module, offset);
             if (owner != null && at != null)
             {
                 (int line, int column) = owner.PositionOf(at.Value);
                 ex.Line = line;
                 ex.Column = column;
                 ex.File = owner.Path ?? owner.DisplayName;
-            }
-            else if (module != null && offset != null)
-            {
-                (int line, int column) = module.PositionOf(offset.Value);
-                ex.Line = line;
-                ex.Column = column;
-                ex.File = module.Path ?? module.DisplayName;
             }
             return ex;
         }
@@ -594,10 +577,6 @@ namespace KScript.Runtime
             catch (ContinueSignal)
             {
                 throw new KScriptException("<continue/> must be inside a loop (<for> or <while>).", "Syntax");
-            }
-            catch (ReturnSignal)
-            {
-                throw new KScriptException("<return> must be inside <fn>.", "Syntax");
             }
             finally
             {
@@ -734,10 +713,6 @@ namespace KScript.Runtime
                 throw Located(ex, module, e.Span.Start);
             }
             catch (ControlSignal)
-            {
-                throw;
-            }
-            catch (ThreadInterruptedException)
             {
                 throw;
             }
