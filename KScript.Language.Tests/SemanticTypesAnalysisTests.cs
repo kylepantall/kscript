@@ -71,6 +71,7 @@ namespace KScript.Language.Tests
         [InlineData("<kscript><let name=\"h\" type=\"handle\" value=\"@me\" /><echo>$h</echo></kscript>")]
         [InlineData("<kscript><let name=\"h\" type=\"handle\">@me</let><echo>$h</echo></kscript>")]
         [InlineData("<kscript><type name=\"Who\" with=\"[handle]\" max=\"5\" /><let name=\"h\" type=\"Who?\" value=\"@me\" /><echo>$h</echo></kscript>")]
+        [InlineData("type Pair {\n  pattern: /^(?<a>\\w+)-(?<b>\\w+)$/\n  parse: { a: $value, b: $match.groups.b }\n  a: string\n  b: string\n}\np: Pair = x-y\necho $p.b")]
         public void ValuesThatFitAreClean(string code) => AssertClean(WithoutUnused(code.StartsWith('<') ? Analyze(code) : Code(code)));
 
         [Theory]
@@ -127,6 +128,78 @@ namespace KScript.Language.Tests
             ConversionResult back = ScriptConverter.Convert(xml.Text, "a.ks.xml");
             Assert.Empty(back.Warnings);
             Assert.Equal(ScriptConverter.Convert(code, "a.kscript").Text, ScriptConverter.Convert(back.Text, "a.kscript").Text);
+        }
+
+        [Theory]
+        [InlineData("type A with [User\ntype User { a: int }", "This [ is missing its closing ].")]
+        [InlineData("type A with [User", "This [ is missing its closing ].")]
+        [InlineData("type A with {\n}", "Write the types to build on after 'with'")]
+        [InlineData("type A with [int] {\n  min:\n}", "Write the value of min, such as min: 0.")]
+        [InlineData("type A with [int] {\n  max:\n}", "such as max: 100.")]
+        [InlineData("type A with [string] {\n  pattern:\n}", "such as pattern: /^[a-z]+$/.")]
+        [InlineData("type A {\n  parse:\n  a: string\n}", "such as parse: $value->split('x').")]
+        [InlineData("type A with [string] {\n  one_of:\n}", "such as one_of: [a, b].")]
+        [InlineData("type A with [int] {\n  min: 1\n  min: 2\n}", "This type already has a min rule.")]
+        [InlineData("type A with [string] {\n  pattern: /abc\n}", "This regular expression is missing its closing /.")]
+        public void TypeBodyMistakesAreReported(string code, string message)
+        {
+            DocumentAnalysis a = Code(code);
+            Assert.Contains(a.Diagnostics, d => d.Message.Contains(message));
+        }
+
+        [Theory]
+        [InlineData("type User { a: int }\ntype A with User {\n  b: int\n}\nx = $A->from({ a: 1, b: 2 })\necho $x.a")]
+        [InlineData("type T {\n  min\n  max: int(\n}")]
+        [InlineData("msg = 'too small'\ntype A with [int] {\n  validate: $value > 0, $msg\n}\nx: A = 3\necho $x")]
+        [InlineData("x = (//c\n  1)\necho $x")]
+        [InlineData("x = 1 +\n  /* c */\n  2\necho $x")]
+        [InlineData("x = /* c */\n  2\necho $x")]
+        [InlineData("type User { a: int }\ntype A with [User, 'it\\'s'] {}")]
+        public void TypeBodiesParse(string code)
+        {
+            MarkupDocument doc = CodeParser.Parse(code);
+            Assert.NotNull(doc);
+            Code(code);
+        }
+
+        [Theory]
+        [InlineData("<kscript><type name=\"A\" fields=\"a: int\"><fn name=\"hi\" value=\"'x'\" /></type><type name=\"B\" with=\"A\" /><let name=\"b\" value=\"$B->from({ a: 1 })\" /><echo>{ $b->hi() }</echo></kscript>", null)]
+        [InlineData("<kscript><type name=\"T\" fields=\"a: int\"><fn value=\"1\" /></type></kscript>", "needs the 'name' attribute")]
+        [InlineData("<kscript><type name=\"A\" with=\"int\"><field name=\"x\" /></type></kscript>", "A refines int, so it has no fields.")]
+        [InlineData("<kscript><type name=\"P\" fields=\"a: string\" parse=\"{ a: $value + $match.text }\" /></kscript>", null)]
+        [InlineData("<kscript><type name=\"P\" fields=\"value: string\" parse=\"{ value: $value }\" /></kscript>", null)]
+        [InlineData("<kscript><type name=\"A\" with=\"\" fields=\"a: int\" /></kscript>", "Name the types to build on")]
+        [InlineData("<kscript><type name=\"A\" with=\"[ ]\" fields=\"a: int\" /></kscript>", "Name the types to build on")]
+        [InlineData("<kscript><type name=\"U\" fields=\"a: int\" /><type name=\"A\" with=\"int, U\" /></kscript>", "A type built on int refines it, so int must be the only type in with [...].")]
+        [InlineData("<kscript><let name=\"x\" type=\"uuid(v: 4\" value=\"3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\" /></kscript>", "*")]
+        [InlineData("<kscript><let name=\"x\" type=\"uuid(v: 4)\" value=\"3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\" /><echo>$x</echo></kscript>", null)]
+        [InlineData("<kscript><let name=\"r\" type=\"regex\" value=\"/a/\" /><echo>{ $r->test('a') }</echo></kscript>", null)]
+        [InlineData("<kscript><let name=\"e\" type=\"email\" value=\"4\" /><echo>$e</echo></kscript>", null)]
+        [InlineData("<kscript><let name=\"x\" type=\"string(min: )\" value=\"'a'\" /><echo>$x</echo></kscript>", "*")]
+        [InlineData("<kscript><let name=\"n\" value=\"2\" /><let name=\"x\" type=\"string(min: $n)\" value=\"'a'\" /><echo>$x</echo></kscript>", null)]
+        [InlineData("<kscript><type name=\"N\" with=\"handle\" not=\"[3]\" /><let name=\"n\" type=\"N\" value=\"@a\" /><echo>$n</echo></kscript>", null)]
+        [InlineData("<kscript><type name=\"S\" fields=\"a: string\" pattern=\"/^(a+)+$/\" /><let name=\"s\" type=\"S\" value=\"'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!'\" /><echo>$s</echo></kscript>", null)]
+        public void TypeElementsAreChecked(string xml, string message)
+        {
+            DocumentAnalysis a = WithoutUnused(Analyze(xml));
+            if (message == null) AssertClean(a);
+            else if (message != "*") Assert.Contains(a.Diagnostics, d => d.Message.Contains(message));
+        }
+
+        [Fact]
+        public void TypeArgumentsAreSkippedWhenColouring()
+        {
+            DocumentAnalysis a = Service.Analyze("<kscript><let name=\"x\" type=\"uuid(v: 4)\" value=\"3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\" /><echo>$x</echo></kscript>", "t.ks.xml");
+            List<SemanticToken> tokens = Service.GetSemanticTokens(a);
+            Assert.Contains(tokens, t => a.Source[t.Span] == "uuid" && t.Type == SemanticTokenType.Type);
+            Assert.DoesNotContain(tokens, t => a.Source[t.Span] == "v" && t.Type == SemanticTokenType.Type);
+        }
+
+        [Fact]
+        public void MultiLineFieldDefaultsStayInTheAttribute()
+        {
+            ConversionResult r = ScriptConverter.Convert("<kscript><type name=\"A\" with=\"int\" min=\"1&#10;2\" /></kscript>", "a.ks.xml");
+            Assert.Contains("A", r.Text);
         }
     }
 }

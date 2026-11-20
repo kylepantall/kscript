@@ -241,7 +241,8 @@ namespace KScript.Language.Analysis
         /// <summary>Walks a &lt;type&gt;: checks its fields attribute and its children (which must be &lt;field&gt;s).</summary>
         private void AnalyzeType(MarkupElement e, ElementInfo info, Scope scope, Scope inner, bool markupMode)
         {
-            AnalyzeAttributes(e, info, scope);
+            // parse="..." sees the text being read, so it is analyzed below with $value and $match.
+            AnalyzeAttributes(e, info, scope, skip: "parse");
             var seen = new HashSet<string>(StringComparer.Ordinal);
             MarkupAttribute fields = e.GetAttribute("fields");
             if (fields?.Value != null)
@@ -303,22 +304,20 @@ namespace KScript.Language.Analysis
                         DeclareImplicit(typeScope, f.Name, f.Shape, f.Description ?? $"The {f.Name} field.", e, f.Declaration);
                     }
                     DeclareImplicit(typeScope, "this", instance, $"The {instance.Name} itself.", e);
-                    if (e.GetAttribute("parse") != null)
-                    {
-                        DeclareImplicit(typeScope, "value", new TypeShape(KType.String), "The text being read.", e);
-                        DeclareImplicit(typeScope, "match", new TypeShape(KType.Map), "The pattern's match: groups by name.", e);
-                    }
                 }
+            }
+            if (e.GetAttribute("parse") is { Value: not null } parse)
+            {
+                var parseScope = new Scope(inner, TrimmedSpan(parse.Value));
+                DeclareImplicit(parseScope, "value", new TypeShape(KType.String), "The text being read.", e);
+                DeclareImplicit(parseScope, "match", new TypeShape(KType.Map), "The pattern's match: { text, index, groups, captures }.", e);
+                AnalyzeExpressionRegion(parse.Value, RegionKind.Expression, parseScope, e, parse);
             }
             WalkChildren(e.Children, typeScope, markupMode);
         }
 
         private void DeclareImplicit(Scope scope, string name, TypeShape shape, string description, MarkupElement e, TextSpan? declaration = null)
         {
-            if (scope.Lookup(name, e.Span.Start) is Symbol existing && existing.DeclaringElement == e)
-            {
-                return;
-            }
             Symbol symbol = new Symbol { Name = name, Kind = SymbolKind.Parameter, Shape = shape, Description = description, DeclaringElement = e, DeclarationSpan = declaration ?? default };
             result.Symbols.Add(symbol);
             scope.Declare(symbol, e.Span.Start);

@@ -1059,9 +1059,12 @@ namespace KScript.Syntax.Markup
                 }
             }
 
-            int valueStart = pos;
             TextSpan value;
-            if (Peek(0) == '/' && rule == "pattern")
+            if (pos >= text.Length || Peek(0) is '\n' or '\r' or '}' or ';')
+            {
+                value = new TextSpan(pos, 0);
+            }
+            else if (Peek(0) == '/' && rule == "pattern")
             {
                 value = ReadRegexSpan();
             }
@@ -1077,7 +1080,7 @@ namespace KScript.Syntax.Markup
                 (int s, int end) = ReadExpression(Stop.Line);
                 value = TextSpan.FromBounds(s, end);
             }
-            if (value.Length == 0 && pos == valueStart)
+            if (value.Length == 0)
             {
                 Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, $"Write the value of {rule}, such as {rule}: {RuleExample(rule)}.");
                 return;
@@ -1628,10 +1631,7 @@ namespace KScript.Syntax.Markup
                 else if (ch == ']') inClass = false;
                 else if (ch == '/' && !inClass)
                 {
-                    if (p == pos + 1)
-                    {
-                        return false;
-                    }
+                    // The caller has ruled out // and /*, so the literal isn't empty.
                     p++;
                     while (p < text.Length && char.IsLetter(text[p])) p++;
                     pos = p;
@@ -1654,10 +1654,6 @@ namespace KScript.Syntax.Markup
                 return true;
             }
             string line = WithoutTrailingComments(text.Substring(start, end - start));
-            if (line.Length == 0)
-            {
-                return true;
-            }
             if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal))
                 && !(line.EndsWith('/') && Lexer.Tokenize(line) is { Count: > 0 } tokens && tokens[^1].Kind == TokenKind.Regex))
             {
