@@ -1269,14 +1269,6 @@ namespace KScript.Language.Analysis
                 }
             }
 
-            foreach (MarkupAttribute attr in e.Attributes.Where(a => a.Name != "in" && a.Name != "each" && a.Name != "index"))
-            {
-                if (attr.Value != null && info.GetAttribute(attr.Name) is AttributeInfo ai)
-                {
-                    AnalyzeAttribute(e, attr, ai, outer);
-                }
-            }
-
             MarkupAttribute each = e.GetAttribute("each");
             if (each?.Value != null)
             {

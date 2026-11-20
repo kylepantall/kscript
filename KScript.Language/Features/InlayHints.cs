@@ -115,13 +115,9 @@ namespace KScript.Language.Features
             {
                 if (region.Kind == RegionKind.Statements)
                 {
-                    foreach (ExprNode node in region.Parse.Nodes)
-                    {
-                        if (node is AssignmentNode a && region.Source.ToSource(a.Span).Contains(s.DeclarationSpan.Start))
-                        {
-                            return IsLiteral(a.Value);
-                        }
-                    }
+                    // The statements that declare the name hold its assignment.
+                    AssignmentNode a = region.Parse.Nodes.OfType<AssignmentNode>().FirstOrDefault(n => region.Source.ToSource(n.Span).Contains(s.DeclarationSpan.Start));
+                    return a != null && IsLiteral(a.Value);
                 }
                 else if (region.Kind == RegionKind.Expression && (region.Attribute == null || region.Attribute.Name == "value") && e.Name != "for")
                 {

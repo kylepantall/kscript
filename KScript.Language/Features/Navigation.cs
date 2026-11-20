@@ -224,12 +224,9 @@ namespace KScript.Language.Features
             Dictionary<MarkupElement, OutlineItem> functions = new Dictionary<MarkupElement, OutlineItem>();
             List<OutlineItem> roots = new List<OutlineItem>();
 
-            foreach (Symbol s in analysis.Symbols.Where(s => s.DeclaringElement != null && s.SourcePath == null || s.Kind == SymbolKind.Import))
+            // Every import has its <import> element, so the declaring element is always there.
+            foreach (Symbol s in analysis.Symbols.Where(s => s.DeclaringElement != null && (s.SourcePath == null || s.Kind == SymbolKind.Import)))
             {
-                if (s.DeclaringElement == null)
-                {
-                    continue;
-                }
 
                 OutlineKind? kind = s.Kind switch
                 {

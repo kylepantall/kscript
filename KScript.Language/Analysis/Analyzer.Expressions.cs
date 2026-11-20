@@ -82,14 +82,6 @@ namespace KScript.Language.Analysis
                     AnalyzeLambda(lambda, region, scope);
                     return;
 
-                case ArgumentNode arg:
-                    AnalyzeExpr(arg.Value, region, scope, ExprContext.Argument);
-                    return;
-
-                case AssignmentNode assign:
-                    AnalyzeExpr(assign.Value, region, scope, ExprContext.Value);
-                    return;
-
                 default:
                     foreach (ExprNode child in node.Children)
                     {
@@ -440,8 +432,6 @@ namespace KScript.Language.Analysis
 
         private static string Plural(string type) => type switch
         {
-            KType.Any => "any value",
-            KType.Bool => "bools (yes/no)",
             _ => type + "s",
         };
 

@@ -261,5 +261,7 @@ public class WebCoverageTests
         string state = System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Match(html, "data-ks-state=\"([^\"]*)\"").Groups[1].Value);
         string json = Values.ToJson(new Dictionary<string, object> { ["page"] = "/index", ["block"] = "l", ["handler"] = 0d, ["state"] = state, ["args"] = "e30=.forged" });
         Assert.Equal(409, PageServer.HandleLive(new PageSite(site.Root), json, new Dictionary<string, object>()).Status);
+        string stale = Values.ToJson(new Dictionary<string, object> { ["page"] = "/index", ["block"] = "l", ["handler"] = 99d, ["state"] = state });
+        Assert.Equal(409, PageServer.HandleLive(new PageSite(site.Root), stale, new Dictionary<string, object>()).Status);
     }
 }

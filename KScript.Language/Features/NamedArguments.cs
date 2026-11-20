@@ -248,30 +248,21 @@ namespace KScript.Language.Features
             {
                 return new List<CompletionItem>();
             }
-            var items = new List<CompletionItem>();
-            foreach (SignatureInfo signature in SignaturesFor(analysis, region, node, out _).Where(sig => sig.Details != null))
-            {
-                foreach ((string param, IReadOnlyList<string> values, _) in signature.Details.Where(d => d.Name == name))
-                {
-                    foreach (string value in values ?? Array.Empty<string>())
+            // Each value once, from the first signature that has it.
+            return SignaturesFor(analysis, region, node, out _).Where(sig => sig.Details != null)
+                .SelectMany(signature => signature.Details.Where(d => d.Name == name)
+                    .SelectMany(d => (d.Values ?? Array.Empty<string>()).Select(value => new CompletionItem
                     {
-                        if (items.Any(i => i.Label == value))
-                        {
-                            continue;
-                        }
-                        items.Add(new CompletionItem
-                        {
-                            Label = value,
-                            Kind = CompletionKind.Value,
-                            Detail = param,
-                            Documentation = $"A value of `{param}` in `{signature.Label}`.",
-                            ReplaceSpan = replace,
-                            SortText = "000" + value,
-                        });
-                    }
-                }
-            }
-            return items;
+                        Label = value,
+                        Kind = CompletionKind.Value,
+                        Detail = d.Name,
+                        Documentation = $"A value of `{d.Name}` in `{signature.Label}`.",
+                        ReplaceSpan = replace,
+                        SortText = "000" + value,
+                    })))
+                .GroupBy(item => item.Label)
+                .Select(g => g.First())
+                .ToList();
         }
 
         /// <summary>Hover on <c>name</c> in <c>name: value</c>: the parameter it fills.</summary>

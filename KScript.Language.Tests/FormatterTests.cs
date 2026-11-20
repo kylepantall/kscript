@@ -606,6 +606,13 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void Empty_documents_and_inline_tags_at_the_top_of_a_page()
+        {
+            Assert.Equal(string.Empty, Formatter.Format(string.Empty, "test.ks.xml").Text);
+            Assert.Equal("<b>a</b><i>b</i>\n", Formatter.Format("<b>a</b><i>b</i>", "page.html").Text);
+        }
+
+        [Fact]
         public void FormatSettingsAreRead()
         {
             ProjectConfig config = ProjectConfig.Parse(
@@ -630,6 +637,13 @@ namespace KScript.Language.Tests
             Assert.True(ruled.Indent);
             Assert.Contains(rules.Warnings, w => w.Contains("no rule 'bogus'"));
             Assert.Contains(rules.Warnings, w => w.Contains("format.rules.indent should be true or false"));
+
+            ProjectConfig off = ProjectConfig.Parse(
+                "{ \"format\": { \"endOfLine\": \"lf\", \"rules\": { \"indent\": false, \"wrapAttributes\": \"off\", \"trimTrailingWhitespace\": false, \"collapseBlankLines\": false, \"finalNewline\": false } } }",
+                Path.Combine(dir, "kscript.json"));
+            FormatOptions allOff = FormatOptions.From(off);
+            Assert.Equal(EndOfLine.Lf, allOff.EndOfLine);
+            Assert.False(allOff.Indent || allOff.WrapAttributes || allOff.TrimTrailingWhitespace || allOff.CollapseBlankLines || allOff.FinalNewline);
 
             // Without a "format" section the editor's settings are used.
             FormatOptions editor = FormatOptions.From(null, editorTabSize: 4, editorInsertSpaces: false);
