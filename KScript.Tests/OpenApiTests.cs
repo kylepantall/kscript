@@ -226,6 +226,83 @@ public class OpenApiTests
         Assert.Contains(ProjectConfig.Parse(json, "/x/kscript.json").Warnings, w => w.Contains(warning));
 
     [Fact]
+    public void ApiRoutesOnlyWhenAskedAndTheEnabledSetting()
+    {
+        using var site = Site();
+        JsonElement doc = Document(site, """{ "http": { "openapi": { "enabled": true, "routes": "api" } } }""");
+        Assert.False(doc.GetProperty("paths").TryGetProperty("/", out _));
+        Assert.True(doc.GetProperty("paths").TryGetProperty("/api/people", out _));
+        Assert.False(ProjectConfig.Parse("""{ "http": { "openapi": { "enabled": false } } }""", "/x/kscript.json").Http.OpenApi.Enabled);
+    }
+
+    [Fact]
+    public void WhereRulesAndOtherPackagesTypesGiveFormats()
+    {
+        const string controller = """
+            kscript {
+              fn find(a: email, b: uuid, c: url, d: password) => null
+              fn search(query: Nowhere) => []
+            }
+            """;
+        const string api = """
+            KScript.Routes {
+              import "controllers/other.kscript" as other
+              Get(path: "/rules/{a}/{b}/{c}", where: "a: int, b: number, c: uuid") {
+                return 'x'
+              }
+              Get(path: "/find/{a}/{b}/{c}/{d}", to: other.find)
+              Get(path: "/search", to: other.search)
+            }
+            """;
+        using var site = new TempSite(("controllers/other.kscript", controller), ("api.kscript", api));
+        JsonElement doc = Document(site);
+        string Schema(string path, int i, string key) =>
+            Op(doc, path, "get").GetProperty("parameters")[i].GetProperty("schema").GetProperty(key).GetString();
+
+        Assert.Equal("integer", Schema("/api/rules/{a}/{b}/{c}", 0, "type"));
+        Assert.Equal("number", Schema("/api/rules/{a}/{b}/{c}", 1, "type"));
+        Assert.Equal("uuid", Schema("/api/rules/{a}/{b}/{c}", 2, "format"));
+
+        Assert.Equal("email", Schema("/api/find/{a}/{b}/{c}/{d}", 0, "format"));
+        Assert.Equal("uuid", Schema("/api/find/{a}/{b}/{c}/{d}", 1, "format"));
+        Assert.Equal("uri", Schema("/api/find/{a}/{b}/{c}/{d}", 2, "format"));
+        Assert.Equal("password", Schema("/api/find/{a}/{b}/{c}/{d}", 3, "format"));
+
+        // A query type that isn't there adds no query parameters.
+        Assert.False(Op(doc, "/api/search", "get").TryGetProperty("parameters", out _));
+    }
+
+    [Theory]
+    [InlineData(200, "OK")]
+    [InlineData(201, "Created")]
+    [InlineData(202, "Accepted")]
+    [InlineData(204, "No content")]
+    [InlineData(301, "Moved permanently")]
+    [InlineData(302, "Found")]
+    [InlineData(304, "Not modified")]
+    [InlineData(400, "Bad request")]
+    [InlineData(401, "Unauthorized")]
+    [InlineData(403, "Forbidden")]
+    [InlineData(404, "Not found")]
+    [InlineData(405, "Method not allowed")]
+    [InlineData(409, "Conflict")]
+    [InlineData(410, "Gone")]
+    [InlineData(415, "Unsupported media type")]
+    [InlineData(422, "Unprocessable content")]
+    [InlineData(429, "Too many requests")]
+    [InlineData(500, "Server error")]
+    [InlineData(503, "Service unavailable")]
+    [InlineData(418, "Status 418")]
+    public void StatusesHaveTheirReason(int status, string reason) => Assert.Equal(reason, OpenApi.Reason(status));
+
+    [Fact]
+    public void YamlWritesNullsBoolsAndNumbers()
+    {
+        string yaml = OpenApi.ToYaml(new Dictionary<string, object> { ["none"] = null, ["on"] = true, ["off"] = false, ["count"] = 3, ["big"] = 4L, ["ratio"] = 1.5 });
+        Assert.Equal("none: null\n\"on\": true\n\"off\": false\ncount: 3\nbig: 4\nratio: 1.5\n", yaml);
+    }
+
+    [Fact]
     public void TheSampleSiteHasAFullDocument()
     {
         string sample = ScriptRunner.RepoFile("samples", "http-app");

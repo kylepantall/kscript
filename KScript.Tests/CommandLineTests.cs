@@ -262,6 +262,49 @@ public sealed class CommandLineTests : IDisposable
     }
 
     [Fact]
+    public void Openapi_writes_the_document()
+    {
+        Write("site/api.kscript", "KScript.Routes {\n  Get(path: \"/hi\") {\n    return 'hi'\n  }\n}\n");
+        string site = Path.Combine(dir, "site");
+
+        var json = Kscript("openapi", site, "--json");
+        Assert.True(json.Code == 0, json.Err);
+        Assert.Contains("\"/api/hi\"", json.Out);
+        var yaml = Kscript("openapi", site, "--yaml");
+        Assert.True(yaml.Code == 0, yaml.Err);
+        Assert.Contains("  /api/hi:\n", yaml.Out);
+
+        // --out writes a file; a .yaml or .yml name means YAML.
+        string file = Path.Combine(dir, "api.yml");
+        var written = Kscript("openapi", site, "-o", file);
+        Assert.True(written.Code == 0, written.Err);
+        Assert.Contains("Wrote " + file + " (1 paths).", written.Out);
+        Assert.StartsWith("openapi:", File.ReadAllText(file));
+        Assert.True(Kscript("openapi", site, "--out", Path.Combine(dir, "api.json")).Code == 0);
+        Assert.StartsWith("{", File.ReadAllText(Path.Combine(dir, "api.json")));
+
+        Assert.Contains("--out needs a file name.", Kscript("openapi", site, "--out").Err);
+        Assert.Contains("Unknown option '--nope' for kscript openapi", Kscript("openapi", "--nope").Err);
+        Assert.Contains("Site folder not found", Kscript("openapi", Path.Combine(dir, "nowhere")).Err);
+        Write("badproject/kscript.json", "{ nope");
+        Assert.Equal(1, Kscript("openapi", Path.Combine(dir, "badproject")).Code);
+
+        // No routes, a route file kscript.json names that isn't there, and a broken route file.
+        Write("plain/index.html", "<h1>Hi</h1>");
+        var none = Kscript("openapi", Path.Combine(dir, "plain"));
+        Assert.Equal(1, none.Code);
+        Assert.Contains("There are no route files in", none.Err);
+        Write("missing/kscript.json", "{ \"http\": { \"routes\": [\"nope.ks.xml\"] } }");
+        var missing = Kscript("openapi", Path.Combine(dir, "missing"));
+        Assert.Equal(1, missing.Code);
+        Assert.Contains("nope.ks.xml", missing.Err);
+        Write("broken/api.kscript", "KScript.Routes {\n  Get(path: \"/hi\", to: nowhere.fn)\n}\n");
+        var broken = Kscript("openapi", Path.Combine(dir, "broken"));
+        Assert.Equal(1, broken.Code);
+        Assert.NotEqual(string.Empty, broken.Err);
+    }
+
+    [Fact]
     public void Serve_runs_until_stopped()
     {
         Write("site/index.html", "<h1>Hi</h1>");
