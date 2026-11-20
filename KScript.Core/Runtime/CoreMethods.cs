@@ -23,7 +23,7 @@ namespace KScript.Runtime
             // Any value.
             p.Method(KType.Any, "type", "", "The value's type: string, number, bool, list, map, fn, date or null.", KType.String, (t, c) => Values.TypeOf(t));
             p.Method(KType.Any, "to_string", "", "The value as text.", KType.String, (t, c) => Values.ToStr(t));
-            p.Method(KType.Any, "to_json", "indented?", "The value as JSON text.", KType.String, (t, c) => Values.ToJson(t, c.Bool(0)));
+            p.Method(KType.Any, "to_json", "indented?: bool", "The value as JSON text.", KType.String, (t, c) => Values.ToJson(t, c.Bool(0)));
             p.Method(KType.Any, "is_null", "", "yes if the value is null.", KType.Bool, (t, c) => t == null);
             p.Method(KType.Any, "or", "fallback", "The value if it is truthy, otherwise fallback.", KType.Any, (t, c) => Values.Truthy(t) ? t : c.Arg(0));
             p.Method(KType.Fn, "call", "args...", "Calls the function with these arguments.", KType.Any, (t, c) => c.Interpreter.Call((ICallable)t, c.Args.ToList(), c.Named, c.Scope, c.Module));

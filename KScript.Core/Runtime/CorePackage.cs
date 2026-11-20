@@ -1,6 +1,7 @@
 using System.Globalization;
 
 using KScript.Metadata;
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 
 using A = KScript.Metadata.AttributeInfo;
@@ -50,6 +51,44 @@ namespace KScript.Runtime
             {
                 Example = "<let name=\"count\" value=\"0\" />\n<let name=\"people\">[{ name: 'Joan', age: 82 }]</let>\n<let>x = 3</let>",
             }, run => Assign(run, declare: true));
+
+            p.Element(new ElementInfo("const", "Declares a value that can't change: the same as <let const=\"yes\">. Top-level consts are exported to scripts that import this one.",
+                ContentKind.Expression,
+                new A("name", K.DeclareVariable, "The constant to declare.", true),
+                new A("value", K.Expression, "Its value. Can be written as the element's text instead."),
+                new A("type", K.Enum, "Convert the value to this type, or fail early.", false, Values.DeclarableTypes),
+                new A("description", K.Text, "What the constant is for, shown on hover."))
+            {
+                Example = "<const name=\"max_size\" value=\"10 * 1024\" />",
+            }, run =>
+            {
+                string name = run.VariableName("name");
+                object value = run.Has("value") ? run.Eval("value") : run.EvalContent();
+                string type = run.Raw("type");
+                if (type != null) value = Values.ConvertTo(value, type, "$" + name);
+                run.Scope.Declare(name, value, isConst: true);
+                return null;
+            });
+
+            p.Element(new ElementInfo("enum", "Declares a set of named values. `$Size.small` is 'small', and a parameter typed with it (`params=\"size: Size\"`) only takes those values, which calls can write bare: `@pack(large)`.",
+                ContentKind.Empty,
+                new A("name", K.DeclareVariable, "The enum's name, used as a parameter type and as $Name.", true),
+                new A("values", K.Text, "The values, comma separated: small, medium, large.", true),
+                new A("description", K.Text, "What the enum is for, shown on hover."))
+            {
+                Example = "<enum name=\"Size\" values=\"small, medium, large\" />\n<fn name=\"pack\" params=\"size: Size\" value=\"'Packing ' + $size\" />\n<echo>{ @pack(large) }</echo>",
+            }, run =>
+            {
+                string name = run.VariableName("name");
+                List<string> names = (run.Raw("values") ?? string.Empty).Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).ToList();
+                if (names.Count == 0) throw run.Error($"<enum name=\"{name}\"> needs its values: values=\"a, b, c\".", "values", "Syntax");
+                string bad = names.FirstOrDefault(v => !Lexer.IsIdentStart(v[0]) || !v.All(Lexer.IsIdentChar));
+                if (bad != null) throw run.Error($"'{bad}' can't be an enum value: use letters, digits and _, starting with a letter.", "values", "Syntax");
+                string twice = names.GroupBy(v => v, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1)?.Key;
+                if (twice != null) throw run.Error($"<enum name=\"{name}\"> lists '{twice}' twice.", "values", "Syntax");
+                run.Scope.Declare(name, new EnumType(name, names), isConst: true);
+                return null;
+            });
 
             p.Element(new ElementInfo("set", "Changes an existing variable. Fails if the variable was never declared (a typo guard) or is const. Without `name`, the text is assignment statements.",
                 ContentKind.Expression,
@@ -576,7 +615,7 @@ namespace KScript.Runtime
         private static void RegisterCommands(PackageBuilder p)
         {
             p.Command("json", "text", "Parses JSON text into a value.", KType.Any, c => Values.ParseJson(c.Str(0)), "@json('{ \"a\": 1 }').a");
-            p.Command("to_json", "value, indented?", "A value as JSON text.", KType.String, c => Values.ToJson(c.Arg(0), c.Bool(1)));
+            p.Command("to_json", "value, indented?: bool", "A value as JSON text.", KType.String, c => Values.ToJson(c.Arg(0), c.Bool(1)));
             p.Command("now", "", "The current date and time.", KType.Date, c => DateTime.Now, "@now()->format('d MMMM yyyy')");
             p.Command("today", "", "Today's date, at midnight.", KType.Date, c => DateTime.Today);
             p.Command("date", "text", "Parses a date such as 2026-11-19 or 2026-11-19 14:30.", KType.Date, c =>

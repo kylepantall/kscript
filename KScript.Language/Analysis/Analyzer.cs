@@ -336,7 +336,7 @@ namespace KScript.Language.Analysis
             {
                 return constants;
             }
-            foreach (MarkupElement let in root.ChildElements.Where(x => x.Name == "let" && IsYes(x.GetAttributeValue("const"))))
+            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum"))
             {
                 MarkupAttribute nameAttr = let.GetAttribute("name");
                 if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
@@ -494,7 +494,13 @@ namespace KScript.Language.Analysis
                 case "let":
                 case "set":
                 case "state":
+                case "const" when info.Package == "KScript.Core":
                     AnalyzeLetOrSet(e, info.Name != "set", scope, declareAfter);
+                    return;
+
+                case "enum" when info.Package == "KScript.Core":
+                    AnalyzeAttributes(e, info, scope);
+                    AnalyzeEnum(e, scope);
                     return;
 
                 case "match":
@@ -1038,7 +1044,7 @@ namespace KScript.Language.Analysis
 
             if (isLet)
             {
-                bool isConst = IsYes(e.GetAttributeValue("const"));
+                bool isConst = e.Name == "const" || IsYes(e.GetAttributeValue("const"));
                 Symbol declared = DeclareFromAttribute(e, "name", scope, e.Span.End, isConst ? SymbolKind.Constant : SymbolKind.Variable, shape);
                 if (declared != null && region?.Parse?.Root is LambdaNode lambda)
                 {
@@ -1053,6 +1059,58 @@ namespace KScript.Language.Analysis
                 {
                     Widen(assigned, shape);
                 }
+            }
+        }
+
+        /// <summary>&lt;enum name="Size" values="small, medium, large" /&gt;: a constant map of its values, usable as a parameter type.</summary>
+        private void AnalyzeEnum(MarkupElement e, Scope scope)
+        {
+            MarkupAttribute valuesAttr = e.GetAttribute("values");
+            var values = new List<string>();
+            if (valuesAttr?.Value != null)
+            {
+                string text = valuesAttr.Value.Value;
+                int start = 0;
+                for (int i = 0; i <= text.Length; i++)
+                {
+                    if (i < text.Length && text[i] != ',')
+                    {
+                        continue;
+                    }
+                    string part = text.Substring(start, i - start);
+                    string value = part.Trim();
+                    int at = start + (part.Length - part.TrimStart().Length);
+                    start = i + 1;
+                    if (value.Length == 0)
+                    {
+                        continue;
+                    }
+                    TextSpan span = valuesAttr.Value.ToSource(new TextSpan(at, value.Length));
+                    if (!Lexer.IsIdentStart(value[0]) || !value.All(Lexer.IsIdentChar))
+                    {
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{value}' can't be an enum value: use letters, digits and _, starting with a letter.");
+                    }
+                    else if (values.Contains(value, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{value}' is listed twice.");
+                    }
+                    else
+                    {
+                        values.Add(value);
+                    }
+                }
+            }
+
+            TypeShape shape = new TypeShape(KType.Map);
+            foreach (string v in values)
+            {
+                shape.Fields[v] = new FieldInfo(v, new TypeShape(KType.String), null, $"A value of {e.GetAttributeValue("name")?.Trim()}.");
+            }
+            Symbol declared = DeclareFromAttribute(e, "name", scope, e.Span.End, SymbolKind.Constant, shape);
+            if (declared != null)
+            {
+                declared.EnumValues = values;
+                declared.Description = (e.GetAttributeValue("description") is string d ? d + "\n\n" : string.Empty) + "enum: " + string.Join(", ", values);
             }
         }
 

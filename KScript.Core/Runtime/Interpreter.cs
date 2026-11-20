@@ -682,7 +682,7 @@ namespace KScript.Runtime
             {
                 string name = e.GetAttributeValue("name")?.Trim().TrimStart('$');
                 if (name == null) continue;
-                bool export = e.Name == "fn" || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
+                bool export = e.Name == "fn" || e.Name == "const" || e.Name == "enum" || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
                 if (export && module.Globals.TryGet(name, out object value)) module.Exports[name] = value;
             }
         }
@@ -704,7 +704,7 @@ namespace KScript.Runtime
                 {
                     string close = Values.Closest(name, imported.Exports.Keys);
                     throw new KScriptException($"{imported.DisplayName} doesn't export '{name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                        + " Scripts export their top-level <fn> functions and <let const=\"yes\"> values.", "Import");
+                        + " Scripts export their top-level <fn> functions, <const> values and <enum> types.", "Import");
                 }
                 scope.Declare(name, value);
             }
