@@ -26,7 +26,8 @@ namespace KScript.LanguageServer
             int? tabSize = o?["tabSize"] is JsonValue t && t.TryGetValue(out int size) ? size : null;
             bool? insertSpaces = o?["insertSpaces"] is JsonValue s && s.TryGetValue(out bool spaces) ? spaces : null;
             KScript.Projects.ProjectConfig project = ProjectFor(doc.Path);
-            if (project != null && (!project.Format.Enabled || project.IsFormatExcluded(doc.Path)))
+            // The formatter reads XML; .kscript files have no formatter yet, so they are left as they are.
+            if (MarkupParser.IsCodePath(doc.Path) || (project != null && (!project.Format.Enabled || project.IsFormatExcluded(doc.Path))))
             {
                 return new JsonArray();
             }

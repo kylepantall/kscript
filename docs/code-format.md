@@ -135,8 +135,11 @@ picks one (`<call fn="greet" args="'x'" />` becomes `@greet('x')`; `x = 3` becom
 conversion may tidy a file, and converting back and forth after that changes nothing. It warns when something can't
 be carried over exactly, such as a `<let>` inside a block that hides an outer variable of the same name.
 
+## Editors
+
+The VS Code extension colours `.kscript` files with their own grammar (language "KScript (code)"), and errors,
+hover, completion and go to definition come from the language server as for XML scripts.
+
 ## Not done yet
 
-- The VS Code extension still colours `.kscript` files with the XML grammar (errors, hover and go to definition
-  already work through the language server).
-- No formatter for this format.
+- No formatter for this format: `kscript fmt` and Format Document leave `.kscript` files as they are.

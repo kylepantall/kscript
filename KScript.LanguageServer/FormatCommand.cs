@@ -97,6 +97,15 @@ namespace KScript.LanguageServer
                     output.WriteLine($"{shown}: skipped (Markdown pages are not reformatted)");
                     continue;
                 }
+                if (Syntax.Markup.MarkupParser.IsCodePath(file))
+                {
+                    // Named on the command line it says so; found in a folder it is passed over quietly.
+                    if (given.Any(g => File.Exists(g) && Path.GetFullPath(g) == Path.GetFullPath(file)))
+                    {
+                        output.WriteLine($"{shown}: skipped (.kscript files are not reformatted yet)");
+                    }
+                    continue;
+                }
 
                 ProjectConfig config;
                 try
