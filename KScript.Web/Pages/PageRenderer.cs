@@ -17,6 +17,9 @@ namespace KScript.Pages
         public string Body { get; set; } = string.Empty;
         public Dictionary<string, string> Headers { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>Set-Cookie header values, each sent as a header of its own.</summary>
+        public List<string> Cookies { get; } = new List<string>();
+
         /// <summary>For static files: the file to send instead of <see cref="Body"/>.</summary>
         public string FilePath { get; set; }
     }

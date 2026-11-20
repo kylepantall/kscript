@@ -1,0 +1,14 @@
+<import package="KScript.Auth" />
+<layout src="_layout.html" title="Home">
+  <h1>Auth App</h1>
+  <if test="@signed_in()">
+    <p>Hello { @user().name ?? @user().email }. <a href="/account">Your account</a></p>
+    <form method="post" action="/logout">
+      {! @csrf_field() }
+      <button>Sign out</button>
+    </form>
+  </if>
+  <else>
+    <p><a href="/login">Sign in</a> or <a href="/register">create an account</a>.</p>
+  </else>
+</layout>

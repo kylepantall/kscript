@@ -26,7 +26,8 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | --- | --- |
 | `KScript.Syntax/` | The parser shared by the interpreter and the editor tools: markup, expressions, `{ }` templates, and the metadata types elements and commands are described with. |
 | `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
-| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/`, `KScript.Style/`, `KScript.Storage/`, `KScript.Cache/` | Packages: each registers its elements, commands and methods, with their documentation. |
+| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/`, `KScript.Style/`, `KScript.Storage/`, `KScript.Cache/`, `KScript.Auth/` | Packages: each registers its elements, commands and methods, with their documentation. |
+| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/`, `KScript.Style/`, `KScript.Storage/`, `KScript.Cache/`, `KScript.Document/` | Packages: each registers its elements, commands and methods, with their documentation. |
 | `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
 | `KScript.Http/` | Routes, controllers and middleware: the KScript.Http package, the route table (`Routing.cs`), request handling (`HttpApp`) and the built-in middleware. |
 | `KScript.UI/` | Desktop windows: the KScript.UI package, the redraw model (`UISession`) and the Avalonia host that shows it on macOS, Windows and Linux. |
@@ -39,6 +40,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | `editors/vscode/` | The VS Code extension. |
 | `samples/kscript2/` | Sample scripts. |
 | `samples/life-lab/` | Life Lab: one KScript program that runs in a terminal, in the browser and as a desktop app. |
+| `samples/auth-app/` | A site with accounts, made by `kscript make auth --api` (see [Sign-in](auth.md)). |
 | `Example Scripts/` | More sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 

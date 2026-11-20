@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>KScript.Documents</RootNamespace>
+    <AssemblyName>KScript.Document</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.0.0</Version>
+    <Product>KScript</Product>
+    <Description>KScript.Document: papers, reports, letters and invoices with LaTeX maths, saved as PDF, LaTeX, Word, Markdown or HTML without a TeX install.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+  </ItemGroup>
+
+</Project>

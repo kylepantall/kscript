@@ -357,6 +357,7 @@ namespace KScript.Scaffolding
             "locale" => "fr",
             "logger" => "alerts",
             "error" => "PaymentFailed",
+            "document" => "annual-report",
             _ => "Example",
         };
 
@@ -382,6 +383,7 @@ namespace KScript.Scaffolding
             ("Pages and styles", new[] { "page", "markdown", "layout", "component", "partial", "css" }),
             ("Scripts and data", new[] { "script", "module", "type", "enum", "error", "const", "storage", "cache", "job" }),
             ("Desktop apps", new[] { "window" }),
+            ("Documents", new[] { "document" }),
             ("Settings", new[] { "config", "env", "locale", "logger" }),
             ("Tests", new[] { "test" }),
         };

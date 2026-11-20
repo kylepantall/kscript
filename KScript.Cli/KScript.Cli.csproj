@@ -18,6 +18,8 @@
     <EmbeddedResource Include="Scaffolding\Templates\*" LogicalName="KScript.Scaffolding.Templates.%(Filename)%(Extension)" WithCulture="false" />
     <!-- kscript make project: every file under Scaffolding/Projects/<template>, by its path (dot-x is written as .x). WithCulture=false: otherwise MSBuild reads hello.ks.xml as a Kashmiri (ks) resource. -->
     <EmbeddedResource Include="Scaffolding\Projects\**\*" WithCulture="false" LogicalName="KScript.Scaffolding.Projects/%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- kscript make auth: the sign-in controller, views and routes, by their path under Scaffolding/Auth. -->
+    <EmbeddedResource Include="Scaffolding\Auth\**\*" WithCulture="false" LogicalName="KScript.Scaffolding.Auth/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

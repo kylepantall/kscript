@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 
+using KScript.Auth;
 using KScript.Runtime;
 
 namespace KScript.Http
@@ -11,8 +12,11 @@ namespace KScript.Http
     /// <list type="bullet">
     /// <item><c>log</c>: writes each request, the route, what answered it, the status and the time to the server log.</item>
     /// <item><c>cors</c>: answers browser preflight requests and adds the Access-Control headers (http.cors in kscript.json).</item>
-    /// <item><c>auth</c>: needs <c>Authorization: Bearer &lt;token&gt;</c> matching the API_TOKEN environment variable
-    /// (http.auth.token_env, or <c>auth:OTHER_VARIABLE</c>).</item>
+    /// <item><c>auth</c>: needs someone signed in (KScript.Auth): a session, an API token, or the shared token in the
+    /// API_TOKEN environment variable (http.auth.token_env). <c>auth:session</c> and <c>auth:token</c> take only one
+    /// kind; <c>auth:OTHER_VARIABLE</c> takes only the shared token in that variable.</item>
+    /// <item><c>guest</c>: only for people who aren't signed in, such as the sign-in page.</item>
+    /// <item><c>csrf</c>: forms must send back the session's CSRF token (web routes in files that import KScript.Auth get it).</item>
     /// <item><c>throttle</c>: allows 60 requests a minute per address and route (http.throttle, or <c>throttle:30</c>).</item>
     /// <item><c>etag</c>, <c>cache_control</c> and <c>cache_response</c>: HTTP caching (see <see cref="HttpCaching"/>).</item>
     /// </list>
@@ -25,6 +29,8 @@ namespace KScript.Http
                 "log" => Log(ctx, request, next),
                 "cors" => Cors(ctx, request, next),
                 "auth" => Auth(middleware.Argument, ctx, request, next),
+                "guest" => Guest(ctx, request, next),
+                "csrf" => Csrf(ctx, next),
                 "throttle" => Throttle(middleware.Argument, ctx, request, next),
                 "etag" => HttpCaching.Etag(middleware.Argument, request, next),
                 "cache_control" => HttpCaching.SetCacheControl(middleware.Argument, request, next),
@@ -79,17 +85,61 @@ namespace KScript.Http
 
         private static HttpResponse Auth(string argument, RequestContext ctx, Dictionary<string, object> request, Func<HttpResponse> next)
         {
-            string variable = string.IsNullOrWhiteSpace(argument) ? ctx.Settings.AuthTokenEnv : argument;
+            string mode = string.IsNullOrWhiteSpace(argument) ? null : argument.Trim();
+            if (mode != null && mode != "session" && mode != "token") return SharedToken(mode, ctx, request, next);
+
+            AuthRequest auth = ctx.Auth;
+            Dictionary<string, object> user = mode == "session" ? auth.SessionUser : mode == "token" ? auth.TokenUser : auth.User;
+            if (user != null)
+            {
+                request["user"] = user;
+                request["authenticated"] = true;
+                return next();
+            }
+
+            // The shared token (API_TOKEN) still works, for scripts and machines that aren't users.
+            string token = auth.BearerToken;
+            string expected = mode == "session" ? null : ctx.App.Environment(ctx.Settings.AuthTokenEnv);
+            if (token != null && !string.IsNullOrEmpty(expected) && AuthApp.SameSecret(token, expected))
+            {
+                request["authenticated"] = true;
+                return next();
+            }
+
+            string login = ctx.Settings.Auth.Login;
+            string path = Values.ToStr(request["path"]);
+            if (WantsJson(ctx, request) || mode == "token" || string.IsNullOrEmpty(login) || path == login)
+            {
+                HttpResponse denied = ctx.ErrorResponse(401, token == null ? "Sign in first, or send an Authorization: Bearer token." : "The token isn't right.");
+                denied.Headers["WWW-Authenticate"] = "Bearer";
+                return denied;
+            }
+            // A person in a browser is sent to sign in, and comes back here afterwards (@intended()).
+            if (Values.ToStr(request["method"]) == "GET") auth.RememberIntended(Values.ToStr(request["url"]));
+            return HttpPackage.Redirect(login, 302);
+        }
+
+        /// <summary>True for API routes, and for requests that ask for JSON or send a bearer token: they get a 401, not a redirect.</summary>
+        private static bool WantsJson(RequestContext ctx, Dictionary<string, object> request)
+        {
+            if (ctx.Route?.Api ?? false) return true;
+            if (Header(request, "authorization") != null) return true;
+            string accept = Header(request, "accept") ?? string.Empty;
+            return accept.Contains("application/json", StringComparison.OrdinalIgnoreCase) && !accept.Contains("text/html", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary><c>auth:VARIABLE</c>: only the shared bearer token in that environment variable.</summary>
+        private static HttpResponse SharedToken(string variable, RequestContext ctx, Dictionary<string, object> request, Func<HttpResponse> next)
+        {
             string expected = ctx.App.Environment(variable);
             if (string.IsNullOrEmpty(expected))
             {
                 // Fail closed: a missing token never lets requests through.
-                return ctx.ErrorResponse(500, $"The auth middleware needs the {variable} environment variable to hold the API token.");
+                return ctx.ErrorResponse(500, $"The auth:{variable} middleware needs the {variable} environment variable to hold the API token.");
             }
 
-            string header = Header(request, "authorization") ?? string.Empty;
-            string token = header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? header.Substring(7).Trim() : null;
-            if (token == null || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(token), Encoding.UTF8.GetBytes(expected)))
+            string token = ctx.Auth.BearerToken;
+            if (token == null || !AuthApp.SameSecret(token, expected))
             {
                 HttpResponse denied = ctx.ErrorResponse(401, token == null ? "This needs an Authorization: Bearer token." : "The token isn't right.");
                 denied.Headers["WWW-Authenticate"] = "Bearer";
@@ -98,6 +148,16 @@ namespace KScript.Http
             request["authenticated"] = true;
             return next();
         }
+
+        private static HttpResponse Guest(RequestContext ctx, Dictionary<string, object> request, Func<HttpResponse> next)
+        {
+            if (ctx.Auth.User == null) return next();
+            if (WantsJson(ctx, request)) return ctx.ErrorResponse(403, "You're already signed in.");
+            return HttpPackage.Redirect(ctx.Settings.Auth.Home, 302);
+        }
+
+        private static HttpResponse Csrf(RequestContext ctx, Func<HttpResponse> next) =>
+            ctx.Auth.CsrfValid() ? next() : ctx.ErrorResponse(419, "This form has expired. Go back, reload the page and try again.");
 
         private static HttpResponse Throttle(string argument, RequestContext ctx, Dictionary<string, object> request, Func<HttpResponse> next)
         {
