@@ -87,15 +87,16 @@ namespace KScript
                     O("--out file", "Write to a file instead of the terminal."),
                 },
                 "kscript openapi\nkscript openapi --yaml --out openapi.yaml", "http"),
-            new CliCommand("docs", "kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open]",
+            new CliCommand("docs", "kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open] [--project]",
                 "Open these docs: a local website with every package, element, command and method, and examples you can run.",
                 new[]
                 {
                     O("--port N", "The port to serve the docs on (default 4180, or a free port if that one is taken)."),
                     O("--format kscript|xml", "Show examples as .kscript or XML (default: the project's make.format, else .kscript)."),
                     O("--no-open", "Don't open a browser; just print the address."),
+                    O("--project", "Write .kscript/docs/project.md, the docs of this project's own code (its conventions, routes, functions and types). From then on kscript watch, kscript serve and saving in the editor keep it up to date."),
                 },
-                "kscript docs\nkscript docs replace\nkscript docs --format xml"),
+                "kscript docs\nkscript docs replace\nkscript docs --format xml\nkscript docs --project"),
             new CliCommand("mcp", "kscript mcp [--format kscript|xml] [--dir folder] [--http [--port 4181]]",
                 "Serve these docs to AI coding assistants (Claude Code, Cursor, VS Code...) over MCP, offline.",
                 new[]

@@ -18,7 +18,8 @@ same whenever a file changes, so edits made anywhere (another editor, a coding a
 ## Watching
 
 `kscript watch` builds everything the project makes from its code, then rebuilds it a moment after its files stop
-changing. Today that is the agent docs; other generated files join the same watch as packages add them, so one
+changing: the agent docs, and the project's own docs (`.kscript/docs/project.md`, once `kscript docs --project` has
+written it; see [Docs while you work](web.md#docs-while-you-work-with-docs)). Other generated files join the same watch as packages add them, so one
 command, the editor and `kscript serve` keep all of them in step with the code.
 
 ```sh
