@@ -287,7 +287,9 @@
             "wrapAttributes": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One attribute per line for long start tags and tags already written that way. Off: tags are never wrapped or joined." },
             "trimTrailingWhitespace": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Remove spaces at the ends of lines of text." },
             "collapseBlankLines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to maxBlankLines." },
-            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." }
+            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." },
+            "spacing": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: one space after commas and colons, around assignments and =>, and before a block's '{'. Off: spacing inside lines is kept." },
+            "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." }
           }
         },
         "indent": {

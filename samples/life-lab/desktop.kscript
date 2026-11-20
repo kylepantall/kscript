@@ -35,7 +35,7 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
     Select(bind: speed, options: { Slow: 400, Normal: 150, Fast: 40 })
     Text(color: "#94a3b8") "Pattern"
     Select(bind: pattern, options: $pattern_choices,
-           on-change: "world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false")
+      on-change: "world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false")
   }
 
   Row(gap: 8, wrap) {
@@ -53,8 +53,8 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
       for row at y in $world.grid {
         for c at x in $row {
           Box(width: 16, height: 16, radius: 2,
-              background: "{ $c == $alive_cell ? '#4ade80' : '#0b1220' }",
-              on-click: "world = @flip($world, $x + ',' + $y)")
+            background: "{ $c == $alive_cell ? '#4ade80' : '#0b1220' }",
+            on-click: "world = @flip($world, $x + ',' + $y)")
         }
       }
     }
@@ -62,7 +62,13 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
 
   Row(gap: 24, wrap) {
     s = @summary($world)
-    for stat in [['Generation', $s.generation], ['Alive', $s.population + ' (' + $s.density + '%)'], ['Born', $s.births], ['Died', $s.deaths], ['Status', $s.status]] {
+    for stat in [
+      ['Generation', $s.generation],
+      ['Alive', $s.population + ' (' + $s.density + '%)'],
+      ['Born', $s.births],
+      ['Died', $s.deaths],
+      ['Status', $s.status]
+    ] {
       Column(gap: 2) {
         Text(size: 11, color: "#64748b") "{ $stat[0]->upper() }"
         Text(size: 16, weight: bold, color: "#e2e8f0") "{ $stat[1] }"

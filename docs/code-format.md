@@ -131,7 +131,8 @@ fn hello(who) => @greet($who)
 
 `kscript check` and the editor warn about a `@param` that names no parameter (KS4007) and about calls to a
 `@deprecated` function (KS4008). `@public` marks a function used from outside the project, so it is never reported as
-[unused](language.md#unused-code) (KS6002). XML scripts write the same text in a `<!--- ... -->` comment (three dashes) just
+[unused](language.md#unused-code) (KS6002). `@llm`, `@prefer`, `@avoid`, `@pitfall` and `@agent hide` are notes for
+coding agents, which `kscript agents` writes into AGENTS.md (see [Coding agents](agents.md)). XML scripts write the same text in a `<!--- ... -->` comment (three dashes) just
 before the element, or in its `description` attribute.
 
 ## Converting
@@ -185,6 +186,8 @@ describe(name: slugify) {
 The VS Code extension colours `.kscript` files with their own grammar (language "KScript (code)"), and errors,
 hover, completion and go to definition come from the language server as for XML scripts.
 
-## Not done yet
+## Formatting
 
-- No formatter for this format: `kscript fmt` and Format Document leave `.kscript` files as they are.
+`kscript fmt` and Format Document tidy `.kscript` files: indentation, one statement per line, `} else {`, and spacing
+after commas and colons and around `=`. The rules, the settings in `kscript.json` and the `// kscript-fmt: off` comments
+are described in [Formatting](formatting.md).

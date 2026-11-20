@@ -35,6 +35,7 @@ public class ScaffoldingCoverageTests
     [InlineData("env", "base")]
     [InlineData("locale", "fr")]
     [InlineData("logger", "alerts")]
+    [InlineData("error", "PaymentFailed")]
     [InlineData("card", "Example")]
     public void A_missing_name_gets_an_example(string type, string example)
     {

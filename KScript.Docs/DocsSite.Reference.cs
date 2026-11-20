@@ -342,6 +342,7 @@ namespace KScript.Docs
             AttributeKind.Statements => "statements",
             AttributeKind.TypeName => "a type",
             AttributeKind.Fields => "fields",
+            AttributeKind.ErrorType => "an error type",
             _ => "text",
         };
 
