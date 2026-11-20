@@ -147,12 +147,21 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://localhost:8098/ > docs.html && break; sleep 1; done
           curl -sf http://localhost:8098/assets/docs.css > docs.css || true
           curl -sf http://localhost:8098/assets/docs.js > docs.js || true
+          # A browser asks for many files at once, and cancels some: do the same, several rounds.
+          for round in 1 2 3 4 5; do
+            for f in docs.css docs.js favicon.svg search.json docs.css docs.js; do
+              curl -s -o /dev/null "http://localhost:8098/assets/$f" &
+              curl -s -o /dev/null --max-time 0.01 "http://localhost:8098/assets/$f" &
+            done
+            wait $(jobs -p | tail -n +2) 2>/dev/null || true
+          done
+          curl -sf http://localhost:8098/assets/favicon.svg > favicon.svg || true
           curl -sf -X POST http://localhost:8098/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
             -d '{"code":"<echo>docs ok</echo>"}' > run.json || true
           kill %1 || true
           cat docs.log
           grep -q "KScript" docs.html
-          test -s docs.css && test -s docs.js
+          test -s docs.css && test -s docs.js && test -s favicon.svg
           grep -q "docs ok" run.json
 
   vscode:
