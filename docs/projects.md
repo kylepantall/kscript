@@ -68,6 +68,7 @@ kscript make project my-app --template ../starters/api   # any folder
 ```jsonc
 {
   "name": "my-site",
+  "standard": "kscript:recommended",               // lint rules and format settings to start from (see Standards)
   "packages": ["KScript.Terminal", "KScript.IO"],   // imported by every script in the project
   "serve": {
     "root": ".",          // the site folder, relative to kscript.json
@@ -103,6 +104,7 @@ kscript make project my-app --template ../starters/api   # any folder
 ```
 
 - A pattern without a `/` (such as `_templates` or `*.draft.html`) matches a file or folder of that name anywhere. Otherwise it is matched against the path from `kscript.json`: `*` stays within a folder, `**` spans folders, and a folder matches everything in it.
+- `standard` picks the [standard](standards.md) the project's `lint` and `format` settings start from: `kscript:recommended` (the default), `kscript:strict`, or a standard file of your own that you can share between projects. Anything set in `kscript.json` itself wins over the standard. `kscript check --print-config` shows the result and where each setting came from.
 - `rules` changes how serious a diagnostic is (see [the codes](language-server.md#diagnostic-codes)). The longest match wins, so `"KS3*": "warning"` with `"KS3001": "error"` keeps unknown elements as errors.
 - Comments and trailing commas are allowed. Unknown settings are reported as warnings rather than ignored silently, and the VS Code extension validates the file and completes its settings as you type.
 - `format` sets the style for `kscript fmt` and the editor's Format Document, and `format.rules` turns individual rules off. See [Formatting](formatting.md) for every setting and the ignore comments.

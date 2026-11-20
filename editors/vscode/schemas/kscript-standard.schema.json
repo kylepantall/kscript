@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript-standard.schema.json",
+  "title": "KScript standard (kscript-standard.json)",
+  "description": "A shareable set of lint rules and format settings. A project uses it with \"standard\" in kscript.json, and another standard can build on it with \"extends\". Later layers win: the standards it extends, then this one, then the project's kscript.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "standardReference": {
+      "type": "string",
+      "anyOf": [{ "enum": ["kscript:recommended", "kscript:strict"] }, { "pattern": "^(?!kscript:)" }],
+      "description": "kscript:recommended, kscript:strict, or a path (relative to this file) to a standard file or a folder holding kscript-standard.json."
+    }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "description": "The standard's name, shown by kscript check --print-config." },
+    "description": { "type": "string", "description": "What the standard is for." },
+    "extends": {
+      "description": "Standards this one builds on. They are applied first, so this one's settings win. Without extends, a standard starts from the built-in defaults, where style rules (KS6xxx) are off: extend kscript:recommended to keep them.",
+      "oneOf": [
+        { "$ref": "#/definitions/standardReference" },
+        { "type": "array", "items": { "$ref": "#/definitions/standardReference" } }
+      ],
+      "examples": ["kscript:recommended"]
+    },
+    "lint": {
+      "type": "object",
+      "description": "Lint rules this standard sets. Which files are checked (include, exclude) belongs in each project's kscript.json.",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "object",
+          "description": "Severity per diagnostic code (KS3003) or code prefix (KS3*). The longest match wins.",
+          "propertyNames": { "pattern": "^[Kk][Ss][0-9]{0,4}\\*?$" },
+          "additionalProperties": { "enum": ["off", "hint", "info", "warning", "error"] },
+          "examples": [{ "KS3003": "off", "KS4*": "error" }]
+        },
+        "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
+      }
+    },
+    "format": {
+      "type": "object",
+      "description": "Format settings this standard sets. Which files are formatted (include, exclude) belongs in each project's kscript.json.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "false turns formatting off for the project: kscript fmt skips its files and Format Document makes no changes."
+        },
+        "rules": {
+          "type": "object",
+          "description": "Turn individual formatting rules off, e.g. { \"statementPerLine\": false }. Every rule is on unless listed. To leave part of a file alone, use <!-- kscript-fmt: off --> ... <!-- kscript-fmt: on --> or <!-- kscript-fmt-ignore --> before an element.",
+          "additionalProperties": false,
+          "properties": {
+            "indent": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Re-indent elements by how deeply they are nested. Off: lines keep their indentation." },
+            "statementPerLine": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Put each statement and block-level element on its own line. Off: line breaks only change where there was already whitespace." },
+            "tidyTags": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One space between attributes, and <x /> for self-closing tags. Off: start tags are kept exactly as written." },
+            "wrapAttributes": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One attribute per line for long start tags and tags already written that way. Off: tags are never wrapped or joined." },
+            "trimTrailingWhitespace": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Remove spaces at the ends of lines of text." },
+            "collapseBlankLines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to maxBlankLines." },
+            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." }
+          }
+        },
+        "indent": {
+          "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 16 }, { "const": "tab" }],
+          "default": 2,
+          "description": "Spaces per indent level, or \"tab\" to indent with tabs."
+        },
+        "tabWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 2,
+          "description": "With \"indent\": \"tab\", how many columns a tab counts as when lining up existing text."
+        },
+        "printWidth": {
+          "type": "integer",
+          "minimum": 20,
+          "default": 120,
+          "description": "A start tag with several attributes that would run past this column gets one attribute per line."
+        },
+        "maxBlankLines": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1,
+          "description": "Blank lines kept in a row; extra ones are removed."
+        },
+        "endOfLine": {
+          "enum": ["auto", "lf", "crlf"],
+          "default": "auto",
+          "description": "Line endings to write. auto keeps the ones each file already uses."
+        },
+        "preserve": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Elements whose content is kept exactly as written, on top of <pre>, <textarea>, <script>, <style> and CDATA sections."
+        }
+      }
+    }
+  }
+}

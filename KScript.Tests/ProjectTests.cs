@@ -75,7 +75,7 @@ public class ProjectConfigTests
     {
         var c = Parse("""{ "nmae": "x", "serve": { "port": "eighty", "colour": 1 }, "lint": { "rules": { "KS3003": "loud", "E100": "off" }, "exclude": "drafts" } }""");
         Assert.Equal(8080, c.Serve.Port);
-        Assert.Empty(c.Lint.Rules);
+        Assert.Equal(new[] { "KS6*" }, c.Lint.Rules.Keys); // only kscript:recommended's rule
         Assert.Equal(LintSettings.DefaultExclude, c.Lint.Exclude);
         Assert.Contains(c.Warnings, w => w.Contains("'nmae'"));
         Assert.Contains(c.Warnings, w => w.Contains("serve.port"));
@@ -144,7 +144,7 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,app,format,lint,name,packages,serve,test", Keys(props));
+        Assert.Equal("$schema,app,format,lint,name,packages,serve,standard,test", Keys(props));
         Assert.Equal("icon,id,main,name,version", Keys(props.GetProperty("app").GetProperty("properties")));
         Assert.Equal("host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
@@ -152,7 +152,7 @@ public class ProjectConfigTests
         Assert.Equal("enabled,endOfLine,exclude,include,indent,maxBlankLines,preserve,printWidth,rules,tabWidth", Keys(props.GetProperty("format").GetProperty("properties")));
 
         // Every key the schema allows is one ProjectConfig reads.
-        var c = Parse("""{ "$schema": "x", "name": "n", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] }, "app": { "main": "a.ks.xml", "name": "A", "id": "x.a", "version": "1", "icon": "a.png" }, "format": { "enabled": true, "rules": { "indent": true, "statementPerLine": false, "tidyTags": "on", "wrapAttributes": "off", "trimTrailingWhitespace": true, "collapseBlankLines": true, "finalNewline": true }, "indent": 4, "tabWidth": 4, "printWidth": 100, "maxBlankLines": 1, "endOfLine": "lf", "preserve": ["echo"], "include": [], "exclude": [] } }""");
+        var c = Parse("""{ "$schema": "x", "name": "n", "standard": "kscript:recommended", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] }, "app": { "main": "a.ks.xml", "name": "A", "id": "x.a", "version": "1", "icon": "a.png" }, "format": { "enabled": true, "rules": { "indent": true, "statementPerLine": false, "tidyTags": "on", "wrapAttributes": "off", "trimTrailingWhitespace": true, "collapseBlankLines": true, "finalNewline": true }, "indent": 4, "tabWidth": 4, "printWidth": 100, "maxBlankLines": 1, "endOfLine": "lf", "preserve": ["echo"], "include": [], "exclude": [] } }""");
         Assert.Empty(c.Warnings);
         Assert.Equal("a.ks.xml", c.App.Main);
         Assert.Equal(5, c.Test.Timeout);

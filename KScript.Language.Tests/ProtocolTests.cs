@@ -320,6 +320,29 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void StandardsApplyInTheEditorAndEditsToThemTakeEffect()
+        {
+            Initialize();
+            void OpenJson(string uri, string text) => Notify("textDocument/didOpen", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = uri, ["languageId"] = "json", ["version"] = 1, ["text"] = text },
+            });
+            const string standard = "file:///work/team.kscript-standard.json";
+            OpenJson(standard, "{ \"lint\": { \"rules\": { \"KS3001\": \"hint\" } } }");
+            OpenJson("file:///work/kscript.json", "{ \"standard\": \"team.kscript-standard.json\" }");
+            Open("<kscript>\n<ehco />\n</kscript>");
+            Assert.Equal(4, Assert.Single(Diagnostics()).AsObject()["severity"].GetValue<int>());
+
+            // Editing the standard (without saving) changes the project's rules straight away.
+            Notify("textDocument/didChange", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = standard, ["version"] = 2 },
+                ["contentChanges"] = new JsonArray { new JsonObject { ["text"] = "{ \"lint\": { \"rules\": { \"KS3001\": \"off\" } } }" } },
+            });
+            Assert.Empty(Diagnostics());
+        }
+
+        [Fact]
         public void FormatsDocuments()
         {
             JsonObject caps = Initialize()["result"]["capabilities"].AsObject();

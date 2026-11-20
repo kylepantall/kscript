@@ -5,9 +5,25 @@
   "description": "Settings for kscript serve, kscript check, kscript fmt and the KScript language server. Commands look for kscript.json in the folder they work on and its parents.",
   "type": "object",
   "additionalProperties": false,
+  "definitions": {
+    "standardReference": {
+      "type": "string",
+      "anyOf": [{ "enum": ["kscript:recommended", "kscript:strict"] }, { "pattern": "^(?!kscript:)" }],
+      "description": "kscript:recommended, kscript:strict, or a path to a standard file or a folder holding kscript-standard.json."
+    }
+  },
   "properties": {
     "$schema": { "type": "string" },
     "name": { "type": "string", "description": "The project's name." },
+    "standard": {
+      "description": "The standard (or standards) whose lint rules and format settings this project starts from; kscript.json's own lint and format settings win over it. Built in: kscript:recommended (the default) and kscript:strict. Anything else is a path, relative to kscript.json, to a standard file or to a folder holding kscript-standard.json. [] uses no standard (style rules off).",
+      "default": "kscript:recommended",
+      "oneOf": [
+        { "$ref": "#/definitions/standardReference" },
+        { "type": "array", "items": { "$ref": "#/definitions/standardReference" }, "description": "Several standards, applied in order: later ones win." }
+      ],
+      "examples": ["kscript:recommended", "kscript:strict", "./standards/team.kscript-standard.json", "../shared-standards/acme"]
+    },
     "packages": {
       "type": "array",
       "description": "Packages every script in the project uses without an <import>. KScript.Core is always imported.",
