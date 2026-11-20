@@ -39,7 +39,7 @@ You can also install this extension from the command line with `kscript ide inst
 
 ## Project settings
 
-A `kscript.json` at the top of a project (created by `kscript make project`) sets the lint rules the editor uses: `lint.rules` changes or turns off a diagnostic by code (`"KS3003": "off"`), and `lint.exclude` silences files and folders such as `_templates`. The extension validates `kscript.json` and completes its settings. See the KScript README for every setting.
+A `kscript.json` at the top of a project (created by `kscript make project`) sets the lint rules the editor uses: `lint.rules` changes or turns off a diagnostic by code (`"KS3003": "off"`), and `lint.exclude` silences files and folders such as `_templates`. The extension validates `kscript.json` and completes its settings. See [Project settings](https://github.com/kylepantall/kscript/blob/master/docs/projects.md#project-settings-kscriptjson) for every setting.
 
 ## Commands
 
