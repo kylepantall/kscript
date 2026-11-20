@@ -38,6 +38,13 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
     "packages": ["KScript.Terminal"]        // imported by test files only
+  },
+  "app": {
+    "main": "app.ks.xml",       // what `kscript app build` packages (see Desktop apps)
+    "name": "My App",           // shown in the Dock, Start menu or launcher (default: the project's name)
+    "id": "com.example.myapp",  // the macOS bundle id
+    "version": "1.0.0",
+    "icon": "icon.icns"         // .icns for macOS, .ico for Windows, .png for Linux
   }
 }
 ```
@@ -47,6 +54,7 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
 - Comments and trailing commas are allowed. Unknown settings are reported as warnings rather than ignored silently, and the VS Code extension validates the file and completes its settings as you type.
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
 - `kscript serve` never serves `kscript.json`.
+- `app` is read by `kscript app build`, which packages a desktop app (see [Desktop apps](desktop.md#packaging-an-app-kscript-app-build)).
 
 ## Generating files: kscript make
 

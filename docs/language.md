@@ -119,12 +119,13 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 
 | Package | What it adds |
 | --- | --- |
-| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, 'green')`, `@bold`, `@dim`, `@underline`, `<echo format="markdown">` |
+| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `<echo format="markdown">` |
 | `KScript.Math` | `@sqrt` `@pow` `@round(x, digits)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low, high)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path` `@known_folder('downloads')`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
 | `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
+| `KScript.UI` | Desktop windows: a script whose root is `<KScript.Window>` opens one. `<Column>` `<Row>` `<Grid>` `<Text>` `<Button>` `<TextBox>` `<CheckBox>` `<Select>` `<Slider>` `<Box>` `<Spacer>` `<Timer>`, `@close_window()`. See [Desktop apps](desktop.md). |
 | `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](testing.md)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).

@@ -53,6 +53,9 @@ namespace KScript.Metadata
 
         /// <summary>Plain text.</summary>
         Text,
+
+        /// <summary>Statements run when something happens, such as a click: <c>on-click="count += 1"</c>. <c>$event</c> describes it.</summary>
+        Statements,
     }
 
     /// <summary>What an element's content holds.</summary>

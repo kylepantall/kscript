@@ -9,6 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" Version="11.3.23" />
+    <PackageReference Include="Avalonia.Skia" Version="11.3.23" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
@@ -31,6 +33,7 @@
     <ProjectReference Include="..\KScript.Web\KScript.Web.csproj" />
     <ProjectReference Include="..\KScript.Cli\KScript.Cli.csproj" />
     <ProjectReference Include="..\KScript.Test\KScript.Test.csproj" />
+    <ProjectReference Include="..\KScript.UI\KScript.UI.csproj" />
   </ItemGroup>
 
 </Project>

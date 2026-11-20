@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/kylepantall/kscript/actions/workflows/ci.yml/badge.svg)](https://github.com/kylepantall/kscript/actions/workflows/ci.yml)
 
-**One readable language for your scripts, your websites and, soon, your desktop apps.**
+**One readable language for your scripts, your websites and your desktop apps.**
 
-KScript is an open source language that looks like the HTML you already know. The same elements, expressions and functions run a terminal script, render a web page, and update that page live as people click and type, all from one small binary on Windows, macOS and Linux. There is no JavaScript to write, no build step, no `node_modules` and no virtual environment.
+KScript is an open source language that looks like the HTML you already know. The same elements, expressions and functions run a terminal script, render a web page, update that page live as people click and type, and draw native desktop windows, all from one small binary on Windows, macOS and Linux. There is no JavaScript to write, no build step, no `node_modules` and no virtual environment.
 
 ```xml
 <kscript>
@@ -114,22 +114,29 @@ kscript serve "Example Sites/team"    # then open http://localhost:8080/demo
 | `KScript.Markdown` | Markdown to HTML |
 | `KScript.Web` | Pages, layouts, components and `<live>` blocks for `kscript serve` |
 | `KScript.Test` | Tests for `kscript test` |
-| `KScript.UI` | Desktop windows. **Coming soon** |
+| `KScript.UI` | Native desktop windows, and `kscript app build` to package them |
 | `KScript.AI` | Language models: `@llm`, `@chat` and `<llm>`. **Coming soon** |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
 
-## Desktop windows (coming soon)
+## Desktop apps, still just KScript
 
-`KScript.UI` will bring the same model to native desktop windows: markup for the window, KScript for the handlers, and a redraw after each one, just like `<live>`. It is planned and not built yet, so this is a sketch of where it is heading, not something you can run today:
+A script whose root is `<KScript.Window>` opens a native window on macOS, Windows or Linux. It works like `<live>`: the `<let>` elements hold the state, the rest is the layout, and the window is redrawn after every handler.
 
 ```xml
-<KScript.Window title="Counter">
+<KScript.Window title="Counter" width="320" height="200">
   <let name="count" value="0" />
-  <text>{$count}</text>
-  <button on-click="$count += 1">Add one</button>
+  <Text size="32">{$count}</Text>
+  <Button variant="primary" on-click="count += 1">Add one</Button>
 </KScript.Window>
 ```
+
+```sh
+kscript counter.ks.xml           # opens the window
+kscript app build counter.ks.xml # packages it: Counter.app on a Mac, Counter/Counter.exe on Windows
+```
+
+There is no Swift, C#, XAML or shell script to write. [`samples/life-lab`](samples/life-lab) is Conway's Game of Life with one rules script shared by a terminal version, a web page and a desktop app.
 
 ## Tooling that comes with it
 
@@ -139,6 +146,7 @@ kscript serve                  # run it
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI
 kscript ide install            # add the extension to VS Code, Cursor, VSCodium or Windsurf
+kscript app build              # package a <KScript.Window> script as a desktop app
 kscript update                 # get the latest release
 ```
 
@@ -185,6 +193,7 @@ Then save the first example above as `hello.ks.xml`, run `kscript hello.ks.xml`,
 - [The language](docs/language.md): values, expressions, control flow, functions, errors and every package
 - [Web pages and `<live>`](docs/web.md): `kscript serve`, layouts, components, routing and reactive blocks
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
+- [Desktop apps](docs/desktop.md): `<KScript.Window>`, its elements, and `kscript app build`
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI

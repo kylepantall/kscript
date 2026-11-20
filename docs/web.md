@@ -75,7 +75,8 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 
 - `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server keeps nothing between requests.
 - `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn($i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
+- `on-tick="…" every="200"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if test="$playing"><span on-tick="frame += 1" every="100"></span></if>`.
 - `bind="name"` ties an input to a state variable both ways and redraws the block as you type.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
 
-See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter.
+See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter, and [`samples/life-lab`](../samples/life-lab) for a game whose rules are a KScript script shared with a terminal version and a desktop app.

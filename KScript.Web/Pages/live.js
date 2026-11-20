@@ -5,6 +5,45 @@
   "use strict";
   var EVENTS = ["click", "input", "change", "submit", "keydown"];
   var timers = {};
+  var ticks = {};
+
+  // A click needs the same element under the pointer when it goes down and when it comes up. While a button
+  // is held, new HTML for its block waits, so a block that redraws often (on-tick) doesn't swallow clicks.
+  var pointerDown = false;
+  var pending = {};
+
+  function flush(id) {
+    var p = pending[id];
+    if (!p) return;
+    delete pending[id];
+    var el = document.querySelector('[data-ks-live="' + id + '"]');
+    if (el) swap(el, p.html, p.keepValue);
+  }
+
+  document.addEventListener("pointerdown", function () { pointerDown = true; }, true);
+  ["pointerup", "pointercancel"].forEach(function (type) {
+    document.addEventListener(type, function () {
+      pointerDown = false;
+      // After the click this pointerup produces has been handled.
+      setTimeout(function () { Object.keys(pending).forEach(flush); }, 0);
+    }, true);
+  });
+
+  // <span on-tick="..." every="200">: while an element with on-tick is in a block, its handler runs every
+  // `every` milliseconds, counted from when the last answer arrived, so slow handlers never pile up.
+  function scheduleTick(block) {
+    var id = block.getAttribute("data-ks-live");
+    clearTimeout(ticks[id]);
+    var el = null;
+    block.querySelectorAll("[data-ks-on-tick]").forEach(function (t) { if (!el && blockOf(t) === block) el = t; });
+    if (!el) return;
+    var every = parseFloat(el.getAttribute("data-ks-every")) || 1000;
+    ticks[id] = setTimeout(function () {
+      var current = document.querySelector('[data-ks-live="' + id + '"]');
+      if (!current || !current.contains(el)) return;
+      send(current, parseInt(el.getAttribute("data-ks-on-tick"), 10), el.getAttribute("data-ks-args"), el, { type: "tick" });
+    }, every);
+  }
 
   function blockOf(el) { return el && el.closest ? el.closest("[data-ks-live]") : null; }
 
@@ -34,6 +73,7 @@
     var targetValue = target && target.type === "checkbox" ? target.checked : target && "value" in target ? target.value : null;
 
     queues[id] = (queues[id] || Promise.resolve()).then(function () {
+      flush(id); // start from the newest HTML, even if it was waiting for the pointer
       var current = document.querySelector('[data-ks-live="' + id + '"]');
       if (!current) return;
       var b = binds(current);
@@ -58,9 +98,11 @@
       }).then(function (r) {
         var el = document.querySelector('[data-ks-live="' + id + '"]');
         if (!r || !el) return;
-        if (!r.ok) { console.error("KScript:", r.html); el.removeAttribute("aria-busy"); return; }
+        if (!r.ok) { console.error("KScript:", r.html); el.removeAttribute("aria-busy"); scheduleTick(el); return; }
         // While typing, keep what is in the box; after an action (Add, Reset…) show what the server set.
-        swap(el, r.html, handler < 0 || eventInfo.type === "input");
+        var keepValue = handler < 0 || eventInfo.type === "input";
+        if (pointerDown) pending[id] = { html: r.html, keepValue: keepValue };
+        else swap(el, r.html, keepValue);
       });
     }).catch(function (err) {
       console.error("KScript:", err);
@@ -84,6 +126,7 @@
     tpl.innerHTML = html.trim();
     var fresh = tpl.content.firstElementChild;
     block.replaceWith(fresh);
+    scheduleTick(fresh);
     if (!keep) return;
     var el = keep.bind
       ? fresh.querySelector('[data-ks-bind="' + keep.bind + '"]')
@@ -128,4 +171,8 @@
   }
 
   EVENTS.forEach(function (type) { document.addEventListener(type, handle, true); });
+
+  function startTicks() { document.querySelectorAll("[data-ks-live]").forEach(scheduleTick); }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startTicks);
+  else startTicks();
 })();

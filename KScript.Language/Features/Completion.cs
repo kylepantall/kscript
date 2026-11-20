@@ -402,6 +402,7 @@ namespace KScript.Language.Features
 
                 case AttributeKind.Expression:
                 case AttributeKind.ExpressionList:
+                case AttributeKind.Statements:
                 case AttributeKind.Template:
                     return cursor.Region != null ? null : ExpressionStartCompletions(analysis, cursor.Offset, replace, a.Kind == AttributeKind.Template);
 

@@ -16,6 +16,7 @@ namespace KScript
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
+            Console.WriteLine("       kscript app build [script] [--name \"My App\"] [--out folder]   Package a script as a desktop app.");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
             Console.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
             Console.WriteLine("       kscript --version | --help");
@@ -101,6 +102,13 @@ namespace KScript
 
         static int Main(string[] args)
         {
+            // Inside an app built by `kscript app build`: run the app's script and nothing else.
+            string appManifest = KScript.Apps.AppLauncher.FindManifest();
+            if (appManifest != null)
+            {
+                return RunApp(appManifest, args);
+            }
+
             if (args.Length > 0 && args[0] == "lsp")
             {
                 // stdout carries the protocol, so nothing else may write to it.
@@ -130,6 +138,11 @@ namespace KScript
             if (args.Length > 0 && args[0] == "ide")
             {
                 return KScript.Ide.IdeCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
+            }
+
+            if (args.Length > 0 && args[0] == "app")
+            {
+                return KScript.Apps.AppCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
             }
 
             if (args.Length > 0 && args[0] == "check")
@@ -182,6 +195,29 @@ namespace KScript
             }
 
             return RunScript(path, args.Skip(1).ToArray());
+        }
+
+        /// <summary>Runs the script of a packaged app. Opened from Finder or a launcher there is no terminal, so a script that
+        /// fails before its window opens shows why in a window instead.</summary>
+        static int RunApp(string manifest, string[] args)
+        {
+            string main = KScript.Apps.AppLauncher.MainScript(manifest);
+            var host = KScriptHost.Console();
+            host.Arguments = KScript.Apps.AppLauncher.ScriptArguments(args);
+            var options = new InterpreterOptions();
+            ProjectConfig project = null;
+            try { project = ProjectConfig.FindAndLoad(Path.GetDirectoryName(main)); } catch (ProjectConfigException) { }
+            if (project != null) options.DefaultPackages.AddRange(project.Packages);
+            try
+            {
+                return new Interpreter(host, options: options).RunFile(main);
+            }
+            catch (KScriptException ex)
+            {
+                Console.Error.WriteLine(ex.ToString());
+                KScript.UI.DesktopHost.ShowError(Path.GetFileName(main), ex.ToString());
+                return 1;
+            }
         }
 
         /// <summary>kscript test: Ctrl+C stops the run after the current test.</summary>
