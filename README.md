@@ -294,6 +294,38 @@ logging:
 
 Packages add provider types with `p.LogProvider("type", description, create)`, and programs that run KScript can add their own with `host.Logs.AddProvider(provider, level)`, where a provider implements `ILogProvider`.
 
+### Translations: @t()
+
+Put translations in a `locales` folder next to the script (or in the site folder): `locales/en.json`, `locales/fr.yaml`, or a folder per locale such as `locales/de/shop.json`, whose keys start with `shop.`.
+
+```yaml
+# locales/fr.yaml
+hello: Bonjour, {name} !
+cart:
+  items:
+    "=0": Votre panier est vide
+    one: "{count} article"
+    other: "{count} articles"
+```
+
+```xml
+<locale set="fr" />
+<echo>{ @t('hello', { name: $user.name }) }</echo>              <!-- Bonjour, Ann ! -->
+<echo>{ @t('cart.items', { count: $cart->count() }) }</echo>   <!-- 3 articles -->
+<echo>{ @format_currency($total, 'EUR') } { @format_date(@today(), 'long') }</echo>   <!-- 9,50 € 20 novembre 2026 -->
+```
+
+- **Plurals.** With a `count`, `@t()` picks `zero`, `one`, `two`, `few`, `many` or `other` by the language's own rules. These are the CLDR rules for English, French, Portuguese, Russian, Ukrainian, Polish, Czech, Arabic, Hebrew, Irish, Welsh, Japanese, Chinese, Korean and more. An exact form such as `=0` wins.
+- **Fallbacks.** A missing translation is looked for in `fr-CA`, then `fr`, then the default locale (`en` unless set). If it isn't anywhere, you get the key itself, and a warning is logged once under the `i18n` category.
+- **The locale** comes from `<locale set="fr" />`, from `<locale from="...">` (the best available match for a list or an Accept-Language header), from `$config.i18n.locale`, from `KSCRIPT_LOCALE`, or from the computer's language. `@locale()` gives it, and `@locales()` lists the locales there are files for.
+- **Pages** pick it in this order: a path prefix (`/fr/about` serves `about.html` in French when there are French translations), `?lang=fr`, a `lang` cookie, and then the browser's Accept-Language. `@locale_path($request.path, 'de')` gives the link to the same page in German. The default locale has no prefix.
+- **Formatting.** These follow the locale, or one you pass as the last argument:
+  - `@format_number(1234.5)` gives 1,234.5 or 1 234,5;
+  - `@format_percent(0.25)`;
+  - `@format_currency(9.5, 'GBP')`;
+  - `@format_date(date, 'short' | 'medium' | 'long' | 'full' | 'time' | 'datetime' | 'd MMMM yyyy')`.
+- **Settings:** `i18n: { folder: lang, default: en-GB, locale: fr }` in config, or `<translations folder="lang" default="en-GB" />`. `@has_t(key)` checks whether a key has a translation, and `@plural(count)` gives the plural category.
+
 ## Packages
 
 KScript.Core (everything above) is always there. Everything else comes from a package, imported at the top of the script, so a script only loads what it uses: a terminal script never loads the web server.

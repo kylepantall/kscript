@@ -47,6 +47,7 @@ namespace KScript.Pages
                 CanWriteFiles = false,
             };
             host.Items[ContextKey] = ctx;
+            if (ctx.Request != null) host.Items[Translator.RequestKey] = ctx.Request;
             Interpreter = new Interpreter(host, options: new InterpreterOptions { MaxSteps = ctx.MaxSteps, MaxCallDepth = 200 });
         }
 

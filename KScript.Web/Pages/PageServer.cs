@@ -24,6 +24,9 @@ namespace KScript.Pages
         /// <summary>The file, relative to the site folder, with forward slashes.</summary>
         public string File { get; init; }
 
+        /// <summary>The locale from a /fr/... path prefix, when the site has translations for it.</summary>
+        public string Locale { get; init; }
+
         /// <summary>Values captured by [name] segments, e.g. people/[id].html.</summary>
         public Dictionary<string, object> Params { get; init; } = new Dictionary<string, object>();
     }
@@ -46,6 +49,17 @@ namespace KScript.Pages
 
         public string Root { get; }
 
+        /// <summary>The folder of translation files that /fr/... prefixes are checked against.</summary>
+        public string LocalesFolder { get; set; } = "locales";
+
+        private bool IsLocalePrefix(string segment)
+        {
+            if (segment.Length < 2 || segment.Length > 12 || !segment.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')) return false;
+            if (File.Exists(Path.Combine(Root, segment)) || Directory.Exists(Path.Combine(Root, segment))) return false;
+            string folder = Path.Combine(Root, LocalesFolder);
+            return Directory.Exists(Path.Combine(folder, segment)) || new[] { ".json", ".yaml", ".yml" }.Any(e => File.Exists(Path.Combine(folder, segment + e)));
+        }
+
         /// <summary>config.json, config.staging.json, and any .yaml, .yml or .env file: never served.</summary>
         internal static bool IsConfigFile(string name)
         {
@@ -67,6 +81,13 @@ namespace KScript.Pages
             // Nor are the settings $config reads (config.json, config.staging.yaml), which may hold secrets.
             if (segments.Count > 0 && IsConfigFile(segments[^1]))
                 return NotFound();
+
+            // /fr/about is the about page in French when locales/fr.json (or .yaml, or a locales/fr folder) exists.
+            if (segments.Count > 0 && IsLocalePrefix(segments[0]))
+            {
+                PageRoute inner = Resolve("/" + string.Join("/", segments.Skip(1)));
+                return new PageRoute { Kind = inner.Kind, File = inner.File, Params = inner.Params, Locale = segments[0] };
+            }
 
             // Stylesheets written in KScript are served compiled (theme.css from theme.ks.css), never as written.
             if (segments.Count > 0 && KScript.Style.Stylesheets.IsStylesheet(segments[^1]))
@@ -267,7 +288,9 @@ namespace KScript.Pages
 
                 case PageRoute.RouteKind.Page:
                 {
-                    var ctx = new PageContext(site.Root, await BuildRequestAsync(request));
+                    var built = await BuildRequestAsync(request);
+                    if (route.Locale != null) built["locale"] = route.Locale;
+                    var ctx = new PageContext(site.Root, built);
                     return PageRenderer.RenderFile(ctx, route.File, route.Params);
                 }
 
@@ -308,6 +331,7 @@ namespace KScript.Pages
 
             var route = site.Resolve(uri.AbsolutePath);
             if (route.Kind != PageRoute.RouteKind.Page) return new PageResult { Status = 404, Body = "Page not found." };
+            if (route.Locale != null) request["locale"] = route.Locale;
 
             var ctx = new PageContext(site.Root, request) { Live = ev };
             try
