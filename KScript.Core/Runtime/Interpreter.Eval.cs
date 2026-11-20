@@ -741,11 +741,14 @@ namespace KScript.Runtime
         /// <summary>Calls <c>value->name(args)</c>.</summary>
         public object InvokeMethod(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
         {
+            // A package's methods for its own objects come first, so their arguments are bound by name (and flags) like commands'.
+            bool defined = TryFindMethod(target, name, ctx.Module, out MethodDefinition method);
+            if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             if (target is IKObject obj && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), name, out object result))
             {
                 return result;
             }
-            if (TryFindMethod(target, name, ctx.Module, out MethodDefinition method))
+            if (defined)
             {
                 return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             }

@@ -1,0 +1,5 @@
+{
+  "name": "notes",
+  "app": { "name": "Notes" },
+  "config": { "user": true }
+}

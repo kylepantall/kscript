@@ -222,7 +222,7 @@ public sealed class ConfigTests : IDisposable
         FileOf("kscript.json", "{ \"config\": { \"environment\": \"prod\", \"files\": [\"app.yaml\"], \"prefix\": \"SHOP_\", \"root\": \"conf\", \"required\": [\"name\"], \"extra\": 1 } }");
         ProjectConfig project = ProjectConfig.Load(Path.Combine(dir, "kscript.json"));
         Assert.Equal("prod", project.Config.Environment);
-        Assert.Contains("unknown setting 'config.extra' (expected environment, files, prefix, root or required).", project.Warnings);
+        Assert.Contains("unknown setting 'config.extra' (expected environment, files, prefix, root, required or user).", project.Warnings);
         ConfigOptions options = project.ConfigOptions("prod");
         Assert.Equal(new[] { "app.yaml" }, options.Files);
         Assert.Equal("SHOP_", options.Prefix);

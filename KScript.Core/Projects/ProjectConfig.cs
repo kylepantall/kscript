@@ -115,6 +115,9 @@ namespace KScript.Projects
 
         /// <summary>Settings that must be set.</summary>
         public List<string> Required { get; set; } = new List<string>();
+
+        /// <summary>True layers the app's own config file (config.json in its config folder) over the project's files.</summary>
+        public bool User { get; set; }
     }
 
     /// <summary>
@@ -256,7 +259,11 @@ namespace KScript.Projects
             Prefix = Config.Prefix,
             Root = Config.Root == null ? null : Path.GetFullPath(Path.Combine(Directory, Config.Root)),
             Required = Config.Required.ToList(),
+            UserFolder = Config.User ? KScript.Runtime.AppFolders.Folder(AppName, "config") : null,
         };
+
+        /// <summary>The app's name for its folders (KScript.Storage): app.name, else name, else the project folder's name.</summary>
+        public string AppName => App.Name ?? Name ?? Path.GetFileName(Directory?.TrimEnd(Path.DirectorySeparatorChar)) ?? "kscript";
         public FormatSettings Format { get; } = new FormatSettings();
         public AppSettings App { get; } = new AppSettings();
         public MakeSettings Make { get; } = new MakeSettings();
@@ -864,8 +871,11 @@ namespace KScript.Projects
                     case "required":
                         config.Config.Required = Strings(p.Value, "config.required", config) ?? config.Config.Required;
                         break;
+                    case "user":
+                        config.Config.User = Bool(p.Value, "config.user", config) ?? false;
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'config.{p.Name}' (expected environment, files, prefix, root or required).");
+                        config.Warnings.Add($"unknown setting 'config.{p.Name}' (expected environment, files, prefix, root, required or user).");
                         break;
                 }
             }

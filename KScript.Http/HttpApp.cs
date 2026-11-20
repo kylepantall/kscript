@@ -364,7 +364,12 @@ namespace KScript.Http
         {
             try
             {
-                if (index == chain.Count) return HttpResponse.From(answer(request));
+                if (index == chain.Count)
+                {
+                    HttpResponse answered = HttpResponse.From(answer(request));
+                    foreach (var h in ctx.ResponseHeaders) answered.Headers.TryAdd(h.Key, h.Value);
+                    return answered;
+                }
 
                 MiddlewareRef middleware = chain[index];
                 HttpResponse Next(Dictionary<string, object> req) => Pipeline(ctx, interpreter, chain, index + 1, req ?? request, answer);
