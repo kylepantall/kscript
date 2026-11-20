@@ -239,6 +239,17 @@ public sealed class CommandLineTests : IDisposable
     }
 
     [Fact]
+    public void Serve_stopped_before_it_has_started_is_a_normal_stop()
+    {
+        // On a slow machine Ctrl+C can come before the server has finished starting.
+        Write("site/index.html", "<h1>Hi</h1>");
+        using var stop = new CancellationTokenSource();
+        stop.Cancel();
+        var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site"), "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { AppFolder = dir, Cancellation = stop.Token });
+        Assert.True(code == 0, error);
+    }
+
+    [Fact]
     public void Packaged_apps_run_their_script_and_show_errors_in_a_window()
     {
         string app = Path.Combine(dir, "MyApp");
