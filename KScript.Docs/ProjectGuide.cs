@@ -142,8 +142,9 @@ namespace KScript.Docs
             foreach (Symbol s in analysis.Symbols)
             {
                 MarkupElement e = s.DeclaringElement;
-                // Only what this file declares itself: not names it imports from another file.
-                if (e == null || e.Parent != root || !Declares.Contains(e.Name) || analysis.ExternalDeclarations.ContainsKey(s)) continue;
+                // Only what this file declares itself: not names it imports from another file, nor the names a type
+                // gives its own rules and methods ($this, $value and its fields).
+                if (e == null || s.Kind == SymbolKind.Parameter || e.Parent != root || !Declares.Contains(e.Name) || analysis.ExternalDeclarations.ContainsKey(s)) continue;
                 string kind = s.Kind == SymbolKind.Function ? "function"
                     : e.Name == "type" ? "type"
                     : e.Name == "enum" || s.EnumValues != null ? "enum"
