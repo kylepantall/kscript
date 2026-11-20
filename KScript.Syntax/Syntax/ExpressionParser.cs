@@ -469,6 +469,18 @@ namespace KScript.Syntax
                     Advance();
                     return new LiteralNode { Kind = LiteralKind.String, Value = t.Text, Span = t.Span };
 
+                case TokenKind.Regex:
+                    Advance();
+                    return new LiteralNode { Kind = LiteralKind.Regex, Value = t.Text, Span = t.Span };
+
+                case TokenKind.Email:
+                    Advance();
+                    return new LiteralNode { Kind = LiteralKind.Email, Value = t.Text, Span = t.Span };
+
+                case TokenKind.Uuid:
+                    Advance();
+                    return new LiteralNode { Kind = LiteralKind.Uuid, Value = t.Text, Span = t.Span };
+
                 case TokenKind.Variable:
                     Advance();
                     return new VariableNode { Name = t.Text, Span = t.Span };

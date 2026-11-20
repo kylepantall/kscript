@@ -1,0 +1,25 @@
+/// Sign-up checks built from KScript's own types: emails, handles, passwords and refinement types.
+type Username with [handle] {
+  min: 3
+  max: 16
+  not: [@admin, @root]
+  validate: not $value->name()->contains('--'), "can't have two dashes in a row"
+}
+
+type Signup {
+  handle: Username
+  email: email
+  password: password(min: 12)
+}
+
+fn sign_up(form: Signup) {
+  stored = $form.password->hash()
+  return { handle: $form.handle, email: $form.email, stored: $stored->starts_with('$argon2id$') }
+}
+
+echo @sign_up($Signup->from({ handle: '@Joan_S', email: ' Joan@Example.COM ', password: 'correct horse battery staple' }))
+try {
+  @sign_up($Signup->from({ handle: '@a--b', email: 'joan@', password: 'short' }))
+} catch err {
+  echo $err.message
+}

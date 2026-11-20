@@ -20,6 +20,15 @@ namespace KScript.Syntax
 
         /// <summary>Operators and punctuation; the text says which.</summary>
         Punctuation,
+
+        /// <summary>A regular expression: <c>/^[a-z]+$/i</c>. The text is the whole literal, slashes and flags included.</summary>
+        Regex,
+
+        /// <summary>An email address written without quotes: <c>kyle@example.com</c>.</summary>
+        Email,
+
+        /// <summary>A UUID written without quotes: <c>3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f</c>.</summary>
+        Uuid,
     }
 
     public readonly struct Token
@@ -81,7 +90,33 @@ namespace KScript.Syntax
 
         public string Text => text;
 
+        /// <summary>The last token returned: a / after a value is division, anywhere else it starts a regex.</summary>
+        private Token previous;
+
         public Token Next()
+        {
+            Token token = NextToken();
+            previous = token;
+            return token;
+        }
+
+        /// <summary>True where a value can start, so a / there opens a regex rather than dividing.</summary>
+        private bool ValueCanStart()
+        {
+            switch (previous.Kind)
+            {
+                case TokenKind.EndOfInput:
+                    return true;
+                case TokenKind.Punctuation:
+                    return previous.Text is not (")" or "]" or "}");
+                case TokenKind.Identifier:
+                    return Keywords.Contains(previous.Text) && previous.Text is not ("true" or "false" or "null");
+                default:
+                    return false;
+            }
+        }
+
+        private Token NextToken()
         {
             while (Position < end)
             {
@@ -122,6 +157,28 @@ namespace KScript.Syntax
 
             int start = Position;
             char c = text[Position];
+
+            if (c == '/' && ValueCanStart() && ReadRegex(start) is Token regex)
+            {
+                return regex;
+            }
+
+            // kyle@example.com and 3f2a8c1e-...: never valid code before these were literals, so nothing changes meaning.
+            if (char.IsLetterOrDigit(c) && !(previous.Kind == TokenKind.Punctuation && previous.Text is "." or "?." or "->"))
+            {
+                int literalEnd = UuidEnd(start);
+                if (literalEnd > 0)
+                {
+                    Position = literalEnd;
+                    return Make(TokenKind.Uuid, start);
+                }
+                literalEnd = EmailEnd(start);
+                if (literalEnd > 0)
+                {
+                    Position = literalEnd;
+                    return Make(TokenKind.Email, start);
+                }
+            }
 
             if (char.IsDigit(c))
             {
@@ -205,6 +262,91 @@ namespace KScript.Syntax
 
             Position++;
             return new Token(TokenKind.Error, c.ToString(), new TextSpan(start, 1), $"Unexpected character '{c}'.");
+        }
+
+        /// <summary>
+        /// <c>/pattern/flags</c> starting at <paramref name="start"/>: a / inside [...] or after \ doesn't end it, and it
+        /// must close on the same line. Null when it doesn't close, so the / is read as an operator.
+        /// </summary>
+        private Token? ReadRegex(int start)
+        {
+            int i = start + 1;
+            bool inClass = false;
+            for (; i < end && text[i] != '\n'; i++)
+            {
+                char ch = text[i];
+                if (ch == '\\')
+                {
+                    i++;
+                    continue;
+                }
+                if (ch == '[') inClass = true;
+                else if (ch == ']') inClass = false;
+                else if (ch == '/' && !inClass) break;
+            }
+            if (i >= end || text[i] != '/' || i == start + 1)
+            {
+                return null;
+            }
+            i++;
+            while (i < end && char.IsAsciiLetterLower(text[i]))
+            {
+                i++;
+            }
+            Position = i;
+            return Make(TokenKind.Regex, start);
+        }
+
+        /// <summary>The end of a UUID (8-4-4-4-12 hex digits) at <paramref name="start"/>, or -1.</summary>
+        private int UuidEnd(int start)
+        {
+            int[] groups = { 8, 4, 4, 4, 12 };
+            int i = start;
+            for (int g = 0; g < groups.Length; g++)
+            {
+                if (g > 0)
+                {
+                    if (i >= end || text[i] != '-') return -1;
+                    i++;
+                }
+                for (int n = 0; n < groups[g]; n++, i++)
+                {
+                    if (i >= end || !char.IsAsciiHexDigit(text[i])) return -1;
+                }
+            }
+            // A method call may follow: 3f2a...->version().
+            bool arrow = i + 1 < end && text[i] == '-' && text[i + 1] == '>';
+            return i < end && (IsIdentChar(text[i]) || (text[i] == '-' && !arrow)) ? -1 : i;
+        }
+
+        /// <summary>The end of an email address (local@domain.tld) at <paramref name="start"/>, or -1.</summary>
+        private int EmailEnd(int start)
+        {
+            int i = start;
+            while (i < end && (char.IsLetterOrDigit(text[i]) || text[i] is '.' or '_' or '%' or '+' or '-'))
+            {
+                i++;
+            }
+            if (i == start || i >= end || text[i] != '@' || text[i - 1] == '.') return -1;
+            i++;
+            int labels = 0;
+            while (true)
+            {
+                int label = i;
+                while (i < end && (char.IsLetterOrDigit(text[i]) || (text[i] == '-' && !(i + 1 < end && text[i + 1] == '>'))))
+                {
+                    i++;
+                }
+                if (i == label || text[i - 1] == '-') return -1;
+                labels++;
+                if (i + 1 < end && text[i] == '.' && char.IsLetterOrDigit(text[i + 1]))
+                {
+                    i++;
+                    continue;
+                }
+                break;
+            }
+            return labels >= 2 ? i : -1;
         }
 
         /// <summary>Tokenizes the whole input (used for highlighting and completion).</summary>

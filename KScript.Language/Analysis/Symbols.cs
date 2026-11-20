@@ -53,6 +53,9 @@ namespace KScript.Language.Analysis
         /// <summary>For a &lt;type&gt; value (<c>$Repo</c>): the shape of the records it makes.</summary>
         public TypeShape Instance { get; init; }
 
+        /// <summary>For records of a &lt;type&gt;: the methods its &lt;fn&gt; children declare (<c>$size->width_in(cm)</c>).</summary>
+        public IDictionary<string, Symbol> Methods { get; } = new Dictionary<string, Symbol>(StringComparer.Ordinal);
+
         /// <summary>Known fields of a map (from a literal, or of a built-in type such as $request).</summary>
         public IDictionary<string, FieldInfo> Fields { get; } = new Dictionary<string, FieldInfo>(StringComparer.Ordinal);
 

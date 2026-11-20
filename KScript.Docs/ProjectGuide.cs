@@ -144,6 +144,8 @@ namespace KScript.Docs
                 MarkupElement e = s.DeclaringElement;
                 // Only what this file declares itself: not names it imports from another file.
                 if (e == null || e.Parent != root || !Declares.Contains(e.Name) || analysis.ExternalDeclarations.ContainsKey(s)) continue;
+                // $this, $value and the fields inside a <type> are names its rules and methods see, not declarations of the file.
+                if (s.Kind == SymbolKind.Parameter) continue;
                 string kind = s.Kind == SymbolKind.Function ? "function"
                     : e.Name == "type" ? "type"
                     : e.Name == "enum" || s.EnumValues != null ? "enum"

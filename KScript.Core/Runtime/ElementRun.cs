@@ -60,6 +60,18 @@ namespace KScript.Runtime
             return Interpreter.EvaluateText(a.Value, Scope, Module);
         }
 
+        /// <summary>As <see cref="Eval(string)"/>, reading bare words as text where <paramref name="type"/> is read from text (<c>@kyle</c> for a handle).</summary>
+        public object EvalTyped(string attribute, string type)
+        {
+            MarkupAttribute a = Element.GetAttribute(attribute) ?? throw Missing(attribute);
+            if (a.Value == null) return true;
+            return type == null ? Interpreter.EvaluateText(a.Value, Scope, Module) : Interpreter.EvaluateTyped(a.Value, Scope, Module, type);
+        }
+
+        /// <summary>As <see cref="EvalContent"/>, with bare words read as text for <paramref name="type"/>.</summary>
+        public object EvalContentTyped(string type) =>
+            !HasContent ? null : type == null ? Interpreter.EvaluateText(Content, Scope, Module) : Interpreter.EvaluateTyped(Content, Scope, Module, type);
+
         public object Eval(string attribute, object fallback) => Has(attribute) ? Eval(attribute) : fallback;
 
         public List<object> EvalList(string attribute)
