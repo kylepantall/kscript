@@ -16,6 +16,12 @@ namespace KScript.Language.Analysis
 
         private bool ChecksImports => Kind == DocumentKind.Script;
 
+        /// <summary>True in a .kscript file, so messages and fixes are written in that format.</summary>
+        private bool IsCode => result.Markup.Syntax == SourceSyntax.Code;
+
+        /// <summary>How the file declares a function, in its own format.</summary>
+        private string FnHint(string name) => IsCode ? $"fn {name}() {{ }}" : $"<fn name=\"{name}\">";
+
         private void ImportPackage(string package)
         {
             foreach (string p in catalog.WithRequired(package))
@@ -179,12 +185,32 @@ namespace KScript.Language.Analysis
                 return;
             }
             Report(span, DiagnosticSeverity.Error, DiagnosticCodes.MissingImport,
-                $"{what} is part of {package}. Add <import package=\"{package}\" /> at the top of the script.",
+                $"{what} is part of {package}. Add {ImportLine(package)} at the top of the script.",
                 AddImportFix(package));
         }
 
+        /// <summary>How the file imports a package, in its own format.</summary>
+        private string ImportLine(string package) => IsCode ? $"import {package}" : $"<import package=\"{package}\" />";
+
         private QuickFix[] AddImportFix(string package)
         {
+            if (IsCode)
+            {
+                // After the last import line; else at the top of the file, or inside a KScript.Window { } root.
+                MarkupElement top = result.Markup.RootElements.FirstOrDefault();
+                MarkupElement last = top?.ChildElements.LastOrDefault(c => c.Name == "import");
+                string fix = $"Add import {package}";
+                if (last != null)
+                {
+                    return new[] { new QuickFix(fix, new TextChange(new TextSpan(last.Span.End, 0), $"\nimport {package}")) };
+                }
+                if (top != null && top.Name != "kscript" && top.ContentSpan.Length > 0)
+                {
+                    return new[] { new QuickFix(fix, new TextChange(new TextSpan(top.ContentSpan.Start, 0), $"\n  import {package}")) };
+                }
+                return new[] { new QuickFix(fix, new TextChange(new TextSpan(0, 0), $"import {package}\n")) };
+            }
+
             MarkupElement root = result.Markup.RootElements.FirstOrDefault();
             if (root == null || !root.StartTagClosed || root.SelfClosing)
             {

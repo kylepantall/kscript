@@ -18,6 +18,7 @@ namespace KScript.Language.Features
         Keyword,
         File,
         Snippet,
+        Folder,
     }
 
     public sealed class CompletionItem

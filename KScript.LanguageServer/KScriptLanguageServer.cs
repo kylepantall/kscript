@@ -763,6 +763,7 @@ namespace KScript.LanguageServer
             CompletionKind.Field => 5,
             CompletionKind.Keyword => 14,     // Keyword
             CompletionKind.File => 17,        // File
+            CompletionKind.Folder => 19,      // Folder
             _ => 15,                          // Snippet
         };
 
