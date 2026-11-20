@@ -130,7 +130,7 @@ namespace KScript.IO
             p.Command("read_text", "path", "The text of a file. Relative paths are from the script's folder.", KType.String, c => File.ReadAllText(PathOf(c.Need(0), c)),
                 "<let name=\"config\" value=\"@read_text('config.json') |> @json()\" />");
             p.Command("read_lines", "path", "The lines of a file.", KType.List, c => File.ReadAllLines(PathOf(c.Need(0), c)).Cast<object>().ToList());
-            p.Command("read_json", "path", "A JSON file read into maps and lists.", KType.Any, c => Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))));
+            p.Command("read_json", "path, as?: type", "A JSON file read into maps and lists. With as: a <type>, the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))), 1));
             p.Command("write_text", "path, text", "Writes text to a file, replacing it. Folders are created as needed.", KType.Null, c => Write(c, c.Str(1), append: false));
             p.Command("append_text", "path, text", "Adds text to the end of a file.", KType.Null, c => Write(c, c.Str(1), append: true));
             p.Command("write_json", "path, value", "Writes a value to a file as indented JSON.", KType.Null, c => Write(c, Values.ToJson(c.Arg(1), indented: true), append: false));

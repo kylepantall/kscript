@@ -56,6 +56,12 @@ namespace KScript.Metadata
 
         /// <summary>Statements run when something happens, such as a click: <c>on-click="count += 1"</c>. <c>$event</c> describes it.</summary>
         Statements,
+
+        /// <summary>A type: a built-in (see the attribute's options), an &lt;enum&gt; or a &lt;type&gt;, with <c>[]</c> for a list and <c>?</c> to allow null.</summary>
+        TypeName,
+
+        /// <summary>The fields of a &lt;type&gt; on one line: <c>login: string, id?: int, tags: string[] = []</c>.</summary>
+        Fields,
     }
 
     /// <summary>What an element's content holds.</summary>

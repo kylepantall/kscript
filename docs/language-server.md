@@ -83,6 +83,6 @@ always in the description the package registers.
 | KS2xxx | Expressions (syntax, assignment outside `let`/`set`/`do`, bare identifiers) |
 | KS3xxx | Elements and attributes (unknown, retired, missing, invalid values, placement), imports (KS3009 missing import, KS3010 unknown package) |
 | KS4xxx | Names (undefined variables and functions, constants, duplicates) |
-| KS5xxx | Calls (unknown or retired commands and methods, argument counts, type mismatches) |
+| KS5xxx | Calls (unknown or retired commands and methods, argument counts, type mismatches), KS5010 a field a `<type>`'s records don't have |
 
 The constants are in `DiagnosticCodes`; each has positive and negative tests in `AnalyzerTests`.

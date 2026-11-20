@@ -38,6 +38,15 @@ namespace KScript.Language.Analysis
 
         public string Type { get; }
 
+        /// <summary>For records made by a &lt;type&gt;, and for the type itself: the type's name, shown instead of its fields.</summary>
+        public string Name { get; init; }
+
+        /// <summary>True for records of a &lt;type&gt; without extra="keep": reading a field it doesn't list is a mistake.</summary>
+        public bool Closed { get; init; }
+
+        /// <summary>For a &lt;type&gt; value (<c>$Repo</c>): the shape of the records it makes.</summary>
+        public TypeShape Instance { get; init; }
+
         /// <summary>Known fields of a map (from a literal, or of a built-in type such as $request).</summary>
         public IDictionary<string, FieldInfo> Fields { get; } = new Dictionary<string, FieldInfo>(StringComparer.Ordinal);
 
@@ -56,6 +65,10 @@ namespace KScript.Language.Analysis
         /// </summary>
         public string Display(int depth = 0)
         {
+            if (Name != null)
+            {
+                return Type == KType.Type ? "type " + Name : Name;
+            }
             if (Type == KType.List)
             {
                 return Element == null || Element.Type == KType.Any ? "list" : $"list<{Element.Display(depth + 1)}>";
@@ -83,7 +96,7 @@ namespace KScript.Language.Analysis
         public string Pretty(string indent = "", int depth = 0)
         {
             string flat = Display();
-            if (flat.Length <= 48 || depth >= 3)
+            if (flat.Length <= 48 || depth >= 3 || Name != null)
             {
                 return flat;
             }

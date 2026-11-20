@@ -46,7 +46,7 @@ namespace KScript.Runtime
                 ContentKind.Expression,
                 new A("name", K.DeclareVariable, "The variable to declare."),
                 new A("value", K.Expression, "The initial value. Can be written as the element's text instead."),
-                new A("type", K.Enum, "Convert the value to this type, or fail early.", false, Values.DeclarableTypes),
+                new A("type", K.TypeName, "Convert the value to this type, or fail early: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes),
                 new A("const", K.Bool, "yes makes a later <set> an error."))
             {
                 Example = "<let name=\"count\" value=\"0\" />\n<let name=\"people\">[{ name: 'Joan', age: 82 }]</let>\n<let>x = 3</let>",
@@ -56,7 +56,7 @@ namespace KScript.Runtime
                 ContentKind.Expression,
                 new A("name", K.DeclareVariable, "The constant to declare.", true),
                 new A("value", K.Expression, "Its value. Can be written as the element's text instead."),
-                new A("type", K.Enum, "Convert the value to this type, or fail early.", false, Values.DeclarableTypes),
+                new A("type", K.TypeName, "Convert the value to this type, or fail early: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes),
                 new A("description", K.Text, "What the constant is for, shown on hover."))
             {
                 Example = "<const name=\"max_size\" value=\"10 * 1024\" />",
@@ -65,7 +65,7 @@ namespace KScript.Runtime
                 string name = run.VariableName("name");
                 object value = run.Has("value") ? run.Eval("value") : run.EvalContent();
                 string type = run.Raw("type");
-                if (type != null) value = Values.ConvertTo(value, type, "$" + name);
+                if (type != null) value = Shapes.Convert(run.Interpreter, value, type, "$" + name, run.Scope, run.Module);
                 run.Scope.Declare(name, value, isConst: true);
                 return null;
             });
@@ -90,12 +90,40 @@ namespace KScript.Runtime
                 return null;
             });
 
+            p.Element(new ElementInfo("type", "Declares the shape of some data, such as an API response. `->json(as: Repo)`, `$Repo->from($data)`, `<let type=\"Repo\">` and `repo: Repo` parameters check data against it and turn it into a record: a map whose fields the editor knows. Every problem is reported at once, with its JSON path.",
+                ContentKind.Statements,
+                new A("name", K.DeclareVariable, "The type's name, used as `type=\"Repo\"`, `as: Repo` and $Repo.", true),
+                new A("fields", K.Fields, "The fields on one line, like fn params: `login: string, id: int, avatar_url?: string, tags: string[] = []`."),
+                new A("sample", K.Path, "A JSON file holding an example of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
+                new A("extra", K.Enum, "Keys in the data that the type doesn't list: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
+                new A("description", K.Text, "What the type is, shown on hover."))
+            {
+                Example = "<type name=\"User\" fields=\"login: string, id: int\" />\n<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int\" from=\"stargazers_count\" />\n  <field name=\"owner\" type=\"User\" />\n</type>\n<let name=\"repo\" value=\"$Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })\" />\n<echo>$repo.name has $repo.stars stars</echo>",
+            }, run =>
+            {
+                RecordType type = Shapes.Declare(run);
+                run.Scope.Declare(type.Name, type, isConst: true);
+                return null;
+            });
+
+            p.Element(new ElementInfo("field", "One field of a <type>.", ContentKind.Empty,
+                new A("name", K.Text, "The field's name. End it with ? to make it optional.", true),
+                new A("type", K.TypeName, "The field's type: a built-in such as string or int, an <enum>, another <type>, T[] for a list, T? to allow null. Defaults to any.", false, Values.DeclarableTypes),
+                new A("from", K.Text, "Where to read the value, when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`."),
+                new A("default", K.Expression, "The value when the data has none (makes the field optional)."),
+                new A("optional", K.Bool, "yes lets the value be missing or null."),
+                new A("value", K.Expression, "Works the field out from the others (they are $name) instead of reading it: `$first + ' ' + $last`."),
+                new A("description", K.Text, "What the field holds, shown on hover and completion."))
+            {
+                MustBeInside = new[] { "type" },
+            }, run => throw run.Error("<field> must be directly inside <type>.", null, "Syntax"));
+
             p.Element(new ElementInfo("set", "Changes an existing variable. Fails if the variable was never declared (a typo guard) or is const. Without `name`, the text is assignment statements.",
                 ContentKind.Expression,
                 new A("name", K.VariableReference, "The variable to change."),
                 new A("value", K.Expression, "The new value. Can be written as the element's text instead."),
                 new A("op", K.Enum, "Update instead of replace: op=\"+=\" value=\"1\".", false, "=", "+=", "-=", "*=", "/=", "??="),
-                new A("type", K.Enum, "Convert the value to this type, or fail.", false, Values.DeclarableTypes))
+                new A("type", K.TypeName, "Convert the value to this type, or fail: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes))
             {
                 Example = "<set name=\"total\" value=\"$total + $price * $qty\" />\n<set>count += 1</set>",
             }, run => Assign(run, declare: false));
@@ -331,7 +359,7 @@ namespace KScript.Runtime
             string name = run.VariableName("name");
             object value = run.Has("value") ? run.Eval("value") : run.EvalContent();
             string type = run.Raw("type");
-            if (type != null) value = Values.ConvertTo(value, type, "$" + name);
+            if (type != null) value = Shapes.Convert(run.Interpreter, value, type, "$" + name, run.Scope, run.Module);
 
             string op = run.Raw("op")?.Trim();
             if (op != null && op != "=")
@@ -614,7 +642,7 @@ namespace KScript.Runtime
 
         private static void RegisterCommands(PackageBuilder p)
         {
-            p.Command("json", "text", "Parses JSON text into a value.", KType.Any, c => Values.ParseJson(c.Str(0)), "@json('{ \"a\": 1 }').a");
+            p.Command("json", "text, as?: type", "Parses JSON text into a value. With as: a <type> (or 'Repo[]'), the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(c.Str(0)), 1), "@json('{ \"a\": 1 }').a");
             p.Command("to_json", "value, indented?: bool", "A value as JSON text.", KType.String, c => Values.ToJson(c.Arg(0), c.Bool(1)));
             p.Command("now", "", "The current date and time.", KType.Date, c => DateTime.Now, "@now()->format('d MMMM yyyy')");
             p.Command("today", "", "Today's date, at midnight.", KType.Date, c => DateTime.Today);
@@ -638,7 +666,7 @@ namespace KScript.Runtime
             p.Command("number", "value, default?", "Converts a value to a number (or returns default when it isn't one).", KType.Number, c =>
                 Values.TryNumber(c.Arg(0), out double n) ? n : c.Has(1) ? c.Arg(1) : throw c.Error($"{Values.Describe(c.Arg(0))} is not a number.", "Type"));
             p.Command("string", "value", "Converts a value to text.", KType.String, c => Values.ToStr(c.Arg(0)));
-            p.Command("type", "value", "The type of a value: string, number, bool, list, map, fn, date or null.", KType.String, c => Values.TypeOf(c.Arg(0)));
+            p.Command("type", "value", "The type of a value: string, number, bool, list, map, fn, date or null, or the name of the <type> that made a record.", KType.String, c => Shapes.TypeName(c.Arg(0)));
             p.Command("min", "values...", "The smallest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: true));
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));
             p.Command("to_lower", "text", "The text in lower case.", KType.String, c => c.Str(0).ToLowerInvariant());

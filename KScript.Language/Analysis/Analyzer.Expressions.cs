@@ -122,6 +122,10 @@ namespace KScript.Language.Analysis
         {
             foreach (ArgumentNode arg in args)
             {
+                if (BareWord(arg) is (_, false, IdentifierNode typeNode) && ReferenceBareType(typeNode, region, scope))
+                {
+                    continue;
+                }
                 if (BareWord(arg) is var (word, _, node) && scope.Lookup(word, region.Source.ToSource(node.Span.Start))?.Kind != SymbolKind.Import)
                 {
                     pendingBare.Add(arg);
@@ -138,7 +142,7 @@ namespace KScript.Language.Analysis
 
         private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context)
         {
-            if (id.Name == "_" && context == ExprContext.Argument)
+            if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceBareType(id, region, scope))
             {
                 return;
             }
@@ -429,6 +433,7 @@ namespace KScript.Language.Analysis
         private void CheckField(MemberNode member, ExpressionRegion region)
         {
             TypeShape target = Infer(member.Target, region);
+            CheckRecordField(target, member, region);
             if ((target.Type == KType.Request || target.Type == KType.Error) && member.Name.Length > 0 && !target.Fields.ContainsKey(member.Name))
             {
                 TextSpan span = region.Source.ToSource(member.NameSpan);

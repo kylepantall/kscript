@@ -28,13 +28,5 @@ namespace KScript.Runtime
             string close = value is string text ? KScript.Runtime.Values.Closest(text, Keys) : null;
             throw new KScriptException($"{what} must be a {Name}: {string.Join(", ", Keys)}. It was {KScript.Runtime.Values.Describe(value)}." + (close != null ? $" Did you mean {close}?" : string.Empty), "Type");
         }
-
-        /// <summary>Finds the &lt;enum&gt; a parameter type names.</summary>
-        internal static EnumType Resolve(string type, Scope scope, Module module, string function)
-        {
-            if (scope.TryGet(type, out object found) && found is EnumType e) return e;
-            if (module != null && module.Globals.TryGet(type, out found) && found is EnumType g) return g;
-            throw new KScriptException($"Unknown type '{type}' for a parameter of @{function}(). Declare it with <enum name=\"{type}\" values=\"...\" />, or use one of: {string.Join(", ", KScript.Runtime.Values.DeclarableTypes)}.", "Type");
-        }
     }
 }

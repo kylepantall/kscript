@@ -34,7 +34,7 @@ namespace KScript.Language.Features
                         Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
                         Documentation = c.Description,
                         Parameters = s.Parameters.Select(p => (p.Label, p.Description)).ToList(),
-                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : null, p.IsFlag)).ToList(),
+                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : null, p.IsFlag)).ToList(),
                     });
                 }
             }
