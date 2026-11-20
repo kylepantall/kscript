@@ -75,8 +75,8 @@ namespace KScript.Auth
     /// </summary>
     public sealed class AuthPackage : KScriptPackage
     {
-        public const string SessionType = "session";
-        public const string UsersType = "users";
+        public const string SessionType = KType.Session;
+        public const string UsersType = KType.Users;
 
         public override string Name => "KScript.Auth";
 

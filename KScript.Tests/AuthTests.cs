@@ -215,8 +215,22 @@ public sealed class AuthKitTests : AuthSiteFixture
     [Fact]
     public void ResettingAPassword()
     {
+        // The controller's log statement writes the link to the server's error stream.
         var log = new StringWriter();
-        var app = new HttpApp(Dir, ProjectConfig.Load(Path.Combine(Dir, "kscript.json")), log);
+        TextWriter error = Console.Error;
+        Console.SetError(log);
+        try
+        {
+            Reset(App(), log);
+        }
+        finally
+        {
+            Console.SetError(error);
+        }
+    }
+
+    private static void Reset(HttpApp app, StringWriter log)
+    {
         var b = new Browser(app);
         SignUp(b);
         var elsewhere = new Browser(app);
@@ -281,7 +295,7 @@ public sealed class AuthKitTests : AuthSiteFixture
         Assert.Equal(401, refused.Status);
         Assert.Contains("don't match an account", refused.Body);
 
-        string id = Regex.Match(b.Get("/account").Body, "/account/tokens/([a-f0-9]+)/delete").Groups[1].Value;
+        string id = Regex.Match(b.Get("/account").Body, @"laptop, made[^<]*<form method=""post"" action=""/account/tokens/([a-f0-9]+)/delete""").Groups[1].Value;
         b.Send("POST", $"/account/tokens/{id}/delete", new Dictionary<string, object> { ["_token"] = b.Token });
         Assert.Contains("The token was revoked.", b.Get("/account").Body);
         Assert.Equal(401, api.Get("/api/me", bearer).Status);
@@ -316,7 +330,7 @@ public sealed class AuthMakeTests : AuthSiteFixture
         string routes = Read("routes/web.ks.xml");
         Assert.Contains("<import package=\"KScript.Auth\" />", routes);
         Assert.Contains("<Group middleware=\"guest\">", routes);
-        Assert.Contains("<fn name=\"sign_in\" params=\"form\">", Read("controllers/accounts.ks.xml"));
+        Assert.Contains("<fn name=\"sign_up\" params=\"form\"", Read("controllers/accounts.ks.xml"));
         Assert.DoesNotContain("accounts", Read("routes/api.kscript"));
 
         var b = new Browser(App());
