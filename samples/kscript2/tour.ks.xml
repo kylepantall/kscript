@@ -15,6 +15,7 @@
   <let>x = 3</let>
   <set>x += 1</set>
   <do>$x = 3; $total += $price * $qty</do>
+  <echo>$x $total</echo>
   <let name="config" const="yes">{ debug: false, retries: 3 }</let>
   <echo>Hello, $name! Total: { ($price * $qty)->round(digits: 2) }. Use {{ and }} for braces.</echo>
 
@@ -30,6 +31,7 @@
       |> join(', ')" />
   <let name="by_age" value="fn($a, $b) => $a.age - $b.age" />
   <let name="sorted" value="$people->sort($by_age)" />
+  <echo>Youngest: {$sorted[0].name}</echo>
   <echo>{ $names |> @to_lower() |> @greet(greeting: 'Hi') }</echo>
 
   <!-- Loops -->
@@ -76,6 +78,7 @@
     </default>
   </match>
   <let name="label" value="match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }" />
+  <echo>$label</echo>
 
   <!-- Functions -->
   <fn name="greet" params="who, greeting = 'Hello'">
@@ -89,6 +92,7 @@
   <let name="path" value="'data.json'" />
   <try>
     <let name="data" value="@read_text($path) |> @json()" />
+    <echo>$data</echo>
     <catch as="err" when="$err.type eq 'FileNotFound'">
       <echo>No file at {$path}, using defaults.</echo>
     </catch>

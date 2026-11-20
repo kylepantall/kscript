@@ -29,7 +29,7 @@ namespace KScript.Language.Tests
         private static readonly LanguageService Service = new LanguageService(files: Files);
 
         private static DocumentAnalysis Analyze(string body, string file = "routes.ks.xml") =>
-            Analyzer.Analyze("<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n" + body + "\n</KScript.Routes>", Path.Combine(Site, file), Files);
+            TestHelpers.WithoutUnused(Analyzer.Analyze("<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n" + body + "\n</KScript.Routes>", Path.Combine(Site, file), Files));
 
         [Theory]
         [InlineData("<Get path=\"/people/{id}\" to=\"people.show\" where=\"id: int\" name=\"people.show\" />")]

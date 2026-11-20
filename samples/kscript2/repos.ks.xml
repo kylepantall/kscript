@@ -11,6 +11,7 @@
   <!-- The same works for a live API: @fetch($url)->check()->json(as: Repo) with KScript.Net. -->
   <try>
     <let name="bad" value="$Repo->from({ name: 'x', stargazers_count: 'lots', visibility: 'secret' })" />
+    <echo>Not reached: {$bad.name}</echo>
     <catch as="err">
       <echo>{ $err.problems->count() } problems, the first at { $err.problems[0].path }</echo>
     </catch>

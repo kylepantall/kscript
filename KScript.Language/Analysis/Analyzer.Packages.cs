@@ -180,6 +180,10 @@ namespace KScript.Language.Analysis
         /// <summary>Reports <paramref name="what"/> (such as "&lt;input&gt;") when its package isn't imported.</summary>
         private void RequirePackage(string package, TextSpan span, string what)
         {
+            if (package != null)
+            {
+                usedPackages.Add(package);
+            }
             if (!ChecksImports || package == null || importedPackages.Contains(package))
             {
                 return;

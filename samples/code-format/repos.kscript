@@ -10,6 +10,7 @@ for repo in $repos {
 // The same works for a live API: @fetch($url)->check()->json(as: Repo) with KScript.Net.
 try {
   bad = $Repo->from({ name: 'x', stargazers_count: 'lots', visibility: 'secret' })
+  echo "Not reached: {$bad.name}"
 } catch err {
   echo "{ $err.problems->count() } problems, the first at { $err.problems[0].path }"
 }

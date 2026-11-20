@@ -262,8 +262,12 @@ namespace KScript.Language.Analysis
                 return fn;
             }
 
-            if (catalog.GetCommand(name) != null)
+            if (catalog.GetCommand(name) is CallableInfo command)
             {
+                if (command.Package != null)
+                {
+                    usedPackages.Add(command.Package);
+                }
                 return null;
             }
 
@@ -291,6 +295,7 @@ namespace KScript.Language.Analysis
                 return;
             }
             result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+            NoteMemberUse(import, member);
             if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member))
             {
                 Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{aliasName}' has no '{member}'.",
