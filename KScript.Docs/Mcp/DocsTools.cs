@@ -57,7 +57,7 @@ namespace KScript.Docs.Mcp
                     Schema(("code", "string", "The code to check (XML or .kscript). Give code or path.", false), ("path", "string", "A file to check instead, relative to the server's folder.", false), FormatParameter),
                     CheckCode),
                 new Tool("format_code", "Format KScript code",
-                    "Format XML scripts and .html pages the way kscript fmt does (with the project's format settings). Returns the formatted code; nothing is written.",
+                    "Format scripts (XML or .kscript) and .html pages the way kscript fmt does (with the project's format settings). Returns the formatted code; nothing is written.",
                     Schema(("code", "string", "The code to format. Give code or path.", false), ("path", "string", "A file to format instead, relative to the server's folder.", false), FormatParameter),
                     FormatCode),
                 new Tool("convert_code", "Convert between XML and .kscript",

@@ -270,6 +270,66 @@ namespace KScript.Language.Tests
             Assert.True(CodeMeaning.Same(CodeParser.Parse("x=add(1 ,2)\n\n"), CodeParser.Parse("x = add(1, 2)\n"), out _));
         }
 
+        [Fact]
+        public void CoversTheRarerCases()
+        {
+            // Escapes in strings, and a string before a comparison (not an assignment) on a block's line.
+            Assert.Equal("if 'a\\'b' == $x {\n  echo \"q\\\"q\"\n}\n", Fmt("if 'a\\'b' == $x {\necho \"q\\\"q\"\n}\n"));
+            // ??= is an assignment.
+            Assert.Equal("x ??= 1\n", Fmt("x??=1\n"));
+            // An = after echo is text, not an assignment.
+            Assert.Equal("echo x=1\n", Fmt("echo x=1\n"));
+            // A comment that opens and closes on one line.
+            Assert.Equal("x = 1 /* one */\n/* two\n   three */\n", Fmt("x = 1 /* one */\n/* two\n   three */\n"));
+            // With finalNewline off, the file keeps its own ending (shrunk to maxBlankLines).
+            Assert.Equal("a = 1\n\n", Fmt("a = 1\n\n\n\n", Without(o => o.FinalNewline = false)));
+            // An explicit lf turns CRLF into LF.
+            Assert.Equal("a = 1\n", Fmt("a = 1\r\n", new FormatOptions { EndOfLine = EndOfLine.Lf }));
+            // Brackets inside a wrapped list stay with their item.
+            string input = "x = call(inner(1, 2), \"" + new string('a', 60) + "\", \"" + new string('b', 50) + "\")\n";
+            Assert.StartsWith("x = call(\n  inner(1, 2),\n", Fmt(input));
+        }
+
+        [Fact]
+        public void IgnoreCommentSkipsBlankLinesAndComments()
+        {
+            string input = "// kscript-fmt-ignore\n\n// why\ngrid = [1,0]\nx=1\n";
+            Assert.Equal("// kscript-fmt-ignore\n\n// why\ngrid = [1,0]\nx = 1\n", Fmt(input));
+            Assert.Equal("x = 1\n// kscript-fmt-ignore\n", Fmt("x=1\n// kscript-fmt-ignore\n"));
+            Assert.Equal("// kscript-fmt-ignore\n\ngrid = [1,0]\n", Fmt("// kscript-fmt-ignore\n   \ngrid = [1,0]\n"));
+        }
+
+        [Fact]
+        public void AResultThatMeansSomethingElseIsNotUsed()
+        {
+            CodeFormatter.Tamper = t => t.Replace("1", "2");
+            try
+            {
+                FormatResult result = Formatter.Format("x = 1\n", "test.kscript");
+                Assert.False(result.Succeeded);
+                Assert.Equal("not formatted: tidying this file would change what it does (text changed at line 1). Please report it.", result.Error);
+            }
+            finally
+            {
+                CodeFormatter.Tamper = null;
+            }
+        }
+
+        [Fact]
+        public void TheMeaningCheckNamesWhatChanged()
+        {
+            static string Diff(string a, string b)
+            {
+                Assert.False(CodeMeaning.Same(CodeParser.Parse(a), CodeParser.Parse(b), out string d));
+                return d;
+            }
+            Assert.StartsWith("the result has an error", Diff("a = 1\n", "if yes {\n"));
+            Assert.Equal("<if> became <while> at line 1", Diff("if yes {\n}\n", "while yes {\n}\n"));
+            Assert.StartsWith("the attributes of", Diff("Text(size: 1) \"a\"\n", "Text(size: 1, wrap) \"a\"\n"));
+            Assert.EndsWith("size changed at line 1", Diff("Text(size: 1) \"a\"\n", "Text(size: 2) \"a\"\n"));
+            Assert.Equal("a statement changed kind at line 1", Diff("// note\n", "x = 1\n"));
+        }
+
         // ---- every .kscript file in the repository ----------------------------------------------------------------
 
         public static IEnumerable<object[]> RepositoryFiles()

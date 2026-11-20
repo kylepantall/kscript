@@ -76,18 +76,22 @@ namespace KScript.Language.Formatting
             string lf = body.Replace("\r\n", "\n");
 
             // The full set of rules first; if the result means something else, only the line layout; else nothing.
+            string where = null;
             foreach (bool full in new[] { true, false })
             {
                 string formatted = Run(lf, options, full);
-                if (CodeMeaning.Same(original, CodeParser.Parse(formatted), out _))
+                if (Tamper != null) formatted = Tamper(formatted);
+                if (CodeMeaning.Same(original, CodeParser.Parse(formatted), out where))
                 {
                     return new FormatResult { Text = bom + (eol == "\n" ? formatted : formatted.Replace("\n", eol)) };
                 }
             }
-
-            CodeMeaning.Same(original, CodeParser.Parse(Run(lf, options, full: false)), out string where);
-            return new FormatResult { Error = "not formatted: tidying this file would change what it does" + (where != null ? $" ({where})" : string.Empty) + ". Please report it." };
+            return new FormatResult { Error = $"not formatted: tidying this file would change what it does ({where}). Please report it." };
         }
+
+        /// <summary>Tests only: changes each result before the meaning check, to show what happens when a result means something else.</summary>
+        [ThreadStatic]
+        internal static Func<string, string> Tamper;
 
         private static string Run(string text, FormatOptions options, bool full)
         {
@@ -135,18 +139,6 @@ namespace KScript.Language.Formatting
             public bool[] Verbatim;      // characters inside kscript-fmt: off regions and ignored statements
 
             public bool IsCode(int i) => i >= 0 && i < Text.Length && States[i] == State.Code;
-
-            public int LineOf(int offset)
-            {
-                int lo = 0, hi = LineStarts.Count - 1;
-                while (lo < hi)
-                {
-                    int mid = (lo + hi + 1) / 2;
-                    if (LineStarts[mid] <= offset) lo = mid;
-                    else hi = mid - 1;
-                }
-                return lo;
-            }
 
             public int LineEnd(int line) => line + 1 < LineStarts.Count ? LineStarts[line + 1] - 1 : Text.Length;
         }
@@ -476,15 +468,10 @@ namespace KScript.Language.Formatting
                 else if (c == '}' && s.IsBlock[i])
                 {
                     int next = SkipSpaces(text, i + 1);
-                    if (next < text.Length && text[next] != '\n' && s.States[next] == State.Code && Lexer.IsIdentStart(text[next]))
-                    {
-                        // } x = 1: the next statement starts a new line; } else stays.
-                        if (options.StatementPerLine && !ChainWords.Contains(WordAt(text, next)))
-                        {
-                            edits.Replace(i + 1, next - (i + 1), "\n");
-                        }
-                    }
-                    else if (options.BraceStyle)
+                    // A word after a block's } on its line can only be else, catch and the like (the parser wants a
+                    // new line before any other statement), so it stays where it is.
+                    bool wordFollows = next < text.Length && text[next] != '\n' && s.States[next] == State.Code && Lexer.IsIdentStart(text[next]);
+                    if (!wordFollows && options.BraceStyle)
                     {
                         // }\nelse { becomes } else {, when only whitespace is between them.
                         int p = i + 1;

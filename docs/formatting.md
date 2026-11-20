@@ -24,9 +24,9 @@ The formatter only touches whitespace that can't change what a file does.
 - Trailing spaces are removed, runs of blank lines shrink to `maxBlankLines` (and go entirely at the start and end of a block), and the file ends with exactly one newline.
 
 ```kscript
-x=add(1 ,2)
-for i in 1..$x { echo $i }
-if $x > 2{
+x=[3 ,1,2]
+for i in $x { echo $i }
+if $x->count() > 2{
 echo 'big'
 }
 else {
@@ -37,11 +37,11 @@ echo 'small'
 becomes
 
 ```kscript
-x = add(1, 2)
-for i in 1..$x {
+x = [3, 1, 2]
+for i in $x {
   echo $i
 }
-if $x > 2 {
+if $x->count() > 2 {
   echo 'big'
 } else {
   echo 'small'
