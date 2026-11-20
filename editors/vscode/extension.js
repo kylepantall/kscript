@@ -5,6 +5,7 @@ const vscode = require('vscode');
 const { LanguageClient, TransportKind, State } = require('vscode-languageclient/node');
 const { resolveServer, versionOf, supportsLsp } = require('./src/server');
 const { isSiteFolder } = require('./src/site');
+const { registerBlockDividers } = require('./src/blocks');
 
 const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-needed';
 
@@ -27,6 +28,8 @@ async function pagesEnabled() {
   const marker = await vscode.workspace.findFiles('{**/_components/*.html,**/_layout.html,**/_layouts/*.html,**/kscript.json}', '**/node_modules/**', 1);
   return marker.length > 0;
 }
+
+let refreshBlocks;
 
 async function startClient(context) {
   const server = resolveServer(config().get('server.path', ''), config().get('server.args', ['lsp']));
@@ -70,6 +73,7 @@ async function startClient(context) {
     synchronize: { fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{xml,ks,kscript,html,md,json}') },
   });
   client.onDidChangeState((e) => {
+    if (e.newState === State.Running && refreshBlocks) refreshBlocks();
     if (e.newState === State.Running) setStatus('$(check) KScript', `kscript ${version || ''} language server is running.`, 'kscript.showOutput');
     if (e.newState === State.Stopped) setStatus('$(error) KScript', 'The KScript language server stopped. Click to see its output.', 'kscript.showOutput');
   });
@@ -105,6 +109,7 @@ async function activate(context) {
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
   status.name = 'KScript';
   context.subscriptions.push(output, status);
+  refreshBlocks = registerBlockDividers(vscode, context, () => client);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('kscript.restartServer', async () => {

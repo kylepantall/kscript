@@ -38,7 +38,11 @@ namespace KScript.Runtime
         }
 
         /// <summary>Replaces <c>{ expr }</c> (and, in element text, bare <c>$name</c>) in text. <paramref name="escape"/> is applied to inserted values, except <c>{! raw }</c>.</summary>
-        public string Interpolate(DecodedText text, Scope scope, Module module, bool bareReferences, Func<string, string> escape = null)
+        public string Interpolate(DecodedText text, Scope scope, Module module, bool bareReferences, Func<string, string> escape = null) =>
+            Interpolate(text, scope, module, bareReferences, escape, Values.ToStr);
+
+        /// <summary>As <see cref="Interpolate(DecodedText, Scope, Module, bool, Func{string, string})"/>, turning each value into text with <paramref name="format"/>.</summary>
+        public string Interpolate(DecodedText text, Scope scope, Module module, bool bareReferences, Func<string, string> escape, Func<object, string> format)
         {
             if (text == null) return string.Empty;
             Template template = GetTemplate(module, text, bareReferences);
@@ -53,15 +57,23 @@ namespace KScript.Runtime
                         sb.Append(segment.Text);
                         break;
                     case TemplateSegmentKind.RawInterpolation:
-                        sb.Append(Values.ToStr(Evaluate(segment.Node, scope, ctx)));
+                        sb.Append(format(Evaluate(segment.Node, scope, ctx)));
                         break;
                     default:
-                        string value = Values.ToStr(Evaluate(segment.Node, scope, ctx));
+                        string value = format(Evaluate(segment.Node, scope, ctx));
                         sb.Append(escape != null ? escape(value) : value);
                         break;
                 }
             }
             return sb.ToString();
+        }
+
+        /// <summary>True if the text is one value and nothing else: <c>{ $person }</c> or a bare <c>$person</c> in element text.</summary>
+        public bool IsSingleValue(DecodedText text, Module module, bool bareReferences)
+        {
+            if (text == null) return false;
+            Template template = GetTemplate(module, text, bareReferences);
+            return template.Expressions.Count() == 1 && template.Segments.All(s => s.Kind != TemplateSegmentKind.Text || string.IsNullOrWhiteSpace(s.Text));
         }
 
         /// <summary>

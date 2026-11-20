@@ -72,7 +72,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("echo", "Prints its text. `{ expr }` inserts a value; `$name` and `$name->method()` work directly.", ContentKind.Template,
                 new A("value", K.Expression, "Print this value instead of the text."),
-                new A("format", K.Enum, "How to print: text (the default), json, or markdown (with KScript.Terminal).", false, "text", "json", "markdown"),
+                new A("format", K.Enum, "How to print: text (the default), json (indented and, in a terminal, coloured), or markdown (with KScript.Terminal). A map or nested list on its own is printed as json.", false, "text", "json", "markdown"),
                 new A("newline", K.Bool, "no leaves the cursor at the end of the line."))
             {
                 Example = "<echo>Hello, $name! You have { $items->count() } items.</echo>",
@@ -310,16 +310,40 @@ namespace KScript.Runtime
         {
             string format = run.Raw("format")?.Trim() ?? "text";
             string text;
+            bool json = format == "json";
             if (run.Has("value"))
             {
                 object value = run.Eval("value");
-                text = format == "json" ? Values.ToJson(value, indented: true) : Values.ToStr(value);
+                // A map or a nested list on its own is printed as indented JSON.
+                json |= format == "text" && JsonText.IsStructured(value);
+                text = json ? JsonText.Pretty(value) : Values.ToStr(value);
+            }
+            else if (format == "json")
+            {
+                // JSON written out in the element is used as it is; otherwise the text is filled in first ({ } and $name).
+                string raw = run.Content?.Value?.Trim();
+                text = JsonText.Pretty(raw != null && JsonText.IsValid(raw) ? Values.ParseJson(raw) : Values.ParseJson(run.Text()));
             }
             else
             {
-                text = run.Text();
-                if (format == "json") text = Values.ToJson(Values.ParseJson(text), indented: true);
+                string structured = null;
+                bool single = format == "text" && run.ContentIsSingleValue;
+                text = run.Text(value =>
+                {
+                    if (single && JsonText.IsStructured(value))
+                    {
+                        structured = JsonText.Pretty(value);
+                        return string.Empty;
+                    }
+                    return Values.ToStr(value);
+                });
+                if (structured != null)
+                {
+                    text = structured;
+                    json = true;
+                }
             }
+            if (json && run.Host.UseColour) text = JsonText.Colourize(text);
 
             if (format != "text" && format != "json")
             {

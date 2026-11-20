@@ -53,7 +53,7 @@ namespace KScript.Language.Features
             {
                 help.Signatures.Add(new SignatureInfo
                 {
-                    Label = fn.Signature,
+                    Label = fn.TypedSignature,
                     Documentation = fn.Description,
                     Parameters = fn.Parameters.Select(p => (p.Label, (string)null)).ToList(),
                 });
@@ -310,7 +310,7 @@ namespace KScript.Language.Features
                 OutlineItem item = new OutlineItem
                 {
                     Name = s.Kind == SymbolKind.Function ? s.Name : s.Kind == SymbolKind.Import ? s.Name : "$" + s.Name,
-                    Detail = s.Kind == SymbolKind.Function ? s.Signature : s.Kind == SymbolKind.Import ? s.Description : s.Shape.ToString(),
+                    Detail = s.Kind == SymbolKind.Function ? s.TypedSignature : s.Kind == SymbolKind.Import ? s.Description : s.Shape.ToString(),
                     Kind = kind.Value,
                     Span = s.DeclaringElement.Span,
                     SelectionSpan = s.DeclarationSpan,

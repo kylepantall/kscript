@@ -272,8 +272,7 @@ namespace KScript.Terminal
 
         public static string Colour(string name) => Colours.TryGetValue((name ?? string.Empty).Trim(), out string code) ? code : null;
 
-        public static bool Enabled(KScriptHost host) =>
-            Environment.GetEnvironmentVariable("FORCE_COLOR") != null || (host.IsInteractive && Environment.GetEnvironmentVariable("NO_COLOR") == null);
+        public static bool Enabled(KScriptHost host) => host.UseColour;
 
         public static string Style(KScriptHost host, string text, string code) => Enabled(host) ? Wrap(text, code) : text;
 

@@ -387,7 +387,7 @@ namespace KScript.Language.Analysis
             if (applicable.Count == 0)
             {
                 Report(nameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
-                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(receiver.ToString())}.");
+                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(receiver.Type)}.");
                 return;
             }
 

@@ -125,6 +125,7 @@ namespace KScript.Language.Features
         String,
         Number,
         Namespace,
+        Type,
     }
 
     [Flags]

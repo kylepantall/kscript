@@ -50,7 +50,94 @@ namespace KScript.Language.Analysis
 
         private TypeShape element;
 
-        public override string ToString() => Type == KType.List && Element != null && Element.Type != KType.Any ? $"list of {Element.Type}s" : Type;
+        /// <summary>
+        /// The shape written like a type: <c>string</c>, <c>list&lt;number&gt;</c>, <c>{ name: string, age: number }</c>
+        /// or <c>list&lt;{ name: string }&gt;</c>. Deep or wide maps are cut short with <c>…</c>.
+        /// </summary>
+        public string Display(int depth = 0)
+        {
+            if (Type == KType.List)
+            {
+                return Element == null || Element.Type == KType.Any ? "list" : $"list<{Element.Display(depth + 1)}>";
+            }
+            if (Type == KType.Map && Fields.Count > 0)
+            {
+                if (depth >= 2)
+                {
+                    return "{ … }";
+                }
+                const int shown = 6;
+                IEnumerable<string> parts = Fields.Values.Take(shown).Select(f => f.Name + ": " + f.Shape.Display(depth + 1));
+                return "{ " + string.Join(", ", parts) + (Fields.Count > shown ? ", …" : string.Empty) + " }";
+            }
+            return Type;
+        }
+
+        /// <summary>
+        /// Like <see cref="Display"/>, but a map with several fields is spread over lines, for hovers:
+        /// <code>{
+        ///   name: string,
+        ///   address: { city: string }
+        /// }</code>
+        /// </summary>
+        public string Pretty(string indent = "", int depth = 0)
+        {
+            string flat = Display();
+            if (flat.Length <= 48 || depth >= 3)
+            {
+                return flat;
+            }
+            if (Type == KType.List && Element != null)
+            {
+                return "list<" + Element.Pretty(indent, depth + 1) + ">";
+            }
+            if (Type == KType.Map && Fields.Count > 0)
+            {
+                string inner = indent + "  ";
+                const int shown = 24;
+                IEnumerable<string> lines = Fields.Values.Take(shown).Select(f => inner + f.Name + ": " + f.Shape.Pretty(inner, depth + 1));
+                return "{\n" + string.Join(",\n", lines) + (Fields.Count > shown ? ",\n" + inner + "…" : string.Empty) + "\n" + indent + "}";
+            }
+            return flat;
+        }
+
+        /// <summary>
+        /// A short form for inline labels (inlay hints): <see cref="Display"/> when it fits, otherwise a map shows only
+        /// its first field names: <c>{ grid, generation, history, … }</c>.
+        /// </summary>
+        public string Brief(int width = 40)
+        {
+            string full = Display();
+            if (full.Length <= width)
+            {
+                return full;
+            }
+            if (Type == KType.List && Element != null)
+            {
+                return "list<" + Element.Brief(width - 6) + ">";
+            }
+            if (Type == KType.Map && Fields.Count > 0)
+            {
+                List<string> names = new List<string>();
+                int length = 4;
+                foreach (string name in Fields.Keys)
+                {
+                    if (names.Count > 0 && length + name.Length + 2 > width)
+                    {
+                        break;
+                    }
+                    names.Add(name);
+                    length += name.Length + 2;
+                }
+                return "{ " + string.Join(", ", names) + (names.Count < Fields.Count ? ", …" : string.Empty) + " }";
+            }
+            return full;
+        }
+
+        /// <summary>True if nothing useful is known (any or null).</summary>
+        public bool IsVague => Type == KType.Any || Type == KType.Null;
+
+        public override string ToString() => Display();
     }
 
     public sealed class FieldInfo
@@ -85,6 +172,10 @@ namespace KScript.Language.Analysis
         public MarkupElement DeclaringElement { get; internal set; }
 
         public TypeShape Shape { get; internal set; } = TypeShape.Unknown;
+
+        /// <summary>For functions: the shape of what they return, worked out from <c>value</c> or their <c>&lt;return&gt;</c>s.</summary>
+        public TypeShape ReturnShape { get; internal set; } = TypeShape.Unknown;
+
         public string Description { get; internal set; }
 
         /// <summary>For functions: their parameters, in order, and how many are required.</summary>
@@ -103,6 +194,9 @@ namespace KScript.Language.Analysis
         public string Signature => Kind == SymbolKind.Function
             ? $"@{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
             : "$" + Name;
+
+        /// <summary>The signature with the return type when it is known: <c>@double(x: int): number</c>.</summary>
+        public string TypedSignature => Kind == SymbolKind.Function && ReturnShape.Type != KType.Any ? Signature + ": " + ReturnShape.Display() : Signature;
 
         public override string ToString() => $"{Kind} {Name}";
     }
