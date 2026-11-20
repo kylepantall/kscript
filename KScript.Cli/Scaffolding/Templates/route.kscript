@@ -1,0 +1,30 @@
+--- make
+description: A route, added to routes.kscript (or api.kscript with --api), with its controller made if it's missing
+category: Routes and APIs
+usage: <path> [--method get|post|put|patch|delete] [--api] [--to controller.action] [--resource] [--view name] [--name route.name]
+--method: The HTTP method: get (the default), post, put, patch, delete, options or any
+--api: Add it to api.kscript, served under /api with JSON errors, instead of routes.kscript
+--to: The controller function that answers it, such as people.list. By default the path picks it: users gives users.index, users/{id} gives users.show, and --method post gives users.store
+--controller: The controller to use or make, such as admin/users (default: the path without its {parameters})
+--action: The controller function (default from the method: index or show, store, update, destroy)
+--resource: Add Resource(path: …, to: …) for index, show, store, update and destroy, and make a resource controller
+--view: Answer with this view (made in views/ if it's missing) instead of a controller
+--name: A name for @route('name')
+--where: Rules for the parameters, such as "id: int"
+example: kscript make route users
+example: kscript make route "users/{id}" --where "id: int"
+example: kscript make route users --method post --api
+example: kscript make route people --resource --api
+example: kscript make route about --view about
+example: kscript make route reports/export --to reports.export
+adds-to: routes
+---
+{{#if resource}}
+Resource(path: "{{ route_path }}", to: {{ alias }})
+{{else}}
+{{#if view}}
+Get(path: "{{ route_path }}", view: "{{ view }}"{{#if route_name}}, name: "{{ route_name }}"{{/if}})
+{{else}}
+{{ method }}(path: "{{ route_path }}", to: {{ alias }}.{{ action }}{{#if route_name}}, name: "{{ route_name }}"{{/if}}{{#if where}}, where: "{{ where }}"{{/if}})
+{{/if}}
+{{/if}}

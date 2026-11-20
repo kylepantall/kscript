@@ -20,6 +20,10 @@
     "version": "1.0.0"
   },
 {{/if}}
+  // $config reads config/config.yaml (and config.<env>.yaml with kscript --env <env>).
+  "config": {
+    "root": "config"
+  },
   // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
   "make": {
     "format": "{{ format }}"

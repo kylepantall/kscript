@@ -1,0 +1,24 @@
+--- make
+description: A library of functions in lib/ that scripts, pages, controllers and tests import
+category: Scripts and data
+usage: <name> [--fns greet,farewell]
+--fns: The functions to write, comma separated (default one named after the file)
+example: kscript make module pricing --fns subtotal,tax,total
+example: kscript make module text/slugs
+to: {{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Import it: import "{{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}" (or "../lib/…" from a folder). Test it: kscript make test {{ kebab }}
+---
+// {{ title }}: functions to import, so scripts, pages and tests share one copy of the rules.
+
+{{#each fns}}
+/// {{ item | title }}.
+fn {{ item | snake }}(value) {
+  return $value
+}
+
+{{else}}
+/// {{ title }}.
+fn {{ snake }}(value) {
+  return $value
+}
+{{/each}}

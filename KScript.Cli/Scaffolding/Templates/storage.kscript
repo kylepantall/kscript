@@ -1,0 +1,38 @@
+--- make
+description: A JSON file store in lib/: all, find, save and remove for a list of records kept in data/
+category: Scripts and data
+usage: <name> [--file data/people.json]
+--file: The JSON file it keeps the records in (default data/<name>.json)
+example: kscript make storage people
+example: kscript make storage orders --file data/shop/orders.json
+to: {{ paths.storage }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Import it with import "{{ paths.storage }}/{{ dir }}{{ kebab }}{{ ext }}" as {{ snake }}, then call @{{ snake }}.all(), @{{ snake }}.save({ name: 'Ann' }) and so on
+---
+// {{ title }}, kept as a JSON list in {{ file }}{{#unless file}}{{ paths.data }}/{{ dir }}{{ kebab }}.json{{/unless}}. Each record gets a numeric id when it is first saved.
+import KScript.IO
+
+// File paths are relative to this script, so {{ up }} leads back to the project folder.
+const file = '{{ up }}{{ file }}{{#unless file}}{{ paths.data }}/{{ dir }}{{ kebab }}.json{{/unless}}'
+
+/// Every record, or an empty list before anything is saved.
+fn all() => @exists($file) ? @read_json($file) : []
+
+/// The record with this id, or null.
+fn find(id) => @all()->find(fn($r) => $r.id == $id)
+
+/// Adds a record, or replaces the one with the same id. Returns the saved record.
+fn save(record) {
+  records = @all()
+  if $record.id != null {
+    @write_json($file, $records->map(fn($r) => $r.id == $record.id ? $record : $r))
+    return $record
+  }
+  saved = $record->set('id', ($records->map(fn($r) => $r.id)->max() ?? 0) + 1)
+  @write_json($file, $records->append($saved))
+  return $saved
+}
+
+/// Removes the record with this id.
+fn remove(id) {
+  @write_json($file, @all()->reject(fn($r) => $r.id == $id))
+}

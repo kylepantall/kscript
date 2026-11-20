@@ -216,6 +216,44 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary>Lexical scopes of variable names, to tell a first assignment (a declaration) from a change.</summary>
+        private static readonly System.Text.RegularExpressions.Regex FieldPart =
+            new System.Text.RegularExpressions.Regex(@"^[A-Za-z_]\w*\??(\s*:\s*[A-Za-z_][\w.]*(\[\])?\??)?(\s*=\s*\S.*)?$", System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        /// <summary>
+        /// The parts of a one-line <c>fields</c> attribute as field lines (<c>login: string</c>, <c>tags: string[] = []</c>),
+        /// or null when there is nothing to split or a part isn't a plain field.
+        /// </summary>
+        internal static List<string> FieldsAsLines(string fields)
+        {
+            if (string.IsNullOrWhiteSpace(fields))
+            {
+                return null;
+            }
+            var parts = new List<string>();
+            int depth = 0, start = 0;
+            char quote = '\0';
+            for (int i = 0; i < fields.Length; i++)
+            {
+                char c = fields[i];
+                if (quote != '\0')
+                {
+                    if (c == '\\') i++;
+                    else if (c == quote) quote = '\0';
+                    continue;
+                }
+                if (c is '\'' or '"') quote = c;
+                else if (c is '(' or '[' or '{') depth++;
+                else if (c is ')' or ']' or '}') depth--;
+                else if (c == ',' && depth == 0)
+                {
+                    parts.Add(fields.Substring(start, i - start).Trim());
+                    start = i + 1;
+                }
+            }
+            parts.Add(fields.Substring(start).Trim());
+            return quote == '\0' && depth == 0 && parts.All(p => p.Length > 0 && !p.Contains('\n') && FieldPart.IsMatch(p)) ? parts : null;
+        }
+
         private sealed class Scopes
         {
             private readonly List<HashSet<string>> stack = new List<HashSet<string>> { new HashSet<string>(StringComparer.Ordinal) };
@@ -566,14 +604,20 @@ namespace KScript.Syntax.Markup
                             {
                                 WriteDoc(e, indent);
                             }
-                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description")).Select(a => FormatAttribute(e, a)));
+                            // fields="login: string, id: int" becomes one line per field, the way .kscript writes types.
+                            List<string> fieldLines = FieldsAsLines(Attr("fields"));
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description") && !(a.Name == "fields" && fieldLines != null)).Select(a => FormatAttribute(e, a)));
                             sb.Append(pad).Append("type ").Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
-                            if (!e.ChildElements.Any())
+                            if (!e.ChildElements.Any() && fieldLines == null)
                             {
                                 sb.Append('\n');
                                 return;
                             }
                             sb.Append(" {\n");
+                            foreach (string fieldLine in fieldLines ?? new List<string>())
+                            {
+                                Line(indent + 1, fieldLine);
+                            }
                             foreach (MarkupNode node in e.Children)
                             {
                                 if (node is MarkupComment c)

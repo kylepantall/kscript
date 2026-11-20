@@ -23,7 +23,7 @@ AGENTS.md each time you save a script, so they never fall behind the code.
 | `.kscript/agents/packages/<name>.md` | One line per command, method and statement of each package the project imports | up to about 7,000 tokens each |
 
 Only packages the project uses get a file, and a file whose package is no longer imported is removed. When a file
-would go over its budget, it stops at a whole entry and says how many were left out; the `kscript mcp` server has the
+would go over its budget, it stops at a whole entry and says how many were left out; the [`kscript mcp`](mcp.md) server has the
 rest. AGENTS.md only replaces the part between its two `<!-- kscript agents -->` lines, so anything you write above or
 below them is kept. Neither file is checked, formatted, tested or served.
 

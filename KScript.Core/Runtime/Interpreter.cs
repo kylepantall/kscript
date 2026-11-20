@@ -665,6 +665,12 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>
+        /// The kinds of thing a script declares by name at its top level, which scripts that import it see:
+        /// functions, constants, enums and types. kscript make has a generator for each one.
+        /// </summary>
+        public static readonly IReadOnlyList<string> Declarations = new[] { "fn", "const", "enum", "type" };
+
         private void CollectExports(Module module)
         {
             if (module.IsPackageRoot) return;
@@ -672,7 +678,7 @@ namespace KScript.Runtime
             {
                 string name = e.GetAttributeValue("name")?.Trim().TrimStart('$');
                 if (name == null) continue;
-                bool export = e.Name == "fn" || e.Name == "const" || e.Name == "enum" || e.Name == "type" || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
+                bool export = Declarations.Contains(e.Name) || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
                 if (export && module.Globals.TryGet(name, out object value)) module.Exports[name] = value;
             }
         }

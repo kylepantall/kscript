@@ -293,12 +293,13 @@ namespace KScript.Language.Features
                 {
                     Label = e.Name,
                     Kind = CompletionKind.Keyword,
-                    Detail = PackageDetail(analysis, e.Package, "statement"),
+                    Detail = PackageDetail(analysis, e.Package, e.Deprecated != null ? "statement (deprecated)" : "statement"),
                     Documentation = ElementMarkdown(e, analysis.Markup.Syntax == SourceSyntax.Code),
+                    Deprecated = e.Deprecated != null,
                     InsertText = snippet,
                     IsSnippet = snippet != null,
                     ReplaceSpan = replace,
-                    SortText = "0" + e.Name,
+                    SortText = (e.Deprecated != null ? "9" : "0") + e.Name,
                     AdditionalEdits = ImportEdits(analysis, e.Package),
                 });
             }

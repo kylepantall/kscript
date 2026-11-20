@@ -78,6 +78,16 @@ namespace KScript
                     O("--no-open", "Don't open a browser; just print the address."),
                 },
                 "kscript docs\nkscript docs replace\nkscript docs --format xml"),
+            new CliCommand("mcp", "kscript mcp [--format kscript|xml] [--dir folder] [--http [--port 4181]]",
+                "Serve these docs to AI coding assistants (Claude Code, Cursor, VS Code...) over MCP, offline.",
+                new[]
+                {
+                    O("--format kscript|xml", "Show examples as .kscript or XML (default: the project's make.format, else .kscript)."),
+                    O("--dir folder", "The project whose kscript.json sets the format and the check and fmt rules (default: the current folder)."),
+                    O("--http", "Serve on http://localhost:4181/mcp instead of stdin and stdout."),
+                    O("--port N", "The port for --http (default 4181)."),
+                },
+                "claude mcp add kscript -- kscript mcp\nkscript mcp --http", "mcp"),
             new CliCommand("css", "kscript css [file-or-folder]... [--out folder] [--var name=value]",
                 "Compile .ks.css, .ks.scss and .ks.sass stylesheets.",
                 new[]
@@ -104,14 +114,17 @@ namespace KScript
                     O("--runtime file", "A kscript release binary or archive for the target, instead of downloading one."),
                 },
                 "kscript compile hello.ks.xml\nkscript compile --target all", "compile"),
-            new CliCommand("make", "kscript make project <folder> [--bare] [--port 8080]\nkscript make <type> <Name> [--key value]",
-                "Start a new project with a kscript.json, or generate a file from a template (run kscript make for the list).",
+            new CliCommand("make", "kscript make project <folder> [--bare] [--port 8080]\nkscript make <type> <name> [--key value]\nkscript make --list",
+                "Start a new project, or generate a file: a route (added to the routes file), controller, request, middleware, view, page, component, stylesheet, type, enum, window, config, test and more. kscript make --list shows them all, with their options.",
                 new[]
                 {
+                    O("--list", "Every type of file kscript make can make, with its options and examples. kscript make <type> --help shows one."),
                     O("--format kscript|xml", "Write .kscript (the default) or .ks.xml files."),
-                    O("--key value", "Values for the template, such as --port 3000."),
+                    O("--dry-run", "Show what would be made, and make nothing."),
+                    O("--force", "Replace a file that is already there."),
+                    O("--key value", "Values for the template, such as --resource or --fields \"name: string\"."),
                 },
-                "kscript make project my-site\nkscript make component Hero", "projects"),
+                "kscript make project my-site\nkscript make route users --api\nkscript make controller people --resource", "projects"),
             new CliCommand("ide", "kscript ide [install|uninstall|config] [editor]",
                 "Set up VS Code, Cursor, VSCodium or another editor.", Array.Empty<CliOption>(),
                 "kscript ide install\nkscript ide config neovim", "install"),

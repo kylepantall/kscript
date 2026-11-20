@@ -90,8 +90,9 @@ namespace KScript.Language.Analysis
             }
             // A leading / so relative paths such as _components/card.html match too.
             string normalized = "/" + path.Replace('\\', '/');
-            return System.IO.Path.GetFileName(normalized).StartsWith("_", StringComparison.Ordinal)
-                || normalized.Contains("/_components/", StringComparison.Ordinal)
+            // Files whose name or folder starts with _ (_layout.html, _components/, _layouts/, _partials/) are never
+            // served on their own, so the page that uses them gives them their variables.
+            return normalized.Split('/').Any(part => part.StartsWith("_", StringComparison.Ordinal))
                 // KScript.Http views get their variables from the controller: @view('people/show', person: $p).
                 || normalized.Contains("/views/", StringComparison.Ordinal);
         }
@@ -525,6 +526,7 @@ namespace KScript.Language.Analysis
             }
 
             CheckAttributes(e, info);
+            ReportDeprecatedElement(e, info);
             CheckPlacement(e, info, previous);
             NoteResourceUses(e, info, scope);
             CheckElse(e, previous, markupMode);

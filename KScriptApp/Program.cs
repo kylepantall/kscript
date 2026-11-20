@@ -187,6 +187,12 @@ namespace KScript
                 return KScript.LanguageServer.KScriptLanguageServer.RunStdioAsync(StandardInput(), StandardOutput()).GetAwaiter().GetResult();
             }
 
+            if (args.Length > 0 && args[0] == "mcp")
+            {
+                // Like lsp: on stdio, stdout carries the protocol.
+                return RunMcp(args.Skip(1).ToArray());
+            }
+
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             KScript.Updates.SelfUpdater.CleanupPreviousBinary();
 
@@ -375,6 +381,22 @@ namespace KScript
             try
             {
                 return KScript.Docs.DocsCommand.Run(args, Out, Error, cancel.Token, OpenBrowser);
+            }
+            finally
+            {
+                Console.CancelKeyPress -= stop;
+            }
+        }
+
+        /// <summary>kscript mcp: the docs for AI coding assistants. Ctrl+C stops the HTTP server.</summary>
+        int RunMcp(string[] args)
+        {
+            using var cancel = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            ConsoleCancelEventHandler stop = (_, e) => e.Cancel = StopOnFirstCtrlC(cancel);
+            Console.CancelKeyPress += stop;
+            try
+            {
+                return KScript.Docs.Mcp.McpCommand.Run(args, StandardInput(), StandardOutput(), Error, cancel.Token);
             }
             finally
             {

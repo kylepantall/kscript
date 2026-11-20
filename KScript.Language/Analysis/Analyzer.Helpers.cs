@@ -264,6 +264,7 @@ namespace KScript.Language.Analysis
 
             if (catalog.GetCommand(name) is CallableInfo command)
             {
+                ReportDeprecated(command.Deprecated, $"@{command.Name}", span, span);
                 if (command.Package != null)
                 {
                     usedPackages.Add(command.Package);
@@ -420,10 +421,10 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            if (report && type != null && !KType.Declarable.Contains(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
+            if (report && type != null && !BuiltInTypes.Contains(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
             {
                 Report(value.ToSource(new TextSpan(start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length), type.Length)),
-                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", KType.Declarable)}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
+                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", BuiltInTypes)}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
             }
 
             if (report && def != null)

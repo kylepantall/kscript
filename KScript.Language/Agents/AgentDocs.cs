@@ -417,7 +417,7 @@ namespace KScript.Language.Agents
             w.Append("1. After each change run `kscript check --format json`. Each problem has `file`, `line`, `column`, `code`, `message` and `fixes` (exact text edits). Repeat until it reports 0 errors.\n");
             w.Append(project.Tests > 0 ? $"2. `kscript test` runs the {project.Tests} test file{(project.Tests == 1 ? string.Empty : "s")}. Add a test for each change.\n" : "2. `kscript test` runs `*.test.kscript` files. Add a test for each change.\n");
             w.Append("3. `kscript fmt` formats files. `kscript agents` refreshes these docs (the editor does it on save).\n");
-            w.Append("4. Unsure about a command or method? Read `.kscript/agents/packages/<package>.md`, or use the `kscript mcp` server (full reference, lookups and search). Never invent names: `kscript check` rejects unknown ones.\n");
+            w.Append("4. Unsure about a command or method? Read `.kscript/agents/packages/<package>.md`, or call `lookup` / `search_docs` on the `kscript mcp` server (the full reference). Never invent names: `kscript check` rejects unknown ones.\n");
 
             w.Append("\n## This project\n\n");
             if (project.Main != null)
@@ -666,7 +666,7 @@ namespace KScript.Language.Agents
             if (shown < entries.Count)
             {
                 // Headings don't count: only the entries under them.
-                w.Append($"\n… {entries.Skip(shown).Count(e => e.StartsWith("- ", StringComparison.Ordinal))} more {what} left out to keep this file short. Use the `kscript mcp` server (lookup, search) or `kscript docs` for the rest.\n");
+                w.Append($"\n… {entries.Skip(shown).Count(e => e.StartsWith("- ", StringComparison.Ordinal))} more {what} left out to keep this file short. Use `lookup` or `search_docs` on the `kscript mcp` server, or `kscript docs`, for the rest.\n");
             }
             return w.ToString();
         }

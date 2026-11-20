@@ -70,6 +70,9 @@ namespace KScript.Language.Features
         /// <summary>Per parameter: its name, the enum values it takes (or null), and whether it is a yes/no flag.</summary>
         internal IReadOnlyList<(string Name, IReadOnlyList<string> Values, bool Flag)> Details { get; init; }
 
+        /// <summary>The parameters that are deprecated, by name.</summary>
+        internal IReadOnlyCollection<string> DeprecatedParameters { get; init; } = Array.Empty<string>();
+
         /// <summary>Per parameter: the enum values its items take when it is a list of an enum (<c>sizes: Size[]</c>), or null.</summary>
         internal IReadOnlyList<IReadOnlyList<string>> ItemValues { get; init; }
     }
