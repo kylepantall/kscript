@@ -51,8 +51,9 @@ namespace KScript
         /// <summary>
         /// While kscript serve runs, keeps what the project makes from its code (the agent docs and the other
         /// <see cref="KScript.Language.Outputs.ProjectOutputs"/>) up to date as files change. Does nothing when the
-        /// project has none turned on.
+        /// project has none turned on. Its own method, so compiled sites (which leave KScript.Language out) never load it.
         /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         internal void WatchOutputs(string root, System.Threading.CancellationToken stop)
         {
             if (!Directory.Exists(root) || KScript.Language.Outputs.ProjectOutputs.Enabled(root).Count == 0) return;
@@ -64,7 +65,7 @@ namespace KScript
         /// kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder. In a project, the nearest
         /// kscript.json gives the defaults (serve.root, serve.port, serve.host); options on the command line win.
         /// </summary>
-        int Serve(string[] args)
+        int Serve(string[] args, bool watch = true)
         {
             string folder = null;
             int? port = null;
@@ -123,7 +124,7 @@ namespace KScript
             using var watching = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
             try
             {
-                WatchOutputs(project?.Directory ?? Path.GetFullPath(folder ?? "."), watching.Token);
+                if (watch) WatchOutputs(project?.Directory ?? Path.GetFullPath(folder ?? "."), watching.Token);
                 return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
@@ -363,7 +364,7 @@ namespace KScript
             CompiledApp.Manifest app = CompiledApp.Read(manifest);
             return app.Kind switch
             {
-                "site" => Serve(new[] { app.Main }.Concat(args).ToArray()),
+                "site" => Serve(new[] { app.Main }.Concat(args).ToArray(), watch: false),
                 "window" => RunWindow(app.Main, args),
                 _ => RunScript(app.Main, args),
             };
