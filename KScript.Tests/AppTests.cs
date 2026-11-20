@@ -143,4 +143,57 @@ public class AppTests : IDisposable
         }
         if (failure != null) throw new Xunit.Sdk.XunitException("Life Lab failed: " + failure);
     }
+
+    [Fact]
+    public void ANewProjectsDesktopAppAddsTicksAndClearsTasks()
+    {
+        string previous = Environment.GetEnvironmentVariable("KSCRIPT_TEMPLATES");
+        Environment.SetEnvironmentVariable("KSCRIPT_TEMPLATES", Path.Combine(dir, "no-user-templates"));
+        try
+        {
+            KScript.Scaffolding.ProjectScaffolder.Create(dir, "todo");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KSCRIPT_TEMPLATES", previous);
+        }
+
+        Exception failure = null;
+        UIPackage.Host = s =>
+        {
+            try
+            {
+                Assert.Equal("2 tasks left", s.FindAll("Text")[^1].Text);
+                s.SetBound(s.FindAll("TextBox")[0], "Write the docs");
+                s.Click("Add");
+                Assert.Equal(3, s.FindAll("CheckBox").Count);
+                Assert.Equal("Write the docs", s.FindAll("CheckBox")[2].Text?.Trim());
+                Assert.Equal("", s.FindAll("TextBox")[0].Prop("value"));
+
+                s.SetBound(s.FindAll("CheckBox")[0], true);
+                Assert.Equal("2 tasks left", s.FindAll("Text")[^1].Text);
+                Assert.True(s.FindAll("CheckBox")[0].Flag("value"));
+
+                s.Click("Clear done");
+                Assert.Equal(2, s.FindAll("CheckBox").Count);
+                s.Click("✕");
+                Assert.Equal("1 task left", s.FindAll("Text")[^1].Text);
+                Assert.Null(s.Error);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        };
+        try
+        {
+            new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(new StringWriter(), ""), options: new KScript.Runtime.InterpreterOptions { Timeout = TimeSpan.FromSeconds(60) })
+                .RunFile(Path.Combine(dir, "todo", "desktop.ks.xml"));
+        }
+        finally
+        {
+            UIPackage.Host = null;
+        }
+        if (failure != null) throw new Xunit.Sdk.XunitException("The project's desktop app failed: " + failure);
+    }
 }
