@@ -557,7 +557,7 @@ namespace KScript.Language.Analysis
         /// <summary>A type without its [] and ?: Repo for Repo[]?.</summary>
         private static string TypeBase(string type)
         {
-            string t = type.TrimEnd('?').TrimEnd();
+            string t = TypeInference.WithoutTypeArguments(type.Trim()).TrimEnd('?').TrimEnd();
             while (t.EndsWith("[]", StringComparison.Ordinal))
             {
                 t = t.Substring(0, t.Length - 2).TrimEnd();

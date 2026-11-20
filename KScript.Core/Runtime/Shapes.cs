@@ -530,6 +530,42 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>
+        /// What text written raw (unquoted) for <paramref name="type"/> means: "handle" for handle types (so <c>@kyle</c> is a handle),
+        /// "word" for types read from text (semantic and refined text types, enums, types with a pattern or parse), or null
+        /// when raw words keep their usual meaning (plain string, numbers, lists and records).
+        /// </summary>
+        internal static string RawTextKind(TypeRef type, Scope scope, Module module)
+        {
+            if (type == null || type.ListDepth > 0) return null;
+            if (type.ArgBase != null) return RawTextKind(type.ArgBase, scope, module) ?? (TextRoots.Contains(type.ArgBase.Name) ? "word" : null);
+            if (type.Inline == null && Values.DeclarableTypes.Contains(type.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                string name = type.Name.ToLowerInvariant();
+                return name == SemanticTypes.Handle ? "handle" : SemanticTypes.IsSemantic(name) ? "word" : null;
+            }
+            object resolved;
+            try { resolved = Resolve(type, scope, module); }
+            catch (KScriptException) { return null; }
+            switch (resolved)
+            {
+                case EnumType:
+                    return "word";
+                case RecordType r:
+                    return r.ReadsText ? "word" : null;
+                case RefinedType t:
+                    string root = t.Root();
+                    return root == SemanticTypes.Handle ? "handle" : TextRoots.Contains(root) ? "word" : null;
+                default:
+                    return null;
+            }
+        }
+
+        private static readonly HashSet<string> TextRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "string", SemanticTypes.Email, SemanticTypes.Handle, SemanticTypes.Uuid, SemanticTypes.Regex, SemanticTypes.Password,
+        };
+
         /// <summary>The &lt;type&gt; or &lt;enum&gt; a name (not a built-in type) refers to. Unknown names fail.</summary>
         internal static object Resolve(TypeRef type, Scope scope, Module module)
         {
@@ -644,7 +680,7 @@ namespace KScript.Runtime
                     type.OwnMethods[method] = e;
                     continue;
                 }
-                if (e.Name != "field") throw run.Error($"<type> can only hold <field>, <validate> and <fn> elements, not <{e.Name}>.", null, "Syntax");
+                if (e.Name != "field") throw run.Error($"<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <{e.Name}>.", null, "Syntax");
                 FieldDefinition field = ParseFieldElement(e, run);
                 if (!seen.Add(field.Name)) throw run.Error($"<type name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
                 SetOwnField(type, field, run);
@@ -992,6 +1028,14 @@ namespace KScript.Runtime
             Problems.Clear();
             Problems.AddRange(problems);
             var text = new StringBuilder();
+            if (Problems.Count == 1 && Problems[0].Path == "$")
+            {
+                // A value with one problem of its own (not in a field): say it on one line.
+                text.Append($"{what} doesn't fit {type}: {Problems[0].Message}");
+                var single = new KScriptException(text.ToString(), "Shape");
+                single.Fields["problems"] = Problems.Select(p => (object)p.ToValue()).ToList();
+                throw single;
+            }
             text.Append($"{what} doesn't fit {type} ({Problems.Count} problem{(Problems.Count == 1 ? string.Empty : "s")}):");
             foreach (ShapeProblem p in Problems.Take(Shapes.MaxProblems)) text.Append($"\n  {p.Path}: {p.Message}");
             if (Problems.Count > Shapes.MaxProblems) text.Append($"\n  ...and {Problems.Count - Shapes.MaxProblems} more.");

@@ -163,7 +163,7 @@ namespace KScript.Language.Analysis
             Dictionary<string, Symbol> seen = new Dictionary<string, Symbol>(StringComparer.Ordinal);
             foreach (MarkupElement e in result.Markup.DescendantElements())
             {
-                if (IsKScriptElementName(e, "fn"))
+                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && IsKScriptElementName(owner, "type")))
                 {
                     MarkupAttribute nameAttr = e.GetAttribute("name");
                     string name = nameAttr?.ValueText?.Trim();
@@ -1053,9 +1053,17 @@ namespace KScript.Language.Analysis
             }
 
             ExpressionRegion region = null;
-            if (valueAttr?.Value != null)
+            string declaredType = e.GetAttributeValue("type")?.Trim();
+            if (valueAttr?.Value != null && CheckTypedValue(valueAttr.Value, declaredType, scope, e.Span.Start))
+            {
+                // Raw text for its type: @kyle for a handle, red for an enum.
+            }
+            else if (valueAttr?.Value != null)
             {
                 region = AnalyzeExpressionRegion(valueAttr.Value, RegionKind.Expression, scope, e, valueAttr);
+            }
+            else if (hasText && CheckTypedValue(text.Content, declaredType, scope, e.Span.Start))
+            {
             }
             else if (hasText)
             {

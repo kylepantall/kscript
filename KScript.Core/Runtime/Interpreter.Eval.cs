@@ -17,6 +17,46 @@ namespace KScript.Runtime
             return Evaluate(parsed.Root, scope, new EvalContext(module, text));
         }
 
+        /// <summary>
+        /// Evaluates a value written for a declared type. Where the type is read from text (a handle, an enum or a type with a
+        /// pattern), a bare word such as <c>@kyle</c>, <c>red</c> or <c>H4cmW12in</c> is taken as the text itself, the way a
+        /// regex literal needs no quotes. Anything else is evaluated as usual.
+        /// </summary>
+        public object EvaluateTyped(DecodedText text, Scope scope, Module module, string type)
+        {
+            string kind = Shapes.RawTextKind(SafeType(type), scope, module);
+            if (kind == null) return EvaluateText(text, scope, module);
+            ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
+            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module)) return text.Value.Trim();
+            return EvaluateText(text, scope, module);
+        }
+
+        private static TypeRef SafeType(string type)
+        {
+            try { return TypeRef.Parse(type); }
+            catch (KScriptException) { return null; }
+        }
+
+        /// <summary>True if <paramref name="node"/> is only bare words, numbers and the operators between them (<c>my-post</c>, <c>H4cmW12in</c>).</summary>
+        internal static bool IsRawWord(ExprNode node, string kind, Scope scope, Module module)
+        {
+            switch (node)
+            {
+                case IdentifierNode id:
+                    return !(module != null && module.Aliases.ContainsKey(id.Name));
+                case CommandCallNode { ArgumentList: null }:
+                    return kind == "handle";
+                case BinaryNode bin when bin.Operator == "-" || bin.Operator == "." || bin.Operator == "+":
+                    return IsRawWord(bin.Left, kind, scope, module) && IsRawPart(bin.Right, kind, scope, module)
+                        || IsRawPart(bin.Left, kind, scope, module) && IsRawWord(bin.Right, kind, scope, module);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsRawPart(ExprNode node, string kind, Scope scope, Module module) =>
+            node is LiteralNode { Kind: LiteralKind.Number } || IsRawWord(node, kind, scope, module);
+
         /// <summary>Evaluates comma separated expressions (<c>is="2, 3"</c>).</summary>
         public List<object> EvaluateList(DecodedText text, Scope scope, Module module)
         {
@@ -289,8 +329,11 @@ namespace KScript.Runtime
             return (args, named);
         }
 
-        private static BareWord BareWordOf(ExprNode node, Scope scope, EvalContext ctx, bool afterNamed)
+        private BareWord BareWordOf(ExprNode node, Scope scope, EvalContext ctx, bool afterNamed)
         {
+            // @kyle names a function when there is one; otherwise it can only be a handle, for a parameter that takes one.
+            if (node is CommandCallNode { ArgumentList: null } reference && !CanResolve(reference, scope, ctx))
+                return new BareWord("@" + reference.Name, false, afterNamed);
             bool negated = false;
             if (node is UnaryNode { Operator: "not", Operand: IdentifierNode inner })
             {
@@ -303,6 +346,19 @@ namespace KScript.Runtime
                 return new BareWord(id.Name, negated, afterNamed);
             }
             return null;
+        }
+
+        private bool CanResolve(CommandCallNode reference, Scope scope, EvalContext ctx)
+        {
+            try
+            {
+                ResolveCallable(reference.Name, scope, ctx, reference);
+                return true;
+            }
+            catch (KScriptException)
+            {
+                return false;
+            }
         }
 
         private object EvaluateRange(RangeNode range, Scope scope, EvalContext ctx)
@@ -344,9 +400,24 @@ namespace KScript.Runtime
                 }
             }
 
+            if (bin.Operator is "==" or "!=" or "===" or "!==")
+            {
+                // $user.handle == @kyle: next to a handle, an @name that isn't a function is a handle.
+                if (bin.Right is CommandCallNode { ArgumentList: null } r && !CanResolve(r, scope, ctx))
+                    return HandleCompare(bin, Evaluate(bin.Left, scope, ctx), r, ctx);
+                if (bin.Left is CommandCallNode { ArgumentList: null } l && !CanResolve(l, scope, ctx))
+                    return HandleCompare(bin, Evaluate(bin.Right, scope, ctx), l, ctx);
+            }
             object a = Evaluate(bin.Left, scope, ctx);
             object b = Evaluate(bin.Right, scope, ctx);
             return Binary(bin.Operator, a, b, bin, ctx);
+        }
+
+        private object HandleCompare(BinaryNode bin, object other, CommandCallNode word, EvalContext ctx)
+        {
+            if (!(other is HandleName)) throw Fail(word, ctx, $"Unknown command @{word.Name}(). An @name without a function is a handle only next to a handle, such as $user.handle == @{word.Name}.", "Name");
+            object handle = SemanticTypes.TryConvert(SemanticTypes.Handle, "@" + word.Name, out object h, out string reason) ? h : throw Fail(word, ctx, reason, "Type");
+            return Binary(bin.Operator, other, handle, bin, ctx);
         }
 
         private object Binary(string op, object a, object b, ExprNode node, EvalContext ctx)

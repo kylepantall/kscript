@@ -37,7 +37,7 @@ namespace KScript.Metadata
         /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>
         public const string Type = "type";
 
-        public static readonly string[] Declarable = { "string", "int", "float", "bool", "list", "map", "fn" };
+        public static readonly string[] Declarable = { "string", "int", "float", "bool", "list", "map", "fn", "email", "password", "handle", "uuid", "regex" };
 
         /// <summary>True if a method declared for <paramref name="receiver"/> can be called on a value of type <paramref name="actual"/>.</summary>
         public static bool Accepts(string receiver, string actual)

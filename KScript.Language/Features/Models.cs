@@ -130,6 +130,7 @@ namespace KScript.Language.Features
         Number,
         Namespace,
         Type,
+        Regexp,
     }
 
     [Flags]

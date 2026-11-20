@@ -12,9 +12,17 @@ namespace KScript.Language.Features
         private static readonly System.Text.RegularExpressions.Regex ParameterType =
             new System.Text.RegularExpressions.Regex(@"(?<![\w$'""])\$?[A-Za-z_]\w*\s*:\s*([A-Za-z_]\w*)");
 
-        /// <summary>Type names: params="count: int" and &lt;let type="list"&gt;.</summary>
+        private static readonly HashSet<string> BuiltInTypeNames = new HashSet<string>(KType.Declarable.Concat(new[] { "number", "date", "any" }), StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Type names, built-in and declared: params="count: int", &lt;let type="uuid(v: 4)"&gt;, field types, and the
+        /// types a &lt;type&gt; is named and built on (<c>type Admin with [User, Auditable]</c>).
+        /// </summary>
         private static void AddTypeNameTokens(DocumentAnalysis analysis, List<SemanticToken> tokens)
         {
+            HashSet<string> declared = new HashSet<string>(analysis.Symbols.Where(s => s.EnumValues != null || s.Shape?.Type == KType.Type).Select(s => s.Name), StringComparer.Ordinal);
+            bool IsType(string name) => BuiltInTypeNames.Contains(name) || declared.Contains(name);
+
             foreach (MarkupElement e in analysis.Markup.DescendantElements())
             {
                 if (e.Name == "fn" && e.GetAttribute("params")?.Value is DecodedText ps)
@@ -22,17 +30,66 @@ namespace KScript.Language.Features
                     foreach (System.Text.RegularExpressions.Match m in ParameterType.Matches(ps.Value))
                     {
                         Group g = m.Groups[1];
-                        if (KType.Declarable.Contains(g.Value))
+                        if (IsType(g.Value))
                         {
                             tokens.Add(new SemanticToken(ps.ToSource(new TextSpan(g.Index, g.Length)), SemanticTokenType.Type, SemanticTokenModifiers.None));
                         }
                     }
                 }
-                if ((e.Name == "let" || e.Name == "set" || e.Name == "state") && e.GetAttribute("type")?.Value is DecodedText type && KType.Declarable.Contains(type.Value.Trim()))
+                if (e.Name is "let" or "set" or "state" or "const" or "field" && e.GetAttribute("type")?.Value is DecodedText type)
                 {
-                    int lead = type.Value.Length - type.Value.TrimStart().Length;
-                    tokens.Add(new SemanticToken(type.ToSource(new TextSpan(lead, type.Value.Trim().Length)), SemanticTokenType.Type, SemanticTokenModifiers.None));
+                    AddTypeWords(type, IsType, tokens);
                 }
+                if (e.Name == "type")
+                {
+                    if (e.GetAttribute("with")?.Value is DecodedText with)
+                    {
+                        AddTypeWords(with, IsType, tokens);
+                    }
+                    if (e.GetAttribute("name")?.Value is DecodedText typeName)
+                    {
+                        AddTypeWords(typeName, IsType, tokens, SemanticTokenModifiers.Declaration);
+                    }
+                }
+                if (e.Name == "enum" && e.GetAttribute("name")?.Value is DecodedText enumName)
+                {
+                    AddTypeWords(enumName, IsType, tokens, SemanticTokenModifiers.Declaration);
+                }
+            }
+        }
+
+        /// <summary>The type names in a type's text (<c>uuid(v: 4)[]?</c>, <c>User, Auditable</c>), skipping what's inside its arguments.</summary>
+        private static void AddTypeWords(DecodedText text, Func<string, bool> isType, List<SemanticToken> tokens, SemanticTokenModifiers modifiers = SemanticTokenModifiers.None)
+        {
+            string s = text.Value;
+            int depth = 0;
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (c == '(')
+                {
+                    depth++;
+                    continue;
+                }
+                if (c == ')')
+                {
+                    depth = Math.Max(0, depth - 1);
+                    continue;
+                }
+                if (depth > 0 || !Lexer.IsIdentStart(c) || (i > 0 && Lexer.IsIdentChar(s[i - 1])))
+                {
+                    continue;
+                }
+                int end = i;
+                while (end < s.Length && Lexer.IsIdentChar(s[end]))
+                {
+                    end++;
+                }
+                if (isType(s.Substring(i, end - i)))
+                {
+                    tokens.Add(new SemanticToken(text.ToSource(new TextSpan(i, end - i)), SemanticTokenType.Type, modifiers));
+                }
+                i = end - 1;
             }
         }
 
@@ -68,7 +125,12 @@ namespace KScript.Language.Features
                                 tokens.Add(new SemanticToken(span, SemanticTokenType.Number, SemanticTokenModifiers.None));
                                 break;
                             case TokenKind.String:
+                            case TokenKind.Email:
+                            case TokenKind.Uuid:
                                 tokens.Add(new SemanticToken(span, SemanticTokenType.String, SemanticTokenModifiers.None));
+                                break;
+                            case TokenKind.Regex:
+                                tokens.Add(new SemanticToken(span, SemanticTokenType.Regexp, SemanticTokenModifiers.None));
                                 break;
                             case TokenKind.Variable:
                             {

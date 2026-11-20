@@ -314,7 +314,9 @@ namespace KScript.Syntax
                     if (i >= end || !char.IsAsciiHexDigit(text[i])) return -1;
                 }
             }
-            return i < end && (IsIdentChar(text[i]) || text[i] == '-') ? -1 : i;
+            // A method call may follow: 3f2a...->version().
+            bool arrow = i + 1 < end && text[i] == '-' && text[i + 1] == '>';
+            return i < end && (IsIdentChar(text[i]) || (text[i] == '-' && !arrow)) ? -1 : i;
         }
 
         /// <summary>The end of an email address (local@domain.tld) at <paramref name="start"/>, or -1.</summary>
@@ -331,11 +333,11 @@ namespace KScript.Syntax
             while (true)
             {
                 int label = i;
-                while (i < end && (char.IsLetterOrDigit(text[i]) || text[i] == '-'))
+                while (i < end && (char.IsLetterOrDigit(text[i]) || (text[i] == '-' && !(i + 1 < end && text[i + 1] == '>'))))
                 {
                     i++;
                 }
-                if (i == label) return -1;
+                if (i == label || text[i - 1] == '-') return -1;
                 labels++;
                 if (i + 1 < end && text[i] == '.' && char.IsLetterOrDigit(text[i + 1]))
                 {

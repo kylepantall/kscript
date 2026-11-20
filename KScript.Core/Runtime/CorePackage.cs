@@ -388,8 +388,8 @@ namespace KScript.Runtime
             }
 
             string name = run.VariableName("name");
-            object value = run.Has("value") ? run.Eval("value") : run.EvalContent();
             string type = run.Raw("type");
+            object value = run.Has("value") ? run.EvalTyped("value", type) : run.EvalContentTyped(type);
             if (type != null) value = Shapes.Convert(run.Interpreter, value, type, "$" + name, run.Scope, run.Module);
 
             string op = run.Raw("op")?.Trim();

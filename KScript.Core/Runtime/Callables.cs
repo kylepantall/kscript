@@ -192,7 +192,8 @@ namespace KScript.Runtime
                 if (declared is EnumType e) enums[p.Name] = e;
             }
             IReadOnlyList<object> args = ArgumentBinder.BindByName(call,
-                Parameters.Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null, TypeName: e?.Name)).ToList(), out HashSet<int> given);
+                Parameters.Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null, TypeName: e?.Name,
+                    RawText: p.Type == null || e != null ? null : Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module))).ToList(), out HashSet<int> given);
             for (int i = 0; i < Parameters.Count; i++)
             {
                 Parameter p = Parameters[i];
