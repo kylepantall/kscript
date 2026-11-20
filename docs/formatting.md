@@ -68,7 +68,9 @@ Put style settings under `"format"` in `kscript.json`. Every setting is optional
 }
 ```
 
-In the editor, the editor's own tab settings (`editor.tabSize`, `editor.insertSpaces`) are used for anything `kscript.json` doesn't set. When a project sets `format.indent`, that wins, so everyone on the project gets the same result.
+These settings can also come from a [standard](standards.md), so several projects can share one style: put them under `"format"` in a standard file and name it with `"standard"` in `kscript.json`. The default standard, `kscript:recommended`, writes out the values above. Anything `kscript.json` sets itself wins over its standard.
+
+In the editor, the editor's own tab settings (`editor.tabSize`, `editor.insertSpaces`) are used for the indent when neither `kscript.json` nor its standard sets it. When a project or its standard sets `format.indent`, that wins, so everyone on the project gets the same result.
 
 ## Turning rules off
 

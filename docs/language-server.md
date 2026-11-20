@@ -11,10 +11,11 @@ reported as retired, with the KScript 2 replacement and a quick fix where one is
 | --- | --- |
 | `kscript lsp` | Runs the server over stdio (LSP 3.17). Any LSP client can use it. |
 | `kscript check [file-or-folder]... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. With no path it checks the project the current folder is in. A folder with `_layout.html`, `_components/`, `_layouts/` or `kscript.json` is a site, so its `.html` and `.md` pages are checked too. |
+| `kscript check --print-config [file-or-folder]` | Prints the lint and format settings that apply, after the project's [standards](standards.md) and `kscript.json` are combined, with the layer that set each one. |
 | `kscript fmt [file-or-folder]... [--check]` | Tidies scripts and pages in place, or with `--check` lists the files that aren't formatted and exits 1. The server's `textDocument/formatting` uses the same formatter (`KScript.Language/Formatting`). See [Formatting](formatting.md). |
 
-Both follow the project's `kscript.json` (see [Project settings](projects.md#project-settings-kscriptjson)): `lint.rules` changes or turns off diagnostics by code, `lint.exclude` silences
-files and folders, and `lint.include` chooses what a folder check covers. The server re-reads `kscript.json` when it changes.
+Both follow the project's `kscript.json` (see [Project settings](projects.md#project-settings-kscriptjson)) and the [standard](standards.md) it names: `lint.rules` changes or turns off diagnostics by code, `lint.exclude` silences
+files and folders, and `lint.include` chooses what a folder check covers. The server re-reads `kscript.json` and its standard files when they change, using the open (unsaved) text of either.
 The rules are applied in `LintRules.Apply` (KScript.Language), after analysis, so the analyzer itself never needs to know about them.
 
 The VS Code extension is in [`editors/vscode`](../editors/vscode). It starts the installed `kscript lsp` (found
@@ -84,6 +85,6 @@ always in the description the package registers.
 | KS3xxx | Elements and attributes (unknown, retired, missing, invalid values, placement), imports (KS3009 missing import, KS3010 unknown package) |
 | KS4xxx | Names (undefined variables and functions, constants, duplicates) |
 | KS5xxx | Calls (unknown or retired commands and methods, argument counts, type mismatches), KS5010 a field a `<type>`'s records don't have |
-| KS6xxx | Style: warnings that keep code easy to read. KS6001 flags `else` and `elif` in scripts, where an early `return`, `continue` or `break` reads better (see [Early returns instead of else](language.md#early-returns-instead-of-else)) |
+| KS6xxx | Style: rules that keep code easy to read. They are only on when a standard turns them on; `kscript:recommended`, the default, makes them warnings. KS6001 flags `else` and `elif` in scripts, where an early `return`, `continue` or `break` reads better (see [Early returns instead of else](language.md#early-returns-instead-of-else)) |
 
 The constants are in `DiagnosticCodes`; each has positive and negative tests in `AnalyzerTests`.

@@ -94,16 +94,22 @@ test('page highlighting is injected into the grammar VS Code uses for .html file
   assert.match(grammar.injectionSelector, /^L:text\.html -source/, 'the selector matches both HTML grammars and skips <script>/<style>');
 });
 
-test('kscript.json is validated with the bundled schema', () => {
+test('kscript.json and standard files are validated with the bundled schemas', () => {
   const root = path.join(__dirname, '../..');
   const pkg = require('../../package.json');
   const ignore = fs.readFileSync(path.join(root, '.vscodeignore'), 'utf8').split(/\r?\n/);
+  const urls = pkg.contributes.jsonValidation.map((v) => v.url);
+  assert.ok(urls.includes('./schemas/kscript.schema.json'));
+  assert.ok(urls.includes('./schemas/kscript-standard.schema.json'));
   for (const v of pkg.contributes.jsonValidation) {
     const schema = JSON.parse(fs.readFileSync(path.join(root, v.url), 'utf8'));
-    assert.ok(schema.properties.serve && schema.properties.lint, v.url);
+    assert.ok(schema.properties.lint && schema.properties.format, v.url);
     assert.ok(ignore.includes('!' + path.posix.dirname(v.url.replace(/^\.\//, '')) + '/**'), `${v.url} is packaged`);
   }
-  assert.ok(pkg.contributes.languages.some((l) => l.id === 'jsonc' && l.filenames.includes('kscript.json')), 'kscript.json allows comments');
+  const jsonc = pkg.contributes.languages.find((l) => l.id === 'jsonc');
+  assert.ok(jsonc.filenames.includes('kscript.json'), 'kscript.json allows comments');
+  assert.ok(jsonc.filenames.includes('kscript-standard.json'), 'standard files allow comments');
+  assert.ok(jsonc.filenamePatterns.includes('*.kscript-standard.json'), 'named standard files allow comments');
 });
 
 test('block dividers go above every block but the first', () => {

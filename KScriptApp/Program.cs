@@ -13,6 +13,7 @@ namespace KScript
         {
             Console.WriteLine("Usage: kscript <script.xml> [script arguments]                Run a script ($args holds the arguments).");
             Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
+            Console.WriteLine("       kscript check --print-config [file-or-folder]      Show the lint and format settings that apply, and which standard set each.");
             Console.WriteLine("       kscript fmt [file-or-folder]... [--check]          Tidy scripts and pages (--check: only report, for CI).");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
@@ -180,6 +181,8 @@ namespace KScript
 
             if (args.Length > 0 && args[0] == "check")
             {
+                if (args.Contains("--print-config"))
+                    return KScript.LanguageServer.CheckCommand.PrintConfig(args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Console.Out);
                 return KScript.LanguageServer.CheckCommand.Run(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)), Console.Out,
                     warningsAsErrors: args.Contains("--warnaserror"));
             }

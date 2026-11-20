@@ -210,6 +210,7 @@ Then save the first example above as `hello.ks.xml`, run `kscript hello.ks.xml`,
 - [Desktop apps](docs/desktop.md): `<KScript.Window>`, its elements, and `kscript app build`
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
+- [Standards](docs/standards.md): shareable lint and format standards, `kscript:recommended` and `kscript check --print-config`
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI
 - [Roadmap](docs/roadmap.md): what's planned next, such as compiling KScript to TypeScript

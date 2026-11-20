@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
   "name": "{{ kebab }}",
+  "standard": "kscript:recommended",
   "serve": {
     "root": ".",
     "port": {{ port }},

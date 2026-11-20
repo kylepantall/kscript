@@ -5,20 +5,26 @@ namespace KScript.Language.Analysis
     /// <summary>Applies a project's kscript.json lint settings to the analyzer's diagnostics, the same way for <c>kscript check</c> and the editor.</summary>
     public static class LintRules
     {
-        /// <summary>Changes severities as lint.rules says, drops rules set to "off", and drops everything for excluded files. Returns the list it changed.</summary>
+        /// <summary>
+        /// Changes severities as the project's lint.rules say (its standards' rules, then its own), drops rules set to
+        /// "off", and drops everything for excluded files. Style rules (KS6xxx) are dropped unless a rule names them,
+        /// which kscript:recommended does. A file outside any project (<paramref name="config"/> null) gets
+        /// kscript:recommended. Returns the list it changed.
+        /// </summary>
         public static List<Diagnostic> Apply(List<Diagnostic> diagnostics, ProjectConfig config, string path)
         {
-            if (config == null || diagnostics.Count == 0)
+            if (diagnostics.Count == 0)
             {
                 return diagnostics;
+            }
+            if (config == null)
+            {
+                config = ProjectConfig.Recommended;
+                path = null;
             }
             if (path != null && config.IsExcluded(path))
             {
                 diagnostics.Clear();
-                return diagnostics;
-            }
-            if (config.Lint.Rules.Count == 0)
-            {
                 return diagnostics;
             }
 
@@ -26,6 +32,10 @@ namespace KScript.Language.Analysis
             {
                 Diagnostic d = diagnostics[i];
                 string severity = config.SeverityFor(d.Code);
+                if (severity == null && Standards.IsStyleRule(d.Code))
+                {
+                    severity = "off";
+                }
                 if (severity == null)
                 {
                     continue;

@@ -171,6 +171,55 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void StandardsSetRulesAndMissingOnesFailTheCheck()
+        {
+            Write("standards/team.kscript-standard.json", "{ \"extends\": \"kscript:strict\", \"lint\": { \"rules\": { \"KS3003\": \"off\" } } }");
+            Write("kscript.json", "{ \"standard\": \"standards/team.kscript-standard.json\" }");
+            Write("a.ks.xml", "<kscript>\n  <fn name=\"f\" params=\"n\">\n    <if test=\"$n\"><echo colour=\"red\">a</echo></if>\n    <else><echo>b</echo></else>\n  </fn>\n</kscript>");
+            (int code, string output) = Run(false, dir);
+            Assert.True(code == 1, output);
+            Assert.Contains("error KS6001", output);
+            Assert.DoesNotContain("KS3003", output);
+
+            Write("kscript.json", "{ \"standard\": \"standards/nope.json\" }");
+            (code, output) = Run(false, dir);
+            Assert.Equal(2, code);
+            Assert.Contains("can't find the standard 'standards/nope.json'", output);
+        }
+
+        [Fact]
+        public void PrintConfigShowsWhereEachSettingCameFrom()
+        {
+            Write("shared/acme/kscript-standard.json", "{ \"name\": \"acme\", \"description\": \"Acme house style.\", \"extends\": \"kscript:recommended\", \"format\": { \"indent\": 4 }, \"lint\": { \"rules\": { \"KS6001\": \"error\" } } }");
+            Write("app/kscript.json", "{ \"standard\": \"../shared/acme\", \"format\": { \"printWidth\": 100 } }");
+            Write("app/a.ks.xml", "<kscript></kscript>");
+            var output = new StringWriter();
+            Assert.Equal(0, CheckCommand.PrintConfig(Path.Combine(dir, "app", "a.ks.xml"), output));
+            string text = output.ToString();
+            string Row(string key) => text.Split('\n').Single(l => l.TrimStart().StartsWith(key + " ", StringComparison.Ordinal));
+
+            Assert.Contains("Project: " + Path.Combine(dir, "app", "kscript.json"), text);
+            Assert.True(text.IndexOf("kscript:recommended", StringComparison.Ordinal) < text.IndexOf("../shared/acme/kscript-standard.json  \"acme\"", StringComparison.Ordinal), text);
+            Assert.Contains("Acme house style.", text);
+            Assert.EndsWith("../shared/acme/kscript-standard.json", Row("lint.rules.KS6001").TrimEnd());
+            Assert.EndsWith("kscript:recommended", Row("lint.rules.KS6*").TrimEnd());
+            Assert.Contains(" 4 ", Row("format.indent"));
+            Assert.EndsWith("kscript.json", Row("format.printWidth").TrimEnd());
+            Assert.EndsWith("default", Row("lint.warningsAsErrors").TrimEnd());
+
+            Write("app/kscript.json", "{ \"standard\": \"kscript:nope\" }");
+            output = new StringWriter();
+            Assert.Equal(2, CheckCommand.PrintConfig(Path.Combine(dir, "app"), output));
+            Assert.Contains("there is no built-in standard 'kscript:nope'", output.ToString());
+
+            // Outside a project, the defaults with kscript:recommended.
+            output = new StringWriter();
+            Assert.Equal(0, CheckCommand.PrintConfig(Path.Combine(dir, "shared"), output));
+            Assert.Contains("No kscript.json above", output.ToString());
+            Assert.Contains("kscript:recommended", output.ToString());
+        }
+
+        [Fact]
         public void ProjectWarningsAndBadJsonAreReported()
         {
             Write("kscript.json", "{ \"lnit\": {} }");

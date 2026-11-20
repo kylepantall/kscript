@@ -68,8 +68,9 @@ first.
 every branch before already ends with `<return>`, `<break>`, `<continue>`, `<throw>` or `<exit>`. The quick fix
 removes the `<else>` (or turns `<elif>` into a separate `<if>`) and, when the chain is the last statement of the
 function or loop, adds the `<return />` or `<continue />` for you. Pages, `<live>` blocks and `<for>`…`<else>` (for an
-empty list) are not flagged, since there is nothing to return from. To turn the rule off for a project, set
-`"lint": { "rules": { "KS6001": "off" } }` in `kscript.json`.
+empty list) are not flagged, since there is nothing to return from. KS6001 comes from the default
+[standard](standards.md), `kscript:recommended`. To turn it off for a project, set
+`"lint": { "rules": { "KS6001": "off" } }` in `kscript.json` (or in a standard your projects share).
 
 ## Functions
 
