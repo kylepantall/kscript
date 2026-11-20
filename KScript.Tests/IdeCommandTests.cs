@@ -32,9 +32,15 @@ namespace KScript.Tests
                 return OnRun(fileName, args);
             }
 
+            public bool DownloadFails { get; set; }
+
             public Task<(string Path, string Tag)> DownloadExtensionAsync(string tag, TextWriter error)
             {
                 DownloadedTag = tag;
+                if (DownloadFails)
+                {
+                    return Task.FromResult<(string, string)>((null, null));
+                }
                 string file = Path.GetTempFileName();
                 return Task.FromResult((file, tag ?? "v9.9.9"));
             }
@@ -174,6 +180,41 @@ namespace KScript.Tests
             FakeHost host = LinuxWith("/usr/bin/code");
             Assert.Equal(0, Run(host, "uninstall").Code);
             Assert.Equal(new[] { "--uninstall-extension", IdeCommand.ExtensionId }, Assert.Single(host.Runs).Args);
+        }
+
+        [Fact]
+        public void UsageAndBadArguments()
+        {
+            FakeHost host = LinuxWith("/usr/bin/code");
+            Assert.Contains("kscript ide install", Run(host, "--help").Out);
+            (int code, _, string error) = Run(host, "frobnicate");
+            Assert.Equal(1, code);
+            Assert.Contains("Unknown ide command 'frobnicate'", error);
+            Assert.Contains("Usage: kscript ide", error);
+
+            Assert.Contains("Usage: kscript ide config", Run(host, "config").Err);
+            Assert.Contains("No settings for 'nano'", Run(host, "config", "nano").Err);
+            Assert.Contains("--vsix needs a value", Run(host, "install", "--vsix").Err);
+            Assert.Contains("nope.vsix doesn't exist", Run(host, "install", "--vsix", "nope.vsix").Err);
+
+            host.DownloadFails = true;
+            Assert.Equal(1, Run(host, "install").Code);
+            Assert.Empty(host.Runs);
+        }
+
+        [Fact]
+        public void UninstallExplainsWhatHappened()
+        {
+            FakeHost host = LinuxWith("/usr/bin/code");
+            host.OnRun = (f, a) => (1, "Extension 'kylepantall.kscript' is not installed.");
+            (int code, string output, _) = Run(host, "uninstall");
+            Assert.Equal(0, code);
+            Assert.Contains("isn't installed in Visual Studio Code", output);
+
+            host.OnRun = (f, a) => (2, "disk full");
+            (code, _, string error) = Run(host, "uninstall");
+            Assert.Equal(1, code);
+            Assert.Contains("couldn't remove the extension (exit code 2): disk full", error);
         }
 
         [Fact]

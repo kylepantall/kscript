@@ -394,6 +394,29 @@ namespace KScript.Ide
     /// <summary>The real machine: environment, files, processes and GitHub releases.</summary>
     public sealed class SystemIdeHost : IIdeHost
     {
+        private readonly HttpMessageHandler handler;
+        private readonly string repository;
+        private readonly string currentVersion;
+        private readonly string token;
+
+        public SystemIdeHost()
+            : this(new HttpClientHandler(), Environment.GetEnvironmentVariable("KSCRIPT_REPO") ?? SelfUpdater.DefaultRepository,
+                   SelfUpdater.CurrentVersion, Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+        {
+        }
+
+        /// <summary>For tests: a fake GitHub, and the version and token to send.</summary>
+        internal SystemIdeHost(HttpMessageHandler handler, string repository, string currentVersion, string token)
+        {
+            this.handler = handler;
+            this.repository = repository;
+            this.currentVersion = currentVersion;
+            this.token = token;
+        }
+
+        /// <summary>How long an editor's command line gets to install or remove the extension.</summary>
+        internal int RunTimeoutMilliseconds { get; set; } = 180000;
+
         public string GetEnvironmentVariable(string name) => Environment.GetEnvironmentVariable(name);
         public bool FileExists(string path) => File.Exists(path);
         public bool IsWindows => OperatingSystem.IsWindows();
@@ -417,7 +440,7 @@ namespace KScript.Ide
                 using Process p = Process.Start(info);
                 Task<string> stdout = p.StandardOutput.ReadToEndAsync();
                 Task<string> stderr = p.StandardError.ReadToEndAsync();
-                if (!p.WaitForExit(180000))
+                if (!p.WaitForExit(RunTimeoutMilliseconds))
                 {
                     try { p.Kill(true); } catch { }
                     return (-1, "Timed out.");
@@ -432,11 +455,10 @@ namespace KScript.Ide
 
         public async Task<(string Path, string Tag)> DownloadExtensionAsync(string tag, TextWriter error)
         {
-            string repo = Environment.GetEnvironmentVariable("KSCRIPT_REPO") ?? SelfUpdater.DefaultRepository;
-            using HttpClient http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("kscript-ide", SelfUpdater.CurrentVersion));
+            string repo = repository;
+            using HttpClient http = new HttpClient(handler, disposeHandler: false) { Timeout = TimeSpan.FromMinutes(5) };
+            http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("kscript-ide", currentVersion));
             http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-            string token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
             if (!string.IsNullOrEmpty(token))
             {
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -450,9 +472,9 @@ namespace KScript.Ide
             }
             else
             {
-                if (SelfUpdater.TryParseVersion(SelfUpdater.CurrentVersion, out _) && !SelfUpdater.CurrentVersion.StartsWith("0.0.0", StringComparison.Ordinal))
+                if (SelfUpdater.TryParseVersion(currentVersion, out _) && !currentVersion.StartsWith("0.0.0", StringComparison.Ordinal))
                 {
-                    tags.Add("v" + SelfUpdater.CurrentVersion);
+                    tags.Add("v" + currentVersion);
                 }
                 tags.Add(null);
             }

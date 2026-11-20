@@ -100,7 +100,7 @@ namespace KScript.Tests
                 File.WriteAllText(target, "old");
                 File.WriteAllText(staged, "new");
 
-                SelfUpdater.ReplaceBinary(staged, target);
+                SelfUpdater.ReplaceBinary(staged, target, windows: false);
 
                 Assert.Equal("new", File.ReadAllText(target));
                 Assert.False(File.Exists(staged));

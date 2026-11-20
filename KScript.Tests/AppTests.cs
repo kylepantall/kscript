@@ -90,6 +90,143 @@ public class AppTests : IDisposable
         Assert.Contains("\"app\": { \"main\"", ex.Message);
     }
 
+    private KScriptRuntime SingleFile => new KScriptRuntime(Path.Combine(dir, "kscript", "kscript"), null, singleFile: true);
+
+    private (int Code, string Out, string Err) App(AppCommand.Platform platform, params string[] args)
+    {
+        var o = new StringWriter { NewLine = "\n" };
+        var e = new StringWriter { NewLine = "\n" };
+        int code = AppCommand.Run(args, o, e, SingleFile, platform);
+        return (code, o.ToString(), e.ToString());
+    }
+
+    [Fact]
+    public void TheCommandLine()
+    {
+        Assert.Equal(1, App(AppCommand.Platform.Linux).Code);
+        Assert.Equal(0, AppCommand.Run(new[] { "help" }, TextWriter.Null, TextWriter.Null));
+        Assert.Contains("Usage: kscript app build", App(AppCommand.Platform.Linux, "--help").Out);
+        Assert.Contains("Unknown app command 'run'", App(AppCommand.Platform.Linux, "run").Err);
+        Assert.Contains("--name needs a value", App(AppCommand.Platform.Linux, "build", "--name").Err);
+        Assert.Contains("--out needs a folder", App(AppCommand.Platform.Linux, "build", "-o").Err);
+        Assert.Contains("Unknown option '--fast'", App(AppCommand.Platform.Linux, "build", "--fast").Err);
+        Assert.Contains("There is no script at", App(AppCommand.Platform.Linux, "build", Path.Combine(dir, "nope.ks.xml")).Err);
+
+        File.WriteAllText(Path.Combine(dir, "project", "kscript.json"), "{ nope");
+        Assert.Equal(1, App(AppCommand.Platform.Linux, "build", Path.Combine(dir, "project")).Code);
+        File.WriteAllText(Path.Combine(dir, "project", "kscript.json"), """{ "app": { "main": "app.ks.xml" }, "bogus": 1 }""");
+
+        string project = Path.Combine(dir, "project");
+        string outDir = Path.Combine(dir, "out");
+        var mac = App(AppCommand.Platform.MacOS, "build", project, "--out", outDir, "--name", "Mac One");
+        Assert.True(mac.Code == 0, mac.Err);
+        Assert.Contains("unknown setting 'bogus'", mac.Out);
+        Assert.Contains("Open it from Finder", mac.Out);
+        Assert.Contains("Run " + Path.Combine(outDir, "Win One", "Win One.exe"), App(AppCommand.Platform.Windows, "build", project, "-o", outDir, "--name", "Win One").Out);
+        Assert.Contains("add Lin-One.desktop to ~/.local/share/applications", App(AppCommand.Platform.Linux, "build", project, "-o", outDir, "--name", "Lin One").Out);
+    }
+
+    [Fact]
+    public void ScriptsWithoutAProjectAreNamedAfterTheFile()
+    {
+        string loose = Path.Combine(dir, "loose");
+        Directory.CreateDirectory(loose);
+        File.WriteAllText(Path.Combine(loose, "tidy-my_files.app.ks.xml"), "<kscript />");
+        string app = Build(AppCommand.Platform.Linux, Path.Combine(loose, "tidy-my_files.app.ks.xml"));
+        Assert.Equal("Tidy My Files", Path.GetFileName(app));
+        Assert.Throws<AppBuildException>(() => Build(AppCommand.Platform.Linux, Path.Combine(loose, "tidy-my_files.app.ks.xml"), name: "///"));
+        File.WriteAllText(Path.Combine(loose, "say hi.ks"), "<kscript />");
+        Assert.Equal("Say Hi", Path.GetFileName(Build(AppCommand.Platform.Linux, Path.Combine(loose, "say hi.ks"))));
+    }
+
+    [Fact]
+    public void IconsGoInEveryKindOfApp()
+    {
+        File.WriteAllText(Path.Combine(dir, "project", "kscript.json"), """{ "app": { "main": "app.ks.xml", "name": "Iconic", "icon": "icon.png" } }""");
+        string script = Path.Combine(dir, "project", "app.ks.xml");
+        Assert.Contains("app.icon: there is no file", Assert.Throws<AppBuildException>(() => Build(AppCommand.Platform.Linux, script)).Message);
+
+        File.WriteAllText(Path.Combine(dir, "project", "icon.png"), "png");
+        string mac = Build(AppCommand.Platform.MacOS, script);
+        Assert.True(File.Exists(Path.Combine(mac, "Contents", "Resources", "AppIcon.png")));
+        Assert.Contains("<key>CFBundleIconFile</key><string>AppIcon.png</string>", File.ReadAllText(Path.Combine(mac, "Contents", "Info.plist")));
+        string linux = Build(AppCommand.Platform.Linux, script);
+        Assert.Contains("Icon=" + Path.Combine(linux, "app-icon.png"), File.ReadAllText(Path.Combine(linux, "Iconic.desktop")));
+    }
+
+    [Fact]
+    public void DevelopmentBuildsCopyTheWholeFolderAndGetALauncher()
+    {
+        string build = Path.Combine(dir, "dev");
+        Directory.CreateDirectory(Path.Combine(build, "runtimes"));
+        File.WriteAllText(Path.Combine(build, "KScript"), "apphost");
+        File.WriteAllText(Path.Combine(build, "KScript.dll"), "dll");
+        File.WriteAllText(Path.Combine(build, "runtimes", "native.so"), "so");
+
+        KScriptRuntime runtime = KScriptRuntime.Current(build, singleFile: false, processPath: null, windows: false);
+        Assert.False(runtime.SingleFile);
+        string app = AppCommand.Build(Path.Combine(dir, "project", "app.ks.xml"), null, Path.Combine(dir, "out"), TextWriter.Null, runtime, AppCommand.Platform.Linux);
+        Assert.True(File.Exists(Path.Combine(app, "runtimes", "native.so")));
+        Assert.Equal("#!/bin/sh\nexec \"$(dirname \"$0\")/KScript\" \"$@\"\n", File.ReadAllText(Path.Combine(app, "Demo-App")));
+
+        Assert.Contains("has no launcher", Assert.Throws<AppBuildException>(() => KScriptRuntime.Current(build, false, null, windows: true)).Message);
+        Assert.True(KScriptRuntime.Current(build, singleFile: true, processPath: "/opt/kscript", windows: false).SingleFile);
+        Assert.Throws<AppBuildException>(() => KScriptRuntime.Current());   // the test host has no KScript launcher
+    }
+
+    [Fact]
+    public void WindowsExesSwitchToTheGuiSubsystem()
+    {
+        byte[] pe = new byte[0x80 + 100];
+        pe[0] = (byte)'M'; pe[1] = (byte)'Z';
+        BitConverter.GetBytes(0x80).CopyTo(pe, 0x3C);
+        "PE\0\0"u8.ToArray().CopyTo(pe, 0x80);
+        BitConverter.GetBytes((ushort)3).CopyTo(pe, 0x80 + 92);
+        string exe = Path.Combine(dir, "a.exe");
+        File.WriteAllBytes(exe, pe);
+        AppCommand.MarkAsWindowsApp(exe);
+        Assert.Equal(2, BitConverter.ToUInt16(File.ReadAllBytes(exe), 0x80 + 92));
+    }
+
+    [Fact]
+    public void SigningReportsProblems()
+    {
+        var log = new StringWriter();
+        AppCommand.Sign(dir, log, codesign: Path.Combine(dir, "no-codesign"));
+        Assert.Contains("codesign isn't available", log.ToString());
+        if (OperatingSystem.IsWindows()) return;
+
+        string fake = Path.Combine(dir, "codesign");
+        File.WriteAllText(fake, "#!/bin/sh\necho 'not signed' >&2\nexit 1\n");
+        File.SetUnixFileMode(fake, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        log = new StringWriter();
+        AppCommand.Sign(dir, log, codesign: fake);
+        Assert.Contains("codesign failed, so macOS may refuse to open the app: not signed", log.ToString());
+
+        File.WriteAllText(fake, "#!/bin/sh\nexit 0\n");
+        log = new StringWriter();
+        AppCommand.Sign(dir, log, codesign: fake);
+        Assert.Equal("", log.ToString());
+    }
+
+    [Fact]
+    public void AppsFindTheirManifest()
+    {
+        string mac = Path.Combine(dir, "Mac.app", "Contents");
+        Directory.CreateDirectory(Path.Combine(mac, "MacOS"));
+        Directory.CreateDirectory(Path.Combine(mac, "Resources", "app"));
+        File.WriteAllText(Path.Combine(mac, "Resources", "app", AppCommand.ManifestName), "{}");
+        Assert.Equal(Path.GetFullPath(Path.Combine(mac, "Resources", "app", AppCommand.ManifestName)), AppLauncher.FindManifest(Path.Combine(mac, "MacOS")));
+
+        string linux = Path.Combine(dir, "Linux");
+        Directory.CreateDirectory(Path.Combine(linux, "app"));
+        File.WriteAllText(Path.Combine(linux, "app", AppCommand.ManifestName), "{}");
+        Assert.Equal(Path.Combine(linux, "app", AppCommand.ManifestName), AppLauncher.FindManifest(linux));
+
+        Assert.Null(AppLauncher.FindManifest(dir));
+        Assert.Null(AppLauncher.FindManifest());
+    }
+
     [Fact]
     public void MacOSArgumentsAreDropped() =>
         Assert.Equal(new[] { "x" }, AppLauncher.ScriptArguments(new[] { "-psn_0_12345", "x" }));

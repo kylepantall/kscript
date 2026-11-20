@@ -18,6 +18,21 @@ namespace KScript.Updates
     /// Release assets are named <c>kscript-&lt;rid&gt;.tar.gz</c> (<c>.zip</c> on Windows), as built by
     /// .github/workflows/release.yml.
     /// </summary>
+    /// <summary>What <c>kscript update</c> needs from the machine; tests swap parts of it.</summary>
+    internal sealed class UpdateEnvironment
+    {
+        public string Repository { get; set; } = Environment.GetEnvironmentVariable("KSCRIPT_REPO") ?? SelfUpdater.DefaultRepository;
+        public string CurrentVersion { get; set; } = SelfUpdater.CurrentVersion;
+        public string RuntimeId { get; set; } = SelfUpdater.RuntimeId();
+        public string Token { get; set; } = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+        /// <summary>The installed binary to replace, or null when running from a .NET build.</summary>
+        public string TargetPath { get; set; } = SelfUpdater.InstalledBinaryPath(typeof(SelfUpdater).Assembly.Location, Environment.ProcessPath);
+        public bool Windows { get; set; } = OperatingSystem.IsWindows();
+        public HttpMessageHandler Handler { get; set; } = new HttpClientHandler();
+        /// <summary>Runs a binary with --version: its output, or null when it doesn't start.</summary>
+        public Func<string, string> RunVersion { get; set; } = binary => SelfUpdater.RunVersion(binary);
+    }
+
     public static class SelfUpdater
     {
         public const string DefaultRepository = "kylepantall/kscript";
@@ -97,7 +112,9 @@ namespace KScript.Updates
         public static bool IsNewer(string latest, string current) =>
             TryParseVersion(latest, out var l) && (!TryParseVersion(current, out var c) || l > c);
 
-        public static int Run(string[] args, TextWriter output, TextWriter error)
+        public static int Run(string[] args, TextWriter output, TextWriter error) => Run(args, output, error, null);
+
+        internal static int Run(string[] args, TextWriter output, TextWriter error, UpdateEnvironment environment)
         {
             bool checkOnly = args.Contains("--check");
             bool force = args.Contains("--force");
@@ -129,7 +146,7 @@ namespace KScript.Updates
 
             try
             {
-                return RunAsync(checkOnly, force, tag, output, error).GetAwaiter().GetResult();
+                return RunAsync(checkOnly, force, tag, output, error, environment ?? new UpdateEnvironment()).GetAwaiter().GetResult();
             }
             catch (HttpRequestException ex)
             {
@@ -139,29 +156,29 @@ namespace KScript.Updates
             catch (UnauthorizedAccessException ex)
             {
                 error.WriteLine($"No permission to replace the kscript binary: {ex.Message}");
-                error.WriteLine(OperatingSystem.IsWindows()
+                error.WriteLine((environment?.Windows ?? OperatingSystem.IsWindows())
                     ? "Re-run from a terminal opened as Administrator, or reinstall with install.ps1."
                     : "Re-run with sudo, or reinstall into a folder you own with install.sh.");
                 return 1;
             }
         }
 
-        static async Task<int> RunAsync(bool checkOnly, bool force, string tag, TextWriter output, TextWriter error)
+        static async Task<int> RunAsync(bool checkOnly, bool force, string tag, TextWriter output, TextWriter error, UpdateEnvironment env)
         {
-            string repo = Environment.GetEnvironmentVariable("KSCRIPT_REPO") ?? DefaultRepository;
-            string current = CurrentVersion;
+            string repo = env.Repository;
+            string current = env.CurrentVersion;
 
-            string rid = RuntimeId();
+            string rid = env.RuntimeId;
             if (rid == null)
             {
                 error.WriteLine($"No kscript release is built for {RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture}).");
                 return 1;
             }
 
-            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            using var http = new HttpClient(env.Handler) { Timeout = TimeSpan.FromMinutes(5) };
             http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("kscript-updater", current));
             http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-            string token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+            string token = env.Token;
             if (!string.IsNullOrEmpty(token))
             {
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -213,7 +230,7 @@ namespace KScript.Updates
                 return 1;
             }
 
-            string target = InstalledBinaryPath();
+            string target = env.TargetPath;
             if (target == null)
             {
                 error.WriteLine("This kscript is running from a .NET build, not an installed binary, so it can't update itself.");
@@ -223,7 +240,7 @@ namespace KScript.Updates
 
             output.WriteLine($"Downloading kscript {latestTag} ({assetName})...");
             string dir = Path.GetDirectoryName(target);
-            string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+            string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}" + (env.Windows ? ".exe" : ""));
 
             try
             {
@@ -237,20 +254,20 @@ namespace KScript.Updates
                     ExtractBinary(archive, assetName, staged);
                 }
 
-                if (!OperatingSystem.IsWindows())
+                if (!env.Windows && !OperatingSystem.IsWindows())
                 {
                     File.SetUnixFileMode(staged, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
                         | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
                 }
 
-                string stagedVersion = RunVersion(staged);
+                string stagedVersion = env.RunVersion(staged);
                 if (stagedVersion == null)
                 {
                     error.WriteLine("The downloaded binary didn't start, so the installed kscript was left as it was.");
                     return 1;
                 }
 
-                ReplaceBinary(staged, target);
+                ReplaceBinary(staged, target, env.Windows);
             }
             finally
             {
@@ -262,16 +279,10 @@ namespace KScript.Updates
         }
 
         /// <summary>The path of the running single-file binary, or null when running as a framework-dependent dll.</summary>
-        static string InstalledBinaryPath()
+        internal static string InstalledBinaryPath(string assemblyLocation, string path)
         {
             // A single-file app's assemblies have no location on disk.
-            if (!string.IsNullOrEmpty(typeof(SelfUpdater).Assembly.Location))
-            {
-                return null;
-            }
-
-            string path = Environment.ProcessPath;
-            if (path == null)
+            if (!string.IsNullOrEmpty(assemblyLocation) || path == null)
             {
                 return null;
             }
@@ -317,7 +328,7 @@ namespace KScript.Updates
         }
 
         /// <summary>Runs <c>binary --version</c> and returns its output, or null if it fails to start.</summary>
-        static string RunVersion(string binary)
+        internal static string RunVersion(string binary, int timeoutMilliseconds = 30000)
         {
             try
             {
@@ -328,7 +339,7 @@ namespace KScript.Updates
                     UseShellExecute = false,
                 });
                 string text = p.StandardOutput.ReadToEnd();
-                if (!p.WaitForExit(30000))
+                if (!p.WaitForExit(timeoutMilliseconds))
                 {
                     try { p.Kill(); } catch { }
                     return null;
@@ -346,9 +357,9 @@ namespace KScript.Updates
         /// runs. Windows locks a running exe against writes but allows renaming it, so the old exe is moved aside to
         /// <c>kscript.exe.old</c> and removed by <see cref="CleanupPreviousBinary"/> on the next start.
         /// </summary>
-        internal static void ReplaceBinary(string staged, string target)
+        internal static void ReplaceBinary(string staged, string target, bool windows)
         {
-            if (!OperatingSystem.IsWindows())
+            if (!windows)
             {
                 File.Move(staged, target, overwrite: true);
                 return;
@@ -356,7 +367,7 @@ namespace KScript.Updates
 
             string old = target + ".old";
             TryDelete(old);
-            if (File.Exists(old))
+            if (Path.Exists(old))
             {
                 // A previous update's exe is still running; pick another name for this one.
                 old = target + $".{Guid.NewGuid():N}.old";
@@ -375,16 +386,17 @@ namespace KScript.Updates
         }
 
         /// <summary>Deletes exes left behind by an earlier update on Windows. Safe to call on every start.</summary>
-        public static void CleanupPreviousBinary()
+        public static void CleanupPreviousBinary() => CleanupPreviousBinary(Environment.ProcessPath, OperatingSystem.IsWindows());
+
+        internal static void CleanupPreviousBinary(string path, bool windows)
         {
-            if (!OperatingSystem.IsWindows())
+            if (!windows)
             {
                 return;
             }
 
             try
             {
-                string path = Environment.ProcessPath;
                 string dir = Path.GetDirectoryName(path);
                 if (dir == null)
                 {
@@ -402,7 +414,7 @@ namespace KScript.Updates
             }
         }
 
-        static void TryDelete(string path)
+        internal static void TryDelete(string path)
         {
             try
             {
