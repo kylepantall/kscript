@@ -36,7 +36,8 @@ namespace KScript.Language.Outputs
 
             Dictionary<string, object> document = OpenApi.Document(app, app.LoadRoutes(), project);
             bool yaml = relative.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".yml", StringComparison.OrdinalIgnoreCase);
-            string text = yaml ? OpenApi.ToYaml(document) : OpenApi.ToJson(document);
+            // \n line ends on every system, so the file doesn't change when someone else rebuilds it.
+            string text = (yaml ? OpenApi.ToYaml(document) : OpenApi.ToJson(document)).Replace("\r\n", "\n");
             string path = Path.Combine(root, relative);
             if (File.Exists(path) && File.ReadAllText(path).Replace("\r\n", "\n") == text) return Array.Empty<string>();
             if (!check)
