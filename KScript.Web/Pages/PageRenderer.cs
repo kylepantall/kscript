@@ -320,7 +320,7 @@ namespace KScript.Pages
 
         private static bool Test(PageElement el, Scope scope, RenderState state)
         {
-            string test = el.Attr("test") ?? throw new PageException($"<{el.Name}> needs a test attribute, e.g. <{el.Name} test=\"$count gt 0\">.");
+            string test = el.Attr("test") ?? throw new PageException($"<{el.Name}> needs a condition, e.g. <{el.Name} $count gt 0>.");
             return Values.Truthy(Eval(test, scope, state));
         }
 
