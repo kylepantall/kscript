@@ -173,12 +173,21 @@ namespace KScript.Language.Analysis
                         Kind = SymbolKind.Function,
                         DeclarationSpan = span,
                         DeclaringElement = e,
-                        Description = e.GetAttributeValue("description"),
+                        Description = e.Documentation,
                     };
                     MarkupAttribute paramsAttr = e.GetAttribute("params");
                     if (paramsAttr?.Value != null)
                     {
                         fn.Parameters.AddRange(ParseParameters(paramsAttr.Value, report: false));
+                    }
+                    foreach ((string docName, string _) in fn.Doc?.Params ?? Array.Empty<(string, string)>())
+                    {
+                        if (!fn.Parameters.Any(p => p.Name == docName))
+                        {
+                            Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.DocParameter,
+                                $"The doc comment describes @param {docName}, but {name} has no parameter called {docName}."
+                                + (fn.Parameters.Count > 0 ? " Its parameters: " + string.Join(", ", fn.Parameters.Select(p => p.Name)) + "." : string.Empty));
+                        }
                     }
                     seen[name] = fn;
                     result.Symbols.Add(fn);
@@ -344,7 +353,7 @@ namespace KScript.Language.Analysis
                     continue;
                 }
                 TextSpan span = nameAttr.Value.SourceSpan;
-                constants[nameAttr.ValueText.Trim().TrimStart('$')] = (new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), let.GetAttributeValue("description"));
+                constants[nameAttr.ValueText.Trim().TrimStart('$')] = (new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), let.Documentation);
             }
             return constants;
         }
@@ -370,7 +379,7 @@ namespace KScript.Language.Analysis
                 }
                 FunctionParameter[] ps = fn.GetAttribute("params")?.Value is DecodedText p ? ParseParameters(p, report: false).ToArray() : Array.Empty<FunctionParameter>();
                 TextSpan span = nameAttr.Value.SourceSpan;
-                exports[nameAttr.ValueText.Trim()] = (ps, new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), fn.GetAttributeValue("description"));
+                exports[nameAttr.ValueText.Trim()] = (ps, new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), fn.Documentation);
             }
             return exports;
         }
@@ -1044,6 +1053,10 @@ namespace KScript.Language.Analysis
                 {
                     declared.Description = "fn(" + string.Join(", ", lambda.Parameters.Select(p => "$" + p.Name)) + ")";
                 }
+                if (declared != null && e.Documentation is string doc)
+                {
+                    declared.Description = declared.Description != null ? declared.Description + "\n\n" + doc : doc;
+                }
             }
             else
             {
@@ -1104,7 +1117,11 @@ namespace KScript.Language.Analysis
                         continue;
                     }
 
-                    if (declare && assign.Operator == "=" && assign.Target is IdentifierNode || declare && assign.Operator == "=" && assign.Target is VariableNode)
+                    bool plain = assign.Operator == "=" && (assign.Target is IdentifierNode || assign.Target is VariableNode);
+                    // In a .kscript file, x = 3 in a <do> declares x when it isn't in scope yet.
+                    bool declareNew = !declare && plain && e.Name == "do" && attr == null && result.Markup.Syntax == SourceSyntax.Code
+                        && scope.Lookup(assign.Name, nameSpan.Start) == null;
+                    if (declare && plain || declareNew)
                     {
                         Symbol symbol = NewVariable(assign.Name, nameSpan, e, SymbolKind.Variable, shape);
                         scope.Declare(symbol, after);

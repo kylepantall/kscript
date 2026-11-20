@@ -799,7 +799,7 @@ namespace KScript.Runtime
                 value = GetParse(module, v, ParseMode.Expression).Root;
                 valueContext = new EvalContext(module, v);
             }
-            scope.Declare(name, new UserFunction(name, parameters, e, value, valueContext, scope, module, e.GetAttributeValue("description")));
+            scope.Declare(name, new UserFunction(name, parameters, e, value, valueContext, scope, module, e.Documentation));
         }
 
         /// <summary>Starts a function on another thread (&lt;spawn&gt;). The run waits for spawned functions before it ends.</summary>

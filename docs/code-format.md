@@ -9,9 +9,10 @@ the parser; `.ks.xml` scripts are unchanged, and the two kinds can import each o
 import KScript.IO
 
 /// Lower-cases text and joins words with dashes.
+/// @param text The text to change.
 fn slugify(text) => $text->lower()->replace(' ', '-')
 
-let people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
+people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
 for p in $people {
   if $p.age >= 18 {
     echo "{ @slugify($p.name) } is an adult"
@@ -23,15 +24,34 @@ for p in $people {
 
 Samples: `samples/code-format/` (rewrites of `samples/kscript2/`) and `samples/life-lab/desktop.kscript`.
 
+## Assignment
+
+There is one way to assign: `x = 3`. The first assignment declares `x` in the current block; after that, the same
+statement changes it, including from inside a nested block or a function. Other operators update an existing variable:
+`total += 1`, `name ??= 'guest'`, `point.x = 3`, `list[0] = 'a'`.
+
+```
+total = 0
+for item in $cart {
+  total += $item.price      // changes the total above
+  line = $item.name         // new: only exists inside the loop
+}
+const tax = 0.2             // can't be changed
+count: int = $raw           // declared with a type (converted, or an error)
+```
+
+`let` and `set` aren't used in .kscript files; writing them is an error that says to drop the word. In XML they keep
+their meaning (`<let>` declares in the current scope, `<set>` changes), and `kscript convert` picks the right one.
+
 ## Statements
 
 | .kscript | XML |
 | --- | --- |
-| `let n = 3` | `<let name="n" value="3" />` |
+| `n = 3` (first time) | `<let name="n" value="3" />` |
+| `n = 4`, `total += 1` (after) | `<set name="n" value="4" />`, `<set name="total" op="+=" value="1" />` |
 | `const config = { retries: 3 }` | `<let name="config" const="yes" value="…" />` |
-| `let count: int = $raw` | `<let name="count" type="int" value="$raw" />` |
-| `set total += 1` | `<set name="total" op="+=" value="1" />` |
-| `$x += 1`, `@greet('Hi')` | `<do>$x += 1</do>` |
+| `count: int = $raw` | `<let name="count" type="int" value="$raw" />` |
+| `@greet('Hi')` | `<do>@greet('Hi')</do>` |
 | `echo "Hello, $name"` | `<echo>Hello, $name</echo>` |
 | `echo $list[1]`, `echo(format: json) $data` | `<echo value="$list[1]" />` |
 | `if a { } elif b { } else { }` (also `else if`) | `<if test>`, `<elif test>`, `<else>` |
@@ -72,7 +92,48 @@ Row(gap: 8, wrap) {
 - Expressions are kept as written, so raw `<` and `>` work (`lt` and `gt` still do).
 - The file is the body of an implied `<kscript>`. A file whose only statement is a `KScript.*` element (such as
   `KScript.Window(...) { }`) uses that element as the root.
-- `//` and `/* */` are comments. `///` lines before a `fn`, `let` or `const` become its description.
+- `//` and `/* */` are comments.
+
+## Doc comments
+
+`///` lines before a `fn` or `const` document it. Editors show the text in hover, completion and signature help.
+The text is Markdown, with tags:
+
+```
+/// Greets someone politely.
+///
+/// @param who The person to greet.
+/// @param greeting How to start, such as 'Hi'.
+/// @returns The greeting, ending with '!'.
+/// @example
+///   @greet('Kyle')   // Hello, Kyle!
+/// @see @welcome
+fn greet(who, greeting = 'Hello') => $greeting + ', ' + $who + '!'
+
+/// @deprecated Use @greet instead.
+fn hello(who) => @greet($who)
+```
+
+`kscript check` and the editor warn about a `@param` that names no parameter (KS4007) and about calls to a
+`@deprecated` function (KS4008). XML scripts write the same text in a `<!--- ... -->` comment (three dashes) just
+before the element, or in its `description` attribute.
+
+## Converting
+
+`kscript convert` writes the other format next to the original, which is left unchanged:
+
+```
+kscript convert tour.ks.xml          # writes tour.kscript
+kscript convert tour.kscript         # writes tour.ks.xml
+kscript convert scripts/ --to kscript   # every XML script in a folder (tests are skipped)
+kscript convert tour.ks.xml --stdout    # print instead of writing
+```
+
+Options: `--to xml|kscript`, `--out file`, `--stdout`, `--force` (replace an existing file). Comments, doc comments
+and blank lines are kept, and expressions are copied as written. Where one meaning has two spellings, the converter
+picks one (`<call fn="greet" args="'x'" />` becomes `@greet('x')`; `x = 3` becomes `<let>` or `<set>`), so the first
+conversion may tidy a file, and converting back and forth after that changes nothing. It warns when something can't
+be carried over exactly, such as a `<let>` inside a block that hides an outer variable of the same name.
 
 ## Not done yet
 

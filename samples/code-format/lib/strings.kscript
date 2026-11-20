@@ -1,6 +1,13 @@
-/// Lower-cases text and joins words with dashes.
+/// Lower-cases text and joins words with dashes, for URLs and file names.
+///
+/// @param text The text to turn into a slug.
+/// @returns The slug, such as `hello-world`.
+/// @example
+///   @slugify('Hello World')   // 'hello-world'
 fn slugify(text) {
   return $text->lower()->replace(' ', '-')
 }
 
+/// Upper-cases text.
+/// @deprecated Use $text->upper() instead.
 fn titlecase(text) => $text->upper()

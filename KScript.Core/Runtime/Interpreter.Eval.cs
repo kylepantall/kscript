@@ -26,13 +26,18 @@ namespace KScript.Runtime
         }
 
         /// <summary>Runs <c>x = 3; $total += $price</c> statements. With <paramref name="declare"/>, plain names are declared (as &lt;let&gt; does).</summary>
-        public void ExecuteStatements(DecodedText text, Scope scope, Module module, bool declare)
+        /// <summary>
+        /// Runs assignment statements and calls. <paramref name="declare"/> declares every assigned name in this scope
+        /// (&lt;let&gt;); <paramref name="declareNew"/> declares only names not yet in scope and changes the rest
+        /// (.kscript files, where <c>x = 3</c> is the one way to assign).
+        /// </summary>
+        public void ExecuteStatements(DecodedText text, Scope scope, Module module, bool declare, bool declareNew = false)
         {
             ParseResult parsed = GetParse(module, text, ParseMode.Statements);
             var ctx = new EvalContext(module, text);
             foreach (ExprNode node in parsed.Nodes)
             {
-                if (node is AssignmentNode assignment) Assign(assignment, scope, ctx, declare);
+                if (node is AssignmentNode assignment) Assign(assignment, scope, ctx, declare || (declareNew && assignment.Operator == "=" && assignment.Target is VariableNode or IdentifierNode && !scope.Has(assignment.Name)));
                 else Evaluate(node, scope, ctx);
             }
         }

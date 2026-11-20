@@ -1,16 +1,16 @@
-let people = [
+people = [
   { name: 'Joseph', age: 28 },
   { name: 'Joan',   age: 82 },
   { name: 'Ellie',  age: 12 },
 ]
-let oldest = $people->max_by(fn($p) => $p.age)
+oldest = $people->max_by(fn($p) => $p.age)
 echo "{$oldest.name} is the oldest at {$oldest.age} years old."
 
 // Or the loop, if you want one
-let eldest = $people[0]
+eldest = $people[0]
 for p in $people {
   if $p.age > $eldest.age {
-    set eldest = $p
+    eldest = $p
   }
 }
 echo "$eldest.name again."

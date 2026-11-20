@@ -3,19 +3,19 @@
 KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, background: "#0f172a") {
   import "lib/life.ks.xml"
 
-  let cols = 40
-  let rows = 24
-  let world = @pattern_world('glider_gun', $cols, $rows)
-  let playing = false
-  let speed = 150
-  let pattern = 'glider_gun'
-  let soup = 30
-  let wrap = true
-  let pattern_choices = $patterns->keys()->map(fn($k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
+  cols = 40
+  rows = 24
+  world = @pattern_world('glider_gun', $cols, $rows)
+  playing = false
+  speed = 150
+  pattern = 'glider_gun'
+  soup = 30
+  wrap = true
+  pattern_choices = $patterns->keys()->map(fn($k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
 
   fn tick() {
-    set world = @advance($world, 1)
-    set playing = @population($world.grid) > 0
+    world = @advance($world, 1)
+    playing = @population($world.grid) > 0
   }
 
   Timer(every: $speed, when: $playing, on-tick: @tick())
@@ -61,7 +61,7 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
   }
 
   Row(gap: 24, wrap) {
-    let s = @summary($world)
+    s = @summary($world)
     for stat in [['Generation', $s.generation], ['Alive', $s.population + ' (' + $s.density + '%)'], ['Born', $s.births], ['Died', $s.deaths], ['Status', $s.status]] {
       Column(gap: 2) {
         Text(size: 11, color: "#64748b") "{ $stat[0]->upper() }"

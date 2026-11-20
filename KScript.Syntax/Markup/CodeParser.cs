@@ -34,6 +34,9 @@ namespace KScript.Syntax.Markup
         private StringBuilder pendingDoc;
         private int pendingDocStart;
 
+        // Where // and /* */ comments go as MarkupComment nodes (null while looking ahead or inside a header).
+        private MarkupElement commentTarget;
+
         private CodeParser(SourceText source)
         {
             this.source = source;
@@ -84,10 +87,13 @@ namespace KScript.Syntax.Markup
             // A file that is a single package element, such as KScript.Window { ... }, uses it as the root,
             // as an XML script would.
             List<MarkupElement> top = root.ChildElements.ToList();
-            if (top.Count == 1 && root.Children.Count == 1 && top[0].Name.StartsWith("KScript.", StringComparison.Ordinal))
+            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && top[0].Name.StartsWith("KScript.", StringComparison.Ordinal))
             {
-                top[0].Parent = null;
-                document.Children.Add(top[0]);
+                foreach (MarkupNode node in root.Children.Where(n => !(n is MarkupText)))
+                {
+                    node.Parent = null;
+                    document.Children.Add(node);
+                }
                 return;
             }
             document.Children.Add(root);
@@ -98,6 +104,7 @@ namespace KScript.Syntax.Markup
         {
             while (true)
             {
+                commentTarget = parent;
                 SkipTrivia(newlines: true);
                 if (pos >= text.Length)
                 {
@@ -127,6 +134,7 @@ namespace KScript.Syntax.Markup
                 }
 
                 ParseStatement(parent);
+                commentTarget = parent;
                 EndStatement();
             }
         }
@@ -163,6 +171,12 @@ namespace KScript.Syntax.Markup
 
             string word = PeekName();
 
+            if (LooksLikeAssignment())
+            {
+                ParseAssignment(parent, start, doc);
+                return;
+            }
+
             // true, false, null and fn(...) start expressions, not elements.
             if (word is "true" or "false" or "null" or "not" || (word == "fn" && Peek(2) == '('))
             {
@@ -173,9 +187,24 @@ namespace KScript.Syntax.Markup
             switch (word)
             {
                 case "import": ParseImport(parent, start); return;
-                case "let": ParseLet(parent, start, isConst: false, doc); return;
-                case "const": ParseLet(parent, start, isConst: true, doc); return;
-                case "set": ParseSet(parent, start); return;
+                case "const": ParseLet(parent, start, isConst: true, doc, keywordLength: 5); return;
+                case "let":
+                case "set":
+                    {
+                        // One way to assign: x = 3 declares x the first time and changes it after that.
+                        int keywordEnd = pos + word.Length;
+                        pos = keywordEnd;
+                        SkipSpaces();
+                        if (LooksLikeAssignment())
+                        {
+                            Error(TextSpan.FromBounds(start, keywordEnd), DiagnosticCodes.RetiredElement,
+                                $"Drop '{word}': in a .kscript file, x = 3 declares x the first time and changes it after that.");
+                            ParseAssignment(parent, pos, doc);
+                            return;
+                        }
+                        pos = start;
+                        break;
+                    }
                 case "echo": ParseEcho(parent, start); return;
                 case "if": ParseIf(parent, start); return;
                 case "while": ParseWhile(parent, start); return;
@@ -293,14 +322,14 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary><c>let name = expr</c>, <c>let name: int = expr</c>, <c>const name = expr</c>.</summary>
-        private void ParseLet(MarkupElement parent, int start, bool isConst, string doc)
+        private void ParseLet(MarkupElement parent, int start, bool isConst, string doc, int keywordLength)
         {
-            MarkupElement e = Begin(parent, "let", start, new TextSpan(start, isConst ? 5 : 3));
+            MarkupElement e = Begin(parent, "let", start, new TextSpan(start, keywordLength));
             SkipSpaces();
             TextSpan name = ReadNameSpan(allowDash: false);
             if (name.Length == 0)
             {
-                Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, $"Write the variable's name after '{(isConst ? "const" : "let")}'.");
+                Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the constant's name after 'const'.");
                 Finish(e, start);
                 return;
             }
@@ -324,43 +353,89 @@ namespace KScript.Syntax.Markup
             }
             if (isConst)
             {
-                AddAttribute(e, "const", DecodedText.Plain("yes", start), e.NameSpan);
+                AddAttribute(e, "const", DecodedText.Plain("yes", start), new TextSpan(e.NameSpan.Start, 0));
             }
             if (doc != null)
             {
-                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), e.NameSpan);
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
             }
             Finish(e, start);
         }
 
-        /// <summary><c>set total = $total + 1</c>, <c>set total += 1</c>.</summary>
-        private void ParseSet(MarkupElement parent, int start)
+        /// <summary>
+        /// <c>total = $price * 2</c>, <c>total += 1</c>, <c>point.x = 3</c>: assignments, which declare a new name or
+        /// change one already in scope. <c>count: int = $raw</c> declares with a type.
+        /// </summary>
+        private void ParseAssignment(MarkupElement parent, int start, string doc)
         {
-            MarkupElement e = Begin(parent, "set", start);
-            SkipSpaces();
+            int save = pos;
             TextSpan name = ReadNameSpan(allowDash: false);
-            if (name.Length == 0)
-            {
-                Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the variable's name after 'set'.");
-                Finish(e, start);
-                return;
-            }
-            AddRawAttribute(e, "name", name);
             SkipSpaces();
-            string op = SetOperators.FirstOrDefault(o => Lookahead(o) && !(o == "=" && Peek(1) == '='));
-            if (op == null)
+            if (name.Length > 0 && Peek(0) == ':' && Peek(1) != ':')
             {
-                Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write = (or +=, -=, *=, /=, ??=) and the new value.");
-                Finish(e, start);
+                pos = save;
+                ParseLet(parent, start, isConst: false, doc, keywordLength: 0);
                 return;
             }
-            if (op != "=")
+            pos = save;
+            ParseDo(parent, start);
+        }
+
+        /// <summary>
+        /// True at <c>name =</c>, <c>name += </c>, <c>name.field =</c>, <c>name[i] =</c> or <c>name: type =</c>.
+        /// </summary>
+        private bool LooksLikeAssignment()
+        {
+            int p = pos;
+            if (p < text.Length && text[p] == '$')
             {
-                AddRawAttribute(e, "op", new TextSpan(pos, op.Length));
+                p++;
             }
-            pos += op.Length;
-            AddExpressionAttribute(e, "value", Stop.Line);
-            Finish(e, start);
+            if (p >= text.Length || !Lexer.IsIdentStart(text[p]))
+            {
+                return false;
+            }
+            while (p < text.Length && (Lexer.IsIdentChar(text[p]) || (text[p] == '.' && p + 1 < text.Length && Lexer.IsIdentStart(text[p + 1]))))
+            {
+                p++;
+            }
+            while (p < text.Length && text[p] == '[')
+            {
+                int depth = 0;
+                do
+                {
+                    if (text[p] == '[') depth++;
+                    else if (text[p] == ']') depth--;
+                    p++;
+                }
+                while (p < text.Length && depth > 0 && text[p] != '\n');
+            }
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p++;
+            }
+            if (p >= text.Length)
+            {
+                return false;
+            }
+            if (text[p] == ':' && p + 1 < text.Length && text[p + 1] != ':')
+            {
+                // name: type = value
+                int q = p + 1;
+                while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
+                int typeStart = q;
+                while (q < text.Length && Lexer.IsIdentChar(text[q])) q++;
+                while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
+                return q > typeStart && q < text.Length && text[q] == '=' && (q + 1 >= text.Length || (text[q + 1] != '=' && text[q + 1] != '>'));
+            }
+            foreach (string op in new[] { "??=", "+=", "-=", "*=", "/=" })
+            {
+                if (string.CompareOrdinal(text, p, op, 0, op.Length) == 0)
+                {
+                    return true;
+                }
+            }
+            return text[p] == '=' && (p + 1 >= text.Length || (text[p + 1] != '=' && text[p + 1] != '>'));
         }
 
         /// <summary><c>echo "Hello, $name"</c> prints a template; <c>echo $x</c> prints a value; <c>echo(format: json) $data</c>.</summary>
@@ -382,7 +457,6 @@ namespace KScript.Syntax.Markup
                 int save = pos;
                 (DecodedText content, TextSpan span) = ReadString();
                 int after = pos;
-                SkipTrivia(newlines: false);
                 bool alone = AtStatementEnd();
                 pos = after;
                 if (alone)
@@ -413,7 +487,7 @@ namespace KScript.Syntax.Markup
             while (true)
             {
                 int save = pos;
-                SkipTrivia(newlines: true);
+                SkipTriviaLookingAhead();
                 int start = pos;
                 string word = Lexer.IsIdentStart(Peek(0)) ? PeekName() : null;
                 if (allowElif && (word == "elif" || (word == "else" && FollowedByIf())))
@@ -513,6 +587,7 @@ namespace KScript.Syntax.Markup
             int open = pos++;
             while (true)
             {
+                commentTarget = e;
                 SkipTrivia(newlines: true);
                 if (pos >= text.Length)
                 {
@@ -586,7 +661,7 @@ namespace KScript.Syntax.Markup
             }
             if (doc != null)
             {
-                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), e.NameSpan);
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
             }
             SkipSpaces();
             if (Lookahead("=>"))
@@ -609,12 +684,17 @@ namespace KScript.Syntax.Markup
             while (true)
             {
                 int save = pos;
-                SkipTrivia(newlines: true);
+                SkipTriviaLookingAhead();
                 int clauseStart = pos;
                 string word = Lexer.IsIdentStart(Peek(0)) ? PeekName() : null;
                 if (word == "catch")
                 {
                     MarkupElement c = Begin(e, "catch", clauseStart);
+                    if (Peek(0) == '(')
+                    {
+                        // catch(type: "FileNotFound, Io") err { }
+                        ParseAttributeList(c);
+                    }
                     SkipSpaces();
                     if (Lexer.IsIdentStart(Peek(0)) && PeekName() != "when")
                     {
@@ -726,6 +806,20 @@ namespace KScript.Syntax.Markup
 
         /// <summary><c>(name: value, name: "text", flag)</c>, which may span lines.</summary>
         private void ParseAttributeList(MarkupElement e)
+        {
+            MarkupElement savedTarget = commentTarget;
+            commentTarget = null;
+            try
+            {
+                ParseAttributes(e);
+            }
+            finally
+            {
+                commentTarget = savedTarget;
+            }
+        }
+
+        private void ParseAttributes(MarkupElement e)
         {
             int open = pos++;
             while (true)
@@ -846,11 +940,12 @@ namespace KScript.Syntax.Markup
         private void AddText(MarkupElement e, DecodedText content, TextSpan? span = null) =>
             e.Children.Add(new MarkupText { Content = content, Parent = e, Span = span ?? content.SourceSpan });
 
+        // Attributes implied by a keyword (let's name, if's test) have no name in the source: an empty name span.
         private void AddRawAttribute(MarkupElement e, string name, TextSpan span) =>
-            AddAttribute(e, name, DecodedText.Plain(text.Substring(span.Start, span.Length), span.Start), span, span, '\0');
+            AddAttribute(e, name, DecodedText.Plain(text.Substring(span.Start, span.Length), span.Start), span, new TextSpan(span.Start, 0), '\0');
 
         private void AddAttribute(MarkupElement e, string name, DecodedText value, TextSpan span, TextSpan? nameSpan = null, char quote = '\0') =>
-            e.Attributes.Add(new MarkupAttribute { Name = name, NameSpan = nameSpan ?? span, Value = value, Span = span, Quote = quote, Owner = e });
+            e.Attributes.Add(new MarkupAttribute { Name = name, NameSpan = nameSpan ?? new TextSpan(span.Start, 0), Value = value, Span = span, Quote = quote, Owner = e });
 
         private void AddExpressionAttribute(MarkupElement e, string name, Stop stop)
         {
@@ -1123,6 +1218,18 @@ namespace KScript.Syntax.Markup
             while (pos < text.Length)
             {
                 char c = text[pos];
+                if (newlines && c == '\n' && commentTarget != null && IsBlankLineAhead())
+                {
+                    // A blank line between statements is kept (as whitespace text), so conversion keeps the layout.
+                    int start = pos;
+                    while (pos < text.Length && char.IsWhiteSpace(text[pos]))
+                    {
+                        pos++;
+                    }
+                    commentTarget.Children.Add(new MarkupText { Content = DecodedText.Plain(text.Substring(start, pos - start), start), Span = TextSpan.FromBounds(start, pos), Parent = commentTarget });
+                    pendingDoc = null;
+                    continue;
+                }
                 if (c == ' ' || c == '\t' || (newlines && (c == '\n' || c == '\r')))
                 {
                     pos++;
@@ -1137,7 +1244,12 @@ namespace KScript.Syntax.Markup
                     }
                     if (newlines && string.CompareOrdinal(text, start, "///", 0, 3) == 0)
                     {
-                        string line = text.Substring(start + 3, pos - start - 3).Trim();
+                        // One space after /// is the separator; more is indentation (kept for @example code).
+                        string line = text.Substring(start + 3, pos - start - 3).TrimEnd();
+                        if (line.StartsWith(" ", StringComparison.Ordinal))
+                        {
+                            line = line.Substring(1);
+                        }
                         if (pendingDoc == null)
                         {
                             pendingDoc = new StringBuilder();
@@ -1145,13 +1257,18 @@ namespace KScript.Syntax.Markup
                         }
                         else
                         {
-                            pendingDoc.Append(' ');
+                            pendingDoc.Append('\n');
                         }
                         pendingDoc.Append(line);
                     }
-                    else if (newlines)
+                    else
                     {
-                        pendingDoc = null;
+                        if (newlines)
+                        {
+                            pendingDoc = null;
+                        }
+                        string body = text.Substring(start + 2, pos - start - 2).TrimEnd('\r');
+                        AddComment(start, body.StartsWith(" ", StringComparison.Ordinal) ? body.Substring(1) : body);
                     }
                     continue;
                 }
@@ -1164,10 +1281,39 @@ namespace KScript.Syntax.Markup
                     {
                         Error(new TextSpan(start, 2), DiagnosticCodes.MarkupSyntax, "This comment is missing its closing */.");
                     }
+                    AddComment(start, text.Substring(start + 2, (close < 0 ? text.Length : close) - start - 2).Trim());
                     continue;
                 }
                 return;
             }
+        }
+
+        private bool IsBlankLineAhead()
+        {
+            int p = pos + 1;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t' || text[p] == '\r'))
+            {
+                p++;
+            }
+            return p < text.Length && text[p] == '\n';
+        }
+
+        private void AddComment(int start, string body)
+        {
+            commentTarget?.Children.Add(new MarkupComment { Text = body, Span = TextSpan.FromBounds(start, pos), Parent = commentTarget });
+        }
+
+        /// <summary>Skips trivia to look at the next word (else, catch, ...) without keeping comments or doc lines.</summary>
+        private void SkipTriviaLookingAhead()
+        {
+            MarkupElement savedTarget = commentTarget;
+            StringBuilder savedDoc = pendingDoc == null ? null : new StringBuilder(pendingDoc.ToString());
+            int savedDocStart = pendingDocStart;
+            commentTarget = null;
+            SkipTrivia(newlines: true);
+            commentTarget = savedTarget;
+            pendingDoc = savedDoc;
+            pendingDocStart = savedDocStart;
         }
 
         private string TakeDoc()

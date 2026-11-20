@@ -15,6 +15,7 @@ namespace KScript
             Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
+            Console.WriteLine("       kscript convert <file-or-folder>... [--to xml|kscript] [--stdout]   Write the .kscript version of an XML script, or the reverse.");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
             Console.WriteLine("       kscript app build [script] [--name \"My App\"] [--out folder]   Package a script as a desktop app.");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
@@ -160,6 +161,11 @@ namespace KScript
             if (args[0] == "serve")
             {
                 return Serve(args.Skip(1).ToArray());
+            }
+
+            if (args[0] == "convert")
+            {
+                return KScript.Conversion.ConvertCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
             }
 
             if (args[0] == "test")

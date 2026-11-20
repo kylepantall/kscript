@@ -466,7 +466,7 @@ namespace KScript.Syntax.Markup
             {
                 pos = end + 3;
             }
-            AddNode(new MarkupComment { Span = TextSpan.FromBounds(start, pos) });
+            AddNode(new MarkupComment { Span = TextSpan.FromBounds(start, pos), Text = text.Substring(start + 4, Math.Max(0, (end < 0 ? text.Length : end) - start - 4)) });
         }
 
         private void ParseCData()

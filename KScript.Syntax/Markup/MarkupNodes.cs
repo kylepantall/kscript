@@ -92,6 +92,27 @@ namespace KScript.Syntax.Markup
 
     public sealed class MarkupComment : MarkupNode
     {
+        /// <summary>The text between &lt;!-- and --&gt;.</summary>
+        public string Text { get; internal set; } = string.Empty;
+
+        /// <summary>A doc comment, &lt;!--- ... --&gt;: documents the element after it, like /// in a .kscript file.</summary>
+        public bool IsDoc => Text.StartsWith("-", StringComparison.Ordinal) && !Text.StartsWith("--", StringComparison.Ordinal);
+
+        /// <summary>The doc comment's text with the leading '-' and the common indentation removed, or null.</summary>
+        public string DocText
+        {
+            get
+            {
+                if (!IsDoc)
+                {
+                    return null;
+                }
+                string[] lines = Text.Substring(1).Replace("\r\n", "\n").Split('\n');
+                IEnumerable<string> rest = lines.Skip(1).Select(l => l.TrimEnd());
+                int indent = rest.Where(l => l.Trim().Length > 0).Select(l => l.Length - l.TrimStart().Length).DefaultIfEmpty(0).Min();
+                return string.Join("\n", new[] { lines[0].Trim() }.Concat(rest.Select(l => l.Length >= indent ? l.Substring(indent) : l.TrimStart()))).Trim();
+            }
+        }
     }
 
     public sealed class MarkupAttribute
@@ -151,6 +172,35 @@ namespace KScript.Syntax.Markup
             {
                 List<MarkupText> texts = Children.OfType<MarkupText>().ToList();
                 return HasOnlyText && texts.Count == 1 ? texts[0] : null;
+            }
+        }
+
+        /// <summary>
+        /// The element's documentation: its description attribute, or a &lt;!--- doc comment --&gt; just before it.
+        /// </summary>
+        public string Documentation
+        {
+            get
+            {
+                string description = GetAttributeValue("description");
+                if (description != null)
+                {
+                    return description;
+                }
+                List<MarkupNode> siblings = Parent?.Children;
+                int index = siblings?.IndexOf(this) ?? -1;
+                for (int i = index - 1; i >= 0; i--)
+                {
+                    switch (siblings[i])
+                    {
+                        case MarkupText t when t.IsWhitespace:
+                            continue;
+                        case MarkupComment c when c.IsDoc:
+                            return c.DocText;
+                    }
+                    break;
+                }
+                return null;
             }
         }
 

@@ -1,3 +1,4 @@
+using KScript.Syntax.Markup;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Syntax;
@@ -40,11 +41,12 @@ namespace KScript.Language.Features
 
             void AddFunction(Symbol fn)
             {
+                DocComment doc = fn.Doc;
                 signatures.Add(new SignatureInfo
                 {
                     Label = fn.TypedSignature,
-                    Documentation = fn.Description,
-                    Parameters = fn.Parameters.Select(p => (p.Label, (string)null)).ToList(),
+                    Documentation = doc != null ? doc.ToMarkdown(includeParams: false) : fn.Description,
+                    Parameters = fn.Parameters.Select(p => (p.Label, doc?.ParamText(p.Name))).ToList(),
                 });
             }
 

@@ -91,6 +91,8 @@ namespace KScript.Syntax
         public const string DuplicateDeclaration = "KS4004";
         public const string UndefinedFunction = "KS4005";
         public const string RetiredSigil = "KS4006";
+        public const string DocParameter = "KS4007";
+        public const string Deprecated = "KS4008";
 
         public const string UnknownCommand = "KS5001";
         public const string RetiredCommand = "KS5002";

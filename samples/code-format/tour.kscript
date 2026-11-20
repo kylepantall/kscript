@@ -1,34 +1,34 @@
 import KScript.IO
 
 // Expressions, interpolation and variables
-let n = 3
-let name = 'Kyle'
+n = 3
+name = 'Kyle'
 if $n < 10 and $name != '' {
   echo "{ $n == 1 ? 'item' : 'items' }"
 }
-let price = 2.5
-let qty = 4
-let total = 0
-set total = $total + $price * $qty
-set total += 1
-let x = 3
+price = 2.5
+qty = 4
+total = 0
+total = $total + $price * $qty
+total += 1
+x = 3
 $x += 1
 $x = 3; $total += $price * $qty
 const config = { debug: false, retries: 3 }
 echo "Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for braces."
 
 // Lists, maps, lambdas and pipes
-let colours = ['red', 'green', 'blue']
+colours = ['red', 'green', 'blue']
 echo $colours[1]
-let person = { name: 'Joan', age: 82 }
+person = { name: 'Joan', age: 82 }
 echo "$person.name is { $person['age'] }"
-let people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
-let names = $people
+people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
+names = $people
   |> filter(fn($p) => $p.age >= 18)
   |> map(fn($p) => $p.name)
   |> join(', ')
-let by_age = fn($a, $b) => $a.age - $b.age
-let sorted = $people->sort($by_age)
+by_age = fn($a, $b) => $a.age - $b.age
+sorted = $people->sort($by_age)
 echo $names |> @to_lower() |> @greet('Hi')
 
 // Loops
@@ -39,7 +39,7 @@ for key, value in $config { echo "$key = $value" }
 while $n < 3 { $n += 1 }
 
 // Branches
-let score = 80
+score = 80
 if $score >= 90 {
   echo "A"
 } elif $score >= 75 {
@@ -47,14 +47,14 @@ if $score >= 90 {
 } else {
   echo "C"
 }
-let choice = 2
+choice = 2
 match $choice {
   case 1 { @greet('settings') }
   case 2, 3 { echo "Coming soon" }
   when $choice > 9 { echo "Out of range" }
   default { echo "Unknown option" }
 }
-let label = match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }
+label = match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }
 
 // Functions
 fn greet(who, greeting = 'Hello') {
@@ -65,9 +65,9 @@ echo @greet('World')
 echo "{ 'Kyle' |> @greet('Hi') } { @double(4) }"
 
 // Errors
-let path = 'data.json'
+path = 'data.json'
 try {
-  let data = @read_text($path) |> @json()
+  data = @read_text($path) |> @json()
 } catch err when $err.type == 'FileNotFound' {
   echo "No file at {$path}, using defaults."
 } catch err {
@@ -75,7 +75,7 @@ try {
 } finally {
   echo "done"
 }
-let age = -1
+age = -1
 try {
   if $age < 0 {
     throw Validation "Age must be positive, got {$age}"
@@ -85,5 +85,5 @@ try {
 }
 
 // Null handling and membership
-let user = null
+user = null
 echo "{ $user?.name ?? 'guest' } { '.cs' in ['.cs', '.xml'] }"

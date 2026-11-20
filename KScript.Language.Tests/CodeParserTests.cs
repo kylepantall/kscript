@@ -33,10 +33,12 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("let n = 3", "kscript { let(name: n, value: 3) }")]
+        [InlineData("n = 3", "kscript { do \"n = 3\" }")]
         [InlineData("const config = { debug: false }", "kscript { let(name: config, value: { debug: false }, const: yes) }")]
-        [InlineData("let count: int = '4'", "kscript { let(name: count, type: int, value: '4') }")]
-        [InlineData("set total += $price * 2", "kscript { set(name: total, op: +=, value: $price * 2) }")]
+        [InlineData("count: int = '4'", "kscript { let(name: count, type: int, value: '4') }")]
+        [InlineData("point.x = 3", "kscript { do \"point.x = 3\" }")]
+        [InlineData("list[0] += 1", "kscript { do \"list[0] += 1\" }")]
+        [InlineData("total += $price * 2", "kscript { do \"total += $price * 2\" }")]
         [InlineData("$x += 1; @greet('Hi')", "kscript { do \"$x += 1\"; do \"@greet('Hi')\" }")]
         [InlineData("echo \"Hello, $name!\"", "kscript { echo \"Hello, $name!\" }")]
         [InlineData("echo $list[1]", "kscript { echo(value: $list[1]) }")]
@@ -84,12 +86,13 @@ namespace KScript.Language.Tests
         [Fact]
         public void ExpressionsContinueOverLines()
         {
-            MarkupElement root = Root("let names = $people\n  |> filter(fn($p) => $p.age >= 18)\n  |> map(fn($p) => $p.name)\nlet m = {\n  a: 1,\n  b: 2\n}\nlet t = $a and\n  $b");
+            MarkupElement root = Root("names = $people\n  |> filter(fn($p) => $p.age >= 18)\n  |> map(fn($p) => $p.name)\nm = {\n  a: 1,\n  b: 2\n}\nt = $a and\n  $b");
             List<MarkupElement> lets = root.ChildElements.ToList();
+            Assert.All(lets, l => Assert.Equal("do", l.Name));
             Assert.Equal(3, lets.Count);
-            Assert.EndsWith("|> map(fn($p) => $p.name)", lets[0].GetAttributeValue("value"));
-            Assert.Equal("{\n  a: 1,\n  b: 2\n}", lets[1].GetAttributeValue("value"));
-            Assert.Equal("$a and\n  $b", lets[2].GetAttributeValue("value"));
+            Assert.EndsWith("|> map(fn($p) => $p.name)", lets[0].SingleText.Value);
+            Assert.Equal("m = {\n  a: 1,\n  b: 2\n}", lets[1].SingleText.Value);
+            Assert.Equal("t = $a and\n  $b", lets[2].SingleText.Value);
         }
 
         [Fact]
@@ -102,9 +105,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void CommentsAndDocComments()
         {
-            MarkupElement root = Root("// a comment\n/* block\ncomment */\n/// Doubles a number.\n/// Twice as big.\nfn double(x) => $x * 2 // trailing\nlet s = 'a // not a comment'");
+            MarkupElement root = Root("// a comment\n/* block\ncomment */\n/// Doubles a number.\n/// Twice as big.\nfn double(x) => $x * 2 // trailing\nconst s = 'a // not a comment'");
             MarkupElement fn = root.ChildElements.First();
-            Assert.Equal("Doubles a number. Twice as big.", fn.GetAttributeValue("description"));
+            Assert.Equal("Doubles a number.\nTwice as big.", fn.GetAttributeValue("description"));
             Assert.Equal("$x * 2", fn.GetAttributeValue("value"));
             Assert.Equal("'a // not a comment'", root.ChildElements.Last().GetAttributeValue("value"));
         }
@@ -112,10 +115,10 @@ namespace KScript.Language.Tests
         [Fact]
         public void AttributeAndTextPositionsPointIntoTheFile()
         {
-            const string text = "let total = $price * 2\necho \"Hi \\\"{$name}\\\"\"";
+            const string text = "total = $price * 2\necho \"Hi \\\"{$name}\\\"\"";
             MarkupElement root = Root(text);
-            MarkupAttribute value = root.ChildElements.First().GetAttribute("value");
-            Assert.Equal("$price * 2", text.Substring(value.Value.SourceSpan.Start, value.Value.SourceSpan.Length));
+            MarkupText value = root.ChildElements.First().SingleText;
+            Assert.Equal("total = $price * 2", text.Substring(value.Content.SourceSpan.Start, value.Content.SourceSpan.Length));
 
             MarkupText echo = root.ChildElements.Last().SingleText;
             Assert.Equal("Hi \"{$name}\"", echo.Value);
@@ -138,7 +141,7 @@ namespace KScript.Language.Tests
         [InlineData("else { }", "KS3007")]
         [InlineData("break continue", "KS1001")]
         [InlineData("for x { }", "KS3005")]
-        [InlineData("set x", "KS3005")]
+        [InlineData("let x = 1", "KS3002")]
         public void ReportsMistakes(string code, string diagnostic)
         {
             MarkupDocument doc = CodeParser.Parse(code);
@@ -150,7 +153,7 @@ namespace KScript.Language.Tests
         {
             Assert.True(MarkupParser.IsCodePath("a/b/code.kscript"));
             Assert.False(MarkupParser.IsCodePath("a/b/code.ks.xml"));
-            Assert.Equal(SourceSyntax.Code, MarkupParser.Parse(new Syntax.Text.SourceText("let x = 1"), DocumentKind.Script, "x.kscript").Syntax);
+            Assert.Equal(SourceSyntax.Code, MarkupParser.Parse(new Syntax.Text.SourceText("x = 1"), DocumentKind.Script, "x.kscript").Syntax);
             Assert.Equal(SourceSyntax.Xml, MarkupParser.Parse(new Syntax.Text.SourceText("<kscript/>"), DocumentKind.Script, "x.ks.xml").Syntax);
         }
 
@@ -167,24 +170,52 @@ namespace KScript.Language.Tests
             Assert.Equal(Outline(xml.RootElements.Single()), Outline(code.RootElements.Single()));
         }
 
-        /// <summary>Element names and attribute names in order (values differ in spelling, such as lt and &lt;).</summary>
+        /// <summary>Element names and attribute names (values differ in spelling, such as lt and &lt;).</summary>
         private static List<string> Outline(MarkupElement root) =>
             new[] { root }.Concat(root.Ancestors()).Take(1).Concat(Descendants(root))
-                .Select(e => e.Name + "(" + string.Join(",", e.Attributes.Select(a => a.Name)
-                    .Concat(e.Name is "let" or "set" && e.SingleText is MarkupText t && !t.IsWhitespace ? new[] { "value" } : Array.Empty<string>())
-                    .Where(n => n != "description" && n != "src").OrderBy(n => n)) + ")")
+                // let, set and do are all "x = value" in .kscript, so they compare as one kind of statement.
+                .Select(e => e.Name is "let" or "set" or "do" && !IsYes(e.GetAttributeValue("const")) && e.GetAttribute("type") == null
+                    ? "assign"
+                    : e.Name + "(" + string.Join(",", e.Attributes.Select(a => a.Name).Where(n => n != "description" && n != "src").OrderBy(n => n)) + ")")
                 .ToList();
+
+        private static bool IsYes(string v) => v == "yes";
 
         private static IEnumerable<MarkupElement> Descendants(MarkupElement e) =>
             e.ChildElements.SelectMany(c => new[] { c }.Concat(Descendants(c)));
 
         [Fact]
+        public void OneAssignmentDeclaresThenChanges()
+        {
+            AssertNoDiagnostics("total = 0\nfor i in 0..3 {\n  total += $i\n  last = $i\n}\necho $total");
+
+            DocumentAnalysis a = Analyzer.Analyze("for i in 0..3 {\n  tmp = $i\n}\necho $tmp\ncount += 1\nconst k = 1\nk = 2", "test.kscript");
+            Assert.Contains(a.Diagnostics, d => d.Code == "KS4001" && d.Message.Contains("$tmp"));
+            Assert.Contains(a.Diagnostics, d => d.Code == "KS4002" && d.Message.Contains("count = ..."));
+            Assert.Contains(a.Diagnostics, d => d.Code == "KS4003");
+        }
+
+        private static void AssertNoDiagnostics(string code)
+        {
+            DocumentAnalysis analysis = Analyzer.Analyze(code, "test.kscript");
+            Assert.True(analysis.Diagnostics.Count == 0, string.Join("\n", analysis.Diagnostics));
+        }
+
+        [Fact]
+        public void KeepsCommentsAndBlankLines()
+        {
+            MarkupElement root = Root("// one\nx = 1\n\n/* two */\ny = 2 // three");
+            Assert.Equal(new[] { "one", "two", "three" }, root.Children.OfType<MarkupComment>().Select(c => c.Text));
+            Assert.Contains(root.Children.OfType<MarkupText>(), t => t.IsWhitespace && t.Value.Count(c => c == '\n') >= 2);
+        }
+
+        [Fact]
         public void AnalyzerChecksCodeFiles()
         {
-            DocumentAnalysis ok = Analyzer.Analyze("let x = 2\necho \"{ $x * 2 }\"", "test.kscript");
+            DocumentAnalysis ok = Analyzer.Analyze("x = 2\necho \"{ $x * 2 }\"", "test.kscript");
             Assert.Empty(ok.Diagnostics);
 
-            const string text = "let x = 2\necho \"{ $y }\"";
+            const string text = "x = 2\necho \"{ $y }\"";
             DocumentAnalysis bad = Analyzer.Analyze(text, "test.kscript");
             Diagnostic d = Assert.Single(bad.Diagnostics);
             Assert.Equal("KS4001", d.Code);
