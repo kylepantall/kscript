@@ -1,0 +1,18 @@
+<kscript>
+  <!-- Typed JSON: the data is checked against Repo, and $repo. completes its fields. -->
+  <import package="KScript.IO" />
+  <import src="lib/github.ks.xml" />
+
+  <let name="repos" value="@read_json('data/repos.json', as: Repo)" />
+  <for each="repo" in="$repos">
+    <echo>$repo.label by $repo.owner.login, licence: { $repo.license ?? 'none' }</echo>
+  </for>
+
+  <!-- The same works for a live API: @fetch($url)->check()->json(as: Repo) with KScript.Net. -->
+  <try>
+    <let name="bad" value="$Repo->from({ name: 'x', stargazers_count: 'lots', visibility: 'secret' })" />
+    <catch as="err">
+      <echo>{ $err.problems->count() } problems, the first at { $err.problems[0].path }</echo>
+    </catch>
+  </try>
+</kscript>

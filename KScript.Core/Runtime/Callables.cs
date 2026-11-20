@@ -58,10 +58,10 @@ namespace KScript.Runtime
                 {
                     type = p.Substring(colon + 1).Trim();
                     p = p.Substring(0, colon).Trim();
-                    // Any other name is an <enum> type, looked up when the function is called.
-                    if (!Values.DeclarableTypes.Contains(type) && !(type.Length > 0 && Lexer.IsIdentStart(type[0]) && type.All(Lexer.IsIdentChar)))
+                    // Any other name is an <enum> or a <type>, looked up when the function is called.
+                    if (TypeRef.Parse(type) == null)
                     {
-                        error = $"Unknown type '{type}' for parameter '{p}'. Use one of: {string.Join(", ", Values.DeclarableTypes)}.";
+                        error = $"Unknown type '{type}' for parameter '{p}'. Use one of: {string.Join(", ", Values.DeclarableTypes)}, or the name of an <enum> or <type> (with [] for a list and ? to allow null).";
                         return result;
                     }
                 }
@@ -175,8 +175,22 @@ namespace KScript.Runtime
         {
             Interpreter interpreter = call.Interpreter;
             Scope scope = Closure.Child();
-            Dictionary<string, EnumType> enums = Parameters.Where(p => p.Type != null && !Values.DeclarableTypes.Contains(p.Type))
-                .ToDictionary(p => p.Name, p => EnumType.Resolve(p.Type, Closure, Module, Name));
+            var enums = new Dictionary<string, EnumType>();
+            foreach (Parameter p in Parameters.Where(p => p.Type != null))
+            {
+                TypeRef t = TypeRef.Parse(p.Type);
+                if (!t.IsSimple || t.IsBuiltIn) continue;
+                object declared;
+                try
+                {
+                    declared = Shapes.Resolve(t, Closure, Module);
+                }
+                catch (KScriptException ex)
+                {
+                    throw new KScriptException(ex.Message.Replace($"Unknown type '{t.Name}'.", $"Unknown type '{t.Name}' for a parameter of @{Name}()."), ex.Type);
+                }
+                if (declared is EnumType e) enums[p.Name] = e;
+            }
             IReadOnlyList<object> args = ArgumentBinder.BindByName(call,
                 Parameters.Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null, TypeName: e?.Name)).ToList(), out HashSet<int> given);
             for (int i = 0; i < Parameters.Count; i++)
@@ -187,7 +201,7 @@ namespace KScript.Runtime
                 else if (p.Default != null) value = interpreter.Evaluate(p.Default, scope, new EvalContext(Module, null));
                 else throw new KScriptException($"@{Name}() needs a value for '{p.Name}'.", "Argument");
                 if (enums.TryGetValue(p.Name, out EnumType type)) value = type.Check(value, $"The '{p.Name}' argument of @{Name}()");
-                else if (p.Type != null) value = Values.ConvertTo(value, p.Type, $"The '{p.Name}' argument of @{Name}()");
+                else if (p.Type != null) value = Shapes.Convert(interpreter, value, p.Type, $"The '{p.Name}' argument of @{Name}()", Closure, Module);
                 scope.Declare(p.Name, value);
             }
 

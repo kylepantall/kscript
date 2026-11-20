@@ -387,6 +387,9 @@ namespace KScript.Language.Features
                 case AttributeKind.Enum:
                     return a.Options.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
+                case AttributeKind.TypeName:
+                    return a.Options.Concat(TypeNames(analysis)).Distinct().Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
+
                 case AttributeKind.Bool:
                     return new[] { "yes", "no" }.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
@@ -410,6 +413,10 @@ namespace KScript.Language.Features
                     return new List<CompletionItem>();
             }
         }
+
+        /// <summary>The &lt;type&gt;s and &lt;enum&gt;s a document declares or imports.</summary>
+        internal static IReadOnlyList<string> TypeNames(DocumentAnalysis analysis) =>
+            analysis.Symbols.Where(s => s.EnumValues != null || s.Shape.Type == KType.Type).Select(s => s.Name).Distinct().ToList();
 
         private List<CompletionItem> PathCompletions(DocumentAnalysis analysis, DecodedText value, int offset)
         {

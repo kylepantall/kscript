@@ -67,6 +67,7 @@ namespace KScript.Language.Analysis
             AnalyzeFrontMatter(root);
             HoistFunctions(root);
             ApplyKnownTypes(root);
+            HoistTypes(root);
             CheckScriptRoot();
 
             WalkChildren(result.Markup.Children, root, markupMode: Kind != DocumentKind.Script);
@@ -345,7 +346,7 @@ namespace KScript.Language.Analysis
             {
                 return constants;
             }
-            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum"))
+            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum" || x.Name == "type"))
             {
                 MarkupAttribute nameAttr = let.GetAttribute("name");
                 if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
@@ -510,6 +511,14 @@ namespace KScript.Language.Analysis
                 case "enum" when info.Package == "KScript.Core":
                     AnalyzeAttributes(e, info, scope);
                     AnalyzeEnum(e, scope);
+                    return;
+
+                case "type" when info.Package == "KScript.Core":
+                    AnalyzeType(e, info, scope, inner, markupMode);
+                    return;
+
+                case "field" when info.Package == "KScript.Core":
+                    AnalyzeField(e, info, scope);
                     return;
 
                 case "match":
@@ -955,6 +964,9 @@ namespace KScript.Language.Analysis
                 case AttributeKind.DeclareVariable:
                     CheckIdentifier(attr.Value);
                     break;
+                case AttributeKind.TypeName:
+                    CheckTypeAttribute(attr);
+                    break;
                 case AttributeKind.Statements:
                 {
                     Scope handlerScope = new Scope(scope, e.Span);
@@ -1043,7 +1055,7 @@ namespace KScript.Language.Analysis
             string type = e.GetAttributeValue("type")?.Trim();
             if (type != null)
             {
-                shape = new TypeShape(type == "int" || type == "float" ? KType.Number : type);
+                shape = TypeNamed(type, e.Span.Start) ?? TypeShape.Unknown;
             }
 
             if (nameAttr.Value == null)
@@ -1323,7 +1335,7 @@ namespace KScript.Language.Analysis
             {
                 foreach (FunctionParameter p in ParseParameters(paramsAttr.Value, report: true))
                 {
-                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, ParameterShape(p));
+                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, ParameterShape(p, e.Span.Start));
                     body.Declare(symbol, e.Span.Start);
                 }
             }
@@ -1373,6 +1385,13 @@ namespace KScript.Language.Analysis
             {
                 shape.Fields[f] = new FieldInfo(f, new TypeShape(f == "line" ? KType.Number : KType.String), null);
             }
+            TypeShape problem = new TypeShape(KType.Map);
+            foreach (string f in new[] { "path", "field", "message" })
+            {
+                problem.Fields[f] = new FieldInfo(f, new TypeShape(KType.String), null);
+            }
+            shape.Fields["problems"] = new FieldInfo("problems", new TypeShape(KType.List) { Element = problem }, null,
+                "For a Shape error (data that doesn't fit a <type>): each problem's JSON path, field and message.");
             return shape;
         }
 
