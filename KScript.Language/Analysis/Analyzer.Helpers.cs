@@ -386,7 +386,7 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            if (report && type != null && !KType.Declarable.Contains(type) && !DeclaredEnums().Contains(type))
+            if (report && type != null && !KType.Declarable.Contains(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
             {
                 Report(value.ToSource(new TextSpan(start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length), type.Length)),
                     DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", KType.Declarable)}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
@@ -526,6 +526,17 @@ namespace KScript.Language.Analysis
 
         #endregion
     
+        /// <summary>A type without its [] and ?: Repo for Repo[]?.</summary>
+        private static string TypeBase(string type)
+        {
+            string t = type.TrimEnd('?').TrimEnd();
+            while (t.EndsWith("[]", StringComparison.Ordinal))
+            {
+                t = t.Substring(0, t.Length - 2).TrimEnd();
+            }
+            return t;
+        }
+
         private HashSet<string> declaredEnums;
 
         /// <summary>The names of the &lt;enum&gt; types declared anywhere in this document.</summary>

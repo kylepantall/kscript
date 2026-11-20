@@ -235,7 +235,8 @@ namespace KScript.Runtime
         public static bool StrictEquals(object a, object b)
         {
             if (a == null || b == null) return a == null && b == null;
-            if (a.GetType() != b.GetType()) return false;
+            // A record (a map made by a <type>) equals a plain map with the same keys and values.
+            if (a.GetType() != b.GetType() && !(a is Dictionary<string, object> && b is Dictionary<string, object>)) return false;
             switch (a)
             {
                 case List<object> la:

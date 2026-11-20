@@ -119,8 +119,16 @@ namespace KScript.Language.Analysis
                     {
                         return TypeShape.Unknown;
                     }
-                    if (command.Name == "read_json" && c.Arguments.Count > 0 && c.Arguments[0].Value is LiteralNode { Kind: LiteralKind.String } file
-                        && result.JsonFileShape?.Invoke(file.Value) is TypeShape json)
+                    TypeShape json = null;
+                    if (command.Name == "read_json" && c.Arguments.Count > 0 && c.Arguments[0].Value is LiteralNode { Kind: LiteralKind.String } file)
+                    {
+                        json = result.JsonFileShape(file.Value);
+                    }
+                    if (MappedShape(command, c.Arguments, 0, json, region) is TypeShape mapped)
+                    {
+                        return mapped;
+                    }
+                    if (json != null)
                     {
                         return json;
                     }
@@ -140,6 +148,15 @@ namespace KScript.Language.Analysis
                     {
                         TypeShape item = Infer(lambda.Body, region);
                         return item.Type == KType.Any ? new TypeShape(KType.List) : new TypeShape(KType.List) { Element = item };
+                    }
+                    if (receiver.Type == KType.Type && receiver.Instance != null && m.Name == "from")
+                    {
+                        TypeShape data = m.Arguments.Count > 0 ? Infer(m.Arguments[0].Value, region) : TypeShape.Unknown;
+                        return data.Type == KType.List ? new TypeShape(KType.List) { Element = receiver.Instance } : receiver.Instance;
+                    }
+                    if (m.Name == "json" && MappedShape(catalog.GetMethods("json", receiver.Type).FirstOrDefault(x => KType.Accepts(x.ReceiverType, receiver.Type)), m.Arguments, 0, null, region) is TypeShape asType)
+                    {
+                        return asType;
                     }
                     return InferMethod(m.Name, receiver, m.Arguments.Count);
                 }
@@ -203,6 +220,81 @@ namespace KScript.Language.Analysis
                 default:
                     return TypeShape.Unknown;
             }
+        }
+
+        /// <summary>
+        /// The result of a call with an <c>as:</c> argument (<c>->json(as: Repo)</c>): records of that type, or a list
+        /// of them when the type says so or the data is known to be a list. Null when the call has no type to map to.
+        /// </summary>
+        private TypeShape MappedShape(CallableInfo callable, IReadOnlyList<ArgumentNode> args, int piped, TypeShape data, ExpressionRegion region)
+        {
+            int index = callable?.Signatures.FirstOrDefault()?.Parameters.ToList().FindIndex(p => p.Name == "as" && p.Type == KType.Type) ?? -1;
+            if (index < 0)
+            {
+                return null;
+            }
+            ArgumentNode arg = args.FirstOrDefault(a => a.Name == "as") ?? (args.Count > index - piped && index - piped >= 0 && args[index - piped].Name == null ? args[index - piped] : null);
+            if (arg == null)
+            {
+                return null;
+            }
+            int offset = region.Source.ToSource(arg.Value.Span.Start);
+            TypeShape shape = arg.Value switch
+            {
+                IdentifierNode id => TypeNamed(id.Name, offset),
+                LiteralNode { Kind: LiteralKind.String } text => TypeNamed(text.Value, offset),
+                _ => Infer(arg.Value, region) is { Type: KType.Type, Instance: TypeShape instance } ? instance : null,
+            };
+            if (shape != null && shape.Type == KType.Map && data?.Type == KType.List)
+            {
+                return new TypeShape(KType.List) { Element = shape };
+            }
+            return shape;
+        }
+
+        /// <summary>
+        /// The shape a type written in the source stands for: <c>string</c>, <c>int</c>, <c>Repo</c>, <c>Repo[]</c>,
+        /// <c>string?</c>. An &lt;enum&gt; is a string. Null when the type isn't known at <paramref name="offset"/>.
+        /// </summary>
+        public TypeShape TypeNamed(string text, int offset)
+        {
+            string t = (text ?? string.Empty).Trim();
+            if (t.EndsWith("?", StringComparison.Ordinal))
+            {
+                t = t.Substring(0, t.Length - 1).TrimEnd();
+            }
+            int depth = 0;
+            while (t.EndsWith("[]", StringComparison.Ordinal))
+            {
+                depth++;
+                t = t.Substring(0, t.Length - 2).TrimEnd();
+            }
+            TypeShape shape = t.ToLowerInvariant() switch
+            {
+                "int" or "float" or "number" => new TypeShape(KType.Number),
+                "string" => new TypeShape(KType.String),
+                "bool" => new TypeShape(KType.Bool),
+                "list" => new TypeShape(KType.List),
+                "map" => new TypeShape(KType.Map),
+                "fn" => new TypeShape(KType.Fn),
+                "date" => new TypeShape(KType.Date),
+                "any" => TypeShape.Unknown,
+                _ => null,
+            };
+            if (shape == null && t.Length > 0)
+            {
+                Symbol symbol = result.RootScope.Innermost(offset).Lookup(t, offset);
+                shape = symbol?.EnumValues != null ? new TypeShape(KType.String)
+                    : symbol?.Shape.Type == KType.Type ? symbol.Shape.Instance
+                    // An <enum> declared further down, or before its scope is walked, is still a string.
+                    : result.Markup.DescendantElements().Any(e => e.Name == "enum" && e.GetAttributeValue("name")?.Trim() == t) ? new TypeShape(KType.String)
+                    : null;
+            }
+            for (int i = 0; i < depth && shape != null; i++)
+            {
+                shape = new TypeShape(KType.List) { Element = shape };
+            }
+            return shape;
         }
 
         /// <summary>The user function (declared or imported) a call names, or null for a built-in command.</summary>

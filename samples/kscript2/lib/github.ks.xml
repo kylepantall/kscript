@@ -1,0 +1,17 @@
+<kscript>
+  <!-- The shape of GitHub's repository data. Other scripts import these types. -->
+  <enum name="Visibility" values="public, private, internal" />
+
+  <type name="Owner" fields="login: string, id: int" />
+
+  <type name="Repo" description="A GitHub repository.">
+    <field name="name" type="string" />
+    <field name="stars" type="int" from="stargazers_count" description="How many people starred it." />
+    <field name="owner" type="Owner" />
+    <field name="topics" type="string[]" default="[]" />
+    <field name="license" type="string?" from="license.name" />
+    <field name="visibility" type="Visibility" />
+    <field name="updated" type="date" from="updated_at" />
+    <field name="label" value="$name + ' (' + $stars + ' stars)'" />
+  </type>
+</kscript>

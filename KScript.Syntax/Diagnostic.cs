@@ -103,6 +103,7 @@ namespace KScript.Syntax
         public const string UnknownParameter = "KS5007";
         public const string NamedArgument = "KS5008";
         public const string InvalidArgumentValue = "KS5009";
+        public const string UnknownField = "KS5010";
 
         /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
         public const string PreferEarlyExit = "KS6001";

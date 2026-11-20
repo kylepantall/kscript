@@ -125,6 +125,63 @@ A yes/no parameter can be written as a bare word: `recursive` sets it to yes and
 
 A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
 
+## Typed data
+
+`<type>` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught.
+
+```xml
+<enum name="Visibility" values="public, private, internal" />
+<type name="Owner" fields="login: string, id: int, avatar_url?: string" />
+
+<type name="Repo" description="A GitHub repository.">
+  <field name="name" type="string" />
+  <field name="stars" type="int" from="stargazers_count" description="How many people starred it." />
+  <field name="owner" type="Owner" />
+  <field name="owner_name" type="string" from="owner.login" />
+  <field name="topics" type="string[]" default="[]" />
+  <field name="license" type="string?" from="license.name" />
+  <field name="visibility" type="Visibility" />
+  <field name="updated" type="date" from="updated_at" />
+  <field name="label" value="$name + ' (' + $stars + ' stars)'" />
+</type>
+```
+
+A short type fits on one line: `fields` takes `name: type` pairs like `fn` params, with `?` for an optional field and `= value` for a default. Bigger ones use `<field>` elements:
+
+| Attribute | What it does |
+| --- | --- |
+| `type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`), an `<enum>`, another `<type>`, `T[]` for a list, `T?` to allow null. Defaults to `any`. |
+| `from` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. |
+| `default` | The value when the data has none. The field is then optional. |
+| `optional` | `yes` lets the value be missing or null. So does ending the name or the type with `?`. |
+| `value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
+| `description` | Shown on hover and in completion. |
+
+On `<type>`, `sample="data/repo.json"` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. `<field>`s and `fields` replace the sampled fields they name. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
+
+Data meets a type in these places:
+
+```xml
+<let name="repo" value="@fetch($url)->check()->json(as: Repo)" />   <!-- KScript.Net -->
+<let name="repos" value="@read_json('repos.json', as: Repo)" />     <!-- KScript.IO; a list maps item by item -->
+<let name="user" value="@json($text, as: Owner)" />
+<let name="user" value="$Owner->from($data)" />                    <!-- a map, a list or JSON text -->
+<let name="repo" type="Repo" value="$data" />                       <!-- also on <const> and <set> -->
+<fn name="show" params="repo: Repo, tags: string[]">…</fn>
+```
+
+`as:` takes the type bare (`as: Repo`), as a value (`as: $Repo`) or as text (`as: 'Repo[]'`). `@type($repo)` is `'Repo'`. A record still works everywhere a map does, but reading or setting a field the type doesn't have is an error, and setting a field converts the value to the field's type.
+
+When the data doesn't fit, mapping fails with one `Shape` error that lists every problem with its JSON path:
+
+```text
+The response from https://api.github.com/... doesn't fit Repo (2 problems):
+  $.stargazers_count: needs an int, but got the string 'lots'.
+  $.visibility: must be a Visibility (public, private, internal), but got the string 'secret'.
+```
+
+In a `<catch>`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo->fields()` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
+
 ## Values and methods
 
 Values are strings, numbers, bools, lists, maps, dates, functions and null, plus values packages add (files, HTTP responses). Every value has methods, called with `->` and chained:

@@ -62,14 +62,17 @@ namespace KScript.Net
                     result = Headers.FirstOrDefault(kv => string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)).Value;
                     return true;
                 case "json":
+                    object data;
                     try
                     {
-                        result = Values.ParseJson(Body);
+                        data = Values.ParseJson(Body);
                     }
                     catch (KScriptException ex)
                     {
                         throw new KScriptException($"The response from {Url} isn't JSON ({ex.Message}).", "Format");
                     }
+                    object type = call.Arg(0, "as");
+                    result = type == null ? data : Shapes.MapAs(call.Interpreter, data, type, $"The response from {Url}", call.Scope, call.Module);
                     return true;
                 case "check":
                     if (!Ok) throw new KScriptException($"{Url} answered {Status} {Reason}.", "Network") { Fields = { ["status"] = (double)Status } };
@@ -88,7 +91,7 @@ namespace KScript.Net
             ("ok", "", "True for a 2xx status.", KType.Bool),
             ("url", "", "The address that was fetched.", KType.String),
             ("text", "", "The body as text.", KType.String),
-            ("json", "", "The body read as JSON.", KType.Any),
+            ("json", "as?: type", "The body read as JSON. With as: a <type> (or 'Repo[]'), the data is checked and turned into records; a list is mapped item by item.", KType.Any),
             ("headers", "", "The response headers as a map.", KType.Map),
             ("header", "name", "One response header (or null).", KType.String),
             ("check", "", "Throws a Network error unless the status is 2xx; otherwise returns the response.", KType.Response),

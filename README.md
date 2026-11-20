@@ -69,6 +69,18 @@ You get real values (strings, numbers, lists, maps, dates, files), methods on al
 <echo>{$repo.full_name} has {$repo.stargazers_count} stars</echo>
 ```
 
+Declare the shape of the data once and the response is checked and turned into records your editor knows the fields of. Every mismatch is reported at once, with its JSON path:
+
+```xml
+<type name="Repo">
+  <field name="name" type="string" />
+  <field name="stars" type="int" from="stargazers_count" />
+  <field name="owner" type="string" from="owner.login" />
+</type>
+<let name="repo" value="@fetch($url)->check()->json(as: Repo)" />
+<echo>{$repo.name} by {$repo.owner} has {$repo.stars} stars</echo>
+```
+
 ## Web pages that react without JavaScript
 
 `kscript serve` turns a folder of `.html` and `.md` files into a website. KScript elements go straight into the HTML and `{ }` works in text and attributes. Add `<live>` and the page becomes interactive:
