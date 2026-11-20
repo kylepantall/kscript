@@ -499,7 +499,7 @@
     return loading;
   }
 
-  var KIND_WEIGHT = { page: 6, method: 4, command: 4, element: 4, variable: 3, cli: 3, heading: 0 };
+  var KIND_WEIGHT = { page: 6, project: 5, method: 4, command: 4, element: 4, variable: 3, cli: 3, heading: 0 };
 
   function search(q) {
     q = q.trim().toLowerCase();
@@ -545,10 +545,10 @@
         results.innerHTML = '<div class="results-empty">Nothing matches “' + esc(q) + '”.</div>';
       } else {
         results.innerHTML = shown.map(function (e, i) {
-          var code = e.k === 'method' || e.k === 'command' || e.k === 'element' || e.k === 'variable' || e.k === 'cli';
+          var code = e.k === 'method' || e.k === 'command' || e.k === 'element' || e.k === 'variable' || e.k === 'cli' || e.k === 'project';
           var ks = preferredFormat() === 'kscript';
           var text = ks && e.c ? e.c : e.t;
-          var kind = ks && e.k === 'element' ? 'statement' : e.k;
+          var kind = ks && e.k === 'element' ? 'statement' : e.k === 'project' ? 'yours' : e.k;
           var title = code ? '<code>' + mark(text, q) + '</code>' : mark(text, q);
           return '<a class="result' + (i === active ? ' active' : '') + '" role="option" href="' + esc(e.u) + '">' +
             '<div class="result-title"><span class="result-kind">' + esc(kind) + '</span>' + title + '<span class="result-section">' + esc(e.s || '') + '</span></div>' +

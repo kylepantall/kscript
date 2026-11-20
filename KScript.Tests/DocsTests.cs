@@ -875,7 +875,7 @@ public sealed class DocsTests
         Assert.False(search.Single(e => e.GetProperty("t").GetString() == "@now()").TryGetProperty("c", out _));
         string js = DocsSite.ReadAsset("docs.js");
         Assert.Contains("var text = ks && e.c ? e.c : e.t;", js);
-        Assert.Contains("var kind = ks && e.k === 'element' ? 'statement' : e.k;", js);
+        Assert.Contains("var kind = ks && e.k === 'element' ? 'statement' : e.k === 'project' ? 'yours' : e.k;", js);
     }
 
     #endregion

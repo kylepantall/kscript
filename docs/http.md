@@ -145,6 +145,28 @@ What a controller returns becomes the response:
 
 `@abort(404)` or `@abort(403, message: 'Admins only')` stops the request with that status, from anywhere: a controller, a function it calls, or middleware. `try` doesn't catch it. An error in a controller answers `500` with the file and line, and the server log shows it too.
 
+### Errors and status codes
+
+An [error type](language.md#error-types) can carry a status. When a controller (or anything it calls) throws one and nothing catches it, the request is answered with that status and the error's message, without the file and line. API routes answer JSON with the error's type and fields as well:
+
+```kscript
+error PersonNotFound(message: "No person with id {$id}") extends NotFound {
+  id: int
+}
+
+people = { 1: { name: "Ada" } }
+
+fn show(id: int) {
+  person = $people[$id]
+  if $person == null {
+    throw PersonNotFound(id: $id) // GET /api/people/7 answers 404: { "error": "No person with id 7", "status": 404, "type": "PersonNotFound", "id": 7 }
+  }
+  return $person
+}
+```
+
+`Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404) and `Conflict` (409) are built in, so `throw Forbidden "Admins only"` works without a declaration, and an error type that extends one answers with its status. Give an error type its own status with `error PaymentFailed(status: 402)`. Unlike `@abort()`, these are ordinary errors: a `try` in the controller can still catch them. Errors without a status still answer `500`.
+
 Controllers can read and write files with KScript.IO, but only inside the site folder. Set `"write_files": false` to make them read-only like pages. Anything a controller prints with `echo` goes to the server log.
 
 ## Views

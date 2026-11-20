@@ -40,7 +40,9 @@
       "properties": {
         "root": { "type": "string", "default": ".", "description": "The site folder, relative to kscript.json. Its files and folders are the site's URLs." },
         "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8080, "description": "The port to listen on." },
-        "host": { "type": "string", "default": "localhost", "description": "localhost, an IP address to listen on, or * for every address." }
+        "host": { "type": "string", "default": "localhost", "description": "localhost, an IP address to listen on, or * for every address." },
+        "docs": { "type": "boolean", "default": false, "description": "Also serve the KScript docs, with a page about this project's routes, functions and types, on localhost while you work (like kscript serve --with-docs). Never on for compiled programs or the production environment." },
+        "docs_port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 4180, "description": "The port the docs are served on. Without it, 4180, or a free port if that is in use." }
       }
     },
     "http": {
@@ -287,7 +289,9 @@
             "wrapAttributes": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One attribute per line for long start tags and tags already written that way. Off: tags are never wrapped or joined." },
             "trimTrailingWhitespace": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Remove spaces at the ends of lines of text." },
             "collapseBlankLines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to maxBlankLines." },
-            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." }
+            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." },
+            "spacing": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: one space after commas and colons, around assignments and =>, and before a block's '{'. Off: spacing inside lines is kept." },
+            "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." }
           }
         },
         "indent": {

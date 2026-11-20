@@ -58,6 +58,7 @@ public sealed class ConvertProjectTests : IDisposable
         // Nothing points at the deleted XML files any more: imports, comments, strings, pages and kscript.json.
         foreach (string file in Directory.EnumerateFiles(project, "*.*", SearchOption.AllDirectories).Where(f => !f.EndsWith("kscript.json", StringComparison.Ordinal)))
         {
+            Assert.True(!File.ReadAllText(file).Replace("**/*.ks.xml", string.Empty).Replace("*.test.ks.xml", string.Empty).Contains(".ks.xml"), file);
             Assert.DoesNotContain(".ks.xml", File.ReadAllText(file).Replace("**/*.ks.xml", string.Empty).Replace("*.test.ks.xml", string.Empty));
         }
         string controller = File.ReadAllText(Path.Combine(project, "controllers", "tasks.kscript"));

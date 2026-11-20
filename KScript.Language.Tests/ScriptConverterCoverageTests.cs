@@ -59,7 +59,7 @@ namespace KScript.Language.Tests
                 "if $x { }",
                 "try {",
                 "  echo \"t\"",
-                "} catch(type: \"Io, Http\") err {",
+                "} catch Io | Http as err {",
                 "  echo \"c\"",
                 "} catch { }",
                 "echo(foo: 1) \"hi\"",

@@ -5,23 +5,37 @@ on:
     branches: [ master, main ]
   pull_request:
 
+# A new push to a pull request cancels the run for the push before it, so the queue only holds runs that still
+# matter. Runs on master always finish.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
 jobs:
   test:
     name: Build and test (${{ matrix.name }})
-    # The Linux job runs on home-ci-kscript, a self-hosted runner on home-ci
-    # that is registered to this repository only.
+    # The Linux and Windows jobs run on home-ci (home-ci-kscript-r1, and a runner on its Windows VM), self-hosted
+    # runners registered to this repository only.
     # Pull requests from forks always fall back to a GitHub-hosted runner so
     # untrusted code never executes on home-ci.
-    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON('["self-hosted","Linux","X64","kscript"]') || matrix.hosted }}
+    timeout-minutes: 20
+    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON(matrix.runner) || matrix.hosted }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: linux
             self-hosted: true
+            runner: '["self-hosted","Linux","X64","kscript"]'
             hosted: ubuntu-latest
           - name: windows
-            self-hosted: false
+            self-hosted: true
+            runner: '["self-hosted","Windows","X64","kscript"]'
             hosted: windows-latest
           - name: macos
             self-hosted: false
@@ -39,6 +53,17 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      # GitHub-hosted runners start empty, so keep the NuGet packages between runs (restore on Windows took
+      # ~40 s without them). home-ci keeps its own package folder between jobs.
+      - uses: actions/cache@v4
+        if: runner.environment == 'github-hosted'
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.job }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ github.job }}-
+            nuget-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore KScript.sln
 
@@ -55,7 +80,7 @@ jobs:
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" --warnaserror
 
       - name: Check KScript formatting
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" "Example Sites/team"
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/code-format "Example Scripts" "Example Sites/team"
 
       - name: Run KScript tests
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab
@@ -69,18 +94,22 @@ jobs:
           $k check new-app --warnaserror
           $k fmt --check new-app
           $k test new-app
+          $k agents --check new-app
           $k make project xml-app --format xml
           $k check xml-app --warnaserror
           $k fmt --check xml-app
           $k test xml-app
+          $k agents --check xml-app
           $k make project bare-tool --bare
           $k check bare-tool --warnaserror
           $k test bare-tool
+          $k agents --check bare-tool
           $k bare-tool/main.kscript
           $k make project bare-app --bare --web --api --desktop
           $k check bare-app --warnaserror
           $k fmt --check bare-app
           $k test bare-app
+          $k agents --check bare-app
           # The generators: routes add themselves to routes/, and everything they make checks and formats cleanly.
           cd bare-app
           $k make route users
@@ -92,6 +121,7 @@ jobs:
           $k make middleware secure-headers
           $k make type Repo --fields "name: string, stars: int"
           $k make enum Size --values small,medium,large
+          $k make error PaymentFailed --status 402 --extends Validation --fields "order: int, reason?: string"
           $k make css theme
           $k check .
           $k fmt --check .
@@ -103,13 +133,14 @@ jobs:
     # Builds a release-style kscript for the runner, compiles a terminal script, Life Lab and a site with it,
     # and runs what it can. Programs for other platforms come out byte-for-byte the same wherever they are
     # compiled, so each platform checks its own.
-    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON('["self-hosted","Linux","X64","kscript"]') || matrix.hosted }}
+    timeout-minutes: 20
+    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON(matrix.runner) || matrix.hosted }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: linux,   rid: linux-x64, target: linux-x64, self-hosted: true,  hosted: ubuntu-latest,  ext: '' }
-          - { name: windows, rid: win-x64,   target: win-x64,   self-hosted: false, hosted: windows-latest, ext: '.exe' }
+          - { name: linux,   rid: linux-x64, target: linux-x64, self-hosted: true,  runner: '["self-hosted","Linux","X64","kscript"]',   hosted: ubuntu-latest,  ext: '' }
+          - { name: windows, rid: win-x64,   target: win-x64,   self-hosted: true,  runner: '["self-hosted","Windows","X64","kscript"]', hosted: windows-latest, ext: '.exe' }
           - { name: macos,   rid: osx-arm64, target: mac-arm64, self-hosted: false, hosted: macos-latest,   ext: '' }
     defaults:
       run:
@@ -122,6 +153,17 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ matrix.self-hosted && format('{0}/dotnet', runner.tool_cache) || '' }}
         with:
           dotnet-version: 8.0.x
+
+      # GitHub-hosted runners start empty, so keep the NuGet packages between runs (restore on Windows took
+      # ~40 s without them). home-ci keeps its own package folder between jobs.
+      - uses: actions/cache@v4
+        if: runner.environment == 'github-hosted'
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.job }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ github.job }}-
+            nuget-${{ runner.os }}-
 
       - name: Publish a single-file kscript
         run: |
@@ -154,34 +196,41 @@ jobs:
           esac
 
       - name: Compile and serve a site
+        timeout-minutes: 5
         run: |
           ./publish/KScript${{ matrix.ext }} compile "Example Sites/team" --out "$RUNNER_TEMP/site"
           "$RUNNER_TEMP/site/${{ matrix.target }}/team${{ matrix.ext }}" --port 8097 --host 127.0.0.1 > site.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8097/ > page.html && break; sleep 1; done
-          curl -sf http://127.0.0.1:8097/site.css > site.css || true
+          for i in $(seq 1 30); do curl -sf --max-time 5 http://127.0.0.1:8097/ > page.html && break; sleep 1; done
+          curl -sf --max-time 10 http://127.0.0.1:8097/site.css > site.css || true
           kill %1 || true
           cat site.log
           grep -q "Team" page.html
           test -s site.css
 
       - name: Serve kscript docs (pages, static files and the run API)
+        # Every request has a time limit, so a server that stops answering fails this step in seconds (with its
+        # log printed) instead of holding the runner until the job times out.
+        timeout-minutes: 5
         run: |
           ./publish/KScript${{ matrix.ext }} docs --no-open --port 8098 > docs.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://localhost:8098/ > docs.html && break; sleep 1; done
-          curl -sf http://localhost:8098/assets/docs.css > docs.css || true
-          curl -sf http://localhost:8098/assets/docs.js > docs.js || true
+          server=$!
+          get() { curl -sf --max-time 10 "$@"; }
+          for i in $(seq 1 30); do curl -sf --max-time 5 http://localhost:8098/ > docs.html && break; sleep 1; done
+          get http://localhost:8098/assets/docs.css > docs.css || true
+          get http://localhost:8098/assets/docs.js > docs.js || true
           # A browser asks for many files at once, and cancels some: do the same, several rounds.
           for round in 1 2 3 4 5; do
+            pids=()
             for f in docs.css docs.js favicon.svg search.json docs.css docs.js; do
-              curl -s -o /dev/null "http://localhost:8098/assets/$f" &
-              curl -s -o /dev/null --max-time 0.01 "http://localhost:8098/assets/$f" &
+              curl -s -o /dev/null --max-time 10 "http://localhost:8098/assets/$f" & pids+=($!)
+              curl -s -o /dev/null --max-time 0.01 "http://localhost:8098/assets/$f" & pids+=($!)
             done
-            wait $(jobs -p | tail -n +2) 2>/dev/null || true
+            wait "${pids[@]}" 2>/dev/null || true
           done
-          curl -sf http://localhost:8098/assets/favicon.svg > favicon.svg || true
-          curl -sf -X POST http://localhost:8098/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
+          get http://localhost:8098/assets/favicon.svg > favicon.svg || true
+          get -X POST http://localhost:8098/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
             -d '{"code":"<echo>docs ok</echo>"}' > run.json || true
-          kill %1 || true
+          kill $server || true
           cat docs.log
           grep -q "KScript" docs.html
           test -s docs.css && test -s docs.js && test -s favicon.svg
@@ -253,6 +302,7 @@ jobs:
 
   vscode:
     name: VS Code extension
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     defaults:
       run:

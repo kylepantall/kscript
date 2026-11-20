@@ -105,6 +105,9 @@ namespace KScript.Syntax
         public const string InvalidArgumentValue = "KS5009";
         public const string UnknownField = "KS5010";
 
+        /// <summary>A catch, throw or extends that names an error type nobody declared.</summary>
+        public const string UnknownErrorType = "KS5011";
+
         /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
         public const string PreferEarlyExit = "KS6001";
 

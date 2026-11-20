@@ -154,7 +154,9 @@ namespace KScript.Runtime
                 case IdentifierNode id:
                     if (ctx.Module != null && ctx.Module.Aliases.TryGetValue(id.Name, out ImportNamespace ns)) return ns;
                     // A <type> can be named without $: as: Repo.
-                    if (scope.TryGet(id.Name, out object declaredType) && declaredType is RecordType) return declaredType;
+                    if (scope.TryGet(id.Name, out object declaredType) && (declaredType is RecordType || declaredType is ErrorType)) return declaredType;
+                    // So is an error type: catch NotFound, $err->is(NotFound).
+                    if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType) return errorType;
                     throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
 
                 case ListNode list:
@@ -306,7 +308,8 @@ namespace KScript.Runtime
                 negated = true;
             }
             if (node is IdentifierNode id && id.Name != "_" && !(ctx.Module != null && ctx.Module.Aliases.ContainsKey(id.Name))
-                && !(!negated && scope.TryGet(id.Name, out object value) && value is RecordType))
+                && !(!negated && scope.TryGet(id.Name, out object value) && (value is RecordType || value is ErrorType))
+                && !(!negated && ErrorTypes.FindExact(id.Name, null) != null))
             {
                 return new BareWord(id.Name, negated, afterNamed);
             }
@@ -678,6 +681,18 @@ namespace KScript.Runtime
                 {
                     // filter(...) after a pipe is a method of the value; slugify() is a function or command.
                     if (scope.TryGet(id.Name, out object stored) && stored is ICallable fn) return Call(fn, args, named, scope, ctx.Module);
+                    // NotFound(id: 42) makes an error, for throw.
+                    if (!piped && ErrorTypes.FindExact(id.Name, scope) is ErrorType error)
+                    {
+                        try
+                        {
+                            return error.Create(this, args, named).ToValue();
+                        }
+                        catch (KScriptException ex)
+                        {
+                            throw Fail(call, ctx, ex.Message, ex.Type);
+                        }
+                    }
                     if (piped && TryFindMethod(pipedValue, id.Name, ctx.Module, out MethodDefinition method))
                     {
                         return InvokeMethodDefinition(method, pipedValue, args.Skip(1).ToList(), named, scope, ctx);
@@ -734,6 +749,7 @@ namespace KScript.Runtime
             method = null;
             if (module == null) return false;
             string type = Values.TypeOf(target);
+            if (target is ErrorValue && module.Methods.TryGetValue("error:" + name, out method)) return true;
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
             return module.Methods.TryGetValue("any:" + name, out method);

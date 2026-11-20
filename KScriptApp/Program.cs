@@ -49,14 +49,31 @@ namespace KScript
         void PrintUsage(TextWriter output) => CliReference.PrintUsage(output);
 
         /// <summary>
-        /// kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder. In a project, the nearest
-        /// kscript.json gives the defaults (serve.root, serve.port, serve.host); options on the command line win.
+        /// While kscript serve runs, keeps what the project makes from its code (the agent docs and the other
+        /// <see cref="KScript.Language.Outputs.ProjectOutputs"/>) up to date as files change. Does nothing when the
+        /// project has none turned on. Its own method, so compiled sites (which leave KScript.Language out) never load it.
         /// </summary>
-        int Serve(string[] args)
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        internal void WatchOutputs(string root, System.Threading.CancellationToken stop)
+        {
+            if (!Directory.Exists(root) || KScript.Language.Outputs.ProjectOutputs.Enabled(root).Count == 0) return;
+            var watcher = new KScript.Language.Outputs.ProjectWatcher(root, null, line => Out.WriteLine($"Watch: {line}"));
+            _ = watcher.RunAsync(stop);
+        }
+
+        /// <summary>
+        /// kscript serve [folder] [--port N] [--host H] [--with-docs]: serves KScript pages from a folder. In a project, the
+        /// nearest kscript.json gives the defaults (serve.root, serve.port, serve.host, serve.docs); options on the
+        /// command line win. --with-docs also serves the docs, with a page about the project, on localhost; compiled
+        /// sites (<paramref name="allowDocs"/> false) and the production environment never do.
+        /// </summary>
+        int Serve(string[] args, bool allowDocs = true, bool watch = true)
         {
             string folder = null;
             int? port = null;
             string host = null;
+            bool? withDocs = null;
+            int? docsPort = null;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -78,6 +95,21 @@ namespace KScript
                             return 1;
                         }
                         host = args[++i];
+                        break;
+                    case "--with-docs":
+                        withDocs = true;
+                        break;
+                    case "--no-docs":
+                        withDocs = false;
+                        break;
+                    case "--docs-port":
+                        if (i + 1 >= args.Length || !int.TryParse(args[++i], out int dp) || dp < 1 || dp > 65535)
+                        {
+                            Error.WriteLine("--docs-port needs a number, e.g. --docs-port 4180");
+                            return 1;
+                        }
+                        docsPort = dp;
+                        withDocs ??= true;
                         break;
                     default:
                         folder = args[i];
@@ -106,10 +138,28 @@ namespace KScript
                     folder = project.SiteRoot;
                 port ??= project.Serve.Port;
                 host ??= project.Serve.Host;
+                docsPort ??= project.Serve.DocsPort;
+                withDocs ??= project.Serve.Docs;
             }
 
+            // The docs (which run examples) are for working on the site: never for a compiled program or in production.
+            System.Threading.Tasks.Task docs = System.Threading.Tasks.Task.CompletedTask;
+            using var stopDocs = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            if (withDocs == true)
+            {
+                string environment = project?.ConfigOptions(EnvironmentName).Environment ?? EnvironmentName ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
+                if (!allowDocs)
+                    withDocs = false;
+                else if (string.Equals(environment, "production", StringComparison.OrdinalIgnoreCase))
+                    Error.WriteLine("Docs: not served in the production environment.");
+                else if (Directory.Exists(folder ?? "."))
+                    docs = ServeDocs(folder ?? ".", project, docsPort, port ?? 8080, stopDocs.Token);
+            }
+
+            using var watching = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
             try
             {
+                if (watch) WatchOutputs(project?.Directory ?? Path.GetFullPath(folder ?? "."), watching.Token);
                 return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
@@ -127,7 +177,21 @@ namespace KScript
                 Error.WriteLine($"Could not start the server: {ex.Message}");
                 return 1;
             }
+            finally
+            {
+                stopDocs.Cancel();
+                docs.GetAwaiter().GetResult();
+                watching.Cancel();
+            }
         }
+
+        /// <summary>
+        /// Starts the docs for kscript serve --with-docs. A method of its own, so serving a compiled site (whose program
+        /// leaves KScript.Docs out) never loads that assembly.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        System.Threading.Tasks.Task ServeDocs(string folder, KScript.Projects.ProjectConfig project, int? docsPort, int sitePort, System.Threading.CancellationToken stop) =>
+            KScript.Docs.DocsCommand.ServeProjectAsync(folder, project, docsPort, sitePort, Out, Error, stop);
 
         /// <summary>The environment from --env, also set as KSCRIPT_ENV so pages and child scripts see it.</summary>
         string EnvironmentName;
@@ -297,8 +361,25 @@ namespace KScript
             {
                 if (args.Contains("--print-config"))
                     return KScript.LanguageServer.CheckCommand.PrintConfig(args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Out);
-                return KScript.LanguageServer.CheckCommand.Run(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)), Out,
-                    warningsAsErrors: args.Contains("--warnaserror"));
+                int formatAt = Array.IndexOf(args, "--format");
+                string format = formatAt > 0 && formatAt + 1 < args.Length ? args[formatAt + 1] : args.FirstOrDefault(a => a.StartsWith("--format=", StringComparison.Ordinal))?.Substring(9) ?? "text";
+                if (format != "text" && format != "json")
+                {
+                    Error.WriteLine($"Unknown --format '{format}'. Use text or json.");
+                    return 2;
+                }
+                IEnumerable<string> paths = args.Skip(1).Where((a, i) => !a.StartsWith("--", StringComparison.Ordinal) && !(formatAt > 0 && i + 1 == formatAt + 1));
+                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: args.Contains("--warnaserror"), json: format == "json");
+            }
+
+            if (args.Length > 0 && args[0] == "watch")
+            {
+                return RunWatch(args.Skip(1).ToArray());
+            }
+
+            if (args.Length > 0 && args[0] == "agents")
+            {
+                return KScript.LanguageServer.AgentsCommand.Run(args.Skip(1), Out);
             }
 
             if (args.Length > 0 && args[0] == "fmt")
@@ -392,7 +473,7 @@ namespace KScript
             CompiledApp.Manifest app = CompiledApp.Read(manifest);
             return app.Kind switch
             {
-                "site" => Serve(new[] { app.Main }.Concat(args).ToArray()),
+                "site" => Serve(new[] { app.Main }.Concat(args).ToArray(), allowDocs: false, watch: false),
                 "window" => RunWindow(app.Main, args),
                 _ => RunScript(app.Main, args),
             };
@@ -423,6 +504,22 @@ namespace KScript
 
         /// <summary>Opens a URL for kscript docs (tests replace it).</summary>
         public Action<string> OpenBrowser { get; init; }
+
+        /// <summary>kscript watch: rebuilds the project's outputs as files change, until Ctrl+C.</summary>
+        int RunWatch(string[] args)
+        {
+            using var cancel = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            ConsoleCancelEventHandler stop = (_, e) => e.Cancel = StopOnFirstCtrlC(cancel);
+            Console.CancelKeyPress += stop;
+            try
+            {
+                return KScript.LanguageServer.WatchCommand.Run(args, Out, cancel.Token);
+            }
+            finally
+            {
+                Console.CancelKeyPress -= stop;
+            }
+        }
 
         /// <summary>kscript docs: Ctrl+C stops the docs server, which then removes its files.</summary>
         int RunDocs(string[] args)

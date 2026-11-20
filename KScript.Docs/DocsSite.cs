@@ -84,6 +84,7 @@ namespace KScript.Docs
             new Guide("formatting", "formatting.md", "Tools", "Formatting"),
             new Guide("standards", "standards.md", "Tools", "Lint standards"),
             new Guide("mcp", "mcp.md", "Tools", "AI assistants (MCP)"),
+            new Guide("agents", "agents.md", "Tools", "Coding agents", "kscript"),
             new Guide("roadmap", "roadmap.md", "More", "Roadmap"),
         };
 
@@ -97,7 +98,7 @@ namespace KScript.Docs
             ["language-server.md"] = "how the language server is built, for contributors",
         };
 
-        private static readonly string[] SectionOrder = { "Start here", "Language", "Build", "Tools", "Reference", "Methods by type", "More" };
+        private static readonly string[] SectionOrder = { ProjectSection, "Start here", "Language", "Build", "Tools", "Reference", "Methods by type", "More" };
 
         public List<DocPage> Pages { get; } = new List<DocPage>();
         public List<SearchEntry> Search { get; } = new List<SearchEntry>();

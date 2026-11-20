@@ -20,6 +20,12 @@ namespace KScript.Projects
         public string Root { get; set; } = ".";
         public int Port { get; set; } = 8080;
         public string Host { get; set; } = "localhost";
+
+        /// <summary>True to serve the docs, with a page about this project, next to the site (as <c>--with-docs</c> does).</summary>
+        public bool Docs { get; set; }
+
+        /// <summary>The port the docs are served on; null picks 4180, or a free port if that is in use.</summary>
+        public int? DocsPort { get; set; }
     }
 
     /// <summary>The <c>app</c> section: what <c>kscript compile</c> builds and how the program is named.</summary>
@@ -160,6 +166,7 @@ namespace KScript.Projects
         public static readonly string[] RuleNames =
         {
             "indent", "statementPerLine", "tidyTags", "wrapAttributes", "trimTrailingWhitespace", "collapseBlankLines", "finalNewline",
+            "spacing", "braceStyle",
         };
     }
 
@@ -313,6 +320,7 @@ namespace KScript.Projects
             ["styles"] = "styles",
             ["lib"] = "lib",
             ["types"] = "types",
+            ["errors"] = "errors",
             ["storage"] = "lib",
             ["jobs"] = "jobs",
             ["windows"] = ".",
@@ -889,8 +897,15 @@ namespace KScript.Projects
                     case "host":
                         config.Serve.Host = String(p.Value, "serve.host", config) ?? "localhost";
                         break;
+                    case "docs":
+                        config.Serve.Docs = Bool(p.Value, "serve.docs", config) ?? false;
+                        break;
+                    case "docs_port":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int docsPort) && docsPort > 0 && docsPort < 65536) config.Serve.DocsPort = docsPort;
+                        else config.Warnings.Add($"serve.docs_port should be a number from 1 to 65535.");
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port or host).");
+                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port, host, docs or docs_port).");
                         break;
                 }
             }
@@ -1102,7 +1117,7 @@ namespace KScript.Projects
         public bool IsFormatIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Format.Include.Any(g => GlobMatches(g, rel)) && !Format.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Format.Include.Any(g => GlobMatches(g, rel)) && !Format.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>True when the file or folder is under the project folder and matches format.exclude.</summary>
@@ -1116,7 +1131,7 @@ namespace KScript.Projects
         public bool IsTestIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Test.Include.Any(g => GlobMatches(g, rel)) && !Test.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Test.Include.Any(g => GlobMatches(g, rel)) && !Test.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>True when the file or folder is under the project folder and matches test.exclude.</summary>
@@ -1170,6 +1185,20 @@ namespace KScript.Projects
                 .FirstOrDefault();
         }
 
+        /// <summary>
+        /// The folder kscript writes generated files into, such as the agent docs in .kscript/agents. It is never
+        /// checked, formatted or tested, whatever lint.include says.
+        /// </summary>
+        public const string GeneratedFolder = ".kscript";
+
+        private static bool IsGenerated(string relative) => relative.StartsWith(GeneratedFolder + "/", StringComparison.Ordinal) || IsAgentFile(relative);
+
+        /// <summary>
+        /// True for the project's notes for coding agents (AGENTS.md and CLAUDE.md at the root): Markdown for tools,
+        /// not pages, so they are never checked or served.
+        /// </summary>
+        public static bool IsAgentFile(string relative) => relative is "AGENTS.md" or "CLAUDE.md";
+
         /// <summary>True when the file is under the project folder and matches lint.exclude.</summary>
         public bool IsExcluded(string path)
         {
@@ -1181,7 +1210,7 @@ namespace KScript.Projects
         public bool IsIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Lint.Include.Any(g => GlobMatches(g, rel)) && !Lint.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Lint.Include.Any(g => GlobMatches(g, rel)) && !Lint.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>The path relative to the project folder with / separators, or null when it is outside it.</summary>

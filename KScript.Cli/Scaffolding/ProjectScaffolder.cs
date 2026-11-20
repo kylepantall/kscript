@@ -122,12 +122,19 @@ namespace KScript.Scaffolding
                 }
             }
 
+            // A template with an AGENTS.md gets its agent docs filled in from the new project's code.
+            var files = rendered.Keys.ToList();
+            if (!dryRun && rendered.ContainsKey(global::KScript.Language.Agents.AgentDocs.AgentsFile))
+            {
+                files.AddRange(global::KScript.Language.Agents.AgentDocs.Write(dir).Where(f => !files.Contains(f)));
+            }
+
             return new ProjectResult
             {
                 Directory = dir,
                 DisplayDirectory = raw,
                 Name = kebab,
-                Files = rendered.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(),
+                Files = files.OrderBy(k => k, StringComparer.Ordinal).ToList(),
                 Contents = rendered,
                 Note = notes.Count == 0 ? null : string.Join("\n", notes),
                 Template = template,
