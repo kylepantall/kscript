@@ -105,6 +105,9 @@ namespace KScript.Metadata
         /// <summary>A short usage example, shown in hover.</summary>
         public string Example { get; set; }
 
+        /// <summary>Notes for coding agents (<c>kscript agents</c>), or null.</summary>
+        public AgentNotes Agent { get; set; }
+
         /// <summary>For methods: the type the method is for.</summary>
         public string ReceiverType { get; init; } = KType.Any;
 

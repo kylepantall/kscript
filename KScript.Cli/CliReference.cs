@@ -28,14 +28,23 @@ namespace KScript
                     O("--env name", "The environment for $config: reads <name>.yaml, .env.<name> and sets KSCRIPT_ENV."),
                 },
                 "kscript hello.ks.xml Joan\nkscript --env staging deploy.kscript", "language"),
-            new CliCommand("check", "kscript check [file-or-folder]... [--warnaserror]",
+            new CliCommand("check", "kscript check [file-or-folder]... [--warnaserror] [--format text|json]",
                 "Check scripts and pages without running them (no path: the current project).",
                 new[]
                 {
                     O("--warnaserror", "Fail on warnings too, for CI."),
+                    O("--format json", "Print the problems as JSON, with each one's range and its fixes as exact text edits (for coding agents and tools)."),
                     O("--print-config [path]", "Show the lint and format settings that apply, and which standard set each."),
                 },
                 "kscript check\nkscript check scripts/ --warnaserror", "standards"),
+            new CliCommand("agents", "kscript agents [folder] [--check] [--print]",
+                "Write AGENTS.md and .kscript/agents: compact docs for coding agents, made from the project's code and packages.",
+                new[]
+                {
+                    O("--check", "Write nothing; fail if the agent docs are out of date (for CI)."),
+                    O("--print", "Print AGENTS.md's generated section instead of writing files."),
+                },
+                "kscript agents\nkscript agents --check", "agents"),
             new CliCommand("fmt", "kscript fmt [file-or-folder]... [--check]",
                 "Tidy scripts and pages.",
                 new[] { O("--check", "Only report files that would change, and fail if any would (for CI).") },

@@ -13,7 +13,47 @@ namespace KScript.LanguageServer
     public static class CheckCommand
     {
         /// <summary>Returns 0 when there are no errors, 1 when there are errors, 2 for bad usage.</summary>
-        public static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors = false)
+        /// <param name="json">
+        /// Print one JSON document instead of text: <c>{ "files", "errors", "warnings", "problems": [...] }</c>, where
+        /// each problem has its file, 1-based line and column range, severity, code, message and fixes, and each fix
+        /// has a title and exact text edits. Usage and settings errors are <c>{ "error": "..." }</c>.
+        /// </param>
+        public static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors = false, bool json = false)
+        {
+            if (json)
+            {
+                var text = new StringWriter();
+                var report = new JsonReport();
+                int code = Run(paths, text, warningsAsErrors, report);
+                System.Text.Json.Nodes.JsonArray problems = report.Problems;
+                var result = new System.Text.Json.Nodes.JsonObject();
+                if (code == 2)
+                {
+                    result["error"] = text.ToString().Trim();
+                }
+                else
+                {
+                    int errors = problems.Count(p => (string)p["severity"] == "error");
+                    int warnings = problems.Count(p => (string)p["severity"] == "warning");
+                    result["files"] = report.Files;
+                    result["errors"] = errors;
+                    result["warnings"] = warnings;
+                    result["problems"] = problems;
+                }
+                output.WriteLine(result.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                return code;
+            }
+            return Run(paths, output, warningsAsErrors, null);
+        }
+
+        /// <summary>What a check found, for --format json.</summary>
+        private sealed class JsonReport
+        {
+            public System.Text.Json.Nodes.JsonArray Problems { get; } = new System.Text.Json.Nodes.JsonArray();
+            public int Files { get; set; }
+        }
+
+        private static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors, JsonReport report)
         {
             List<string> given = paths.ToList();
             var configs = new Dictionary<string, ProjectConfig>(StringComparer.Ordinal);
@@ -94,14 +134,56 @@ namespace KScript.LanguageServer
                         _ => "hint",
                     };
                     string shown = file.StartsWith("./", StringComparison.Ordinal) || file.StartsWith(".\\", StringComparison.Ordinal) ? file.Substring(2) : file;
-                    output.WriteLine($"{shown}({pos.Line + 1},{pos.Character + 1}): {severity} {d.Code}: {d.Message}");
+                    if (report != null)
+                    {
+                        report.Problems.Add(ProblemJson(shown.Replace('\\', '/'), analysis.Source, d, severity));
+                    }
+                    else
+                    {
+                        output.WriteLine($"{shown}({pos.Line + 1},{pos.Character + 1}): {severity} {d.Code}: {d.Message}");
+                    }
                     if (d.Severity == DiagnosticSeverity.Error) errors++;
                     else if (d.Severity == DiagnosticSeverity.Warning) warnings++;
                 }
             }
 
+            if (report != null) report.Files = files.Count;
             output.WriteLine($"{files.Count} file{(files.Count == 1 ? string.Empty : "s")} checked: {errors} error{(errors == 1 ? string.Empty : "s")}, {warnings} warning{(warnings == 1 ? string.Empty : "s")}.");
             return errors > 0 || (anyWarningsAsErrors && warnings > 0) ? 1 : 0;
+        }
+
+        /// <summary>A problem as JSON: positions are 1-based, and the end is just past the last character.</summary>
+        internal static System.Text.Json.Nodes.JsonObject ProblemJson(string file, SourceText source, Diagnostic d, string severity)
+        {
+            System.Text.Json.Nodes.JsonObject Range(TextSpan span, System.Text.Json.Nodes.JsonObject into)
+            {
+                LinePosition start = source.GetPosition(span.Start);
+                LinePosition end = source.GetPosition(span.End);
+                into["line"] = start.Line + 1;
+                into["column"] = start.Character + 1;
+                into["endLine"] = end.Line + 1;
+                into["endColumn"] = end.Character + 1;
+                return into;
+            }
+
+            var fixes = new System.Text.Json.Nodes.JsonArray();
+            foreach (QuickFix fix in d.Fixes)
+            {
+                var edits = new System.Text.Json.Nodes.JsonArray();
+                foreach (TextChange change in fix.Changes)
+                {
+                    edits.Add(Range(change.Span, new System.Text.Json.Nodes.JsonObject()).Also(e => e["newText"] = change.NewText));
+                }
+                fixes.Add(new System.Text.Json.Nodes.JsonObject { ["title"] = fix.Title, ["edits"] = edits });
+            }
+
+            var problem = new System.Text.Json.Nodes.JsonObject { ["file"] = file };
+            Range(d.Span, problem);
+            problem["severity"] = severity;
+            problem["code"] = d.Code;
+            problem["message"] = d.Message;
+            problem["fixes"] = fixes;
+            return problem;
         }
 
         /// <summary>
@@ -269,6 +351,12 @@ namespace KScript.LanguageServer
         private static bool IsScriptName(string f) =>
             f.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".ks", StringComparison.OrdinalIgnoreCase)
             || f.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase);
+
+        private static System.Text.Json.Nodes.JsonObject Also(this System.Text.Json.Nodes.JsonObject o, Action<System.Text.Json.Nodes.JsonObject> set)
+        {
+            set(o);
+            return o;
+        }
 
         private static bool LooksLikeScript(string path)
         {

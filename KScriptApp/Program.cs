@@ -232,8 +232,20 @@ namespace KScript
             {
                 if (args.Contains("--print-config"))
                     return KScript.LanguageServer.CheckCommand.PrintConfig(args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Out);
-                return KScript.LanguageServer.CheckCommand.Run(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)), Out,
-                    warningsAsErrors: args.Contains("--warnaserror"));
+                int formatAt = Array.IndexOf(args, "--format");
+                string format = formatAt > 0 && formatAt + 1 < args.Length ? args[formatAt + 1] : args.FirstOrDefault(a => a.StartsWith("--format=", StringComparison.Ordinal))?.Substring(9) ?? "text";
+                if (format != "text" && format != "json")
+                {
+                    Error.WriteLine($"Unknown --format '{format}'. Use text or json.");
+                    return 2;
+                }
+                IEnumerable<string> paths = args.Skip(1).Where((a, i) => !a.StartsWith("--", StringComparison.Ordinal) && !(formatAt > 0 && i + 1 == formatAt + 1));
+                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: args.Contains("--warnaserror"), json: format == "json");
+            }
+
+            if (args.Length > 0 && args[0] == "agents")
+            {
+                return KScript.LanguageServer.AgentsCommand.Run(args.Skip(1), Out);
             }
 
             if (args.Length > 0 && args[0] == "fmt")

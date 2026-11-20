@@ -50,6 +50,9 @@ namespace KScript.Metadata
         /// <summary>An example shown in hover.</summary>
         public string Example { get; init; }
 
+        /// <summary>Notes for coding agents (<c>kscript agents</c>), or null.</summary>
+        public AgentNotes Agent { get; set; }
+
         /// <summary>Elements this one must directly follow (for <c>elif</c>/<c>else</c>), or be inside (for <c>case</c>).</summary>
         public IReadOnlyList<string> MustFollow { get; init; }
 
