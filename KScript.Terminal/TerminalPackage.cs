@@ -22,9 +22,9 @@ namespace KScript.Terminal
         {
             p.Element(new ElementInfo("input", "Asks for a line of input and stores it. The element text is the prompt. With `type`, the answer is converted and asked again until it fits.", ContentKind.Template,
                 new A("to", K.DeclareVariable, "The variable that receives the answer.", true),
-                new A("type", K.Enum, "Convert the answer: string (the default), int, number or bool.", false, "string", "int", "number", "float", "bool"),
+                new A("type", K.Enum, "Convert the answer: string (the default), int, number, bool, email, handle, uuid or password. A password is never echoed back.", false, "string", "int", "number", "float", "bool", "email", "handle", "uuid", "password"),
                 new A("default", K.Expression, "The value used when the answer is empty (or input has ended)."),
-                new A("secret", K.Bool, "yes hides what is typed, for passwords."),
+                new A("secret", K.Bool, "yes hides what is typed. type=\"password\" hides it too and keeps the answer as a password."),
                 new A("error", K.Template, "What to say when the answer doesn't fit the type."))
             {
                 Context = ElementContext.Script,
@@ -152,13 +152,14 @@ namespace KScript.Terminal
         private static bool? Input(ElementRun run)
         {
             string name = run.VariableName("to");
-            string type = run.Raw("type")?.Trim() ?? "string";
+            string type = run.Raw("type")?.Trim().ToLowerInvariant() ?? "string";
+            bool secret = run.Flag("secret") || type == SemanticTypes.Password;
             string prompt = Prompt(run);
             bool hasDefault = run.Has("default");
             for (int attempt = 0; ; attempt++)
             {
                 run.Host.Write(prompt);
-                string answer = Read(run, run.Flag("secret"));
+                string answer = Read(run, secret);
                 object value;
                 if (answer == null || answer.Length == 0 && hasDefault)
                 {
@@ -167,6 +168,18 @@ namespace KScript.Terminal
                     return null;
                 }
 
+                if (SemanticTypes.IsSemantic(type))
+                {
+                    // An email, handle, uuid or password: tidied as the type does, or asked again with the reason.
+                    if (SemanticTypes.TryConvert(type, type == SemanticTypes.Password ? answer : answer.Trim(), out value, out string reason))
+                    {
+                        run.Scope.Declare(name, value);
+                        return null;
+                    }
+                    if (attempt >= 100) throw run.Error($"No valid {type} after 100 tries.", null, "Input");
+                    run.Host.WriteLine(run.Template("error") ?? $"That isn't {(type == SemanticTypes.Email ? "an" : "a")} {type}: {reason}. Try again.");
+                    continue;
+                }
                 try
                 {
                     value = Values.ConvertTo(answer, type == "float" ? "number" : type, "The answer");

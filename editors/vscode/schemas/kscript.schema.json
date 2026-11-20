@@ -132,7 +132,8 @@
                 "title": { "type": "string", "description": "info.title. Defaults to the project's name." },
                 "version": { "type": "string", "description": "info.version. Defaults to app.version, then 1.0.0." },
                 "description": { "type": "string", "description": "info.description." },
-                "routes": { "enum": ["auto", "api", "all"], "default": "auto", "description": "Which routes: api (from api.* files), all, or auto (the API routes if there are any, otherwise all)." }
+                "routes": { "enum": ["auto", "api", "all"], "default": "auto", "description": "Which routes: api (from api.* files), all, or auto (the API routes if there are any, otherwise all)." },
+                "file": { "type": "string", "description": "A file, relative to kscript.json, to keep the document in (openapi.json, or openapi.yaml for YAML). kscript watch, kscript serve and the editor (on save) rewrite it as the routes change." }
               }
             }
           ]

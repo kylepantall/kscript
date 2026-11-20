@@ -4,12 +4,18 @@ on:
   push:
     branches: [ master, main ]
   pull_request:
+    # closed is here only to stop work: see the concurrency note below.
+    types: [ opened, synchronize, reopened, closed ]
 
-# A new push to a pull request cancels the run for the push before it, so the queue only holds runs that still
-# matter. Runs on master always finish.
+# One run at a time per pull request, and one for master; a newer run cancels the older one, whether it is running
+# or still queued. That covers three cases:
+# - a new push to a pull request cancels the run for the push before it;
+# - merging or closing a pull request starts a run in the same group, which cancels whatever is left of that pull
+#   request's run, and its jobs are all skipped (the `if:` on each job), so nothing more runs for a closed PR;
+# - a new commit on master cancels master's older run, since the newest run tests everything the older one did.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: true
 
 env:
   DOTNET_NOLOGO: 'true'
@@ -19,6 +25,7 @@ env:
 jobs:
   test:
     name: Build and test (${{ matrix.name }})
+    if: github.event.action != 'closed'
     # The Linux and Windows jobs run on home-ci (home-ci-kscript-r1, and a runner on its Windows VM), self-hosted
     # runners registered to this repository only.
     # Pull requests from forks always fall back to a GitHub-hosted runner so
@@ -130,6 +137,7 @@ jobs:
 
   compile:
     name: kscript compile (${{ matrix.name }})
+    if: github.event.action != 'closed'
     # Builds a release-style kscript for the runner, compiles a terminal script, Life Lab and a site with it,
     # and runs what it can. Programs for other platforms come out byte-for-byte the same wherever they are
     # compiled, so each platform checks its own.
@@ -341,6 +349,7 @@ jobs:
 
   vscode:
     name: VS Code extension
+    if: github.event.action != 'closed'
     timeout-minutes: 20
     runs-on: ubuntu-latest
     defaults:
