@@ -16,6 +16,7 @@
     <InternalsVisibleTo Include="KScript.Core" />
     <InternalsVisibleTo Include="KScript.Language" />
     <InternalsVisibleTo Include="KScript.Language.Tests" />
+    <InternalsVisibleTo Include="KScript.Tests" />
   </ItemGroup>
 
 </Project>

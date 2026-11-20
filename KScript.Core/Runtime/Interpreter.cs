@@ -393,7 +393,7 @@ namespace KScript.Runtime
                             throw Located(new KScriptException($"{a.Name}=\"{a.Value.Value}\" isn't one of: {string.Join(", ", spec.Options)}.", "Syntax"), module, a.Value.SourceSpan.Start);
                         break;
                     case AttributeKind.Bool:
-                        if (Values.ParseBool(a.Value.Value) == null)
+                        if (Values.ParseBool(a.Value.Value) == null && !a.Value.Value.Contains('{'))
                             throw Located(new KScriptException($"{a.Name}=\"{a.Value.Value}\" should be yes or no.", "Syntax"), module, a.Value.SourceSpan.Start);
                         break;
                 }
