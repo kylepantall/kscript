@@ -87,7 +87,6 @@ namespace KScript.Runtime
             ("extension_of", "Use $file->extension() or @file(path)->extension() (KScript.IO).", null),
             ("path", "Use @file(path) and its methods: ->name(), ->directory(), ->extension() (KScript.IO).", "file"),
             ("directory", "Use @known_folder('desktop') or @cwd() (KScript.IO).", "known_folder"),
-            ("api", "Use @fetch(url)->text() (KScript.Net).", "fetch"),
             ("k", "Use $os, $script and $env: $os.name, $script.path, $env.HOME.", null),
             ("args", "Use the $args list: $args[0].", null),
             ("length", "Use ->length() (or ->count()).", null),
