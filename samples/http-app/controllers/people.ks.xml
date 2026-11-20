@@ -38,7 +38,10 @@
   </fn>
 
   <fn name="show" params="id">
-    <return value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
+    <let name="person" value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
+    <!-- A client that already has this version gets 304 Not Modified, and nothing below runs. -->
+    <do>@etag($person)</do>
+    <return value="$person" />
   </fn>
 
   <fn name="store" params="json: NewPerson">

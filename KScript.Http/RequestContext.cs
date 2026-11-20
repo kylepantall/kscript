@@ -40,6 +40,9 @@ namespace KScript.Http
         public RouteTable Table { get; } = new RouteTable();
         public Dictionary<string, object> Request { get; }
 
+        /// <summary>Headers for the controller's answer, set before it exists: @etag() puts the ETag here.</summary>
+        public Dictionary<string, object> ResponseHeaders { get; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>The route being answered, once one matched.</summary>
         public Route Route { get; set; }
 

@@ -14,6 +14,7 @@ namespace KScript.Http
     /// <item><c>auth</c>: needs <c>Authorization: Bearer &lt;token&gt;</c> matching the API_TOKEN environment variable
     /// (http.auth.token_env, or <c>auth:OTHER_VARIABLE</c>).</item>
     /// <item><c>throttle</c>: allows 60 requests a minute per address and route (http.throttle, or <c>throttle:30</c>).</item>
+    /// <item><c>etag</c>, <c>cache_control</c> and <c>cache_response</c>: HTTP caching (see <see cref="HttpCaching"/>).</item>
     /// </list>
     /// </summary>
     internal static class BuiltInMiddleware
@@ -25,10 +26,13 @@ namespace KScript.Http
                 "cors" => Cors(ctx, request, next),
                 "auth" => Auth(middleware.Argument, ctx, request, next),
                 "throttle" => Throttle(middleware.Argument, ctx, request, next),
+                "etag" => HttpCaching.Etag(middleware.Argument, request, next),
+                "cache_control" => HttpCaching.SetCacheControl(middleware.Argument, request, next),
+                "cache_response" => HttpCaching.CacheResponse(middleware.Argument, ctx, request, next),
                 _ => throw new KScriptException($"There is no built-in middleware '{middleware.Name}'.", "Http"),
             };
 
-        private static string Header(Dictionary<string, object> request, string name) =>
+        internal static string Header(Dictionary<string, object> request, string name) =>
             request.TryGetValue("headers", out object h) && h is Dictionary<string, object> headers && headers.TryGetValue(name, out object v) ? Values.ToStr(v) : null;
 
         private static HttpResponse Log(RequestContext ctx, Dictionary<string, object> request, Func<HttpResponse> next)

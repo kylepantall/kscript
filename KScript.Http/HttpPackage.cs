@@ -21,7 +21,7 @@ namespace KScript.Http
         public const string ContextKey = "KScript.Http.Request";
 
         /// <summary>The middleware that ship with KScript.Http.</summary>
-        public static readonly string[] BuiltInMiddleware = { "log", "cors", "auth", "throttle" };
+        public static readonly string[] BuiltInMiddleware = { "log", "cors", "auth", "throttle", "etag", "cache_control", "cache_response" };
 
         /// <summary>The method elements: &lt;Get&gt;, &lt;Post&gt;... and the HTTP method each answers.</summary>
         public static readonly (string Element, string Method)[] MethodElements =
@@ -154,6 +154,9 @@ namespace KScript.Http
                     string message = c.Has(1, "message") ? Values.ToStr(c.Arg(1, "message")) : null;
                     throw new HttpAbortSignal(RequestContext.Current(c.Host)?.ErrorResponse(status, message) ?? HttpResponse.Text(message ?? ReasonPhrase(status), status));
                 }, "<if $person == null><do>@abort(404)</do></if>");
+            p.Command("etag", "value, weak?: bool",
+                "Tags the answer with an ETag made from a value (such as a record's version or updated time). When the request's If-None-Match already has it, the request stops here with 304 Not Modified, so the rest of the controller doesn't run.",
+                KType.String, HttpCaching.EtagCommand, "<do>@etag($person.updated_at)</do>");
             p.Command("route", "name, params...", "The address of a named route, with its {parameters} filled in: @route('people.show', id: 3) is /people/3. Other values become the query.",
                 KType.String, c =>
                 {
@@ -181,6 +184,8 @@ namespace KScript.Http
             new A("name", K.Text, "A name for the route, for @route('name', ...)."),
             Middleware("Middleware for this route, comma separated."),
             new A("where", K.Text, "Rules for the parameters: where=\"id: int, slug: slug\". Rules: number, int, alpha, alnum, slug, uuid or a regular expression.") { Literal = true },
+            new A("etag", K.Bool, "yes tags GET answers with an ETag (a hash of the body) and answers If-None-Match with 304 Not Modified when the client already has that version."),
+            new A("cache", K.Text, "The Cache-Control header for GET answers: public, max-age=300, or just a number of seconds (300 is public for 5 minutes), private, no-store...") { Literal = true },
         };
 
         internal static RequestContext Context(ElementRun run) =>
@@ -226,6 +231,7 @@ namespace KScript.Http
             }
 
             var middleware = ctx.MiddlewareFor(run).Concat(ResolveMiddleware(run, run.Raw("middleware"))).ToList();
+            AddCaching(run, middleware);
             string name = run.Raw("name")?.Trim();
             ctx.Add(run, new Route
             {
@@ -246,6 +252,23 @@ namespace KScript.Http
                 Line = run.Module.Source.GetPosition(run.Element.Span.Start).Line + 1,
             });
             return null;
+        }
+
+        /// <summary>A route's etag and cache attributes, as the etag and cache_control middleware closest to the controller.</summary>
+        private static void AddCaching(ElementRun run, List<MiddlewareRef> middleware)
+        {
+            if (run.Has("cache"))
+            {
+                try
+                {
+                    middleware.Add(new MiddlewareRef("cache_control", HttpCaching.CacheControl(run.Raw("cache")), null));
+                }
+                catch (KScriptException ex)
+                {
+                    throw run.Error(ex.Message, "cache", "Http");
+                }
+            }
+            if (run.Flag("etag")) middleware.Add(new MiddlewareRef("etag", null, null));
         }
 
         private static readonly (string Action, string[] Methods, bool Member)[] ResourceActions =

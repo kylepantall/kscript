@@ -124,6 +124,8 @@ import "lib/strings.kscript" // your own functions
 | `KScript.UI` | Native desktop windows, which `kscript compile` turns into Mac, Windows and Linux apps |
 | `KScript.AI` | Language models: `@llm`, `@chat` and `llm`, with Claude |
 | `KScript.Style` | Stylesheets written in KScript: themes from JSON, breakpoints, fluid sizes and colours |
+| `KScript.Storage` | Settings, data, caches and logs in the right folders on macOS, Windows and Linux |
+| `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
 

@@ -67,7 +67,7 @@
             ]
           }
         },
-        "middleware": { "type": "array", "items": { "type": "string" }, "description": "Middleware run for every route, such as [\"log\"]. Built-ins: log, cors, auth, throttle (throttle:30, auth:OTHER_TOKEN)." },
+        "middleware": { "type": "array", "items": { "type": "string" }, "description": "Middleware run for every route, such as [\"log\"]. Built-ins: log, cors, auth, throttle, etag, cache_control, cache_response (throttle:30, auth:OTHER_TOKEN, cache_control:300, cache_response:5m)." },
         "groups": {
           "type": "object",
           "description": "Names for lists of middleware, used like a middleware name: { \"admin\": [\"auth\", \"log\"] }.",
@@ -214,6 +214,10 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Settings that must be set, such as database.host. A script stops with a clear message when one is missing."
+        },
+        "user": {
+          "type": "boolean",
+          "description": "true also reads the person's own settings: config.json (or config.yaml) in the app's config folder, such as ~/.config/<app> on Linux. They are layered over the project's files."
         }
       }
     },
