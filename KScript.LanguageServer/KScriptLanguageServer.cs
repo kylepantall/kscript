@@ -38,8 +38,8 @@ namespace KScript.LanguageServer
         }
 
         /// <summary>Runs on stdin/stdout until the client sends exit. Returns the process exit code.</summary>
-        public static Task<int> RunStdioAsync() =>
-            new KScriptLanguageServer(Console.OpenStandardInput(), Console.OpenStandardOutput()).RunAsync();
+        public static Task<int> RunStdioAsync(Stream input = null, Stream output = null) =>
+            new KScriptLanguageServer(input ?? Console.OpenStandardInput(), output ?? Console.OpenStandardOutput()).RunAsync();
 
         public async Task<int> RunAsync(CancellationToken cancellation = default)
         {
@@ -568,14 +568,7 @@ namespace KScript.LanguageServer
                     JsonObject json = new JsonObject
                     {
                         ["name"] = item.Name,
-                        ["kind"] = item.Kind switch
-                        {
-                            OutlineKind.Function => 12,
-                            OutlineKind.Constant => 14,
-                            OutlineKind.Module => 2,
-                            OutlineKind.Element => 8,
-                            _ => 13,
-                        },
+                        ["kind"] = OutlineKindToLsp(item.Kind),
                         ["range"] = Range(a.Source, item.Span),
                         ["selectionRange"] = Range(a.Source, item.SelectionSpan),
                         ["children"] = Convert(item.Children),
@@ -620,11 +613,7 @@ namespace KScript.LanguageServer
                         lastLine = pos.Line;
                         lastChar = pos.Character;
                     }
-                    if (lineEnd <= start)
-                    {
-                        break;
-                    }
-                    start = lineEnd;
+                    start = lineEnd; // Always past start: a token ends inside the text, and the next line starts after it.
                 }
             }
             return new JsonObject { ["data"] = data };
@@ -713,7 +702,16 @@ namespace KScript.LanguageServer
             };
         }
 
-        private static int CompletionKindToLsp(CompletionKind kind) => kind switch
+        internal static int OutlineKindToLsp(OutlineKind kind) => kind switch
+        {
+            OutlineKind.Function => 12,
+            OutlineKind.Constant => 14,
+            OutlineKind.Module => 2,
+            OutlineKind.Element => 8,
+            _ => 13,                          // Variable
+        };
+
+        internal static int CompletionKindToLsp(CompletionKind kind) => kind switch
         {
             CompletionKind.Element => 10,     // Property
             CompletionKind.Attribute => 5,    // Field

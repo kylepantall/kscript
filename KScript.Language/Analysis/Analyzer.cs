@@ -218,6 +218,7 @@ namespace KScript.Language.Analysis
                     foreach (string name in exported.Keys)
                     {
                         alias.Shape.Fields.TryAdd(name, new FieldInfo(name, new TypeShape(KType.Fn), null, exported[name].Description));
+                        result.ExternalMembers.TryAdd((alias, name), exported[name].Location);
                     }
                 }
                 if (constants != null)
@@ -225,6 +226,7 @@ namespace KScript.Language.Analysis
                     foreach (string name in constants.Keys)
                     {
                         alias.Shape.Fields.TryAdd(name, new FieldInfo(name, TypeShape.Unknown, null, constants[name].Description));
+                        result.ExternalMembers.TryAdd((alias, name), constants[name].Location);
                     }
                 }
                 result.Symbols.Add(alias);

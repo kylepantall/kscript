@@ -661,5 +661,58 @@ namespace KScript.Language.Tests
             Assert.Equal(after, before.Substring(0, change.Span.Start) + change.NewText + before.Substring(change.Span.End));
             Assert.Null(KScriptLanguageServer.MinimalChange("x", "x"));
         }
+
+        [Fact]
+        public void Usage_and_unusual_paths()
+        {
+            Assert.Equal(0, Run("--help").Code);
+            Assert.Contains("Unknown option --nope", Run("--nope").Output);
+            Assert.Contains("file not found", Run(Path.Combine(dir, "missing.ks.xml")).Output);
+            Assert.Contains("No KScript files found", Run(dir).Output);
+
+            string md = Write("notes.md", "# Hi  \n");
+            Assert.Contains("notes.md: skipped (Markdown pages", Run(md).Output);
+
+            Write("_templates/t.ks.xml", Messy);
+            string xml = Write("plain.xml", Messy);
+            Write("data.xml", "<data />");
+            File.CreateSymbolicLink(Path.Combine(dir, "gone.xml"), Path.Combine(dir, "nowhere.xml"));
+            (int code, string output) = Run(dir);
+            Assert.Equal(0, code);
+            Assert.Contains("1 file checked: 1 formatted.", output);
+            Assert.Equal(Tidy, File.ReadAllText(xml));
+        }
+
+        [Fact]
+        public void Runs_on_the_current_project()
+        {
+            string previous = Directory.GetCurrentDirectory();
+            try
+            {
+                Directory.SetCurrentDirectory(dir);
+                Assert.Contains("run it in a project with a kscript.json", Run().Output);
+
+                Write("kscript.json", "{ \"nope\": 1 }");
+                string script = Write("a.ks.xml", Messy);
+                (int code, string output) = Run();
+                Assert.Equal(0, code);
+                Assert.Contains("warning unknown setting 'nope'", output);
+                Assert.Equal(Tidy, File.ReadAllText(script));
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(previous);
+            }
+        }
+
+        [Fact]
+        public void A_broken_project_file_stops_the_run()
+        {
+            Write("kscript.json", "{ nope");
+            string script = Write("a.ks.xml", Messy);
+            Assert.Equal(2, Run(dir).Code);
+            Assert.Equal(2, Run(script).Code);
+            Assert.Equal(Messy, File.ReadAllText(script));
+        }
     }
 }

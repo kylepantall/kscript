@@ -149,8 +149,7 @@ namespace KScript.Language.Features
                 }
                 else if (member.Target is IdentifierNode alias && analysis.RootScope.Lookup(alias.Name, int.MaxValue) is Symbol import && import.Kind == SymbolKind.Import)
                 {
-                    Symbol fn = analysis.Symbols.FirstOrDefault(x => x.Kind == SymbolKind.Function && x.Name == member.Name && x.SourcePath == import.SourcePath);
-                    if (fn != null && analysis.ExternalDeclarations.TryGetValue(fn, out ExternalLocation ext))
+                    if (analysis.ExternalMembers.TryGetValue((import, member.Name), out ExternalLocation ext))
                     {
                         locations.Add(new SourceLocation(ext.Path, ext.Start, ext.End));
                     }
