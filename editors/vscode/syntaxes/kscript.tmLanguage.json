@@ -13,6 +13,15 @@
       "include": "#declaration"
     },
     {
+      "include": "#json-block"
+    },
+    {
+      "include": "#tag-control"
+    },
+    {
+      "include": "#tag-declaration"
+    },
+    {
       "include": "#tag"
     },
     {
@@ -361,6 +370,160 @@
               "name": "entity.name.function.method.kscript"
             }
           }
+        }
+      ]
+    },
+    "tag-control": {
+      "begin": "(</?)(if|elif|else|for|while|match|case|default|try|catch|finally|return|break|continue|throw)(?=[\\s/>])",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.kscript"
+        },
+        "2": {
+          "name": "keyword.control.flow.kscript entity.name.tag.kscript"
+        }
+      },
+      "end": "(/?>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.kscript"
+        }
+      },
+      "name": "meta.tag.kscript",
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][\\w.:-]*)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.kscript"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.kscript"
+            }
+          }
+        },
+        {
+          "include": "#attribute-value-double"
+        },
+        {
+          "include": "#attribute-value-single"
+        }
+      ]
+    },
+    "tag-declaration": {
+      "begin": "(</?)(let|set|const|state|fn|import)(?=[\\s/>])",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.kscript"
+        },
+        "2": {
+          "name": "storage.type.kscript entity.name.tag.kscript"
+        }
+      },
+      "end": "(/?>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.kscript"
+        }
+      },
+      "name": "meta.tag.kscript",
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][\\w.:-]*)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.kscript"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.kscript"
+            }
+          }
+        },
+        {
+          "include": "#attribute-value-double"
+        },
+        {
+          "include": "#attribute-value-single"
+        }
+      ]
+    },
+    "json-block": {
+      "comment": "The text of an element with format=\"json\" (for example <echo format=\"json\">) is JSON, highlighted by VS Code's JSON grammar.",
+      "begin": "(<)([A-Za-z_][\\w.:-]*)(?=[^>]*\\bformat\\s*=\\s*[\"']json[\"'])((?:[^>\"']|\"[^\"]*\"|'[^']*')*?)(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.kscript"
+        },
+        "2": {
+          "name": "entity.name.tag.kscript"
+        },
+        "3": {
+          "name": "meta.tag.kscript",
+          "patterns": [
+            {
+              "match": "\\b([A-Za-z_][\\w.:-]*)\\s*(=)",
+              "captures": {
+                "1": {
+                  "name": "entity.other.attribute-name.kscript"
+                },
+                "2": {
+                  "name": "punctuation.separator.key-value.kscript"
+                }
+              }
+            },
+            {
+              "include": "#attribute-value-double"
+            },
+            {
+              "include": "#attribute-value-single"
+            }
+          ]
+        },
+        "4": {
+          "name": "punctuation.definition.tag.kscript"
+        }
+      },
+      "end": "(</)(\\2)\\s*(>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.kscript"
+        },
+        "2": {
+          "name": "entity.name.tag.kscript"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.kscript"
+        }
+      },
+      "contentName": "meta.embedded.block.json",
+      "patterns": [
+        {
+          "include": "#comment"
+        },
+        {
+          "include": "#cdata-json"
+        },
+        {
+          "include": "source.json"
+        }
+      ]
+    },
+    "cdata-json": {
+      "begin": "<!\\[CDATA\\[",
+      "end": "]]>",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.cdata.kscript"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.cdata.kscript"
+        }
+      },
+      "patterns": [
+        {
+          "include": "source.json"
         }
       ]
     }

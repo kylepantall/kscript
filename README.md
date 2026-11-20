@@ -85,7 +85,7 @@ kscript ide                   # list the editors it found
 kscript ide uninstall
 ```
 
-The extension shows errors as you type and adds completion, hover, go to definition, rename and highlighting for scripts and `kscript serve` pages. It runs `kscript lsp` from your installed `kscript`, so keep that current with `kscript update`. To use a different `kscript`, set `kscript.server.path` in the editor's settings.
+The extension shows errors as you type and adds completion, hover, go to definition, rename and highlighting for scripts and `kscript serve` pages. It works out types as it goes: `$person.` and `$name->` offer the fields and methods of that value (including what your own functions return), inlay hints show the types you didn't write, and thin lines divide a script into blocks like a notebook. It runs `kscript lsp` from your installed `kscript`, so keep that current with `kscript update`. To use a different `kscript`, set `kscript.server.path` in the editor's settings.
 
 Other editors with LSP support work too: `kscript ide config neovim` (or `helix`, `sublime`, `emacs`) prints the settings to add. `kscript check <folder>` reports the same problems on the command line, for CI. See [docs/language-server.md](docs/language-server.md) for how the language server works.
 
@@ -133,8 +133,10 @@ Every push to `master` and every pull request runs [the CI workflow](.github/wor
 
 <echo>Hello, {$name}! You have { $count } new { $count eq 1 ? 'message' : 'messages' }.</echo>
 <echo>$person.name is $person.age</echo>           <!-- bare $name works in text too -->
-<echo value="$people" format="json" />
+<echo>$people</echo>                               <!-- a map or list of maps prints as indented JSON -->
 ```
+
+A map, or a list of maps, on its own in `<echo>` prints as indented JSON, coloured in a terminal (unless `NO_COLOR` is set). Inside text it stays on one line. `<echo format="json">` reformats JSON text, and `->to_json()` gives compact JSON.
 
 Variables belong to the block they are declared in. `{{` and `}}` are literal braces.
 

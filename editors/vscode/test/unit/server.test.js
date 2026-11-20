@@ -105,3 +105,11 @@ test('kscript.json is validated with the bundled schema', () => {
   }
   assert.ok(pkg.contributes.languages.some((l) => l.id === 'jsonc' && l.filenames.includes('kscript.json')), 'kscript.json allows comments');
 });
+
+test('block dividers go above every block but the first', () => {
+  const { dividerLines } = require('../../src/blocks');
+  const block = (line) => ({ range: { start: { line, character: 2 }, end: { line: line + 1, character: 0 } } });
+  assert.deepStrictEqual(dividerLines([block(1), block(4), block(9)]), [4, 9]);
+  assert.deepStrictEqual(dividerLines([]), []);
+  assert.deepStrictEqual(dividerLines(undefined), []);
+});

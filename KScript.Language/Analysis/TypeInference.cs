@@ -109,8 +109,13 @@ namespace KScript.Language.Analysis
 
                 case CommandCallNode c:
                 {
+                    Symbol fn = FunctionNamed(c.Name);
+                    if (fn != null)
+                    {
+                        return fn.ReturnShape;
+                    }
                     CallableInfo command = catalog.GetCommand(c.Name);
-                    if (command == null || result.RootScope.Lookup(c.Name, int.MaxValue)?.Kind == SymbolKind.Function)
+                    if (command == null)
                     {
                         return TypeShape.Unknown;
                     }
@@ -145,7 +150,7 @@ namespace KScript.Language.Analysis
                     switch (pipe.Right)
                     {
                         case CallNode call when call.Callee is IdentifierNode id:
-                            return result.RootScope.Lookup(id.Name, int.MaxValue)?.Kind == SymbolKind.Function ? TypeShape.Unknown : InferMethod(id.Name, left, call.Arguments.Count);
+                            return FunctionNamed(id.Name) is Symbol piped ? piped.ReturnShape : InferMethod(id.Name, left, call.Arguments.Count);
                         case CommandCallNode command:
                             return Infer(command, region);
                         default:
@@ -185,6 +190,9 @@ namespace KScript.Language.Analysis
                             return new TypeShape(KType.Number);
                     }
 
+                case MatchNode match:
+                    return Analyzer.Unify(match.Arms.Select(a => Infer(a.Result, region)));
+
                 case ConditionalNode cond:
                 {
                     TypeShape a = Infer(cond.WhenTrue, region);
@@ -195,6 +203,31 @@ namespace KScript.Language.Analysis
                 default:
                     return TypeShape.Unknown;
             }
+        }
+
+        /// <summary>The user function (declared or imported) a call names, or null for a built-in command.</summary>
+        private Symbol FunctionNamed(string name)
+        {
+            // Functions are hoisted into the root scope.
+            Symbol s = result.RootScope.Lookup(name, int.MaxValue);
+            return s?.Kind == SymbolKind.Function ? s : null;
+        }
+
+        /// <summary>What a method returns when called on a value of this shape.</summary>
+        public static TypeShape MethodResult(CallableInfo method, TypeShape receiver)
+        {
+            if (receiver.Type == KType.List)
+            {
+                if (SameShapeListMethods.Contains(method.Name))
+                {
+                    return receiver;
+                }
+                if (ItemListMethods.Contains(method.Name))
+                {
+                    return receiver.Element ?? TypeShape.Unknown;
+                }
+            }
+            return new TypeShape(method.ReturnType);
         }
 
         private TypeShape InferMethod(string name, TypeShape receiver, int argCount)

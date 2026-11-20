@@ -160,7 +160,7 @@ namespace KScript.Language.Tests
             Assert.Equal(new[] { "name", "age" }, a.Symbols.Single(s => s.Name == "people").Shape.Element.Fields.Keys);
             Assert.Equal(new[] { "name", "age" }, a.Symbols.Single(s => s.Name == "oldest").Shape.Fields.Keys);
             Assert.Equal("string", a.Symbols.Single(s => s.Name == "names").Shape.Type);
-            Assert.Equal("list of numbers", a.Symbols.Single(s => s.Name == "r").Shape.ToString());
+            Assert.Equal("list<number>", a.Symbols.Single(s => s.Name == "r").Shape.ToString());
             Assert.Equal("string", a.Symbols.Single(s => s.Name == "t").Shape.Type);
             Assert.Equal("bool", a.Symbols.Single(s => s.Name == "b").Shape.Type);
         }

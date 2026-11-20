@@ -106,6 +106,12 @@ namespace KScript.Runtime
         /// <summary>The element text with <c>{ }</c> and bare <c>$name</c> filled in, trimmed and with common indentation removed.</summary>
         public string Text(Func<string, string> escape = null) => Content == null ? string.Empty : TextLayout.Tidy(Interpreter.Interpolate(Content, Scope, Module, bareReferences: true, escape));
 
+        /// <summary>As <see cref="Text"/>, turning each inserted value into text with <paramref name="format"/>.</summary>
+        public string Text(Func<object, string> format) => Content == null ? string.Empty : TextLayout.Tidy(Interpreter.Interpolate(Content, Scope, Module, bareReferences: true, null, format));
+
+        /// <summary>True if the element text is one value and nothing else: <c>&lt;echo&gt;$person&lt;/echo&gt;</c>.</summary>
+        public bool ContentIsSingleValue => Content != null && Interpreter.IsSingleValue(Content, Module, bareReferences: true);
+
         /// <summary>Runs the element text as assignment statements.</summary>
         public void RunStatements(bool declare)
         {

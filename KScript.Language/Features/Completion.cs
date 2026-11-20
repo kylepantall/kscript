@@ -511,6 +511,14 @@ namespace KScript.Language.Features
                 {
                     return CommandCompletions(analysis, replace, withSigil: false);
                 }
+                if (allowBare && before == '>' && wordStart >= 2 && text[wordStart - 2] == '-')
+                {
+                    return BareMemberCompletions(analysis, region, wordStart - 2, replace, method: true);
+                }
+                if (allowBare && before == '.')
+                {
+                    return BareMemberCompletions(analysis, region, wordStart - 1, replace, method: false);
+                }
                 return new List<CompletionItem>();
             }
 
@@ -575,7 +583,7 @@ namespace KScript.Language.Features
                 {
                     Label = (withSigil ? "$" : string.Empty) + s.Name,
                     Kind = s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : s.IsConst ? CompletionKind.Constant : CompletionKind.Variable,
-                    Detail = s.Shape.ToString(),
+                    Detail = s.Shape.Display(),
                     Documentation = SymbolMarkdown(analysis, s),
                     ReplaceSpan = withSigil ? replace : replace,
                     FilterText = (withSigil ? "$" : string.Empty) + s.Name,
@@ -594,7 +602,7 @@ namespace KScript.Language.Features
                 {
                     Label = sigil + s.Name,
                     Kind = CompletionKind.Function,
-                    Detail = s.Signature,
+                    Detail = s.TypedSignature,
                     Documentation = SymbolMarkdown(analysis, s),
                     InsertText = sigil + s.Name + (s.Parameters.Count == 0 ? "()" : "($1)"),
                     IsSnippet = true,
@@ -618,7 +626,7 @@ namespace KScript.Language.Features
 
         private List<CompletionItem> FunctionSymbolCompletions(DocumentAnalysis analysis, TextSpan replace) =>
             analysis.Symbols.Where(s => s.Kind == SymbolKind.Function).GroupBy(s => s.Name).Select(g => g.First())
-                .Select(s => new CompletionItem { Label = s.Name, Kind = CompletionKind.Function, Detail = s.Signature, ReplaceSpan = replace })
+                .Select(s => new CompletionItem { Label = s.Name, Kind = CompletionKind.Function, Detail = s.TypedSignature, ReplaceSpan = replace })
                 .ToList();
 
         /// <summary>Methods after <c>-&gt;</c> or <c>|&gt;</c>, for the type of the value on the left.</summary>
@@ -637,18 +645,7 @@ namespace KScript.Language.Features
                 receiver = InferAt(analysis, region, pipeNode.Left);
             }
 
-            List<CompletionItem> items = Catalog.MethodsFor(receiver.Type)
-                .Select(m => new CompletionItem
-                {
-                    Label = m.Name,
-                    Kind = CompletionKind.Method,
-                    Detail = m.Labels.First() + (m.ReceiverType != KType.Any ? "  (" + m.ReceiverType + ")" : string.Empty),
-                    Documentation = CallableMarkdown(m),
-                    InsertText = m.Name + (m.MaxArgs == 0 ? "()" : "($1)"),
-                    IsSnippet = true,
-                    ReplaceSpan = replace,
-                    SortText = (m.ReceiverType == receiver.Type ? "0" : "1") + m.Name,
-                }).ToList();
+            List<CompletionItem> items = MethodItems(receiver, replace);
 
             if (pipe)
             {
@@ -657,7 +654,7 @@ namespace KScript.Language.Features
                     {
                         Label = s.Name,
                         Kind = CompletionKind.Function,
-                        Detail = s.Signature,
+                        Detail = s.TypedSignature,
                         InsertText = s.Name + (s.Parameters.Count <= 1 ? "()" : "($1)"),
                         IsSnippet = true,
                         ReplaceSpan = replace,
@@ -666,6 +663,57 @@ namespace KScript.Language.Features
                 items.AddRange(CommandCompletions(analysis, replace, withSigil: true));
             }
             return items;
+        }
+
+        /// <summary>
+        /// The methods a value of this shape has. The value's own type's methods come first, then the ones every
+        /// value has, then the ones it gets by conversion (a string's number methods, for text that holds a number).
+        /// </summary>
+        private List<CompletionItem> MethodItems(TypeShape receiver, TextSpan replace) =>
+            Catalog.MethodsFor(receiver.Type)
+                .Select(m => new CompletionItem
+                {
+                    Label = m.Name,
+                    Kind = CompletionKind.Method,
+                    Detail = m.Labels.First() + ": " + MethodResult(m, receiver).Display()
+                             + (m.ReceiverType != KType.Any && m.ReceiverType != receiver.Type ? "  (" + m.ReceiverType + ")" : string.Empty),
+                    Documentation = CallableMarkdown(m, receiver.Type != KType.Any ? receiver : null),
+                    InsertText = m.Name + (m.MaxArgs == 0 ? "()" : "($1)"),
+                    IsSnippet = true,
+                    ReplaceSpan = replace,
+                    SortText = (receiver.Type == KType.Any || m.ReceiverType == receiver.Type ? "0" : m.ReceiverType == KType.Any ? "1" : "2") + m.Name,
+                }).ToList();
+
+        /// <summary>What a method returns on this receiver: list methods such as filter keep the item type.</summary>
+        private TypeShape MethodResult(CallableInfo m, TypeShape receiver) => TypeInference.MethodResult(m, receiver);
+
+        /// <summary>
+        /// <c>$name-&gt;</c> or <c>$name.</c> in an element's plain text (bare references, no braces): the parser stops
+        /// at the reference, so the receiver is the code that ends just before the operator.
+        /// </summary>
+        private List<CompletionItem> BareMemberCompletions(DocumentAnalysis analysis, ExpressionRegion region, int operatorIndex, TextSpan replace, bool method)
+        {
+            ExprNode receiverNode = region.Nodes.SelectMany(n => n.DescendantsAndSelf())
+                .Where(n => n.Span.End == operatorIndex && !(n is ArgumentNode))
+                .OrderByDescending(n => n.Span.Length)
+                .FirstOrDefault();
+            if (receiverNode == null)
+            {
+                return new List<CompletionItem>();
+            }
+            TypeShape receiver = InferAt(analysis, region, receiverNode);
+            if (method)
+            {
+                return MethodItems(receiver, replace);
+            }
+            return receiver.Fields.Values.Select(f => new CompletionItem
+            {
+                Label = f.Name,
+                Kind = CompletionKind.Field,
+                Detail = f.Shape.Display(),
+                Documentation = f.Description,
+                ReplaceSpan = replace,
+            }).ToList();
         }
 
         /// <summary>Fields after <c>.</c>: keys of a map literal, an import's functions, or a built-in value's fields.</summary>
@@ -703,7 +751,7 @@ namespace KScript.Language.Features
             {
                 Label = f.Name,
                 Kind = CompletionKind.Field,
-                Detail = f.Shape.ToString(),
+                Detail = f.Shape.Display(),
                 Documentation = f.Description,
                 ReplaceSpan = replace,
             }).ToList();

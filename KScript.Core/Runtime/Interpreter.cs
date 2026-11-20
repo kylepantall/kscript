@@ -327,7 +327,9 @@ namespace KScript.Runtime
                     if (content == null) break;
                     if (info.Content == ContentKind.Template)
                     {
-                        GetTemplate(module, content, bareReferences: true, check: true);
+                        // <echo format="json">{ "a": 1 }</echo> is JSON written out, used as it is.
+                        bool literalJson = e.GetAttributeValue("format")?.Trim() == "json" && JsonText.IsValid(content.Value);
+                        if (!literalJson) GetTemplate(module, content, bareReferences: true, check: true);
                     }
                     else if (info.Content == ContentKind.AssignmentStatements
                         || (info.Content == ContentKind.Expression && e.GetAttribute("name") == null && info.GetAttribute("name") != null))

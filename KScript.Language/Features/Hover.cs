@@ -144,7 +144,7 @@ namespace KScript.Language.Features
                     TypeShape target = InferAt(analysis, region, member.Target);
                     if (target.Fields.TryGetValue(member.Name, out FieldInfo field))
                     {
-                        return new HoverResult($"```kscript\n.{field.Name}: {field.Shape}\n```" + (field.Description != null ? "\n\n" + field.Description : string.Empty),
+                        return new HoverResult($"```kscript\n.{field.Name}: {field.Shape.Pretty()}\n```" + (field.Description != null ? "\n\n" + field.Description : string.Empty),
                             region.Source.ToSource(member.NameSpan));
                     }
                     break;
@@ -224,9 +224,10 @@ namespace KScript.Language.Features
             foreach (string label in c.Labels)
             {
                 sb.Append(label);
-                if (c.ReturnType != KType.Any)
+                TypeShape returns = c.Kind == CallableKind.Method && receiver != null ? TypeInference.MethodResult(c, receiver) : new TypeShape(c.ReturnType);
+                if (returns.Type != KType.Any)
                 {
-                    sb.Append(": ").Append(c.ReturnType);
+                    sb.Append(": ").Append(returns.Display());
                 }
                 sb.Append('\n');
             }
@@ -266,6 +267,10 @@ namespace KScript.Language.Features
             {
                 case SymbolKind.Function:
                     sb.Append(s.Signature);
+                    if (s.ReturnShape.Type != KType.Any)
+                    {
+                        sb.Append(": ").Append(s.ReturnShape.Pretty());
+                    }
                     break;
                 case SymbolKind.Import:
                     sb.Append("import ").Append(s.Name);
@@ -282,18 +287,15 @@ namespace KScript.Language.Features
                     }).Append('$').Append(s.Name);
                     if (s.Shape.Type != KType.Any)
                     {
-                        sb.Append(": ").Append(s.Shape);
+                        sb.Append(": ").Append(s.Shape.Pretty());
                     }
                     break;
             }
             sb.Append("\n```");
-            if (s.Shape.Fields.Count > 0 && s.Kind != SymbolKind.Import)
+            if (s.Shape.Fields.Count > 0 && s.Kind != SymbolKind.Import && s.Shape.Type != KType.Map)
             {
+                // Built-in values such as $request or $err: their type name doesn't show the fields.
                 sb.Append("\n\nFields: ").Append(string.Join(", ", s.Shape.Fields.Keys.Select(k => "`" + k + "`")));
-            }
-            else if (s.Shape.Element?.Fields.Count > 0)
-            {
-                sb.Append("\n\nItems have: ").Append(string.Join(", ", s.Shape.Element.Fields.Keys.Select(k => "`" + k + "`")));
             }
             if (!string.IsNullOrEmpty(s.Description))
             {

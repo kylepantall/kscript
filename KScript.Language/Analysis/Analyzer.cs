@@ -35,9 +35,8 @@ namespace KScript.Language.Analysis
         /// <summary>Analyzes a document. The kind is chosen from the path's extension unless given.</summary>
         public static DocumentAnalysis Analyze(string text, string path = null, IFileSystem files = null, LanguageCatalog catalog = null, DocumentKind? kind = null)
         {
-            Analyzer analyzer = new Analyzer(new SourceText(text), path, kind ?? MarkupParser.KindFromPath(path), files, catalog);
-            analyzer.Run();
-            return analyzer.result;
+            DocumentKind documentKind = kind ?? MarkupParser.KindFromPath(path);
+            return RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog)).result;
         }
 
         #region Driver
@@ -67,6 +66,7 @@ namespace KScript.Language.Analysis
             DeclareBuiltIns(root);
             AnalyzeFrontMatter(root);
             HoistFunctions(root);
+            ApplyKnownTypes(root);
             CheckScriptRoot();
 
             WalkChildren(result.Markup.Children, root, markupMode: Kind != DocumentKind.Script);
@@ -599,6 +599,11 @@ namespace KScript.Language.Analysis
                 case ContentKind.Template:
                     foreach (MarkupNode child in e.Children)
                     {
+                        if (child is MarkupText json && IsLiteralJson(e, json))
+                        {
+                            // <echo format="json">{ "a": 1 }</echo>: JSON written out, used as it is.
+                            continue;
+                        }
                         if (child is MarkupText text)
                         {
                             AnalyzeTemplate(text.Content, scope, e, null, allowBare: Kind == DocumentKind.Script);
@@ -1042,7 +1047,12 @@ namespace KScript.Language.Analysis
             }
             else
             {
-                ReferenceVariableByName(nameAttr.Value, scope, isWrite: true, mustBeMutable: true);
+                Symbol assigned = ReferenceVariableByName(nameAttr.Value, scope, isWrite: true, mustBeMutable: true);
+                string op = e.GetAttributeValue("op")?.Trim();
+                if (op == null || op == "=")
+                {
+                    Widen(assigned, shape);
+                }
             }
         }
 
@@ -1101,7 +1111,11 @@ namespace KScript.Language.Analysis
                     }
                     else
                     {
-                        ReferenceVariable(assign.Name, nameSpan, scope, isWrite: true, mustBeMutable: true, offset: nameSpan.Start);
+                        Symbol assigned = ReferenceVariable(assign.Name, nameSpan, scope, isWrite: true, mustBeMutable: true, offset: nameSpan.Start);
+                        if (assign.Operator == "=" && (assign.Target is IdentifierNode || assign.Target is VariableNode))
+                        {
+                            Widen(assigned, shape);
+                        }
                     }
                 }
                 else
@@ -1234,8 +1248,7 @@ namespace KScript.Language.Analysis
             {
                 foreach (FunctionParameter p in ParseParameters(paramsAttr.Value, report: true))
                 {
-                    TypeShape shape = p.Type != null ? new TypeShape(p.Type == "int" || p.Type == "float" ? KType.Number : p.Type) : TypeShape.Unknown;
-                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, shape);
+                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, ParameterShape(p));
                     body.Declare(symbol, e.Span.Start);
                 }
             }
@@ -1257,6 +1270,7 @@ namespace KScript.Language.Analysis
             }
 
             WalkChildren(e.Children, new Scope(body, e.ContentSpan), markupMode);
+            RecordReturnShape(e);
         }
 
         private void CheckCallArguments(MarkupElement e)

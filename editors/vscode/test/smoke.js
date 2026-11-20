@@ -17,6 +17,9 @@ const text = [
   '  <let name="total" value="1" />',
   '  <echo>{ $totl }</echo>',
   '  <echo>{ $total-> }</echo>',
+  '  <!-- Functions -->',
+  '  <fn name="double" params="x: int" value="$x * 2" />',
+  '  <let name="d" value="@double($total)" />',
   '</kscript>',
 ].join('\n');
 
@@ -46,6 +49,16 @@ const diagnostics = new Promise((resolve) => {
 
   const tokens = await connection.sendRequest('textDocument/semanticTokens/full', { textDocument: { uri } });
   assert.ok(tokens.data.length > 0 && tokens.data.length % 5 === 0, 'semantic tokens');
+
+  const hints = await connection.sendRequest('textDocument/inlayHint', { textDocument: { uri }, range: { start: { line: 0, character: 0 }, end: { line: 8, character: 0 } } });
+  assert.ok(hints.some((h) => h.label === ': number' && h.position.line === 6), 'inlay type hint for $d: ' + JSON.stringify(hints));
+  assert.ok(hints.some((h) => h.label === ' → number' && h.position.line === 5), 'inlay return type for @double');
+
+  const blocks = await connection.sendRequest('kscript/blocks', { textDocument: { uri } });
+  assert.deepStrictEqual(blocks.blocks.map((b) => b.label), ['let total', 'Functions'], 'notebook-style blocks');
+
+  const folds = await connection.sendRequest('textDocument/foldingRange', { textDocument: { uri } });
+  assert.ok(folds.some((f) => f.startLine === 0), 'the script folds');
 
   await connection.sendRequest('shutdown');
   connection.sendNotification('exit');
