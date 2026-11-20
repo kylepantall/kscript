@@ -157,23 +157,17 @@ namespace KScript.Docs
         public static string Convert(string code, string to)
         {
             if (string.IsNullOrWhiteSpace(code) || (code.Length > MaxCode)) return null;
-            try
+            // The parsers report problems as diagnostics rather than exceptions, so code with errors gives null here.
+            if (to == "kscript")
             {
-                if (to == "kscript")
-                {
-                    var xml = MarkupParser.Parse(AsScript(code, "xml"), DocumentKind.Script);
-                    if (xml.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
-                    return ScriptConverter.ToCode(xml).Text?.TrimEnd() + "\n";
-                }
-                var parsed = CodeParser.Parse(code);
-                if (parsed.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
-                string text = ScriptConverter.ToXml(parsed).Text;
-                return text == null ? null : Unwrap(text);
+                var xml = MarkupParser.Parse(AsScript(code, "xml"), DocumentKind.Script);
+                if (xml.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
+                return ScriptConverter.ToCode(xml).Text?.TrimEnd() + "\n";
             }
-            catch (Exception ex) when (ex is FormatException || ex is InvalidOperationException || ex is ArgumentException)
-            {
-                return null;
-            }
+            var parsed = CodeParser.Parse(code);
+            if (parsed.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
+            string text = ScriptConverter.ToXml(parsed).Text;
+            return text == null ? null : Unwrap(text);
         }
 
         /// <summary>Takes the statements out of a &lt;kscript&gt; root, so examples stay short.</summary>
@@ -188,7 +182,7 @@ namespace KScript.Docs
         }
 
         /// <summary>A writer that keeps the first <c>max</c> characters and drops the rest.</summary>
-        private sealed class LimitedWriter : TextWriter
+        internal sealed class LimitedWriter : TextWriter
         {
             private readonly StringBuilder text = new StringBuilder();
             private readonly int max;

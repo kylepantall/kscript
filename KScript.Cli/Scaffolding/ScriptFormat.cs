@@ -46,15 +46,8 @@ namespace KScript.Scaffolding
         public static (string Path, string Content) Apply(string templateFile, string path, string content, string format)
         {
             if (format != Xml || !MarkupParser.IsCodePath(templateFile)) return (path, content);
-            ConversionResult result;
-            try
-            {
-                result = ScriptConverter.ToXml(CodeParser.Parse(content));
-            }
-            catch (Exception ex) when (ex is not StubException)
-            {
-                throw new StubException($"{templateFile}: couldn't turn it into XML for --format xml: {ex.Message}");
-            }
+            // The parser and converter report problems as diagnostics, never by throwing.
+            ConversionResult result = ScriptConverter.ToXml(CodeParser.Parse(content));
             if (MarkupParser.IsCodePath(path)) path = ScriptConverter.ConvertedPath(path);
             // Lay it out as kscript fmt would, so a new project passes kscript fmt --check.
             string text = global::KScript.Language.Formatting.Formatter.Format(result.Text, path)?.Text ?? result.Text;

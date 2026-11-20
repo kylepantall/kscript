@@ -210,7 +210,10 @@ namespace KScript.Language.Analysis
                 }
                 if (top != null && top.Name != "kscript" && top.ContentSpan.Length > 0)
                 {
-                    return new[] { new QuickFix(fix, new TextChange(new TextSpan(top.ContentSpan.Start, 0), $"\n  import {package}")) };
+                    // A block's content starts at its '{': the import goes on the line after it.
+                    int brace = source.Text.IndexOf('{', top.ContentSpan.Start);
+                    int insertAt = brace >= 0 && brace < top.ContentSpan.End ? brace + 1 : top.ContentSpan.Start;
+                    return new[] { new QuickFix(fix, new TextChange(new TextSpan(insertAt, 0), $"\n  import {package}")) };
                 }
                 return new[] { new QuickFix(fix, new TextChange(new TextSpan(0, 0), $"import {package}\n")) };
             }

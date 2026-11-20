@@ -123,7 +123,7 @@ namespace KScript.Scaffolding
                 if (positional.Count < 2)
                 {
                     var t = Scaffolder.FindTemplate(root, type);
-                    error.WriteLine($"Give the {t.Type} a name, e.g. kscript make {t.Type} Hero.");
+                    error.WriteLine($"Give the {t.Type} a name, e.g. kscript make {t.Type} {Scaffolder.Example(t.Type)}.");
                     return 1;
                 }
                 if (positional.Count > 2)
