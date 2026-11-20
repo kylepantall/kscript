@@ -19,6 +19,7 @@ public class CodeFormatTests
     [Theory]
     [InlineData("tour")]
     [InlineData("oldest")]
+    [InlineData("repos")]
     public void SamplesPrintTheSameAsTheirXmlVersions(string name)
     {
         string xml = RunFile(ScriptRunner.RepoFile("samples", "kscript2", name + ".ks.xml"));
@@ -123,6 +124,7 @@ public class CodeFormatTests
     [InlineData("samples/kscript2/tour.ks.xml")]
     [InlineData("samples/kscript2/oldest.ks.xml")]
     [InlineData("samples/kscript2/imports.ks.xml")]
+    [InlineData("samples/kscript2/lib/github.ks.xml")]
     [InlineData("samples/life-lab/lib/life.ks.xml")]
     [InlineData("samples/life-lab/life.ks.xml")]
     [InlineData("samples/life-lab/desktop.ks.xml")]
@@ -209,5 +211,67 @@ public class CodeFormatTests
         var thrown = Assert.Throws<KScriptException>(() => Run("try {\n  throw Validation \"bad {1 + 1}\"\n} catch err when $err.type == 'Other' {\n  echo \"no\"\n}"));
         Assert.Equal("Validation", thrown.Type);
         Assert.Equal("bad 2", thrown.Message);
+    }
+
+    [Fact]
+    public void TypesAndEnumsConvertToTheShortForm()
+    {
+        const string xml = "<kscript>\n"
+            + "  <enum name=\"Size\" values=\"s, m\" description=\"Sizes.\" />\n"
+            + "  <type name=\"Repo\" extra=\"error\">\n"
+            + "    <!-- fields -->\n"
+            + "    <field name=\"stars\" type=\"int\" from=\"stargazers_count\" description=\"Stars.\" />\n"
+            + "    <field name=\"owner\" from=\"owner name\" optional=\"yes\" />\n"
+            + "    <field name=\"label\" value=\"$stars + 1\" />\n"
+            + "  </type>\n"
+            + "  <type name=\"Point\" fields=\"x: int, y: int\" />\n"
+            + "  <type name=\"Odd\"><field name=\"a\" default=\"1\" value=\"2\" /></type>\n"
+            + "  <type name=\"Odd2\"><field name=\"a\" optional=\"maybe\" /></type>\n"
+            + "  <type name=\"Odd3\"><field name=\"a\" type=\"int | string\" /></type>\n"
+            + "  <type name=\"Odd4\"><field name=\"a\" other=\"x\" /></type>\n"
+            + "  <type name=\"Odd5\"><field name=\"a\">text</field><echo>no</echo></type>\n"
+            + "  <type name=\"Odd6\"><echo>no</echo></type>\n"
+            + "  <enum name=\"E\" values=\"a\" other=\"x\" />\n"
+            + "  <enum name=\"E2\" />\n"
+            + "  <enum name=\"E3\" values=\"a}\" />\n"
+            + "  <enum name=\"E.x\" values=\"a\" />\n"
+            + "  <enum name=\"3x\" values=\"a\" />\n"
+            + "  <enum name=\"E4\" values=\"a\"><echo>no</echo></enum>\n"
+            + "  <type name=\"Odd7\"><field type=\"int\" /></type>\n"
+            + "  <type name=\"Odd8\"><field name=\"a.b\" /></type>\n"
+            + "  <type name=\"Odd9\">text</type>\n"
+            + "  <type name=\"Odd10\"><field name=\"a\" type=\"\" /></type>\n"
+            + "  <type name=\"T.x\"><field name=\"a\" /></type>\n"
+            + "  <type name=\"Odd11\"><field name=\"a\"><echo>x</echo></field></type>\n"
+            + "  <type name=\"Paths\">\n"
+            + "    <field name=\"a?\" optional=\"yes\" from=\"\" />\n"
+            + "    <field name=\"b\" optional=\"no\" from=\"x;y\" />\n"
+            + "    <field name=\"c\" from=\"x}\" />\n"
+            + "    <field name=\"d\" from=\"x=y\" />\n"
+            + "    <field name=\"e\" from=\"say &quot;hi&quot;\" />\n"
+            + "    <field name=\"f\"> </field>\n"
+            + "  </type>\n"
+            + "</kscript>\n";
+        string code = KScript.Syntax.Markup.ScriptConverter.Convert(xml, "x.ks.xml").Text;
+        Assert.Contains("/// Sizes.\nenum Size { s, m }\n", code);
+        Assert.Contains("type Repo(extra: error) {\n  // fields\n  /// Stars.\n  stars: int from stargazers_count\n  owner? from \"owner name\"\n  label => $stars + 1\n}\n", code);
+        Assert.Contains("type Point(fields: \"x: int, y: int\")\n", code);
+        Assert.Contains("enum E2 { }\n", code);
+        Assert.Contains("type Paths {\n  a? from \"\"\n  b from \"x;y\"\n  c from \"x}\"\n  d from \"x=y\"\n  e from \"say \\\"hi\\\"\"\n  f\n}\n", code);
+        foreach (string odd in new[] { "Odd", "Odd2", "Odd3", "Odd4", "Odd5", "Odd6", "Odd7", "Odd8", "Odd9", "Odd10", "Odd11", "T.x", "E3", "E.x", "3x", "E4" })
+        {
+            Assert.Contains("(name: " + odd, code);
+        }
+        Assert.Contains("enum(name: E", code);
+    }
+
+    [Fact]
+    public void TypesWorkInCodeFiles()
+    {
+        Assert.Equal("kscript has 12 stars, size m\n", Run(
+            "enum Size { s, m }\n"
+            + "type Repo {\n  name: string\n  stars: int from stargazers_count\n  size: Size = 'm'\n}\n"
+            + "r = '{\"name\": \"kscript\", \"stargazers_count\": 12}'->json(as: Repo)\n"
+            + "echo \"$r.name has $r.stars stars, size $r.size\""));
     }
 }

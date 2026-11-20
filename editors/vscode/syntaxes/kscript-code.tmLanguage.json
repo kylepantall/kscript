@@ -18,6 +18,9 @@
           "include": "#fn"
         },
         {
+          "include": "#typeDeclaration"
+        },
+        {
           "include": "#import"
         },
         {
@@ -347,6 +350,17 @@
           "name": "keyword.operator.kscript"
         }
       ]
+    },
+    "typeDeclaration": {
+      "match": "\\b(type|enum)\\s+([A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "storage.type.kscript"
+        },
+        "2": {
+          "name": "entity.name.type.kscript"
+        }
+      }
     }
   }
 }

@@ -67,6 +67,12 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `import KScript.Math as math` | `<import package="KScript.Math" as="math" />` |
 | `import "lib/s.kscript" as s` | `<import src="lib/s.kscript" as="s" />` |
 | `import slugify from "lib/s.kscript"` | `<import src="lib/s.kscript" names="slugify" />` |
+| `enum Size { small, medium, large }` | `<enum name="Size" values="small, medium, large" />` |
+| `type Repo(extra: error) { … }` | `<type name="Repo" extra="error">` with `<field>`s inside |
+| `stars: int from stargazers_count` (in a type) | `<field name="stars" type="int" from="stargazers_count" />` |
+| `topics?: string[] = []`, `label => $name + '!'` | `<field name="topics?" type="string[]" default="[]" />`, `<field name="label" value="$name + '!'" />` |
+
+A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Typed data](language.md#typed-data) for what each part does.
 
 Any other name is an element: `name(attribute: value, ...) "text" { children }`, each part optional.
 
@@ -96,7 +102,7 @@ Row(gap: 8, wrap) {
 
 ## Doc comments
 
-`///` lines before a `fn` or `const` document it. Editors show the text in hover, completion and signature help.
+`///` lines before a `fn`, `const`, `type`, `enum` or a type's field document it. Editors show the text in hover, completion and signature help.
 The text is Markdown, with tags:
 
 ```

@@ -44,10 +44,13 @@ namespace KScript.Language.Features
         internal static Cursor Locate(DocumentAnalysis analysis, int offset)
         {
             Cursor c = new Cursor { Offset = offset };
+            bool code = analysis.Markup.Syntax == SourceSyntax.Code;
 
             foreach (MarkupElement e in analysis.Markup.DescendantElements())
             {
-                bool inStart = offset > e.StartTagSpan.Start && (offset < e.StartTagSpan.End || (!e.StartTagClosed && offset <= e.StartTagSpan.End));
+                // A .kscript statement has no closing '>': a value that ends the line (a: |) is still inside it.
+                bool inStart = offset > e.StartTagSpan.Start && (offset < e.StartTagSpan.End || (offset == e.StartTagSpan.End
+                    && (!e.StartTagClosed || (code && e.Attributes.Any(a => a.Value.SourceSpan.End == offset)))));
                 if (inStart)
                 {
                     c.TagElement = e;
@@ -55,7 +58,8 @@ namespace KScript.Language.Features
                     c.InElementName = offset >= e.NameSpan.Start && offset <= e.NameSpan.End;
                     foreach (MarkupAttribute a in e.Attributes)
                     {
-                        if (offset >= a.NameSpan.Start && offset <= a.NameSpan.End)
+                        // An attribute a keyword implies (a field's type after ':') has no name to complete.
+                        if (offset >= a.NameSpan.Start && offset <= a.NameSpan.End && (a.NameSpan.Length > 0 || a.Value == null || !code))
                         {
                             c.Attribute = a;
                             c.InAttributeName = true;
