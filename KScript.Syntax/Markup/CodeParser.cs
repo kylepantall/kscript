@@ -84,10 +84,10 @@ namespace KScript.Syntax.Markup
 
             ParseBody(root, braced: false);
 
-            // A file that is a single package element, such as KScript.Window { ... }, uses it as the root,
-            // as an XML script would.
+            // A file that is a single package element, such as KScript.Window { ... }, or an explicit kscript { ... },
+            // uses it as the root, as an XML script would.
             List<MarkupElement> top = root.ChildElements.ToList();
-            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && top[0].Name.StartsWith("KScript.", StringComparison.Ordinal))
+            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && (top[0].Name.StartsWith("KScript.", StringComparison.Ordinal) || top[0].Name == "kscript"))
             {
                 foreach (MarkupNode node in root.Children.Where(n => !(n is MarkupText)))
                 {
@@ -1165,6 +1165,27 @@ namespace KScript.Syntax.Markup
                 {
                     break;
                 }
+                if (c == '/' && Peek(1) == '*')
+                {
+                    // At the end of a statement it is a comment of its own (kept after the statement); inside an
+                    // expression it stays there, and the expression lexer skips it. A new line inside doesn't end it.
+                    if (brackets.Count == 0 && TrailingCommentAt(pos))
+                    {
+                        break;
+                    }
+                    int close = text.IndexOf("*/", pos + 2, StringComparison.Ordinal);
+                    pos = close < 0 ? text.Length : close + 2;
+                    continue;
+                }
+                if (c == '/' && Peek(1) == '/')
+                {
+                    // Inside brackets: a comment to the end of the line, skipped by the expression lexer too.
+                    while (pos < text.Length && text[pos] != '\n')
+                    {
+                        pos++;
+                    }
+                    continue;
+                }
                 if (c == '(' || c == '[' || c == '{')
                 {
                     if (c == '{' && brackets.Count == 0 && stop == Stop.Header)
@@ -1227,12 +1248,32 @@ namespace KScript.Syntax.Markup
             {
                 return true;
             }
-            string line = text.Substring(start, end - start);
+            string line = WithoutTrailingComments(text.Substring(start, end - start));
+            if (line.Length == 0)
+            {
+                return true;
+            }
             if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal)))
             {
                 return true;
             }
             return WordContinuations.Any(w => line.EndsWith(" " + w, StringComparison.Ordinal));
+        }
+
+        /// <summary>The text with any /* */ comments at its end removed, so a closing */ isn't read as an operator.</summary>
+        private static string WithoutTrailingComments(string line)
+        {
+            line = line.TrimEnd();
+            while (line.EndsWith("*/", StringComparison.Ordinal))
+            {
+                int open = line.LastIndexOf("/*", line.Length - 2, StringComparison.Ordinal);
+                if (open < 0)
+                {
+                    break;
+                }
+                line = line.Substring(0, open).TrimEnd();
+            }
+            return line;
         }
 
         private bool ContinuesBefore(int newline)
@@ -1383,6 +1424,27 @@ namespace KScript.Syntax.Markup
                 p++;
             }
             return p >= text.Length || text[p] == '\n' || text[p] == '\r' || text[p] == ';' || text[p] == '}'
+                || (text[p] == '/' && p + 1 < text.Length && text[p + 1] == '/')
+                || TrailingCommentAt(p);
+        }
+
+        /// <summary>True when a /* */ comment starts at <paramref name="p"/> and only comments or the line's end follow it.</summary>
+        private bool TrailingCommentAt(int p)
+        {
+            while (p + 1 < text.Length && text[p] == '/' && text[p + 1] == '*')
+            {
+                int close = text.IndexOf("*/", p + 2, StringComparison.Ordinal);
+                if (close < 0)
+                {
+                    return true;
+                }
+                p = close + 2;
+                while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
+                {
+                    p++;
+                }
+            }
+            return p >= text.Length || text[p] == '\n' || text[p] == '\r' || text[p] == '}' || text[p] == ';'
                 || (text[p] == '/' && p + 1 < text.Length && text[p + 1] == '/');
         }
 
@@ -1463,7 +1525,7 @@ namespace KScript.Syntax.Markup
                     {
                         Error(new TextSpan(start, 2), DiagnosticCodes.MarkupSyntax, "This comment is missing its closing */.");
                     }
-                    AddComment(start, text.Substring(start + 2, (close < 0 ? text.Length : close) - start - 2).Trim());
+                    AddComment(start, BlockCommentText(text.Substring(start + 2, (close < 0 ? text.Length : close) - start - 2)), block: true);
                     continue;
                 }
                 return;
@@ -1480,9 +1542,36 @@ namespace KScript.Syntax.Markup
             return p < text.Length && text[p] == '\n';
         }
 
-        private void AddComment(int start, string body)
+        private void AddComment(int start, string body, bool block = false)
         {
-            commentTarget?.Children.Add(new MarkupComment { Text = body, Plain = true, Span = TextSpan.FromBounds(start, pos), Parent = commentTarget });
+            commentTarget?.Children.Add(new MarkupComment { Text = body, Plain = true, IsBlock = block, Span = TextSpan.FromBounds(start, pos), Parent = commentTarget });
+        }
+
+        /// <summary>A /* */ comment's lines, trimmed at the ends and without the indentation (or " * ") they share.</summary>
+        private static string BlockCommentText(string body)
+        {
+            if (body.StartsWith("*", StringComparison.Ordinal))
+            {
+                body = body.Substring(1); // /** ... */
+            }
+            List<string> lines = body.Replace("\r", string.Empty).Split('\n').Select(l => l.TrimEnd()).ToList();
+            // Text on the opening line has lost its indentation; lines below keep theirs.
+            string first = lines[0].Trim();
+            bool sameLine = first.Length > 0;
+            List<string> rest = lines.Skip(1).ToList();
+            while (rest.Count > 0 && rest[^1].Trim().Length == 0) rest.RemoveAt(rest.Count - 1);
+            if (!sameLine)
+            {
+                while (rest.Count > 0 && rest[0].Trim().Length == 0) rest.RemoveAt(0);
+            }
+            // A leading "*" on every line below (javadoc style) is decoration, not text.
+            if (rest.Count > 0 && rest.All(l => l.TrimStart().StartsWith("*", StringComparison.Ordinal)))
+            {
+                rest = rest.Select(l => l.TrimStart().Substring(1)).ToList();
+            }
+            int indent = rest.Where(l => l.Trim().Length > 0).Select(l => l.Length - l.TrimStart().Length).DefaultIfEmpty(0).Min();
+            rest = rest.Select(l => l.Trim().Length == 0 ? string.Empty : l.Substring(indent)).ToList();
+            return string.Join("\n", sameLine ? rest.Prepend(first) : rest);
         }
 
         /// <summary>Skips trivia to look at the next word (else, catch, ...) without keeping comments or doc lines.</summary>

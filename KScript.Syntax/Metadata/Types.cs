@@ -23,6 +23,8 @@ namespace KScript.Metadata
         public const string Error = "error";
         public const string Request = "request";
         public const string HttpResponse = "http_response";
+        public const string Storage = "storage";
+        public const string Cache = "cache";
 
         /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>
         public const string Type = "type";

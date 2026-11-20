@@ -104,6 +104,18 @@
       if (src[i] === '<' && /[A-Za-z\/?!]/.test(src[i + 1] || '')) {
         var m = /^<[\/?!]?[\w.:-]*/.exec(src.slice(i));
         out += span('tag', esc(m[0])); i += m[0].length;
+        // A shorthand start tag holds an expression, not attributes: <if $n > 3>, <match $choice>.
+        var sh = /^\s+(?![\w:.-]+\s*=)(?![\/>])\S/.exec(src.slice(i));
+        if (sh && /^<(if|elif|while|match|assert)$/.test(m[0])) {
+          var close = i;
+          // A > ends the tag unless it has a space on both sides with more of the condition after it.
+          while ((close = src.indexOf('>', close)) >= 0 && src[close - 1] === ' ' && src[close + 1] === ' ' && /\S/.test(src.slice(close + 1, src.indexOf('\n', close) < 0 ? n : src.indexOf('\n', close)))) close++;
+          if (close < 0) close = n;
+          out += hlExpr(src.slice(i, close));
+          i = close;
+          if (i < n) { out += span('tag', '&gt;'); i++; }
+          continue;
+        }
         while (i < n && src[i] !== '>') {
           var c = src[i];
           if (c === '"' || c === "'") {
@@ -163,9 +175,88 @@
     });
   }
 
+  // Stylesheets (.ks.css, .ks.scss, .ks.sass): CSS with KScript elements on their own lines and { $x } / { @fn() }
+  // expressions. A { is KScript only when $, @ or ! comes next, as in the stylesheet compiler.
+  function cssBraceEnd(src, i) {
+    var depth = 0, q = null;
+    for (var j = i; j < src.length; j++) {
+      var c = src[j];
+      if (q) { if (c === '\\') j++; else if (c === q) q = null; continue; }
+      if (c === '"' || c === "'") q = c;
+      else if (c === '{') depth++;
+      else if (c === '}' && --depth === 0) return j;
+    }
+    return -1;
+  }
+  function cssIsKs(src, i) { return src[i] === '{' && /^\{\s*[$@!]/.test(src.slice(i, i + 40)); }
+  // Whether the word at i is part of a selector: the next ; { or } (outside KScript braces) is a {.
+  function cssInSelector(src, i) {
+    for (var j = i; j < src.length; j++) {
+      var c = src[j];
+      if (cssIsKs(src, j)) { var e = cssBraceEnd(src, j); if (e < 0) return false; j = e; continue; }
+      if (c === '(') { var close = src.indexOf(')', j); if (close < 0) return false; j = close; continue; }
+      if (c === ')') return false; // inside ( ), such as a media query
+      if (c === '{') return true;
+      if (c === ';' || c === '}') return false;
+    }
+    return false;
+  }
+  function hlCss(src) {
+    var out = '', i = 0, n = src.length, m;
+    while (i < n) {
+      var c = src[i], rest = src.slice(i);
+      var lineStart = i === 0 || /^[ \t]*$/.test(src.slice(src.lastIndexOf('\n', i - 1) + 1, i));
+      if (rest.startsWith('/*')) {
+        var e = src.indexOf('*/', i + 2); e = e < 0 ? n : e + 2;
+        out += span('com', esc(src.slice(i, e))); i = e; continue;
+      }
+      if (rest.startsWith('//') && lineStart) {
+        var nl = src.indexOf('\n', i); nl = nl < 0 ? n : nl;
+        out += span('com', esc(src.slice(i, nl))); i = nl; continue;
+      }
+      if (c === '<' && lineStart && /[A-Za-z\/!]/.test(src[i + 1] || '')) {
+        var end = src.indexOf('\n', i); end = end < 0 ? n : end;
+        out += hlXml(src.slice(i, end)); i = end; continue;
+      }
+      if (cssIsKs(src, i)) {
+        var close = cssBraceEnd(src, i);
+        if (close > 0) { out += span('br', '{') + hlExpr(src.slice(i + 1, close)) + span('br', '}'); i = close + 1; continue; }
+      }
+      if (rest.startsWith('#{')) {
+        var se = src.indexOf('}', i); se = se < 0 ? n : se + 1;
+        out += span('var', esc(src.slice(i, se))); i = se; continue;
+      }
+      if (c === '"' || c === "'") {
+        var q = src.indexOf(c, i + 1); q = q < 0 ? n : q + 1;
+        out += span('str', esc(src.slice(i, q))); i = q; continue;
+      }
+      if ((m = /^@[A-Za-z-]+/.exec(rest))) { out += span('kw', esc(m[0])); i += m[0].length; continue; }
+      if ((m = /^\$[A-Za-z_][\w-]*/.exec(rest))) { out += span('var', esc(m[0])); i += m[0].length; continue; }
+      if ((m = /^#[0-9a-fA-F]{3,8}\b/.exec(rest)) && !cssInSelector(src, i)) { out += span('num', m[0]); i += m[0].length; continue; }
+      if (/[\w-]/.test(src[i - 1] || '') === false && (m = /^-?(?:\d*\.)?\d+(?:[a-z]+|%)?/.exec(rest))) {
+        out += span('num', esc(m[0])); i += m[0].length; continue;
+      }
+      if ((m = /^(?:--|-?[A-Za-z_])[\w-]*/.exec(rest)) && /[\w-]/.test(src[i - 1] || '') === false) {
+        var after = src.slice(i + m[0].length);
+        if (/^\(/.test(after)) out += span('cmd', esc(m[0]));
+        else if (/^\s*:(?!:)/.test(after) && !cssInSelector(src, i)) out += span('attr', esc(m[0]));
+        else if (cssInSelector(src, i)) out += span('tag', esc(m[0]));
+        else out += esc(m[0]);
+        i += m[0].length; continue;
+      }
+      if ((c === '.' || c === '#' || c === ':') && /[A-Za-z_-]/.test(src[i + 1] || '') && cssInSelector(src, i)) {
+        m = /^[.#:]+[\w-]+/.exec(rest);
+        out += span('tag', esc(m[0])); i += m[0].length; continue;
+      }
+      out += esc(c); i++;
+    }
+    return out;
+  }
+
   function highlight(code, lang) {
     if (lang === 'xml' || lang === 'html') return hlXml(code);
     if (lang === 'kscript') return hlKscript(code);
+    if (lang === 'css' || lang === 'scss' || lang === 'sass') return hlCss(code);
     if (lang === 'sh' || lang === 'powershell') return hlShell(code);
     if (lang === 'json' || lang === 'jsonc' || lang === 'yaml') return hlJson(code);
     return esc(code);

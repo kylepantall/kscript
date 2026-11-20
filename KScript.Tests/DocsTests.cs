@@ -399,7 +399,7 @@ public sealed class DocsTests
     [Fact]
     public void Playground_has_no_network_servers_windows_or_models()
     {
-        foreach (string package in new[] { "KScript.Net", "KScript.Http", "KScript.UI", "KScript.AI", "KScript.Web", "KScript.Test" })
+        foreach (string package in new[] { "KScript.Net", "KScript.Http", "KScript.UI", "KScript.AI", "KScript.Web", "KScript.Test", "KScript.Storage", "KScript.Cache" })
         {
             PlaygroundResult result = Playground.Run($"<import package=\"{package}\" />");
             Assert.Contains("can't run in the docs", result.Error);
@@ -671,6 +671,69 @@ public sealed class DocsTests
         Assert.True(server.Wait(TimeSpan.FromSeconds(30)));
         Assert.Equal(0, server.Result);
         Assert.Empty(Directory.GetDirectories(Path.GetTempPath(), "kscript-docs-*").Where(d => !before.Contains(d) && !d.Contains("-test-")));
+    }
+
+    [Fact]
+    public void Stylesheet_examples_are_highlighted_as_kscript_css()
+    {
+        DocPage page = Site.Value.Find("/guide/stylesheets");
+        Assert.NotNull(page);
+        Assert.Contains("<div class=\"code\" data-lang=\"css\">", page.Body);
+
+        string js = DocsSite.ReadAsset("docs.js");
+        Assert.Contains("if (lang === 'css' || lang === 'scss' || lang === 'sass') return hlCss(code);", js);
+
+        // Run the page's highlighter on a stylesheet when Node is around (it is on CI); the docs site needs no Node.
+        string node = FindOnPath(OperatingSystem.IsWindows() ? "node.exe" : "node");
+        if (node == null) return;
+        string highlighter = js.Substring(js.IndexOf("  function esc(", StringComparison.Ordinal));
+        highlighter = highlighter.Substring(0, highlighter.IndexOf("  function store(", StringComparison.Ordinal))
+            + js.Substring(js.IndexOf("// ---------- Highlighting", StringComparison.Ordinal),
+                js.IndexOf("document.querySelectorAll('.code')", StringComparison.Ordinal) - js.IndexOf("// ---------- Highlighting", StringComparison.Ordinal));
+        string folder = Path.Combine(Path.GetTempPath(), "kscript-docs-test-hl-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            string sheet = "<let name=\"theme\" value=\"@read_json('theme.json')\" />\n"
+                + "/* a comment */\n.p-{$name} { padding: {@rem($px)}; }\n"
+                + "@media {@up('md')} { .grid { display: grid; } }\n<if $vars.dark>\n:root { --surface: #111; }\n</if>\n";
+            File.WriteAllText(Path.Combine(folder, "hl.js"), highlighter
+                + "\nprocess.stdout.write(highlight(require('fs').readFileSync(process.argv[2], 'utf8'), 'css'));\n");
+            File.WriteAllText(Path.Combine(folder, "sheet.ks.css"), sheet);
+            var info = new System.Diagnostics.ProcessStartInfo(node) { RedirectStandardOutput = true, UseShellExecute = false };
+            info.ArgumentList.Add(Path.Combine(folder, "hl.js"));
+            info.ArgumentList.Add(Path.Combine(folder, "sheet.ks.css"));
+            using var process = System.Diagnostics.Process.Start(info)!;
+            string html = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            Assert.Equal(0, process.ExitCode);
+
+            Assert.Contains("<span class=\"hl-tag\">&lt;let</span>", html);
+            Assert.Contains("<span class=\"hl-cmd\">@read_json</span>", html);
+            Assert.Contains("<span class=\"hl-com\">/* a comment */</span>", html);
+            Assert.Contains("<span class=\"hl-tag\">.p-</span><span class=\"hl-br\">{</span><span class=\"hl-var\">$name</span><span class=\"hl-br\">}</span>", html);
+            Assert.Contains("<span class=\"hl-attr\">padding</span>", html);
+            Assert.Contains("<span class=\"hl-kw\">@media</span> <span class=\"hl-br\">{</span><span class=\"hl-cmd\">@up</span>", html);
+            Assert.Contains("<span class=\"hl-tag\">&lt;if</span> <span class=\"hl-var\">$vars</span>", html);
+            Assert.Contains("<span class=\"hl-attr\">--surface</span>: <span class=\"hl-num\">#111</span>", html);
+            // Removing the tags gives back the stylesheet.
+            Assert.Equal(sheet, WebUtility.HtmlDecode(Regex.Replace(html, "<[^>]+>", "")));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    private static string FindOnPath(string file)
+    {
+        foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
+        {
+            if (dir.Length == 0) continue;
+            string path = Path.Combine(dir, file);
+            if (File.Exists(path)) return path;
+        }
+        return null;
     }
 
     #endregion

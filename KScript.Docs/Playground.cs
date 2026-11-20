@@ -46,6 +46,8 @@ namespace KScript.Docs
             ["KScript.UI"] = "opens desktop windows",
             ["KScript.AI"] = "calls a language model",
             ["KScript.Test"] = "runs with kscript test",
+            ["KScript.Storage"] = "writes to your app's own folders",
+            ["KScript.Cache"] = "keeps values between runs",
         };
 
         public const int MaxOutput = 64 * 1024;

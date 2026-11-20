@@ -86,6 +86,15 @@ namespace KScript.Http
                     Headers[call.Str(0)] = Values.ToStr(call.Arg(1));
                     result = this;
                     return true;
+                case "with_etag":
+                    bool weak = Values.Truthy(call.Arg(1, "weak"));
+                    Headers["ETag"] = call.Arg(0, "value") is object value ? HttpCaching.TagFor(value, weak) : HttpCaching.Tag(Body, weak);
+                    result = this;
+                    return true;
+                case "with_cache":
+                    Headers["Cache-Control"] = HttpCaching.CacheControl(call.Str(0));
+                    result = this;
+                    return true;
                 case "with_type":
                     ContentType = call.Str(0);
                     result = this;
@@ -108,6 +117,8 @@ namespace KScript.Http
             ("with_status", "code", "Changes the status code and returns the response.", KType.HttpResponse),
             ("with_header", "name, value", "Sets a header and returns the response: $next($request)->with_header('X-Frame-Options', 'DENY').", KType.HttpResponse),
             ("with_type", "type", "Changes the Content-Type and returns the response.", KType.HttpResponse),
+            ("with_etag", "value?, weak?: bool", "Sets the ETag: a hash of the value, or of the body without one. Add the etag middleware (or etag=\"yes\") to answer If-None-Match with 304.", KType.HttpResponse),
+            ("with_cache", "directives", "Sets Cache-Control: ->with_cache('public, max-age=300'), or a number of seconds: ->with_cache(300).", KType.HttpResponse),
         };
     }
 

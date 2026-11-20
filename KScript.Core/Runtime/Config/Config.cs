@@ -36,6 +36,12 @@ namespace KScript.Runtime
         /// <summary>Whether values from .env files become environment variables (for @env() and packages such as KScript.AI). Existing variables are kept.</summary>
         public bool ExportEnv { get; set; } = true;
 
+        /// <summary>
+        /// The app's own config folder (from KScript.Storage's folders, such as ~/.config/notes). Its config.json,
+        /// config.yaml or config.yml is layered over the project's files, so a person's own settings win. Null: none.
+        /// </summary>
+        public string UserFolder { get; set; }
+
         public static readonly string[] DefaultFiles = { "config", ".env" };
 
         public ConfigOptions Clone() => new ConfigOptions
@@ -47,6 +53,7 @@ namespace KScript.Runtime
             Defaults = Defaults,
             Required = Required.ToList(),
             ExportEnv = ExportEnv,
+            UserFolder = UserFolder,
         };
     }
 
@@ -100,11 +107,16 @@ namespace KScript.Runtime
                 // staging.yaml / staging.json: a file named after the environment.
                 layers.AddRange(Extensions.Select(e => Path.Combine(root, environment + e)).Where(File.Exists).Select(f => (f, false)));
             }
+            // The person's own settings, in the app's config folder: outside the project, so not checked against FileRoot.
+            var user = string.IsNullOrWhiteSpace(options.UserFolder)
+                ? new List<string>()
+                : Extensions.Select(e => Path.Combine(options.UserFolder, "config" + e)).Where(File.Exists).ToList();
             if (missing.Count > 0)
                 throw new KScriptException($"There is no config file {string.Join(" or ", missing.Select(m => $"'{m}'"))} in {root}. End a name with ? if it may be missing.", "Config");
             layers = layers.Distinct().ToList();
 
             foreach (var layer in layers) host.CheckPath(layer.Path);
+            layers.AddRange(user.Select(f => (f, false)));
 
             // .env files are read first, so ${NAME} in any file can use their values.
             var dotenv = new Dictionary<string, string>(StringComparer.Ordinal);

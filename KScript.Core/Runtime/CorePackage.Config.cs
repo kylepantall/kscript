@@ -30,6 +30,7 @@ namespace KScript.Runtime
                 new A("root", K.Path, "The folder the files are in. Default: the script's folder."),
                 new A("defaults", K.Expression, "A map of settings used when no file sets them."),
                 new A("require", K.Text, "Settings that must be set, comma separated, such as `database.host, api.key`."),
+                new A("user", K.Bool, "yes also reads the person's own settings: config.json (or .yaml) in the app's config folder (see KScript.Storage), layered over the other files."),
                 new A("export-env", K.Bool, "no stops values in .env files becoming environment variables (they always do for @env() unless this is no)."),
                 new A("to", K.DeclareVariable, "Store the settings in this variable instead of changing $config."))
             {
@@ -50,6 +51,7 @@ namespace KScript.Runtime
                 }
                 if (run.Has("require")) options.Required = List(run.Raw("require"));
                 options.ExportEnv = run.Flag("export-env", options.ExportEnv);
+                if (run.Has("user")) options.UserFolder = run.Flag("user") ? AppFolders.Folder(AppFolders.AppNameFor(run.Module.Directory, run.Module.Path), "config") : null;
 
                 if (run.Has("to"))
                 {

@@ -101,6 +101,9 @@ namespace KScript.Syntax.Markup
         /// <summary>A // or /* */ comment from a .kscript file: never a doc comment, even when it starts with '-'.</summary>
         internal bool Plain { get; init; }
 
+        /// <summary>A /* */ comment from a .kscript file, so converting back writes it the same way.</summary>
+        public bool IsBlock { get; init; }
+
         /// <summary>The doc comment's text with the leading '-' and the common indentation removed, or null.</summary>
         public string DocText
         {

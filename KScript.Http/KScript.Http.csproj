@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
     <ProjectReference Include="..\KScript.Web\KScript.Web.csproj" />
+    <ProjectReference Include="..\KScript.Cache\KScript.Cache.csproj" />
   </ItemGroup>
 
 </Project>

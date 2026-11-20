@@ -102,9 +102,12 @@ Row(gap: 8, wrap) {
   The XML form writes the same list as text, `use="secure_headers, json_only"`, and `kscript convert` turns one into
   the other. The old string form (`use: "a, b"`) still works in `.kscript`, with a KS6006 hint to use the array.
 - Expressions are kept as written, so raw `<` and `>` work (`lt` and `gt` still do).
-- The file is the body of an implied `<kscript>`. A file whose only statement is a `KScript.*` element (such as
-  `KScript.Window(...) { }`) uses that element as the root.
-- `//` and `/* */` are comments.
+- The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. A file whose only
+  statement is `kscript { }` or a `KScript.*` element (such as `KScript.Window(...) { }`) uses that element as the
+  root. `import` goes at that top level, not inside another block.
+- `//` and `/* */` are comments. Either can go on its own lines, at the end of a line, or inside an expression
+  that spans lines (`[1, /* first */ 2]`). `kscript convert` keeps them; XML has one kind of comment, so they come
+  back from XML as `//` lines.
 
 ## Doc comments
 

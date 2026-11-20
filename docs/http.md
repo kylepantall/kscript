@@ -194,8 +194,53 @@ In XML, attributes are text, so the same list is written `use="secure_headers, j
 | `cors` | Answers browser preflight requests and adds `Access-Control-Allow-Origin`. The allowed origins, methods, headers and credentials come from `http.cors`. |
 | `auth` | Needs `Authorization: Bearer <token>` to match the `API_TOKEN` environment variable. Set `http.auth.token_env` to use another variable, or name one per route with `auth:ADMIN_TOKEN`. If the variable isn't set, every request is refused (500), never let through. Requests that pass have `$request.authenticated` set. |
 | `throttle` | Allows 60 requests a minute per client address and route (`http.throttle`), or `throttle:30`. Over the limit gets `429` with `Retry-After`. Every response has `X-RateLimit-Limit` and `X-RateLimit-Remaining`. |
+| `etag` | Tags `GET` answers with an ETag and answers `If-None-Match` with `304 Not Modified` (see [Caching and ETags](#caching-and-etags)). `etag:weak` gives weak tags. |
+| `cache_control` | Sets `Cache-Control` on `GET` answers: `cache_control:300` (public for five minutes) or `cache_control:private;max-age=60`. |
+| `cache_response` | Keeps whole `GET` answers in memory and answers again from there: `cache_response:5m` (one minute by default). |
 
 A function with the same name as a built-in wins, so you can replace one.
+
+## Caching and ETags
+
+Browsers and proxies can keep an answer and ask again only when it may have changed. KScript.Http helps at three levels, with [KScript.Cache](cache.md) underneath.
+
+**ETags.** `etag: yes` on a route (or the `etag` middleware) adds an `ETag` header to every `200` answer to `GET` and `HEAD`: a hash of the body. When the browser asks again with `If-None-Match` and the tag still matches, it gets `304 Not Modified` with no body, so nothing is sent twice.
+
+```kscript
+KScript.Routes {
+  import "controllers/people.kscript" as people
+
+  Get(path: /people, to: people.index, etag: yes, cache: 60)
+  Get(path: /people/{id}, to: people.show, etag: yes, cache: "private, max-age=0, must-revalidate")
+}
+```
+
+The route still runs before its body is hashed. To skip the work as well, a controller can name its version itself with `@etag(value)`. The value can be anything that changes when the answer would, such as the record or its `updated_at`. When the browser already has that version, the request stops right there with `304`:
+
+```kscript
+kscript {
+  import KScript.Http
+  import KScript.IO
+
+  fn show(id) {
+    person = @read_json('data/people.json')->find(fn($p) => $p.id == $id) ?? @abort(404)
+    @etag($person.updated_at)
+    return @view('people/show', person: $person)
+  }
+}
+```
+
+`@etag(value, weak: yes)` makes a weak tag, and a response can be tagged by hand with `->with_etag()` (a hash of its body) or `->with_etag($value)`.
+
+**Cache-Control.** `cache` on a route (or the `cache_control` middleware) sets `Cache-Control` on successful `GET` answers and on `304`s. A number alone is a public max-age in seconds, so `cache: 300` gives `public, max-age=300`. Otherwise list the directives: `public`, `private`, `no-cache`, `no-store`, `no-transform`, `must-revalidate`, `proxy-revalidate`, `must-understand`, `immutable`, `max-age=`, `s-maxage=`, `stale-while-revalidate=` and `stale-if-error=`. A directive the browser wouldn't understand is an error when the route file loads. A header set by the controller (`->with_cache('no-store')`) wins.
+
+**Answers kept on the server.** `cache_response:5m` keeps whole `200` answers to `GET` in KScript.Cache's memory store for that long, by URL, and answers again from memory without running the controller. Answers carry `X-Cache: HIT` or `MISS`. Requests with an `Authorization` header, and answers marked `private` or `no-store`, are never kept, so one person's answer is never given to another.
+
+Put `etag` in `http.middleware` (or in a group) to tag every route at once:
+
+```jsonc
+{ "http": { "middleware": ["log", "etag"] } }
+```
 
 ## Resources
 
@@ -231,7 +276,7 @@ Group(middleware: auth) {
 `@response()`, `@view()` and `@redirect()` give a response value. Middleware gets one back from `$next($request)`.
 
 - Read it with `->status()`, `->body()`, `->type()`, `->headers()`, `->header(name)`, `->ok()` and `->json()`.
-- Change it with `->with_status(code)`, `->with_header(name, value)` and `->with_type(type)`. Each returns the response, so the calls chain.
+- Change it with `->with_status(code)`, `->with_header(name, value)`, `->with_type(type)`, `->with_etag(value)` and `->with_cache(directives)`. Each returns the response, so the calls chain.
 
 ## Settings: kscript.json
 

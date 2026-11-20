@@ -423,7 +423,7 @@ namespace KScript.Runtime
                 {
                     KScriptPackage owner = run.Interpreter.Packages.LoadAll().FirstOrDefault(pk => pk.EchoFormats.ContainsKey(format));
                     throw run.Error(owner != null
-                        ? $"<echo format=\"{format}\"> needs {owner.Name}. Add <import package=\"{owner.Name}\" /> at the top of the script."
+                        ? (run.Module.IsCode ? $"echo(format: {format}) needs {owner.Name}." : $"<echo format=\"{format}\"> needs {owner.Name}.") + $" Add {run.Module.ImportHint(owner.Name)} at the top of the script."
                         : $"Unknown echo format '{format}'.", "format", "Import");
                 }
                 text = formatter(text, run.Interpreter);

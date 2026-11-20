@@ -369,6 +369,22 @@ namespace KScript.Syntax.Markup
 
             private void WriteComment(MarkupComment c, int indent)
             {
+                if (c.IsBlock && !c.Text.Contains("*/", StringComparison.Ordinal))
+                {
+                    List<string> lines = c.Text.Split('\n').Select(XmlExamples).ToList();
+                    if (lines.Count == 1)
+                    {
+                        Line(indent, "/* " + lines[0] + " */");
+                        return;
+                    }
+                    Line(indent, "/*");
+                    foreach (string line in lines)
+                    {
+                        if (line.Length == 0) sb.Append('\n'); else Line(indent, "  " + line);
+                    }
+                    Line(indent, "*/");
+                    return;
+                }
                 string prefix = c.IsDoc ? "///" : "//";
                 foreach (string line in c.IsDoc ? c.DocText.Split('\n').ToList() : DedentAll(c.Text))
                 {

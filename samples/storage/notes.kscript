@@ -1,0 +1,35 @@
+// A small notes app that keeps its files where this computer expects them (KScript.Storage):
+// ~/Library/Application Support/Notes on macOS, %LOCALAPPDATA%\Notes on Windows, ~/.local/share/notes on Linux.
+//
+// kscript notes.kscript add Buy milk
+// kscript notes.kscript
+// kscript notes.kscript clear
+//
+// "config": { "user": true } in kscript.json also reads the person's own config.json from the app's config folder,
+// so $config.greeting can be changed without touching the project.
+import KScript.Storage
+import KScript.Cache
+
+data = @storage(data)
+notes = $data->read_json('notes.json', default: [])
+command = $args->first() ?? 'list'
+
+match $command {
+  case 'add' {
+    text = $args->skip(1)->join(' ')
+    $data->write_json('notes.json', $notes->push({ text: $text, added: @now()->to_string() }))
+    echo "Added: { $text }"
+  }
+  case 'clear' {
+    $data->delete('notes.json')
+    echo "All notes removed."
+  }
+  default {
+    // The file cache keeps the count between runs, so this says how often the notes were read.
+    views = @cache(file)->increment('views')
+    echo "{ $config->get('greeting', 'Your notes') } ({ $views } views, in { $data->path() })"
+    for note in $notes {
+      echo "- { $note.text }"
+    }
+  }
+}

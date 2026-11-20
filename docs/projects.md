@@ -139,7 +139,8 @@ kscript make project my-app --template ../starters/api   # any folder
     "files": ["config", ".env"],            // the base files $config reads (the default)
     "prefix": "APP_",                       // APP_DATABASE__HOST overrides database.host
     "root": "settings",                     // where the files are, relative to kscript.json (default: each script's folder)
-    "required": ["database.host"]           // scripts stop with a clear message when one is missing
+    "required": ["database.host"],          // scripts stop with a clear message when one is missing
+    "user": true                            // also read config.json from the app's config folder (KScript.Storage)
   }
 }
 ```
@@ -152,6 +153,7 @@ kscript make project my-app --template ../starters/api   # any folder
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
 - `kscript serve` never serves `kscript.json`, or the `config.*`, `.yaml`, `.yml` and `.env` files that `$config` reads.
 - `http` configures route files, middleware, CORS, auth and rate limits for KScript.Http (see [Routes, controllers and middleware](http.md#settings-kscriptjson)).
+- `app.name` (or `name`) also names the app's own folders for settings, data and caches (see [App folders](storage.md)).
 - `app` is read by `kscript compile`, which builds the script (often a desktop app) into a program for macOS, Windows and Linux (see [Programs](compile.md#names-icons-and-versions)).
 
 ## Generating files: kscript make
