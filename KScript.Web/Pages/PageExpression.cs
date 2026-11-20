@@ -549,7 +549,9 @@ namespace KScript.Pages
                         args.AddRange(pc.Args.Select(a => Eval(a, scope, ctx)));
                         return CallCommand(pc.Name, args, scope, ctx, pipe.Source);
                     }
-                    var fn = Eval(pipe.Target, scope, ctx) as PageLambda
+                    var target = Eval(pipe.Target, scope, ctx);
+                    if (target is KScript.Runtime.ICallable pipedScriptFn) return ctx.Scripts.Call(pipedScriptFn, new List<object> { left }, pipe.Source);
+                    var fn = target as PageLambda
                         ?? throw new PageException($"The right side of '|>' must be a method like filter(...), a command like @json(), or a lambda, in '{pipe.Source}'.");
                     return Call(fn, new List<object> { left }, ctx);
                 }
@@ -729,6 +731,9 @@ namespace KScript.Pages
             // A lambda stored in a variable can be called like a command: <let name="double" value="fn($x) => $x * 2"/> then @double(4)
             if (scope.TryGet(name, out var stored) && stored is PageLambda fn)
                 return Call(fn, args, ctx);
+            // A function imported from a script with <import src>: run it with the KScript interpreter.
+            if (stored is KScript.Runtime.ICallable scriptFn)
+                return ctx.Scripts.Call(scriptFn, args, source);
             return PageCommands.Invoke(name, args, ctx, source);
         }
     }

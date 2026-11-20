@@ -493,6 +493,53 @@ public class PageLiveTests
         Assert.Contains("value=\"\"", added.Body);
     }
 
+    private const string Lib = "<kscript>\n<fn name=\"double\" params=\"n\" value=\"$n * 2\" />\n<fn name=\"apply\" params=\"f, x\" value=\"$f($x)\" />\n" +
+                               "<fn name=\"boom\" params=\"\"><throw type=\"Oops\" message=\"no good\" /></fn>\n<let name=\"limit\" value=\"3\" const=\"yes\" />\n<let name=\"hidden\" value=\"1\" />\n</kscript>";
+
+    [Fact]
+    public void Pages_import_functions_and_constants_from_scripts()
+    {
+        using var site = new TempSite(("lib/math.ks.xml", Lib),
+            ("index.html", "<import src=\"lib/math.ks.xml\" />{ @double(21) } { 5 |> @double() } { @apply(fn($x) => $x + 1, 1) } {$limit} { $hidden ?? 'none' }"));
+        Assert.Equal("42 10 2 3 none", site.Render("index.html").Body.Trim());
+    }
+
+    [Fact]
+    public void Page_imports_can_pick_names_and_report_script_errors()
+    {
+        using var site = new TempSite(("lib/math.ks.xml", Lib),
+            ("names.html", "<import src=\"lib/math.ks.xml\" names=\"double\" />{ @double(2) } { $limit ?? 'none' }"),
+            ("missing.html", "<import src=\"lib/math.ks.xml\" names=\"triple\" />"),
+            ("boom.html", "<import src=\"lib/math.ks.xml\" />{ @boom() }"),
+            ("outside.html", "<import src=\"../x.ks.xml\" />"),
+            ("package.html", "<import package=\"KScript.Math\" />"));
+        Assert.Equal("4 none", site.Render("names.html").Body.Trim());
+        Assert.Contains("doesn't export 'triple'", Assert.Throws<PageException>(() => site.Render("missing.html")).Message);
+        var boom = Assert.Throws<PageException>(() => site.Render("boom.html"));
+        Assert.Contains("math.ks.xml:4", boom.Message);
+        Assert.Contains("Oops: no good", boom.Message);
+        Assert.Contains("outside the site folder", Assert.Throws<PageException>(() => site.Render("outside.html")).Message);
+        Assert.Contains("Pages can't import packages", Assert.Throws<PageException>(() => site.Render("package.html")).Message);
+    }
+
+    [Fact]
+    public void Live_handlers_can_call_imported_functions()
+    {
+        using var site = new TempSite(("lib/math.ks.xml", Lib),
+            ("index.html", "<import src=\"lib/math.ks.xml\" /><live id=\"d\"><state name=\"n\" value=\"@double(1)\" /><p>{$n}</p><button on-click=\"n = @double($n)\">x2</button></live>"));
+        string html = site.Render("index.html").Body;
+        Assert.Contains("<p>2</p>", html);
+        var doubled = Event(site, "index.html", "d", 0, Attr(html, "data-ks-state"));
+        Assert.Contains("<p>4</p>", doubled.Body);
+    }
+
+    [Fact]
+    public void On_tick_handlers_carry_their_interval()
+    {
+        string html = PageRenderer.RenderString("<live id=\"t\"><state name=\"n\" value=\"0\" /><state name=\"ms\" value=\"'250'\" /><span on-tick=\"n += 1\" every=\"{$ms}\"></span></live>").Body;
+        Assert.Contains("<span data-ks-on-tick=\"0\" data-ks-every=\"250\"></span>", html);
+    }
+
     [Fact]
     public void Handlers_outside_live_blocks_are_an_error()
     {

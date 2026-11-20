@@ -44,6 +44,11 @@ namespace KScript.Pages
         /// <summary>Set when re-rendering a &lt;live&gt; block for a browser event.</summary>
         public LiveEvent Live { get; set; }
 
+        private PageScripts scripts;
+
+        /// <summary>The scripts pages import with &lt;import src&gt;, run by the KScript interpreter.</summary>
+        internal PageScripts Scripts => scripts ??= new PageScripts(this);
+
         internal int LiveCounter;
         internal long Steps;
         internal int CallDepth;
@@ -325,6 +330,15 @@ namespace KScript.Pages
                     RenderLive(el, scope, sb, state);
                     return;
 
+                case "import":
+                {
+                    if (el.Attr("package") != null)
+                        throw new PageException("Pages can't import packages. Put the code that needs KScript.Math, KScript.IO and so on in a script and import that: <import src=\"lib/tools.ks.xml\" />.");
+                    string src = el.Attr("src") ?? throw new PageException("<import> in a page needs src, a script relative to the site folder: <import src=\"lib/life.ks.xml\" />.");
+                    state.Ctx.Scripts.Import(src, el.Attr("names"), el.Attr("as"), scope);
+                    return;
+                }
+
                 case "state":
                     // Handled by the enclosing <live>.
                     if (state.LiveScope == null) throw new PageException("<state> must be inside a <live> block.");
@@ -464,6 +478,13 @@ namespace KScript.Pages
                         throw new PageException($"{a.Name} only works inside a <live> block, e.g. <live id=\"counter\">…</live>.");
                     sb.Append(" data-ks-").Append(a.Name).Append("=\"").Append(a.HandlerIndex).Append('"');
                     hasHandler = true;
+                    continue;
+                }
+                if (a.Name == "every" && el.HasAttr("on-tick"))
+                {
+                    // <span on-tick="..." every="200">: how often, in milliseconds, the tick handler runs.
+                    double ms = PageValues.ToNumber(TryWholeExpression(a.Value ?? string.Empty, out string everyExpr, out _) ? Eval(everyExpr, scope, state) : a.Value, "every");
+                    sb.Append(" data-ks-every=\"").Append(PageValues.FormatNumber(Math.Max(16, ms))).Append('"');
                     continue;
                 }
                 if (a.Name == "bind")
@@ -631,7 +652,7 @@ namespace KScript.Pages
             foreach (var name in stateNames)
             {
                 liveScope.TryGet(name, out var v);
-                if (v is PageLambda) throw new PageException($"State ${name} holds a lambda, which can't be sent to the browser.");
+                if (v is PageLambda || v is KScript.Runtime.ICallable) throw new PageException($"State ${name} holds a function, which can't be sent to the browser.");
                 values[name] = v;
             }
 
@@ -663,7 +684,7 @@ namespace KScript.Pages
             {
                 foreach (var kv in s.OwnVariables)
                 {
-                    if (kv.Value is PageLambda || locals.ContainsKey(kv.Key)) continue;
+                    if (kv.Value is PageLambda || kv.Value is KScript.Runtime.ICallable || locals.ContainsKey(kv.Key)) continue;
                     locals[kv.Key] = kv.Value;
                 }
             }

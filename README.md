@@ -17,7 +17,7 @@ This is KScript 2: expressions, `{ }` interpolation, typed values, lambdas and p
 </kscript>
 ```
 
-Save it as `hello.ks.xml` and run `kscript hello.ks.xml`. More examples live in [`Example Scripts/`](Example%20Scripts) and [`samples/kscript2/`](samples/kscript2).
+Save it as `hello.ks.xml` and run `kscript hello.ks.xml`. More examples live in [`Example Scripts/`](Example%20Scripts) and [`samples/kscript2/`](samples/kscript2), and [`samples/life-lab/`](samples/life-lab) is a complete program (Conway's Game of Life) that runs in a terminal, in the browser and as a Mac app from one shared script.
 
 ## Building and running
 
@@ -104,6 +104,7 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 | `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |
 | `editors/vscode/` | The VS Code extension. |
 | `samples/kscript2/` | Sample scripts. |
+| `samples/life-lab/` | Life Lab: one KScript program that runs in a terminal, in the browser and as a Mac app. |
 | `Example Scripts/` | More sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 
@@ -220,7 +221,7 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 
 | Package | What it adds |
 | --- | --- |
-| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, 'green')`, `@bold`, `@dim`, `@underline`, `<echo format="markdown">` |
+| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `<echo format="markdown">` |
 | `KScript.Math` | `@sqrt` `@pow` `@round(x, digits)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low, high)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path` `@known_folder('downloads')`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
 | `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
@@ -269,6 +270,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 | `<layout src="_layout.html" title="…">` and `<slot />` | Wrap the page in a layout; extra attributes become variables. |
 | `<my-card user="{$u}">`, `<hero>` | A component: `_components/my-card.html`, with `<slot />` for its children. Any element that isn't an HTML or KScript element can be a component. Components only see their own attributes. |
 | `<include src="_part.html">` | Insert another template here. |
+| `<import src="lib/tools.ks.xml" names="a, b">` | Use the top-level `<fn>` functions and `<let const="yes">` values of a KScript script, run by the same interpreter as `kscript tools.ks.xml`: `{ @a(1) }`. The path is relative to the site folder; without `names`, everything the script exports. |
 | `<markdown>` | Render Markdown, with `{ }` values escaped. |
 | `<respond status json type header-x>` / `<redirect to>` | Send a different response, e.g. JSON or a 404. |
 
@@ -306,9 +308,10 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 - `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server keeps nothing between requests.
 - `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn($i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
 - `bind="name"` ties an input to a state variable both ways and redraws the block as you type.
+- `on-tick="…" every="200"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if test="$playing"><span on-tick="frame += 1" every="100"></span></if>`.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
 
-See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter.
+See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter, and [`samples/life-lab`](samples/life-lab) for a game whose rules are a KScript script shared with a terminal version and a Mac app.
 
 ## Starting a project: kscript make project
 

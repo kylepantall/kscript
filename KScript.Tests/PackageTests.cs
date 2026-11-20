@@ -126,6 +126,7 @@ public class PackageTests
     public void ColoursArePlainWhenNotATerminal()
     {
         Assert.Equal("ok\n", RunBody("<echo>{ @color('ok', 'green') }</echo>", "", "KScript.Terminal"));
+        Assert.Equal("false\n", RunBody("<echo>{ @is_terminal() }</echo>", "", "KScript.Terminal"));
     }
 
     [Fact]

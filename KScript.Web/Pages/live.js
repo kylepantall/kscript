@@ -5,6 +5,23 @@
   "use strict";
   var EVENTS = ["click", "input", "change", "submit", "keydown"];
   var timers = {};
+  var ticks = {};
+
+  // <span on-tick="..." every="200">: while an element with on-tick is in a block, its handler runs every
+  // `every` milliseconds, counted from when the last answer arrived, so slow handlers never pile up.
+  function scheduleTick(block) {
+    var id = block.getAttribute("data-ks-live");
+    clearTimeout(ticks[id]);
+    var el = null;
+    block.querySelectorAll("[data-ks-on-tick]").forEach(function (t) { if (!el && blockOf(t) === block) el = t; });
+    if (!el) return;
+    var every = parseFloat(el.getAttribute("data-ks-every")) || 1000;
+    ticks[id] = setTimeout(function () {
+      var current = document.querySelector('[data-ks-live="' + id + '"]');
+      if (!current || !current.contains(el)) return;
+      send(current, parseInt(el.getAttribute("data-ks-on-tick"), 10), el.getAttribute("data-ks-args"), el, { type: "tick" });
+    }, every);
+  }
 
   function blockOf(el) { return el && el.closest ? el.closest("[data-ks-live]") : null; }
 
@@ -58,7 +75,7 @@
       }).then(function (r) {
         var el = document.querySelector('[data-ks-live="' + id + '"]');
         if (!r || !el) return;
-        if (!r.ok) { console.error("KScript:", r.html); el.removeAttribute("aria-busy"); return; }
+        if (!r.ok) { console.error("KScript:", r.html); el.removeAttribute("aria-busy"); scheduleTick(el); return; }
         // While typing, keep what is in the box; after an action (Add, Reset…) show what the server set.
         swap(el, r.html, handler < 0 || eventInfo.type === "input");
       });
@@ -84,6 +101,7 @@
     tpl.innerHTML = html.trim();
     var fresh = tpl.content.firstElementChild;
     block.replaceWith(fresh);
+    scheduleTick(fresh);
     if (!keep) return;
     var el = keep.bind
       ? fresh.querySelector('[data-ks-bind="' + keep.bind + '"]')
@@ -128,4 +146,8 @@
   }
 
   EVENTS.forEach(function (type) { document.addEventListener(type, handle, true); });
+
+  function startTicks() { document.querySelectorAll("[data-ks-live]").forEach(scheduleTick); }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startTicks);
+  else startTicks();
 })();

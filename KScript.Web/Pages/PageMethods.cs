@@ -26,6 +26,7 @@ namespace KScript.Pages
                 case "or": return PageValues.Truthy(target) ? target : Arg(args, 0);
                 case "call":
                     if (target is PageLambda fn) return PageEvaluator.Call(fn, args, ctx);
+                    if (target is KScript.Runtime.ICallable scriptFn) return ctx.Scripts.Call(scriptFn, args, where);
                     break;
             }
 

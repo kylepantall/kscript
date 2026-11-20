@@ -46,6 +46,7 @@ namespace KScript.Pages
             List<object> => "list",
             Dictionary<string, object> => "map",
             PageLambda => "fn",
+            KScript.Runtime.ICallable => "fn",
             _ => value.GetType().Name,
         };
 
@@ -55,7 +56,7 @@ namespace KScript.Pages
             switch (value)
             {
                 case null: return null;
-                case string or bool or double or DateTime or PageLambda: return value;
+                case string or bool or double or DateTime or PageLambda or KScript.Runtime.ICallable: return value;
                 case int i: return (double)i;
                 case long l: return (double)l;
                 case float f: return (double)f;
@@ -107,6 +108,7 @@ namespace KScript.Pages
                     return obj;
                 case double d when d == Math.Floor(d) && Math.Abs(d) < 1e15: return new JValue((long)d);
                 case PageLambda lambda: return new JValue(lambda.Source);
+                case KScript.Runtime.ICallable callable: return new JValue("@" + callable.Name);
                 default: return new JValue(value);
             }
         }
