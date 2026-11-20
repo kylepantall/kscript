@@ -8,16 +8,16 @@
 
   <let name="cols" value="40" />
   <let name="rows" value="24" />
-  <let name="world" value="@pattern_world('glider_gun', $cols, $rows)" />
+  <let name="world" value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
   <let name="playing" value="false" />
   <let name="speed" value="150" />
   <let name="pattern" value="'glider_gun'" />
   <let name="soup" value="30" />
   <let name="wrap" value="true" />
-  <let name="pattern_choices" value="$patterns->keys()->map(fn($k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })" />
+  <let name="pattern_choices" value="$patterns->keys()->map(fn($k) => { label: $k->replace(old: '_', new: ' ')->capitalize(), value: $k })" />
 
   <fn name="tick">
-    <set name="world" value="@advance($world, 1)" />
+    <set name="world" value="@advance($world, generations: 1)" />
     <set name="playing" value="@population($world.grid) gt 0" />
   </fn>
 
@@ -30,22 +30,22 @@
 
   <Row gap="8" wrap="yes">
     <Button variant="primary" width="80" on-click="playing = not $playing">{ $playing ? 'Pause' : 'Play' }</Button>
-    <Button on-click="world = @advance($world, 1); playing = false">Step</Button>
-    <Button on-click="world = @advance($world, 10)">+10</Button>
-    <Button on-click="world = @advance($world, 50)">+50</Button>
+    <Button on-click="world = @advance($world, generations: 1); playing = false">Step</Button>
+    <Button on-click="world = @advance($world, generations: 10)">+10</Button>
+    <Button on-click="world = @advance($world, generations: 50)">+50</Button>
     <Spacer size="8" />
     <Text color="#94a3b8">Speed</Text>
     <Select bind="speed" options="{ Slow: 400, Normal: 150, Fast: 40 }" />
     <Text color="#94a3b8">Pattern</Text>
-    <Select bind="pattern" options="$pattern_choices" on-change="world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false" />
+    <Select bind="pattern" options="$pattern_choices" on-change="world = @pattern_world($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false" />
   </Row>
 
   <Row gap="8" wrap="yes">
-    <Button on-click="world = @new_world(@random_grid($cols, $rows, $soup), $world.wrap, 'random soup'); playing = false">Random soup</Button>
+    <Button on-click="world = @new_world(@random_grid(width: $cols, height: $rows, density: $soup), wrap: $world.wrap, pattern: 'random soup'); playing = false">Random soup</Button>
     <Slider bind="soup" min="5" max="80" step="5" width="140" tooltip="How full the soup is" />
     <Text color="#94a3b8" width="40">{$soup}%</Text>
     <CheckBox bind="wrap" on-change="world = $world->merge({ wrap: $event.value })">Wrap edges</CheckBox>
-    <Button on-click="world = @new_world(@blank($cols, $rows), $world.wrap); playing = false">Clear</Button>
+    <Button on-click="world = @new_world(@blank(width: $cols, height: $rows), wrap: $world.wrap); playing = false">Clear</Button>
   </Row>
 
   <Text color="#cbd5e1" wrap="yes">{ $patterns->has($world.pattern) ? $patterns[$world.pattern].about : 'Your own pattern.' }</Text>
@@ -54,7 +54,7 @@
     <Grid columns="$cols" gap="1">
       <for each="row" index="y" in="$world.grid">
         <for each="c" index="x" in="$row">
-          <Box width="16" height="16" radius="2" background="{ $c eq $alive_cell ? '#4ade80' : '#0b1220' }" on-click="world = @flip($world, $x + ',' + $y)" />
+          <Box width="16" height="16" radius="2" background="{ $c eq $alive_cell ? '#4ade80' : '#0b1220' }" on-click="world = @flip($world, where: $x + ',' + $y)" />
         </for>
       </for>
     </Grid>

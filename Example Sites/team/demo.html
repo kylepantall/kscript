@@ -52,7 +52,7 @@
       <ul class="todos">
         <for each="t" in="$todos">
           <li class="{ $t.done ? 'done' : '' }">
-            <label><input type="checkbox" checked="{$t.done}" on-change="todos = $todos->map(fn($x) => $x.id == $t.id ? $x->set('done', not $x.done) : $x)"> {$t.text}</label>
+            <label><input type="checkbox" checked="{$t.done}" on-change="todos = $todos->map(fn($x) => $x.id == $t.id ? $x->set(key: 'done', value: not $x.done) : $x)"> {$t.text}</label>
             <button class="remove" title="Remove" on-click="todos = $todos->reject(fn($x) => $x.id == $t.id)">✕</button>
           </li>
         </for>
@@ -66,10 +66,10 @@
     <h2>Temperature converter</h2>
     <live id="temperature">
       <state name="celsius" value="20" />
-      <let name="c" value="$celsius->to_number(0)" />
+      <let name="c" value="$celsius->to_number(default: 0)" />
       <label><input type="number" bind="celsius"> °C</label>
       <input type="range" min="-30" max="50" bind="celsius">
-      <p class="big">{ ($c * 9 / 5 + 32)->round(1) } °F</p>
+      <p class="big">{ ($c * 9 / 5 + 32)->round(digits: 1) } °F</p>
       <match value="$c">
         <case when="$it lt 0">
           <p class="note">Freezing.</p>

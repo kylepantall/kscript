@@ -9,7 +9,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 ```html
 <!-- people.html -->
 <let name="people" value="@read_json('data/people.json')" />
-<let name="min" value="($request.query.min_age ?? '0')->to_number(0)" />
+<let name="min" value="($request.query.min_age ?? '0')->to_number(default: 0)" />
 
 <layout src="_layout.html" title="People">
   <h1>People aged {$min} and over</h1>

@@ -12,4 +12,4 @@ We are { $people->count() } people. In alphabetical order:
 - **{$p.name}**, {$p.role}
 </for>
 
-Page rendered on { @today()->format('d MMMM yyyy') }.
+Page rendered on { @today()->format(pattern: 'd MMMM yyyy') }.

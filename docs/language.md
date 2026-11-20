@@ -82,7 +82,7 @@ Values are strings, numbers, bools, lists, maps, dates, functions and null, plus
 <echo>{ $name->trim()->upper() }</echo>
 <echo>{ $people->filter(fn($p) => $p.age ge 18)->map(fn($p) => $p.name)->join(', ') }</echo>
 <echo>{ $people |> sort_by(fn($p) => $p.name) |> first() }</echo>
-<echo>{ @now()->add_days(7)->format('d MMMM yyyy') }</echo>
+<echo>{ @now()->add_days(7)->format(pattern: 'd MMMM yyyy') }</echo>
 ```
 
 The editor completes the methods for each type and shows what they do. `@json(text)` and `$value->to_json()` convert to and from JSON.
@@ -119,10 +119,10 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 
 | Package | What it adds |
 | --- | --- |
-| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `<echo format="markdown">` |
-| `KScript.Math` | `@sqrt` `@pow` `@round(x, digits)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low, high)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
-| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path` `@known_folder('downloads')`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
-| `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
+| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, colour: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `<echo format="markdown">` |
+| `KScript.Math` | `@sqrt` `@pow` `@round(x, digits: 2)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
+| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive: true)` `@folders` `@file(path)` `@exists` `@join_path` `@known_folder(name: 'downloads')`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
+| `KScript.Net` | `@fetch(url, options: { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
 | `KScript.UI` | Desktop windows: a script whose root is `<KScript.Window>` opens one. `<Column>` `<Row>` `<Grid>` `<Text>` `<Button>` `<TextBox>` `<CheckBox>` `<Select>` `<Slider>` `<Box>` `<Spacer>` `<Timer>`, `@close_window()`. See [Desktop apps](desktop.md). |

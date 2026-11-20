@@ -288,7 +288,7 @@ public class TestFrameworkTests
     {
         TestFileResult file = RunTests("""
             <test name="greets">
-              <let name="r" value="@run_script('greet.ks.xml', { args: ['Joan'], input: 'yes' })" />
+              <let name="r" value="@run_script('greet.ks.xml', options: { args: ['Joan'], input: 'yes' })" />
               <expect value="$r.output->lines()->first()" equals="'Hello Joan'" />
               <expect value="$r.output" contains="'yes'" />
               <expect value="$r.code" equals="4" />
@@ -300,7 +300,7 @@ public class TestFrameworkTests
               <expect value="$r.error.message" contains="'bad'" />
             </test>
             <test name="bad option">
-              <expect-error type="Argument" contains="no option 'arg'"><do>@run_script('greet.ks.xml', { arg: [] })</do></expect-error>
+              <expect-error type="Argument" contains="no option 'arg'"><do>@run_script('greet.ks.xml', options: { arg: [] })</do></expect-error>
             </test>
             """, null,
             ("greet.ks.xml", "<kscript><import package=\"KScript.Terminal\" /><echo>Hello {$args[0]}</echo><input to=\"a\">Sure? </input><echo newline=\"no\">{$a}</echo><exit code=\"4\" /></kscript>"),

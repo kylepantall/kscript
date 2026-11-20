@@ -38,13 +38,13 @@ Find everything over 1 MB in a folder, list it largest first, and offer to move 
   <import package="KScript.IO" />
   <import package="KScript.Terminal" />
 
-  <let name="folder" value="$args[0] ?? @known_folder('downloads')" />
-  <let name="big" value="@files($folder, '*', true)
+  <let name="folder" value="$args[0] ?? @known_folder(name: 'downloads')" />
+  <let name="big" value="@files($folder, pattern: '*', recursive: true)
       |> filter(fn($f) => $f->size() gt 1000000)
       |> sort_by(fn($f) => -$f->size())" />
 
   <for each="f" in="$big">
-    <echo>{ @bold($f->name()) }  { ($f->size() / 1000000)->round(1) } MB</echo>
+    <echo>{ @bold($f->name()) }  { ($f->size() / 1000000)->round(digits: 1) } MB</echo>
   </for>
   <else>
     <echo>Nothing over 1 MB in {$folder}.</echo>

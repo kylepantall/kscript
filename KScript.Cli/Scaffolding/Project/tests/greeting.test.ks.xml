@@ -13,7 +13,7 @@
   </describe>
 
   <test name="scripts/hello.ks.xml greets the name it is given">
-    <let name="run" value="@run_script('../scripts/hello.ks.xml', { args: ['ellie'] })" />
+    <let name="run" value="@run_script('../scripts/hello.ks.xml', options: { args: ['ellie'] })" />
     <expect value="$run.code" equals="0" />
     <expect value="$run.output" equals="'Hello, Ellie!'" />
   </test>
