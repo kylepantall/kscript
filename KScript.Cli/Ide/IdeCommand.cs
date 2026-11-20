@@ -362,6 +362,105 @@ namespace KScript.Ide
             return failures == 0 ? 0 : 1;
         }
 
+        /// <summary>
+        /// The KScript extension version installed in an editor ("0.3.0"), null when it isn't installed,
+        /// or an error message when the editor couldn't list its extensions.
+        /// </summary>
+        internal static (string Version, string Error) InstalledVersion(DetectedEditor editor, IIdeHost host)
+        {
+            (int exit, string text) = host.Run(editor.Launcher, new[] { "--list-extensions", "--show-versions" });
+            if (exit != 0)
+            {
+                return (null, $"{editor.Editor.Name} couldn't list its extensions (exit code {exit}): {text.Trim()}");
+            }
+            string prefix = ExtensionId + "@";
+            string line = text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+            return (line?.Substring(prefix.Length), null);
+        }
+
+        /// <summary>
+        /// Part of <c>kscript update</c>: brings the KScript extension up to <paramref name="tag"/> in every detected editor
+        /// that already has it. Editors without it are left alone. With <paramref name="checkOnly"/> it only reports.
+        /// </summary>
+        public static async Task<int> UpdateInstalledAsync(string tag, bool force, bool checkOnly, TextWriter output, TextWriter error, IIdeHost host)
+        {
+            string wanted = tag.TrimStart('v');
+            SelfUpdater.TryParseVersion(wanted, out Version wantedVersion);
+            int failures = 0;
+            List<(DetectedEditor Editor, string Version)> stale = new List<(DetectedEditor, string)>();
+            foreach (DetectedEditor editor in Detect(host))
+            {
+                (string version, string problem) = InstalledVersion(editor, host);
+                if (problem != null)
+                {
+                    failures++;
+                    error.WriteLine(problem);
+                }
+                else if (version != null)
+                {
+                    bool current = SelfUpdater.TryParseVersion(version, out Version installed) && installed == wantedVersion;
+                    if (current && !force)
+                    {
+                        output.WriteLine($"The KScript extension in {editor.Editor.Name} is up to date ({version}).");
+                    }
+                    else
+                    {
+                        stale.Add((editor, version));
+                    }
+                }
+            }
+
+            if (checkOnly)
+            {
+                foreach ((DetectedEditor editor, string version) in stale)
+                {
+                    output.WriteLine($"The KScript extension in {editor.Editor.Name} is {version}; kscript update will install {wanted}.");
+                }
+                return 0;
+            }
+            if (stale.Count == 0)
+            {
+                return failures == 0 ? 0 : 1;
+            }
+
+            (string vsix, _) = await host.DownloadExtensionAsync(tag, error);
+            if (vsix == null)
+            {
+                return 1;
+            }
+
+            int updated = 0;
+            try
+            {
+                foreach ((DetectedEditor editor, string version) in stale)
+                {
+                    (int exit, string text) = host.Run(editor.Launcher, new[] { "--install-extension", vsix, "--force" });
+                    if (exit == 0)
+                    {
+                        updated++;
+                        output.WriteLine(version == wanted
+                            ? $"Reinstalled the KScript extension {wanted} in {editor.Editor.Name}."
+                            : $"Updated the KScript extension in {editor.Editor.Name}: {version} -> {wanted}");
+                    }
+                    else
+                    {
+                        failures++;
+                        error.WriteLine($"{editor.Editor.Name} couldn't update the extension (exit code {exit}): {text.Trim()}");
+                    }
+                }
+            }
+            finally
+            {
+                try { File.Delete(vsix); } catch { }
+            }
+
+            if (updated > 0)
+            {
+                output.WriteLine("Reload the editor window to use the new extension.");
+            }
+            return failures == 0 ? 0 : 1;
+        }
+
         static int Uninstall(string[] args, TextWriter output, TextWriter error, IIdeHost host)
         {
             (List<DetectedEditor> targets, int code) = ChooseEditors(args.Where(a => !a.StartsWith("--", StringComparison.Ordinal)), error, host);

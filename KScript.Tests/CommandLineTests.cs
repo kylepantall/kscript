@@ -229,6 +229,39 @@ public sealed class CommandLineTests : IDisposable
     }
 
     [Fact]
+    public void Routes_and_convert()
+    {
+        Assert.Contains("Usage: kscript convert", Kscript("convert", "--help").Out);
+
+        Write("site/kscript.json", "{ \"serve\": { \"root\": \"public\" } }");
+        Write("site/public/routes.ks.xml", "<KScript.Routes><Get path=\"/hi\"><return value=\"'hi'\" /></Get></KScript.Routes>");
+        var listed = Kscript("routes", Path.Combine(dir, "site"));
+        Assert.True(listed.Code == 0, listed.Err);
+        Assert.Contains("/hi", listed.Out);
+
+        string cwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(Path.Combine(dir, "site"));
+            Assert.Contains("/hi", Kscript("routes").Out);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+
+        Assert.Contains("Site folder not found", Kscript("routes", Path.Combine(dir, "nowhere")).Err);
+        Write("broken/kscript.json", "{ nope");
+        Assert.Equal(1, Kscript("routes", Path.Combine(dir, "broken")).Code);
+
+        // A route file kscript.json names but that isn't there stops kscript serve.
+        Write("missing/kscript.json", "{ \"http\": { \"routes\": [\"nope.ks.xml\"] } }");
+        var serve = Kscript("serve", Path.Combine(dir, "missing"));
+        Assert.Equal(1, serve.Code);
+        Assert.Contains("there is no route file nope.ks.xml", serve.Err);
+    }
+
+    [Fact]
     public void Serve_runs_until_stopped()
     {
         Write("site/index.html", "<h1>Hi</h1>");

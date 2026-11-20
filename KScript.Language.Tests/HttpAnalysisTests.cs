@@ -54,6 +54,19 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void GroupsComeFromTheNearestKscriptJson()
+        {
+            string routes = "<KScript.Routes>\n  <Middleware use=\"admin\" />\n  <Middleware use=\"admin\" />\n</KScript.Routes>";
+            // kscript.json is two folders up, and the group is used twice (read once).
+            TestHelpers.AssertClean(Analyzer.Analyze(routes, Path.Combine(Site, "api", "v1", "routes.ks.xml"), Files));
+
+            // A kscript.json that can't be read means no groups, so admin is an unknown function.
+            var broken = new FakeFiles(new Dictionary<string, string> { [Path.Combine(Site, "kscript.json")] = "{ nope" });
+            DocumentAnalysis a = Analyzer.Analyze(routes, Path.Combine(Site, "routes.ks.xml"), broken);
+            Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.UndefinedFunction && d.Message.Contains("'admin'"));
+        }
+
+        [Fact]
         public void RoutesBelongInsideRoutes()
         {
             DocumentAnalysis a = Analyzer.Analyze("<kscript>\n<import package=\"KScript.Http\" />\n<Get path=\"/\" redirect=\"/\" />\n</kscript>", Path.Combine(Site, "x.ks.xml"), Files);

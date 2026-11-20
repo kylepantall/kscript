@@ -69,6 +69,10 @@ jobs:
           $k check new-app --warnaserror
           $k fmt --check new-app
           $k test new-app
+          $k make project xml-app --format xml
+          $k check xml-app --warnaserror
+          $k fmt --check xml-app
+          $k test xml-app
 
   vscode:
     name: VS Code extension

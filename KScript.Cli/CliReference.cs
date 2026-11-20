@@ -41,7 +41,7 @@ namespace KScript
                 new[] { O("--check", "Only report files that would change, and fail if any would (for CI).") },
                 "kscript fmt\nkscript fmt --check", "formatting"),
             new CliCommand("test", "kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]",
-                "Run *.test.ks.xml tests.",
+                "Run *.test.kscript and *.test.ks.xml tests.",
                 new[]
                 {
                     O("--filter text", "Only run tests whose name contains the text."),
@@ -94,7 +94,11 @@ namespace KScript
                 "kscript app build counter.ks.xml --name Counter", "desktop"),
             new CliCommand("make", "kscript make project <folder> [--port 8080]\nkscript make <type> <Name> [--key value]",
                 "Start a new project with a kscript.json, or generate a file from a template (run kscript make for the list).",
-                new[] { O("--key value", "Values for the template, such as --port 3000.") },
+                new[]
+                {
+                    O("--format kscript|xml", "Write .kscript (the default) or .ks.xml files."),
+                    O("--key value", "Values for the template, such as --port 3000."),
+                },
                 "kscript make project my-site\nkscript make component Hero", "projects"),
             new CliCommand("ide", "kscript ide [install|uninstall|config] [editor]",
                 "Set up VS Code, Cursor, VSCodium or another editor.", Array.Empty<CliOption>(),

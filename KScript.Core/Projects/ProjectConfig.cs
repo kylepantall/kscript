@@ -23,6 +23,16 @@ namespace KScript.Projects
     }
 
     /// <summary>The <c>app</c> section: what <c>kscript app build</c> packages and how the app is named.</summary>
+    /// <summary>The "make" section: settings for <c>kscript make</c>.</summary>
+    public sealed class MakeSettings
+    {
+        public const string KScriptFormat = "kscript";
+        public const string XmlFormat = "xml";
+
+        /// <summary>The format new scripts, tests and routes are written in: "kscript" (.kscript) or "xml" (.ks.xml). Null when unset.</summary>
+        public string Format { get; set; }
+    }
+
     public sealed class AppSettings
     {
         /// <summary>The script the app runs, relative to kscript.json (usually one whose root is &lt;KScript.Window&gt;).</summary>
@@ -75,14 +85,16 @@ namespace KScript.Projects
         public List<string> Packages { get; set; } = new List<string>();
 
         public const double DefaultTimeout = 10;
-        public static readonly string[] DefaultInclude = { "**/*.test.ks.xml", "**/*.test.xml" };
+        public static readonly string[] DefaultInclude = { "**/*.test.kscript", "**/*.test.ks.xml", "**/*.test.xml" };
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
 
-        /// <summary>True for a file named like a test: <c>name.test.ks.xml</c> or <c>name.test.xml</c>.</summary>
+        /// <summary>True for a file named like a test: <c>name.test.kscript</c>, <c>name.test.ks.xml</c> or <c>name.test.xml</c>.</summary>
         public static bool IsTestFileName(string path)
         {
             string name = Path.GetFileName(path ?? string.Empty);
-            return name.EndsWith(".test.ks.xml", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".test.xml", StringComparison.OrdinalIgnoreCase);
+            return name.EndsWith(".test.kscript", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith(".test.ks.xml", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith(".test.xml", StringComparison.OrdinalIgnoreCase);
         }
     }
 
@@ -247,6 +259,7 @@ namespace KScript.Projects
         };
         public FormatSettings Format { get; } = new FormatSettings();
         public AppSettings App { get; } = new AppSettings();
+        public MakeSettings Make { get; } = new MakeSettings();
         public HttpSettings Http { get; } = new HttpSettings();
 
         /// <summary>
@@ -389,6 +402,9 @@ namespace KScript.Projects
                         case "app":
                             ReadApp(prop.Value, config);
                             break;
+                        case "make":
+                            ReadMake(prop.Value, config);
+                            break;
                         case "http":
                             ReadHttp(prop.Value, config);
                             break;
@@ -401,7 +417,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, serve, http, lint, test, config, format or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, serve, http, lint, test, config, format, make or app).");
                             break;
                     }
                 }
@@ -565,6 +581,25 @@ namespace KScript.Projects
             Lint.Rules.Remove(key); // keep the spelling of the layer that set it last
             Lint.Rules[key] = severity;
             Set("lint.rules." + key);
+        }
+
+        private static void ReadMake(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "make", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "format":
+                        string format = String(p.Value, "make.format", config);
+                        if (format == MakeSettings.KScriptFormat || format == MakeSettings.XmlFormat) config.Make.Format = format;
+                        else if (format != null) config.Warnings.Add($"make.format should be \"kscript\" or \"xml\", not \"{format}\".");
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'make.{p.Name}' (expected format).");
+                        break;
+                }
+            }
         }
 
         private static void ReadApp(JsonElement e, ProjectConfig config)

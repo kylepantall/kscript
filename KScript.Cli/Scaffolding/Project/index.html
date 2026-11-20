@@ -1,7 +1,7 @@
 <layout src="_layout.html" title="Home">
   <h1>Welcome to {{ title }}</h1>
   <p>This page is rendered by KScript on each request (today is { @today()->format(pattern: 'd MMMM yyyy') }). Edit index.html and refresh.</p>
-  <p>The <a href="/tasks">Tasks</a> page is a small app: its rules are in <code>lib/tasks.ks.xml</code>{{#if desktop}}, and <code>desktop.ks.xml</code> shows the same app in a desktop window{{/if}}.</p>
+  <p>The <a href="/tasks">Tasks</a> page is a small app: its rules are in <code>lib/tasks{{ ext }}</code>{{#if desktop}}, and <code>desktop{{ ext }}</code> shows the same app in a desktop window{{/if}}.</p>
 
   <h2>Next steps</h2>
   <ul>
@@ -9,7 +9,7 @@
     <li>Add a component: <code>kscript make component Hero</code></li>
     <li>Run the tests: <code>kscript test</code></li>
 {{#if desktop}}
-    <li>Open the desktop app: <code>kscript desktop.ks.xml</code>, or package it with <code>kscript app build</code></li>
+    <li>Open the desktop app: <code>kscript desktop{{ ext }}</code>, or package it with <code>kscript app build</code></li>
 {{/if}}
     <li>Check the project: <code>kscript check</code></li>
     <li>Change the port, lint rules or app settings in <code>kscript.json</code></li>
