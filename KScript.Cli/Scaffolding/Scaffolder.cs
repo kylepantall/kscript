@@ -253,7 +253,7 @@ namespace KScript.Scaffolding
                                         $"Pick another name, e.g. {StubNames.Pascal("site-" + kebab)} for <site-{kebab}>.");
         }
 
-        private static string Example(string type) => type.ToLowerInvariant() switch
+        internal static string Example(string type) => type.ToLowerInvariant() switch
         {
             "component" => "Hero",
             "page" => "about",

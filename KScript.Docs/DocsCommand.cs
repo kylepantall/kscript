@@ -130,15 +130,16 @@ namespace KScript.Docs
                     if (Directory.GetLastWriteTimeUtc(dir) < DateTime.UtcNow.AddDays(-1)) TryDelete(dir);
                 }
             }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
+
+        /// <summary>Deletes a folder and everything in it; tests replace it to make deleting fail.</summary>
+        internal static Action<string> DeleteFolder = folder => Directory.Delete(folder, recursive: true);
 
         private static void TryDelete(string folder)
         {
-            try { if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            try { if (Directory.Exists(folder)) DeleteFolder(folder); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
 
         /// <summary>Starts a process; tests replace it so no real browser opens.</summary>

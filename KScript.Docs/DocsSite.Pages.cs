@@ -15,8 +15,7 @@ namespace KScript.Docs
             sb.Append("<h2 id=\"try-it\">Try it</h2><p>Every example marked <em>Run</em> can be edited and run right here. It runs on your computer, in a sandbox: its own empty folder, no network, and a time limit. Switch between XML and <code>.kscript</code> to see the same script in both formats.</p>");
             sb.Append(Html.Try(HelloExample));
             sb.Append("<h2 id=\"guides\">Guides</h2><div class=\"cards\">");
-            foreach (DocPage guide in Pages.Where(p => p.Source != null).ToList().Concat(Array.Empty<DocPage>()))
-                sb.Append(Card(guide));
+            // FillHomeCards adds the cards once every guide is in.
             sb.Append("</div>");
             var home = new DocPage { Path = "/", Title = "KScript docs", NavTitle = "Home", Section = "Start here", Description = "Guides, reference and runnable examples for KScript.", Body = sb.ToString() };
             home.Toc.Add((2, "try-it", "Try it"));

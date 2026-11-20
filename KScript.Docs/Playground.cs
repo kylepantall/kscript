@@ -89,6 +89,9 @@ namespace KScript.Docs
             return "<kscript>" + code + "\n</kscript>";
         }
 
+        /// <summary>Cancels a run once its time is up; tests replace it with one that is already cancelled.</summary>
+        internal static Func<TimeSpan, CancellationTokenSource> StartTimer = limit => new CancellationTokenSource(limit);
+
         public static PlaygroundResult Run(string code, string format = "xml", string input = null, TimeSpan? timeout = null)
         {
             format = format == "kscript" ? "kscript" : "xml";
@@ -107,7 +110,7 @@ namespace KScript.Docs
             var output = new LimitedWriter(MaxOutput);
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var limit = timeout ?? DefaultTimeout;
-            using var cancel = new CancellationTokenSource(limit);
+            using var cancel = StartTimer(limit);
             try
             {
                 var host = new KScriptHost(output, output, new StringReader(input ?? string.Empty))
@@ -157,23 +160,17 @@ namespace KScript.Docs
         public static string Convert(string code, string to)
         {
             if (string.IsNullOrWhiteSpace(code) || (code.Length > MaxCode)) return null;
-            try
+            // The parsers report problems as diagnostics rather than exceptions, so code with errors gives null here.
+            if (to == "kscript")
             {
-                if (to == "kscript")
-                {
-                    var xml = MarkupParser.Parse(AsScript(code, "xml"), DocumentKind.Script);
-                    if (xml.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
-                    return ScriptConverter.ToCode(xml).Text?.TrimEnd() + "\n";
-                }
-                var parsed = CodeParser.Parse(code);
-                if (parsed.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
-                string text = ScriptConverter.ToXml(parsed).Text;
-                return text == null ? null : Unwrap(text);
+                var xml = MarkupParser.Parse(AsScript(code, "xml"), DocumentKind.Script);
+                if (xml.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
+                return ScriptConverter.ToCode(xml).Text?.TrimEnd() + "\n";
             }
-            catch (Exception ex) when (ex is FormatException || ex is InvalidOperationException || ex is ArgumentException)
-            {
-                return null;
-            }
+            var parsed = CodeParser.Parse(code);
+            if (parsed.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
+            string text = ScriptConverter.ToXml(parsed).Text;
+            return text == null ? null : Unwrap(text);
         }
 
         /// <summary>Takes the statements out of a &lt;kscript&gt; root, so examples stay short.</summary>
@@ -188,7 +185,7 @@ namespace KScript.Docs
         }
 
         /// <summary>A writer that keeps the first <c>max</c> characters and drops the rest.</summary>
-        private sealed class LimitedWriter : TextWriter
+        internal sealed class LimitedWriter : TextWriter
         {
             private readonly StringBuilder text = new StringBuilder();
             private readonly int max;
