@@ -40,6 +40,7 @@
     <ProjectReference Include="..\KScript.Cli\KScript.Cli.csproj" />
     <ProjectReference Include="..\KScript.Test\KScript.Test.csproj" />
     <ProjectReference Include="..\KScript.UI\KScript.UI.csproj" />
+    <ProjectReference Include="..\KScriptApp\KScriptApp.csproj" />
   </ItemGroup>
 
 </Project>

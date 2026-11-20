@@ -217,11 +217,11 @@ public class UIDesktopTests
             """;
         Exception failure = null;
         string summary = null;
-        UIPackage.Host = s =>
+        UIPackage.Host = s => AvaloniaThread.Run(() =>
         {
             try
             {
-                DesktopHost.Start(b => b.UseSkia().UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false }));
+                AvaloniaThread.Start();
                 var view = new WindowView(s);
                 view.Window.Show();
                 var text = (Avalonia.Controls.TextBlock)view.ControlFor(s.FindAll("Text")[0]);
@@ -250,7 +250,7 @@ public class UIDesktopTests
             {
                 failure = ex;
             }
-        };
+        });
         try
         {
             ScriptRunner.Run(xml);

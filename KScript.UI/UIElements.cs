@@ -83,7 +83,8 @@ namespace KScript.UI
                         node.Props[attr.Name] = run.Interpreter.EvaluateText(attr.Value, scope, run.Module);
                         break;
                     case AttributeKind.Bool:
-                        node.Props[attr.Name] = Values.ParseBool(attr.ValueText) ?? Values.Truthy(run.Interpreter.EvaluateText(attr.Value, scope, run.Module));
+                        // yes / no, or { ... } worked out each time the window is drawn, as everywhere else.
+                        node.Props[attr.Name] = Values.ParseBool(attr.ValueText) ?? Values.Truthy(run.Interpreter.InterpolateValue(attr.Value, scope, run.Module));
                         break;
                     default:
                         node.Props[attr.Name] = run.Interpreter.Interpolate(attr.Value, scope, run.Module, bareReferences: false);

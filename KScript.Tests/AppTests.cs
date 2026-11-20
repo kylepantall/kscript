@@ -171,7 +171,7 @@ public class AppTests : IDisposable
 
         Assert.Contains("has no launcher", Assert.Throws<AppBuildException>(() => KScriptRuntime.Current(build, false, null, windows: true)).Message);
         Assert.True(KScriptRuntime.Current(build, singleFile: true, processPath: "/opt/kscript", windows: false).SingleFile);
-        Assert.Throws<AppBuildException>(() => KScriptRuntime.Current());   // the test host has no KScript launcher
+        Assert.False(KScriptRuntime.Current().SingleFile);                 // the tests run next to a development build
     }
 
     [Fact]

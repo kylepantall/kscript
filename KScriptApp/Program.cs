@@ -10,28 +10,58 @@ namespace KScript
 {
     class Program
     {
-        static void PrintUsage()
+        static int Main(string[] args) => new CommandLine().Run(args);
+    }
+
+    /// <summary>The kscript command: runs scripts and dispatches check, fmt, lsp, test, css, serve, app, update, ide and make.</summary>
+    internal sealed class CommandLine
+    {
+        public TextWriter Out { get; init; } = Console.Out;
+        public TextWriter Error { get; init; } = Console.Error;
+
+        /// <summary>Where kscript lsp reads and writes the protocol.</summary>
+        public Func<Stream> StandardInput { get; init; } = Console.OpenStandardInput;
+        public Func<Stream> StandardOutput { get; init; } = Console.OpenStandardOutput;
+
+        /// <summary>The folder kscript runs from, where a packaged app keeps its manifest.</summary>
+        public string AppFolder { get; init; } = AppContext.BaseDirectory;
+
+        /// <summary>Stops kscript serve and running scripts, as Ctrl+C does.</summary>
+        public System.Threading.CancellationToken Cancellation { get; init; }
+
+        /// <summary>Shows why a packaged app's script failed, in a window.</summary>
+        public Action<string, string> ShowError { get; init; } = KScript.UI.DesktopHost.ShowError;
+
+        /// <summary>The first Ctrl+C stops the work cleanly (finally blocks run); a second one ends the process.</summary>
+        internal static bool StopOnFirstCtrlC(System.Threading.CancellationTokenSource cancel)
         {
-            Console.WriteLine("Usage: kscript [--env name] <script.xml> [script arguments]   Run a script ($args holds the arguments; --env picks staging.yaml, .env.staging...).");
-            Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
-            Console.WriteLine("       kscript fmt [file-or-folder]... [--check]          Tidy scripts and pages (--check: only report, for CI).");
-            Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
-            Console.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
-            Console.WriteLine("       kscript css [file-or-folder]... [--out folder] [--var name=value]   Compile .ks.css, .ks.scss and .ks.sass stylesheets.");
-            Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]");
-            Console.WriteLine("       kscript app build [script] [--name \"My App\"] [--out folder]   Package a script as a desktop app.");
-            Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
-            Console.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
-            Console.WriteLine("       kscript --version | --help");
-            Console.WriteLine("       kscript make project <folder> [--port 8080]       Start a new project with a kscript.json.");
-            Console.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
+            if (cancel.IsCancellationRequested) return false;
+            cancel.Cancel();
+            return true;
+        }
+
+        void PrintUsage(TextWriter output)
+        {
+            output.WriteLine("Usage: kscript [--env name] <script.xml> [script arguments]   Run a script ($args holds the arguments; --env picks staging.yaml, .env.staging...).");
+            output.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
+            output.WriteLine("       kscript fmt [file-or-folder]... [--check]          Tidy scripts and pages (--check: only report, for CI).");
+            output.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
+            output.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
+            output.WriteLine("       kscript css [file-or-folder]... [--out folder] [--var name=value]   Compile .ks.css, .ks.scss and .ks.sass stylesheets.");
+            output.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]");
+            output.WriteLine("       kscript app build [script] [--name \"My App\"] [--out folder]   Package a script as a desktop app.");
+            output.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
+            output.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
+            output.WriteLine("       kscript --version | --help");
+            output.WriteLine("       kscript make project <folder> [--port 8080]       Start a new project with a kscript.json.");
+            output.WriteLine("       kscript make <type> <Name> [--key value]   e.g. kscript make component Hero (run kscript make for the list)");
         }
 
         /// <summary>
         /// kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder. In a project, the nearest
         /// kscript.json gives the defaults (serve.root, serve.port, serve.host); options on the command line win.
         /// </summary>
-        static int Serve(string[] args)
+        int Serve(string[] args)
         {
             string folder = null;
             int? port = null;
@@ -45,7 +75,7 @@ namespace KScript
                     case "-p":
                         if (i + 1 >= args.Length || !int.TryParse(args[++i], out int p))
                         {
-                            Console.Error.WriteLine("--port needs a number, e.g. --port 8080");
+                            Error.WriteLine("--port needs a number, e.g. --port 8080");
                             return 1;
                         }
                         port = p;
@@ -53,7 +83,7 @@ namespace KScript
                     case "--host":
                         if (i + 1 >= args.Length)
                         {
-                            Console.Error.WriteLine("--host needs a value, e.g. --host 0.0.0.0");
+                            Error.WriteLine("--host needs a value, e.g. --host 0.0.0.0");
                             return 1;
                         }
                         host = args[++i];
@@ -71,13 +101,13 @@ namespace KScript
             }
             catch (KScript.Projects.ProjectConfigException ex)
             {
-                Console.Error.WriteLine(ex.Message);
+                Error.WriteLine(ex.Message);
                 return 1;
             }
 
             if (project != null)
             {
-                foreach (string warning in project.Warnings) Console.Error.WriteLine($"{project.FilePath}: {warning}");
+                foreach (string warning in project.Warnings) Error.WriteLine($"{project.FilePath}: {warning}");
                 // `kscript serve` (or `kscript serve <project folder>`) serves the project's site root. A folder
                 // inside the project is served as given, with the project's port and host.
                 string given = folder == null ? null : Path.GetFullPath(folder);
@@ -89,24 +119,24 @@ namespace KScript
 
             try
             {
-                return KScript.Pages.PageServer.RunAsync(folder ?? ".", port ?? 8080, host ?? "localhost", Console.Out).GetAwaiter().GetResult();
+                return KScript.Pages.PageServer.RunAsync(folder ?? ".", port ?? 8080, host ?? "localhost", Out, Cancellation).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
             {
-                Console.Error.WriteLine(ex.Message);
+                Error.WriteLine(ex.Message);
                 return 1;
             }
             catch (IOException ex)
             {
-                Console.Error.WriteLine($"Could not start the server: {ex.Message}");
+                Error.WriteLine($"Could not start the server: {ex.Message}");
                 return 1;
             }
         }
 
         /// <summary>The environment from --env, also set as KSCRIPT_ENV so pages and child scripts see it.</summary>
-        static string EnvironmentName;
+        string EnvironmentName;
 
-        static string[] TakeEnvironment(string[] args)
+        string[] TakeEnvironment(string[] args)
         {
             var rest = new List<string>();
             bool anywhere = args.Length > 0 && (args[0] == "serve" || args[0] == "test" || args[0] == "css");
@@ -128,10 +158,10 @@ namespace KScript
             return rest.ToArray();
         }
 
-        static int Main(string[] args)
+        public int Run(string[] args)
         {
             // Inside an app built by `kscript app build`: run the app's script and nothing else.
-            string appManifest = KScript.Apps.AppLauncher.FindManifest();
+            string appManifest = KScript.Apps.AppLauncher.FindManifest(AppFolder);
             if (appManifest != null)
             {
                 return RunApp(appManifest, args);
@@ -140,7 +170,7 @@ namespace KScript
             if (args.Length > 0 && args[0] == "lsp")
             {
                 // stdout carries the protocol, so nothing else may write to it.
-                return KScript.LanguageServer.KScriptLanguageServer.RunStdioAsync().GetAwaiter().GetResult();
+                return KScript.LanguageServer.KScriptLanguageServer.RunStdioAsync(StandardInput(), StandardOutput()).GetAwaiter().GetResult();
             }
 
             Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -153,51 +183,51 @@ namespace KScript
             }
             catch (ArgumentException ex)
             {
-                Console.Error.WriteLine(ex.Message);
+                Error.WriteLine(ex.Message);
                 return 1;
             }
 
             if (args.Length > 0 && (args[0] == "--version" || args[0] == "version"))
             {
-                Console.WriteLine(KScript.Updates.SelfUpdater.CurrentVersion);
+                Out.WriteLine(KScript.Updates.SelfUpdater.CurrentVersion);
                 return 0;
             }
 
             if (args.Length > 0 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help" || args[0] == "-?" || args[0] == "/?"))
             {
-                PrintUsage();
+                PrintUsage(Out);
                 return 0;
             }
 
             if (args.Length > 0 && args[0] == "update")
             {
-                return KScript.Updates.SelfUpdater.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
+                return KScript.Updates.SelfUpdater.Run(args.Skip(1).ToArray(), Out, Error);
             }
 
             if (args.Length > 0 && args[0] == "ide")
             {
-                return KScript.Ide.IdeCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
+                return KScript.Ide.IdeCommand.Run(args.Skip(1).ToArray(), Out, Error);
             }
 
             if (args.Length > 0 && args[0] == "app")
             {
-                return KScript.Apps.AppCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
+                return KScript.Apps.AppCommand.Run(args.Skip(1).ToArray(), Out, Error);
             }
 
             if (args.Length > 0 && args[0] == "check")
             {
-                return KScript.LanguageServer.CheckCommand.Run(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)), Console.Out,
+                return KScript.LanguageServer.CheckCommand.Run(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)), Out,
                     warningsAsErrors: args.Contains("--warnaserror"));
             }
 
             if (args.Length > 0 && args[0] == "fmt")
             {
-                return KScript.LanguageServer.FormatCommand.Run(args.Skip(1), Console.Out);
+                return KScript.LanguageServer.FormatCommand.Run(args.Skip(1), Out);
             }
 
             if (args.Length == 0)
             {
-                PrintUsage();
+                PrintUsage(Out);
                 return 1;
             }
 
@@ -208,7 +238,7 @@ namespace KScript
 
             if (args[0] == "css")
             {
-                return KScript.Style.CssCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
+                return KScript.Style.CssCommand.Run(args.Skip(1).ToArray(), Out, Error);
             }
 
             if (args[0] == "test")
@@ -220,20 +250,20 @@ namespace KScript
             if (args[0] == "make" || args[0].StartsWith("make:", StringComparison.Ordinal))
             {
                 var rest = args[0] == "make" ? args.Skip(1) : new[] { args[0].Substring(5) }.Concat(args.Skip(1));
-                return KScript.Scaffolding.MakeCommand.Run(rest.ToArray(), Console.Out, Console.Error);
+                return KScript.Scaffolding.MakeCommand.Run(rest.ToArray(), Out, Error);
             }
 
             if (args[0].StartsWith("-", StringComparison.Ordinal))
             {
-                Console.Error.WriteLine($"Unknown option '{args[0]}'.");
-                Console.Error.WriteLine("Run kscript --help for usage.");
+                Error.WriteLine($"Unknown option '{args[0]}'.");
+                Error.WriteLine("Run kscript --help for usage.");
                 return 1;
             }
 
             string path = ResolveScriptPath(args[0]);
             if (path == null)
             {
-                Console.Error.WriteLine($"There is no script at '{args[0]}'.");
+                Error.WriteLine($"There is no script at '{args[0]}'.");
                 return 2;
             }
 
@@ -248,7 +278,7 @@ namespace KScript
 
         /// <summary>Runs the script of a packaged app. Opened from Finder or a launcher there is no terminal, so a script that
         /// fails before its window opens shows why in a window instead.</summary>
-        static int RunApp(string manifest, string[] args)
+        int RunApp(string manifest, string[] args)
         {
             string main = KScript.Apps.AppLauncher.MainScript(manifest);
             var host = KScriptHost.Console();
@@ -263,29 +293,32 @@ namespace KScript
             }
             catch (KScriptException ex)
             {
-                Console.Error.WriteLine(ex.ToString());
-                KScript.UI.DesktopHost.ShowError(Path.GetFileName(main), ex.ToString());
+                Error.WriteLine(ex.ToString());
+                ShowError(Path.GetFileName(main), ex.ToString());
                 return 1;
             }
         }
 
         /// <summary>kscript test: Ctrl+C stops the run after the current test.</summary>
-        static int RunTests(string[] args)
+        int RunTests(string[] args)
         {
-            using var cancel = new System.Threading.CancellationTokenSource();
-            Console.CancelKeyPress += (_, e) =>
+            using var cancel = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            ConsoleCancelEventHandler stop = (_, e) => e.Cancel = StopOnFirstCtrlC(cancel);
+            Console.CancelKeyPress += stop;
+            try
             {
-                if (cancel.IsCancellationRequested) return;
-                e.Cancel = true;
-                cancel.Cancel();
-            };
-            return KScript.Testing.TestCommand.Run(args, Console.Out, Console.Error, cancel.Token);
+                return KScript.Testing.TestCommand.Run(args, Out, Error, cancel.Token);
+            }
+            finally
+            {
+                Console.CancelKeyPress -= stop;
+            }
         }
 
         /// <summary>
         /// Runs a script. Packages listed in the nearest kscript.json are imported for it.
         /// </summary>
-        static int RunScript(string path, string[] scriptArgs)
+        int RunScript(string path, string[] scriptArgs)
         {
             var options = new InterpreterOptions();
             ConfigOptions config = null;
@@ -294,14 +327,14 @@ namespace KScript
                 ProjectConfig project = ProjectConfig.FindAndLoad(Path.GetDirectoryName(path));
                 if (project != null)
                 {
-                    foreach (string warning in project.Warnings) Console.Error.WriteLine($"{project.FilePath}: {warning}");
+                    foreach (string warning in project.Warnings) Error.WriteLine($"{project.FilePath}: {warning}");
                     options.DefaultPackages.AddRange(project.Packages);
                 }
                 config = project?.ConfigOptions(EnvironmentName);
             }
             catch (ProjectConfigException ex)
             {
-                Console.Error.WriteLine(ex.Message);
+                Error.WriteLine(ex.Message);
                 return 1;
             }
 
@@ -309,29 +342,29 @@ namespace KScript
             host.Arguments = scriptArgs;
             host.Config = config;
 
-            using var cancel = new System.Threading.CancellationTokenSource();
+            using var cancel = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
             options.Cancellation = cancel.Token;
-            Console.CancelKeyPress += (_, e) =>
-            {
-                // The first Ctrl+C stops the script cleanly (finally blocks run); a second one ends the process.
-                if (cancel.IsCancellationRequested) return;
-                e.Cancel = true;
-                cancel.Cancel();
-            };
+            ConsoleCancelEventHandler stop = (_, e) => e.Cancel = StopOnFirstCtrlC(cancel);
+            Console.CancelKeyPress += stop;
 
             try
             {
                 return new Interpreter(host, options: options).RunFile(path);
             }
+            catch (Exception ex) when (cancel.IsCancellationRequested && (ex is OperationCanceledException || ex is KScriptException { Type: "Cancelled" }))
+            {
+                // Stopped with Ctrl+C: the usual exit code for an interrupted command, without an error report.
+                return 130;
+            }
             catch (KScriptException ex)
             {
-                Console.Out.Flush();
-                Console.Error.WriteLine(ex.ToString());
+                Out.Flush();
+                Error.WriteLine(ex.ToString());
                 return 3;
             }
-            catch (OperationCanceledException)
+            finally
             {
-                return 130;
+                Console.CancelKeyPress -= stop;
             }
         }
 
@@ -341,11 +374,6 @@ namespace KScript
         /// </summary>
         static string ResolveScriptPath(string arg)
         {
-            if (arg.StartsWith("-"))
-            {
-                return null;
-            }
-
             if (File.Exists(arg))
             {
                 return Path.GetFullPath(arg);

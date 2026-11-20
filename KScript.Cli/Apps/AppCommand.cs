@@ -380,7 +380,8 @@ namespace KScript.Apps
         /// <summary>The manifest of the app this kscript is inside, or null when it is plain kscript.</summary>
         public static string FindManifest() => FindManifest(AppContext.BaseDirectory);
 
-        internal static string FindManifest(string baseDir)
+        /// <summary>The manifest of the app whose kscript runs from <paramref name="baseDir"/>, or null.</summary>
+        public static string FindManifest(string baseDir)
         {
             foreach (string candidate in new[]
             {
