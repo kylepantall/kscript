@@ -401,7 +401,7 @@ public sealed class DocsTests
     [Fact]
     public void Playground_has_no_network_servers_windows_or_models()
     {
-        foreach (string package in new[] { "KScript.Net", "KScript.Http", "KScript.UI", "KScript.AI", "KScript.Web", "KScript.Test", "KScript.Storage", "KScript.Cache" })
+        foreach (string package in new[] { "KScript.Net", "KScript.Http", "KScript.UI", "KScript.AI", "KScript.Web", "KScript.Test", "KScript.Storage", "KScript.Cache", "KScript.Document" })
         {
             PlaygroundResult result = Playground.Run($"<import package=\"{package}\" />");
             Assert.Contains("can't run in the docs", result.Error);

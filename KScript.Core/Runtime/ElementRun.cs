@@ -116,10 +116,10 @@ namespace KScript.Runtime
         public object EvalContent() => HasContent ? Interpreter.EvaluateText(Content, Scope, Module) : null;
 
         /// <summary>The element text with <c>{ }</c> and bare <c>$name</c> filled in, trimmed and with common indentation removed.</summary>
-        public string Text(Func<string, string> escape = null) => Content == null ? string.Empty : TextLayout.Tidy(Interpreter.Interpolate(Content, Scope, Module, bareReferences: true, escape));
+        public string Text(Func<string, string> escape = null) => Content == null ? string.Empty : TextLayout.Tidy(Interpreter.Interpolate(Content, Scope, Module, bareReferences: true, escape, Values.ToStr, Definition.Info.LiteralText));
 
         /// <summary>As <see cref="Text"/>, turning each inserted value into text with <paramref name="format"/>.</summary>
-        public string Text(Func<object, string> format) => Content == null ? string.Empty : TextLayout.Tidy(Interpreter.Interpolate(Content, Scope, Module, bareReferences: true, null, format));
+        public string Text(Func<object, string> format) => Content == null ? string.Empty : TextLayout.Tidy(Interpreter.Interpolate(Content, Scope, Module, bareReferences: true, null, format, Definition.Info.LiteralText));
 
         /// <summary>True if the element text is one value and nothing else: <c>&lt;echo&gt;$person&lt;/echo&gt;</c>.</summary>
         public bool ContentIsSingleValue => Content != null && Interpreter.IsSingleValue(Content, Module, bareReferences: true);

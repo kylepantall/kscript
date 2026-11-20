@@ -324,6 +324,7 @@ namespace KScript.Projects
             ["storage"] = "lib",
             ["jobs"] = "jobs",
             ["windows"] = ".",
+            ["documents"] = "documents",
             ["config"] = "config",
             ["locales"] = "locales",
             ["logging"] = "lib",

@@ -48,6 +48,7 @@ namespace KScript.Docs
             ["KScript.Test"] = "runs with kscript test",
             ["KScript.Storage"] = "writes to your app's own folders",
             ["KScript.Cache"] = "keeps values between runs",
+            ["KScript.Document"] = "writes PDF and Word files",
         };
 
         public const int MaxOutput = 64 * 1024;

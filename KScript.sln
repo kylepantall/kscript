@@ -45,6 +45,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Storage", "KScript.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Cache", "KScript.Cache\KScript.Cache.csproj", "{219BFB77-83DE-449E-9FE7-C85F0BB1CB7D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Document", "KScript.Document\KScript.Document.csproj", "{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -142,5 +144,9 @@ Global
 		{219BFB77-83DE-449E-9FE7-C85F0BB1CB7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{219BFB77-83DE-449E-9FE7-C85F0BB1CB7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{219BFB77-83DE-449E-9FE7-C85F0BB1CB7D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

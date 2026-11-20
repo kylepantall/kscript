@@ -670,7 +670,7 @@ namespace KScript.Language.Analysis
                 MarkupAttribute attr = e.GetAttribute(a.Name);
                 if (attr?.Value != null)
                 {
-                    TypeShape shape = info.Name == "marray" ? MarrayShape(e) : info.Name == "llm" && e.GetAttribute("schema") != null ? new TypeShape(KType.Map) : new TypeShape(KType.String);
+                    TypeShape shape = info.Name == "marray" ? MarrayShape(e) : info.Name == "llm" && e.GetAttribute("schema") != null ? new TypeShape(KType.Map) : new TypeShape(info.DeclaresType ?? KType.String);
                     declareAfter.Add(() => DeclareFromAttribute(e, a.Name, scope, e.Span.End, SymbolKind.Variable, shape));
                 }
             }
@@ -713,7 +713,7 @@ namespace KScript.Language.Analysis
                         }
                         if (child is MarkupText text)
                         {
-                            AnalyzeTemplate(text.Content, scope, e, null, allowBare: Kind == DocumentKind.Script);
+                            AnalyzeTemplate(text.Content, scope, e, null, allowBare: Kind == DocumentKind.Script, info.LiteralText);
                         }
                         else if (child is MarkupElement ce)
                         {
