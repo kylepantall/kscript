@@ -1,0 +1,4 @@
+{
+  "name": "life-lab",
+  "serve": { "root": ".", "port": 8080 }
+}

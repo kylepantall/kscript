@@ -104,6 +104,9 @@ namespace KScript.Terminal
                 catch (IOException) { return 80d; }
             });
 
+            p.Command("is_terminal", "", "yes when a person is at a terminal, no when input or output is redirected (a pipe, a file, a test). Use it to skip animations and prompts.", KType.Bool,
+                c => c.Host.IsInteractive, "<if test=\"@is_terminal()\"><clear /></if>");
+
             p.EchoFormat("markdown", (text, interpreter) => TerminalMarkdown.Render(text, Ansi.Enabled(interpreter.Host)));
         }
 

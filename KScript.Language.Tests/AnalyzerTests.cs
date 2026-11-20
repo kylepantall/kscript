@@ -237,7 +237,7 @@ namespace KScript.Language.Tests
             [Path.Combine(Site, "_layout.html")] = "<html><slot /></html>",
             [Path.Combine(Site, "_components", "people-card.html")] = "<div>{$person.name}</div>",
             [Path.Combine(Site, "_components", "hero.html")] = "<header>{$title}</header>",
-            [Path.Combine(Site, "lib", "strings.ks.xml")] = "<kscript><fn name=\"slugify\" params=\"text\" value=\"$text\" /></kscript>",
+            [Path.Combine(Site, "lib", "strings.ks.xml")] = "<kscript><fn name=\"slugify\" params=\"text\" value=\"$text\" /><let name=\"dash\" value=\"'-'\" const=\"yes\" /><let name=\"scratch\" value=\"1\" /></kscript>",
         });
 
         [Fact]
@@ -389,6 +389,28 @@ namespace KScript.Language.Tests
             Symbol slugify = a.Symbols.Single(s => s.Kind == SymbolKind.Function && s.Name == "slugify");
             Assert.Single(slugify.Parameters);
             Assert.True(a.ExternalDeclarations.ContainsKey(slugify));
+        }
+
+        [Fact]
+        public void ImportsBringInConstants()
+        {
+            string script = Script("<import src=\"lib/strings.ks.xml\" /><import src=\"lib/strings.ks.xml\" names=\"dash\" as=\"s\" /><echo>{$dash} {$scratch}</echo>");
+            DocumentAnalysis a = Analyze(script, Path.Combine(Site, "main.ks.xml"), SiteFiles());
+            Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedVariable);
+            Assert.Equal("scratch", a.Source[d.Span]);
+            Symbol dash = a.Symbols.First(s => s.Name == "dash");
+            Assert.Equal(SymbolKind.Constant, dash.Kind);
+            Assert.True(a.ExternalDeclarations.ContainsKey(dash));
+        }
+
+        [Fact]
+        public void PagesImportScriptsAndHandlersSeeTheEvent()
+        {
+            string page = "<import src=\"lib/strings.ks.xml\" />\n<live id=\"x\"><state name=\"v\" value=\"''\" />\n" +
+                          "<input on-input=\"v = @slugify($event.value) + $dash\"><p>{$v}</p></live>\n<p>{ $event ?? '' }</p>";
+            DocumentAnalysis a = Analyze(page, Path.Combine(Site, "p.html"), SiteFiles());
+            Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedVariable);
+            Assert.Equal("event", a.Source[d.Span]);
         }
 
         [Fact]
