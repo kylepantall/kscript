@@ -46,6 +46,14 @@ namespace KScript.Pages
 
         public string Root { get; }
 
+        /// <summary>config.json, config.staging.json, and any .yaml, .yml or .env file: never served.</summary>
+        internal static bool IsConfigFile(string name)
+        {
+            string ext = Path.GetExtension(name).ToLowerInvariant();
+            if (ext == ".yaml" || ext == ".yml" || ext == ".env") return true;
+            return ext == ".json" && name.StartsWith("config.", StringComparison.OrdinalIgnoreCase);
+        }
+
         public PageRoute Resolve(string urlPath)
         {
             string path = Uri.UnescapeDataString((urlPath ?? "/").Split('?')[0]).Replace('\\', '/');
@@ -55,6 +63,9 @@ namespace KScript.Pages
                 return NotFound();
             // The project's settings file is not part of the site.
             if (segments.Count > 0 && string.Equals(segments[^1], Projects.ProjectConfig.FileName, StringComparison.OrdinalIgnoreCase))
+                return NotFound();
+            // Nor are the settings $config reads (config.json, config.staging.yaml), which may hold secrets.
+            if (segments.Count > 0 && IsConfigFile(segments[^1]))
                 return NotFound();
 
             // Exact file

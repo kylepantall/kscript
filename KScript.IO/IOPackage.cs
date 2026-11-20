@@ -131,9 +131,22 @@ namespace KScript.IO
                 "<let name=\"config\" value=\"@read_text('config.json') |> @json()\" />");
             p.Command("read_lines", "path", "The lines of a file.", KType.List, c => File.ReadAllLines(PathOf(c.Need(0), c)).Cast<object>().ToList());
             p.Command("read_json", "path", "A JSON file read into maps and lists.", KType.Any, c => Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))));
+            p.Command("read_yaml", "path", "A YAML file read into maps and lists.", KType.Any, c =>
+            {
+                string path = PathOf(c.Need(0), c);
+                return Yaml.Parse(File.ReadAllText(path), System.IO.Path.GetFileName(path));
+            });
+            p.Command("read_env", "path", "A .env file (NAME=value lines) read into a map. ${NAME} uses earlier lines or the environment.", KType.Map, c =>
+            {
+                string path = PathOf(c.Need(0), c);
+                var map = new Dictionary<string, object>();
+                foreach (var pair in DotEnv.Parse(File.ReadAllText(path), Environment.GetEnvironmentVariable, System.IO.Path.GetFileName(path))) map[pair.Key] = pair.Value;
+                return map;
+            });
             p.Command("write_text", "path, text", "Writes text to a file, replacing it. Folders are created as needed.", KType.Null, c => Write(c, c.Str(1), append: false));
             p.Command("append_text", "path, text", "Adds text to the end of a file.", KType.Null, c => Write(c, c.Str(1), append: true));
             p.Command("write_json", "path, value", "Writes a value to a file as indented JSON.", KType.Null, c => Write(c, Values.ToJson(c.Arg(1), indented: true), append: false));
+            p.Command("write_yaml", "path, value", "Writes a value to a file as YAML.", KType.Null, c => Write(c, Yaml.Write(c.Arg(1)), append: false));
             p.Command("exists", "path", "True if a file or folder is at the path.", KType.Bool, c =>
             {
                 string path = PathOf(c.Need(0), c);

@@ -24,6 +24,7 @@ namespace KScript.Runtime
             RegisterCommands(p);
             RegisterVariables(p);
             RegisterMethods(p);
+            RegisterConfig(p);
         }
 
         #region Elements

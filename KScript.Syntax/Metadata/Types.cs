@@ -17,6 +17,7 @@ namespace KScript.Metadata
         public const string Date = "date";
         public const string Response = "response";
         public const string Chat = "chat";
+        public const string Config = "config";
         public const string Element = "element";
         public const string Error = "error";
         public const string Request = "request";

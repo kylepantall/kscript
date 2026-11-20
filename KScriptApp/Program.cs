@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -11,11 +12,11 @@ namespace KScript
     {
         static void PrintUsage()
         {
-            Console.WriteLine("Usage: kscript <script.xml> [script arguments]                Run a script ($args holds the arguments).");
+            Console.WriteLine("Usage: kscript [--env name] <script.xml> [script arguments]   Run a script ($args holds the arguments; --env picks staging.yaml, .env.staging...).");
             Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
-            Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
+            Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
             Console.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
             Console.WriteLine("       kscript --version | --help");
@@ -99,6 +100,31 @@ namespace KScript
             }
         }
 
+        /// <summary>The environment from --env, also set as KSCRIPT_ENV so pages and child scripts see it.</summary>
+        static string EnvironmentName;
+
+        static string[] TakeEnvironment(string[] args)
+        {
+            var rest = new List<string>();
+            bool anywhere = args.Length > 0 && (args[0] == "serve" || args[0] == "test");
+            bool before = true;
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = args[i];
+                if ((before || anywhere) && (a == "--env" || a.StartsWith("--env=", StringComparison.Ordinal)))
+                {
+                    string value = a == "--env" ? (i + 1 < args.Length ? args[++i] : null) : a.Substring(6);
+                    if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("--env needs a name, e.g. --env staging");
+                    EnvironmentName = value;
+                    Environment.SetEnvironmentVariable("KSCRIPT_ENV", value);
+                    continue;
+                }
+                if (!a.StartsWith("-", StringComparison.Ordinal)) before = false;
+                rest.Add(a);
+            }
+            return rest.ToArray();
+        }
+
         static int Main(string[] args)
         {
             if (args.Length > 0 && args[0] == "lsp")
@@ -109,6 +135,17 @@ namespace KScript
 
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             KScript.Updates.SelfUpdater.CleanupPreviousBinary();
+
+            // --env staging (before the script, or anywhere after serve and test) picks the environment for $config.
+            try
+            {
+                args = TakeEnvironment(args);
+            }
+            catch (ArgumentException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
 
             if (args.Length > 0 && (args[0] == "--version" || args[0] == "version"))
             {
@@ -203,6 +240,7 @@ namespace KScript
         static int RunScript(string path, string[] scriptArgs)
         {
             var options = new InterpreterOptions();
+            ConfigOptions config = null;
             try
             {
                 ProjectConfig project = ProjectConfig.FindAndLoad(Path.GetDirectoryName(path));
@@ -211,6 +249,7 @@ namespace KScript
                     foreach (string warning in project.Warnings) Console.Error.WriteLine($"{project.FilePath}: {warning}");
                     options.DefaultPackages.AddRange(project.Packages);
                 }
+                config = project?.ConfigOptions(EnvironmentName);
             }
             catch (ProjectConfigException ex)
             {
@@ -220,6 +259,7 @@ namespace KScript
 
             var host = KScriptHost.Console();
             host.Arguments = scriptArgs;
+            host.Config = config;
 
             using var cancel = new System.Threading.CancellationTokenSource();
             options.Cancellation = cancel.Token;

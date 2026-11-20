@@ -206,6 +206,48 @@ The editor completes the methods for each type and shows what they do. `@json(te
 
 Unknown elements, attributes and syntax errors are reported before a script starts, so a typo near the end doesn't leave a job half done.
 
+### Settings: $config
+
+Every script can read settings without an import. `$config` reads `config.json`, `config.yaml` (or `config.yml`) and `.env` from the script's folder the first time it is used:
+
+```yaml
+# config.yaml
+database:
+  host: localhost
+  port: 5432
+features: [search, cart]
+```
+
+```xml
+<echo>{$config.database.host}:{$config.database.port}</echo>
+<let name="timeout" value="@config('http.timeout', 30)" />      <!-- a path, and a default when it isn't set -->
+<if test="$config->has('features')"><echo>{ $config.features->join(', ') }</echo></if>
+<let name="key" value="$config->require('api.key')" />         <!-- stops with a clear message when it's missing -->
+```
+
+**Environments.** `kscript --env staging script.ks.xml` (or `KSCRIPT_ENV=staging`, or `<config env="staging" />`) layers the environment's files over the base files. Later files win, and maps merge field by field:
+
+1. `config.json`, `config.yaml`, `config.yml`, then `.env`
+2. `config.staging.json`, `config.staging.yaml`, `config.staging.yml`, then `.env.staging`
+3. `staging.json`, `staging.yaml`, `staging.yml`
+4. environment variables with the prefix, when there is one
+
+**Environment variables.** With a prefix, variables override the files, and `__` nests: with `<config prefix="APP_" />`, `APP_DATABASE__HOST=db.internal` sets `database.host`. Names don't depend on case, so `$config.database.host` and `$config.DATABASE.HOST` are the same setting. Values such as `true`, `false` and `8080` become booleans and numbers.
+
+**.env files** hold `NAME=value` lines, with `#` comments, `export` in front if you like, `'single quotes'` taken as written, and `"double quotes"` that allow `\n` and can span lines. `${NAME}` and `${NAME:-default}` use another variable, in .env files and in text in JSON and YAML files. Values from .env files also become environment variables unless one is already set, so `@env('ANTHROPIC_API_KEY')` and KScript.AI find a key kept in `.env`.
+
+**`<config>`** reads the settings again with other options. Without `to`, it changes `$config`:
+
+```xml
+<config env="production" prefix="SHOP_" files="settings, secrets.yaml?, .env"
+        root="conf" defaults="{ server: { port: 8080 } }" require="database.host, api.key" />
+<config files="themes/dark.json" to="theme" />   <!-- a separate set of settings in $theme -->
+```
+
+`files` lists the base files (a name without an extension means .json, .yaml and .yml, and a name ending in `?` may be missing). `$config->environment()` gives the environment, `$config->sources()` lists the files that were read, `$config->all()` gives every setting as a map, and `$config->reload()` reads them again. `@yaml(text)`, `@to_yaml(value)` and `@parse_env(text)` work on text, and KScript.IO adds `@read_yaml(path)`, `@read_env(path)` and `@write_yaml(path, value)`.
+
+Pages served by `kscript serve` read settings from the site folder. They never change environment variables, and `kscript serve` never serves `config.*` files or any `.yaml`, `.yml` or `.env` file. Keep secrets in `.env` or in YAML, because a JSON file named after an environment (such as `staging.json`) is served like any other file.
+
 ## Packages
 
 KScript.Core (everything above) is always there. Everything else comes from a package, imported at the top of the script, so a script only loads what it uses: a terminal script never loads the web server.
@@ -394,6 +436,13 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
     "packages": ["KScript.Terminal"]        // imported by test files only
+  },
+  "config": {
+    "environment": "development",           // used when neither --env nor KSCRIPT_ENV names one
+    "files": ["config", ".env"],            // the base files $config reads (the default)
+    "prefix": "APP_",                       // APP_DATABASE__HOST overrides database.host
+    "root": "settings",                     // where the files are, relative to kscript.json (default: each script's folder)
+    "required": ["database.host"]           // scripts stop with a clear message when one is missing
   }
 }
 ```
@@ -402,7 +451,7 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
 - `rules` changes how serious a diagnostic is (see [the codes](docs/language-server.md#diagnostic-codes)). The longest match wins, so `"KS3*": "warning"` with `"KS3001": "error"` keeps unknown elements as errors.
 - Comments and trailing commas are allowed. Unknown settings are reported as warnings rather than ignored silently, and the VS Code extension validates the file and completes its settings as you type.
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
-- `kscript serve` never serves `kscript.json`.
+- `kscript serve` never serves `kscript.json`, or the `config.*`, `.yaml`, `.yml` and `.env` files that `$config` reads.
 
 ## Generating files: kscript make
 

@@ -67,6 +67,25 @@ namespace KScript.Projects
         }
     }
 
+    /// <summary>The <c>config</c> section: where <c>$config</c> reads a script's settings from.</summary>
+    public sealed class ConfigSettings
+    {
+        /// <summary>The environment used when neither kscript --env nor KSCRIPT_ENV names one.</summary>
+        public string Environment { get; set; }
+
+        /// <summary>The base files (default: config, .env).</summary>
+        public List<string> Files { get; set; }
+
+        /// <summary>Environment variables with this prefix override the files.</summary>
+        public string Prefix { get; set; }
+
+        /// <summary>The folder the files are in, relative to kscript.json. Null means each script's own folder.</summary>
+        public string Root { get; set; }
+
+        /// <summary>Settings that must be set.</summary>
+        public List<string> Required { get; set; } = new List<string>();
+    }
+
     /// <summary>
     /// A KScript project's settings, read from <c>kscript.json</c> in the project folder. <c>kscript serve</c>,
     /// <c>kscript check</c>, <c>kscript make</c> and the language server look for it in the folder they work on and
@@ -99,6 +118,20 @@ namespace KScript.Projects
         public ServeSettings Serve { get; } = new ServeSettings();
         public LintSettings Lint { get; } = new LintSettings();
         public TestSettings Test { get; } = new TestSettings();
+        public ConfigSettings Config { get; } = new ConfigSettings();
+
+        /// <summary>
+        /// The options $config uses for scripts in this project. <paramref name="environment"/> (from kscript --env)
+        /// wins over KSCRIPT_ENV, which wins over config.environment.
+        /// </summary>
+        public KScript.Runtime.ConfigOptions ConfigOptions(string environment = null) => new KScript.Runtime.ConfigOptions
+        {
+            Environment = environment ?? System.Environment.GetEnvironmentVariable("KSCRIPT_ENV") ?? Config.Environment,
+            Files = Config.Files,
+            Prefix = Config.Prefix,
+            Root = Config.Root == null ? null : Path.GetFullPath(Path.Combine(Directory, Config.Root)),
+            Required = Config.Required.ToList(),
+        };
 
         /// <summary>
         /// Packages every script in the project imports without an &lt;import&gt;, such as KScript.Terminal.
@@ -187,6 +220,9 @@ namespace KScript.Projects
                         case "test":
                             ReadTest(prop.Value, config);
                             break;
+                        case "config":
+                            ReadConfig(prop.Value, config);
+                            break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
                             foreach (string package in config.Packages)
@@ -196,7 +232,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve, lint or test).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve, lint, test or config).");
                             break;
                     }
                 }
@@ -293,6 +329,35 @@ namespace KScript.Projects
                         break;
                     default:
                         config.Warnings.Add($"unknown setting 'test.{p.Name}' (expected include, exclude, timeout or packages).");
+                        break;
+                }
+            }
+        }
+
+        private static void ReadConfig(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "config", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "environment":
+                        config.Config.Environment = String(p.Value, "config.environment", config);
+                        break;
+                    case "files":
+                        config.Config.Files = Strings(p.Value, "config.files", config);
+                        break;
+                    case "prefix":
+                        config.Config.Prefix = String(p.Value, "config.prefix", config);
+                        break;
+                    case "root":
+                        config.Config.Root = String(p.Value, "config.root", config);
+                        break;
+                    case "required":
+                        config.Config.Required = Strings(p.Value, "config.required", config) ?? config.Config.Required;
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'config.{p.Name}' (expected environment, files, prefix, root or required).");
                         break;
                 }
             }

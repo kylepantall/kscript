@@ -90,6 +90,9 @@ namespace KScript.Runtime
             if (!CanWriteFiles) throw new KScriptException($"{what} can't change files here: files are read-only.", "Permission");
         }
 
+        /// <summary>Where <c>$config</c> reads settings from (kscript --env, kscript.json's config section). Null for the defaults.</summary>
+        public ConfigOptions Config { get; set; }
+
         /// <summary>State that packages keep for the length of a run, by key.</summary>
         public Dictionary<string, object> Items { get; } = new Dictionary<string, object>();
 
