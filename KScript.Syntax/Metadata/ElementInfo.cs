@@ -22,6 +22,9 @@ namespace KScript.Metadata
 
         /// <summary>True for text that is used as written, without <c>{ }</c> interpolation, such as a route path <c>/people/{id}</c>.</summary>
         public bool Literal { get; init; }
+
+        /// <summary>Set when the attribute is deprecated; it still works, with a warning.</summary>
+        public Deprecation Deprecated { get; internal set; }
     }
 
     public sealed class ElementInfo
@@ -43,6 +46,9 @@ namespace KScript.Metadata
 
         /// <summary>An example shown in hover.</summary>
         public string Example { get; init; }
+
+        /// <summary>Set when the element is deprecated; it still works, with a warning.</summary>
+        public Deprecation Deprecated { get; internal set; }
 
         /// <summary>Elements this one must directly follow (for <c>elif</c>/<c>else</c>), or be inside (for <c>case</c>).</summary>
         public IReadOnlyList<string> MustFollow { get; init; }

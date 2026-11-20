@@ -34,8 +34,9 @@ namespace KScript.Language.Features
                     {
                         Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
                         Documentation = c.Description,
-                        Parameters = s.Parameters.Select(p => (p.Label, p.Description)).ToList(),
+                        Parameters = s.Parameters.Select(p => (p.Label, p.Deprecated != null ? DeprecationLine(p.Deprecated, p.Name) + p.Description : p.Description)).ToList(),
                         Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : null, p.IsFlag)).ToList(),
+                        DeprecatedParameters = s.Parameters.Where(p => p.Deprecated != null).Select(p => p.Name).ToList(),
                     });
                 }
             }
@@ -188,6 +189,7 @@ namespace KScript.Language.Features
                             Label = label,
                             Kind = CompletionKind.Keyword,
                             Detail = "flag",
+                            Deprecated = signature.DeprecatedParameters.Contains(name),
                             Documentation = $"Sets `{name}` to {(label.StartsWith("not ", StringComparison.Ordinal) ? "no" : "yes")} in `{signature.Label}`.",
                             ReplaceSpan = replace,
                             FilterText = label,
@@ -212,11 +214,12 @@ namespace KScript.Language.Features
                         Label = name + ":",
                         Kind = CompletionKind.Parameter,
                         Detail = label,
+                        Deprecated = signature.DeprecatedParameters.Contains(name),
                         Documentation = (doc != null ? doc + "\n\n" : string.Empty) + $"Named argument of `{signature.Label}`.",
                         InsertText = name + ": ",
                         ReplaceSpan = replace,
                         FilterText = name,
-                        SortText = "00" + i.ToString("D2"),
+                        SortText = (signature.DeprecatedParameters.Contains(name) ? "09" : "00") + i.ToString("D2"),
                     });
                 }
             }

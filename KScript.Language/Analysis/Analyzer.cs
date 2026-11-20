@@ -495,6 +495,7 @@ namespace KScript.Language.Analysis
             }
 
             CheckAttributes(e, info);
+            ReportDeprecatedElement(e, info);
             CheckPlacement(e, info, previous);
             NoteResourceUses(e, info, scope);
             CheckElse(e, previous, markupMode);

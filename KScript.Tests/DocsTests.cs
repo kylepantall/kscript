@@ -6,6 +6,8 @@ using System.Text.RegularExpressions;
 using KScript.Docs;
 using KScript.Language.Catalog;
 using KScript.Metadata;
+using KScript.Runtime;
+using KScript.Syntax;
 
 using Microsoft.AspNetCore.Http;
 
@@ -671,6 +673,111 @@ public sealed class DocsTests
         Assert.True(server.Wait(TimeSpan.FromSeconds(30)));
         Assert.Equal(0, server.Result);
         Assert.Empty(Directory.GetDirectories(Path.GetTempPath(), "kscript-docs-*").Where(d => !before.Contains(d) && !d.Contains("-test-")));
+    }
+
+    /// <summary>
+    /// Codes that mean an example in a guide is out of step with the code: something it uses was removed, renamed or
+    /// deprecated, or takes different arguments now.
+    /// </summary>
+    private static readonly HashSet<string> OutOfSync = new HashSet<string>
+    {
+        DiagnosticCodes.UnknownElement, DiagnosticCodes.RetiredElement, DiagnosticCodes.UnknownAttribute, DiagnosticCodes.RetiredAttribute,
+        DiagnosticCodes.MissingAttribute, DiagnosticCodes.InvalidAttributeValue, DiagnosticCodes.Deprecated, DiagnosticCodes.UnknownCommand,
+        DiagnosticCodes.RetiredCommand, DiagnosticCodes.UnknownMethod, DiagnosticCodes.ArgumentCount, DiagnosticCodes.UnknownParameter,
+        DiagnosticCodes.NamedArgument, DiagnosticCodes.InvalidArgumentValue, DiagnosticCodes.UnknownPackage,
+    };
+
+    /// <summary>Functions that examples call as if the reader's script declared them; every other unknown @name fails.</summary>
+    private static readonly HashSet<string> AssumedFunctions = new HashSet<string> { "greet", "greeting", "slugify", "set_age", "sign_up" };
+
+    private static readonly Regex ScriptFence = new Regex(@"^```(kscript|xml)[^\n]*\n(.*?)^```[ \t]*$", RegexOptions.Multiline | RegexOptions.Singleline);
+
+    [Fact]
+    public void Every_example_in_the_guides_and_readme_matches_the_code()
+    {
+        var sources = DocsSite.GuideFiles.Select(f => ("docs/" + f, DocsSite.ReadEmbeddedGuide(f))).ToList();
+        string root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Combine(root, "KScript.sln"))) root = Path.GetDirectoryName(root);
+        if (root != null) sources.Add(("README.md", File.ReadAllText(Path.Combine(root, "README.md"))));
+
+        var problems = new List<string>();
+        int checkedCount = 0;
+        foreach (var (file, markdown) in sources)
+        {
+            foreach (Match m in ScriptFence.Matches(markdown.Replace("\r\n", "\n")))
+            {
+                bool code = m.Groups[1].Value == "kscript";
+                string body = m.Groups[2].Value;
+                if (!code && !Regex.IsMatch(body.TrimStart(), @"^(<!--.*?-->\s*)*<(kscript|KScript\.)", RegexOptions.Singleline)) body = "<kscript>\n" + body + "\n</kscript>";
+                var analysis = KScript.Language.Analysis.Analyzer.Analyze(body, code ? "example.kscript" : "example.ks.xml", KScript.Language.Analysis.EmptyFileSystem.Instance);
+                checkedCount++;
+                foreach (var d in analysis.Diagnostics.Where(d => OutOfSync.Contains(d.Code)))
+                {
+                    // Examples import files of the reader's that aren't here.
+                    // Examples import files of the reader's that aren't here, and use types declared in an earlier example.
+                    if (d.Code == DiagnosticCodes.InvalidAttributeValue && (d.Message.StartsWith("File not found", StringComparison.Ordinal)
+                        || Regex.IsMatch(d.Message, "^Unknown type '[A-Z]"))) continue;
+                    if (d.Code == DiagnosticCodes.UnknownCommand && Regex.Match(d.Message, @"Unknown command @(\w+)\.") is { Success: true } unknown && AssumedFunctions.Contains(unknown.Groups[1].Value)) continue;
+                    int line = markdown.Replace("\r\n", "\n").Substring(0, m.Index).Count(c => c == '\n') + 2 + body.Substring(0, Math.Min(d.Span.Start, body.Length)).Count(c => c == '\n') - (code || body == m.Groups[2].Value ? 0 : 1);
+                    problems.Add($"{file}:{line}: {d.Code} {d.Message}");
+                }
+            }
+        }
+        Assert.True(checkedCount > 40, $"Only {checkedCount} examples were found.");
+        Assert.True(problems.Count == 0, "Examples out of step with the code:\n" + string.Join("\n", problems));
+    }
+
+    private sealed class RetiringPackage : KScriptPackage
+    {
+        public override string Name => "KScript.Retiring";
+
+        public override string Description => "Deprecated things, for the reference.";
+
+        protected override void Register(PackageBuilder p)
+        {
+            p.Command("old_sum", "a, b", "Adds two numbers.", KType.Number, call => null);
+            p.Command("fetch_text", "url, retries?", "Fetches text.", KType.String, call => null);
+            p.Method(KType.String, "shout", "", "Upper-cases text.", KType.String, (target, call) => null);
+            p.Element(new ElementInfo("beep", "Beeps.", ContentKind.Empty, new AttributeInfo("tone", AttributeKind.Template, "The sound.")), run => null);
+            p.Element(new ElementInfo("old-beep", "Beeps.", ContentKind.Empty), run => null);
+            p.Deprecate("@old_sum", "Sums moved to `KScript.Math`", "@sum");
+            p.Deprecate("@fetch_text(retries)", "Requests are retried for you");
+            p.Deprecate("string->shout", "", "->upper");
+            p.Deprecate("<beep tone>", "Renamed", "sound");
+            p.Deprecate("<old-beep>", "");
+        }
+    }
+
+    [Fact]
+    public void The_reference_strikes_through_and_labels_what_is_deprecated()
+    {
+        var registry = new KScript.Runtime.PackageRegistry();
+        foreach (var (name, type, description) in KScript.Runtime.PackageRegistry.BuiltIn.Skip(1)) registry.Register(name, type, description);
+        registry.Register(new RetiringPackage());
+        DocsSite site = DocsSite.Build(new LanguageCatalog(registry), readGuide: _ => "# Guide\n");
+
+        string package = site.Find("/reference/retiring").Body;
+        Assert.Contains("<section class=\"entry deprecated\" id=\"cmd-old-sum\">", package);
+        Assert.Contains("<del><code>@<span class=\"name\">old_sum</span>(<span class=\"param\">a</span>, <span class=\"param\">b</span>)</code></del> <span class=\"badge deprecated-badge\">deprecated</span>", package);
+        Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Sums moved to <code>KScript.Math</code>. Use <code>@sum</code> instead.</p>", package);
+        Assert.Contains("<del class=\"param\" title=\"Deprecated\">retries?</del>", package);
+        Assert.Contains("<tr class=\"deprecated\"><td><del><code>retries</code></del> <span class=\"badge deprecated-badge\">deprecated</span>", package);
+        Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Requests are retried for you.</p>", package);
+        Assert.Contains("<tr class=\"deprecated\"><td><del><code>tone</code></del>", package);
+        Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Renamed. Use <code>sound</code> instead.</p>", package);
+        Assert.Contains("<del><code>&lt;old-beep&gt;</code></del>", package);
+        Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong></p>", package);
+        Assert.Contains("title=\"Deprecated\"><del><code>-&gt;shout()</code></del></a>", package);
+        Assert.Contains("<del class=\"param\"", site.Find("/reference/retiring").Body);
+
+        string strings = site.Find("/reference/methods/string").Body;
+        Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Use <code>-&gt;upper</code> instead.</p>", strings);
+        Assert.Contains("<section class=\"entry\" id=\"", strings);
+
+        var search = JsonDocument.Parse(site.SearchJson()).RootElement.EnumerateArray().ToList();
+        Assert.StartsWith("Deprecated. ", search.Single(e => e.GetProperty("t").GetString() == "@old_sum()").GetProperty("d").GetString());
+        Assert.StartsWith("Deprecated. ", search.Single(e => e.GetProperty("t").GetString() == "<old-beep>").GetProperty("d").GetString());
+        Assert.Contains(".badge.deprecated-badge", DocsSite.ReadAsset("docs.css"));
     }
 
     #endregion

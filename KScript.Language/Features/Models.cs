@@ -65,6 +65,9 @@ namespace KScript.Language.Features
 
         /// <summary>Per parameter: its name, the enum values it takes (or null), and whether it is a yes/no flag.</summary>
         internal IReadOnlyList<(string Name, IReadOnlyList<string> Values, bool Flag)> Details { get; init; }
+
+        /// <summary>The parameters that are deprecated, by name.</summary>
+        internal IReadOnlyCollection<string> DeprecatedParameters { get; init; } = Array.Empty<string>();
     }
 
     public sealed class SignatureHelpResult

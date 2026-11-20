@@ -74,7 +74,7 @@ namespace KScript.Language.Features
                 AttributeInfo a = info?.GetAttribute(cursor.Attribute.Name);
                 if (a != null)
                 {
-                    return new HoverResult($"**{a.Name}** ({KindLabel(a.Kind)}{(a.Required ? ", required" : string.Empty)})\n\n{a.Description}{OptionsLine(a)}", cursor.Attribute.NameSpan);
+                    return new HoverResult($"**{a.Name}** ({KindLabel(a.Kind)}{(a.Required ? ", required" : string.Empty)})\n\n{DeprecationLine(a.Deprecated, a.Name)}{a.Description}{OptionsLine(a)}", cursor.Attribute.NameSpan);
                 }
                 RetiredInfo retired = Catalog.GetRetiredAttribute(cursor.Attribute.Name);
                 if (retired != null)
@@ -189,6 +189,17 @@ namespace KScript.Language.Features
 
         #region Markdown
 
+        /// <summary>"**Deprecated.** Why. Use X instead." and a blank line, or empty when not deprecated.</summary>
+        internal static string DeprecationLine(Deprecation d, string subject)
+        {
+            if (d == null)
+            {
+                return string.Empty;
+            }
+            string rest = d.Describe(subject).Substring(subject.Length + " is deprecated.".Length).Trim();
+            return rest.Length == 0 ? "**Deprecated.**\n\n" : "**Deprecated.** " + rest + "\n\n";
+        }
+
         internal static string ElementMarkdown(ElementInfo e)
         {
             StringBuilder sb = new StringBuilder();
@@ -197,7 +208,7 @@ namespace KScript.Language.Features
             {
                 sb.Append(" (KScript 2, planned: no package implements it yet)");
             }
-            sb.Append("\n\n").Append(e.Description);
+            sb.Append("\n\n").Append(DeprecationLine(e.Deprecated, "<" + e.Name + ">")).Append(e.Description);
             if (e.Package != null && e.Package != "KScript.Core")
             {
                 sb.Append("\n\nFrom ").Append(e.Package).Append(e.Context == ElementContext.Page ? " (pages)." : ".");
@@ -207,8 +218,8 @@ namespace KScript.Language.Features
                 sb.Append("\n\n| Attribute | |\n|---|---|\n");
                 foreach (AttributeInfo a in e.Attributes)
                 {
-                    sb.Append("| `").Append(a.Name).Append('`').Append(a.Required ? " (required)" : string.Empty).Append(" | ")
-                      .Append(a.Description.Replace("|", "\\|").Replace("\n", " ")).Append(" |\n");
+                    sb.Append("| ").Append(a.Deprecated != null ? "~~`" + a.Name + "`~~" : "`" + a.Name + "`").Append(a.Required ? " (required)" : string.Empty).Append(" | ")
+                      .Append((DeprecationLine(a.Deprecated, a.Name).Trim() + " " + a.Description).Trim().Replace("|", "\\|").Replace("\n", " ")).Append(" |\n");
                 }
             }
             if (!string.IsNullOrEmpty(e.Example))
@@ -232,9 +243,17 @@ namespace KScript.Language.Features
                 sb.Append('\n');
             }
             sb.Append("```\n");
+            if (c.Deprecated != null)
+            {
+                sb.Append('\n').Append(DeprecationLine(c.Deprecated, c.Prefix + c.Name).TrimEnd());
+            }
             if (!string.IsNullOrEmpty(c.Description))
             {
                 sb.Append('\n').Append(c.Description);
+            }
+            foreach (ParameterInfo p in c.Signatures.SelectMany(s => s.Parameters).Where(p => p.Deprecated != null).GroupBy(p => p.Name).Select(g => g.First()))
+            {
+                sb.Append("\n\n").Append(DeprecationLine(p.Deprecated, "`" + p.Name + "`").TrimEnd());
             }
             if (c.Kind == CallableKind.Method && c.ReceiverType != KType.Any)
             {

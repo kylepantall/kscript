@@ -147,7 +147,9 @@ namespace KScript.Docs
                 foreach (var group in methods.GroupBy(m => m.ReceiverType).OrderBy(g => Array.IndexOf(TypeOrder, g.Key) is int i && i >= 0 ? i : 50))
                 {
                     sb.Append($"<p>On <a href=\"{TypeSlug(group.Key)}\">{Html.H(group.Key)}</a> values: ");
-                    sb.Append(string.Join(", ", group.Select(m => $"<a href=\"{TypeSlug(group.Key)}#{MethodAnchor(m)}\"><code>-&gt;{Html.H(m.Name)}()</code></a>")));
+                    sb.Append(string.Join(", ", group.Select(m => m.Deprecated != null
+                        ? $"<a href=\"{TypeSlug(group.Key)}#{MethodAnchor(m)}\" title=\"Deprecated\"><del><code>-&gt;{Html.H(m.Name)}()</code></del></a>"
+                        : $"<a href=\"{TypeSlug(group.Key)}#{MethodAnchor(m)}\"><code>-&gt;{Html.H(m.Name)}()</code></a>")));
                     sb.Append("</p>");
                 }
             }
@@ -235,7 +237,10 @@ namespace KScript.Docs
             string name = ElementName(e);
             string anchor = ElementAnchor(e);
             var sb = new StringBuilder();
-            sb.Append($"<section class=\"entry\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a><code>&lt;{Html.H(name)}&gt;</code></h3>");
+            string deprecatedClass = e.Deprecated != null ? " deprecated" : string.Empty;
+            string shown = $"<code>&lt;{Html.H(name)}&gt;</code>";
+            sb.Append($"<section class=\"entry{deprecatedClass}\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a>{(e.Deprecated != null ? "<del>" + shown + "</del>" + DeprecatedBadge : shown)}</h3>");
+            sb.Append(DeprecationNote(e.Deprecated));
             sb.Append($"<div class=\"desc\">{Html.Inline(e.Description)}</div>");
 
             var facts = new List<string>();
@@ -262,14 +267,15 @@ namespace KScript.Docs
                 foreach (AttributeInfo a in e.Attributes)
                 {
                     string value = a.Options.Count > 0 ? string.Join(" | ", a.Options.Select(o => $"<code>{Html.H(o)}</code>")) : KindName(a.Kind);
-                    sb.Append($"<tr><td><code>{Html.H(a.Name)}</code>{(a.Required ? " <span class=\"req\">required</span>" : "")}</td><td>{value}</td><td>{Html.Inline(a.Description)}</td></tr>");
+                    string attrName = a.Deprecated != null ? $"<del><code>{Html.H(a.Name)}</code></del>{DeprecatedBadge}" : $"<code>{Html.H(a.Name)}</code>";
+                    sb.Append($"<tr{(a.Deprecated != null ? " class=\"deprecated\"" : "")}><td>{attrName}{(a.Required ? " <span class=\"req\">required</span>" : "")}</td><td>{value}</td><td>{DeprecationNote(a.Deprecated)}{Html.Inline(a.Description)}</td></tr>");
                 }
                 sb.Append("</tbody></table></div>");
             }
             if (e.Example != null) sb.Append(Example("<" + e.Name + ">", e.Example, e.Package));
             sb.Append("</section>");
 
-            Search.Add(new SearchEntry { Title = "<" + name + ">", Url = path + "#" + anchor, Section = e.Package, Kind = "element", Text = Shorten(Html.Text(Html.Inline(e.Description))) });
+            Search.Add(new SearchEntry { Title = "<" + name + ">", Url = path + "#" + anchor, Section = e.Package, Kind = "element", Text = Shorten((e.Deprecated != null ? "Deprecated. " : "") + Html.Text(Html.Inline(e.Description))) });
             return sb.ToString();
         }
 
@@ -300,22 +306,27 @@ namespace KScript.Docs
             bool method = c.Kind == CallableKind.Method;
             string anchor = method ? MethodAnchor(c) : CommandAnchor(c);
             var sb = new StringBuilder();
-            sb.Append($"<section class=\"entry\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a>");
+            sb.Append($"<section class=\"entry{(c.Deprecated != null ? " deprecated" : "")}\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a>");
             foreach (Signature s in c.Signatures)
             {
                 string receiver = method ? $"<span class=\"recv\">{Html.H(c.ReceiverType)}</span>" : string.Empty;
-                string parameters = string.Join(", ", s.Parameters.Select(p => $"<span class=\"param\">{Html.H(p.Label)}</span>"));
-                sb.Append($"<code>{receiver}{Html.H(c.Prefix)}<span class=\"name\">{Html.H(c.Name)}</span>({parameters})</code>");
+                string parameters = string.Join(", ", s.Parameters.Select(p => p.Deprecated != null
+                    ? $"<del class=\"param\" title=\"Deprecated\">{Html.H(p.Label)}</del>"
+                    : $"<span class=\"param\">{Html.H(p.Label)}</span>"));
+                string signature = $"<code>{receiver}{Html.H(c.Prefix)}<span class=\"name\">{Html.H(c.Name)}</span>({parameters})</code>";
+                sb.Append(c.Deprecated != null ? "<del>" + signature + "</del>" : signature);
             }
+            if (c.Deprecated != null) sb.Append(DeprecatedBadge);
             if (c.ReturnType != null && c.ReturnType != KType.Null) sb.Append($" <span class=\"returns\">→ {TypeLink(c.ReturnType)}</span>");
             if (method && c.Package != "KScript.Core") sb.Append($" <a class=\"badge\" href=\"{PackageSlug(c.Package)}\">{Html.H(c.Package)}</a>");
             sb.Append("</h3>");
+            sb.Append(DeprecationNote(c.Deprecated));
             sb.Append($"<div class=\"desc\">{Html.Inline(c.Description)}</div>");
 
             var parametersList = c.Signatures.SelectMany(s => s.Parameters).GroupBy(p => p.Name).Select(g => g.First()).ToList();
             // Parameters only get a table when there is more to say than the signature shows: a type, the values
             // allowed, or a description.
-            bool detailed = parametersList.Any(p => p.Type != null || p.Values.Count > 0 || !string.IsNullOrEmpty(p.Description));
+            bool detailed = parametersList.Any(p => p.Type != null || p.Values.Count > 0 || !string.IsNullOrEmpty(p.Description) || p.Deprecated != null);
             if (detailed)
             {
                 sb.Append("<div class=\"table\"><table class=\"params\"><thead><tr><th>Parameter</th><th>Takes</th></tr></thead><tbody>");
@@ -327,7 +338,8 @@ namespace KScript.Docs
                     if (p.Variadic) takes += ", any number of them";
                     string notes = p.Optional ? " <span class=\"opt\">optional</span>" : p.Variadic ? string.Empty : " <span class=\"req\">required</span>";
                     if (!string.IsNullOrEmpty(p.Description)) takes += ". " + Html.Inline(p.Description);
-                    sb.Append($"<tr><td><code>{Html.H(p.Name)}</code>{notes}</td><td>{takes}</td></tr>");
+                    string paramName = p.Deprecated != null ? $"<del><code>{Html.H(p.Name)}</code></del>{DeprecatedBadge}" : $"<code>{Html.H(p.Name)}</code>";
+                    sb.Append($"<tr{(p.Deprecated != null ? " class=\"deprecated\"" : "")}><td>{paramName}{notes}</td><td>{DeprecationNote(p.Deprecated)}{takes}</td></tr>");
                 }
                 sb.Append("</tbody></table></div>");
             }
@@ -339,8 +351,19 @@ namespace KScript.Docs
             sb.Append("</section>");
 
             string title = method ? $"{c.ReceiverType}->{c.Name}()" : $"@{c.Name}()";
-            Search.Add(new SearchEntry { Title = title, Url = path + "#" + anchor, Section = c.Package, Kind = method ? "method" : "command", Text = Shorten(Html.Text(Html.Inline(c.Description))) });
+            Search.Add(new SearchEntry { Title = title, Url = path + "#" + anchor, Section = c.Package, Kind = method ? "method" : "command", Text = Shorten((c.Deprecated != null ? "Deprecated. " : "") + Html.Text(Html.Inline(c.Description))) });
             return sb.ToString();
+        }
+
+        private const string DeprecatedBadge = " <span class=\"badge deprecated-badge\">deprecated</span>";
+
+        /// <summary>Why something is deprecated and what to use instead, or nothing.</summary>
+        internal static string DeprecationNote(Deprecation d)
+        {
+            if (d == null) return string.Empty;
+            string text = d.Message.Length > 0 ? Html.Inline(d.Message.EndsWith(".", StringComparison.Ordinal) ? d.Message : d.Message + ".") : string.Empty;
+            if (d.Replacement != null) text += (text.Length > 0 ? " " : "") + $"Use <code>{Html.H(d.Replacement)}</code> instead.";
+            return $"<p class=\"deprecation\"><strong>Deprecated.</strong>{(text.Length > 0 ? " " + text : "")}</p>";
         }
 
         /// <summary>An example from the catalog. An expression is shown echoed, so running it prints its value.</summary>
