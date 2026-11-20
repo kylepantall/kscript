@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
   "title": "KScript project settings (kscript.json)",
-  "description": "Settings for kscript serve, kscript check and the KScript language server. Commands look for kscript.json in the folder they work on and its parents.",
+  "description": "Settings for kscript serve, kscript check, kscript fmt and the KScript language server. Commands look for kscript.json in the folder they work on and its parents.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -85,6 +85,60 @@
             "enum": ["KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web", "KScript.UI", "KScript.AI"]
           },
           "uniqueItems": true
+        }
+      }
+    },
+    "format": {
+      "type": "object",
+      "description": "Used by kscript fmt and the editor's Format Document. Values set here win over the editor's tab settings.",
+      "additionalProperties": false,
+      "properties": {
+        "indent": {
+          "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 16 }, { "const": "tab" }],
+          "default": 2,
+          "description": "Spaces per indent level, or \"tab\" to indent with tabs."
+        },
+        "tabWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 2,
+          "description": "With \"indent\": \"tab\", how many columns a tab counts as when lining up existing text."
+        },
+        "printWidth": {
+          "type": "integer",
+          "minimum": 20,
+          "default": 120,
+          "description": "A start tag with several attributes that would run past this column gets one attribute per line."
+        },
+        "maxBlankLines": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1,
+          "description": "Blank lines kept in a row; extra ones are removed."
+        },
+        "endOfLine": {
+          "enum": ["auto", "lf", "crlf"],
+          "default": "auto",
+          "description": "Line endings to write. auto keeps the ones each file already uses."
+        },
+        "preserve": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Elements whose content is kept exactly as written, on top of <pre>, <textarea>, <script>, <style> and CDATA sections."
+        },
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html"],
+          "description": "Files kscript fmt formats in a project folder, as globs relative to kscript.json. .xml files that start with <kscript> are always included; Markdown pages are never reformatted."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["_templates", "node_modules", ".git"],
+          "description": "Files and folders kscript fmt leaves alone."
         }
       }
     }

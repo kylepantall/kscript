@@ -143,13 +143,14 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,lint,name,packages,serve,test", Keys(props));
+        Assert.Equal("$schema,format,lint,name,packages,serve,test", Keys(props));
         Assert.Equal("host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
         Assert.Equal("exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
+        Assert.Equal("endOfLine,exclude,include,indent,maxBlankLines,preserve,printWidth,tabWidth", Keys(props.GetProperty("format").GetProperty("properties")));
 
         // Every key the schema allows is one ProjectConfig reads.
-        var c = Parse("""{ "$schema": "x", "name": "n", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] } }""");
+        var c = Parse("""{ "$schema": "x", "name": "n", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] }, "format": { "indent": 4, "tabWidth": 4, "printWidth": 100, "maxBlankLines": 1, "endOfLine": "lf", "preserve": ["echo"], "include": [], "exclude": [] } }""");
         Assert.Empty(c.Warnings);
         Assert.Equal(5, c.Test.Timeout);
         Assert.Equal(
@@ -165,6 +166,12 @@ public class ProjectConfigTests
         Assert.Equal(
             props.GetProperty("lint").GetProperty("properties").GetProperty("include").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
             LintSettings.DefaultInclude);
+        Assert.Equal(
+            props.GetProperty("format").GetProperty("properties").GetProperty("include").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
+            FormatSettings.DefaultInclude);
+        Assert.Equal(
+            props.GetProperty("format").GetProperty("properties").GetProperty("exclude").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
+            FormatSettings.DefaultExclude);
     }
 }
 

@@ -9,6 +9,7 @@ kscript make project my-site --port 3000
 cd my-site
 kscript serve      # http://localhost:3000, from kscript.json
 kscript check      # checks every page and script in the project
+kscript fmt        # tidies every script and page in the project
 kscript test       # runs the tests in tests/
 ```
 
@@ -16,7 +17,7 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
 
 ## Project settings: kscript.json
 
-`kscript serve`, `kscript check`, `kscript make` and the editor read the nearest `kscript.json` in the folder they work on or a parent folder, so they behave the same from anywhere in the project. Every setting is optional:
+`kscript serve`, `kscript check`, `kscript fmt`, `kscript make` and the editor read the nearest `kscript.json` in the folder they work on or a parent folder, so they behave the same from anywhere in the project. Every setting is optional:
 
 ```jsonc
 {
@@ -38,6 +39,11 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
     "packages": ["KScript.Terminal"]        // imported by test files only
+  },
+  "format": {
+    "indent": 2,           // spaces per level, or "tab"; used by kscript fmt and Format Document
+    "printWidth": 120,     // start tags past this column get one attribute per line
+    "exclude": ["vendor"]  // see docs/formatting.md for every format setting
   }
 }
 ```
@@ -45,6 +51,7 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
 - A pattern without a `/` (such as `_templates` or `*.draft.html`) matches a file or folder of that name anywhere. Otherwise it is matched against the path from `kscript.json`: `*` stays within a folder, `**` spans folders, and a folder matches everything in it.
 - `rules` changes how serious a diagnostic is (see [the codes](language-server.md#diagnostic-codes)). The longest match wins, so `"KS3*": "warning"` with `"KS3001": "error"` keeps unknown elements as errors.
 - Comments and trailing commas are allowed. Unknown settings are reported as warnings rather than ignored silently, and the VS Code extension validates the file and completes its settings as you type.
+- `format` sets the style for `kscript fmt` and the editor's Format Document. See [Formatting](formatting.md) for every setting.
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
 - `kscript serve` never serves `kscript.json`.
 
