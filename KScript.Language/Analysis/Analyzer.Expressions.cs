@@ -213,6 +213,7 @@ namespace KScript.Language.Analysis
             if (command != null)
             {
                 RequirePackage(command.Package, full, $"@{command.Name}()");
+                ReportDeprecatedCall(command, $"@{command.Name}", nameSpan, count >= 0 ? c.Arguments : null, piped, region);
                 if (count >= 0 && CheckNamedArguments($"@{command.Name}()", c.Arguments, piped, SlotsOf(new[] { command }), region, full))
                 {
                     return;
@@ -452,6 +453,10 @@ namespace KScript.Language.Analysis
                 return;
             }
 
+            if (applicable.Count == 1 || applicable.All(m => m.Deprecated != null))
+            {
+                ReportDeprecatedCall(applicable[0], $"->{name}", nameSpan, count >= 0 ? args : null, 0, region);
+            }
             if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(applicable), region, nameSpan))
             {
                 return;

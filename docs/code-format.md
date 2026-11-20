@@ -75,7 +75,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `stars: int from stargazers_count` (in a type) | `<field name="stars" type="int" from="stargazers_count" />` |
 | `topics?: string[] = []`, `label => $name + '!'` | `<field name="topics?" type="string[]" default="[]" />`, `<field name="label" value="$name + '!'" />` |
 
-A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Typed data](language.md#typed-data) for what each part does.
+A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Field lines](language.md#field-lines) for what each part does.
 
 Any other name is an element: `name(attribute: value, ...) "text" { children }`, each part optional.
 

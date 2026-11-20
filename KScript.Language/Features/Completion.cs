@@ -173,14 +173,15 @@ namespace KScript.Language.Features
                 {
                     Label = e.Name,
                     Kind = CompletionKind.Element,
-                    Detail = PackageDetail(analysis, e.Package, "KScript element"),
+                    Detail = PackageDetail(analysis, e.Package, e.Deprecated != null ? "KScript element (deprecated)" : "KScript element"),
                     Documentation = ElementMarkdown(e, analysis.Markup.Syntax == SourceSyntax.Code),
+                    Deprecated = e.Deprecated != null,
                     AdditionalEdits = ImportEdits(analysis, e.Package),
                     InsertText = snippets ? openBracket + ElementSnippet(e) : null,
                     IsSnippet = snippets,
                     ReplaceSpan = replace,
                     FilterText = openBracket.Length > 0 ? e.Name : null,
-                    SortText = "0" + e.Name,
+                    SortText = (e.Deprecated != null ? "9" : "0") + e.Name,
                 });
             }
 
@@ -380,12 +381,13 @@ namespace KScript.Language.Features
                 {
                     Label = a.Name,
                     Kind = CompletionKind.Attribute,
-                    Detail = (a.Required ? "required " : string.Empty) + KindLabel(a.Kind),
-                    Documentation = a.Description + OptionsLine(a),
+                    Detail = (a.Required ? "required " : string.Empty) + KindLabel(a.Kind) + (a.Deprecated != null ? " (deprecated)" : string.Empty),
+                    Documentation = DeprecationLine(a.Deprecated, a.Name) + a.Description + OptionsLine(a),
+                    Deprecated = a.Deprecated != null,
                     InsertText = !code ? a.Name + "=\"$1\"" : quoted ? a.Name + ": \"$1\"" : a.Name + ": $1",
                     IsSnippet = true,
                     ReplaceSpan = TextSpan.FromBounds(start, offset),
-                    SortText = (a.Required ? "0" : "1") + a.Name,
+                    SortText = (a.Deprecated != null ? "9" : a.Required ? "0" : "1") + a.Name,
                 });
             }
             return items;
@@ -781,11 +783,12 @@ namespace KScript.Language.Features
                 Detail = PackageDetail(analysis, c.Package, c.Labels.FirstOrDefault()),
                 AdditionalEdits = ImportEdits(analysis, c.Package),
                 Documentation = CallableMarkdown(c),
+                Deprecated = c.Deprecated != null,
                 InsertText = sigil + c.Name + (c.MaxArgs == 0 ? "()" : "($1)"),
                 IsSnippet = true,
                 ReplaceSpan = replace,
                 FilterText = c.Name,
-                SortText = "2" + c.Name,
+                SortText = (c.Deprecated != null ? "9" : "2") + c.Name,
             }));
             return items;
         }
@@ -844,10 +847,11 @@ namespace KScript.Language.Features
                     Detail = m.Labels.First() + ": " + MethodResult(m, receiver).Display()
                              + (m.ReceiverType != KType.Any && m.ReceiverType != receiver.Type ? "  (" + m.ReceiverType + ")" : string.Empty),
                     Documentation = CallableMarkdown(m, receiver.Type != KType.Any ? receiver : null),
+                    Deprecated = m.Deprecated != null,
                     InsertText = m.Name + (m.MaxArgs == 0 ? "()" : "($1)"),
                     IsSnippet = true,
                     ReplaceSpan = replace,
-                    SortText = (receiver.Type == KType.Any || m.ReceiverType == receiver.Type ? "0" : m.ReceiverType == KType.Any ? "1" : "2") + m.Name,
+                    SortText = (m.Deprecated != null ? "9" : receiver.Type == KType.Any || m.ReceiverType == receiver.Type ? "0" : m.ReceiverType == KType.Any ? "1" : "2") + m.Name,
                 }).ToList();
 
         /// <summary>What a method returns on this receiver: list methods such as filter keep the item type.</summary>

@@ -80,7 +80,11 @@ A controller is a plain `fn`. Its parameters are filled in by name:
 A typed parameter is converted, so `id: int` gives a number. A `type` maps the request data into a record, so the controller only sees data of the right shape:
 
 ```kscript
-type NewPerson(fields: "name: string, age?: int, role?: string")
+type NewPerson {
+  name: string
+  age?: int
+  role?: string
+}
 
 fn store(json: NewPerson) {
   // $json is a NewPerson record
@@ -110,7 +114,11 @@ kscript {
     return @view('people/show', person: $person)
   }
 
-  type NewPerson(fields: "name: string, age?: int, role?: string")
+  type NewPerson {
+    name: string
+    age?: int
+    role?: string
+  }
 
   fn store(json: NewPerson) {
     // POST /api/people
