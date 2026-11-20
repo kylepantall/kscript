@@ -15,10 +15,11 @@ namespace KScript.Testing
     {
         public const string Usage = "kscript test [file-or-folder]... [--filter <text>] [--timeout <seconds>] [--junit <file>]";
 
-        public static int Run(string[] args, TextWriter output, TextWriter error, CancellationToken cancellation = default, bool? color = null)
+        public static int Run(string[] args, TextWriter output, TextWriter error, CancellationToken cancellation = default, bool? color = null, string workingDirectory = null)
         {
+            string cwd = workingDirectory ?? Directory.GetCurrentDirectory();
             var paths = new List<string>();
-            var settings = new TestRunSettings { Cancellation = cancellation };
+            var settings = new TestRunSettings { Cancellation = cancellation, BaseDirectory = cwd };
             string junit = null;
 
             for (int i = 0; i < args.Length; i++)
@@ -64,13 +65,13 @@ namespace KScript.Testing
                 ProjectConfig project = null;
                 try
                 {
-                    project = ProjectConfig.FindAndLoad(Directory.GetCurrentDirectory());
+                    project = ProjectConfig.FindAndLoad(cwd);
                 }
                 catch (ProjectConfigException ex)
                 {
                     return Fail(error, ex.Message);
                 }
-                paths.Add(project?.Directory ?? Directory.GetCurrentDirectory());
+                paths.Add(project?.Directory ?? cwd);
             }
 
             var missing = new List<string>();
