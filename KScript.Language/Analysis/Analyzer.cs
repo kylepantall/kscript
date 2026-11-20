@@ -935,6 +935,13 @@ namespace KScript.Language.Analysis
                 case AttributeKind.DeclareVariable:
                     CheckIdentifier(attr.Value);
                     break;
+                case AttributeKind.Statements:
+                {
+                    Scope handlerScope = new Scope(scope, e.Span);
+                    handlerScope.Declare(BuiltIn("event"), e.Span.Start);
+                    AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
+                    break;
+                }
             }
         }
 

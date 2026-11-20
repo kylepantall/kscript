@@ -17,7 +17,7 @@ This is KScript 2: expressions, `{ }` interpolation, typed values, lambdas and p
 </kscript>
 ```
 
-Save it as `hello.ks.xml` and run `kscript hello.ks.xml`. More examples live in [`Example Scripts/`](Example%20Scripts) and [`samples/kscript2/`](samples/kscript2), and [`samples/life-lab/`](samples/life-lab) is a complete program (Conway's Game of Life) that runs in a terminal, in the browser and as a Mac app from one shared script.
+Save it as `hello.ks.xml` and run `kscript hello.ks.xml`. More examples live in [`Example Scripts/`](Example%20Scripts) and [`samples/kscript2/`](samples/kscript2), and [`samples/life-lab/`](samples/life-lab) is a complete program (Conway's Game of Life) that runs in a terminal, in the browser and as a desktop app from one shared script.
 
 ## Building and running
 
@@ -97,14 +97,15 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 | `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
 | `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/` | Packages: each registers its elements, commands and methods, with their documentation. |
 | `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
+| `KScript.UI/` | Desktop windows: the KScript.UI package, the redraw model (`UISession`) and the Avalonia host that shows it on macOS, Windows and Linux. |
 | `KScript.Test/` | The KScript.Test package and `kscript test`: finding test files, running them, and the console and JUnit reports. |
-| `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript ide` and `kscript update`. |
+| `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript ide`, `kscript update` and `kscript app build` (`Apps/`). |
 | `KScriptApp/` | The `kscript` command line app. |
 | `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
 | `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |
 | `editors/vscode/` | The VS Code extension. |
 | `samples/kscript2/` | Sample scripts. |
-| `samples/life-lab/` | Life Lab: one KScript program that runs in a terminal, in the browser and as a Mac app. |
+| `samples/life-lab/` | Life Lab: one KScript program that runs in a terminal, in the browser and as a desktop app (`KScript.UI`). |
 | `Example Scripts/` | More sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 
@@ -227,6 +228,7 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 | `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
+| `KScript.UI` | Desktop windows: a script whose root is `<KScript.Window>` opens one. `<Column>` `<Row>` `<Grid>` `<Text>` `<Button>` `<TextBox>` `<CheckBox>` `<Select>` `<Slider>` `<Box>` `<Spacer>` `<Timer>`, `@close_window()`. See [Desktop apps](#desktop-apps-kscriptui). |
 | `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](#testing-scripts-kscript-test)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).
@@ -312,7 +314,53 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 - `on-tick="…" every="200"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if test="$playing"><span on-tick="frame += 1" every="100"></span></if>`.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
 
-See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter, and [`samples/life-lab`](samples/life-lab) for a game whose rules are a KScript script shared with a terminal version and a Mac app.
+See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter, and [`samples/life-lab`](samples/life-lab) for a game whose rules are a KScript script shared with a terminal version and a desktop app.
+
+## Desktop apps: KScript.UI
+
+A script whose root element is `<KScript.Window>` opens a native window on macOS, Windows or Linux. There is nothing else to write: no Swift, C#, XAML or shell scripts.
+
+```xml
+<KScript.Window title="Counter" width="320" height="200">
+  <let name="count" value="0" />
+
+  <Text size="32">{$count}</Text>
+  <Row>
+    <Button variant="primary" on-click="count += 1">Add one</Button>
+    <Button on-click="count = 0" disabled="$count eq 0">Reset</Button>
+  </Row>
+</KScript.Window>
+```
+
+`kscript counter.ks.xml` opens it, and the script ends when the window is closed. It works like a `<live>` block on a page:
+
+- The `<let>`, `<fn>` and `<import>` elements directly inside `<KScript.Window>` run once and hold the window's state.
+- Everything else is the layout. After every `on-click`, `on-change`, `on-enter` or `on-tick`, the layout is drawn again from the variables. `<if>`, `<for>` and `{ }` work as they do anywhere else. Controls stay the same object from one draw to the next, so typing and focus aren't lost.
+- `bind="name"` ties a `<TextBox>`, `<CheckBox>`, `<Select>` or `<Slider>` to a state variable. `$event.value` holds the new value in `on-change`.
+- `<Timer every="100" when="$playing" on-tick="...">` runs on a timer while `when` is true.
+- If a handler fails, the error is shown at the top of the window and the window carries on.
+- `<KScript.Window>` can also go inside a `<kscript>` script. The script waits while the window is open, then carries on with the window's changes.
+
+| Element | What it is |
+| --- | --- |
+| `<Column gap align scroll>`, `<Row gap align wrap>`, `<Grid columns gap>` | Layout: top to bottom, side by side, or equal columns. |
+| `<Text size weight color wrap>` | Text. |
+| `<Button on-click variant="primary" disabled>` | A button. |
+| `<TextBox bind placeholder on-enter multiline>`, `<CheckBox bind>`, `<Select bind options>`, `<Slider bind min max step>` | Inputs, each tied to a variable. `options` is a list, a list of `{ label, value }` maps, or a map from label to value. |
+| `<Box on-click border>` | A rectangle: a cell, a card or a panel. It can hold other elements. |
+| `<Spacer size>`, `<Timer every when on-tick>` | Space, and a timer. |
+
+Every element takes `width`, `height`, `padding`, `margin`, `background`, `radius` and `tooltip`. Colours are names such as `teal` or `#rrggbb`. `<KScript.Window>` takes `title`, `width`, `height`, `theme` (`dark`, `light` or `system`), `background`, `padding`, `gap` and `resizable`.
+
+### Packaging an app: kscript app build
+
+```sh
+kscript app build counter.ks.xml --name "Counter"
+```
+
+This builds `dist/Counter.app` on a Mac, and `dist/Counter/` with `Counter.exe` on Windows or a launcher and a `.desktop` file on Linux. It builds for the computer it runs on. The app holds the script's folder (or its whole `kscript.json` project, so imports and data files come along) and its own copy of `kscript`. Built with a release `kscript`, it runs on computers that don't have kscript or .NET. In a project, the `app` section of `kscript.json` names the main script, the app's name and its icon, so `kscript app build` needs no arguments. Mac apps are signed ad hoc, not notarized: macOS opens them on the Mac that built them, and elsewhere after right-clicking and choosing **Open**.
+
+[`samples/life-lab/desktop.ks.xml`](samples/life-lab/desktop.ks.xml) is a complete example: the Game of Life with a clickable board, a timer and controls, sharing its rules with a terminal and a browser version.
 
 ## Starting a project: kscript make project
 
@@ -352,6 +400,13 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
     "packages": ["KScript.Terminal"]        // imported by test files only
+  },
+  "app": {
+    "main": "app.ks.xml",       // what `kscript app build` packages (see Desktop apps)
+    "name": "My App",           // shown in the Dock, Start menu or launcher (default: the project's name)
+    "id": "com.example.myapp",  // the macOS bundle id
+    "version": "1.0.0",
+    "icon": "icon.icns"         // .icns for macOS, .ico for Windows, .png for Linux
   }
 }
 ```
@@ -455,5 +510,5 @@ See [docs/testing.md](docs/testing.md) for every element, check and setting.
 
 ## Roadmap
 
-KScript 2 is landing in steps. Scripts and `kscript serve` pages already share one interpreter; desktop windows (`KScript.UI`) and language models (`KScript.AI`) come next.
+KScript 2 is landing in steps. Scripts, `kscript serve` pages and desktop windows (`KScript.UI`) already share one interpreter; language models (`KScript.AI`) come next.
 

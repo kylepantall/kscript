@@ -1,16 +1,17 @@
 # Life Lab
 
-Conway's Game of Life, written once in KScript and run three ways: in a terminal, in the browser, and as a Mac app. All three use the same rules script, [`lib/life.ks.xml`](lib/life.ks.xml), so a change there changes every version.
+Conway's Game of Life, written once in KScript and run three ways: in a terminal, in the browser, and as a desktop app on macOS, Windows or Linux. All three use the same rules script, [`lib/life.ks.xml`](lib/life.ks.xml), so a change there changes every version.
 
 | File | What it is |
 | --- | --- |
 | `lib/life.ks.xml` | The shared logic: grids, the rules, ten built-in patterns, the `.cells` pattern format, worlds (generation, births, deaths, history) and spotting still lifes, oscillators and extinction. |
 | `life.ks.xml` | The terminal version: an animated, coloured board and a menu. |
 | `index.html`, `site.css` | The browser version, served by `kscript serve`. No JavaScript: every button runs KScript on the server and only the board is redrawn. |
-| `mac/` | `make-app.sh` builds `Life Lab.app`, a native macOS window around the browser version with `kscript` inside. |
+| `desktop.ks.xml` | The desktop version: a native window with `<KScript.Window>`. `kscript app build` packages it as an app. |
+| `kscript.json` | The project: the port `kscript serve` uses, and the app's name and main script for `kscript app build`. |
 | `tests/life.test.ks.xml` | Tests for the rules and the terminal version, run by `kscript test`. |
 
-Run the commands below from this folder (`samples/life-lab`). They need a `kscript` built from this repository, or a release that includes page imports and `on-tick`; to use the repository's build without installing it, replace `kscript` with `dotnet run --project ../../KScriptApp --`.
+Run the commands below from this folder (`samples/life-lab`). They need a `kscript` built from this repository, or a release that includes `KScript.UI` and `kscript app build`; to use the repository's build without installing it, replace `kscript` with `dotnet run --project ../../KScriptApp --`.
 
 ## In a terminal
 
@@ -32,19 +33,17 @@ Click cells to draw, then press **Play**. **Step**, **+10** and **+50** move on 
 
 The page imports the rules with `<import src="lib/life.ks.xml" />`, and **Play** uses an `on-tick` handler that runs every few hundred milliseconds while the game is playing.
 
-## On a Mac
+## As a desktop app
 
 ```sh
-cd mac
-./make-app.sh                 # builds kscript from this repository and bundles it (needs the .NET 8 SDK)
-open "Life Lab.app"
+kscript desktop.ks.xml     # opens Life Lab in a window
+kscript app build          # packages it: dist/Life Lab.app on a Mac, dist/Life Lab/ on Windows and Linux
+open "dist/Life Lab.app"   # macOS
 ```
 
-`make-app.sh --kscript ~/.kscript/bin/kscript` bundles an installed `kscript` instead of building one, and `--out ~/Applications` puts the app there. It needs the Xcode command line tools (`xcode-select --install`) for `swiftc`.
+`desktop.ks.xml` is an ordinary KScript file whose root element is `<KScript.Window>`. Its `<let>` elements hold the window's state, and the rest is the layout: `<Row>`, `<Grid>`, `<Button>`, `<Select>`, `<Slider>` and a `<Box>` for each cell. After every click the window is drawn again from the variables, the same way a `<live>` block on a page works. **Play** is a `<Timer when="$playing">`. There is no Swift, C# or shell script anywhere.
 
-The app is a small Swift program (`mac/LifeLab.swift`) that starts the bundled `kscript serve` on a free local port and shows the page in a native window; quitting the app stops the server. The app is signed ad hoc, not notarized, so it is meant for your own Mac.
-
-Native KScript windows (`KScript.UI`, with Avalonia) aren't built yet. Once they are, the Mac version can be a KScript script too, using the same `lib/life.ks.xml`.
+`kscript app build` reads the `app` section of `kscript.json` (the main script, the name and an optional icon) and copies this folder and `kscript` itself into the app. The app runs on computers without kscript when it is built with a release `kscript`. On a Mac it is signed ad hoc, not notarized, so it is meant for your own machine. If macOS won't open it, right-click it and choose **Open**.
 
 ## Tests
 

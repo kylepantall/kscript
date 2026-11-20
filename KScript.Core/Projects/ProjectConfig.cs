@@ -22,6 +22,25 @@ namespace KScript.Projects
         public string Host { get; set; } = "localhost";
     }
 
+    /// <summary>The <c>app</c> section: what <c>kscript app build</c> packages and how the app is named.</summary>
+    public sealed class AppSettings
+    {
+        /// <summary>The script the app runs, relative to kscript.json (usually one whose root is &lt;KScript.Window&gt;).</summary>
+        public string Main { get; set; }
+
+        /// <summary>The app's name, as shown in the Dock, Start menu or launcher. Defaults to the project's name.</summary>
+        public string Name { get; set; }
+
+        /// <summary>A reverse-DNS id such as com.example.lifelab (macOS bundle id). Made from the name when missing.</summary>
+        public string Id { get; set; }
+
+        /// <summary>The app's version, such as 1.0.0.</summary>
+        public string Version { get; set; }
+
+        /// <summary>An icon file relative to kscript.json: .icns for macOS, .ico for Windows, .png for Linux.</summary>
+        public string Icon { get; set; }
+    }
+
     /// <summary>The <c>lint</c> section: used by <c>kscript check</c> and by the language server.</summary>
     public sealed class LintSettings
     {
@@ -75,6 +94,7 @@ namespace KScript.Projects
     /// {
     ///   "name": "my-site",
     ///   "serve": { "root": ".", "port": 8080, "host": "localhost" },
+    ///   "app": { "main": "app.ks.xml", "name": "My App", "icon": "icon.icns" },
     ///   "lint": {
     ///     "exclude": ["_templates", "drafts/**"],
     ///     "rules": { "KS3003": "off", "KS4*": "error" },
@@ -99,6 +119,7 @@ namespace KScript.Projects
         public ServeSettings Serve { get; } = new ServeSettings();
         public LintSettings Lint { get; } = new LintSettings();
         public TestSettings Test { get; } = new TestSettings();
+        public AppSettings App { get; } = new AppSettings();
 
         /// <summary>
         /// Packages every script in the project imports without an &lt;import&gt;, such as KScript.Terminal.
@@ -187,6 +208,9 @@ namespace KScript.Projects
                         case "test":
                             ReadTest(prop.Value, config);
                             break;
+                        case "app":
+                            ReadApp(prop.Value, config);
+                            break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
                             foreach (string package in config.Packages)
@@ -196,12 +220,31 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve, lint or test).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve, lint, test or app).");
                             break;
                     }
                 }
             }
             return config;
+        }
+
+        private static void ReadApp(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "app", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "main": config.App.Main = String(p.Value, "app.main", config); break;
+                    case "name": config.App.Name = String(p.Value, "app.name", config); break;
+                    case "id": config.App.Id = String(p.Value, "app.id", config); break;
+                    case "version": config.App.Version = String(p.Value, "app.version", config); break;
+                    case "icon": config.App.Icon = String(p.Value, "app.icon", config); break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'app.{p.Name}' (expected main, name, id, version or icon).");
+                        break;
+                }
+            }
         }
 
         private static void ReadServe(JsonElement e, ProjectConfig config)
