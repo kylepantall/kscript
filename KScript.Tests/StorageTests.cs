@@ -73,7 +73,7 @@ public sealed class AppFoldersTests : StorageFixture
     [InlineData("cache", "/home/joan/Library/Caches/Life Lab")]
     [InlineData("logs", "/home/joan/Library/Logs/Life Lab")]
     public void MacOsUsesApplicationSupportCachesAndLogs(string kind, string expected) =>
-        Assert.Equal(expected, AppFolders.Folder("Life Lab", kind, "macos", Env(), Home));
+        Assert.Equal(expected, AppFolders.Folder("Life Lab", kind, "macos", Env(), Home).Replace('\\', '/'));
 
     [Theory]
     [InlineData("config", "/r/Life Lab")]
@@ -98,16 +98,16 @@ public sealed class AppFoldersTests : StorageFixture
     [InlineData("state", "/home/joan/.local/state/life-lab")]
     [InlineData("logs", "/home/joan/.local/state/life-lab/logs")]
     public void LinuxUsesTheXdgFolders(string kind, string expected) =>
-        Assert.Equal(expected, AppFolders.Folder("Life  Lab", kind, "linux", Env(), Home));
+        Assert.Equal(expected, AppFolders.Folder("Life  Lab", kind, "linux", Env(), Home).Replace('\\', '/'));
 
     [Fact]
     public void XdgVariablesWinWhenTheyAreAbsolute()
     {
         var env = Env(("XDG_CONFIG_HOME", "/x/config"), ("XDG_DATA_HOME", "/x/data"), ("XDG_CACHE_HOME", "/x/cache"), ("XDG_STATE_HOME", "relative/state"));
-        Assert.Equal("/x/config/notes", AppFolders.Folder("Notes", "config", "linux", env, Home));
-        Assert.Equal("/x/data/notes", AppFolders.Folder("Notes", "data", "linux", env, Home));
-        Assert.Equal("/x/cache/notes", AppFolders.Folder("Notes", "cache", "freebsd", env, Home));
-        Assert.Equal("/home/joan/.local/state/notes", AppFolders.Folder("Notes", "state", "linux", env, Home));
+        Assert.Equal("/x/config/notes", AppFolders.Folder("Notes", "config", "linux", env, Home).Replace('\\', '/'));
+        Assert.Equal("/x/data/notes", AppFolders.Folder("Notes", "data", "linux", env, Home).Replace('\\', '/'));
+        Assert.Equal("/x/cache/notes", AppFolders.Folder("Notes", "cache", "freebsd", env, Home).Replace('\\', '/'));
+        Assert.Equal("/home/joan/.local/state/notes", AppFolders.Folder("Notes", "state", "linux", env, Home).Replace('\\', '/'));
     }
 
     [Fact]
