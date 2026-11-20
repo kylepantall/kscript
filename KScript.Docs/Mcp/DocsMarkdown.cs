@@ -69,6 +69,7 @@ namespace KScript.Docs.Mcp
             }
             if (path == "/") return Home();
             if (path == "/cli") return Cli();
+            if (path == "/cli/make") return MakeCommands();
             if (path == "/reference") return ReferenceIndex(format);
             if (path == "/reference/variables") return Variables(Catalog.BuiltInVariables.Keys);
             if (path.StartsWith("/reference/methods/", StringComparison.Ordinal))
@@ -295,6 +296,24 @@ namespace KScript.Docs.Mcp
         #endregion
 
         #region Command line
+
+        /// <summary>The kscript make command directory: every type it makes, with its options and examples.</summary>
+        private static string MakeCommands()
+        {
+            var sb = new StringBuilder("# kscript make commands\n\n`kscript make <type> <name>` makes a file where the project keeps that kind of file. `kscript make --list` prints this list, and `kscript make <type> --help` prints one entry. `kscript make templates` copies the templates to the project's `_templates` folder to change them or add types.\n");
+            foreach (var (category, types) in KScript.Scaffolding.MakeCommand.Grouped(KScript.Scaffolding.Scaffolder.BuiltInTemplates()))
+            {
+                sb.Append($"\n## {category}\n");
+                foreach (KScript.Scaffolding.StubInfo t in types)
+                {
+                    sb.Append($"\n### kscript make {t.Type}\n\n```sh\nkscript make {t.Type} {t.Usage ?? "<name>"}\n```\n");
+                    if (t.Description != null) sb.Append('\n').Append(t.Description).Append('\n');
+                    foreach (KScript.Scaffolding.StubOption o in t.Options) sb.Append($"- `{o.Name}`: {o.Description}\n");
+                    if (t.Examples.Count > 0) sb.Append($"\nExample:\n\n```sh\n{string.Join("\n", t.Examples)}\n```\n");
+                }
+            }
+            return sb.ToString();
+        }
 
         private static string Cli()
         {

@@ -126,6 +126,7 @@ public sealed class McpTests : IDisposable
         Assert.Contains("kscript://docs", uris);
         Assert.Contains("kscript://docs/guide/mcp", uris);
         Assert.Contains("kscript://docs/reference/io", uris);
+        Assert.Contains("kscript://docs/cli/make", uris);
         Assert.DoesNotContain("kscript://docs/playground", uris);
         Assert.DoesNotContain("kscript://docs/404", uris);
         Assert.Equal("home", resources.First(r => r!["uri"]!.GetValue<string>() == "kscript://docs")!["name"]!.GetValue<string>());
