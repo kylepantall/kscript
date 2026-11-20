@@ -318,7 +318,7 @@ public sealed class CommandLineTests : IDisposable
     {
         string manifest = Write("x/kscript-app/kscript-app.json", "{}");
         string search = string.Join(Path.PathSeparator, Path.Combine(dir, "nothing"), Path.Combine(dir, "x"));
-        Assert.Equal(manifest, CompiledApp.FindManifest("kscript-app/kscript-app.json", search));
+        Assert.Equal(Path.GetFullPath(manifest), CompiledApp.FindManifest("kscript-app/kscript-app.json", search));
         Assert.Null(CompiledApp.FindManifest("kscript-app/kscript-app.json", Path.Combine(dir, "nothing")));
         Assert.Null(CompiledApp.FindManifest(null, search));
         Assert.Null(CompiledApp.FindManifest("kscript-app/kscript-app.json", null));
