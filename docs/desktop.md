@@ -42,6 +42,6 @@ kscript app build counter.ks.xml --name "Counter"
 
 This builds `dist/Counter.app` on a Mac, and `dist/Counter/` with `Counter.exe` on Windows or a launcher and a `.desktop` file on Linux. It builds for the computer it runs on. The app holds the script's folder (or its whole `kscript.json` project, so imports and data files come along) and its own copy of `kscript`. Built with a release `kscript`, it runs on computers that don't have kscript or .NET. In a project, the [`app` section of `kscript.json`](projects.md#project-settings-kscriptjson) names the main script, the app's name and its icon, so `kscript app build` needs no arguments. Mac apps are signed ad hoc, not notarized: macOS opens them on the Mac that built them, and elsewhere after right-clicking and choosing **Open**.
 
-`kscript make project my-app` starts a project with a desktop app already set up: `desktop.ks.xml` and the `app` section of `kscript.json` (leave them out with `--no-desktop`).
+`kscript make project my-app` starts a project with a desktop app already set up: `desktop.kscript` and the `app` section of `kscript.json` (leave them out with `--no-desktop`).
 
 [`samples/life-lab/desktop.ks.xml`](../samples/life-lab/desktop.ks.xml) is a complete example: the Game of Life with a clickable board, a timer and controls, sharing its rules with a terminal and a browser version.

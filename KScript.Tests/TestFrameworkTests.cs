@@ -452,12 +452,23 @@ public class TestFrameworkTests
     {
         using var site = new TempSite(("kscript.json", """{ "serve": { "root": "site" } }"""), ("site/index.html", "<p>hi</p>"));
         var result = Scaffolder.Make(new MakeRequest { Type = "test", Name = "cart/Checkout", Root = Path.Combine(site.Root, "site") });
-        Assert.Equal("tests/cart/checkout.test.ks.xml", result.RelativePath);
-        Assert.Equal(Path.Combine(site.Root, "tests", "cart", "checkout.test.ks.xml"), result.FullPath);
-        Assert.Contains("<describe name=\"Checkout\">", result.Content);
+        Assert.Equal("tests/cart/checkout.test.kscript", result.RelativePath);
+        Assert.Equal(Path.Combine(site.Root, "tests", "cart", "checkout.test.kscript"), result.FullPath);
+        Assert.Contains("describe(name: \"Checkout\")", result.Content);
 
         TestFileResult run = TestRunner.RunFile(result.FullPath, new TestRunSettings());
         Assert.Null(run.Error);
+        Assert.Equal(2, run.Tests.Count);
+        Assert.All(run.Tests, t => Assert.Equal(TestOutcome.Passed, t.Outcome));
+
+        // A project can ask for XML instead.
+        File.WriteAllText(Path.Combine(site.Root, "kscript.json"), """{ "serve": { "root": "site" }, "make": { "format": "xml" } }""");
+        var xml = Scaffolder.Make(new MakeRequest { Type = "test", Name = "cart/Checkout", Root = Path.Combine(site.Root, "site") });
+        Assert.Equal("tests/cart/checkout.test.ks.xml", xml.RelativePath);
+        Assert.Contains("<describe name=\"Checkout\">", xml.Content);
+        run = TestRunner.RunFile(xml.FullPath, new TestRunSettings());
+        Assert.Null(run.Error);
+        Assert.Equal(2, run.Tests.Count);
         Assert.All(run.Tests, t => Assert.Equal(TestOutcome.Passed, t.Outcome));
     }
 
@@ -472,7 +483,7 @@ public class TestFrameworkTests
             Assert.Equal(0, MakeCommand.Run(new[] { "project", "demo", "--dir", parent }, o, new StringWriter()));
             string project = Path.Combine(parent, "demo");
             List<string> files = TestRunner.Discover(new[] { project });
-            Assert.Equal(new[] { "greeting.test.ks.xml", "tasks.test.ks.xml" }, files.Select(Path.GetFileName).OrderBy(f => f, StringComparer.Ordinal));
+            Assert.Equal(new[] { "greeting.test.kscript", "tasks.test.kscript" }, files.Select(Path.GetFileName).OrderBy(f => f, StringComparer.Ordinal));
             var results = files.Select(f => TestRunner.RunFile(f, new TestRunSettings())).ToList();
             Assert.All(results, r => Assert.Null(r.Error));
             Assert.Equal(14, results.Sum(r => r.Tests.Count));

@@ -1,5 +1,0 @@
-<kscript>
-  <import src="../lib/greeting.ks.xml" />
-
-  <echo>{ @greeting($args[0] ?? '{{ title }}') }</echo>
-</kscript>

@@ -1,0 +1,17 @@
+--- make
+description: A test file in tests/, run with kscript test
+base: project
+to: tests/{{ dir }}{{ kebab }}.test{{ ext }}
+hint: Run it: kscript test tests/{{ dir }}{{ kebab }}.test{{ ext }}
+---
+// Bring in what you're testing, e.g. import "../lib/{{ kebab }}{{ ext }}"
+
+describe(name: "{{ title }}") {
+  test(name: "adds numbers") {
+    expect(value: 1 + 2, equals: 3)
+  }
+
+  test(name: "joins text") {
+    assert(test: ['a', 'b']->join('-') == 'a-b')
+  }
+}

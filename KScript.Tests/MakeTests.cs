@@ -228,8 +228,16 @@ public class ScaffolderTests
     public void ScriptRuns()
     {
         using var site = new TempSite();
+        // Scripts are .kscript by default, and XML with --format xml.
         Assert.Equal(0, Make(site.Root, "script", "tidy_downloads").Code);
-        string xml = Read(site, "tidy-downloads.xml");
+        Assert.Equal("echo \"Hello from Tidy Downloads!\"\n", Read(site, "tidy-downloads.kscript"));
+        var output = new StringWriter();
+        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(output, "")).RunFile(Path.Combine(site.Root, "tidy-downloads.kscript"));
+        Assert.Contains("Hello from Tidy Downloads!", output.ToString());
+
+        Assert.Equal(0, Make(site.Root, "script", "tidy_downloads", "--format", "xml").Code);
+        string xml = Read(site, "tidy-downloads.ks.xml");
+        Assert.StartsWith("<kscript>", xml);
         Assert.Contains("Hello from Tidy Downloads!", ScriptRunner.Run(xml));
     }
 
@@ -297,7 +305,7 @@ public class ScaffolderTests
         using var site = new TempSite();
         var (code, output, _) = Make(site.Root, "templates");
         Assert.Equal(0, code);
-        foreach (var f in new[] { "component.html", "page.html", "markdown.md", "layout.html", "script.xml" })
+        foreach (var f in new[] { "component.html", "page.html", "markdown.md", "layout.html", "script.kscript", "test.kscript" })
         {
             Assert.Contains($"Created _templates/{f}", output);
             Assert.True(File.Exists(Path.Combine(site.Root, "_templates", f)));

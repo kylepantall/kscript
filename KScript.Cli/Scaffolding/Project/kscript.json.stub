@@ -14,20 +14,24 @@
 {{/if}}
 {{#if desktop}}
   "app": {
-    "main": "desktop.ks.xml",
+    "main": "desktop{{ ext }}",
     "name": "{{ title }}",
     "id": "app.kscript.{{ kebab }}",
     "version": "1.0.0"
   },
 {{/if}}
+  // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
+  "make": {
+    "format": "{{ format }}"
+  },
   "lint": {
-    "include": ["**/*.html", "**/*.md", "**/*.ks.xml"],
+    "include": ["**/*.html", "**/*.md", "**/*.kscript", "**/*.ks.xml"],
     "exclude": ["_templates", "node_modules", "dist"],
     "rules": {},
     "warningsAsErrors": false
   },
   "test": {
-    "include": ["tests/**/*.test.ks.xml"],
+    "include": ["tests/**/*.test.kscript", "tests/**/*.test.ks.xml"],
     "timeout": 10
   }
 }
