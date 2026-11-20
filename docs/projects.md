@@ -24,7 +24,7 @@ What it makes:
 | `tasks.html` | A to-do list in a [`<live>`](web.md#reactive-pages-with-live-no-javascript) block, with no JavaScript. |
 | `lib/tasks.kscript` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app, the API and the tests. |
 | `desktop.kscript` | The same to-do list as a [`<KScript.Window>`](desktop.md) desktop app. |
-| `routes/api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). |
+| `routes/api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). While `kscript serve` runs, its docs are at `/_api` ([OpenAPI](http.md#api-docs-openapi)). |
 | `config/config.yaml` | Settings every script and page reads as `$config` (`config.root` in `kscript.json` points there). |
 | `lib/greeting.kscript`, `scripts/hello.kscript` | A function and a command-line script that uses it. |
 | `tests/tasks.test.kscript`, `tests/greeting.test.kscript` | Tests for the rules and the script, run with `kscript test`. |

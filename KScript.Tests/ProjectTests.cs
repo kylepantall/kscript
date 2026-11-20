@@ -145,7 +145,7 @@ public class ProjectConfigTests
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
         Assert.Equal("$schema,app,config,format,http,lint,make,name,packages,paths,serve,standard,test", Keys(props));
-        Assert.Equal("api_prefix,auth,cors,groups,middleware,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
+        Assert.Equal("api_prefix,auth,cors,groups,middleware,openapi,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
         Assert.Equal("credentials,headers,methods,origins", Keys(props.GetProperty("http").GetProperty("properties").GetProperty("cors").GetProperty("properties")));
         Assert.Equal("icon,id,main,name,version", Keys(props.GetProperty("app").GetProperty("properties")));
         Assert.Equal("format", Keys(props.GetProperty("make").GetProperty("properties")));

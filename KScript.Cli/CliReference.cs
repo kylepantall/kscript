@@ -60,6 +60,14 @@ namespace KScript
                 "kscript serve\nkscript serve site --port 3000", "web"),
             new CliCommand("routes", "kscript routes [site folder]",
                 "List the routes of a site.", Array.Empty<CliOption>(), "kscript routes samples/http-app", "http"),
+            new CliCommand("openapi", "kscript openapi [site folder] [--yaml] [--out file]",
+                "Write the OpenAPI 3.1 document for a site's routes, made from the code. kscript serve also answers /_openapi.json, /_openapi.yaml and /_api.",
+                new[]
+                {
+                    O("--yaml", "Write YAML instead of JSON (also chosen by an --out file ending in .yaml or .yml)."),
+                    O("--out file", "Write to a file instead of the terminal."),
+                },
+                "kscript openapi\nkscript openapi --yaml --out openapi.yaml", "http"),
             new CliCommand("docs", "kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open]",
                 "Open these docs: a local website with every package, element, command and method, and examples you can run.",
                 new[]

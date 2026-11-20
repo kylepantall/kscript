@@ -245,6 +245,7 @@ namespace KScript.Http
                 RedirectTo = redirect,
                 RedirectStatus = run.Has("status") ? (int)run.Number("status", 302) : 302,
                 Inline = inline ? run.Element : null,
+                Element = run.Element,
                 Module = run.Module,
                 Scope = run.Scope,
                 Api = ctx.Api,

@@ -154,6 +154,65 @@ namespace KScript
             return rest.ToArray();
         }
 
+        /// <summary>kscript openapi [folder] [--yaml] [--out file]: the OpenAPI document made from a site's routes.</summary>
+        int OpenApi(string[] args)
+        {
+            string output = null, folder = null;
+            bool yaml = false;
+            for (int i = 0; i < args.Length; i++)
+            {
+                switch (args[i])
+                {
+                    case "--yaml": yaml = true; break;
+                    case "--json": yaml = false; break;
+                    case "--out":
+                    case "-o":
+                        if (i + 1 >= args.Length)
+                        {
+                            Error.WriteLine("--out needs a file name.");
+                            return 1;
+                        }
+                        output = args[++i];
+                        break;
+                    default:
+                        if (args[i].StartsWith("-", StringComparison.Ordinal))
+                        {
+                            Error.WriteLine($"Unknown option '{args[i]}' for kscript openapi. Use --yaml or --out file.");
+                            return 1;
+                        }
+                        folder = args[i];
+                        break;
+                }
+            }
+            if (output != null && (output.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || output.EndsWith(".yml", StringComparison.OrdinalIgnoreCase))) yaml = true;
+            if (!TryFindSite(ref folder, out KScript.Projects.ProjectConfig project)) return 1;
+            return KScript.Http.HttpServer.WriteOpenApi(folder ?? ".", project, yaml, output, Out, Error);
+        }
+
+        /// <summary>The site folder for a command given an optional folder: the project's site root when it names the project.</summary>
+        bool TryFindSite(ref string folder, out KScript.Projects.ProjectConfig project)
+        {
+            project = null;
+            try
+            {
+                project = KScript.Projects.ProjectConfig.FindAndLoad(folder ?? ".");
+            }
+            catch (KScript.Projects.ProjectConfigException ex)
+            {
+                Error.WriteLine(ex.Message);
+                return false;
+            }
+            string given = folder == null ? null : Path.GetFullPath(folder);
+            if (project != null && (given == null || string.Equals(given.TrimEnd(Path.DirectorySeparatorChar), project.Directory, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)))
+                folder = project.SiteRoot;
+            if (!Directory.Exists(folder ?? "."))
+            {
+                Error.WriteLine($"Site folder not found: {folder}");
+                return false;
+            }
+            return true;
+        }
+
         /// <summary>kscript routes [folder]: the route table of a site (the project's site root by default).</summary>
         int Routes(string[] args)
         {
@@ -271,6 +330,11 @@ namespace KScript
             if (args[0] == "routes")
             {
                 return Routes(args.Skip(1).ToArray());
+            }
+
+            if (args[0] == "openapi")
+            {
+                return OpenApi(args.Skip(1).ToArray());
             }
 
             if (args[0] == "convert")
