@@ -265,3 +265,78 @@ public class WebCoverageTests
         Assert.Equal(409, PageServer.HandleLive(new PageSite(site.Root), stale, new Dictionary<string, object>()).Status);
     }
 }
+
+/// <summary>How kscript serve writes a result, without Kestrel.</summary>
+public class PageServerWriteTests
+{
+    /// <summary>A response body that fails the test if SendFileAsync is used, which crashed kscript docs on macOS.</summary>
+    private sealed class NoSendFile : Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature
+    {
+        public MemoryStream Body { get; } = new MemoryStream();
+        public Stream Stream => Body;
+        public System.IO.Pipelines.PipeWriter Writer => System.IO.Pipelines.PipeWriter.Create(Body);
+        public void DisableBuffering() { }
+        public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task CompleteAsync() => Task.CompletedTask;
+        public Task SendFileAsync(string path, long offset, long? count, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("SendFileAsync is not used: it crashed the single-file kscript on macOS.");
+    }
+
+    private static (DefaultHttpContext Context, NoSendFile Body) Context(string method = "GET")
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = method;
+        var body = new NoSendFile();
+        context.Features.Set<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>(body);
+        context.Response.Body = body.Body;
+        return (context, body);
+    }
+
+    [Fact]
+    public async Task Files_are_copied_without_SendFileAsync()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "kscript-send-" + Guid.NewGuid().ToString("N") + ".css");
+        File.WriteAllText(path, "body { color: red; }");
+        try
+        {
+            var (context, body) = Context();
+            await PageServer.WriteAsync(context.Response, new PageResult { ContentType = "text/css", FilePath = path });
+            Assert.Equal("body { color: red; }", System.Text.Encoding.UTF8.GetString(body.Body.ToArray()));
+            Assert.Equal(20, context.Response.ContentLength);
+            Assert.Equal("text/css", context.Response.ContentType);
+
+            var (head, headBody) = Context("HEAD");
+            await PageServer.WriteAsync(head.Response, new PageResult { ContentType = "text/css", FilePath = path });
+            Assert.Equal(20, head.Response.ContentLength);
+            Assert.Equal(0, headBody.Body.Length);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Text_redirects_and_not_modified()
+    {
+        var (page, pageBody) = Context();
+        var result = new PageResult { Status = 201, ContentType = "text/html", Body = "<p>hi</p>" };
+        result.Headers["X-Test"] = "1";
+        await PageServer.WriteAsync(page.Response, result);
+        Assert.Equal(201, page.Response.StatusCode);
+        Assert.Equal("1", page.Response.Headers["X-Test"].ToString());
+        Assert.Equal("<p>hi</p>", System.Text.Encoding.UTF8.GetString(pageBody.Body.ToArray()));
+
+        var (cached, cachedBody) = Context();
+        await PageServer.WriteAsync(cached.Response, new PageResult { Status = 304, Body = "ignored" });
+        Assert.Equal(304, cached.Response.StatusCode);
+        Assert.Equal(0, cachedBody.Body.Length);
+
+        var (moved, movedBody) = Context();
+        var redirect = new PageResult { Status = 302, Body = string.Empty };
+        redirect.Headers["Location"] = "/next";
+        await PageServer.WriteAsync(moved.Response, redirect);
+        Assert.Equal("/next", moved.Response.Headers.Location.ToString());
+        Assert.Equal(0, movedBody.Body.Length);
+    }
+}
