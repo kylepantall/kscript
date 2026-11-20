@@ -10,7 +10,14 @@ quarters = [
 ]
 total = $quarters->map(fn($q) => $q.signups)->sum()
 
-KScript.Document(template: report, title: "Annual Report 2026", subtitle: "Life Lab: a year in numbers", author: "The Life Lab team", date: "December 2026", into: report) {
+KScript.Document(
+  template: report,
+  title: "Annual Report 2026",
+  subtitle: "Life Lab: a year in numbers",
+  author: "The Life Lab team",
+  date: "December 2026",
+  into: report
+) {
   Contents
 
   Section(title: Summary) {
@@ -24,7 +31,13 @@ KScript.Document(template: report, title: "Annual Report 2026", subtitle: "Life 
   }
 
   Section(title: Growth, new-page) {
-    Table(caption: "Visitors and sign-ups by quarter.", id: tab-growth, data: $quarters, columns: { Quarter: 'quarter', Visitors: 'visitors', 'Sign-ups': 'signups' }, align: "lrr")
+    Table(
+      caption: "Visitors and sign-ups by quarter.",
+      id: tab-growth,
+      data: $quarters,
+      columns: { Quarter: 'quarter', Visitors: 'visitors', 'Sign-ups': 'signups' },
+      align: "lrr"
+    )
 
     Paragraph "The conversion rate is the share of visitors who sign up:"
 

@@ -26,14 +26,15 @@ namespace KScript.LanguageServer
             int? tabSize = o?["tabSize"] is JsonValue t && t.TryGetValue(out int size) ? size : null;
             bool? insertSpaces = o?["insertSpaces"] is JsonValue s && s.TryGetValue(out bool spaces) ? spaces : null;
             KScript.Projects.ProjectConfig project = ProjectFor(doc.Path);
-            // The formatter reads XML; .kscript files have no formatter yet, so they are left as they are.
-            if (MarkupParser.IsCodePath(doc.Path) || (project != null && (!project.Format.Enabled || project.IsFormatExcluded(doc.Path))))
+            if (project != null && (!project.Format.Enabled || project.IsFormatExcluded(doc.Path)))
             {
                 return new JsonArray();
             }
             FormatOptions options = FormatOptions.From(project, tabSize, insertSpaces);
 
-            FormatResult result = Formatter.Format(doc.Text, doc.Kind, options);
+            // .kscript files (or an unsaved document in the KScript (code) language) have their own formatter.
+            bool code = MarkupParser.IsCodePath(doc.Path) || (doc.Path == null && doc.LanguageId == "kscript-code");
+            FormatResult result = code ? CodeFormatter.Format(doc.Text, options) : Formatter.Format(doc.Text, doc.Kind, options);
             if (!result.Succeeded)
             {
                 if (doc.Kind != DocumentKind.Markdown)

@@ -10,7 +10,14 @@ patterns = [
   { name: 'Pulsar', period: 3, speed: '0', cells: 48 },
 ]
 
-KScript.Document(template: paper, title: "How Gliders Move", subtitle: "A note on Conway's Game of Life", date: "20 November 2026", keywords: "cellular automata, Game of Life", to: "paper.pdf, paper.docx, paper.tex") {
+KScript.Document(
+  template: paper,
+  title: "How Gliders Move",
+  subtitle: "A note on Conway's Game of Life",
+  date: "20 November 2026",
+  keywords: "cellular automata, Game of Life",
+  to: "paper.pdf, paper.docx, paper.tex"
+) {
   Author(affiliation: "Department of Computing, Example University", email: "ada@example.org") "Ada Lovelace"
   Author(affiliation: "Institute of Patterns") "Alan Turing"
 
@@ -33,7 +40,12 @@ KScript.Document(template: paper, title: "How Gliders Move", subtitle: "A note o
   }
 
   Section(title: Gliders) {
-    Figure(src: "glider.png", caption: "A glider over four generations: after \( p = 4 \) steps it has moved one cell down and to the right.", id: fig-glider, width: 0.8)
+    Figure(
+      src: "glider.png",
+      caption: "A glider over four generations: after \( p = 4 \) steps it has moved one cell down and to the right.",
+      id: fig-glider,
+      width: 0.8
+    )
 
     Paragraph "A pattern with period \( p \) that moves \( (\Delta x, \Delta y) \) cells has speed"
 
@@ -41,7 +53,13 @@ KScript.Document(template: paper, title: "How Gliders Move", subtitle: "A note o
 
     Paragraph "where \( c \) is one cell per generation, the fastest any signal can travel. For the glider, \( \Delta x = \Delta y = 1 \) and \( p = 4 \), so \( v = c/4 \)."
 
-    Table(caption: "Some small patterns and their periods.", id: tab-patterns, data: $patterns, columns: { Pattern: 'name', Period: 'period', Speed: 'speed', Cells: 'cells' }, align: "lrrr")
+    Table(
+      caption: "Some small patterns and their periods.",
+      id: tab-patterns,
+      data: $patterns,
+      columns: { Pattern: 'name', Period: 'period', Speed: 'speed', Cells: 'cells' },
+      align: "lrrr"
+    )
 
     Section(title: Population) {
       Paragraph "The population of a glider is always 5. Across all phases the mean density in its \( 3 \times 3 \) bounding box is \( \tfrac{5}{9} \approx 0.56 \)."

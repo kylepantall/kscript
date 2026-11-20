@@ -247,7 +247,7 @@ public class ScaffolderTests
         using var site = new TempSite();
         Assert.Equal(0, Make(site.Root, "document", "annual_report").Code);
         string script = Read(site, "documents/annual-report.kscript");
-        Assert.Contains("template: paper, title: \"Annual Report\"", script);
+        Assert.Contains("template: paper,\n  title: \"Annual Report\"", script);
         new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(new StringWriter(), "")).RunFile(Path.Combine(site.Root, "documents", "annual-report.kscript"));
         Assert.StartsWith("%PDF-", File.ReadAllText(Path.Combine(site.Root, "documents", "annual-report.pdf")));
         Assert.True(File.Exists(Path.Combine(site.Root, "documents", "annual-report.docx")));

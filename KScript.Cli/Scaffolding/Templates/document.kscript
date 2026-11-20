@@ -10,7 +10,12 @@ to: {{ paths.documents }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Build it: kscript {{ paths.documents }}/{{ dir }}{{ kebab }}{{ ext }} (writes {{ kebab }}.pdf and {{ kebab }}.docx next to it). See the Documents guide for tables, figures and citations.
 ---
 // Add .tex, .md or .html to to: for those formats too.
-KScript.Document(template: {{ template ?? paper }}, title: "{{ title }}", author: "Your Name", to: "{{ kebab }}.pdf, {{ kebab }}.docx") {
+KScript.Document(
+  template: {{ template ?? paper }},
+  title: "{{ title }}",
+  author: "Your Name",
+  to: "{{ kebab }}.pdf, {{ kebab }}.docx"
+) {
   Abstract "One paragraph on what this document is about."
 
   Section(title: Introduction, id: intro) {

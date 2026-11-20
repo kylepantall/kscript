@@ -40,6 +40,12 @@ namespace KScript.Mathematics
             One(p, "ceil", "Rounded up.", M.Ceiling);
             One(p, "trunc", "With the fraction removed.", M.Truncate);
 
+            p.Command("convert_length", "value, from, to", "A length in other units: @convert_length(12, in, cm) is 30.48. Units: mm, cm, m, km, in, ft, yd, mi, pt and px (at 96 per inch).", KType.Number, c =>
+            {
+                double from = LengthUnit(c.Str(1), c);
+                double to = LengthUnit(c.Str(2), c);
+                return M.Round(c.Num(0) * from / to, 10);
+            }, "@convert_length(12, 'in', 'cm')");
             p.Command("pow", "base, exponent", "base to the power of exponent (the same as base ** exponent).", KType.Number, c => M.Pow(c.Num(0), c.Num(1)));
             p.Command("atan2", "y, x", "The angle in radians of the point (x, y).", KType.Number, c => M.Atan2(c.Num(0), c.Num(1)));
             p.Command("hypot", "x, y", "The length of the hypotenuse: sqrt(x² + y²).", KType.Number, c => M.Sqrt(c.Num(0) * c.Num(0) + c.Num(1) * c.Num(1)));
@@ -190,5 +196,21 @@ namespace KScript.Mathematics
             double mean = numbers.Average();
             return M.Sqrt(numbers.Sum(x => (x - mean) * (x - mean)) / numbers.Count);
         }
+
+        /// <summary>How many metres one of the unit is.</summary>
+        private static double LengthUnit(string unit, CallContext c) => unit.Trim().ToLowerInvariant() switch
+        {
+            "mm" => 0.001,
+            "cm" => 0.01,
+            "m" => 1,
+            "km" => 1000,
+            "in" => 0.0254,
+            "ft" => 0.3048,
+            "yd" => 0.9144,
+            "mi" => 1609.344,
+            "pt" => 0.0254 / 72,
+            "px" => 0.0254 / 96,
+            _ => throw c.Error($"'{unit}' isn't a length unit. Use mm, cm, m, km, in, ft, yd, mi, pt or px.", "Value"),
+        };
     }
 }

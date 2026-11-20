@@ -14,7 +14,7 @@ KScript.Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
 
   Row(gap: 8) {
     TextBox(bind: draft, placeholder: "What needs doing?", width: 320,
-            on-enter: "tasks = @add_task($tasks, title: $draft); draft = ''")
+      on-enter: "tasks = @add_task($tasks, title: $draft); draft = ''")
     Button(variant: primary, on-click: "tasks = @add_task($tasks, title: $draft); draft = ''") "Add"
   }
 

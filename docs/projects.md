@@ -105,7 +105,8 @@ kscript make project my-app --template ../starters/api   # any folder
   "serve": {
     "root": ".",          // the site folder, relative to kscript.json
     "port": 8080,         // --port and --host on the command line still win
-    "host": "localhost"
+    "host": "localhost",
+    "docs": true          // also serve the docs, with a page about this project (see docs/web.md)
   },
   "http": {
     "middleware": ["log"],                     // routes, middleware and their settings (see docs/http.md)
@@ -136,6 +137,10 @@ kscript make project my-app --template ../starters/api   # any folder
     "version": "1.0.0",
     "icon": "icon.png"          // a .png, .ico or .icns, used for every platform
   },
+  "types": {
+    "uuid": { "v": 4 },                     // arguments for every use of a built-in type (see Types and validation)
+    "password": { "min": 12 }
+  },
   "config": {
     "environment": "development",           // used when neither --env nor KSCRIPT_ENV names one
     "files": ["config", ".env"],            // the base files $config reads (the default)
@@ -155,6 +160,7 @@ kscript make project my-app --template ../starters/api   # any folder
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
 - `kscript serve` never serves `kscript.json`, or the `config.*`, `.yaml`, `.yml` and `.env` files that `$config` reads.
 - `http` configures route files, middleware, CORS, auth and rate limits for KScript.Http (see [Routes, controllers and middleware](http.md#settings-kscriptjson)).
+- `types` gives built-in types such as `uuid`, `email` and `password` the same arguments everywhere in the project. Arguments written where a type is used, such as `uuid(v: 8)`, win (see [Types and validation](types.md#project-defaults-in-kscriptjson)).
 - `app.name` (or `name`) also names the app's own folders for settings, data and caches (see [App folders](storage.md)).
 - `app` is read by `kscript compile`, which builds the script (often a desktop app) into a program for macOS, Windows and Linux (see [Programs](compile.md#names-icons-and-versions)).
 
