@@ -15,6 +15,10 @@ namespace KScript.Syntax.Markup
     /// ///   @greet('Kyle')   // Hello, Kyle!
     /// /// @deprecated Use @welcome instead.
     /// </code>
+    /// Coding agents get their own tags, which <c>kscript agents</c> turns into compact docs (AGENTS.md and
+    /// .kscript/agents): <c>@llm</c> is the one line an agent reads, <c>@prefer</c> and <c>@avoid</c> say which
+    /// way to write something, <c>@pitfall</c> names a mistake that is easy to make, and <c>@agent hide</c> leaves
+    /// the symbol out of the agent docs.
     /// </summary>
     public sealed class DocComment
     {
@@ -43,15 +47,34 @@ namespace KScript.Syntax.Markup
 
         public IReadOnlyList<string> SeeAlso => see;
 
-        public bool IsEmpty => Summary.Length == 0 && paramList.Count == 0 && Returns == null && Deprecated == null && !IsPublic && examples.Count == 0 && see.Count == 0;
+        /// <summary>The <c>@llm</c> line: what a coding agent needs to know, in one line. Null when not given.</summary>
+        public string Llm { get; private set; }
+
+        /// <summary><c>@prefer</c> lines: the way to write something that agents should choose.</summary>
+        public IReadOnlyList<string> Prefer => prefer;
+
+        /// <summary><c>@avoid</c> lines: ways of using the symbol that agents should not choose.</summary>
+        public IReadOnlyList<string> Avoid => avoid;
+
+        /// <summary><c>@pitfall</c> lines: mistakes that are easy to make with the symbol.</summary>
+        public IReadOnlyList<string> Pitfalls => pitfalls;
+
+        /// <summary>True when the doc says <c>@agent hide</c>: the symbol is left out of the agent docs.</summary>
+        public bool AgentHidden { get; private set; }
+
+        public bool IsEmpty => Summary.Length == 0 && paramList.Count == 0 && Returns == null && Deprecated == null && !IsPublic && examples.Count == 0 && see.Count == 0
+            && Llm == null && prefer.Count == 0 && avoid.Count == 0 && pitfalls.Count == 0 && !AgentHidden;
 
         private readonly List<(string, string)> paramList = new List<(string, string)>();
         private readonly List<string> examples = new List<string>();
         private readonly List<string> see = new List<string>();
+        private readonly List<string> prefer = new List<string>();
+        private readonly List<string> avoid = new List<string>();
+        private readonly List<string> pitfalls = new List<string>();
 
         public string ParamText(string name) => paramList.FirstOrDefault(p => p.Item1 == name).Item2;
 
-        private static readonly string[] Tags = { "param", "returns", "return", "example", "deprecated", "see", "public" };
+        private static readonly string[] Tags = { "param", "returns", "return", "example", "deprecated", "see", "public", "llm", "prefer", "avoid", "pitfall", "agent" };
 
         /// <summary>Parses doc text. Returns null for null or blank text.</summary>
         public static DocComment Parse(string text)
@@ -122,6 +145,22 @@ namespace KScript.Syntax.Markup
                         current.Append(rest).Append('\n');
                         finish = t => doc.see.Add(Clean(t));
                         break;
+                    case "llm":
+                        current.Append(rest).Append('\n');
+                        finish = t => doc.Llm = OneLine(t);
+                        break;
+                    case "prefer":
+                    case "avoid":
+                    case "pitfall":
+                        {
+                            List<string> into = tag == "prefer" ? doc.prefer : tag == "avoid" ? doc.avoid : doc.pitfalls;
+                            current.Append(rest).Append('\n');
+                            finish = t => into.Add(OneLine(t));
+                            break;
+                        }
+                    case "agent":
+                        doc.AgentHidden |= string.Equals(rest, "hide", StringComparison.OrdinalIgnoreCase);
+                        break;
                     case "example":
                         if (rest.Length > 0)
                         {
@@ -138,6 +177,9 @@ namespace KScript.Syntax.Markup
 
         /// <summary>Joins a tag's lines into one paragraph unless they hold Markdown structure.</summary>
         private static string Clean(string text) => text.Trim();
+
+        /// <summary>Agent tags are read as one line: wrapped lines are joined with spaces.</summary>
+        private static string OneLine(string text) => string.Join(" ", text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
         private static IEnumerable<string> Dedent(IList<string> lines)
         {
@@ -177,6 +219,18 @@ namespace KScript.Syntax.Markup
             foreach (string example in examples)
             {
                 Block("**Example**\n```kscript\n" + example + "\n```");
+            }
+            if (prefer.Count > 0)
+            {
+                Block(string.Join("\n", prefer.Select(p => "**Prefer** " + p)));
+            }
+            if (avoid.Count > 0)
+            {
+                Block(string.Join("\n", avoid.Select(p => "**Avoid** " + p)));
+            }
+            if (pitfalls.Count > 0)
+            {
+                Block(string.Join("\n", pitfalls.Select(p => "**Pitfall** " + p)));
             }
             if (see.Count > 0)
             {

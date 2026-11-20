@@ -25,7 +25,7 @@ namespace KScript.Testing
         public const string AssertionType = "Assertion";
 
         /// <summary>The attributes of &lt;expect&gt; that say what to check, one per element.</summary>
-        internal static readonly string[] Matchers = { "equals", "not-equals", "same", "contains", "not-contains", "matches", "type", "count" };
+        internal static readonly string[] Matchers = { "equals", "not-equals", "same", "contains", "not-contains", "matches", "type", "count", "throws" };
 
         protected override void Register(PackageBuilder p)
         {
@@ -80,16 +80,17 @@ namespace KScript.Testing
                 new A("contains", K.Expression, "A list has this item, text has this text, or a map has this key."),
                 new A("not-contains", K.Expression, "A list doesn't have this item, text doesn't have this text, or a map doesn't have this key."),
                 new A("matches", K.Expression, "Text matches this regular expression, such as '^\\d+$'."),
-                new A("type", K.Enum, "Its type is this.", false, "string", "number", "bool", "list", "map", "date", "fn", "null"),
+                new A("type", K.Enum, "Its type is this.", false, "string", "number", "bool", "list", "map", "date", "fn", "error", "null"),
                 new A("count", K.Expression, "A list, map or text has this many items or characters."),
+                new A("throws", K.ErrorType, "Working out the value stops with an error of this type, or one that extends it: throws=\"NotFound\"."),
                 new A("message", K.Template, "What to say when it fails, instead of the usual message."))
             {
                 Context = ElementContext.Script,
-                Example = "<expect value=\"2 + 3\" equals=\"5\" />\n<expect value=\"$names\" contains=\"'Joan'\" />\n<expect value=\"$id\" matches=\"'^[a-z0-9-]+$'\" />",
+                Example = "<expect value=\"2 + 3\" equals=\"5\" />\n<expect value=\"$names\" contains=\"'Joan'\" />\n<expect value=\"$id\" matches=\"'^[a-z0-9-]+$'\" />\n<expect value=\"@json('nope')\" throws=\"Json\" />",
             }, Expect);
 
             p.Element(new ElementInfo("expect-error", "Fails the test unless its body stops with an error. `type` and `contains` check which error; `as` keeps it for more checks.", ContentKind.Statements,
-                new A("type", K.Text, "The error type it should be, such as Validation, Type or FileNotFound."),
+                new A("type", K.ErrorType, "The error type it should be (or a type that extends it), such as Validation, FileNotFound or an <error>."),
                 new A("contains", K.Template, "Text the error message should contain."),
                 new A("as", K.DeclareVariable, "A variable for the error (type, message, line, and the fields of <throw>), declared after the element."))
             {
@@ -285,6 +286,7 @@ namespace KScript.Testing
                     ? $"<expect> needs one check, such as equals=\"5\". Checks: {string.Join(", ", Matchers)}."
                     : $"<expect> takes one check, but has {string.Join(" and ", given)}. Write one <expect> for each.", given.Length > 1 ? given[1] : null, "Syntax");
             string matcher = given[0];
+            if (matcher == "throws") return ExpectThrows(run);
             object actual = run.Eval("value");
             string subject = run.Raw("value").Trim();
             string got = $"but it was {Show(actual)}";
@@ -337,7 +339,7 @@ namespace KScript.Testing
                 case "type":
                 {
                     string expected = run.Raw("type").Trim();
-                    string type = Values.TypeOf(actual);
+                    string type = actual is ErrorValue ? "error" : Values.TypeOf(actual);
                     if (!string.Equals(type, expected, StringComparison.OrdinalIgnoreCase)) throw Failure(run, $"Expected {subject} to be a {expected}, but it was {Show(actual)}, a {type}.", "value");
                     break;
                 }
@@ -407,15 +409,35 @@ namespace KScript.Testing
                 caught = ex;
             }
 
-            string wanted = string.IsNullOrEmpty(type) ? "an error" : $"a {type} error";
+            string wanted = string.IsNullOrEmpty(type) ? "an error" : $"{Article(type)} {type} error";
             if (caught == null) throw Failure(run, $"Expected {wanted}, but the body ran without one.");
-            if (!string.IsNullOrEmpty(type) && !string.Equals(caught.Type, type, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(type) && !ErrorTypes.Matches(caught, type))
                 throw Failure(run, $"Expected {wanted}, but got {caught.Type}: {caught.Message}");
             if (!string.IsNullOrEmpty(contains) && !caught.Message.Contains(contains, StringComparison.Ordinal))
                 throw Failure(run, $"Expected the error message to contain '{contains}', but it was: {caught.Message}");
             if (asName != null) run.Scope.Declare(asName, caught.ToValue());
             return null;
         }
+
+        /// <summary><c>&lt;expect value="@find(99)" throws="NotFound" /&gt;</c>: working out the value must fail with that type.</summary>
+        private static bool? ExpectThrows(ElementRun run)
+        {
+            string type = run.Raw("throws").Trim();
+            string subject = run.Raw("value").Trim();
+            object actual;
+            try
+            {
+                actual = run.Eval("value");
+            }
+            catch (KScriptException ex) when (ex.Type != AssertionType || string.Equals(type, AssertionType, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!ErrorTypes.Matches(ex, type)) throw Failure(run, $"Expected {subject} to throw {Article(type)} {type} error, but it threw {ex.Type}: {ex.Message}", "throws");
+                return null;
+            }
+            throw Failure(run, $"Expected {subject} to throw {Article(type)} {type} error, but it was {Show(actual)}.", "value");
+        }
+
+        private static string Article(string word) => "AEIOU".Contains(char.ToUpperInvariant(word[0])) ? "an" : "a";
 
         private static bool? Capture(ElementRun run)
         {

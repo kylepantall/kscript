@@ -9,6 +9,8 @@
   -->
   <import package="KScript.Math" />
 
+  <error name="Pattern" extends="Validation" description="A pattern that can't be read or loaded." />
+
   <let name="alive_cell" value="'O'" const="yes" />
   <let name="dead_cell" value="'.'" const="yes" />
   <let name="history_size" value="12" const="yes" />

@@ -25,18 +25,31 @@ namespace KScript.Runtime
         private static double N(object target) => (double)target;
         private static DateTime D(object target) => (DateTime)target;
 
+        private static string ErrorName(CallContext c, object type) => type switch
+        {
+            ErrorType t => t.Name,
+            string s => s,
+            _ => throw c.Error($"->is() takes an error type, such as NotFound or 'NotFound', not {Values.Describe(type)}.", "Type"),
+        };
+
         private static int Clamp(int i, int count) => Math.Clamp(i < 0 ? i + count : i, 0, count);
 
         private static void RegisterMethods(PackageBuilder p)
         {
             // Any value.
-            p.Method(KType.Any, "type", "", "The value's type: string, number, bool, list, map, fn, date or null, or the name of the <type> that made a record.", KType.String, (t, c) => Shapes.TypeName(t));
+            p.Method(KType.Any, "type", "", "The value's type: string, number, bool, list, map, fn, date, error or null, or the name of the <type> that made a record.", KType.String, (t, c) => Shapes.TypeName(t));
             p.Method(KType.Any, "to_string", "", "The value as text.", KType.String, (t, c) => Values.ToStr(t));
             p.Method(KType.Any, "to_json", "indented?: bool", "The value as JSON text.", KType.String, (t, c) => Values.ToJson(t, c.Bool(0)));
             p.Method(KType.Any, "is_null", "", "yes if the value is null.", KType.Bool, (t, c) => t == null);
             p.Method(KType.Any, "or", "fallback", "The value if it is truthy, otherwise fallback.", KType.Any, (t, c) => Values.Truthy(t) ? t : c.Arg(0));
             p.Method(KType.Fn, "call", "args...", "Calls the function with these arguments.", KType.Any, (t, c) => c.Interpreter.Call((ICallable)t, c.Args.ToList(), c.Named, c.Scope, c.Module));
             p.Method(KType.Bool, "not", "", "The opposite bool.", KType.Bool, (t, c) => !(bool)t);
+
+            // Caught errors and error types.
+            p.Method(KType.Error, "is", "type", "yes if the error is this type or one that extends it: $err->is(NotFound), $err->is(IO).", KType.Bool, (t, c) => ((ErrorValue)t).Is(ErrorName(c, c.Arg(0))));
+            p.Method(KType.Error, "chain", "", "The error's type and the types it extends, nearest first: ['NotFound', 'Validation', 'Error'].", KType.List, (t, c) => ErrorTypes.Chain(((ErrorValue)t).Exception).Cast<object>().ToList());
+            foreach (var m in ErrorType.Methods)
+                p.Method(KType.ErrorType, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((ErrorType)t).TryCallMethod(c, m.Name, out object r) ? r : null);
 
             RegisterListMethods(p);
             RegisterMapMethods(p);

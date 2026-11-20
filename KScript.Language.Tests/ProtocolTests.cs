@@ -397,6 +397,22 @@ namespace KScript.Language.Tests
             Open("<kscript>\n<if test=\"yes\">\n</kscript>", broken);
             Assert.Empty(Request("textDocument/formatting", Doc(broken))["result"].AsArray());
         }
+
+        [Fact]
+        public void FormatsKscriptDocuments()
+        {
+            Initialize();
+            const string uri = "file:///work/code.kscript";
+            string text = "x=1\nif $x > 0 {\necho \"hi\"\n}\n";
+            Open(text, uri);
+            JsonArray edits = Request("textDocument/formatting", Doc(uri))["result"].AsArray();
+            JsonObject edit = Assert.Single(edits).AsObject();
+            Syntax.Text.SourceText source = new Syntax.Text.SourceText(text);
+            int start = source.GetOffset(edit["range"]["start"]["line"].GetValue<int>(), edit["range"]["start"]["character"].GetValue<int>());
+            int end = source.GetOffset(edit["range"]["end"]["line"].GetValue<int>(), edit["range"]["end"]["character"].GetValue<int>());
+            string formatted = text.Substring(0, start) + edit["newText"].GetValue<string>() + text.Substring(end);
+            Assert.Equal("x = 1\nif $x > 0 {\n  echo \"hi\"\n}\n", formatted);
+        }
     }
 
     internal static class JsonExtensions

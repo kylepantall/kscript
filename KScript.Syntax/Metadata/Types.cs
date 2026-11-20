@@ -29,6 +29,9 @@ namespace KScript.Metadata
         /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>
         public const string Type = "type";
 
+        /// <summary>An error type: <c>NotFound</c> from <c>error NotFound { id: int }</c>, or a built-in such as Validation.</summary>
+        public const string ErrorType = "error_type";
+
         public static readonly string[] Declarable = { "string", "int", "float", "bool", "list", "map", "fn" };
 
         /// <summary>True if a method declared for <paramref name="receiver"/> can be called on a value of type <paramref name="actual"/>.</summary>

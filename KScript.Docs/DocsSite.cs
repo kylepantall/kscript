@@ -83,6 +83,7 @@ namespace KScript.Docs
             new Guide("formatting", "formatting.md", "Tools", "Formatting"),
             new Guide("standards", "standards.md", "Tools", "Lint standards"),
             new Guide("mcp", "mcp.md", "Tools", "AI assistants (MCP)"),
+            new Guide("agents", "agents.md", "Tools", "Coding agents", "kscript"),
             new Guide("roadmap", "roadmap.md", "More", "Roadmap"),
         };
 

@@ -8,6 +8,8 @@ kscript mcp --format xml    # show examples as XML instead of .kscript
 kscript mcp --http          # serve on http://localhost:4181/mcp instead
 ```
 
+For docs an assistant reads without a server, made from your own code, see [Coding agents](agents.md) (`kscript agents`).
+
 You don't usually run it yourself. Add it to your assistant once, as below, and the assistant starts it when it needs it.
 
 ## What the assistant gets

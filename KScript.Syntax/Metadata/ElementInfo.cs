@@ -56,6 +56,9 @@ namespace KScript.Metadata
         /// <summary>Set when the element is deprecated; it still works, with a warning.</summary>
         public Deprecation Deprecated { get; internal set; }
 
+        /// <summary>Notes for coding agents (<c>kscript agents</c>), or null.</summary>
+        public AgentNotes Agent { get; set; }
+
         /// <summary>Elements this one must directly follow (for <c>elif</c>/<c>else</c>), or be inside (for <c>case</c>).</summary>
         public IReadOnlyList<string> MustFollow { get; init; }
 

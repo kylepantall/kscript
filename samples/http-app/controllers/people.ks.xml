@@ -7,6 +7,12 @@
   <!--- What a client sends to add a person. A body that doesn't fit is answered with 422 and every problem. -->
   <type name="NewPerson" fields="name: string, age?: int, role?: string" />
 
+  <!--- Someone in data/people.json. -->
+  <type name="Person" fields="id: int, name: string, age: int, role: string" />
+
+  <!--- Filters for the list of people. -->
+  <type name="PeopleQuery" fields="role?: string" />
+
   <fn name="all" value="@read_json($file)" />
 
   <fn name="find" params="id">
@@ -31,19 +37,33 @@
 
   <!-- JSON API: a map or list is sent as JSON -->
 
+  <!--- Says the API is up. -->
   <fn name="health" value="{ ok: true }" />
 
-  <fn name="index" params="query">
+  <!---
+    Lists everyone, or only the people with a role.
+    @returns Person[]
+  -->
+  <fn name="index" params="query: PeopleQuery">
     <return value="@all() |> filter(fn($p) => $query.role == null or $p.role == $query.role)" />
   </fn>
 
-  <fn name="show" params="id">
+  <!---
+    One person.
+    @param id The person's id.
+    @returns Person
+  -->
+  <fn name="show" params="id: int">
     <let name="person" value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
     <!-- A client that already has this version gets 304 Not Modified, and nothing below runs. -->
     <do>@etag($person)</do>
     <return value="$person" />
   </fn>
 
+  <!---
+    Adds a person. The answer's Location header is the new person's address.
+    @returns Person the person, with their new id
+  -->
   <fn name="store" params="json: NewPerson">
     <if $json.name->trim() == ''>
       <return value="@response({ error: 'A person needs a name.' }, status: 422)" />
@@ -56,14 +76,19 @@
     <return value="@response($person, status: 201, headers: { Location: @route('people.show', id: $person.id) })" />
   </fn>
 
-  <fn name="update" params="id, json">
+  <!---
+    Changes some of a person's fields.
+    @returns Person
+  -->
+  <fn name="update" params="id: int, json">
     <let name="person" value="@find($id) ?? @abort(404)" />
     <let name="changed" value="$person->merge($json ?? {})->merge({ id: $person.id })" />
     <do>@write_json($file, @all()->map(fn($p) => $p.id == $person.id ? $changed : $p))</do>
     <return value="$changed" />
   </fn>
 
-  <fn name="destroy" params="id">
+  <!--- Removes a person. -->
+  <fn name="destroy" params="id: int">
     <let name="person" value="@find($id) ?? @abort(404)" />
     <do>@write_json($file, @all()->reject(fn($p) => $p.id == $person.id))</do>
     <return value="@response(null, status: 204)" />

@@ -87,6 +87,13 @@ namespace KScript.Language.Analysis
                     return result.RootScope.Innermost(span.Start).Lookup(v.Name, span.Start)?.Shape ?? TypeShape.Unknown;
                 }
 
+                case CallNode call when call.Callee is IdentifierNode errorName && ErrorTypeNamed(errorName, region) is TypeShape errorType:
+                    // NotFound(id: 42) makes an error of that type.
+                    return errorType.Instance ?? Analyzer.BaseErrorShape();
+
+                case IdentifierNode id when ErrorTypeNamed(id, region) is TypeShape errorType:
+                    return errorType;
+
                 case MemberNode member:
                 {
                     TypeShape target = Infer(member.Target, region);
@@ -220,6 +227,19 @@ namespace KScript.Language.Analysis
                 default:
                     return TypeShape.Unknown;
             }
+        }
+
+        /// <summary>The error type a bare name means here: a declared &lt;error&gt;, or a built-in such as Validation.</summary>
+        private TypeShape ErrorTypeNamed(IdentifierNode id, ExpressionRegion region)
+        {
+            int offset = region.Source.ToSource(id.Span.Start);
+            Symbol symbol = result.RootScope.Innermost(offset).Lookup(id.Name, offset);
+            if (symbol?.Shape.Type == KType.ErrorType)
+            {
+                return symbol.Shape;
+            }
+            return symbol == null && KScript.Runtime.ErrorTypes.BuiltIn.TryGetValue(id.Name, out KScript.Runtime.ErrorType b) && b.Name == id.Name
+                ? new TypeShape(KType.ErrorType) { Name = b.Name } : null;
         }
 
         /// <summary>
