@@ -115,7 +115,7 @@ namespace KScript.Language.Analysis
         {
             foreach (ArgumentNode arg in args)
             {
-                if (BareWord(arg) is (_, false, IdentifierNode typeNode) && ReferenceBareType(typeNode, region, scope))
+                if (BareWord(arg) is (_, false, IdentifierNode typeNode) && (ReferenceBareType(typeNode, region, scope) || ReferenceBareErrorType(typeNode, region, scope)))
                 {
                     continue;
                 }
@@ -155,7 +155,7 @@ namespace KScript.Language.Analysis
 
         private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context)
         {
-            if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceBareType(id, region, scope))
+            if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceBareType(id, region, scope) || ReferenceBareErrorType(id, region, scope))
             {
                 return;
             }
@@ -292,6 +292,10 @@ namespace KScript.Language.Analysis
                         return;
                     }
 
+                    if (AnalyzeErrorCall(call, id, region, scope))
+                    {
+                        return;
+                    }
                     if (fn != null && fn.Kind == SymbolKind.Function)
                     {
                         result.References.Add(new SymbolReference(fn, span, false, false));

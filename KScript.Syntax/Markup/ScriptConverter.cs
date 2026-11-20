@@ -610,6 +610,45 @@ namespace KScript.Syntax.Markup
                     case "continue" when e.Attributes.Count == 0 && !e.Children.Any():
                         Line(indent, e.Name);
                         return;
+                    case "throw" when Only("value") && !e.Children.Any():
+                        Line(indent, "throw " + Reindent(Attr("value").Trim(), Pad(indent)));
+                        return;
+                    case "throw" when e.Attributes.Count == 0 && !e.Children.Any(c => !(c is MarkupText t && t.IsWhitespace)):
+                        Line(indent, "throw");
+                        return;
+                    case "error" when Attr("name") is string errorName && IsName(errorName.Trim()) && !errorName.Contains('.') && e.Children.All(IsFieldLine)
+                        && (Attr("extends") == null || IsName(Attr("extends").Trim())):
+                        {
+                            if (!chained)
+                            {
+                                WriteDoc(e, indent);
+                            }
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "extends")).Select(a => FormatAttribute(e, a)));
+                            sb.Append(pad).Append("error ").Append(errorName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
+                            if (Attr("extends") is string extends)
+                            {
+                                sb.Append(" extends ").Append(extends.Trim());
+                            }
+                            if (!e.ChildElements.Any())
+                            {
+                                sb.Append('\n');
+                                return;
+                            }
+                            sb.Append(" {\n");
+                            foreach (MarkupNode node in e.Children)
+                            {
+                                if (node is MarkupComment c)
+                                {
+                                    WriteComment(c, indent + 1);
+                                }
+                                else if (node is MarkupElement field)
+                                {
+                                    WriteField(field, indent + 1);
+                                }
+                            }
+                            Line(indent, "}");
+                            return;
+                        }
                     case "throw" when Only("type", "message") && !e.ChildElements.Any() && (Attr("type") == null || IsName(Attr("type").Trim())):
                         {
                             string message = Attr("message") ?? TrimLayout(TextOf(e));
@@ -746,6 +785,10 @@ namespace KScript.Syntax.Markup
                 Line(indent, "}");
             }
 
+            /// <summary>The names in a catch's type: <c>NotFound, Conflict</c>, <c>NotFound | Conflict</c> or <c>[IO, Network]</c>.</summary>
+            private static List<string> ErrorTypeNames(string text) =>
+                text.Trim().TrimStart('[').TrimEnd(']').Split(',', '|').Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
+
             private void WriteTry(MarkupElement e, int indent, bool chained)
             {
                 string pad = chained ? string.Empty : Pad(indent);
@@ -765,13 +808,35 @@ namespace KScript.Syntax.Markup
                     else
                     {
                         sb.Append(" catch");
-                        if (clause.GetAttributeValue("type") is string type)
+                        string name = clause.GetAttributeValue("as")?.Trim().TrimStart('$');
+                        List<string> types = clause.GetAttributeValue("type") is string type ? ErrorTypeNames(type) : null;
+                        if (types != null && types.All(t => IsName(t) && char.IsUpper(t[0])) && types.Count > 0)
                         {
-                            sb.Append("(type: ").Append(FormatValue(type)).Append(')');
+                            // catch NotFound | Conflict as e
+                            sb.Append(' ').Append(string.Join(" | ", types));
+                            if (name != null)
+                            {
+                                sb.Append(" as ").Append(name);
+                            }
                         }
-                        if (clause.GetAttributeValue("as") is string name)
+                        else
                         {
-                            sb.Append(' ').Append(name.Trim().TrimStart('$'));
+                            if (clause.GetAttributeValue("type") is string raw)
+                            {
+                                sb.Append("(type: ").Append(FormatValue(raw)).Append(')');
+                            }
+                            if (name != null && name.Length > 0 && char.IsUpper(name[0]))
+                            {
+                                // A capitalised name would read as an error type.
+                                sb.Append(types == null ? " Error" : string.Empty).Append(" as ").Append(name);
+                            }
+                            else if (name != null)
+                            {
+                                sb.Append(' ').Append(name);
+                            }
+                        }
+                        if (name != null)
+                        {
                             scopes.Declare(name);
                         }
                         if (clause.GetAttributeValue("when") is string when)

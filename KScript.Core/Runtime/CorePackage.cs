@@ -110,7 +110,24 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("field", "One field of a <type>.", ContentKind.Empty,
+            p.Element(new ElementInfo("error", "Declares an error type. `throw NotFound(id: 42)` raises one, `catch NotFound as e` catches it and the error types that extend it, and `$e.id` reads its fields. A `status` (its own or a parent's) is the HTTP status a KScript.Http route answers with when nothing catches it.",
+                ContentKind.Statements,
+                new A("name", K.DeclareVariable, "The error type's name, starting with a capital letter: NotFound, PaymentFailed.", true),
+                new A("extends", K.ErrorType, "The error type it is a kind of, such as Validation or another <error>. `catch` of that type catches this one too, and it inherits its fields, message and status. Defaults to Error."),
+                new A("message", K.Template, "The message, with the fields as variables: `No {$kind} with id {$id}`. `throw NotFound(id: 1, message: '...')` gives one instead."),
+                new A("status", K.Text, "The HTTP status a KScript.Http route answers with, such as 404. Inherited from the type it extends."),
+                new A("fields", K.Fields, "The fields on one line, like fn params: `id: int, kind: string = 'item'`."),
+                new A("description", K.Text, "What the error means, shown on hover."))
+            {
+                Example = "<error name=\"PersonNotFound\" extends=\"NotFound\" fields=\"id: int\" message=\"No person with id {$id}\" />\n<try>\n  <throw value=\"PersonNotFound(id: 42)\" />\n  <catch type=\"NotFound\" as=\"e\">\n    <echo>{ $e.message } ({ $e.status })</echo>\n  </catch>\n</try>",
+            }, run =>
+            {
+                ErrorType type = DeclareError(run);
+                run.Scope.Declare(type.Name, type, isConst: true);
+                return null;
+            });
+
+            p.Element(new ElementInfo("field", "One field of a <type> or <error>.", ContentKind.Empty,
                 new A("name", K.Text, "The field's name. End it with ? to make it optional.", true),
                 new A("type", K.TypeName, "The field's type: a built-in such as string or int, an <enum>, another <type>, T[] for a list, T? to allow null. Defaults to any.", false, Values.DeclarableTypes),
                 new A("from", K.Text, "Where to read the value, when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`."),
@@ -119,8 +136,8 @@ namespace KScript.Runtime
                 new A("value", K.Expression, "Works the field out from the others (they are $name) instead of reading it: `$first + ' ' + $last`."),
                 new A("description", K.Text, "What the field holds, shown on hover and completion."))
             {
-                MustBeInside = new[] { "type" },
-            }, run => throw run.Error("<field> must be directly inside <type>.", null, "Syntax"));
+                MustBeInside = new[] { "type", "error" },
+            }, run => throw run.Error("<field> must be directly inside <type> or <error>.", null, "Syntax"));
 
             p.Element(new ElementInfo("set", "Changes an existing variable. Fails if the variable was never declared (a typo guard) or is const. Without `name`, the text is assignment statements.",
                 ContentKind.Expression,
@@ -275,10 +292,10 @@ namespace KScript.Runtime
                 Example = "<let name=\"text\" value=\"'not json'\" />\n<try>\n  <let name=\"data\" value=\"@json($text)\" />\n  <catch as=\"err\" when=\"$err.type eq 'Json'\">\n    <echo>That isn't JSON: {$err.message}</echo>\n  </catch>\n  <finally><echo>done</echo></finally>\n</try>",
             }, Try);
 
-            p.Element(new ElementInfo("catch", "Handles an error thrown in the <try> around it. `as` names the error: $err.type, $err.message, $err.line.", ContentKind.Statements,
-                new A("as", K.DeclareVariable, "A variable for the error."),
-                new A("when", K.Expression, "Only handle errors for which this is true, such as `$err.type eq 'FileNotFound'`."),
-                new A("type", K.Text, "Only handle errors of this type (comma separated)."))
+            p.Element(new ElementInfo("catch", "Handles an error thrown in the <try> around it. `type` picks which errors (and the types that extend them); `as` names the error: $err.type, $err.message, $err.line, $err.status, $err.cause and its fields. A bare <throw /> inside rethrows it.", ContentKind.Statements,
+                new A("as", K.DeclareVariable, "A variable for the error. Defaults to err."),
+                new A("when", K.Expression, "Only handle errors for which this is true, such as `$err.status eq 404`."),
+                new A("type", K.ErrorType, "Only handle errors of these types, or types that extend them: `NotFound`, `[IO, Network]`. Error catches everything."))
             {
                 MustBeInside = new[] { "try" },
             }, run => null);
@@ -288,16 +305,14 @@ namespace KScript.Runtime
                 MustBeInside = new[] { "try" },
             }, run => null);
 
-            p.Element(new ElementInfo("throw", "Raises an error, which a <catch> can handle. Without a <try>, the script stops with the message.", ContentKind.Template,
-                new A("type", K.Text, "The error type, such as Validation. Defaults to Error."),
-                new A("message", K.Template, "What went wrong. Can be written as the element's text instead.") { SatisfiedByContent = true })
+            p.Element(new ElementInfo("throw", "Raises an error, which a <catch> can handle. Without a <try>, the script stops with the message. `value` throws an error made from a type (`NotFound(id: 42)`) or a caught one again; a bare <throw /> inside a <catch> rethrows the error it is handling.", ContentKind.Template,
+                new A("type", K.ErrorType, "The error type, such as Validation or an <error>. Defaults to Error."),
+                new A("message", K.Template, "What went wrong. Can be written as the element's text instead.") { SatisfiedByContent = true },
+                new A("value", K.Expression, "The error to throw: `NotFound(id: 42)`, `Validation('Too short')`, or a caught `$err`."),
+                new A("cause", K.Expression, "The error that led to this one, such as the $err of the <catch> around it. It is $e.cause on the new error."))
             {
                 Example = "<let name=\"age\" value=\"-1\" />\n<try>\n  <throw type=\"Validation\" message=\"Age must be positive, got {$age}\" />\n  <catch as=\"err\"><echo>{ $err.type }: { $err.message }</echo></catch>\n</try>",
-            }, run =>
-            {
-                string message = run.Has("message") ? run.Template("message") : run.Text();
-                throw run.Error(string.IsNullOrWhiteSpace(message) ? "Error" : message, null, run.Raw("type")?.Trim() ?? "Error");
-            });
+            }, Throw);
 
             p.Element(new ElementInfo("import", "Imports a package (`package=\"KScript.Terminal\"`), or the top-level <fn> functions and <let const> values of another script (`src`). Goes at the top of the script.", ContentKind.Empty,
                 new A("package", K.Text, "A package such as KScript.Terminal, KScript.Math, KScript.IO or KScript.Net."),
@@ -574,12 +589,12 @@ namespace KScript.Runtime
                     Scope scope = run.Scope.Child();
                     string name = c.GetAttributeValue("as")?.Trim().TrimStart('$') ?? "err";
                     scope.Declare(name, ex.ToValue());
-                    if (c.GetAttributeValue("type") is string types && !types.Split(',').Any(t => string.Equals(t.Trim(), ex.Type, StringComparison.OrdinalIgnoreCase))) continue;
+                    if (c.GetAttributeValue("type") is string types && !ErrorNames(types).Any(t => ErrorTypes.Matches(ex, t))) continue;
                     if (c.GetAttribute("when")?.Value is DecodedText when && !Values.Truthy(run.Interpreter.EvaluateText(when, scope, run.Module))) continue;
                     handled = true;
                     try
                     {
-                        run.RunElementChildren(c, scope);
+                        using (ErrorTypes.Handle(ex)) run.RunElementChildren(c, scope);
                     }
                     finally
                     {
@@ -601,6 +616,95 @@ namespace KScript.Runtime
             }
             if (finallies.Count > 0) RunFinally(run, finallies);
             return null;
+        }
+
+        private static bool? Throw(ElementRun run)
+        {
+            if (run.Has("value"))
+            {
+                if (run.Has("type") || run.Has("message") || run.HasContent)
+                    throw run.Error("<throw value> throws the error it is given. Put its type and message there: value=\"Validation('Too short')\".", "value", "Syntax");
+                throw ThrownValue(run, run.Eval("value"));
+            }
+            string message = run.Has("message") ? run.Template("message") : run.Text();
+            string typeName = run.Raw("type")?.Trim();
+            object cause = run.Has("cause") ? run.Eval("cause") : null;
+            if (typeName == null && string.IsNullOrWhiteSpace(message) && cause == null && ErrorTypes.Handling is KScriptException handling) throw handling;
+            ErrorType type = ErrorTypes.Find(typeName ?? ErrorTypes.Root, run.Scope);
+            if (type == null)
+            {
+                // An error type nobody declared still works, as a kind of Error (the editor warns about it).
+                KScriptException adhoc = run.Error(string.IsNullOrWhiteSpace(message) ? typeName : message, null, typeName);
+                if (cause != null) adhoc = WithCause(adhoc, cause, run);
+                throw adhoc;
+            }
+            var named = new Dictionary<string, object>();
+            if (!string.IsNullOrWhiteSpace(message)) named["message"] = message;
+            if (cause != null) named["cause"] = cause;
+            try
+            {
+                throw type.Create(run.Interpreter, Array.Empty<object>(), named);
+            }
+            catch (KScriptException ex) when (ex.Declared == null)
+            {
+                throw run.Error(ex.Message, "type", ex.Type);
+            }
+        }
+
+        private static KScriptException WithCause(KScriptException ex, object cause, ElementRun run)
+        {
+            KScriptException inner = cause is ErrorValue e ? e.Exception : cause is Dictionary<string, object> map ? ErrorTypes.FromMap(map)
+                : throw run.Error($"cause is the error that led to this one, such as $err in a catch, not {Values.Describe(cause)}.", "cause", "Argument");
+            var wrapped = new KScriptException(ex.Message, ex.Type, inner) { Offset = ex.Offset, OffsetModule = ex.OffsetModule };
+            foreach (var kv in ex.Fields) wrapped.Fields[kv.Key] = kv.Value;
+            return wrapped;
+        }
+
+        /// <summary>What <c>throw $value</c> throws: a caught error again, an error made with NotFound(...), or a map or text.</summary>
+        private static KScriptException ThrownValue(ElementRun run, object value) => value switch
+        {
+            ErrorValue e => e.Exception,
+            ErrorType t => t.IsBuiltIn || t.Fields.Fields.All(f => f.Optional) ? Located(run, t.Create(run.Interpreter, Array.Empty<object>(), new Dictionary<string, object>()))
+                : throw run.Error($"{t.Name} has fields, so throw it with them: {t.Name}({string.Join(", ", t.Fields.Fields.Where(f => !f.Optional).Select(f => f.Name + ": ..."))}).", "value", "Argument"),
+            Dictionary<string, object> map when map.ContainsKey("message") => Located(run, ErrorTypes.FromMap(map)),
+            string text => run.Error(text),
+            _ => throw run.Error($"<throw value> needs an error, such as NotFound(id: 42) or a caught $err, not {Values.Describe(value)}.", "value", "Type"),
+        };
+
+        private static KScriptException Located(ElementRun run, KScriptException ex)
+        {
+            ex.Offset ??= run.Element.Span.Start;
+            ex.OffsetModule ??= run.Module;
+            return ex;
+        }
+
+        /// <summary>The names in a catch's type: <c>NotFound</c>, <c>IO, Network</c> or <c>[IO, Network]</c>.</summary>
+        internal static IEnumerable<string> ErrorNames(string text) =>
+            text.Trim().TrimStart('[').TrimEnd(']').Split(',', '|').Select(t => t.Trim()).Where(t => t.Length > 0);
+
+        /// <summary>Builds the error type an &lt;error&gt; element declares.</summary>
+        private static ErrorType DeclareError(ElementRun run)
+        {
+            string name = run.VariableName("name");
+            if (!char.IsUpper(name[0])) throw run.Error($"Error type names start with a capital letter, so catch can tell them from variables: {char.ToUpperInvariant(name[0]) + name.Substring(1)}.", "name", "Syntax");
+            if (ErrorTypes.BuiltIn.ContainsKey(name)) throw run.Error($"{name} is a built-in error type. Give yours another name, and extend it: <error name=\"My{name}\" extends=\"{name}\">.", "name", "Syntax");
+            int? status = null;
+            if (run.Raw("status") is string statusText)
+            {
+                if (!int.TryParse(statusText.Trim(), out int code) || code < 100 || code > 599)
+                    throw run.Error($"status=\"{statusText}\" isn't an HTTP status. Use a number from 100 to 599, such as 404.", "status", "Syntax");
+                status = code;
+            }
+            var fields = new RecordType(name, run.Raw("description"), ExtraKeys.Error, run.Scope, run.Module);
+            Shapes.AddFields(run, fields);
+            string reserved = fields.Fields.Select(f => f.Name).FirstOrDefault(f => f is "type" or "message" or "cause" or "status" or "line" or "column" or "file");
+            if (reserved != null) throw run.Error($"'{reserved}' is part of every error, so <error name=\"{name}\"> can't have a field with that name.", "fields", "Syntax");
+            string parent = run.Raw("extends")?.Trim();
+            if (parent != null && parent.Length == 0) parent = null;
+            var type = new ErrorType(name, parent ?? ErrorTypes.Root, status, run.Raw("description"), run.Element.GetAttribute("message")?.Value, fields, run.Scope, run.Module);
+            // Check what it extends now when that is already declared; one declared further down is found on first use.
+            if (parent != null && ErrorTypes.Find(parent, run.Scope) != null) _ = type.Parent;
+            return type;
         }
 
         private static void RunFinally(ElementRun run, List<MarkupElement> finallies)

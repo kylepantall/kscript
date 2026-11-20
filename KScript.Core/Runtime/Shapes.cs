@@ -381,7 +381,7 @@ namespace KScript.Runtime
         internal static object ParseIfText(object value) => value is string s ? Values.ParseJson(s) : value;
 
         /// <summary>The name a value's type has: a record's type name, or <see cref="Values.TypeOf"/>.</summary>
-        public static string TypeName(object value) => value is Record r ? r.Type.Name : Values.TypeOf(value);
+        public static string TypeName(object value) => value is Record r ? r.Type.Name : value is ErrorValue ? "error" : Values.TypeOf(value);
 
         #region Declaring
 
@@ -413,6 +413,16 @@ namespace KScript.Runtime
                 SampleTypes.Fill(type, data, sample, run);
             }
 
+            AddFields(run, type);
+
+            if (type.Fields.Count == 0) throw run.Error($"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.", null, "Syntax");
+            return type;
+        }
+
+        /// <summary>Adds the fields of a &lt;type&gt; or &lt;error&gt;: its <c>fields</c> attribute, then its &lt;field&gt; elements.</summary>
+        internal static void AddFields(ElementRun run, RecordType type)
+        {
+            string name = type.Name;
             var seen = new HashSet<string>(StringComparer.Ordinal);
             string fieldsText = run.Raw("fields");
             if (!string.IsNullOrWhiteSpace(fieldsText))
@@ -421,21 +431,18 @@ namespace KScript.Runtime
                 {
                     if (part.Trim().Length == 0) continue;
                     FieldDefinition field = ParseInlineField(part.Trim(), run);
-                    if (!seen.Add(field.Name)) throw run.Error($"<type name=\"{name}\"> lists the field '{field.Name}' twice.", "fields", "Syntax");
+                    if (!seen.Add(field.Name)) throw run.Error($"<{run.Name} name=\"{name}\"> lists the field '{field.Name}' twice.", "fields", "Syntax");
                     type.SetField(field);
                 }
             }
 
             foreach (MarkupElement e in run.ChildElements)
             {
-                if (e.Name != "field") throw run.Error($"<type> can only hold <field> elements, not <{e.Name}>.", null, "Syntax");
+                if (e.Name != "field") throw run.Error($"<{run.Name}> can only hold <field> elements, not <{e.Name}>.", null, "Syntax");
                 FieldDefinition field = ParseFieldElement(e, run);
-                if (!seen.Add(field.Name)) throw run.Error($"<type name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
+                if (!seen.Add(field.Name)) throw run.Error($"<{run.Name} name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
                 type.SetField(field);
             }
-
-            if (type.Fields.Count == 0) throw run.Error($"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.", null, "Syntax");
-            return type;
         }
 
         /// <summary><c>login: string</c>, <c>avatar_url?: string</c>, <c>tags: string[] = []</c> or just <c>name</c>.</summary>

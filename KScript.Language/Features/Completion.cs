@@ -496,6 +496,9 @@ namespace KScript.Language.Features
                 case AttributeKind.TypeName:
                     return a.Options.Concat(TypeNames(analysis)).Distinct().Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
+                case AttributeKind.ErrorType:
+                    return ErrorTypeCompletions(analysis, cursor.Offset, replace);
+
                 case AttributeKind.Bool:
                     return new[] { "yes", "no" }.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
@@ -530,6 +533,33 @@ namespace KScript.Language.Features
                 default:
                     return new List<CompletionItem>();
             }
+        }
+
+        /// <summary>The error types for a catch, throw, extends or expect-error: declared ones first, then the built-ins.</summary>
+        private static List<CompletionItem> ErrorTypeCompletions(DocumentAnalysis analysis, int offset, TextSpan replace)
+        {
+            List<CompletionItem> items = analysis.Symbols.Where(s => s.Shape.Type == KType.ErrorType).GroupBy(s => s.Name).Select(g => new CompletionItem
+            {
+                Label = g.Key,
+                Kind = CompletionKind.Value,
+                Detail = "error type",
+                Documentation = g.First().Description,
+                ReplaceSpan = replace,
+                SortText = "0" + g.Key,
+            }).ToList();
+            foreach (KScript.Runtime.ErrorType t in KScript.Runtime.ErrorTypes.BuiltIn.Values.Where(t => items.All(i => i.Label != t.Name)))
+            {
+                items.Add(new CompletionItem
+                {
+                    Label = t.Name,
+                    Kind = CompletionKind.Value,
+                    Detail = "built-in error" + (t.Parent != null && t.Parent.Name != KScript.Runtime.ErrorTypes.Root ? ", extends " + t.Parent.Name : string.Empty) + (t.Status is int s ? $", status {s}" : string.Empty),
+                    Documentation = t.Description,
+                    ReplaceSpan = replace,
+                    SortText = "1" + t.Name,
+                });
+            }
+            return items;
         }
 
         /// <summary>The &lt;type&gt;s and &lt;enum&gt;s a document declares or imports.</summary>
