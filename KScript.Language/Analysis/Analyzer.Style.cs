@@ -66,6 +66,30 @@ namespace KScript.Language.Analysis
             Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.PreferEarlyExit, message, fix != null ? new[] { fix } : null);
         }
 
+        /// <summary>
+        /// KS6006: a list of names written as one string in a .kscript file, <c>use: "log, cors"</c>, where an array
+        /// reads better: <c>use: [log, cors]</c>. XML attributes are always text, so they are left alone there.
+        /// </summary>
+        private void CheckNameListString(MarkupElement e, MarkupAttribute attr, AttributeInfo a)
+        {
+            if (result.Markup.Syntax != SourceSyntax.Code || !a.IsNameList || e.Name == "import" || attr.Quote != '"' || !attr.ValueText.Contains(','))
+            {
+                return;
+            }
+            List<string> names = KScript.Metadata.NameList.Names(attr.ValueText);
+            if (names.Count < 2 || names.Any(n => !n.All(c => char.IsLetterOrDigit(c) || c is '_' or '.' or ':' or '-' or '$' or '@')))
+            {
+                return;
+            }
+            string array = "[" + string.Join(", ", names) + "]";
+            int open = attr.Value.SourceSpan.Start - 1;
+            QuickFix fix = open >= 0 && source.Text[open] == '"' && attr.Span.End > attr.Value.SourceSpan.End
+                ? new QuickFix($"Write {array}", new TextChange(TextSpan.FromBounds(open, attr.Span.End), array))
+                : null;
+            Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Warning, DiagnosticCodes.PreferArrayList,
+                $"Write the list as an array: {attr.Name}: {array}.", fix != null ? new[] { fix } : null);
+        }
+
         private static string Capital(string s) => s.StartsWith("<", StringComparison.Ordinal) ? s : char.ToUpperInvariant(s[0]) + s.Substring(1);
 
         /// <summary>The <c>if</c> and <c>elif</c>s before this branch, starting with the <c>if</c>; null if the chain doesn't start with one.</summary>

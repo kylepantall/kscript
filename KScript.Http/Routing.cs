@@ -38,7 +38,7 @@ namespace KScript.Http
         public RoutePattern(string path, string where = null)
         {
             Path = Normalise(path);
-            Dictionary<string, Regex> constraints = ParseWhere(where);
+            Dictionary<string, Regex> constraints = ParseWhere(where, rules);
             var parts = Path.Split('/', StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < parts.Length; i++)
             {
@@ -77,6 +77,17 @@ namespace KScript.Http
 
         public List<string> Parameters { get; } = new List<string>();
 
+        private readonly Dictionary<string, string> rules = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        /// <summary>The <c>where</c> rule of each parameter that has one, as written: int, slug or a regular expression.</summary>
+        public IReadOnlyDictionary<string, string> Rules => rules;
+
+        /// <summary>True for <c>{name?}</c>.</summary>
+        public bool IsOptional(string name) => segments.Any(s => s.Param == name && s.Optional);
+
+        /// <summary>True for <c>{name*}</c>, which takes the rest of the path.</summary>
+        public bool IsCatchAll(string name) => segments.Any(s => s.Param == name && s.CatchAll);
+
         public static string Normalise(string path)
         {
             path = (path ?? "/").Trim().Replace('\\', '/');
@@ -93,7 +104,7 @@ namespace KScript.Http
             return a + b;
         }
 
-        private static Dictionary<string, Regex> ParseWhere(string where)
+        private static Dictionary<string, Regex> ParseWhere(string where, Dictionary<string, string> rules)
         {
             var result = new Dictionary<string, Regex>(StringComparer.Ordinal);
             if (string.IsNullOrWhiteSpace(where)) return result;
@@ -105,6 +116,7 @@ namespace KScript.Http
                 string name = entry[..colon].Trim();
                 string rule = entry[(colon + 1)..].Trim().Trim('\'', '"');
                 string pattern = NamedConstraints.TryGetValue(rule, out string named) ? named : rule;
+                rules[name] = rule;
                 try
                 {
                     result[name] = new Regex("^(?:" + pattern + ")$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
@@ -245,6 +257,9 @@ namespace KScript.Http
 
         /// <summary>The element whose content is the controller (<c>&lt;Get path="/ping"&gt;&lt;return value="'pong'" /&gt;&lt;/Get&gt;</c>).</summary>
         public MarkupElement Inline { get; init; }
+
+        /// <summary>The element that declared the route (Get, Route...); null for the routes of a Resource.</summary>
+        public MarkupElement Element { get; init; }
         public Module Module { get; init; }
         public Scope Scope { get; init; }
 

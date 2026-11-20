@@ -667,6 +667,12 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>
+        /// The kinds of thing a script declares by name at its top level, which scripts that import it see:
+        /// functions, constants, enums and types. kscript make has a generator for each one.
+        /// </summary>
+        public static readonly IReadOnlyList<string> Declarations = new[] { "fn", "const", "enum", "type", "error" };
+
         private void CollectExports(Module module)
         {
             if (module.IsPackageRoot) return;
@@ -674,7 +680,7 @@ namespace KScript.Runtime
             {
                 string name = e.GetAttributeValue("name")?.Trim().TrimStart('$');
                 if (name == null) continue;
-                bool export = e.Name == "fn" || e.Name == "const" || e.Name == "enum" || e.Name == "type" || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
+                bool export = Declarations.Contains(e.Name) || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
                 if (export && module.Globals.TryGet(name, out object value)) module.Exports[name] = value;
             }
         }
@@ -689,14 +695,14 @@ namespace KScript.Runtime
 
         private static void DeclareExports(Module imported, string names, Scope scope)
         {
-            IEnumerable<string> wanted = names == null ? imported.Exports.Keys : names.Split(',').Select(n => n.Trim().TrimStart('@', '$')).Where(n => n.Length > 0);
+            IEnumerable<string> wanted = names == null ? imported.Exports.Keys : NameList.Names(names).Select(n => n.TrimStart('@', '$')).Where(n => n.Length > 0);
             foreach (string name in wanted)
             {
                 if (!imported.Exports.TryGetValue(name, out object value))
                 {
                     string close = Values.Closest(name, imported.Exports.Keys);
                     throw new KScriptException($"{imported.DisplayName} doesn't export '{name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                        + " Scripts export their top-level <fn> functions, <const> values, <enum>s and <type>s.", "Import");
+                        + " Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s and <error>s.", "Import");
                 }
                 scope.Declare(name, value);
             }
@@ -726,7 +732,7 @@ namespace KScript.Runtime
                 }
             }
 
-            // <type> declarations are hoisted too, so data can be mapped to a type declared further down.
+            // <type> and <error> declarations are hoisted too, so data can be mapped to a type declared further down.
             foreach (MarkupNode node in nodes)
             {
                 if (node is MarkupElement type && IsTypeDeclaration(module, type)) ExecuteElement(type, scope, module, null);
@@ -751,7 +757,7 @@ namespace KScript.Runtime
             e.Name == "fn" && module.DefinitionOf(e)?.Package is CorePackage;
 
         private bool IsTypeDeclaration(Module module, MarkupElement e) =>
-            e.Name == "type" && module.DefinitionOf(e)?.Package is CorePackage;
+            (e.Name == "type" || e.Name == "error") && module.DefinitionOf(e)?.Package is CorePackage;
 
         /// <summary>Runs one element. <paramref name="chain"/> is the result of the element before it, for &lt;elif&gt; and &lt;else&gt;.</summary>
         public bool? ExecuteElement(MarkupElement e, Scope scope, Module module, bool? chain)

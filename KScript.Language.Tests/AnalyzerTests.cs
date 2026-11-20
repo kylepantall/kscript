@@ -48,7 +48,7 @@ namespace KScript.Language.Tests
         [InlineData("<fn name=\"f\" params=\"a, a\"></fn>", DiagnosticCodes.DuplicateDeclaration, "a", null)]
         [InlineData("<fn name=\"f\"></fn><fn name=\"f\"></fn>", DiagnosticCodes.DuplicateDeclaration, "f", null)]
         [InlineData("<fn name=\"f\" params=\"a = 1, b\"></fn>", DiagnosticCodes.InvalidAttributeValue, "b", "default")]
-        [InlineData("<fn name=\"f\" params=\"a: number\"></fn>", DiagnosticCodes.InvalidAttributeValue, "number", "Unknown type")]
+        [InlineData("<fn name=\"f\" params=\"a: nmber\"></fn>", DiagnosticCodes.InvalidAttributeValue, "nmber", "Unknown type")]
         [InlineData("<call fn=\"nothing\" />", DiagnosticCodes.UndefinedFunction, "nothing", null)]
         [InlineData("<echo>{ ~people }</echo>", DiagnosticCodes.RetiredSigil, "~people", "$people")]
         // Expressions
@@ -109,7 +109,7 @@ namespace KScript.Language.Tests
         [InlineData("<let name=\"f\" value=\"fn($x) => $x\" /><echo>{ $f->call(1) } { 1 |> $f }</echo>")]
         [InlineData("<let name=\"names\" value=\"[1, 2] |> map(fn($n) => $n + 1) |> join(', ')\" />")]
         [InlineData("<let name=\"s\" value=\"[3, 1]->sort(fn($a, $b) => $a - $b)->first()\" />")]
-        [InlineData("<try><throw type=\"X\" message=\"bad {1}\" /><catch as=\"err\" when=\"$err.type eq 'X'\"><echo>{$err.message} {$err.line}</echo></catch><finally></finally></try>")]
+        [InlineData("<try><throw type=\"Validation\" message=\"bad {1}\" /><catch as=\"err\" when=\"$err.type eq 'Validation'\"><echo>{$err.message} {$err.line}</echo></catch><finally></finally></try>")]
         [InlineData("<import package=\"KScript.Terminal\" /><input to=\"name\">Name: </input><echo>Hi $name</echo>")]
         [InlineData("<echo>email kyle@example.com, it's $args fine</echo>")]
         [InlineData("<echo>Use {{ and }}.</echo>")]

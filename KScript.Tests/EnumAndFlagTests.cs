@@ -45,6 +45,29 @@ public class EnumAndFlagTests
         Assert.Contains(expected, Fails(Pack + "<fn name=\"wrap\" params=\"size: Size = 'smal'\" value=\"$size\" />" + $"<echo>{{ {expression} }}</echo>", "KScript.Math", "KScript.IO").Message);
     }
 
+    private const string Sizes = "<enum name=\"Size\" values=\"small, medium, large\" />"
+        + "<fn name=\"pack_all\" params=\"sizes: Size[]\" value=\"$sizes->join(',')\" />"
+        + "<fn name=\"plain\" params=\"items\" value=\"$items->join(',')\" />";
+
+    [Theory]
+    [InlineData("@pack_all([large, small])", "large,small")]
+    [InlineData("@pack_all(sizes: [medium])", "medium")]
+    [InlineData("@pack_all([LARGE, 'small'])", "large,small")]
+    [InlineData("@pack_all([])", "")]
+    public void ArraysOfEnumValuesCanBeBare(string expression, string expected)
+    {
+        Assert.Equal(expected + "\n", RunBody(Sizes + $"<echo>{{ {expression} }}</echo>"));
+    }
+
+    [Theory]
+    [InlineData("@pack_all([large, huge])", "'huge' isn't a Size. Use small, medium or large.")]
+    [InlineData("@plain([large])", "Unknown name 'large'")]
+    [InlineData("@pack_all(sizes: [huge])", "'huge' isn't a Size.")]
+    public void BareWordsInArraysMustBeEnumValues(string expression, string expected)
+    {
+        Assert.Contains(expected, Fails(Sizes + $"<echo>{{ {expression} }}</echo>").Message);
+    }
+
     [Fact]
     public void Late_enum_values_and_bare_words_print_as_written()
     {

@@ -1,0 +1,37 @@
+--- make
+description: A stylesheet in KScript (.ks.css) in styles/ that compiles to .css; kscript serve compiles it on each request
+category: Pages and styles
+usage: <name> [--primary "#3355ff"] [--theme theme.json]
+--primary: The main colour (default #3355ff)
+--theme: Read colours from this JSON file instead, such as theme.json with { "colors": { "primary": "…" } }
+example: kscript make css site
+example: kscript make css css/theme --primary "#0a7"
+example: kscript make css brand --theme theme.json
+to: {{ paths.styles }}/{{ dir }}{{ kebab }}.ks.css
+hint: Link it from a page as /{{ paths.styles }}/{{ dir }}{{ kebab }}.css, or build it with: kscript css {{ paths.styles }}/{{ dir }}{{ kebab }}.ks.css
+---
+{{#if theme}}
+<let name="theme" value="@read_json('{{ theme }}')" />
+<let name="primary" value="$theme.colors.primary" />
+{{else}}
+<let name="primary" value="'{{ primary ?? #3355ff }}'" />
+{{/if}}
+:root {
+  --color-primary: {$primary};
+  --space: {@rem(16)};
+}
+
+.{{ kebab }} {
+  padding: var(--space);
+}
+
+.{{ kebab }} .button {
+  background: var(--color-primary);
+  color: {@contrast($primary)};
+}
+
+.{{ kebab }} .button:hover { background: {@darken($primary, '10%')}; }
+
+@media {@up('md')} {
+  .{{ kebab }} { padding: calc(var(--space) * 2); }
+}

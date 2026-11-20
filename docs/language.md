@@ -114,6 +114,7 @@ reported).
 | KS6003 | A variable, constant or loop variable whose value is never read, including one that is only ever set. A script's top-level constants are exported like its functions, so they count as used when an importing file uses them. In pages, only a function's own variables are checked, because a layout or component may read the rest. |
 | KS6004 | A function parameter the body never reads. For a lambda, only the parameters after the last one it reads, since the caller decides what it is passed: write `fn($_y) => ...` to keep the position. |
 | KS6005 | An import nothing uses: an `as` alias, a name in `names="..."`, a whole script, or a package none of whose elements, commands, methods or variables appear. |
+| KS6006 | Not unused code, but a style hint: a list of names written as one string in a `.kscript` file (`Middleware(use: "log, cors")`). Write it as an array, `use: [log, cors]`; the quick fix does it for you. XML attributes are text, so `use="log, cors"` is fine there. |
 
 The project is the folder with the nearest `kscript.json` and everything under it (hidden folders, `bin`, `obj` and
 `node_modules` are skipped). A script outside a project is checked against the other files in its own folder. A
@@ -183,51 +184,76 @@ fn pack(size: Size, gift: bool = false) => 'Packing ' + $size
 echo "{ @pack(large) } { @pack(size: small, gift) } { $Size.medium }"
 ```
 
-A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
+A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. A list of an enum takes an array of bare values too: with `fn pack_all(sizes: Size[])`, write `@pack_all([large, small])`. Anywhere else, a bare word in an array is an error, because names of variables start with `$` (`[$max_items, 3]`) and functions are passed with `@` (`[@twice]`). Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
 
 ## Typed data
 
 `type` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught. Fields can also be `email`, `password`, `handle`, `uuid` or `regex`, and types can add rules to other types or join them. See [Types and validation](types.md).
 
+A type is a block with one field per line, `name: type`:
+
+```kscript try
+type User {
+  login: string
+  id: int
+}
+
+type Repo {
+  name: string
+  stars: int from stargazers_count
+  owner: User
+}
+
+repo = $Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })
+echo "$repo.name has $repo.stars stars, owned by $repo.owner.login"
+```
+
+`stars: int from stargazers_count` reads the field from a key with another name, and `owner: User` is another type, so the nested data is checked and turned into a `User` record too. `$Repo->from(data)` maps a map, a list of maps or JSON text.
+
+### Field lines
+
+A field line is `name[?][: type] [from path] [= default | => value]`. Each part is optional except the name:
+
 ```kscript
 enum Visibility { public, private, internal }
-type Owner(fields: "login: string, id: int, avatar_url?: string")
 
 /// A GitHub repository.
 type Repo {
   name: string
   /// How many people starred it.
   stars: int from stargazers_count
-  owner: Owner
+  owner: User
   owner_name: string from owner.login
   topics: string[] = []
-  license: string? from license.name
+  license?: string from license.name
   visibility: Visibility
   updated: date from updated_at
   label => $name + ' (' + $stars + ' stars)'
 }
 ```
 
-A short type fits on one line: `fields` takes `name: type` pairs like `fn` params, with `?` for an optional field and `= value` for a default. Bigger ones list their fields in a block, one `name: type` per line:
-
-| Attribute | What it does |
+| Part | What it does |
 | --- | --- |
-| `type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`, `email`, `password`, `handle`, `uuid`, `regex`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Rules can follow in brackets: `string(min: 1)`. Defaults to `any`. |
-| `from` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. |
-| `default` | The value when the data has none. The field is then optional. |
-| `optional` | `yes` lets the value be missing or null. So does ending the name or the type with `?`. |
-| `value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
-| `description` | Shown on hover and in completion. |
+| `: type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`, `email`, `password`, `handle`, `uuid`, `regex`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Rules can follow in brackets: `string(min: 1)`. Without it the field takes any value. |
+| `?` after the name | The value can be missing or null. |
+| `from path` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. Quote a path that has spaces. |
+| `= default` | The value when the data has none. The field is then optional. |
+| `=> value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
+| `///` above the line | Shown on hover and in completion. |
 
-On `type`, `sample: data/repo.json` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. Fields in the block and `fields` replace the sampled fields they name. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
+The type itself takes options in brackets: `type Repo(extra: error) { … }`. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. `sample: data/repo.json` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. Lines in the block replace the sampled fields they name. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
 
-Data meets a type in these places:
+A small type can also go on one line, with the fields written like `fn` parameters: `type Point(fields: "x: int, y: int")`. `kscript convert` writes it as a block.
+
+In XML, a type is `<type name="Repo">` with a `<field name="stars" type="int" from="stargazers_count" />` element for each line, or a `fields="..."` attribute for the one-line form. Switch the examples to **XML** to see them.
+
+### Where data meets a type
 
 ```kscript
 repo = @fetch($url)->check()->json(as: $Repo) // KScript.Net
 repos = @read_json('repos.json', as: $Repo) // KScript.IO; a list maps item by item
-user = @json($text, as: $Owner)
-user = $Owner->from($data) // a map, a list or JSON text
+user = @json($text, as: $User)
+user = $User->from($data) // a map, a list or JSON text
 repo: Repo = $data // also on const and plain assignment
 fn show(repo: Repo, tags: string[]) {
   // …
@@ -245,24 +271,6 @@ The response from https://api.github.com/... doesn't fit Repo (2 problems):
 ```
 
 In a `catch`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo->fields()` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
-
-In a `.kscript` file, a type is a block with one field per line, and an enum lists its values in braces (see [the .kscript format](code-format.md)):
-
-```
-enum Visibility { public, private, internal }
-type Owner(fields: "login: string, id: int")
-
-/// A GitHub repository.
-type Repo(extra: error) {
-  name: string
-  /// How many people starred it.
-  stars: int from stargazers_count
-  owner_name: string from owner.login
-  topics: string[] = []
-  license?: string from license.name
-  label => $name + ' (' + $stars + ' stars)'
-}
-```
 
 ## Values and methods
 
@@ -282,7 +290,7 @@ The editor completes the methods for each type and shows what they do. `@json(te
 ```kscript
 try {
   data = @read_json($path)
-} catch err when $err.type eq 'FileNotFound' {
+} catch FileNotFound {
   echo "No file at {$path}, using defaults."
 } catch err {
   echo "Failed: {$err.message} (line {$err.line})"
@@ -292,7 +300,56 @@ try {
 throw Validation "Age must be positive, got {$age}"
 ```
 
+`catch` takes the error types it handles, joined by `|`, and `as` names the error: `catch FileNotFound | Permission as e`. A catch with only a lower-case name (`catch err`) handles every error. `when` adds a test: `catch Network as e when $e.status eq 503`. Catches are tried in order and the first that fits runs. Error type names start with a capital letter, which is how `catch` tells them from the variable's name.
+
 Unknown elements, attributes and syntax errors are reported before a script starts, so a typo near the end doesn't leave a job half done.
+
+### Error types
+
+Declare your own error types with `error`. Fields work as in a [`type`](#typed-data), the message can use them, and `extends` says what kind of error it is:
+
+```kscript try
+/// No person has that id.
+error PersonNotFound(message: "No person with id {$id}") extends NotFound {
+  id: int
+}
+error OutOfStock(status: 409, message: "{$item} is out of stock") {
+  item: string
+  left: int = 0
+}
+
+fn find_person(id: int) {
+  throw PersonNotFound(id: $id)
+}
+
+try {
+  @find_person(42)
+} catch NotFound as e {
+  echo "{ $e.message } ({ $e.type }, status { $e.status })"
+}
+```
+
+- **Throwing.** `throw PersonNotFound(id: 42)` makes the error and throws it. Its arguments are its fields, by name, plus `message:` (instead of the type's message) and `cause:` (the error that led to this one). A field without a default must be given, and the editor flags missing and unknown fields. `throw Validation "Too short"` still works for a type with no fields, and `throw Validation(field: 'name', message: 'Too short')` adds fields to a built-in one.
+- **Catching.** `catch NotFound` catches `PersonNotFound` too, because it extends `NotFound`. In the catch, `$e.id` reads a field, and the editor completes the fields of the types the catch names. Every error has `type`, `message`, `line`, `column`, `file`, `status` and `cause`. `$e->is(NotFound)` checks the type in code, and `$e->chain()` lists it: `['PersonNotFound', 'NotFound', 'Error']`.
+- **Rethrowing and wrapping.** A bare `throw` inside a catch rethrows the error it is handling, unchanged. `throw $e` does the same with a saved error. To add context, wrap it: `throw ConfigBroken(path: $path, cause: $e)`, then `$err.cause.message` reads the original.
+- **Making one without throwing.** `$OutOfStock->new(item: 'tea')` gives the error as a value, to return or throw later.
+- **Status.** `status` is the HTTP status a [KScript.Http route](http.md#errors-and-status-codes) answers with when nothing catches the error. A type inherits it, and its fields and message, from the type it extends.
+- **Exports.** Top-level error types are exported, like functions and types, so `import "errors/payment-failed.kscript"` brings them in. `kscript make error PaymentFailed --status 402 --extends Validation --fields "order: int"` writes one to `errors/`.
+
+The built-in error types, which KScript itself raises, form a tree that `catch` follows:
+
+| Type | Extends | Raised for |
+| --- | --- | --- |
+| `Error` | | Every error. `catch Error` catches everything. |
+| `Syntax`, `Name`, `Null`, `Argument`, `Value`, `Const` | `Error` | Mistakes in a script: bad syntax, an unknown name, null where a value is needed, wrong arguments, a bad value, changing a const. |
+| `Type` | `Error` | A value of the wrong type. `Shape` extends it, for data that doesn't fit a `type` (`$e.problems` lists each problem). |
+| `Format` | `Error` | Text in the wrong format. `Json` and `Yaml` extend it. |
+| `IO` | `Error` | Files. `FileNotFound`, `Permission` and `Access` extend it. |
+| `Network` | `Error` | Requests. `Timeout` extends it, and `$e.status` is the response's status. |
+| `Import`, `Config`, `Input`, `Limit`, `Context`, `Platform`, `Cancelled`, `Retired`, `Http`, `AI`, `Assertion` | `Error` | Imports, settings, input, limits such as recursion, the wrong place, the OS, a stopped script, KScript 1 features, KScript.Http apps, language models, failed test checks. |
+| `Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409) | `Error` | For your own code to throw or extend. The number is the HTTP status. |
+
+A name in `catch` or `throw` that is neither declared nor built in still works (as a kind of `Error`), but the editor warns about it (KS5011), since it is usually a typo.
 
 ## Settings: $config
 

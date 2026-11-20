@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 using KScript.Metadata;
 using KScript.Runtime;
@@ -49,6 +50,27 @@ namespace KScript.Docs
         /// <summary>How an element is written: the package roots are KScript.Routes and KScript.Window.</summary>
         internal static string ElementName(ElementInfo e) =>
             e.Example != null && e.Example.Contains("<KScript." + e.Name, StringComparison.Ordinal) ? "KScript." + e.Name : e.Name;
+
+        /// <summary>Elements that a .kscript file writes another way than <c>name(…)</c>.</summary>
+        private static readonly IReadOnlyDictionary<string, string> CodeForms = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["kscript"] = "a .kscript file",
+            ["let"] = "name = value",
+            ["set"] = "name += value",
+            ["do"] = "name = value; …",
+            ["const"] = "const name = value",
+            ["field"] = "name: type",
+            ["for"] = "for item in list",
+            ["catch"] = "catch err",
+            ["case"] = "case value",
+        };
+
+        /// <summary>How an element is written in a .kscript file: <c>break</c>, <c>name = value</c>, <c>KScript.Window</c>.</summary>
+        internal static string CodeName(ElementInfo e) => CodeForms.TryGetValue(e.Name, out string form) ? form : ElementName(e);
+
+        /// <summary>An element's name as code, in both formats: the page shows the reader's.</summary>
+        internal static string DualName(ElementInfo e) =>
+            Html.Dual($"<code>&lt;{Html.H(ElementName(e))}&gt;</code>", $"<code>{Html.H(CodeName(e))}</code>");
 
         private IEnumerable<string> PackageNames =>
             Catalog.Packages.Keys.OrderBy(p => p == "KScript.Core" ? 0 : Array.IndexOf(BuiltInNames, p) is int i && i >= 0 ? i : 50).ThenBy(p => p, StringComparer.Ordinal);
@@ -106,7 +128,8 @@ namespace KScript.Docs
                 string root = elements.Select(ElementName).FirstOrDefault(n => n.StartsWith("KScript.", StringComparison.Ordinal));
                 sb.Append("<p>Import it at the top of a script:</p>");
                 sb.Append(Html.Code($"<import package=\"{package}\" />", "xml"));
-                if (root != null) sb.Append($"<p>A file whose root element is <code>&lt;{Html.H(root)}&gt;</code> imports it for you.</p>");
+                if (root != null) sb.Append(Html.Dual($"<p>A file whose root element is <code>&lt;{Html.H(root)}&gt;</code> imports it for you.</p>",
+                    $"<p>A file made of a <code>{Html.H(root)} {{ }}</code> block imports it for you.</p>"));
                 var brings = Catalog.WithRequired(package).Skip(1).ToList();
                 if (brings.Count > 0) sb.Append($"<p>It brings {string.Join(", ", brings.Select(b => $"<a href=\"{PackageSlug(b)}\">{Html.H(b)}</a>"))} with it.</p>");
                 if (!CanRun(package) && Playground.Unavailable.TryGetValue(package, out string why))
@@ -114,7 +137,7 @@ namespace KScript.Docs
             }
 
             sb.Append("<div class=\"summary\">");
-            if (elements.Count > 0) sb.Append($"<a href=\"#elements\">{elements.Count} element{(elements.Count == 1 ? "" : "s")}</a>");
+            if (elements.Count > 0) sb.Append($"<a href=\"#elements\">{elements.Count} {Html.Dual("element" + (elements.Count == 1 ? "" : "s"), "statement" + (elements.Count == 1 ? "" : "s"))}</a>");
             if (commands.Count > 0) sb.Append($"<a href=\"#commands\">{commands.Count} command{(commands.Count == 1 ? "" : "s")}</a>");
             if (methods.Count > 0) sb.Append($"<a href=\"#methods\">{methods.Count} method{(methods.Count == 1 ? "" : "s")}</a>");
             if (variables.Count > 0) sb.Append($"<a href=\"#variables\">{variables.Count} variable{(variables.Count == 1 ? "" : "s")}</a>");
@@ -122,12 +145,14 @@ namespace KScript.Docs
 
             if (elements.Count > 0)
             {
-                sb.Append("<h2 id=\"elements\">Elements</h2>");
+                sb.Append($"<h2 id=\"elements\">{Html.Dual("Elements", "Statements")}</h2>");
                 page.Toc.Add((2, "elements", "Elements"));
+                page.TocCode["elements"] = "Statements";
                 foreach (ElementInfo e in elements)
                 {
                     sb.Append(ElementEntry(e, path));
                     page.Toc.Add((3, ElementAnchor(e), "<" + ElementName(e) + ">"));
+                    page.TocCode[ElementAnchor(e)] = CodeName(e);
                 }
             }
             if (commands.Count > 0)
@@ -147,7 +172,9 @@ namespace KScript.Docs
                 foreach (var group in methods.GroupBy(m => m.ReceiverType).OrderBy(g => Array.IndexOf(TypeOrder, g.Key) is int i && i >= 0 ? i : 50))
                 {
                     sb.Append($"<p>On <a href=\"{TypeSlug(group.Key)}\">{Html.H(group.Key)}</a> values: ");
-                    sb.Append(string.Join(", ", group.Select(m => $"<a href=\"{TypeSlug(group.Key)}#{MethodAnchor(m)}\"><code>-&gt;{Html.H(m.Name)}()</code></a>")));
+                    sb.Append(string.Join(", ", group.Select(m => m.Deprecated != null
+                        ? $"<a href=\"{TypeSlug(group.Key)}#{MethodAnchor(m)}\" title=\"Deprecated\"><del><code>-&gt;{Html.H(m.Name)}()</code></del></a>"
+                        : $"<a href=\"{TypeSlug(group.Key)}#{MethodAnchor(m)}\"><code>-&gt;{Html.H(m.Name)}()</code></a>")));
                     sb.Append("</p>");
                 }
             }
@@ -182,7 +209,7 @@ namespace KScript.Docs
             {
                 string id = "from-" + Html.Slug(group.Key);
                 sb.Append($"<h2 id=\"{id}\">From {Html.H(group.Key)}</h2>");
-                if (group.Key != "KScript.Core") sb.Append($"<p>These need <code>&lt;import package=\"{Html.H(group.Key)}\" /&gt;</code>. See <a href=\"{PackageSlug(group.Key)}\">{Html.H(group.Key)}</a>.</p>");
+                if (group.Key != "KScript.Core") sb.Append($"<p>These need {Html.Dual($"<code>&lt;import package=\"{Html.H(group.Key)}\" /&gt;</code>", $"<code>import {Html.H(group.Key)}</code>")}. See <a href=\"{PackageSlug(group.Key)}\">{Html.H(group.Key)}</a>.</p>");
                 page.Toc.Add((2, id, "From " + group.Key));
                 foreach (CallableInfo m in group.OrderBy(m => m.Name, StringComparer.Ordinal))
                 {
@@ -235,14 +262,17 @@ namespace KScript.Docs
             string name = ElementName(e);
             string anchor = ElementAnchor(e);
             var sb = new StringBuilder();
-            sb.Append($"<section class=\"entry\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a><code>&lt;{Html.H(name)}&gt;</code></h3>");
-            sb.Append($"<div class=\"desc\">{Html.Inline(e.Description)}</div>");
+            string deprecatedClass = e.Deprecated != null ? " deprecated" : string.Empty;
+            string shown = DualName(e);
+            sb.Append($"<section class=\"entry{deprecatedClass}\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a>{(e.Deprecated != null ? "<del>" + shown + "</del>" + DeprecatedBadge : shown)}</h3>");
+            sb.Append(DeprecationNote(e.Deprecated));
+            sb.Append($"<div class=\"desc\">{Describe(e.Description)}</div>");
 
             var facts = new List<string>();
             facts.Add(e.Content switch
             {
-                ContentKind.Empty => "Self-closing.",
-                ContentKind.Statements => "Holds statements.",
+                ContentKind.Empty => Html.Dual("Self-closing.", "A statement on its own."),
+                ContentKind.Statements => Html.Dual("Holds statements.", "Holds statements in <code>{ }</code>."),
                 ContentKind.Template => "Holds text with <code>{ }</code> values.",
                 ContentKind.Expression => "Its text is one expression.",
                 ContentKind.AssignmentStatements => "Its text is assignments separated by <code>;</code>.",
@@ -250,28 +280,48 @@ namespace KScript.Docs
             });
             if (e.Context == ElementContext.Page) facts.Add("Pages only.");
             else if (e.Context == ElementContext.Script) facts.Add("Scripts only.");
-            if (e.MustBeInside?.Count > 0) facts.Add($"Goes inside {string.Join(" or ", e.MustBeInside.Select(x => $"<code>&lt;{Html.H(x)}&gt;</code>"))}.");
-            if (e.MustFollow?.Count > 0) facts.Add($"Follows {string.Join(" or ", e.MustFollow.Select(x => $"<code>&lt;{Html.H(x)}&gt;</code>"))}.");
-            if (e.IsLoop) facts.Add("A loop: <code>&lt;break /&gt;</code> and <code>&lt;continue /&gt;</code> work inside.");
-            if (e.AllowsExtraAttributes) facts.Add("Other attributes become variables.");
+            if (e.MustBeInside?.Count > 0) facts.Add($"Goes inside {string.Join(" or ", e.MustBeInside.Select(TagName))}.");
+            if (e.MustFollow?.Count > 0) facts.Add($"Follows {string.Join(" or ", e.MustFollow.Select(TagName))}.");
+            if (e.IsLoop) facts.Add(Html.Dual("A loop: <code>&lt;break /&gt;</code> and <code>&lt;continue /&gt;</code> work inside.", "A loop: <code>break</code> and <code>continue</code> work inside."));
+            if (e.AllowsExtraAttributes) facts.Add(Html.Dual("Other attributes become variables.", "Other options become variables."));
             sb.Append($"<p class=\"facts\">{string.Join(" ", facts)}</p>");
 
             if (e.Attributes.Count > 0)
             {
-                sb.Append("<div class=\"table\"><table class=\"params\"><thead><tr><th>Attribute</th><th>Value</th><th>Description</th></tr></thead><tbody>");
+                sb.Append($"<div class=\"table\"><table class=\"params\"><thead><tr><th>{Html.Dual("Attribute", "Option")}</th><th>Value</th><th>Description</th></tr></thead><tbody>");
                 foreach (AttributeInfo a in e.Attributes)
                 {
                     string value = a.Options.Count > 0 ? string.Join(" | ", a.Options.Select(o => $"<code>{Html.H(o)}</code>")) : KindName(a.Kind);
-                    sb.Append($"<tr><td><code>{Html.H(a.Name)}</code>{(a.Required ? " <span class=\"req\">required</span>" : "")}</td><td>{value}</td><td>{Html.Inline(a.Description)}</td></tr>");
+                    string attrName = a.Deprecated != null ? $"<del><code>{Html.H(a.Name)}</code></del>{DeprecatedBadge}" : $"<code>{Html.H(a.Name)}</code>";
+                    sb.Append($"<tr{(a.Deprecated != null ? " class=\"deprecated\"" : "")}><td>{attrName}{(a.Required ? " <span class=\"req\">required</span>" : "")}</td><td>{value}</td><td>{DeprecationNote(a.Deprecated)}{Describe(a.Description)}</td></tr>");
                 }
                 sb.Append("</tbody></table></div>");
             }
             if (e.Example != null) sb.Append(Example("<" + e.Name + ">", e.Example, e.Package));
             sb.Append("</section>");
 
-            Search.Add(new SearchEntry { Title = "<" + name + ">", Url = path + "#" + anchor, Section = e.Package, Kind = "element", Text = Shorten(Html.Text(Html.Inline(e.Description))) });
+            Search.Add(new SearchEntry { Title = "<" + name + ">", CodeTitle = CodeName(e), Url = path + "#" + anchor, Section = e.Package, Kind = "element", Text = Shorten((e.Deprecated != null ? "Deprecated. " : "") + Html.Text(Html.Inline(e.Description))) });
             return sb.ToString();
         }
+
+        private static readonly Regex ElementMention = new Regex(@"<(/?)([A-Za-z][\w.-]*)((?:\s+[\w-]+(?:=""[^""]*"")?)*)\s*/?>", RegexOptions.Compiled);
+
+        /// <summary>
+        /// A catalog description, in both formats when it names elements: "A branch of &lt;match&gt;" reads "A branch of
+        /// match" in the .kscript format.
+        /// </summary>
+        private string Describe(string markdown)
+        {
+            if (string.IsNullOrEmpty(markdown)) return Html.Inline(markdown);
+            string code = ElementMention.Replace(markdown, m =>
+                m.Groups[1].Value.Length == 0 && Catalog.GetElement(m.Groups[2].Value) is ElementInfo e
+                    && m.Groups[3].Value.Trim().Length == 0 ? CodeName(e) : m.Value);
+            return Html.Dual(Html.Inline(markdown), Html.Inline(code));
+        }
+
+        /// <summary>An element named by another one (goes inside, follows), in both formats.</summary>
+        private string TagName(string name) =>
+            Catalog.GetElement(name) is ElementInfo e ? DualName(e) : Html.Dual($"<code>&lt;{Html.H(name)}&gt;</code>", $"<code>{Html.H(name)}</code>");
 
         internal static string KindName(AttributeKind kind) => kind switch
         {
@@ -284,7 +334,7 @@ namespace KScript.Docs
             AttributeKind.Parameters => "parameters",
             AttributeKind.DeclareFunction => "a function name",
             AttributeKind.FunctionReference => "a function",
-            AttributeKind.FunctionReferences => "functions, comma separated",
+            AttributeKind.FunctionReferences => "a list of functions: <code>[a, b]</code>",
             AttributeKind.Path => "a file path",
             AttributeKind.Selector => "a CSS selector",
             AttributeKind.Enum => "one of a set of words",
@@ -292,6 +342,7 @@ namespace KScript.Docs
             AttributeKind.Statements => "statements",
             AttributeKind.TypeName => "a type",
             AttributeKind.Fields => "fields",
+            AttributeKind.ErrorType => "an error type",
             _ => "text",
         };
 
@@ -300,22 +351,27 @@ namespace KScript.Docs
             bool method = c.Kind == CallableKind.Method;
             string anchor = method ? MethodAnchor(c) : CommandAnchor(c);
             var sb = new StringBuilder();
-            sb.Append($"<section class=\"entry\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a>");
+            sb.Append($"<section class=\"entry{(c.Deprecated != null ? " deprecated" : "")}\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a>");
             foreach (Signature s in c.Signatures)
             {
                 string receiver = method ? $"<span class=\"recv\">{Html.H(c.ReceiverType)}</span>" : string.Empty;
-                string parameters = string.Join(", ", s.Parameters.Select(p => $"<span class=\"param\">{Html.H(p.Label)}</span>"));
-                sb.Append($"<code>{receiver}{Html.H(c.Prefix)}<span class=\"name\">{Html.H(c.Name)}</span>({parameters})</code>");
+                string parameters = string.Join(", ", s.Parameters.Select(p => p.Deprecated != null
+                    ? $"<del class=\"param\" title=\"Deprecated\">{Html.H(p.Label)}</del>"
+                    : $"<span class=\"param\">{Html.H(p.Label)}</span>"));
+                string signature = $"<code>{receiver}{Html.H(c.Prefix)}<span class=\"name\">{Html.H(c.Name)}</span>({parameters})</code>";
+                sb.Append(c.Deprecated != null ? "<del>" + signature + "</del>" : signature);
             }
+            if (c.Deprecated != null) sb.Append(DeprecatedBadge);
             if (c.ReturnType != null && c.ReturnType != KType.Null) sb.Append($" <span class=\"returns\">→ {TypeLink(c.ReturnType)}</span>");
             if (method && c.Package != "KScript.Core") sb.Append($" <a class=\"badge\" href=\"{PackageSlug(c.Package)}\">{Html.H(c.Package)}</a>");
             sb.Append("</h3>");
-            sb.Append($"<div class=\"desc\">{Html.Inline(c.Description)}</div>");
+            sb.Append(DeprecationNote(c.Deprecated));
+            sb.Append($"<div class=\"desc\">{Describe(c.Description)}</div>");
 
             var parametersList = c.Signatures.SelectMany(s => s.Parameters).GroupBy(p => p.Name).Select(g => g.First()).ToList();
             // Parameters only get a table when there is more to say than the signature shows: a type, the values
             // allowed, or a description.
-            bool detailed = parametersList.Any(p => p.Type != null || p.Values.Count > 0 || !string.IsNullOrEmpty(p.Description));
+            bool detailed = parametersList.Any(p => p.Type != null || p.Values.Count > 0 || !string.IsNullOrEmpty(p.Description) || p.Deprecated != null);
             if (detailed)
             {
                 sb.Append("<div class=\"table\"><table class=\"params\"><thead><tr><th>Parameter</th><th>Takes</th></tr></thead><tbody>");
@@ -326,8 +382,9 @@ namespace KScript.Docs
                         : p.Type != null ? Html.H(p.Type) : "any value";
                     if (p.Variadic) takes += ", any number of them";
                     string notes = p.Optional ? " <span class=\"opt\">optional</span>" : p.Variadic ? string.Empty : " <span class=\"req\">required</span>";
-                    if (!string.IsNullOrEmpty(p.Description)) takes += ". " + Html.Inline(p.Description);
-                    sb.Append($"<tr><td><code>{Html.H(p.Name)}</code>{notes}</td><td>{takes}</td></tr>");
+                    if (!string.IsNullOrEmpty(p.Description)) takes += ". " + Describe(p.Description);
+                    string paramName = p.Deprecated != null ? $"<del><code>{Html.H(p.Name)}</code></del>{DeprecatedBadge}" : $"<code>{Html.H(p.Name)}</code>";
+                    sb.Append($"<tr{(p.Deprecated != null ? " class=\"deprecated\"" : "")}><td>{paramName}{notes}</td><td>{DeprecationNote(p.Deprecated)}{takes}</td></tr>");
                 }
                 sb.Append("</tbody></table></div>");
             }
@@ -339,8 +396,19 @@ namespace KScript.Docs
             sb.Append("</section>");
 
             string title = method ? $"{c.ReceiverType}->{c.Name}()" : $"@{c.Name}()";
-            Search.Add(new SearchEntry { Title = title, Url = path + "#" + anchor, Section = c.Package, Kind = method ? "method" : "command", Text = Shorten(Html.Text(Html.Inline(c.Description))) });
+            Search.Add(new SearchEntry { Title = title, Url = path + "#" + anchor, Section = c.Package, Kind = method ? "method" : "command", Text = Shorten((c.Deprecated != null ? "Deprecated. " : "") + Html.Text(Html.Inline(c.Description))) });
             return sb.ToString();
+        }
+
+        private const string DeprecatedBadge = " <span class=\"badge deprecated-badge\">deprecated</span>";
+
+        /// <summary>Why something is deprecated and what to use instead, or nothing.</summary>
+        internal static string DeprecationNote(Deprecation d)
+        {
+            if (d == null) return string.Empty;
+            string text = d.Message.Length > 0 ? Html.Inline(d.Message.EndsWith(".", StringComparison.Ordinal) ? d.Message : d.Message + ".") : string.Empty;
+            if (d.Replacement != null) text += (text.Length > 0 ? " " : "") + $"Use <code>{Html.H(d.Replacement)}</code> instead.";
+            return $"<p class=\"deprecation\"><strong>Deprecated.</strong>{(text.Length > 0 ? " " + text : "")}</p>";
         }
 
         /// <summary>An example from the catalog. An expression is shown echoed, so running it prints its value.</summary>

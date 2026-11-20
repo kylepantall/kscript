@@ -144,8 +144,8 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,app,config,format,http,lint,make,name,packages,serve,standard,test", Keys(props));
-        Assert.Equal("api_prefix,auth,cors,groups,middleware,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
+        Assert.Equal("$schema,app,config,format,http,lint,make,name,packages,paths,serve,standard,test", Keys(props));
+        Assert.Equal("api_prefix,auth,cors,groups,middleware,openapi,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
         Assert.Equal("credentials,headers,methods,origins", Keys(props.GetProperty("http").GetProperty("properties").GetProperty("cors").GetProperty("properties")));
         Assert.Equal("icon,id,main,name,version", Keys(props.GetProperty("app").GetProperty("properties")));
         Assert.Equal("format", Keys(props.GetProperty("make").GetProperty("properties")));
@@ -232,7 +232,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "My Site");
 
-        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.html", "site.css", "scripts/hello.kscript", "lib/greeting.kscript", "lib/tasks.kscript", "desktop.kscript", "tests/greeting.test.kscript", "tests/tasks.test.kscript", ".vscode/extensions.json", ".gitignore", "api.kscript", "controllers/tasks.kscript" })
+        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.html", "site.css", "scripts/hello.kscript", "lib/greeting.kscript", "lib/tasks.kscript", "desktop.kscript", "tests/greeting.test.kscript", "tests/tasks.test.kscript", ".vscode/extensions.json", ".gitignore", "routes/api.kscript", "controllers/tasks.kscript", "config/config.yaml" })
         {
             Assert.True(File.Exists(Path.Combine(root, f)), f + " is created");
             Assert.Contains(f, output);
@@ -355,7 +355,7 @@ public class MakeProjectTests : IDisposable
         var (code, output, err) = Make(parent.Root, "site", "--no-http");
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "site");
-        Assert.False(File.Exists(Path.Combine(root, "api.kscript")));
+        Assert.False(File.Exists(Path.Combine(root, "routes", "api.kscript")));
         Assert.False(Directory.Exists(Path.Combine(root, "controllers")));
         Assert.DoesNotContain("kscript routes", output);
         var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
@@ -370,8 +370,8 @@ public class MakeProjectTests : IDisposable
         var (code, output, err) = Make(parent.Root, "site", "--format", "xml");
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "site");
-        Assert.DoesNotContain(".kscript", output);
-        foreach (var f in new[] { "lib/tasks.ks.xml", "lib/greeting.ks.xml", "scripts/hello.ks.xml", "desktop.ks.xml", "api.ks.xml", "controllers/tasks.ks.xml", "tests/tasks.test.ks.xml", "tests/greeting.test.ks.xml" })
+        Assert.DoesNotContain(".kscript", output.Replace(".kscript/agents/", string.Empty));
+        foreach (var f in new[] { "lib/tasks.ks.xml", "lib/greeting.ks.xml", "scripts/hello.ks.xml", "desktop.ks.xml", "routes/api.ks.xml", "controllers/tasks.ks.xml", "tests/tasks.test.ks.xml", "tests/greeting.test.ks.xml" })
         {
             Assert.True(File.Exists(Path.Combine(root, f)), f + " is created");
             Assert.False(File.Exists(Path.Combine(root, Path.ChangeExtension(f, null).Replace(".ks", "") + ".kscript")));
@@ -391,7 +391,7 @@ public class MakeProjectTests : IDisposable
 
         // kscript make in the project follows its make.format.
         Assert.Equal(0, MakeCommandRun("script", "tidy", "--dir", root).Code);
-        Assert.True(File.Exists(Path.Combine(root, "tidy.ks.xml")));
+        Assert.True(File.Exists(Path.Combine(root, "scripts", "tidy.ks.xml")));
         Assert.Contains("--format should be kscript or xml", Make(parent.Root, "other", "--format", "yaml").Err);
     }
 
@@ -403,7 +403,9 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "my-tool");
         var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
-        Assert.Equal(new[] { ".vscode/extensions.json", "Makefile", "kscript.json", "main.kscript", "tests/main.test.kscript" }, files);
+        Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config/config.yaml", "kscript.json", "main.kscript", "tests/main.test.kscript" }, files);
+        Assert.Contains("@greeting(name): string", File.ReadAllText(Path.Combine(root, ".kscript", "agents", "index.md")));
+        Assert.Equal("@AGENTS.md\n", File.ReadAllText(Path.Combine(root, "CLAUDE.md")));
         Assert.Contains("kscript main.kscript    run the script", output);
 
         var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
@@ -436,7 +438,7 @@ public class MakeProjectTests : IDisposable
         Assert.DoesNotContain("Note:", output);
         string root = Path.Combine(parent.Root, "app");
         var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
-        Assert.Equal(new[] { ".vscode/extensions.json", "Makefile", "_layout.html", "api.kscript", "controllers/hello.kscript", "index.html", "kscript.json", "main.kscript", "site.css", "tests/hello.test.kscript", "tests/main.test.kscript" }, files);
+        Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".kscript/agents/packages/KScript.Http.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_layout.html", "config/config.yaml", "controllers/hello.kscript", "index.html", "kscript.json", "main.kscript", "routes/api.kscript", "site.css", "tests/hello.test.kscript", "tests/main.test.kscript" }, files);
         Assert.Contains("kscript serve           serve the site at http://localhost:8080", output);
         Assert.Contains("kscript routes", output);
 

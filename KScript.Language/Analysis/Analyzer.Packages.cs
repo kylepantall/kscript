@@ -198,24 +198,35 @@ namespace KScript.Language.Analysis
 
         private QuickFix[] AddImportFix(string package)
         {
-            if (IsCode)
+            TextChange change = ImportChange(result, package);
+            if (change == null)
+            {
+                return null;
+            }
+            return new[] { new QuickFix(IsCode ? $"Add import {package}" : $"Add <import package=\"{package}\" />", change) };
+        }
+
+        /// <summary>The edit that imports a package, in the file's own format; null for an XML file with no usable root.</summary>
+        internal static TextChange ImportChange(DocumentAnalysis result, string package)
+        {
+            SourceText source = result.Source;
+            if (result.Markup.Syntax == SourceSyntax.Code)
             {
                 // After the last import line; else at the top of the file, or inside a KScript.Window { } root.
                 MarkupElement top = result.Markup.RootElements.FirstOrDefault();
                 MarkupElement last = top?.ChildElements.LastOrDefault(c => c.Name == "import");
-                string fix = $"Add import {package}";
                 if (last != null)
                 {
-                    return new[] { new QuickFix(fix, new TextChange(new TextSpan(last.Span.End, 0), $"\nimport {package}")) };
+                    return new TextChange(new TextSpan(last.Span.End, 0), $"\nimport {package}");
                 }
                 if (top != null && top.Name != "kscript" && top.ContentSpan.Length > 0)
                 {
                     // A block's content starts at its '{': the import goes on the line after it.
                     int brace = source.Text.IndexOf('{', top.ContentSpan.Start);
                     int insertAt = brace >= 0 && brace < top.ContentSpan.End ? brace + 1 : top.ContentSpan.Start;
-                    return new[] { new QuickFix(fix, new TextChange(new TextSpan(insertAt, 0), $"\n  import {package}")) };
+                    return new TextChange(new TextSpan(insertAt, 0), $"\n  import {package}");
                 }
-                return new[] { new QuickFix(fix, new TextChange(new TextSpan(0, 0), $"import {package}\n")) };
+                return new TextChange(new TextSpan(0, 0), $"import {package}\n");
             }
 
             MarkupElement root = result.Markup.RootElements.FirstOrDefault();
@@ -235,7 +246,7 @@ namespace KScript.Language.Analysis
                 string lead = source.Text.Substring(lineStart, first.Span.Start - lineStart);
                 if (lead.All(char.IsWhiteSpace)) indent = lead;
             }
-            return new[] { new QuickFix($"Add <import package=\"{package}\" />", new TextChange(new TextSpan(at, 0), $"\n{indent}<import package=\"{package}\" />")) };
+            return new TextChange(new TextSpan(at, 0), $"\n{indent}<import package=\"{package}\" />");
         }
     }
 }

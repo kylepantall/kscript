@@ -160,6 +160,7 @@ namespace KScript.Projects
         public static readonly string[] RuleNames =
         {
             "indent", "statementPerLine", "tidyTags", "wrapAttributes", "trimTrailingWhitespace", "collapseBlankLines", "finalNewline",
+            "spacing", "braceStyle",
         };
     }
 
@@ -227,7 +228,34 @@ namespace KScript.Projects
         public int ThrottleLimit { get; set; } = 60;
         public double ThrottleSeconds { get; set; } = 60;
 
-        public static readonly string[] DefaultRouteNames = { "routes", "api" };
+        public static readonly string[] DefaultRouteNames = { "routes", "api", "routes/web", "routes/api" };
+
+        /// <summary>The <c>http.openapi</c> section: the OpenAPI document made from the routes.</summary>
+        public OpenApiSettings OpenApi { get; } = new OpenApiSettings();
+    }
+
+    /// <summary>
+    /// The OpenAPI document <c>kscript serve</c> makes from the routes (at /_openapi.json, /_openapi.yaml and the
+    /// /_api page) and <c>kscript openapi</c> writes. <c>"openapi": false</c> turns the served copies off.
+    /// </summary>
+    public sealed class OpenApiSettings
+    {
+        /// <summary>False stops kscript serve answering /_openapi.json, /_openapi.yaml and /_api.</summary>
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>info.title. Defaults to the project's name.</summary>
+        public string Title { get; set; }
+
+        /// <summary>info.version. Defaults to app.version, then 1.0.0.</summary>
+        public string Version { get; set; }
+
+        /// <summary>info.description.</summary>
+        public string Description { get; set; }
+
+        /// <summary>Which routes: "api" (from api.* files), "all", or "auto" (the API routes if there are any, otherwise all).</summary>
+        public string Routes { get; set; } = "auto";
+
+        public static readonly string[] RouteChoices = { "auto", "api", "all" };
     }
 
     public sealed class ProjectConfig
@@ -268,6 +296,44 @@ namespace KScript.Projects
         public AppSettings App { get; } = new AppSettings();
         public MakeSettings Make { get; } = new MakeSettings();
         public HttpSettings Http { get; } = new HttpSettings();
+
+        /// <summary>
+        /// The recommended folder for each kind of file, which <c>kscript make</c> writes to. kscript.json's "paths"
+        /// section moves any of them, relative to the site folder: <c>"paths": { "controllers": "app/controllers" }</c>.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> DefaultPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["routes"] = "routes",
+            ["controllers"] = "controllers",
+            ["middleware"] = "middleware",
+            ["requests"] = "requests",
+            ["views"] = "views",
+            ["components"] = "_components",
+            ["layouts"] = "_layouts",
+            ["partials"] = "_partials",
+            ["styles"] = "styles",
+            ["lib"] = "lib",
+            ["types"] = "types",
+            ["errors"] = "errors",
+            ["storage"] = "lib",
+            ["jobs"] = "jobs",
+            ["windows"] = ".",
+            ["config"] = "config",
+            ["locales"] = "locales",
+            ["logging"] = "lib",
+            ["data"] = "data",
+            ["scripts"] = "scripts",
+            ["tests"] = "tests",
+        };
+
+        /// <summary>The folders kscript.json's "paths" section sets, by name (see <see cref="DefaultPaths"/>).</summary>
+        public Dictionary<string, string> Paths { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The folder for a kind of file: kscript.json's "paths" setting, or the recommended one.</summary>
+        public string PathFor(string name) =>
+            Paths.TryGetValue(name, out var path) ? path
+            : string.Equals(name, "views", StringComparison.OrdinalIgnoreCase) ? Http.Views
+            : DefaultPaths.TryGetValue(name, out var folder) ? folder : name;
 
         /// <summary>
         /// Packages every script in the project imports without an &lt;import&gt;, such as KScript.Terminal.
@@ -457,6 +523,9 @@ namespace KScript.Projects
                         case "types":
                             ReadTypes(prop.Value, config);
                             break;
+                        case "paths":
+                            ReadPaths(prop.Value, config);
+                            break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
                             foreach (string package in config.Packages)
@@ -466,7 +535,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, types, serve, http, lint, test, config, format, make or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, types, serve, http, lint, test, config, format, make or app).");
                             break;
                     }
                 }
@@ -632,6 +701,34 @@ namespace KScript.Projects
             Set("lint.rules." + key);
         }
 
+        private static void ReadPaths(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "paths", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                if (!DefaultPaths.ContainsKey(p.Name))
+                {
+                    config.Warnings.Add($"paths: unknown folder '{p.Name}' (expected {string.Join(", ", DefaultPaths.Keys)}).");
+                    continue;
+                }
+                string folder = String(p.Value, "paths." + p.Name, config);
+                if (folder == null) continue;
+                folder = folder.Replace('\\', '/').Trim().TrimEnd('/');
+                if (folder.Length == 0) folder = ".";
+                if (Path.IsPathRooted(folder) || folder.Split('/').Contains(".."))
+                {
+                    config.Warnings.Add($"paths.{p.Name} should be a folder inside the project, such as \"{DefaultPaths[p.Name]}\", not \"{folder}\".");
+                    continue;
+                }
+                config.Paths[p.Name] = folder;
+            }
+            // @view() looks in paths.views unless http.views says otherwise.
+            if (config.Paths.TryGetValue("views", out var views) && !config.httpViewsSet) config.Http.Views = views;
+        }
+
+        /// <summary>True once http.views is read, so paths.views doesn't replace it.</summary>
+        private bool httpViewsSet;
+
         private static void ReadMake(JsonElement e, ProjectConfig config)
         {
             if (!Object(e, "make", config)) return;
@@ -725,6 +822,7 @@ namespace KScript.Projects
                         break;
                     case "views":
                         http.Views = String(p.Value, "http.views", config) ?? http.Views;
+                        config.httpViewsSet = true;
                         break;
                     case "api_prefix":
                         http.ApiPrefix = String(p.Value, "http.api_prefix", config) ?? http.ApiPrefix;
@@ -772,8 +870,39 @@ namespace KScript.Projects
                             }
                         }
                         break;
+                    case "openapi":
+                        ReadOpenApi(p.Value, http.OpenApi, config);
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'http.{p.Name}' (expected routes, middleware, groups, views, api_prefix, write_files, cors, auth or throttle).");
+                        config.Warnings.Add($"unknown setting 'http.{p.Name}' (expected routes, middleware, groups, views, api_prefix, write_files, cors, auth, throttle or openapi).");
+                        break;
+                }
+            }
+        }
+
+        private static void ReadOpenApi(JsonElement e, OpenApiSettings openApi, ProjectConfig config)
+        {
+            if (e.ValueKind == JsonValueKind.True || e.ValueKind == JsonValueKind.False)
+            {
+                openApi.Enabled = e.ValueKind == JsonValueKind.True;
+                return;
+            }
+            if (!Object(e, "http.openapi", config)) return;
+            foreach (var o in e.EnumerateObject())
+            {
+                switch (o.Name)
+                {
+                    case "enabled": openApi.Enabled = Bool(o.Value, "http.openapi.enabled", config) ?? openApi.Enabled; break;
+                    case "title": openApi.Title = String(o.Value, "http.openapi.title", config) ?? openApi.Title; break;
+                    case "version": openApi.Version = String(o.Value, "http.openapi.version", config) ?? openApi.Version; break;
+                    case "description": openApi.Description = String(o.Value, "http.openapi.description", config) ?? openApi.Description; break;
+                    case "routes":
+                        string routes = String(o.Value, "http.openapi.routes", config);
+                        if (routes != null && OpenApiSettings.RouteChoices.Contains(routes)) openApi.Routes = routes;
+                        else if (routes != null) config.Warnings.Add($"http.openapi.routes should be {string.Join(", ", OpenApiSettings.RouteChoices)}, not '{routes}'.");
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'http.openapi.{o.Name}' (expected enabled, title, version, description or routes).");
                         break;
                 }
             }
@@ -1017,7 +1146,7 @@ namespace KScript.Projects
         public bool IsFormatIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Format.Include.Any(g => GlobMatches(g, rel)) && !Format.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Format.Include.Any(g => GlobMatches(g, rel)) && !Format.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>True when the file or folder is under the project folder and matches format.exclude.</summary>
@@ -1031,7 +1160,7 @@ namespace KScript.Projects
         public bool IsTestIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Test.Include.Any(g => GlobMatches(g, rel)) && !Test.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Test.Include.Any(g => GlobMatches(g, rel)) && !Test.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>True when the file or folder is under the project folder and matches test.exclude.</summary>
@@ -1085,6 +1214,20 @@ namespace KScript.Projects
                 .FirstOrDefault();
         }
 
+        /// <summary>
+        /// The folder kscript writes generated files into, such as the agent docs in .kscript/agents. It is never
+        /// checked, formatted or tested, whatever lint.include says.
+        /// </summary>
+        public const string GeneratedFolder = ".kscript";
+
+        private static bool IsGenerated(string relative) => relative.StartsWith(GeneratedFolder + "/", StringComparison.Ordinal) || IsAgentFile(relative);
+
+        /// <summary>
+        /// True for the project's notes for coding agents (AGENTS.md and CLAUDE.md at the root): Markdown for tools,
+        /// not pages, so they are never checked or served.
+        /// </summary>
+        public static bool IsAgentFile(string relative) => relative is "AGENTS.md" or "CLAUDE.md";
+
         /// <summary>True when the file is under the project folder and matches lint.exclude.</summary>
         public bool IsExcluded(string path)
         {
@@ -1096,7 +1239,7 @@ namespace KScript.Projects
         public bool IsIncluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Lint.Include.Any(g => GlobMatches(g, rel)) && !Lint.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && !IsGenerated(rel) && Lint.Include.Any(g => GlobMatches(g, rel)) && !Lint.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>The path relative to the project folder with / separators, or null when it is outside it.</summary>

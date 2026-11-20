@@ -26,6 +26,9 @@ namespace KScript.Docs
         /// <summary>The page's h2 and h3 headings, for "On this page".</summary>
         public List<(int Level, string Id, string Text)> Toc { get; } = new List<(int, string, string)>();
 
+        /// <summary>What a table-of-contents entry says in the .kscript format, by id, when it differs (<c>break</c> for <c>&lt;break&gt;</c>).</summary>
+        public Dictionary<string, string> TocCode { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
         /// <summary>Shorter text for the sidebar, when the title is long.</summary>
         public string NavTitle { get; init; }
 
@@ -37,6 +40,10 @@ namespace KScript.Docs
     public sealed class SearchEntry
     {
         public string Title { get; init; }
+
+        /// <summary>The title in the .kscript format, when it differs: <c>break</c> for <c>&lt;break&gt;</c>.</summary>
+        public string CodeTitle { get; init; }
+
         public string Url { get; init; }
         public string Section { get; init; }
 
@@ -76,6 +83,8 @@ namespace KScript.Docs
             new Guide("projects", "projects.md", "Tools", "Projects and kscript.json"),
             new Guide("formatting", "formatting.md", "Tools", "Formatting"),
             new Guide("standards", "standards.md", "Tools", "Lint standards"),
+            new Guide("mcp", "mcp.md", "Tools", "AI assistants (MCP)"),
+            new Guide("agents", "agents.md", "Tools", "Coding agents", "kscript"),
             new Guide("roadmap", "roadmap.md", "More", "Roadmap"),
         };
 
@@ -122,6 +131,7 @@ namespace KScript.Docs
             }
             site.AddReference();
             site.AddCli();
+            site.AddMakeCommands();
             site.AddPlayground();
             site.AddNotFound();
             return site;
@@ -255,7 +265,8 @@ namespace KScript.Docs
         #region Output
 
         /// <summary>The search index the page script loads.</summary>
-        public string SearchJson() => JsonSerializer.Serialize(Search.Select(s => new { t = s.Title, u = s.Url, s = s.Section, k = s.Kind, d = s.Text }));
+        public string SearchJson() => JsonSerializer.Serialize(Search.Select(s => new { t = s.Title, c = s.CodeTitle, u = s.Url, s = s.Section, k = s.Kind, d = s.Text }),
+            new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
 
         /// <summary>
         /// Writes the site as a folder that kscript serve can serve: the rendered pages in _pages (never served

@@ -1,0 +1,23 @@
+--- make
+description: A type in types/ that checks data and turns it into a record (API responses, JSON files, request bodies)
+category: Scripts and data
+usage: <Name> [--fields "name: string, stars: int from stargazers_count"] [--sample data/repo.json]
+--fields: The fields, comma separated, as name: type, with ? for optional, = for a default and from for another key. Default: name: string
+--sample: Take the fields from a saved example of the data instead
+example: kscript make type Repo --fields "name: string, stars: int from stargazers_count, topics: string[] = []"
+example: kscript make type Order --sample data/order.json
+to: {{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Import it with import "{{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}", then map data with @read_json(path, as: ${{ pascal }}) or ${{ pascal }}->from($data)
+---
+/// {{ title }}.
+{{#if sample}}
+type {{ pascal }}(sample: "{{ sample }}")
+{{else}}
+type {{ pascal }} {
+{{#each fields}}
+  {{ item }}
+{{else}}
+  name: string
+{{/each}}
+}
+{{/if}}

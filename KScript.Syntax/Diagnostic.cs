@@ -105,7 +105,10 @@ namespace KScript.Syntax
         public const string InvalidArgumentValue = "KS5009";
         public const string UnknownField = "KS5010";
         /// <summary>A literal that can't be the type it is written for: a bad email, an Age of 200, a word not in an enum.</summary>
-        public const string InvalidTypedValue = "KS5011";
+        public const string InvalidTypedValue = "KS5012";
+
+        /// <summary>A catch, throw or extends that names an error type nobody declared.</summary>
+        public const string UnknownErrorType = "KS5011";
 
         /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
         public const string PreferEarlyExit = "KS6001";
@@ -121,6 +124,9 @@ namespace KScript.Syntax
 
         /// <summary>An import (a script, a name from one, or a package) that nothing uses.</summary>
         public const string UnusedImport = "KS6005";
+
+        /// <summary>A list of names written as one string in a .kscript file (<c>use: "log, cors"</c>) rather than an array (<c>use: [log, cors]</c>).</summary>
+        public const string PreferArrayList = "KS6006";
 
         /// <summary>
         /// True for the unused-code rules (KS6002-KS6005). Editors show their code faded, as unnecessary, as well as

@@ -197,17 +197,95 @@ namespace KScript.Runtime
             {
                 foreach (var (key, example) in examples)
                 {
-                    CallableInfo info;
-                    int arrow = key.IndexOf("->", StringComparison.Ordinal);
-                    if (key.StartsWith("@", StringComparison.Ordinal))
-                        info = package.commands.TryGetValue(key.Substring(1), out CommandDefinition c) ? c.Info : null;
-                    else if (arrow > 0)
-                        info = package.methods.FirstOrDefault(m => m.Receiver == key.Substring(0, arrow) && m.Name == key.Substring(arrow + 2))?.Info;
-                    else
-                        info = null;
-                    if (info == null) throw new InvalidOperationException($"{package.Name} has no command or method {key} to give an example to.");
-                    info.Example = example;
+                    Find(key, "an example").Example = example;
                 }
+            }
+
+            /// <summary>
+            /// Adds notes for coding agents to commands, methods and elements registered above, keyed like
+            /// <see cref="Examples"/> (<c>"@read_json"</c>, <c>"list->map"</c>) or <c>"&lt;each&gt;"</c> for an element.
+            /// <c>kscript agents</c> writes them into AGENTS.md and .kscript/agents. Keep each note to one short line:
+            /// agents read every one, so they cost tokens. A key that names nothing is an error here.
+            /// </summary>
+            public void AgentNotes(params (string Key, AgentNotes Notes)[] notes)
+            {
+                foreach (var (key, value) in notes)
+                {
+                    if (key.StartsWith("<", StringComparison.Ordinal) && key.EndsWith(">", StringComparison.Ordinal))
+                    {
+                        ElementInfo element = package.elements.TryGetValue(key.Substring(1, key.Length - 2), out ElementDefinition e) ? e.Info : null;
+                        if (element == null) throw new InvalidOperationException($"{package.Name} has no element {key} to give agent notes to.");
+                        element.Agent = value;
+                        continue;
+                    }
+                    Find(key, "agent notes").Agent = value;
+                }
+            }
+
+            private CallableInfo Find(string key, string what)
+            {
+                CallableInfo info;
+                int arrow = key.IndexOf("->", StringComparison.Ordinal);
+                if (key.StartsWith("@", StringComparison.Ordinal))
+                    info = package.commands.TryGetValue(key.Substring(1), out CommandDefinition c) ? c.Info : null;
+                else if (arrow > 0)
+                    info = package.methods.FirstOrDefault(m => m.Receiver == key.Substring(0, arrow) && m.Name == key.Substring(arrow + 2))?.Info;
+                else
+                    info = null;
+                return info ?? throw new InvalidOperationException($"{package.Name} has no command or method {key} to give {what} to.");
+            }
+
+            /// <summary>
+            /// Marks something registered above as deprecated. It keeps working, but <c>kscript check</c> and the editor
+            /// warn where it is used, completion shows it struck through, and the reference labels it. <paramref name="key"/>
+            /// names a command (<c>@name</c>), a method (<c>string->name</c>), an element (<c>&lt;name&gt;</c>), or one of
+            /// their parameters or attributes: <c>@name(param)</c>, <c>string->name(param)</c>, <c>&lt;name attr&gt;</c>.
+            /// <paramref name="replacement"/> is what to use instead, as written in a script (<c>@read_text</c>, <c>path</c>).
+            /// A key that names nothing is an error here, so a removed parameter can't leave a stale deprecation behind.
+            /// </summary>
+            public void Deprecate(string key, string message, string replacement = null)
+            {
+                var deprecation = new Deprecation(message, replacement);
+                string member = null;
+                if (key.StartsWith("<", StringComparison.Ordinal) && key.EndsWith(">", StringComparison.Ordinal))
+                {
+                    string inner = key.Substring(1, key.Length - 2).Trim();
+                    int space = inner.IndexOf(' ');
+                    string elementName = space < 0 ? inner : inner.Substring(0, space);
+                    member = space < 0 ? null : inner.Substring(space + 1).Trim();
+                    ElementInfo element = package.elements.TryGetValue(elementName, out ElementDefinition e) ? e.Info : null;
+                    AttributeInfo attribute = member == null ? null : element?.GetAttribute(member);
+                    if (element == null || (member != null && attribute == null))
+                        throw new InvalidOperationException($"{package.Name} has no element or attribute {key} to deprecate.");
+                    if (attribute != null) attribute.Deprecated = deprecation;
+                    else element.Deprecated = deprecation;
+                    return;
+                }
+
+                string callable = key;
+                int open = key.IndexOf('(');
+                if (open > 0 && key.EndsWith(")", StringComparison.Ordinal))
+                {
+                    callable = key.Substring(0, open);
+                    member = key.Substring(open + 1, key.Length - open - 2).Trim();
+                }
+                CallableInfo info;
+                int arrow = callable.IndexOf("->", StringComparison.Ordinal);
+                if (callable.StartsWith("@", StringComparison.Ordinal))
+                    info = package.commands.TryGetValue(callable.Substring(1), out CommandDefinition c) ? c.Info : null;
+                else if (arrow > 0)
+                    info = package.methods.FirstOrDefault(m => m.Receiver == callable.Substring(0, arrow) && m.Name == callable.Substring(arrow + 2))?.Info;
+                else
+                    info = null;
+                if (info == null) throw new InvalidOperationException($"{package.Name} has no command or method {callable} to deprecate.");
+                if (member == null)
+                {
+                    info.Deprecated = deprecation;
+                    return;
+                }
+                var parameters = info.Signatures.SelectMany(sig => sig.Parameters).Where(p => p.Name == member).ToList();
+                if (parameters.Count == 0) throw new InvalidOperationException($"{package.Name}: {callable} has no parameter '{member}' to deprecate.");
+                foreach (var parameter in parameters) parameter.Deprecated = deprecation;
             }
 
             public VariableDefinition Variable(string name, string type, string description, Func<Interpreter, Module, object> value)

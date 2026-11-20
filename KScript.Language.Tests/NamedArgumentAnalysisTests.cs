@@ -120,6 +120,7 @@ namespace KScript.Language.Tests
         private static readonly LanguageService Service = new LanguageService(files: EmptyFileSystem.Instance);
         private const string IO = "<import package=\"KScript.IO\" />\n";
         private const string Pack = "<enum name=\"Size\" values=\"small, medium, large\" />\n<fn name=\"pack\" params=\"size: Size, gift: bool = false\" value=\"$size\" />\n";
+        private const string Sizes = "<enum name=\"Size\" values=\"small, medium, large\" />\n<fn name=\"pack_all\" params=\"sizes: Size[]\" value=\"$sizes\" />\n<fn name=\"plain\" params=\"items\" value=\"$items\" />\n";
 
         private static (DocumentAnalysis, int) At(string textWithCaret)
         {
@@ -132,6 +133,7 @@ namespace KScript.Language.Tests
         [InlineData(IO + "<echo>{ @known_folder(downloads) } { @known_folder(name: home) } { @files('.', pattern: '*', recursive) }</echo>")]
         [InlineData(IO + "<echo>{ @join_path(base: '/a', ['b', 'c']) }</echo>")]
         [InlineData("<const name=\"max\" value=\"3\" /><echo>$max</echo>")]
+        [InlineData(Sizes + "<echo>{ @pack_all([large, small]) } { @pack_all(sizes: [medium, 'small']) } { @pack_all([]) }</echo>")]
         public void ValidCallsAreClean(string body) => AssertClean(Analyze(Script(body)));
 
         [Theory]
@@ -141,6 +143,9 @@ namespace KScript.Language.Tests
         [InlineData(Pack + "<echo>{ @pack(large, giift) }</echo>", DiagnosticCodes.UnknownParameter, "giift")]
         [InlineData(Pack + "<echo>{ @pack(size, large) }</echo>", DiagnosticCodes.NamedArgument, "size")]
         [InlineData("<fn name=\"f\" params=\"x: Nope\" value=\"$x\" />", DiagnosticCodes.InvalidAttributeValue, "Nope")]
+        [InlineData(Sizes + "<echo>{ @pack_all([large, lrage]) }</echo>", DiagnosticCodes.InvalidArgumentValue, "lrage")]
+        [InlineData(Sizes + "<echo>{ @pack_all(['huge']) }</echo>", DiagnosticCodes.InvalidArgumentValue, "'huge'")]
+        [InlineData(Sizes + "<echo>{ @plain([large]) }</echo>", DiagnosticCodes.BareIdentifier, "large")]
         public void MistakesAreReported(string body, string code, string marked)
         {
             DocumentAnalysis a = Analyze(Script(body));
@@ -169,6 +174,9 @@ namespace KScript.Language.Tests
             (a, offset) = At(Script(IO + "<echo>{ @known_folder(name: ‸) }</echo>"));
             Assert.Contains("downloads", Service.GetCompletions(a, offset).Select(c => c.Label));
 
+            (a, offset) = At(Script(Sizes + "<echo>{ @pack_all([large, ‸]) }</echo>"));
+            Assert.Contains("medium", Service.GetCompletions(a, offset).Select(c => c.Label));
+
             (a, offset) = At(Script(Pack + "<echo>{ @pack(‸) }</echo>"));
             labels = Service.GetCompletions(a, offset).Select(c => c.Label).ToList();
             Assert.Contains("large", labels);
@@ -179,6 +187,16 @@ namespace KScript.Language.Tests
             labels = Service.GetCompletions(a, offset).Select(c => c.Label).ToList();
             Assert.Contains("recursive", labels);
             Assert.Contains("not recursive", labels);
+        }
+
+        [Fact]
+        public void ListsOfOtherParametersOfferNoEnumValues()
+        {
+            (DocumentAnalysis a, int offset) = At(Script(Sizes + "<echo>{ @plain([‸]) }</echo>"));
+            Assert.DoesNotContain("medium", (Service.GetCompletions(a, offset) ?? new List<CompletionItem>()).Select(c => c.Label));
+
+            (a, offset) = At(Script(Sizes + "<echo>{ @pack_all(other: [‸]) }</echo>"));
+            Assert.DoesNotContain("medium", (Service.GetCompletions(a, offset) ?? new List<CompletionItem>()).Select(c => c.Label));
         }
 
         [Fact]

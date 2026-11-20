@@ -52,7 +52,7 @@ A value of the wrong form fails where it is made, with a `Shape` error that says
 $email doesn't fit email: 'joan@' isn't an email: there's nothing after the @.
 ```
 
-The editor reports the same problem at the value as you type (KS5011).
+The editor reports the same problem at the value as you type (KS5012).
 
 ## Values without quotes
 

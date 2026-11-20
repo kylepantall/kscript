@@ -22,6 +22,7 @@ public class CodeFormatTests
     [InlineData("tour")]
     [InlineData("oldest")]
     [InlineData("repos")]
+    [InlineData("errors")]
     public void SamplesPrintTheSameAsTheirXmlVersions(string name)
     {
         string xml = RunFile(ScriptRunner.RepoFile("samples", "kscript2", name + ".ks.xml"));
@@ -295,6 +296,25 @@ public class CodeFormatTests
     }
 
     [Fact]
+    public void OneLineFieldsBecomeABlockWhenTheySplitCleanly()
+    {
+        static string Code(string type) => KScript.Syntax.Markup.ScriptConverter.Convert("<kscript>\n  " + type + "\n</kscript>\n", "x.ks.xml").Text;
+
+        Assert.Contains("type Owner {\n  login: string\n  avatar_url?: string\n  tags: string[] = []\n  pair: list = [1, 2]\n  m: map = { a: 'x, y' }\n  n: int = @max(1, 2)\n}\n",
+            Code("<type name=\"Owner\" fields=\"login: string, avatar_url?: string, tags: string[] = [], pair: list = [1, 2], m: map = { a: 'x, y' }, n: int = @max(1, 2)\" />"));
+        // Lines from fields come before the <field> elements, and other options stay.
+        Assert.Contains("type R(extra: keep) {\n  a: string\n  b: int from x\n}\n",
+            Code("<type name=\"R\" fields=\"a: string\" extra=\"keep\"><field name=\"b\" type=\"int\" from=\"x\" /></type>"));
+        // Anything that isn't a plain list of fields is left as it is.
+        foreach (string odd in new[] { "a: string,, b: int", "a b: string", "a: string = 'x", "a: string = [1" })
+        {
+            Assert.StartsWith("type Odd(fields: ", Code($"<type name=\"Odd\" fields=\"{odd}\" />").Trim());
+        }
+        Assert.Equal(new[] { "a: string = 'it\\'s, ok'", "b: int" }, KScript.Syntax.Markup.ScriptConverter.FieldsAsLines("a: string = 'it\\'s, ok', b: int"));
+        Assert.Null(KScript.Syntax.Markup.ScriptConverter.FieldsAsLines(" "));
+    }
+
+    [Fact]
     public void TypesAndEnumsConvertToTheShortForm()
     {
         const string xml = "<kscript>\n"
@@ -336,7 +356,8 @@ public class CodeFormatTests
         string code = KScript.Syntax.Markup.ScriptConverter.Convert(xml, "x.ks.xml").Text;
         Assert.Contains("/// Sizes.\nenum Size { s, m }\n", code);
         Assert.Contains("type Repo(extra: error) {\n  // fields\n  /// Stars.\n  stars: int from stargazers_count\n  owner? from \"owner name\"\n  label => $stars + 1\n}\n", code);
-        Assert.Contains("type Point(fields: \"x: int, y: int\")\n", code);
+        // A one-line fields attribute becomes one line per field.
+        Assert.Contains("type Point {\n  x: int\n  y: int\n}\n", code);
         Assert.Contains("enum E2 { }\n", code);
         Assert.Contains("type Paths {\n  a? from \"\"\n  b from \"x;y\"\n  c from \"x}\"\n  d from \"x=y\"\n  e from \"say \\\"hi\\\"\"\n  f\n}\n", code);
         foreach (string odd in new[] { "Odd", "Odd2", "Odd3", "Odd4", "Odd5", "Odd6", "Odd7", "Odd8", "Odd9", "Odd10", "Odd11", "T.x", "E3", "E.x", "3x", "E4" })

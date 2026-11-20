@@ -20,13 +20,13 @@ namespace KScript.Syntax.Markup
     public static class ScriptConverter
     {
         /// <summary>Converts a file's text to the other format, chosen by its path (.kscript becomes XML, anything else .kscript).</summary>
-        public static ConversionResult Convert(string text, string path, Func<string, string> importPath = null)
+        public static ConversionResult Convert(string text, string path, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
         {
             if (MarkupParser.IsCodePath(path))
             {
-                return ToXml(CodeParser.Parse(text), importPath);
+                return ToXml(CodeParser.Parse(text), importPath, nameList);
             }
-            return ToCode(MarkupParser.Parse(text, DocumentKind.Script), importPath);
+            return ToCode(MarkupParser.Parse(text, DocumentKind.Script), importPath, nameList);
         }
 
         /// <summary>The path a converted file gets: x.ks.xml or x.xml becomes x.kscript, and x.kscript becomes x.ks.xml.</summary>
@@ -50,16 +50,21 @@ namespace KScript.Syntax.Markup
         /// Rewrites the <c>src</c> of each &lt;import&gt; (given as written, trimmed); null or a function that returns
         /// its input keeps every import as it is. <c>kscript convert</c> uses it to point imports at converted files.
         /// </param>
-        public static ConversionResult ToCode(MarkupDocument document, Func<string, string> importPath = null)
+        /// <param name="nameList">
+        /// True for an element's attribute that holds a list of names (<c>&lt;Middleware use&gt;</c>), such as
+        /// LanguageCatalog.IsNameList. Such lists are written <c>[a, b]</c> in
+        /// .kscript and <c>"a, b"</c> in XML. Null leaves every value as written.
+        /// </param>
+        public static ConversionResult ToCode(MarkupDocument document, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
         {
-            var writer = new CodeWriter { ImportPath = importPath ?? (s => s) };
+            var writer = new CodeWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? ((_, _) => false) };
             writer.WriteDocument(document);
             return writer.Result;
         }
 
-        public static ConversionResult ToXml(MarkupDocument document, Func<string, string> importPath = null)
+        public static ConversionResult ToXml(MarkupDocument document, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
         {
-            var writer = new XmlWriter { ImportPath = importPath ?? (s => s) };
+            var writer = new XmlWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? ((_, _) => false) };
             writer.WriteDocument(document);
             return writer.Result;
         }
@@ -211,6 +216,44 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary>Lexical scopes of variable names, to tell a first assignment (a declaration) from a change.</summary>
+        private static readonly System.Text.RegularExpressions.Regex FieldPart =
+            new System.Text.RegularExpressions.Regex(@"^[A-Za-z_]\w*\??(\s*:\s*[A-Za-z_][\w.]*(\[\])?\??)?(\s*=\s*\S.*)?$", System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        /// <summary>
+        /// The parts of a one-line <c>fields</c> attribute as field lines (<c>login: string</c>, <c>tags: string[] = []</c>),
+        /// or null when there is nothing to split or a part isn't a plain field.
+        /// </summary>
+        internal static List<string> FieldsAsLines(string fields)
+        {
+            if (string.IsNullOrWhiteSpace(fields))
+            {
+                return null;
+            }
+            var parts = new List<string>();
+            int depth = 0, start = 0;
+            char quote = '\0';
+            for (int i = 0; i < fields.Length; i++)
+            {
+                char c = fields[i];
+                if (quote != '\0')
+                {
+                    if (c == '\\') i++;
+                    else if (c == quote) quote = '\0';
+                    continue;
+                }
+                if (c is '\'' or '"') quote = c;
+                else if (c is '(' or '[' or '{') depth++;
+                else if (c is ')' or ']' or '}') depth--;
+                else if (c == ',' && depth == 0)
+                {
+                    parts.Add(fields.Substring(start, i - start).Trim());
+                    start = i + 1;
+                }
+            }
+            parts.Add(fields.Substring(start).Trim());
+            return quote == '\0' && depth == 0 && parts.All(p => p.Length > 0 && !p.Contains('\n') && FieldPart.IsMatch(p)) ? parts : null;
+        }
+
         private sealed class Scopes
         {
             private readonly List<HashSet<string>> stack = new List<HashSet<string>> { new HashSet<string>(StringComparer.Ordinal) };
@@ -239,6 +282,9 @@ namespace KScript.Syntax.Markup
         private sealed class CodeWriter
         {
             public Func<string, string> ImportPath { get; init; }
+
+            /// <summary>True for an element's attribute that holds a list of names.</summary>
+            public Func<string, string, bool> NameList { get; init; }
 
             private readonly StringBuilder sb = new StringBuilder();
             private readonly Scopes scopes = new Scopes();
@@ -399,7 +445,7 @@ namespace KScript.Syntax.Markup
                 {
                     return m.Value;
                 }
-                var writer = new CodeWriter { ImportPath = ImportPath };
+                var writer = new CodeWriter { ImportPath = ImportPath, NameList = NameList };
                 writer.WriteDocument(doc);
                 string text = writer.Result.Text.Trim();
                 return text.Length == 0 || text.Contains('\n') ? m.Value : text;
@@ -465,7 +511,7 @@ namespace KScript.Syntax.Markup
                         return;
                     case "echo" when Only("value", "format", "newline") && !e.ChildElements.Any():
                         {
-                            string options = string.Join(", ", e.Attributes.Where(a => a.Name != "value").Select(FormatAttribute));
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name != "value").Select(a => FormatAttribute(e, a)));
                             sb.Append(pad).Append("echo").Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
                             string text = TrimLayout(TextOf(e));
                             if (Attr("value") is string v)
@@ -559,7 +605,10 @@ namespace KScript.Syntax.Markup
                             {
                                 WriteDoc(e, indent);
                             }
-                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "with") && !RuleAttributes.Contains(a.Name)).Select(FormatAttribute));
+                            // fields="login: string, id: int" becomes one line per field, the way .kscript writes types.
+                            List<string> fieldLines = FieldsAsLines(Attr("fields"));
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "with") && !RuleAttributes.Contains(a.Name)
+                                && !(a.Name == "fields" && fieldLines != null)).Select(a => FormatAttribute(e, a)));
                             sb.Append(pad).Append("type ").Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
                             if (Attr("with") is string with)
                             {
@@ -567,13 +616,13 @@ namespace KScript.Syntax.Markup
                                 string bases = with.Trim().TrimStart('[').TrimEnd(']');
                                 sb.Append(" with [").Append(string.Join(", ", bases.Split(',').Select(b => b.Trim()).Where(b => b.Length > 0))).Append(']');
                             }
-                            if (!e.ChildElements.Any() && rules.Count == 0)
+                            if (!e.ChildElements.Any() && rules.Count == 0 && fieldLines == null)
                             {
                                 sb.Append('\n');
                                 return;
                             }
                             // A refinement type with only short rules fits on one line: type Age with [int] { min: 0; max: 150 }.
-                            if (!e.ChildElements.Any() && !e.Children.OfType<MarkupComment>().Any() && rules.Count <= 3 && rules.Sum(r => r.Length) <= 60)
+                            if (!e.ChildElements.Any() && fieldLines == null && !e.Children.OfType<MarkupComment>().Any() && rules.Count <= 3 && rules.Sum(r => r.Length) <= 60)
                             {
                                 sb.Append(" { ").Append(string.Join("; ", rules)).Append(" }\n");
                                 return;
@@ -582,6 +631,10 @@ namespace KScript.Syntax.Markup
                             foreach (string rule in rules)
                             {
                                 Line(indent + 1, rule);
+                            }
+                            foreach (string fieldLine in fieldLines ?? new List<string>())
+                            {
+                                Line(indent + 1, fieldLine);
                             }
                             scopes.Push();
                             foreach (MarkupNode node in e.Children)
@@ -636,6 +689,45 @@ namespace KScript.Syntax.Markup
                     case "continue" when e.Attributes.Count == 0 && !e.Children.Any():
                         Line(indent, e.Name);
                         return;
+                    case "throw" when Only("value") && Attr("value") != null && !e.Children.Any():
+                        Line(indent, "throw " + Reindent(Attr("value").Trim(), Pad(indent)));
+                        return;
+                    case "throw" when e.Attributes.Count == 0 && !e.Children.Any(c => !(c is MarkupText t && t.IsWhitespace)):
+                        Line(indent, "throw");
+                        return;
+                    case "error" when Attr("name") is string errorName && IsName(errorName.Trim()) && !errorName.Contains('.') && e.Children.All(IsFieldLine)
+                        && (Attr("extends") == null || IsName(Attr("extends").Trim())):
+                        {
+                            if (!chained)
+                            {
+                                WriteDoc(e, indent);
+                            }
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "extends")).Select(a => FormatAttribute(e, a)));
+                            sb.Append(pad).Append("error ").Append(errorName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
+                            if (Attr("extends") is string extends)
+                            {
+                                sb.Append(" extends ").Append(extends.Trim());
+                            }
+                            if (!e.ChildElements.Any())
+                            {
+                                sb.Append('\n');
+                                return;
+                            }
+                            sb.Append(" {\n");
+                            foreach (MarkupNode node in e.Children)
+                            {
+                                if (node is MarkupComment c)
+                                {
+                                    WriteComment(c, indent + 1);
+                                }
+                                else if (node is MarkupElement field)
+                                {
+                                    WriteField(field, indent + 1);
+                                }
+                            }
+                            Line(indent, "}");
+                            return;
+                        }
                     case "throw" when Only("type", "message") && !e.ChildElements.Any() && (Attr("type") == null || IsName(Attr("type").Trim())):
                         {
                             string message = Attr("message") ?? TrimLayout(TextOf(e));
@@ -825,6 +917,10 @@ namespace KScript.Syntax.Markup
                 Line(indent, "}");
             }
 
+            /// <summary>The names in a catch's type: <c>NotFound, Conflict</c>, <c>NotFound | Conflict</c> or <c>[IO, Network]</c>.</summary>
+            private static List<string> ErrorTypeNames(string text) =>
+                text.Trim().TrimStart('[').TrimEnd(']').Split(',', '|').Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
+
             private void WriteTry(MarkupElement e, int indent, bool chained)
             {
                 string pad = chained ? string.Empty : Pad(indent);
@@ -844,13 +940,35 @@ namespace KScript.Syntax.Markup
                     else
                     {
                         sb.Append(" catch");
-                        if (clause.GetAttributeValue("type") is string type)
+                        string name = clause.GetAttributeValue("as")?.Trim().TrimStart('$');
+                        List<string> types = clause.GetAttributeValue("type") is string type ? ErrorTypeNames(type) : null;
+                        if (types != null && types.All(t => IsName(t) && char.IsUpper(t[0])) && types.Count > 0)
                         {
-                            sb.Append("(type: ").Append(FormatValue(type)).Append(')');
+                            // catch NotFound | Conflict as e
+                            sb.Append(' ').Append(string.Join(" | ", types));
+                            if (name != null)
+                            {
+                                sb.Append(" as ").Append(name);
+                            }
                         }
-                        if (clause.GetAttributeValue("as") is string name)
+                        else
                         {
-                            sb.Append(' ').Append(name.Trim().TrimStart('$'));
+                            if (clause.GetAttributeValue("type") is string raw)
+                            {
+                                sb.Append("(type: ").Append(FormatValue(raw)).Append(')');
+                            }
+                            if (name != null && name.Length > 0 && char.IsUpper(name[0]))
+                            {
+                                // A capitalised name would read as an error type.
+                                sb.Append(types == null ? " Error" : string.Empty).Append(" as ").Append(name);
+                            }
+                            else if (name != null)
+                            {
+                                sb.Append(' ').Append(name);
+                            }
+                        }
+                        if (name != null)
+                        {
                             scopes.Declare(name);
                         }
                         if (clause.GetAttributeValue("when") is string when)
@@ -883,7 +1001,7 @@ namespace KScript.Syntax.Markup
                 sb.Append(pad).Append(e.Name);
                 if (e.Attributes.Count > 0)
                 {
-                    sb.Append('(').Append(string.Join(", ", e.Attributes.Select(FormatAttribute))).Append(')');
+                    sb.Append('(').Append(string.Join(", ", e.Attributes.Select(a => FormatAttribute(e, a)))).Append(')');
                 }
                 List<MarkupNode> content = e.Children.Where(c => !(c is MarkupText t && t.IsWhitespace)).ToList();
                 bool hasElements = content.Any(c => c is MarkupElement);
@@ -909,11 +1027,17 @@ namespace KScript.Syntax.Markup
 
             private int LineOf(MarkupElement e) => source.GetPosition(e.Span.Start).Line + 1;
 
-            private static string FormatAttribute(MarkupAttribute a)
+            private string FormatAttribute(MarkupElement e, MarkupAttribute a)
             {
                 if (a.Value == null || a.ValueText.Trim() == "yes")
                 {
                     return a.Name;
+                }
+                if (NameList(e.Name, a.Name) && global::KScript.Metadata.NameList.Names(a.ValueText) is { Count: > 1 } names
+                    && names.All(n => IsSafeBare(n)))
+                {
+                    // <Middleware use="log, cors"> becomes Middleware(use: [log, cors]).
+                    return a.Name + ": [" + string.Join(", ", names) + "]";
                 }
                 return a.Name + ": " + FormatValue(a.ValueText);
             }
@@ -1000,6 +1124,9 @@ namespace KScript.Syntax.Markup
         private sealed class XmlWriter
         {
             public Func<string, string> ImportPath { get; init; }
+
+            /// <summary>True for an element's attribute that holds a list of names.</summary>
+            public Func<string, string, bool> NameList { get; init; }
 
             private readonly StringBuilder sb = new StringBuilder();
             private readonly Scopes scopes = new Scopes();
@@ -1148,6 +1275,11 @@ namespace KScript.Syntax.Markup
                     if (a.Value != null && e.Name == "import" && a.Name == "src")
                     {
                         sb.Append("=\"").Append(EscapeAttribute(ImportPath(a.ValueText.Trim()))).Append('"');
+                    }
+                    else if (a.Value != null && NameList(e.Name, a.Name) && global::KScript.Metadata.NameList.IsArray(a.ValueText))
+                    {
+                        // Middleware(use: [log, cors]) becomes <Middleware use="log, cors">.
+                        sb.Append("=\"").Append(EscapeAttribute(string.Join(", ", global::KScript.Metadata.NameList.Names(a.ValueText)))).Append('"');
                     }
                     else if (a.Value != null)
                     {

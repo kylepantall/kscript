@@ -7,6 +7,7 @@ The page features you already have keep working. `kscript serve` sends each requ
 ```sh
 kscript serve samples/http-app      # then open http://localhost:8080/people
 kscript routes samples/http-app     # print the route table
+kscript openapi samples/http-app    # the OpenAPI document, made from the routes
 ```
 
 [`samples/http-app`](../samples/http-app) is a complete site: web routes in XML, API routes in the `.kscript` format, a controller, views, custom middleware and a `kscript.json`.
@@ -17,10 +18,10 @@ A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a rou
 
 | File | Routes |
 | --- | --- |
-| `routes.kscript` or `routes.ks.xml` | Web routes, mounted at `/`. |
-| `api.kscript` or `api.ks.xml` | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
+| `routes/web.kscript`, or `routes.kscript` at the top (or `.ks.xml`) | Web routes, mounted at `/`. |
+| `routes/api.kscript`, or `api.kscript` at the top (or `.ks.xml`) | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
 
-`http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)).
+`http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)). `kscript make route users` adds a route and makes its controller (see [Generating files](projects.md#generating-files-kscript-make)): `kscript make route "people/{id}" --api`, `kscript make route people --resource`, and `kscript make controller`, `request`, `middleware` and `view` for the rest.
 
 ```kscript
 // routes.kscript
@@ -44,10 +45,10 @@ KScript.Routes {
 | Element | Use |
 | --- | --- |
 | `Get` `Post` `Put` `Patch` `Delete` `Options` `Any` | A route for that method. `Get` answers `HEAD` too. |
-| `Route(methods: "get, post")` | A route for several methods. |
+| `Route(methods: [get, post])` | A route for several methods. |
 | `Resource(path: /people, to: people)` | The usual JSON resource routes, answered by the controller's `index`, `store`, `show`, `update` and `destroy` functions (see [Resources](#resources)). |
 | `Group(prefix, middleware, name)` | Routes that share a path prefix, middleware or a name prefix. Groups nest. |
-| `Middleware(use: "log, cors")` | Middleware for the routes after it in this file or group. |
+| `Middleware(use: [log, cors])` | Middleware for the routes after it in this file or group. |
 
 A route has a `path` and one way to answer:
 
@@ -80,7 +81,11 @@ A controller is a plain `fn`. Its parameters are filled in by name:
 A typed parameter is converted, so `id: int` gives a number. A `type` maps the request data into a record, so the controller only sees data of the right shape:
 
 ```kscript
-type NewPerson(fields: "name: string, age?: int, role?: string")
+type NewPerson {
+  name: string
+  age?: int
+  role?: string
+}
 
 fn store(json: NewPerson) {
   // $json is a NewPerson record
@@ -110,7 +115,11 @@ kscript {
     return @view('people/show', person: $person)
   }
 
-  type NewPerson(fields: "name: string, age?: int, role?: string")
+  type NewPerson {
+    name: string
+    age?: int
+    role?: string
+  }
 
   fn store(json: NewPerson) {
     // POST /api/people
@@ -135,6 +144,28 @@ What a controller returns becomes the response:
 | nothing (`null`) | `204 No Content`. |
 
 `@abort(404)` or `@abort(403, message: 'Admins only')` stops the request with that status, from anywhere: a controller, a function it calls, or middleware. `try` doesn't catch it. An error in a controller answers `500` with the file and line, and the server log shows it too.
+
+### Errors and status codes
+
+An [error type](language.md#error-types) can carry a status. When a controller (or anything it calls) throws one and nothing catches it, the request is answered with that status and the error's message, without the file and line. API routes answer JSON with the error's type and fields as well:
+
+```kscript
+error PersonNotFound(message: "No person with id {$id}") extends NotFound {
+  id: int
+}
+
+people = { 1: { name: "Ada" } }
+
+fn show(id: int) {
+  person = $people[$id]
+  if $person == null {
+    throw PersonNotFound(id: $id) // GET /api/people/7 answers 404: { "error": "No person with id 7", "status": 404, "type": "PersonNotFound", "id": 7 }
+  }
+  return $person
+}
+```
+
+`Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404) and `Conflict` (409) are built in, so `throw Forbidden "Admins only"` works without a declaration, and an error type that extends one answers with its status. Give an error type its own status with `error PaymentFailed(status: 402)`. Unlike `@abort()`, these are ordinary errors: a `try` in the controller can still catch them. Errors without a status still answer `500`.
 
 Controllers can read and write files with KScript.IO, but only inside the site folder. Set `"write_files": false` to make them read-only like pages. Anything a controller prints with `echo` goes to the server log.
 
@@ -173,7 +204,18 @@ Middleware applies at four levels, and it runs outermost first:
 3. `Group(middleware: …)`, for the routes inside the group.
 4. `Get(…, middleware: …)`, for one route.
 
-A middleware list is comma separated. Each entry can be a built-in, a function, or a group name from `http.groups`. Built-ins take an argument after a colon, such as `throttle:30`.
+A middleware list is an array of names: `[log, secure_headers, throttle:30]`. Each entry can be a built-in, a function (including one from an imported script), or a group name from `http.groups`. Built-ins take an argument after a colon, such as `throttle:30`. A single entry needs no brackets: `middleware: auth`.
+
+```kscript
+// routes.kscript
+KScript.Routes {
+  import "middleware/security.kscript"
+
+  Middleware(use: [secure_headers, json_only])
+}
+```
+
+In XML, attributes are text, so the same list is written `use="secure_headers, json_only"`. In `.kscript` files, a list written as one string (`use: "log, cors"`) still works, but `kscript check` suggests the array with KS6006, and the quick fix rewrites it. The same goes for every list of names: `only`, `except`, `methods`, and `<llm tools>`.
 
 ### Built-in middleware
 
@@ -243,12 +285,12 @@ Put `etag` in `http.middleware` (or in a group) to tag every route at once:
 | PUT, PATCH | /people/{id} | `update` | people.update |
 | DELETE | /people/{id} | `destroy` | people.destroy |
 
-Functions the controller doesn't have get no route. `only="index, show"` and `except="destroy"` pick actions. `name` changes the name prefix, and `param` changes `{id}`. Put the write actions in an auth group:
+Functions the controller doesn't have get no route. `only: [index, show]` and `except: [destroy]` pick actions. `name` changes the name prefix, and `param` changes `{id}`. Put the write actions in an auth group:
 
 ```
-Resource(path: "/people", to: people, only: "index, show")
+Resource(path: "/people", to: people, only: [index, show])
 Group(middleware: auth) {
-  Resource(path: "/people", to: people, only: "store, update, destroy")
+  Resource(path: "/people", to: people, only: [store, update, destroy])
 }
 ```
 
@@ -272,7 +314,7 @@ Group(middleware: auth) {
 ```jsonc
 {
   "http": {
-    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes.* and api.*
+    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes/web.*, routes/api.*, routes.* and api.*
     "middleware": ["log"],                      // for every route
     "groups": { "api": ["cors", "throttle"] },  // names for lists of middleware
     "views": "views",                           // where @view() looks first; never served
@@ -280,10 +322,39 @@ Group(middleware: auth) {
     "write_files": true,                        // false: controllers can only read files
     "cors": { "origins": ["*"], "methods": ["GET", "POST"], "headers": ["Content-Type", "Authorization"], "credentials": false },
     "auth": { "token_env": "API_TOKEN" },
-    "throttle": { "limit": 60, "seconds": 60 }
+    "throttle": { "limit": 60, "seconds": 60 },
+    "openapi": { "routes": "auto", "title": "People API", "version": "1.2.0" }  // or false
   }
 }
 ```
+
+## API docs: OpenAPI
+
+The routes already say everything an API document needs, so KScript writes one for you. While `kscript serve` runs, open `/_api` for a page that lists every endpoint with its parameters, body and answers, plus a form to try each one. Tools such as Postman, client generators and gateways read the same document at `/_openapi.json` or `/_openapi.yaml`. `kscript openapi` writes it to the terminal or a file:
+
+```sh
+kscript openapi                          # JSON
+kscript openapi --yaml --out openapi.yaml
+```
+
+The document is OpenAPI 3.1. Each part comes from the code:
+
+| In the document | From |
+| --- | --- |
+| paths and methods | the routes. `{id?}` and `{path*}` become `{id}` and `{path}`. A route for any method is listed under GET, POST, PUT, PATCH and DELETE. Redirects are left out. |
+| path parameters | the controller's typed parameter (`id: int` is an integer), else the `where` rule (`int`, `number`, `uuid`, or a `pattern` for `slug`, `alpha` and regular expressions). |
+| query parameters | `query: Search`: each field of the type is a query parameter, required unless it is optional. |
+| request body | `json: NewPerson` or `body: NewPerson` as `application/json`, `form: T` as a form, `input: T` as either. |
+| success answer | `/// @returns Person[]` (a type, then any words) for the schema. The status is 200, or the 2xx a `@response(..., status: 201)` gives. Views are `text/html`. |
+| error answers | `@abort(404)` and `status: 409` in the controller. 422 for typed input that doesn't fit (the body lists the `problems`), 400 for a JSON body that isn't JSON, 404 for a path parameter with a type or rule, 401 for `auth`, 429 for `throttle`, 304 for `etag`. Errors share the `Error` schema. |
+| summary, description | the controller's `///` doc comment (the first line is the summary, the rest the description), or one on the route itself. `@param id ...` describes a parameter. |
+| deprecated | `@deprecated` in the doc comment. |
+| security | the `auth` middleware, as a bearer token scheme. Every middleware is also listed under `x-middleware`. |
+| schemas | each `type` and `enum` the routes use, with field descriptions and required fields, in `components.schemas`. |
+| tags | the controller's import name (`people` for `people.show`). |
+| info | `http.openapi.title` and `version`, else the project's `name` and `app.version`. |
+
+Only the API routes (from `api.*` files) are included when there are any, otherwise every route. Set `http.openapi.routes` to `"all"` or `"api"` to choose. `"openapi": false` stops `kscript serve` answering `/_api`, `/_openapi.json` and `/_openapi.yaml`, for example on a public server. `kscript openapi` still works.
 
 ## Editor and kscript check
 
@@ -291,8 +362,10 @@ Route files get the same checking and completion as scripts:
 
 - `to` completes the functions of imported controllers (`people.show`). A name that doesn't exist is an error with a did-you-mean.
 - `middleware` and `use` complete the built-ins too, and accept `http.groups` names.
+- Names in a list are checked and completed one by one, inside `[ ]` too.
 - Route elements are only offered inside `KScript.Routes` or `Group`.
 - `{id}` in `path` isn't read as a `{ }` expression.
+- Doc comments on controllers show in hover, and also become the [API docs](#api-docs-openapi).
 
 ## How it runs
 

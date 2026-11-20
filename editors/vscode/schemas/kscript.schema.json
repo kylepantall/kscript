@@ -103,6 +103,24 @@
             "limit": { "type": "integer", "minimum": 1, "default": 60, "description": "Requests allowed per window, per address and route." },
             "seconds": { "type": "number", "exclusiveMinimum": 0, "default": 60, "description": "The length of the window." }
           }
+        },
+        "openapi": {
+          "description": "The OpenAPI 3.1 document made from the routes. kscript serve answers /_openapi.json, /_openapi.yaml and the /_api page; kscript openapi writes it. false turns the served copies off.",
+          "default": true,
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "default": true, "description": "false stops kscript serve answering /_openapi.json, /_openapi.yaml and /_api." },
+                "title": { "type": "string", "description": "info.title. Defaults to the project's name." },
+                "version": { "type": "string", "description": "info.version. Defaults to app.version, then 1.0.0." },
+                "description": { "type": "string", "description": "info.description." },
+                "routes": { "enum": ["auto", "api", "all"], "default": "auto", "description": "Which routes: api (from api.* files), all, or auto (the API routes if there are any, otherwise all)." }
+              }
+            }
+          ]
         }
       }
     },
@@ -131,6 +149,33 @@
           "examples": [{ "KS3003": "off", "KS4*": "error" }]
         },
         "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "description": "Where kscript make puts each kind of file, relative to the site folder. Leave a folder out to use the recommended one.",
+      "additionalProperties": false,
+      "properties": {
+        "routes": { "type": "string", "default": "routes", "description": "Route files: web.kscript (served at /) and api.kscript (under /api)." },
+        "controllers": { "type": "string", "default": "controllers", "description": "Controllers (kscript make controller, kscript make route)." },
+        "middleware": { "type": "string", "default": "middleware", "description": "Middleware (kscript make middleware)." },
+        "requests": { "type": "string", "default": "requests", "description": "Typed request bodies (kscript make request)." },
+        "views": { "type": "string", "default": "views", "description": "Views that controllers render with @view() (kscript make view). Also where @view() looks, unless http.views is set." },
+        "components": { "type": "string", "default": "_components", "description": "Page components (kscript make component)." },
+        "layouts": { "type": "string", "default": "_layouts", "description": "Page layouts (kscript make layout)." },
+        "partials": { "type": "string", "default": "_partials", "description": "HTML that pages <include> (kscript make partial)." },
+        "styles": { "type": "string", "default": "styles", "description": ".ks.css stylesheets (kscript make css)." },
+        "lib": { "type": "string", "default": "lib", "description": "Shared functions and constants (kscript make module, kscript make const, kscript make cache)." },
+        "types": { "type": "string", "default": "types", "description": "Types and enums (kscript make type, kscript make enum)." },
+        "storage": { "type": "string", "default": "lib", "description": "JSON file stores (kscript make storage)." },
+        "jobs": { "type": "string", "default": "jobs", "description": "Jobs (kscript make job)." },
+        "windows": { "type": "string", "default": ".", "description": "Desktop windows (kscript make window)." },
+        "config": { "type": "string", "default": "config", "description": "Settings files (kscript make config), unless config.root is set." },
+        "locales": { "type": "string", "default": "locales", "description": "Translations (kscript make locale)." },
+        "logging": { "type": "string", "default": "lib", "description": "Log providers (kscript make logger)." },
+        "data": { "type": "string", "default": "data", "description": "JSON data that stores and caches write." },
+        "scripts": { "type": "string", "default": "scripts", "description": "Scripts (kscript make script)." },
+        "tests": { "type": "string", "default": "tests", "description": "Tests (kscript make test)." }
       }
     },
     "make": {
@@ -242,7 +287,9 @@
             "wrapAttributes": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One attribute per line for long start tags and tags already written that way. Off: tags are never wrapped or joined." },
             "trimTrailingWhitespace": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Remove spaces at the ends of lines of text." },
             "collapseBlankLines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to maxBlankLines." },
-            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." }
+            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." },
+            "spacing": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: one space after commas and colons, around assignments and =>, and before a block's '{'. Off: spacing inside lines is kept." },
+            "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." }
           }
         },
         "indent": {

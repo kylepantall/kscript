@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+using KScript.Language.Catalog;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
 
@@ -126,7 +127,7 @@ namespace KScript.Conversion
 
                 var notConverted = new List<string>();
                 Func<string, string> importPath = src => ImportPath(file, src, toCode: !isCode, converting, notConverted);
-                ConversionResult result = isCode ? ScriptConverter.ToXml(parsed, importPath) : ScriptConverter.ToCode(parsed, importPath);
+                ConversionResult result = isCode ? ScriptConverter.ToXml(parsed, importPath, LanguageCatalog.Default.IsNameList) : ScriptConverter.ToCode(parsed, importPath, LanguageCatalog.Default.IsNameList);
                 string written = RenameMentions(result.Text, file, toCode: !isCode, converting, roots);
                 foreach (string src in notConverted.Distinct())
                 {
@@ -204,6 +205,14 @@ namespace KScript.Conversion
                     File.WriteAllText(page, text);
                     output.WriteLine($"{page}: now names the converted files");
                 }
+            }
+
+            // Agent docs describe the converted scripts, in the new format.
+            bool code = files.Any(f => !MarkupParser.IsCodePath(f));
+            foreach (string root in projects.Select(Path.GetDirectoryName).Where(global::KScript.Language.Agents.AgentDocs.IsEnabled))
+            {
+                if (global::KScript.Language.Agents.AgentDocs.Write(root, format: code ? "kscript" : "xml", skip: converting).Count > 0)
+                    output.WriteLine($"{Path.Combine(root, global::KScript.Language.Agents.AgentDocs.AgentsFile)}: updated for the converted files");
             }
         }
 

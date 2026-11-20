@@ -505,9 +505,14 @@
   function loadIndex() {
     if (index) return Promise.resolve(index);
     if (!loading) loading = fetch('/assets/search.json').then(function (r) { return r.json(); }).then(function (data) {
+      // An element has an XML title (<break>) and a .kscript one (break): either matches.
       index = data.map(function (e) {
-        var t = e.t.toLowerCase();
-        return { e: e, t: t, name: t.replace(/^.*->/, '').replace(/^[@<$]|[()>]+$/g, '').replace(/^kscript /, ''), all: (t + ' ' + (e.d || '') + ' ' + (e.s || '')).toLowerCase() };
+        var t = e.t.toLowerCase(), c = (e.c || '').toLowerCase();
+        return {
+          e: e, t: t, c: c,
+          name: t.replace(/^.*->/, '').replace(/^[@<$]|[()>]+$/g, '').replace(/^kscript /, ''),
+          all: (t + ' ' + c + ' ' + (e.d || '') + ' ' + (e.s || '')).toLowerCase()
+        };
       });
       return index;
     });
@@ -524,9 +529,10 @@
     var scored = [];
     index.forEach(function (x) {
       var s = 0;
-      if (x.name === bare || x.t === q) s = 100;
+      if (x.name === bare || x.t === q || (x.c && x.c === q)) s = 100;
       else if (x.name.indexOf(bare) === 0) s = 80 - Math.min(20, x.name.length - bare.length);
-      else if (x.t.indexOf(q) >= 0) s = 60;
+      else if (x.c && x.c.indexOf(q) === 0) s = 75 - Math.min(20, x.c.length - q.length);
+      else if (x.t.indexOf(q) >= 0 || (x.c && x.c.indexOf(q) >= 0)) s = 60;
       else if (words.every(function (w) { return x.all.indexOf(w) >= 0; })) s = 30;
       else return;
       if (q.indexOf('->') === 0 && x.e.k !== 'method') s -= 30;
@@ -560,9 +566,12 @@
       } else {
         results.innerHTML = shown.map(function (e, i) {
           var code = e.k === 'method' || e.k === 'command' || e.k === 'element' || e.k === 'variable' || e.k === 'cli';
-          var title = code ? '<code>' + mark(e.t, q) + '</code>' : mark(e.t, q);
+          var ks = preferredFormat() === 'kscript';
+          var text = ks && e.c ? e.c : e.t;
+          var kind = ks && e.k === 'element' ? 'statement' : e.k;
+          var title = code ? '<code>' + mark(text, q) + '</code>' : mark(text, q);
           return '<a class="result' + (i === active ? ' active' : '') + '" role="option" href="' + esc(e.u) + '">' +
-            '<div class="result-title"><span class="result-kind">' + esc(e.k) + '</span>' + title + '<span class="result-section">' + esc(e.s || '') + '</span></div>' +
+            '<div class="result-title"><span class="result-kind">' + esc(kind) + '</span>' + title + '<span class="result-section">' + esc(e.s || '') + '</span></div>' +
             (e.d ? '<div class="result-text">' + esc(e.d) + '</div>' : '') + '</a>';
         }).join('');
       }

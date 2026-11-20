@@ -124,6 +124,11 @@
           "default": "off",
           "description": "Log the messages between VS Code and the language server."
         },
+        "kscript.autoCloseTags": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Add the end tag when you finish typing a start tag in a `.ks.xml` script: `<echo>` becomes `<echo></echo>`."
+        },
         "kscript.blocks.dividers": {
           "type": "boolean",
           "default": true,
@@ -226,9 +231,13 @@
           "strings": "on"
         },
         "editor.suggest.showStatusBar": true,
-        "editor.wordBasedSuggestions": "off"
+        "editor.wordBasedSuggestions": "off",
+        "editor.snippetSuggestions": "none",
+        "editor.suggest.showWords": false,
+        "editor.suggest.showSnippets": false
       },
       "[kscript-code]": {
+        "editor.defaultFormatter": "kylepantall.kscript",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
           "other": "on",
@@ -236,7 +245,10 @@
           "strings": "on"
         },
         "editor.suggest.showStatusBar": true,
-        "editor.wordBasedSuggestions": "off"
+        "editor.wordBasedSuggestions": "off",
+        "editor.snippetSuggestions": "none",
+        "editor.suggest.showWords": false,
+        "editor.suggest.showSnippets": false
       }
     },
     "semanticTokenScopes": [
@@ -301,7 +313,7 @@
     ]
   },
   "scripts": {
-    "check": "node --check extension.js && node --check src/server.js && node --check src/site.js && node --check src/blocks.js && node --check src/watch.js && node --check src/comments.js",
+    "check": "node --check extension.js && node --check src/server.js && node --check src/site.js && node --check src/blocks.js && node --check src/watch.js && node --check src/comments.js && node --check src/autoclose.js",
     "test": "node --test test/unit/*.test.js",
     "smoke": "node test/smoke.js",
     "package": "vsce package --no-dependencies --skip-license -o kscript-vscode.vsix",

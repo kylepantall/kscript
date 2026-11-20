@@ -14,9 +14,12 @@ namespace KScript.Language.Analysis
     {
         /// <remarks><paramref name="RawText"/>: how a bare word is read for the parameter's type, as text ("word") or a handle ("handle").</remarks>
         internal readonly record struct ParameterSlot(string Name, bool Required, bool Variadic, bool Flag = false, IReadOnlyList<string> Values = null, string TypeName = null,
-            string RawText = null, string Type = null)
+            IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
+
+            /// <summary>A list of an enum (<c>sizes: Size[]</c>): its items can be written bare, <c>[large, small]</c>.</summary>
+            public bool IsEnumList => ItemValues != null && ItemValues.Count > 0;
 
             public string Match(string word)
             {
@@ -26,7 +29,13 @@ namespace KScript.Language.Analysis
                 }
                 return RawText != null && (RawText == "handle" || !word.StartsWith('@')) ? word : null;
             }
+
+            public string MatchItem(string word) => IsEnumList ? ItemValues.FirstOrDefault(v => string.Equals(v, word.Trim(), StringComparison.OrdinalIgnoreCase)) : null;
+
         }
+
+        /// <summary>Bare words inside an array argument (<c>[large, small]</c>), waiting for their call to say whether the parameter is a list of an enum.</summary>
+        private readonly Dictionary<ArgumentNode, List<IdentifierNode>> pendingBareItems = new Dictionary<ArgumentNode, List<IdentifierNode>>();
 
         /// <summary>Bare-word arguments (<c>downloads</c>, <c>not recursive</c>) waiting for their call to say what they are.</summary>
         private readonly HashSet<ArgumentNode> pendingBare = new HashSet<ArgumentNode>();
@@ -44,7 +53,10 @@ namespace KScript.Language.Analysis
                     Symbol type = p.Type != null && !KType.Declarable.Contains(p.Type) && p.Type != "number" && p.Type != "date" && p.Type != "any"
                         ? scope?.Lookup(p.Type, int.MaxValue) : null;
                     string raw = type?.EnumValues == null ? RawTextKindOf(p.Type, scope, int.MaxValue) : null;
-                    return new ParameterSlot(p.Name, !p.HasDefault, false, p.Type == KType.Bool, type?.EnumValues, type?.EnumValues != null ? type.Name : null, raw, p.Type);
+                    string itemType = p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal) ? p.Type.Substring(0, p.Type.Length - 2).Trim() : null;
+                    Symbol item = itemType != null && !KType.Declarable.Contains(itemType) ? scope?.Lookup(itemType, int.MaxValue) : null;
+                    return new ParameterSlot(p.Name, !p.HasDefault, false, p.Type == KType.Bool, type?.EnumValues, type?.EnumValues != null ? type.Name : item?.EnumValues != null ? item.Name : null,
+                        item?.EnumValues, raw, p.Type);
                 }).ToList(),
             };
 
@@ -108,6 +120,13 @@ namespace KScript.Language.Analysis
                     AnalyzeExpr(a.Value, region, scope, ExprContext.Argument);
                     continue;
                 }
+                if (pendingBareItems.Remove(a, out List<IdentifierNode> items))
+                {
+                    foreach (IdentifierNode item in items)
+                    {
+                        AnalyzeBareIdentifier(item, region, scope, ExprContext.Value);
+                    }
+                }
                 if (pendingBare.Remove(a) && BareWord(a) is var (_, _, node))
                 {
                     AnalyzeBareIdentifier(node, region, scope, ExprContext.Argument);
@@ -167,6 +186,10 @@ namespace KScript.Language.Analysis
                     return;
                 }
                 filled[index] = a;
+                if (a != null && index < signature.Count)
+                {
+                    ResolveEnumItems(display, a, signature[index], region);
+                }
             }
 
             foreach (ArgumentNode a in args)
@@ -253,6 +276,7 @@ namespace KScript.Language.Analysis
                 {
                     CheckEnumLiteral(display, a, s, region);
                     ClaimTyped(a, s, region);
+                    ResolveEnumItems(display, a, s, region);
                 }
                 filled[positional] = a;
                 positional++;
@@ -296,6 +320,7 @@ namespace KScript.Language.Analysis
                 {
                     CheckEnumLiteral(display, a, slot.Value, region);
                     ClaimTyped(a, slot.Value, region);
+                    ResolveEnumItems(display, a, slot.Value, region);
                 }
                 filled[free] = a;
             }
@@ -330,6 +355,34 @@ namespace KScript.Language.Analysis
                 return;
             }
             ReportBadValue(display, slot, word, span, quoted: false);
+        }
+
+        /// <summary>
+        /// Bare words in an array on a list-of-enum parameter (<c>@pack([large, small])</c> for <c>sizes: Size[]</c>):
+        /// each must be one of the values. On any other parameter they stay pending and are reported as unknown names.
+        /// </summary>
+        private void ResolveEnumItems(string display, ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
+        {
+            if (!slot.IsEnumList || !(a.Value is ListNode))
+            {
+                return;
+            }
+            List<IdentifierNode> items = pendingBareItems.Remove(a, out List<IdentifierNode> pending) ? pending : new List<IdentifierNode>();
+            var asItems = slot with { Values = slot.ItemValues };
+            foreach (IdentifierNode item in items)
+            {
+                if (slot.MatchItem(item.Name) == null)
+                {
+                    ReportBadValue(display, asItems, item.Name, region.Source.ToSource(item.Span), quoted: false);
+                }
+            }
+            foreach (ExprNode literal in ((ListNode)a.Value).Items)
+            {
+                if (literal is LiteralNode { Kind: LiteralKind.String } text && slot.MatchItem(text.Value) == null)
+                {
+                    ReportBadValue(display, asItems, text.Value, region.Source.ToSource(text.Span), quoted: true);
+                }
+            }
         }
 
         /// <summary>A text literal on an enum parameter must be one of its values.</summary>

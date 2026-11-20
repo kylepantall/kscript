@@ -193,9 +193,23 @@ namespace KScript.Runtime
             Interpreter interpreter = call.Interpreter;
             Scope scope = Closure.Child();
             var enums = new Dictionary<string, EnumType>();
+            var enumLists = new Dictionary<string, EnumType>();
             foreach (Parameter p in Parameters.Where(p => p.Type != null))
             {
                 TypeRef t = TypeRef.Parse(p.Type);
+                if (t.ListDepth == 1 && !t.Optional && !t.IsBuiltIn && t.Inline == null)
+                {
+                    // sizes: Size[] takes [large, small] with bare values.
+                    try
+                    {
+                        if (Shapes.Resolve(TypeRef.Parse(t.Name), Closure, Module) is EnumType item) enumLists[p.Name] = item;
+                    }
+                    catch (KScriptException)
+                    {
+                        // Reported when the argument is converted below.
+                    }
+                    continue;
+                }
                 if (!t.IsSimple || t.IsBuiltIn || t.Args != null) continue;
                 object declared;
                 try
@@ -209,7 +223,8 @@ namespace KScript.Runtime
                 if (declared is EnumType e) enums[p.Name] = e;
             }
             IReadOnlyList<object> args = ArgumentBinder.BindByName(call,
-                Parameters.Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null, TypeName: e?.Name,
+                Parameters.Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null,
+                    TypeName: e?.Name ?? enumLists.GetValueOrDefault(p.Name)?.Name, ItemValues: enumLists.GetValueOrDefault(p.Name)?.Names,
                     RawText: p.Type == null || e != null ? null : Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module))).ToList(), out HashSet<int> given);
             for (int i = 0; i < Parameters.Count; i++)
             {

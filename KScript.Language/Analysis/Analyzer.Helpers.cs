@@ -264,6 +264,7 @@ namespace KScript.Language.Analysis
 
             if (catalog.GetCommand(name) is CallableInfo command)
             {
+                ReportDeprecated(command.Deprecated, $"@{command.Name}", span, span);
                 if (command.Package != null)
                 {
                     usedPackages.Add(command.Package);
@@ -420,10 +421,10 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            if (report && type != null && !KType.Declarable.Contains(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
+            if (report && type != null && !IsBuiltInTypeName(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
             {
                 Report(value.ToSource(new TextSpan(start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length), type.Length)),
-                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", KType.Declarable)}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
+                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
             }
 
             if (report && def != null)
@@ -438,23 +439,13 @@ namespace KScript.Language.Analysis
             return new FunctionParameter { Name = name, Type = type, Default = def, Span = span };
         }
 
-        /// <summary>Splits <c>a, b</c> into names and their document spans.</summary>
+        /// <summary>Splits <c>[a, b]</c> (or <c>a, b</c>) into names and their document spans.</summary>
         private static IEnumerable<(string Name, TextSpan Span)> SplitNames(DecodedText value)
         {
-            string text = value.Value;
-            int i = 0;
-            while (i < text.Length)
+            foreach ((string listed, int at) in KScript.Metadata.NameList.Split(value.Value))
             {
-                while (i < text.Length && (char.IsWhiteSpace(text[i]) || text[i] == ','))
-                {
-                    i++;
-                }
-                int start = i;
-                while (i < text.Length && text[i] != ',')
-                {
-                    i++;
-                }
-                string name = text.Substring(start, i - start).TrimEnd();
+                string name = listed;
+                int start = at;
                 if (name.StartsWith("$", StringComparison.Ordinal) || name.StartsWith("@", StringComparison.Ordinal))
                 {
                     name = name.Substring(1);

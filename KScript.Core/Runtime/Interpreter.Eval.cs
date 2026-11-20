@@ -194,7 +194,9 @@ namespace KScript.Runtime
                 case IdentifierNode id:
                     if (ctx.Module != null && ctx.Module.Aliases.TryGetValue(id.Name, out ImportNamespace ns)) return ns;
                     // A <type> can be named without $: as: Repo.
-                    if (scope.TryGet(id.Name, out object declaredType) && declaredType is RecordType) return declaredType;
+                    if (scope.TryGet(id.Name, out object declaredType) && (declaredType is RecordType || declaredType is ErrorType)) return declaredType;
+                    // So is an error type: catch NotFound, $err->is(NotFound).
+                    if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType) return errorType;
                     throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
 
                 case ListNode list:
@@ -320,12 +322,21 @@ namespace KScript.Runtime
             foreach (ArgumentNode a in arguments)
             {
                 // A bare word (downloads, recursive, not recursive) means something only to the parameter it lands on.
-                object value = BareWordOf(a.Value, scope, ctx, afterNamed: named != null && a.Name == null) ?? Evaluate(a.Value, scope, ctx);
+                object value = BareWordOf(a.Value, scope, ctx, afterNamed: named != null && a.Name == null) ?? BareListOf(a.Value, scope, ctx) ?? Evaluate(a.Value, scope, ctx);
                 if (a.Name != null) (named ??= new Dictionary<string, object>(StringComparer.Ordinal))[a.Name] = value;
                 else if (named != null && !(value is BareWord)) args.Add(new LatePositional(value));
                 else args.Add(value);
             }
             return (args, named);
+        }
+
+        /// <summary>An array with bare words in it, <c>[large, small]</c>, for the binder to resolve against the parameter; null otherwise.</summary>
+        private BareList BareListOf(ExprNode node, Scope scope, EvalContext ctx)
+        {
+            if (!(node is ListNode list) || !list.Items.Any(i => i is IdentifierNode)) return null;
+            var words = list.Items.Select(i => i is IdentifierNode ? BareWordOf(i, scope, ctx, afterNamed: false) : null).ToList();
+            if (words.All(w => w == null)) return null;
+            return new BareList(list.Items.Select((item, n) => words[n] ?? Evaluate(item, scope, ctx)).ToList());
         }
 
         private BareWord BareWordOf(ExprNode node, Scope scope, EvalContext ctx, bool afterNamed)
@@ -347,7 +358,8 @@ namespace KScript.Runtime
                 negated = true;
             }
             if (node is IdentifierNode id && id.Name != "_" && !(ctx.Module != null && ctx.Module.Aliases.ContainsKey(id.Name))
-                && !(!negated && scope.TryGet(id.Name, out object value) && value is RecordType))
+                && !(!negated && scope.TryGet(id.Name, out object value) && (value is RecordType || value is ErrorType))
+                && !(!negated && ErrorTypes.FindExact(id.Name, null) != null))
             {
                 return new BareWord(id.Name, negated, afterNamed);
             }
@@ -747,6 +759,18 @@ namespace KScript.Runtime
                 {
                     // filter(...) after a pipe is a method of the value; slugify() is a function or command.
                     if (scope.TryGet(id.Name, out object stored) && stored is ICallable fn) return Call(fn, args, named, scope, ctx.Module);
+                    // NotFound(id: 42) makes an error, for throw.
+                    if (!piped && ErrorTypes.FindExact(id.Name, scope) is ErrorType error)
+                    {
+                        try
+                        {
+                            return error.Create(this, args, named).ToValue();
+                        }
+                        catch (KScriptException ex)
+                        {
+                            throw Fail(call, ctx, ex.Message, ex.Type);
+                        }
+                    }
                     if (piped && TryFindMethod(pipedValue, id.Name, ctx.Module, out MethodDefinition method))
                     {
                         return InvokeMethodDefinition(method, pipedValue, args.Skip(1).ToList(), named, scope, ctx);
@@ -803,6 +827,7 @@ namespace KScript.Runtime
             method = null;
             if (module == null) return false;
             string type = Values.TypeOf(target);
+            if (target is ErrorValue && module.Methods.TryGetValue("error:" + name, out method)) return true;
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
             // An email or a handle is text too, so string methods work on it.

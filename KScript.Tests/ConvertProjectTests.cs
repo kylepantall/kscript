@@ -58,6 +58,7 @@ public sealed class ConvertProjectTests : IDisposable
         // Nothing points at the deleted XML files any more: imports, comments, strings, pages and kscript.json.
         foreach (string file in Directory.EnumerateFiles(project, "*.*", SearchOption.AllDirectories).Where(f => !f.EndsWith("kscript.json", StringComparison.Ordinal)))
         {
+            Assert.True(!File.ReadAllText(file).Replace("**/*.ks.xml", string.Empty).Replace("*.test.ks.xml", string.Empty).Contains(".ks.xml"), file);
             Assert.DoesNotContain(".ks.xml", File.ReadAllText(file).Replace("**/*.ks.xml", string.Empty).Replace("*.test.ks.xml", string.Empty));
         }
         string controller = File.ReadAllText(Path.Combine(project, "controllers", "tasks.kscript"));
@@ -124,6 +125,36 @@ public sealed class ConvertProjectTests : IDisposable
         Write("lib/a.ks.xml", "<kscript />");
         Assert.Equal(0, Convert(Path.Combine(dir, "b.kscript")).Code);
         Assert.Contains("<import src=\"lib/a.ks.xml\" />", Read("b.ks.xml"));
+    }
+
+    [Fact]
+    public void ListsOfNamesBecomeArrays()
+    {
+        Func<string, string, bool> lists = KScript.Language.Catalog.LanguageCatalog.Default.IsNameList;
+        string xml = "<KScript.Routes>\n  <Middleware use=\"log, cors, throttle:30\" />\n  <Resource path=\"/p\" to=\"people\" only=\"index, show\" />\n  <Get path=\"/\" redirect=\"/p\" middleware=\"auth\" />\n</KScript.Routes>";
+        string code = ScriptConverter.Convert(xml, "routes.ks.xml", nameList: lists).Text;
+        Assert.Contains("Middleware(use: [log, cors, throttle:30])", code);
+        Assert.Contains("only: [index, show]", code);
+        Assert.Contains("middleware: auth", code);
+
+        string back = ScriptConverter.Convert(code, "routes.kscript", nameList: lists).Text;
+        Assert.Contains("<Middleware use=\"log, cors, throttle:30\" />", back);
+        Assert.Contains("only=\"index, show\"", back);
+
+        // Without the catalog, values are kept as written.
+        Assert.Contains("use: \"log, cors, throttle:30\"", ScriptConverter.Convert(xml, "routes.ks.xml").Text);
+    }
+
+    [Theory]
+    [InlineData("[log, cors]", "log|cors")]
+    [InlineData("log, cors", "log|cors")]
+    [InlineData(" [ a ,b,  throttle:30 ] ", "a|b|throttle:30")]
+    [InlineData("[]", "")]
+    [InlineData("people.show", "people.show")]
+    public void NameListsReadBothForms(string text, string expected)
+    {
+        Assert.Equal(expected, string.Join("|", KScript.Metadata.NameList.Names(text)));
+        Assert.Equal(text.Trim().StartsWith('['), KScript.Metadata.NameList.IsArray(text));
     }
 
     [Fact]

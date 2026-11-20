@@ -254,6 +254,11 @@ button.link:hover { color: var(--fg); background: var(--bg); }
 .returns { font-size: 13.5px; color: var(--fg-soft); font-weight: 400; }
 .type { font-family: var(--mono); font-size: 13px; }
 .badge { font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); }
+.badge.deprecated-badge { color: var(--err); background: var(--err-bg); margin-left: 6px; vertical-align: middle; }
+.entry.deprecated .sig del, tr.deprecated del, .sig del.param { text-decoration-color: var(--err); text-decoration-thickness: 1.5px; }
+.entry.deprecated .sig del code, tr.deprecated del code { color: var(--fg-soft); }
+.deprecation { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--err); background: var(--err-bg); border-radius: 4px; font-size: 14px; }
+td .deprecation { margin: 0 0 4px; }
 .anchor { position: absolute; left: -22px; color: var(--fg-faint); opacity: 0; font-weight: 400; }
 .entry:hover .anchor, h2:hover > .anchor { opacity: 1; text-decoration: none; }
 .desc { margin-bottom: .6em; }
@@ -299,6 +304,7 @@ button.link:hover { color: var(--fg); background: var(--bg); }
 .code-bar .fmt-tabs { margin-left: -8px; }
 :root[data-format="kscript"] .code-pair > .code[data-lang="xml"],
 :root[data-format="xml"] .code-pair > .code[data-lang="kscript"] { display: none; }
+:root[data-format="kscript"] .f-xml, :root:not([data-format="kscript"]) .f-ks { display: none; }
 .fmt-switch { flex: none; }
 .fmt-switch button { font-size: 12.5px; padding: 4px 10px; }
 @media (max-width: 720px) { .fmt-switch button { padding: 3px 7px; font-size: 11.5px; } }

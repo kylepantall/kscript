@@ -240,6 +240,29 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void BlockCommentsAtALinesEndDontEndTheStatement()
+        {
+            // After an operator, the statement goes on past the comment to the next line.
+            Assert.Equal("kscript { do \"x = 1 + /* tax */\n  2\" }", Shape(Root("x = 1 + /* tax */\n  2")));
+            Assert.Equal("kscript { do \"x = /* soon */ /* really */\n  1\" }", Shape(Root("x = /* soon */ /* really */\n  1")));
+            // Otherwise the comment is its own, after the statement.
+            MarkupElement root = Root("x = 1 /* one */\ny = 2");
+            Assert.Equal("kscript { do \"x = 1\"; do \"y = 2\" }", Shape(root));
+            Assert.Equal("one", Assert.Single(root.Children.OfType<MarkupComment>()).Text.Trim());
+
+            Assert.Contains(CodeParser.Parse("x = 1 /* never closed").Diagnostics, d => d.Message.Contains("missing its closing */"));
+            // A stray */ with no /* is just text: the line ends in an operator-like character and goes on.
+            Assert.Single(CodeParser.Parse("x = 2 */\ny = 3").RootElements.Single().ChildElements);
+        }
+
+        [Fact]
+        public void BlockCommentsSurviveWritingCodeBackOut()
+        {
+            string code = ScriptConverter.ToCode(CodeParser.Parse("/* one line */\nx = 1\n/* first\n\nlast */\ny = 2\n")).Text;
+            Assert.Equal("/* one line */\nx = 1\n/*\n  first\n\n  last\n*/\ny = 2\n", code);
+        }
+
+        [Fact]
         public void AnalyzerChecksCodeFiles()
         {
             DocumentAnalysis ok = Analyzer.Analyze("x = 2\necho \"{ $x * 2 }\"", "test.kscript");

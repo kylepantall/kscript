@@ -184,6 +184,12 @@ namespace KScript.Runtime
                 ("password->strong", "<let name=\"pw\" type=\"password\" value=\"'correct horse battery staple'\" />\n<echo>{ $pw->strong(min: 12) }</echo>"),
                 ("password->reveal", "<let name=\"pw\" type=\"password\" value=\"'s3cret!'\" />\n<echo>$pw is { $pw->reveal()->length() } characters</echo>"),
 
+                // Errors
+                ("error->is", "<try>\n  <throw value=\"FileNotFound('No settings.json')\" />\n  <catch as=\"err\"><echo>{ $err->is(IO) }</echo></catch>\n</try>"),
+                ("error->chain", "<error name=\"PersonNotFound\" extends=\"NotFound\" />\n<try>\n  <throw value=\"PersonNotFound()\" />\n  <catch as=\"err\"><echo>{ $err->chain() }</echo></catch>\n</try>"),
+                ("error_type->new", "<error name=\"OutOfStock\" fields=\"item: string\" message=\"{$item} is out of stock\" />\n<let name=\"e\" value=\"$OutOfStock->new(item: 'tea')\" />\n<echo>{ $e.message }</echo>"),
+                ("error_type->fields", "<error name=\"OutOfStock\" fields=\"item: string, left?: int\" />\n<echo>{ $OutOfStock->fields()->map(fn($f) => $f.name) }</echo>"),
+
                 // Config and logging
                 ("config->get", "$config->get('server.port', 8080)"),
                 ("config->has", "$config->has('database.url')"),
