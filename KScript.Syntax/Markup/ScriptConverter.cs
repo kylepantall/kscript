@@ -20,13 +20,13 @@ namespace KScript.Syntax.Markup
     public static class ScriptConverter
     {
         /// <summary>Converts a file's text to the other format, chosen by its path (.kscript becomes XML, anything else .kscript).</summary>
-        public static ConversionResult Convert(string text, string path)
+        public static ConversionResult Convert(string text, string path, Func<string, string> importPath = null)
         {
             if (MarkupParser.IsCodePath(path))
             {
-                return ToXml(CodeParser.Parse(text));
+                return ToXml(CodeParser.Parse(text), importPath);
             }
-            return ToCode(MarkupParser.Parse(text, DocumentKind.Script));
+            return ToCode(MarkupParser.Parse(text, DocumentKind.Script), importPath);
         }
 
         /// <summary>The path a converted file gets: x.ks.xml or x.xml becomes x.kscript, and x.kscript becomes x.ks.xml.</summary>
@@ -46,16 +46,20 @@ namespace KScript.Syntax.Markup
             return path + ".kscript";
         }
 
-        public static ConversionResult ToCode(MarkupDocument document)
+        /// <param name="importPath">
+        /// Rewrites the <c>src</c> of each &lt;import&gt; (given as written, trimmed); null or a function that returns
+        /// its input keeps every import as it is. <c>kscript convert</c> uses it to point imports at converted files.
+        /// </param>
+        public static ConversionResult ToCode(MarkupDocument document, Func<string, string> importPath = null)
         {
-            var writer = new CodeWriter();
+            var writer = new CodeWriter { ImportPath = importPath ?? (s => s) };
             writer.WriteDocument(document);
             return writer.Result;
         }
 
-        public static ConversionResult ToXml(MarkupDocument document)
+        public static ConversionResult ToXml(MarkupDocument document, Func<string, string> importPath = null)
         {
-            var writer = new XmlWriter();
+            var writer = new XmlWriter { ImportPath = importPath ?? (s => s) };
             writer.WriteDocument(document);
             return writer.Result;
         }
@@ -234,6 +238,8 @@ namespace KScript.Syntax.Markup
 
         private sealed class CodeWriter
         {
+            public Func<string, string> ImportPath { get; init; }
+
             private readonly StringBuilder sb = new StringBuilder();
             private readonly Scopes scopes = new Scopes();
 
@@ -342,9 +348,30 @@ namespace KScript.Syntax.Markup
                 string prefix = c.IsDoc ? "///" : "//";
                 foreach (string line in c.IsDoc ? c.DocText.Split('\n').ToList() : DedentAll(c.Text))
                 {
-                    Line(indent, line.Length == 0 ? prefix : prefix + " " + line);
+                    string converted = XmlExamples(line);
+                    Line(indent, converted.Length == 0 ? prefix : prefix + " " + converted);
                 }
             }
+
+            private static readonly System.Text.RegularExpressions.Regex XmlExample =
+                new System.Text.RegularExpressions.Regex(@"<[a-z][\w.\-]*(?:\s+[\w\-:]+=""[^""<>]*"")*\s*/>");
+
+            /// <summary>
+            /// One-line XML examples in a comment (<c>&lt;import src="lib/x.ks.xml" /&gt;</c>) are written the .kscript
+            /// way (<c>import "lib/x.ks.xml"</c>); anything that doesn't convert to one line is kept as written.
+            /// </summary>
+            private string XmlExamples(string line) => XmlExample.Replace(line, m =>
+            {
+                MarkupDocument doc = MarkupParser.Parse("<kscript>" + m.Value + "</kscript>", DocumentKind.Script);
+                if (doc.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
+                {
+                    return m.Value;
+                }
+                var writer = new CodeWriter { ImportPath = ImportPath };
+                writer.WriteDocument(doc);
+                string text = writer.Result.Text.Trim();
+                return text.Length == 0 || text.Contains('\n') ? m.Value : text;
+            });
 
             private void WriteDoc(MarkupElement e, int indent)
             {
@@ -367,19 +394,7 @@ namespace KScript.Syntax.Markup
 
                 switch (e.Name)
                 {
-                    case "const" when Only("name", "value", "type", "description") && Attr("name") != null && !e.ChildElements.Any():
-                        {
-                            // <const name="max" value="10" /> is const max = 10, the same as <let ... const="yes">.
-                            string name = Attr("name").Trim();
-                            string value = Attr("value") ?? TrimLayout(TextOf(e))?.Trim();
-                            WriteDoc(e, indent);
-                            string type = Attr("type") != null ? ": " + Attr("type").Trim() : string.Empty;
-                            sb.Append(pad).Append("const ").Append(name).Append(type).Append(" = ")
-                                .Append(value != null ? Reindent(value.Trim(), Pad(indent)) : "null").Append('\n');
-                            scopes.Declare(name);
-                            return;
-                        }
-                    case "let" when Only("name", "value", "const", "type", "description") && !e.ChildElements.Any():
+                    case "let" or "const" when Only("name", "value", "const", "type", "description") && !e.ChildElements.Any():
                         {
                             string name = Attr("name")?.Trim();
                             string value = Attr("value") ?? TrimLayout(TextOf(e))?.Trim();
@@ -388,7 +403,7 @@ namespace KScript.Syntax.Markup
                                 WriteStatements(value, indent, declare: true);
                                 return;
                             }
-                            bool isConst = IsYes(Attr("const"));
+                            bool isConst = e.Name == "const" || IsYes(Attr("const"));
                             if (!isConst && scopes.IsInOuterScope(name))
                             {
                                 Result.Warnings.Add($"<let name=\"{name}\"> declared a new ${name} inside a block, hiding the outer one. In .kscript, {name} = ... changes the outer ${name} instead.");
@@ -634,8 +649,7 @@ namespace KScript.Syntax.Markup
 
             private static bool IsName(string s) => s.Length > 0 && Lexer.IsIdentStart(s[0]) && s.All(c => Lexer.IsIdentChar(c) || c == '.');
 
-            /// <summary>Imports keep pointing at the file as it is; converting a library is a separate step.</summary>
-            private static string ConvertedImport(string src) => src.Trim();
+            private string ConvertedImport(string src) => ImportPath(src.Trim());
 
             private void WriteStatements(string statements, int indent, bool declare)
             {
@@ -866,6 +880,8 @@ namespace KScript.Syntax.Markup
 
         private sealed class XmlWriter
         {
+            public Func<string, string> ImportPath { get; init; }
+
             private readonly StringBuilder sb = new StringBuilder();
             private readonly Scopes scopes = new Scopes();
 
@@ -951,6 +967,13 @@ namespace KScript.Syntax.Markup
                 }
 
                 List<MarkupAttribute> attributes = e.Attributes.ToList();
+                // let const="yes" is written as <const>, the element made for it.
+                string tag = e.Name;
+                if (tag == "let" && attributes.Any(a => a.Name == "const" && IsYes(a.ValueText)))
+                {
+                    tag = "const";
+                    attributes.RemoveAll(a => a.Name == "const");
+                }
                 string doc = e.GetAttributeValue("description");
                 if (doc != null && (doc.Contains('\n') || doc.TrimStart().StartsWith("@", StringComparison.Ordinal) || doc.Contains("\n@")))
                 {
@@ -967,17 +990,28 @@ namespace KScript.Syntax.Markup
 
                 // A long value reads better as element text: <let name="people">[ ... ]</let>.
                 string textValue = null;
-                if (e.Name is "let" or "set" && e.GetAttributeValue("value") is string v && v.Contains('\n') && !e.Children.Any())
+                if (e.Name is "let" or "set" or "const" && e.GetAttributeValue("value") is string v && v.Contains('\n') && !e.Children.Any())
                 {
                     attributes.RemoveAll(a => a.Name == "value");
                     textValue = Reindent(v, Pad(indent + 1));
                 }
 
-                sb.Append(Pad(indent)).Append('<').Append(e.Name);
+                sb.Append(Pad(indent)).Append('<').Append(tag);
+                if (attributes.Count == 1 && attributes[0].Name == ShorthandCondition.AttributeFor(tag)
+                    && ShorthandCondition.CanWrite(attributes[0].ValueText))
+                {
+                    // <if $ready> rather than <if test="$ready">.
+                    sb.Append(' ').Append(attributes[0].ValueText.Trim());
+                    attributes.Clear();
+                }
                 foreach (MarkupAttribute a in attributes)
                 {
                     sb.Append(' ').Append(a.Name);
-                    if (a.Value != null)
+                    if (a.Value != null && e.Name == "import" && a.Name == "src")
+                    {
+                        sb.Append("=\"").Append(EscapeAttribute(ImportPath(a.ValueText.Trim()))).Append('"');
+                    }
+                    else if (a.Value != null)
                     {
                         sb.Append("=\"").Append(EscapeAttribute(Reindent(a.ValueText, Pad(indent + 1)))).Append('"');
                     }
@@ -986,7 +1020,7 @@ namespace KScript.Syntax.Markup
                 List<MarkupNode> content = e.Children.Where(c => !(c is MarkupText t && t.IsWhitespace)).ToList();
                 if (textValue != null)
                 {
-                    sb.Append('>').Append(EscapeText(textValue)).Append("</").Append(e.Name).Append(">\n");
+                    sb.Append('>').Append(EscapeText(textValue)).Append("</").Append(tag).Append(">\n");
                     return;
                 }
                 if (content.Count == 0)
@@ -996,7 +1030,7 @@ namespace KScript.Syntax.Markup
                 }
                 if (content.All(c => c is MarkupText))
                 {
-                    sb.Append('>').Append(EscapeText(string.Concat(content.Cast<MarkupText>().Select(t => t.Value)))).Append("</").Append(e.Name).Append(">\n");
+                    sb.Append('>').Append(EscapeText(string.Concat(content.Cast<MarkupText>().Select(t => t.Value)))).Append("</").Append(tag).Append(">\n");
                     return;
                 }
 
@@ -1037,7 +1071,7 @@ namespace KScript.Syntax.Markup
                 {
                     scopes.Pop();
                 }
-                sb.Append(Pad(indent)).Append("</").Append(e.Name).Append(">\n");
+                sb.Append(Pad(indent)).Append("</").Append(tag).Append(">\n");
             }
 
             /// <summary>

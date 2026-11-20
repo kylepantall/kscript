@@ -152,7 +152,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("if", "Runs its body when the test is true. Follow it with <elif> and <else> for other cases.", ContentKind.Statements, Test)
             {
-                Example = "<let name=\"score\" value=\"80\" />\n<if test=\"$score ge 90\">\n  <echo>A</echo>\n</if>\n<elif test=\"$score ge 75\">\n  <echo>B</echo>\n</elif>\n<else>\n  <echo>C</echo>\n</else>",
+                Example = "<let name=\"score\" value=\"80\" />\n<if $score ge 90>\n  <echo>A</echo>\n</if>\n<elif $score ge 75>\n  <echo>B</echo>\n</elif>\n<else>\n  <echo>C</echo>\n</else>",
             }, run =>
             {
                 bool ok = Values.Truthy(run.Eval("test"));
@@ -194,7 +194,7 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("while", "Loops while the test is true. `test=\"true\"` loops until <break/>.", ContentKind.Statements, Test)
             {
                 IsLoop = true,
-                Example = "<let name=\"n\" value=\"0\" />\n<while test=\"$n lt 3\">\n  <set name=\"n\" value=\"$n + 1\" />\n</while>\n<echo>$n</echo>",
+                Example = "<let name=\"n\" value=\"0\" />\n<while $n lt 3>\n  <set name=\"n\" value=\"$n + 1\" />\n</while>\n<echo>$n</echo>",
             }, run =>
             {
                 while (Values.Truthy(run.Eval("test")))
@@ -215,7 +215,7 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("match", "Compares one value against several cases. Inside, `$it` is the value.", ContentKind.Statements,
                 new A("value", K.Expression, "The value to compare.", true))
             {
-                Example = "<let name=\"choice\" value=\"3\" />\n<match value=\"$choice\">\n  <case is=\"1\"><echo>One</echo></case>\n  <case is=\"2, 3\"><echo>Two or three</echo></case>\n  <case when=\"$choice gt 9\"><echo>Big</echo></case>\n  <default><echo>Unknown</echo></default>\n</match>",
+                Example = "<let name=\"choice\" value=\"3\" />\n<match $choice>\n  <case is=\"1\"><echo>One</echo></case>\n  <case is=\"2, 3\"><echo>Two or three</echo></case>\n  <case when=\"$choice gt 9\"><echo>Big</echo></case>\n  <default><echo>Unknown</echo></default>\n</match>",
             }, Match);
 
             p.Element(new ElementInfo("case", "A branch of <match>: runs when the value equals one of `is`, or when `when` is true.", ContentKind.Statements,

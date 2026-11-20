@@ -101,7 +101,7 @@
       <for each="c" index="dx" in="$row->chars()">
         <let name="x" value="$x0 + $dx" />
         <let name="y" value="$y0 + $dy" />
-        <if test="$c eq $alive_cell and $x ge 0 and $y ge 0 and $x lt @width($grid) and $y lt @height($grid)">
+        <if $c eq $alive_cell and $x ge 0 and $y ge 0 and $x lt @width($grid) and $y lt @height($grid)>
           <set name="out" value="@set_cell($out, x: $x, y: $y, alive: true)" />
         </if>
       </for>
@@ -122,7 +122,7 @@
     description="Reads a pattern in the plaintext .cells format: lines of O and ., with ! comment lines. Any of O, o, *, # or X counts as alive.">
     <let name="lines" value="$text->lines()->map(fn($l) => $l->trim_end())->reject(fn($l) => $l->starts_with('!'))" />
     <let name="w" value="$lines->map(fn($l) => $l->length())->max() ?? 0" />
-    <if test="$w eq 0">
+    <if $w eq 0>
       <throw type="Pattern" message="That pattern has no cells in it." />
     </if>
     <return value="$lines->map(fn($l) => $l->pad_right($w, char: '.')->replace_pattern(pattern: '[oO*#X]', replacement: $alive_cell)->replace_pattern(pattern: '[^O]', replacement: $dead_cell))" />
@@ -139,13 +139,13 @@
     <let name="count" value="0" />
     <for each="dy" in="[-1, 0, 1]">
       <for each="dx" in="[-1, 0, 1]">
-        <if test="$dx ne 0 or $dy ne 0">
+        <if $dx ne 0 or $dy ne 0>
           <let name="nx" value="$x + $dx" />
           <let name="ny" value="$y + $dy" />
-          <if test="$wrap">
+          <if $wrap>
             <do>$nx = ($nx + $w) % $w; $ny = ($ny + $h) % $h</do>
           </if>
-          <if test="$nx ge 0 and $ny ge 0 and $nx lt $w and $ny lt $h and $grid[$ny][$nx] eq $alive_cell">
+          <if $nx ge 0 and $ny ge 0 and $nx lt $w and $ny lt $h and $grid[$ny][$nx] eq $alive_cell>
             <set>count += 1</set>
           </if>
         </if>
@@ -192,7 +192,7 @@
     name="pattern_world"
     params="name, width: int, height: int, wrap = true"
     description="A world with a named pattern from $patterns in the middle.">
-    <if test="not $patterns->has($name)">
+    <if not $patterns->has($name)>
       <throw
         type="Pattern"
         message="There's no pattern called '{$name}'. Try one of: { $patterns->keys()->join(', ') }." />
@@ -212,7 +212,7 @@
     params="world, where"
     description="The world with one cell flipped, where is &quot;column,row&quot; from 0 (what a board button sends). Anything else leaves the world as it is.">
     <let name="xy" value="($where ?? '')->split(',')->map(fn($p) => $p->trim()->to_int(default: -1))" />
-    <if test="$xy->count() ne 2 or $xy[0] lt 0 or $xy[1] lt 0 or $xy[0] ge @width($world.grid) or $xy[1] ge @height($world.grid)">
+    <if $xy->count() ne 2 or $xy[0] lt 0 or $xy[1] lt 0 or $xy[0] ge @width($world.grid) or $xy[1] ge @height($world.grid)>
       <return value="$world" />
     </if>
     <return value="@edit_world($world, grid: @toggle($world.grid, x: $xy[0], y: $xy[1]))" />
@@ -224,7 +224,7 @@
     description="Runs a world forward, counting births and deaths and keeping a short history for spotting cycles. Stops early once nothing is left alive.">
     <let name="w" value="$world" />
     <for each="i" in="0..$generations">
-      <if test="@population($w.grid) eq 0">
+      <if @population($w.grid) eq 0>
         <break />
       </if>
       <let name="before" value="$w.grid->join('')" />
@@ -253,7 +253,7 @@
     <let name="h" value="$world.history" />
     <let name="now" value="$h->last()" />
     <for each="back" in="1..$h->count()">
-      <if test="$h[-1 - $back] eq $now">
+      <if $h[-1 - $back] eq $now>
         <return value="$back" />
       </if>
     </for>

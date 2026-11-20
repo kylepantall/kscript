@@ -177,7 +177,10 @@ namespace KScript.Syntax.Markup
                 Parent = open.Count > 0 ? open.Peek() : null,
             };
 
-            ParseAttributes(element);
+            if (!ParseShorthand(element))
+            {
+                ParseAttributes(element);
+            }
 
             if (pos < text.Length && text[pos] == '/' && Peek(1) == '>')
             {
@@ -255,6 +258,34 @@ namespace KScript.Syntax.Markup
                 }
             }
             element.Span = TextSpan.FromBounds(element.StartTagSpan.Start, pos);
+        }
+
+        /// <summary>
+        /// Reads <c>&lt;if $ready&gt;</c> as <c>&lt;if test="$ready"&gt;</c> (see <see cref="ShorthandCondition"/>). The
+        /// attribute has an empty name span at the start of the expression, like the ones .kscript statements make.
+        /// </summary>
+        private bool ParseShorthand(MarkupElement element)
+        {
+            string name = ShorthandCondition.AttributeFor(IsHtml ? element.Name.ToLowerInvariant() : element.Name);
+            if (name == null || !ShorthandCondition.Scan(text, pos, out ShorthandCondition.Head head))
+            {
+                return false;
+            }
+
+            TextSpan span = TextSpan.FromBounds(head.Start, head.End);
+            element.Attributes.Add(new MarkupAttribute
+            {
+                Name = name,
+                NameSpan = new TextSpan(head.Start, 0),
+                Value = Decode(head.Start, head.End, reportErrors: false),
+                Span = span,
+                Owner = element,
+                IsShorthand = true,
+            });
+
+            // Leave pos on the '>' or '/>' so the caller closes the tag as usual.
+            pos = !head.Closed ? head.TagEnd : head.SelfClosing ? head.TagEnd - 2 : head.TagEnd - 1;
+            return true;
         }
 
         private void ParseAttributes(MarkupElement element)

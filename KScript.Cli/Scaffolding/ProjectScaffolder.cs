@@ -30,7 +30,7 @@ namespace KScript.Scaffolding
     /// <c>kscript make project &lt;name&gt;</c>: creates a new KScript project folder from a project template (see
     /// <see cref="ProjectTemplate"/>). The built-in one is a web app with a kscript.json, a layout, a component, pages
     /// (one of them a live Tasks app), a script, tests, editor settings and, unless --no-desktop, the same Tasks app as a
-    /// desktop window that kscript app build packages. Every file comes from the template, so a project's
+    /// desktop window that kscript compile builds into a program. Every file comes from the template, so a project's
     /// _templates/project or ~/.kscript/templates/project (made by kscript make templates project) changes them.
     /// </summary>
     public static class ProjectScaffolder
@@ -51,7 +51,12 @@ namespace KScript.Scaffolding
             var given = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in options ?? new Dictionary<string, string>()) given[kv.Key.Replace('-', '_')] = kv.Value;
             given.Remove("template", out string templateOption);
-            if (templateOption != null && !Path.IsPathRooted(templateOption)) templateOption = Path.Combine(Directory.GetCurrentDirectory(), templateOption);
+            // --bare is short for --template bare.
+            if (given.Remove("bare", out string bare) && StubTemplate.IsSet(bare))
+            {
+                if (templateOption != null) throw new StubException("Use --bare or --template, not both.");
+                templateOption = "bare";
+            }
             var template = ProjectTemplate.Find(dir, templateOption);
 
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

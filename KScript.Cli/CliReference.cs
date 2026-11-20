@@ -84,15 +84,17 @@ namespace KScript
                     O("--stdout", "Print the result instead of writing a file."),
                 },
                 "kscript convert hello.ks.xml\nkscript convert hello.kscript --to xml --stdout", "code-format"),
-            new CliCommand("app", "kscript app build [script] [--name \"My App\"] [--out folder]",
-                "Package a script as a desktop app.",
+            new CliCommand("compile", "kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist]",
+                "Build programs that run without kscript.",
                 new[]
                 {
-                    O("--name \"My App\"", "The app's name (default: from the script's file name)."),
-                    O("--out folder", "Where to write the app."),
+                    O("--target name[,name]", "mac-arm64, mac-x64, linux-x64, linux-arm64, win-x64, or all (default: this computer)."),
+                    O("--out folder", "Where programs go (default: dist/ next to the script or kscript.json), one folder per target."),
+                    O("--name \"My App\"", "The program's name (default: the app section of kscript.json, or the script's name)."),
+                    O("--runtime file", "A kscript release binary or archive for the target, instead of downloading one."),
                 },
-                "kscript app build counter.ks.xml --name Counter", "desktop"),
-            new CliCommand("make", "kscript make project <folder> [--port 8080]\nkscript make <type> <Name> [--key value]",
+                "kscript compile hello.ks.xml\nkscript compile --target all", "compile"),
+            new CliCommand("make", "kscript make project <folder> [--bare] [--port 8080]\nkscript make <type> <Name> [--key value]",
                 "Start a new project with a kscript.json, or generate a file from a template (run kscript make for the list).",
                 new[]
                 {

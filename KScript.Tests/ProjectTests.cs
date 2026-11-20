@@ -261,7 +261,7 @@ public class MakeProjectTests : IDisposable
         Assert.Contains("<title>Home · My Site</title>", home.Body);
         Assert.Contains("<nav class=\"site-nav\">", home.Body);
         Assert.Contains("Welcome to My Site", home.Body);
-        Assert.Contains("kscript app build", home.Body);
+        Assert.Contains("kscript compile", home.Body);
 
         var about = PageRenderer.RenderFile(new PageContext(site.Root), site.Resolve("/about").File);
         Assert.Contains("About My Site", about.Body);
@@ -341,7 +341,7 @@ public class MakeProjectTests : IDisposable
         Assert.Empty(config.Warnings);
         Assert.Null(config.App.Main);
         Assert.DoesNotContain("desktop.kscript", File.ReadAllText(Path.Combine(root, "tasks.html")));
-        Assert.DoesNotContain("app build", File.ReadAllText(Path.Combine(root, "index.html")));
+        Assert.DoesNotContain("kscript compile", File.ReadAllText(Path.Combine(root, "index.html")));
     }
 
     [Fact]
@@ -392,6 +392,70 @@ public class MakeProjectTests : IDisposable
     }
 
     [Fact]
+    public void BareProjectsHaveOneScriptAndATest()
+    {
+        using var parent = new TempSite();
+        var (code, output, err) = Make(parent.Root, "my-tool", "--bare");
+        Assert.True(code == 0, err);
+        string root = Path.Combine(parent.Root, "my-tool");
+        var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
+        Assert.Equal(new[] { ".vscode/extensions.json", "kscript.json", "main.kscript", "tests/main.test.kscript" }, files);
+        Assert.Contains("kscript main.kscript    run the script", output);
+
+        var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
+        Assert.Empty(config.Warnings);
+        Assert.Equal("my-tool", config.Name);
+        Assert.Null(config.App.Main);
+        Assert.Equal("kscript", config.Make.Format);
+
+        var o = new StringWriter { NewLine = "\n" };
+        var e = new StringWriter { NewLine = "\n" };
+        Assert.True(KScript.Testing.TestCommand.Run(new[] { root }, o, e, color: false) == 0, o.ToString() + e);
+        Assert.Contains("Tests: 2 passed, 2 total", o.ToString());
+
+        // --template bare is the same, and works with --format xml.
+        Assert.Equal(0, Make(parent.Root, "xml-tool", "--template", "bare", "--format", "xml").Code);
+        Assert.True(File.Exists(Path.Combine(parent.Root, "xml-tool", "main.ks.xml")));
+        Assert.True(File.Exists(Path.Combine(parent.Root, "xml-tool", "tests", "main.test.ks.xml")));
+        Assert.Equal(0, KScript.Testing.TestCommand.Run(new[] { Path.Combine(parent.Root, "xml-tool") }, new StringWriter(), new StringWriter(), color: false));
+
+        Assert.Contains("not both", Make(parent.Root, "x", "--bare", "--template", "web").Err);
+        Assert.Contains("no 'nope' project template", Make(parent.Root, "y", "--template", "nope").Err);
+    }
+
+    [Fact]
+    public void TheBareTemplateCanBeCopiedAndChangedToo()
+    {
+        using var parent = new TempSite();
+        string previous = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(parent.Root);
+            var (code, output, err) = MakeCommandRun("templates", "project", "bare");
+            Assert.True(code == 0, err);
+            Assert.Contains("Copied the bare project template", output);
+            Assert.Contains("kscript make project --template bare now uses it", output);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(previous);
+        }
+
+        string folder = Path.Combine(userTemplates, "project-bare");
+        Assert.True(File.Exists(Path.Combine(folder, "main.kscript")));
+        Assert.False(Directory.Exists(Path.Combine(userTemplates, "project")), "the web template is left alone");
+        File.WriteAllText(Path.Combine(folder, "main.kscript"), "echo \"Hi from {{ title }}\"\n");
+
+        var (c, outp, e) = Make(parent.Root, "cli", "--bare");
+        Assert.True(c == 0, e);
+        Assert.Contains("from the template in", outp);
+        Assert.Equal("echo \"Hi from Cli\"\n", File.ReadAllText(Path.Combine(parent.Root, "cli", "main.kscript")));
+        // The default template is still the built-in web app.
+        Assert.Equal(0, Make(parent.Root, "site").Code);
+        Assert.True(File.Exists(Path.Combine(parent.Root, "site", "tasks.html")));
+    }
+
+    [Fact]
     public void AMistypedOptionIsPointedOut()
     {
         using var parent = new TempSite();
@@ -407,7 +471,8 @@ public class MakeProjectTests : IDisposable
         using var parent = new TempSite();
         var (code, output, _) = Make(parent.Root, "--help");
         Assert.Equal(0, code);
-        Assert.Contains("Template: built in", output);
+        Assert.Contains("Template: web (built in)", output);
+        Assert.Contains("Built-in templates: web, bare", output);
         Assert.Contains("--no-desktop", output);
         Assert.Contains("--port", output);
         Assert.Contains("(default 8080)", output);

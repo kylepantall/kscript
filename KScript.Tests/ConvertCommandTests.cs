@@ -45,7 +45,7 @@ public sealed class ConvertCommandTests : IDisposable
     {
         string xml = Write("a.ks.xml", "<kscript>\n  <echo>hi</echo>\n</kscript>\n");
         string code = Write("b.kscript", "echo \"b\"\n");
-        Write("a.test.ks.xml", "<kscript />");
+        Write("a.test.ks.xml", "<kscript>\n  <echo>t</echo>\n</kscript>\n");
 
         var tooMany = Run(dir, "--out", Path.Combine(dir, "x.kscript"));
         Assert.Equal(1, tooMany.Code);
@@ -58,10 +58,10 @@ public sealed class ConvertCommandTests : IDisposable
         Assert.Equal(0, Run(xml, "--out", named, "--force").Code);
         Assert.Equal(0, Run(xml, "--out", named, "-f").Code);
 
-        // --to kscript converts only the XML scripts in a folder (not tests); --to xml only the .kscript files.
+        // --to kscript converts only the XML scripts in a folder (tests too); --to xml only the .kscript files.
         var toCode = Run(dir, "--to", "kscript", "--stdout");
         Assert.Equal(0, toCode.Code);
-        Assert.Equal("echo \"hi\"\n", toCode.Out);
+        Assert.Equal("echo \"hi\"\necho \"t\"\n", toCode.Out);
         var toXml = Run(dir, "--to", "xml", "--stdout");
         Assert.Contains("<echo>b</echo>", toXml.Out);
         Assert.Contains("<echo>hi</echo>", toXml.Out);

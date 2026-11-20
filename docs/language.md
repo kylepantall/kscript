@@ -24,27 +24,31 @@ Variables belong to the block they are declared in. `{{` and `}}` are literal br
 
 ## Expressions
 
-`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `lt le gt ge` (or `> >=`), `eq ne`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn($x) => …`. Use the word forms in attributes, since XML can't hold a raw `<` or `&&` there.
+`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `lt le gt ge` (or `> >=`), `eq ne`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn($x) => …`. Use the word forms inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. Write `and`/`or` rather than `&&`/`||` everywhere.
 
 ## Control flow
 
 ```xml
-<if test="$n lt 10"> … </if>
-<elif test="$n lt 100"> … </elif>
+<if $n lt 10> … </if>
+<elif $n lt 100> … </elif>
 <else> … </else>
 
 <for each="p" in="$people"> … </for>
 <for each="i" index="n" in="0..10 step 2"> … </for>
 <for each="key, value" in="$map"> … </for>
-<while test="$queue->count() gt 0"> … <break /> … <continue /> … </while>
+<while $queue->count() gt 0> … <break /> … <continue /> … </while>
 
-<match value="$choice">
+<match $choice>
   <case is="1"> … </case>
   <case is="2, 3"> … </case>
   <case when="$it gt 9"> … </case>
   <default> … </default>
 </match>
 ```
+
+`<if>`, `<elif>`, `<while>`, `<match>` and `<assert>` take their expression straight in the start tag: `<if $user.is_logged_in>` is short for `<if test="$user.is_logged_in">`, and `<match $choice>` for `<match value="$choice">`. Both forms work in scripts and pages; use the long one when the tag has other attributes (`<assert test="…" message="…" />`). Inside the tag, `<`, `>` and quotes need no escaping, so `<if $n > 3>` and `<if $name == "Joan">` work. A `>` ends the tag unless it has a space on both sides with more of the condition after it, so write `$n > 3`, not `$n>3`. `kscript convert` and the editor's `<if>` snippet use the short form.
+
+Shorthand tags make a `.ks.xml` file KScript markup rather than strict XML: KScript's own parser, formatter and editor support read it, but generic XML tools such as `xmllint` will reject it. Stick to `test="…"` if a file has to stay valid XML.
 
 ### Early returns instead of else
 
@@ -54,10 +58,10 @@ first.
 
 ```xml try
 <fn name="grade" params="score">
-  <if test="$score ge 90">
+  <if $score ge 90>
     <return value="'A'" />
   </if>
-  <if test="$score ge 75">
+  <if $score ge 75>
     <return value="'B'" />
   </if>
   <return value="'C'" />
@@ -247,7 +251,7 @@ features: [search, cart]
 ```xml
 <echo>{$config.database.host}:{$config.database.port}</echo>
 <let name="timeout" value="@config('http.timeout', 30)" />      <!-- a path, and a default when it isn't set -->
-<if test="$config->has('features')"><echo>{ $config.features->join(', ') }</echo></if>
+<if $config->has('features')><echo>{ $config.features->join(', ') }</echo></if>
 <let name="key" value="$config->require('api.key')" />         <!-- stops with a clear message when it's missing -->
 ```
 
@@ -285,7 +289,7 @@ Every script has a logger. Entries at `info` and above go to the terminal (stder
 
 <let name="db" value="$log->named('db')->with({ host: $config.database.host })" />
 <do>$db->debug('Connected')</do>                       <!-- category db, with a host field -->
-<if test="$log->enabled('debug')"><do>$log->debug(@to_json($everything))</do></if>
+<if $log->enabled('debug')><do>$log->debug(@to_json($everything))</do></if>
 
 <try>
   <do>@read_json('missing.json')</do>

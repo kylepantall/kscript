@@ -257,9 +257,16 @@ namespace KScript.Pages
                 log?.WriteLine($"Serving {site.Root} on {url}");
                 log?.WriteLine("Press Ctrl+C to stop.");
             }
-            await app.StartAsync(stop);
-            onStarted?.Invoke(url);
-            await app.WaitForShutdownAsync(stop);
+            try
+            {
+                await app.StartAsync(stop);
+                onStarted?.Invoke(url);
+                await app.WaitForShutdownAsync(stop);
+            }
+            catch (OperationCanceledException) when (stop.IsCancellationRequested)
+            {
+                // Stopped (Ctrl+C) while the server was still starting: that is a normal stop, not an error.
+            }
             await app.StopAsync();
             return 0;
         }

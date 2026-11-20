@@ -50,9 +50,9 @@ Find everything over 1 MB in a folder, list it largest first, and offer to move 
     <echo>Nothing over 1 MB in {$folder}.</echo>
   </else>
 
-  <if test="$big->count() gt 0">
+  <if $big->count() gt 0>
     <confirm to="ok">Move them to an archive folder?</confirm>
-    <if test="$ok">
+    <if $ok>
       <for each="f" in="$big">
         <move from="$f" to="@join_path(base: $folder, ['archive', $f->name()])" />
       </for>
@@ -126,7 +126,7 @@ kscript serve "Example Sites/team"    # then open http://localhost:8080/demo
 | `KScript.Markdown` | Markdown to HTML |
 | `KScript.Web` | Pages, layouts, components and `<live>` blocks for `kscript serve` |
 | `KScript.Test` | Tests for `kscript test` |
-| `KScript.UI` | Native desktop windows, and `kscript app build` to package them |
+| `KScript.UI` | Native desktop windows, which `kscript compile` turns into Mac, Windows and Linux apps |
 | `KScript.AI` | Language models: `@llm`, `@chat` and `<llm>`, with Claude |
 | `KScript.Style` | Stylesheets written in KScript: themes from JSON, breakpoints, fluid sizes and colours |
 
@@ -146,21 +146,22 @@ A script whose root is `<KScript.Window>` opens a native window on macOS, Window
 
 ```sh
 kscript counter.ks.xml           # opens the window
-kscript app build counter.ks.xml # packages it: Counter.app on a Mac, Counter/Counter.exe on Windows
+kscript compile counter.ks.xml --target all   # Counter.app for Macs, Counter.exe for Windows, a Linux program
 ```
 
-There is no Swift, C#, XAML or shell script to write. [`samples/life-lab`](samples/life-lab) is Conway's Game of Life with one rules script shared by a terminal version, a web page and a desktop app.
+There is no Swift, C#, XAML or shell script to write, and the programs `kscript compile` builds run on computers without kscript. It works for terminal scripts and sites too, and keeps only the packages the script imports. [`samples/life-lab`](samples/life-lab) is Conway's Game of Life with one rules script shared by a terminal version, a web page and a desktop app.
 
 ## Tooling that comes with it
 
 ```sh
 kscript make project my-app    # a web app and desktop app with a layout, a live page, scripts, tests and editor settings
+kscript make project my-tool --bare   # just kscript.json, a script and a test
 kscript serve                  # run it
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI
 kscript fmt                    # tidy every script and page (--check for CI)
 kscript ide install            # add the extension to VS Code, Cursor, VSCodium or Windsurf
-kscript app build              # package a <KScript.Window> script as a desktop app
+kscript compile --target all   # build programs for macOS, Windows and Linux that run without kscript
 kscript update                 # get the latest release
 kscript docs                   # open the docs in your browser, with examples you can run
 ```
@@ -213,7 +214,8 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Stylesheets](docs/stylesheets.md): `.ks.css`, `.ks.scss` and `.ks.sass`, and `kscript css`
 - [Routes, controllers and middleware](docs/http.md): KScript.Http route files, JSON APIs, views and middleware
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
-- [Desktop apps](docs/desktop.md): `<KScript.Window>`, its elements, and `kscript app build`
+- [Desktop apps](docs/desktop.md): `<KScript.Window>` and its elements
+- [Programs](docs/compile.md): `kscript compile`, targets, icons and what a program holds
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
 - [Standards](docs/standards.md): shareable lint and format standards, `kscript:recommended` and `kscript check --print-config`

@@ -26,7 +26,7 @@ h1 { font-size: {@fluid(28, 48)}; }            /* 28px on phones, growing to 48p
 @media {@up('md')} {
   .grid { display: grid; grid-template-columns: repeat(2, 1fr); }
 }
-<if test="$vars.dark ?? false">
+<if $vars.dark ?? false>
 @media (prefers-color-scheme: dark) { :root { --color-surface: #111; } }
 </if>
 ```

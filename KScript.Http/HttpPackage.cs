@@ -153,7 +153,7 @@ namespace KScript.Http
                     int status = (int)Values.ToNumber(c.Arg(0, "status"), "status");
                     string message = c.Has(1, "message") ? Values.ToStr(c.Arg(1, "message")) : null;
                     throw new HttpAbortSignal(RequestContext.Current(c.Host)?.ErrorResponse(status, message) ?? HttpResponse.Text(message ?? ReasonPhrase(status), status));
-                }, "<if test=\"$person == null\"><do>@abort(404)</do></if>");
+                }, "<if $person == null><do>@abort(404)</do></if>");
             p.Command("route", "name, params...", "The address of a named route, with its {parameters} filled in: @route('people.show', id: 3) is /people/3. Other values become the query.",
                 KType.String, c =>
                 {

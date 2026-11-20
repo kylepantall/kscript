@@ -69,7 +69,7 @@ namespace KScript.Testing
                 new A("message", K.Template, "What to say when it fails, instead of the condition and its values."))
             {
                 Context = ElementContext.Script,
-                Example = "<assert test=\"$order.total eq 30\" />\n<assert test=\"$items->count() gt 0\" message=\"The cart should not be empty\" />",
+                Example = "<assert $order.total eq 30 />\n<assert test=\"$items->count() gt 0\" message=\"The cart should not be empty\" />",
             }, Assert);
 
             p.Element(new ElementInfo("expect", "Checks a value and fails the test if the check doesn't hold. Give the value and one check, such as equals=\"5\".", ContentKind.Empty,

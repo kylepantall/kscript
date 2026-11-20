@@ -67,6 +67,7 @@ namespace KScript.Docs
             new Guide("web", "web.md", "Build", "Web pages"),
             new Guide("http", "http.md", "Build", "Routes and APIs"),
             new Guide("desktop", "desktop.md", "Build", "Desktop apps"),
+            new Guide("compile", "compile.md", "Build", "Programs: kscript compile"),
             new Guide("stylesheets", "stylesheets.md", "Build", "Stylesheets"),
             new Guide("testing", "testing.md", "Build", "Testing"),
             new Guide("projects", "projects.md", "Tools", "Projects and kscript.json"),

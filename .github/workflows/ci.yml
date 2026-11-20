@@ -73,6 +73,71 @@ jobs:
           $k check xml-app --warnaserror
           $k fmt --check xml-app
           $k test xml-app
+          $k make project bare-tool --bare
+          $k check bare-tool --warnaserror
+          $k test bare-tool
+          $k bare-tool/main.kscript
+
+  compile:
+    name: kscript compile (${{ matrix.name }})
+    # Builds a release-style kscript for the runner, compiles a terminal script, Life Lab and a site with it,
+    # and runs what it can. Programs for other platforms come out byte-for-byte the same wherever they are
+    # compiled, so each platform checks its own.
+    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON('["self-hosted","Linux","X64","kscript"]') || matrix.hosted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux,   rid: linux-x64, target: linux-x64, self-hosted: true,  hosted: ubuntu-latest,  ext: '' }
+          - { name: windows, rid: win-x64,   target: win-x64,   self-hosted: false, hosted: windows-latest, ext: '.exe' }
+          - { name: macos,   rid: osx-arm64, target: mac-arm64, self-hosted: false, hosted: macos-latest,   ext: '' }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ matrix.self-hosted && format('{0}/dotnet', runner.tool_cache) || '' }}
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish a single-file kscript
+        run: |
+          dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none -p:Version=0.0.0-ci --output publish
+
+      - name: Compile and run a terminal program
+        run: |
+          mkdir -p "$RUNNER_TEMP/hello"
+          printf '<kscript>\n  <import package="KScript.Math" />\n  <echo>compiled ok: {@sqrt(9)} {$args->join(",")}</echo>\n</kscript>\n' > "$RUNNER_TEMP/hello/hello.ks.xml"
+          ./publish/KScript${{ matrix.ext }} compile "$RUNNER_TEMP/hello/hello.ks.xml"
+          program="$RUNNER_TEMP/hello/dist/${{ matrix.target }}/hello${{ matrix.ext }}"
+          ls -l "$program" publish/
+          "$program" a b | tee out.txt
+          grep -q "compiled ok: 3 a,b" out.txt
+          if [ "${{ matrix.name }}" = macos ]; then codesign --verify --verbose "$program"; fi
+
+      - name: Compile Life Lab (desktop app)
+        run: |
+          ./publish/KScript${{ matrix.ext }} compile samples/life-lab --out "$RUNNER_TEMP/life-lab"
+          ls -lR "$RUNNER_TEMP/life-lab"
+          case "${{ matrix.name }}" in
+            macos) codesign --verify --deep --verbose "$RUNNER_TEMP/life-lab/mac-arm64/Life Lab.app" ;;
+            windows) test -f "$RUNNER_TEMP/life-lab/win-x64/Life Lab.exe" ;;
+            linux) test -x "$RUNNER_TEMP/life-lab/linux-x64/Life-Lab" && test -f "$RUNNER_TEMP/life-lab/linux-x64/Life-Lab.desktop" ;;
+          esac
+
+      - name: Compile and serve a site
+        run: |
+          ./publish/KScript${{ matrix.ext }} compile "Example Sites/team" --out "$RUNNER_TEMP/site"
+          "$RUNNER_TEMP/site/${{ matrix.target }}/team${{ matrix.ext }}" --port 8097 --host 127.0.0.1 > site.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8097/ > page.html && break; sleep 1; done
+          kill %1 || true
+          cat site.log
+          grep -q "Team" page.html
 
   vscode:
     name: VS Code extension
