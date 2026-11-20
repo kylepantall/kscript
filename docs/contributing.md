@@ -58,7 +58,7 @@ A CI job also publishes kscript with Native AOT on Linux (`-p:PublishAot=true`) 
 - Write JSON with `JsonNode`/`JsonObject` or a source-generated `JsonSerializerContext` (see `OpenApiJsonContext`), not `JsonSerializer.Serialize(object)`. Add to a `JsonArray` with `array.Add((JsonNode)value)`: the generic `Add<T>` isn't AOT-safe.
 - A new built-in package needs a `DynamicDependency` on `PackageRegistry.Get` as well as its line in `PackageRegistry.BuiltIn`; `NativeAotTests` checks the two lists match.
 
-To try it locally: `dotnet publish KScriptApp/KScriptApp.csproj -c Release -r linux-x64 -p:PublishAot=true -o aot` (needs `clang` and `zlib1g-dev`). Two things don't work in an AOT build yet: `KScript.AI` (the Anthropic SDK uses reflection-based JSON), and `kscript compile`, which builds programs from a single-file kscript.
+To try it locally: `dotnet publish KScriptApp/KScriptApp.csproj -c Release -r linux-x64 -p:PublishAot=true -o aot` (needs `clang` and `zlib1g-dev`). `KScript.AI` calls the Messages API directly rather than through the Anthropic SDK, because the SDK serialises with reflection.
 
 ## Changing a command, method or element
 

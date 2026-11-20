@@ -5,12 +5,11 @@ using System.Text.Json.Serialization;
 namespace KScript.AI
 {
     /// <summary>
-    /// Source-generated JSON for tool schemas and tool inputs, so KScript.AI works without reflection (Native AOT).
+    /// Source-generated JSON for tool and answer schemas, so KScript.AI works without reflection (Native AOT).
     /// Schemas are maps, lists and text (see <see cref="Schemas"/>); every type that appears in one is listed here.
     /// </summary>
     [JsonSerializable(typeof(Dictionary<string, object>))]
     [JsonSerializable(typeof(Dictionary<string, JsonElement>))]
-    [JsonSerializable(typeof(IReadOnlyDictionary<string, JsonElement>))]
     [JsonSerializable(typeof(List<object>))]
     [JsonSerializable(typeof(List<string>))]
     [JsonSerializable(typeof(string))]

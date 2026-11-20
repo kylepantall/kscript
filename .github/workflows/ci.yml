@@ -256,9 +256,8 @@ jobs:
         run: |
           dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime linux-x64 \
             -p:PublishAot=true -p:TrimmerSingleWarn=false -p:DebugType=none -p:Version=0.0.0-aot --output aot | tee aot.log
-          # Allowed: one warning inside ASP.NET Core 8 (JsonOptions), on a path kscript doesn't use, and the Anthropic
-          # SDK's own (KScript.AI doesn't work in an AOT build yet). Anything in kscript's code fails the job.
-          grep -o "warning IL[0-9]*: [^[]*" aot.log | sort -u | grep -v "Microsoft.AspNetCore.Http.Json.JsonOptions" | grep -v "warning IL[0-9]*: Anthropic\." > warnings.txt || true
+          # Allowed: one warning inside ASP.NET Core 8 (JsonOptions), on a path kscript doesn't use. Anything else fails the job.
+          grep -o "warning IL[0-9]*: [^[]*" aot.log | sort -u | grep -v "Microsoft.AspNetCore.Http.Json.JsonOptions" > warnings.txt || true
           if [ -s warnings.txt ]; then echo "New trim or AOT warnings:"; cat warnings.txt; exit 1; fi
           ls -l aot
 
