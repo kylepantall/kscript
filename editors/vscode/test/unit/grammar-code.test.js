@@ -98,6 +98,13 @@ test('comments and doc comments', async () => {
   assert.match(scopeOf(tokens, '@returns'), /storage\.type\.class\.doc\.kscript/);
   assert.match(scopeOf(tokens, 'plain'), /comment\.line\.double-slash\.kscript/);
   assert.match(scopeOf(tokens, 'block'), /comment\.block\.kscript/);
+
+  const more = tokenize(await load(), 'x = 1 /* inline */\ny = [\n  1, /* first */\n  2 // second\n]\n/*\n  multi\n  line\n*/\necho "after"');
+  assert.match(scopeOf(more, 'inline'), /comment\.block\.kscript/);
+  assert.match(scopeOf(more, 'first'), /comment\.block\.kscript/);
+  assert.match(scopeOf(more, 'second'), /comment\.line\.double-slash\.kscript/);
+  assert.match(scopeOf(more, 'line'), /comment\.block\.kscript/);
+  assert.match(scopeOf(more, 'after'), /string\.quoted\.double\.kscript/);
 });
 
 test('every sample tokenizes without leaving a string or block open', async () => {

@@ -58,7 +58,7 @@ namespace KScript.LanguageServer
 
             if (files.Count == 0)
             {
-                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .ks, .ks.xml or .xml files that start with <kscript>; " +
+                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .kscript, .ks or .ks.xml files, or .xml files that start with <kscript>; " +
                                  ".html and .md pages are checked in folders with _layout.html, _components/, _layouts/ or kscript.json.");
                 return 2;
             }
@@ -267,7 +267,8 @@ namespace KScript.LanguageServer
             SiteMarkers.Any(m => Directory.Exists(Path.Combine(folder, m)) || File.Exists(Path.Combine(folder, m)));
 
         private static bool IsScriptName(string f) =>
-            f.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".ks", StringComparison.OrdinalIgnoreCase);
+            f.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".ks", StringComparison.OrdinalIgnoreCase)
+            || f.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase);
 
         private static bool LooksLikeScript(string path)
         {

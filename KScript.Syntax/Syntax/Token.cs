@@ -83,9 +83,36 @@ namespace KScript.Syntax
 
         public Token Next()
         {
-            while (Position < end && char.IsWhiteSpace(text[Position]))
+            while (Position < end)
             {
-                Position++;
+                if (char.IsWhiteSpace(text[Position]))
+                {
+                    Position++;
+                    continue;
+                }
+                // /* ... */ is a comment anywhere in an expression ('/' then '*' is never an operator pair).
+                if (text[Position] == '/' && Position + 1 < end && text[Position + 1] == '*')
+                {
+                    int close = text.IndexOf("*/", Position + 2, end - Position - 2, StringComparison.Ordinal);
+                    if (close < 0)
+                    {
+                        int at = Position;
+                        Position = end;
+                        return new Token(TokenKind.EndOfInput, string.Empty, TextSpan.FromBounds(at, end), "This comment is missing its closing */.");
+                    }
+                    Position = close + 2;
+                    continue;
+                }
+                // // to the end of the line, for expressions written over several lines ('//' is never an operator).
+                if (text[Position] == '/' && Position + 1 < end && text[Position + 1] == '/')
+                {
+                    while (Position < end && text[Position] != '\n')
+                    {
+                        Position++;
+                    }
+                    continue;
+                }
+                break;
             }
 
             if (Position >= end)

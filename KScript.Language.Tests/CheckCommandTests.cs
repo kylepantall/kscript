@@ -36,6 +36,18 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void FolderChecksIncludeKscriptFiles()
+        {
+            Write("a.kscript", "echo \"hi\"");
+            Write(Path.Combine("tests", "a.test.kscript"), "kscript {\n  describe(name: a) {\n  }\n}\n");
+            Write(Path.Combine("tests", "bad.kscript"), "echo $nope");
+            (int code, string output) = Run(false, dir);
+            Assert.Equal(1, code);
+            Assert.Contains("3 files checked: 1 error", output);
+            Assert.Contains("bad.kscript", output);
+        }
+
+        [Fact]
         public void FolderChecksSkipMakeTemplates()
         {
             Write("ok.ks.xml", "<kscript><echo>hi</echo></kscript>");
