@@ -44,6 +44,7 @@ namespace KScript
         {
             output.WriteLine("Usage: kscript [--env name] <script.xml> [script arguments]   Run a script ($args holds the arguments; --env picks staging.yaml, .env.staging...).");
             output.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
+            output.WriteLine("       kscript check --print-config [file-or-folder]      Show the lint and format settings that apply, and which standard set each.");
             output.WriteLine("       kscript fmt [file-or-folder]... [--check]          Tidy scripts and pages (--check: only report, for CI).");
             output.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             output.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
@@ -248,6 +249,8 @@ namespace KScript
 
             if (args.Length > 0 && args[0] == "check")
             {
+                if (args.Contains("--print-config"))
+                    return KScript.LanguageServer.CheckCommand.PrintConfig(args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Out);
                 return KScript.LanguageServer.CheckCommand.Run(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)), Out,
                     warningsAsErrors: args.Contains("--warnaserror"));
             }

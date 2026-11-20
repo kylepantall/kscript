@@ -27,8 +27,12 @@ namespace KScript.LanguageServer
         private bool initialized;
         private bool shutdownRequested;
 
-        // kscript.json files by path, re-parsed when their text changes.
-        private readonly Dictionary<string, (string Text, ProjectConfig Config)> projectConfigs = new Dictionary<string, (string, ProjectConfig)>(StringComparer.Ordinal);
+        // kscript.json files by path, re-parsed when their text or the text of a standard they use changes.
+        private readonly Dictionary<string, (string Text, ProjectConfig Config, Dictionary<string, string> Standards)> projectConfigs =
+            new Dictionary<string, (string, ProjectConfig, Dictionary<string, string>)>(StringComparer.Ordinal);
+
+        // The last problem reported for each kscript.json that can't be used, so it is logged once.
+        private readonly Dictionary<string, string> configErrors = new Dictionary<string, string>(StringComparer.Ordinal);
 
         public KScriptLanguageServer(Stream input, Stream output, IFileSystem disk = null)
         {
@@ -291,15 +295,22 @@ namespace KScript.LanguageServer
                 {
                     return null;
                 }
-                if (projectConfigs.TryGetValue(file, out var cached) && cached.Text == text)
+                if (projectConfigs.TryGetValue(file, out var cached) && cached.Text == text && StandardsUnchanged(cached.Standards))
                 {
                     return cached.Config;
                 }
 
                 ProjectConfig config = null;
+                var standards = new Dictionary<string, string>(StringComparer.Ordinal);
                 try
                 {
-                    config = ProjectConfig.Parse(text, file);
+                    // Standards are read through the workspace, so an edited (unsaved) standard file applies straight away.
+                    config = ProjectConfig.Parse(text, file, workspace.FileExists, path =>
+                    {
+                        string standardText = workspace.ReadText(path);
+                        standards[path] = standardText;
+                        return standardText;
+                    });
                     foreach (string warning in config.Warnings)
                     {
                         Log($"{file}: {warning}");
@@ -307,12 +318,39 @@ namespace KScript.LanguageServer
                 }
                 catch (ProjectConfigException ex)
                 {
-                    Log(ex.Message + " Using the default lint settings until it is fixed.");
+                    // Not cached, so that creating a missing standard file fixes it; logged once per problem.
+                    if (!configErrors.TryGetValue(file, out string last) || last != ex.Message)
+                    {
+                        Log(ex.Message + " Using the default lint settings until it is fixed.");
+                    }
+                    configErrors[file] = ex.Message;
+                    projectConfigs.Remove(file);
+                    return null;
                 }
-                projectConfigs[file] = (text, config);
+                configErrors.Remove(file);
+                projectConfigs[file] = (text, config, standards);
                 return config;
             }
             return null;
+        }
+
+        private bool StandardsUnchanged(Dictionary<string, string> standards)
+        {
+            foreach (var (path, text) in standards)
+            {
+                try
+                {
+                    if (!workspace.FileExists(path) || workspace.ReadText(path) != text)
+                    {
+                        return false;
+                    }
+                }
+                catch (IOException)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static string ApplyChange(string text, JsonNode change)

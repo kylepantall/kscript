@@ -1,3 +1,4 @@
+using KScript.Language.Features;
 using KScript.Language.Analysis;
 using KScript.Syntax.Markup;
 
@@ -57,6 +58,21 @@ namespace KScript.Language.Tests
         [InlineData("move(from: $a, to: \"x, y\")", "kscript { move(from: $a, to: x, y) }")]
         [InlineData("Row(gap: 8, wrap) { Text \"Hi\" }", "kscript { Row(gap: 8, wrap: yes) { Text \"Hi\" } }")]
         [InlineData("Button(on-click: \"n = $n + 1\") \"Add\"", "kscript { Button(on-click: n = $n + 1) \"Add\" }")]
+        [InlineData("type User { login: string; id: int }", "kscript { type(name: User) { field(name: login, type: string); field(name: id, type: int) } }")]
+        [InlineData("type User(fields: \"login: string\", extra: error)", "kscript { type(name: User, fields: login: string, extra: error) }")]
+        [InlineData("type Repo {\n  stars: int from stargazers_count\n  owner from \"owner.login\"\n  tags?: string[] = []\n  label => $name + '!'\n}",
+            "kscript { type(name: Repo) { field(name: stars, type: int, from: stargazers_count); field(name: owner, from: owner.login); field(name: tags?, type: string[], default: []); field(name: label, value: $name + '!') } }")]
+        [InlineData("type(name: T, fields: \"a\")", "kscript { type(name: T, fields: a) }")]
+        [InlineData("type = 3", "kscript { do \"type = 3\" }")]
+        [InlineData("type\t T { a }", "kscript { type(name: T) { field(name: a) } }")]
+        [InlineData("type", "kscript { type }")]
+        [InlineData("type  ", "kscript { type }")]
+        [InlineData("type \"x\"", "kscript { type \"x\" }")]
+        [InlineData("type T { a from x; b from y}", "kscript { type(name: T) { field(name: a, from: x); field(name: b, from: y) } }")]
+        [InlineData("type T { a from x= 1 }", "kscript { type(name: T) { field(name: a, from: x, default: 1) } }")]
+        [InlineData("enum E {}", "kscript { enum(name: E, values: ) }")]
+        [InlineData("enum Size { small, medium,\n  large }", "kscript { enum(name: Size, values: small, medium,\n  large) }")]
+        [InlineData("enum(name: Size, values: \"a, b\")", "kscript { enum(name: Size, values: a, b) }")]
         public void Statements(string code, string shape)
         {
             Assert.Equal(shape, Shape(Root(code)));
@@ -142,6 +158,18 @@ namespace KScript.Language.Tests
         [InlineData("break continue", "KS1001")]
         [InlineData("for x { }", "KS3005")]
         [InlineData("let x = 1", "KS3002")]
+        [InlineData("type T { 3 }", "KS1001")]
+        [InlineData("type T {\n  3\n  a\n}", "KS1001")]
+        [InlineData("type T { 3; a }", "KS1001")]
+        [InlineData("type T { 3", "KS1003")]
+        [InlineData("type T { a from x", "KS1003")]
+        [InlineData("type T { a: }", "KS3005")]
+        [InlineData("type T { a from }", "KS3005")]
+        [InlineData("type T { a = }", "KS3005")]
+        [InlineData("type T { a: int b }", "KS1001")]
+        [InlineData("type T { a: int", "KS1003")]
+        [InlineData("enum E a, b", "KS1001")]
+        [InlineData("enum E { a, b", "KS1003")]
         public void ReportsMistakes(string code, string diagnostic)
         {
             MarkupDocument doc = CodeParser.Parse(code);
@@ -163,6 +191,8 @@ namespace KScript.Language.Tests
         [InlineData("samples/kscript2/move-files.ks.xml", "samples/code-format/move-files.kscript")]
         [InlineData("samples/kscript2/lib/strings.ks.xml", "samples/code-format/lib/strings.kscript")]
         [InlineData("samples/life-lab/desktop.ks.xml", "samples/life-lab/desktop.kscript")]
+        [InlineData("samples/kscript2/lib/github.ks.xml", "samples/code-format/lib/github.kscript")]
+        [InlineData("samples/kscript2/repos.ks.xml", "samples/code-format/repos.kscript")]
         public void SameTreeAsTheXmlVersion(string xmlFile, string codeFile)
         {
             MarkupDocument xml = MarkupParser.Parse(File.ReadAllText(RepoFile(xmlFile.Split('/'))), DocumentKind.Script);
@@ -220,6 +250,37 @@ namespace KScript.Language.Tests
             Diagnostic d = Assert.Single(bad.Diagnostics);
             Assert.Equal("KS4001", d.Code);
             Assert.Equal(text.IndexOf("$y", StringComparison.Ordinal) + 1, d.Span.Start);
+        }
+    
+        [Fact]
+        public void TypesDocumentTheirFields()
+        {
+            MarkupElement type = Root("/// A repository.\ntype Repo {\n  /// How many stars.\n  stars: int\n  // a note\n\n  name\n}").ChildElements.Single();
+            Assert.Equal("A repository.", type.GetAttributeValue("description"));
+            Assert.Equal("How many stars.", type.ChildElements.First().GetAttributeValue("description"));
+            Assert.Equal("name", type.ChildElements.Last().GetAttributeValue("name"));
+            Assert.Contains(type.Children, c => c is MarkupComment { Text: "a note" });
+
+            MarkupElement e = Root("/// Sizes.\nenum Size { s, m }").ChildElements.Single();
+            Assert.Equal("Sizes.", e.GetAttributeValue("description"));
+        }
+
+        [Fact]
+        public void TypesInCodeFilesGetTheSameChecksAndCompletion()
+        {
+            const string types = "enum Size { s, m }\ntype Repo {\n  name: string\n  stars: int from stargazers_count\n  size: Size = 's'\n}\n";
+            AssertNoDiagnostics(types + "r = $Repo->from({ name: 'k', stargazers_count: 1 })\necho \"$r.name { $r.stars }\"");
+
+            DocumentAnalysis bad = Analyzer.Analyze(types + "r = $Repo->from({})\necho $r.stras\ntype T { a: Nope }", "test.kscript");
+            Assert.Contains(bad.Diagnostics, d => d.Code == "KS5010" && d.Message.Contains("stars"));
+            Diagnostic nope = Assert.Single(bad.Diagnostics, d => d.Message.Contains("Nope"));
+            Assert.Equal("Nope", (types + "r = $Repo->from({})\necho $r.stras\ntype T { a: Nope }").Substring(nope.Span.Start, nope.Span.Length));
+
+            var service = new LanguageService();
+            (string text, int offset) = TestHelpers.WithCaret(types + "r = $Repo->from({})\necho \"{ $r.‸ }\"");
+            Assert.Contains(service.GetCompletions(service.Analyze(text, "test.kscript"), offset), i => i.Label == "stars");
+            (text, offset) = TestHelpers.WithCaret(types + "type T { a: ‸ }");
+            Assert.Contains(service.GetCompletions(service.Analyze(text, "test.kscript"), offset), i => i.Label == "Size");
         }
     }
 }

@@ -155,6 +155,7 @@ namespace KScript.Projects
     /// <code>
     /// {
     ///   "name": "my-site",
+    ///   "standard": "kscript:recommended",
     ///   "serve": { "root": ".", "port": 8080, "host": "localhost" },
     ///   "app": { "main": "app.ks.xml", "name": "My App", "icon": "icon.icns" },
     ///   "lint": {
@@ -257,11 +258,43 @@ namespace KScript.Projects
         /// <summary>Unknown keys and values that were ignored.</summary>
         public List<string> Warnings { get; } = new List<string>();
 
+        /// <summary>The standards kscript.json names in "standard", as written. Unset means kscript:recommended.</summary>
+        public List<string> Standard { get; private set; } = new List<string> { Standards.Recommended };
+
+        /// <summary>Every standard that was applied, including the ones they extend, in the order they were applied.</summary>
+        public List<AppliedStandard> AppliedStandards { get; } = new List<AppliedStandard>();
+
+        /// <summary>The standard files that were read (not built-in ones), so an editor can notice when one changes.</summary>
+        public List<string> StandardFiles { get; } = new List<string>();
+
+        /// <summary>
+        /// Where each lint and format setting came from: a key such as <c>lint.rules.KS6*</c> or <c>format.indent</c>
+        /// mapped to a standard's label or <c>kscript.json</c>. Settings missing here are the built-in defaults.
+        /// </summary>
+        public Dictionary<string, string> Sources { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The layer being read: a standard's label, or kscript.json.</summary>
+        private string source = FileName;
+
+        /// <summary>True while reading a standard file, where only shareable settings are allowed.</summary>
+        private bool readingStandard;
+
         /// <summary>The site folder <c>kscript serve</c> serves.</summary>
         public string SiteRoot => Path.GetFullPath(Path.Combine(Directory, Serve.Root ?? "."));
 
-        /// <summary>Settings for a folder without a kscript.json.</summary>
-        public static ProjectConfig Default(string directory) => new ProjectConfig { Directory = Path.GetFullPath(directory ?? ".") };
+        /// <summary>Settings for a folder without a kscript.json: the built-in defaults with kscript:recommended applied.</summary>
+        public static ProjectConfig Default(string directory)
+        {
+            var config = new ProjectConfig { Directory = Path.GetFullPath(directory ?? ".") };
+            config.ApplyStandards(config.Standard, config.Directory, new Stack<string>(), File.Exists, File.ReadAllText);
+            config.source = FileName;
+            return config;
+        }
+
+        private static ProjectConfig recommended;
+
+        /// <summary>The settings files outside any project get: kscript:recommended on the built-in defaults.</summary>
+        public static ProjectConfig Recommended => recommended ??= Default(".");
 
         /// <summary>The nearest kscript.json in <paramref name="start"/> (a file or folder) or a parent folder, or null.</summary>
         public static string Find(string start)
@@ -296,32 +329,44 @@ namespace KScript.Projects
 
         public static ProjectConfig Load(string file) => Parse(File.ReadAllText(file), file);
 
-        public static ProjectConfig Parse(string json, string file)
+        /// <summary>
+        /// Reads kscript.json text. The standards it names are read with <paramref name="fileExists"/> and
+        /// <paramref name="readText"/> (the disk by default; an editor passes its open documents).
+        /// </summary>
+        public static ProjectConfig Parse(string json, string file, Func<string, bool> fileExists = null, Func<string, string> readText = null)
         {
             string full = Path.GetFullPath(file);
             var config = new ProjectConfig { FilePath = full, Directory = Path.GetDirectoryName(full) };
+            fileExists ??= File.Exists;
+            readText ??= File.ReadAllText;
 
-            JsonDocument doc;
-            try
-            {
-                doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-            }
-            catch (JsonException ex)
-            {
-                string where = ex.LineNumber != null ? $" (line {ex.LineNumber + 1})" : "";
-                throw new ProjectConfigException($"{full}{where}: not valid JSON. {FirstSentence(ex.Message)}");
-            }
-
-            using (doc)
+            using (JsonDocument doc = ParseJson(json, full))
             {
                 if (doc.RootElement.ValueKind != JsonValueKind.Object)
                     throw new ProjectConfigException($"{full}: should hold an object, e.g. {{ \"name\": \"my-site\" }}.");
+
+                // The standards go first, so that everything kscript.json sets itself wins over them.
+                if (doc.RootElement.TryGetProperty("standard", out JsonElement standard))
+                {
+                    List<string> named = StandardList(standard, "standard", config);
+                    if (named != null) config.Standard = named;
+                }
+                try
+                {
+                    config.ApplyStandards(config.Standard, config.Directory, new Stack<string>(), fileExists, readText);
+                }
+                catch (ProjectConfigException ex) when (!ex.Message.StartsWith(full, StringComparison.Ordinal))
+                {
+                    throw new ProjectConfigException($"{full}: {ex.Message}");
+                }
+                config.source = FileName;
 
                 foreach (var prop in doc.RootElement.EnumerateObject())
                 {
                     switch (prop.Name)
                     {
                         case "$schema":
+                        case "standard":
                             break;
                         case "name":
                             config.Name = String(prop.Value, "name", config);
@@ -356,12 +401,170 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve, http, lint, test, config, format or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, serve, http, lint, test, config, format or app).");
                             break;
                     }
                 }
             }
             return config;
+        }
+
+        private static JsonDocument ParseJson(string json, string full)
+        {
+            try
+            {
+                return JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+            }
+            catch (JsonException ex)
+            {
+                string where = ex.LineNumber != null ? $" (line {ex.LineNumber + 1})" : "";
+                throw new ProjectConfigException($"{full}{where}: not valid JSON. {FirstSentence(ex.Message)}");
+            }
+        }
+
+        /// <summary>"standard" or "extends": one name or path, or a list of them (applied in order, so later ones win).</summary>
+        private static List<string> StandardList(JsonElement e, string name, ProjectConfig config)
+        {
+            if (e.ValueKind == JsonValueKind.String) return new List<string> { e.GetString() };
+            if (e.ValueKind == JsonValueKind.Array && e.EnumerateArray().All(i => i.ValueKind == JsonValueKind.String))
+                return e.EnumerateArray().Select(i => i.GetString()).ToList();
+            config.Warnings.Add($"{name} should be a standard's name or path, such as \"{Standards.Recommended}\" or \"./standards/team.json\", or a list of them.");
+            return null;
+        }
+
+        /// <summary>
+        /// Applies standards in order: for each one, first the standards it extends, then its own settings.
+        /// <paramref name="chain"/> holds the standards being applied, to report a standard that extends itself.
+        /// </summary>
+        private void ApplyStandards(IEnumerable<string> references, string baseDirectory, Stack<string> chain, Func<string, bool> fileExists, Func<string, string> readText)
+        {
+            foreach (string reference in references)
+            {
+                string resolved = Standards.Resolve(reference, baseDirectory, fileExists);
+                if (chain.Contains(resolved, StringComparer.OrdinalIgnoreCase))
+                {
+                    string loop = string.Join(" -> ", chain.Reverse().Append(resolved).Select(LabelFor));
+                    throw new ProjectConfigException($"the standards extend each other in a loop: {loop}.");
+                }
+
+                bool builtIn = Standards.IsBuiltInName(resolved);
+                string text;
+                if (builtIn)
+                {
+                    text = Standards.BuiltIn[resolved];
+                }
+                else
+                {
+                    try
+                    {
+                        text = readText(resolved);
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    {
+                        throw new ProjectConfigException($"can't read the standard {resolved}: {ex.Message}");
+                    }
+                    if (!StandardFiles.Contains(resolved)) StandardFiles.Add(resolved);
+                }
+
+                chain.Push(resolved);
+                ApplyStandard(text, resolved, builtIn, chain, fileExists, readText);
+                chain.Pop();
+            }
+        }
+
+        private void ApplyStandard(string text, string resolved, bool builtIn, Stack<string> chain, Func<string, bool> fileExists, Func<string, string> readText)
+        {
+            string label = LabelFor(resolved);
+            using JsonDocument doc = ParseJson(text, resolved);
+            JsonElement root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                throw new ProjectConfigException($"{resolved}: a standard should hold an object, e.g. {{ \"extends\": \"{Standards.Recommended}\", \"lint\": {{ … }} }}.");
+
+            List<string> extends = new List<string>();
+            if (root.TryGetProperty("extends", out JsonElement e))
+            {
+                int before = Warnings.Count;
+                extends = StandardList(e, "extends", this) ?? extends;
+                PrefixWarnings(before, label);
+            }
+            string baseDirectory = builtIn ? Directory : Path.GetDirectoryName(resolved);
+            ApplyStandards(extends, baseDirectory, chain, fileExists, readText);
+
+            string name = null, description = null;
+            int start = Warnings.Count;
+            source = label;
+            readingStandard = true;
+            try
+            {
+                foreach (var prop in root.EnumerateObject())
+                {
+                    switch (prop.Name)
+                    {
+                        case "$schema":
+                        case "extends":
+                            break;
+                        case "name":
+                            name = String(prop.Value, "name", this);
+                            break;
+                        case "description":
+                            description = String(prop.Value, "description", this);
+                            break;
+                        case "lint":
+                            ReadLint(prop.Value, this);
+                            break;
+                        case "format":
+                            ReadFormat(prop.Value, this);
+                            break;
+                        default:
+                            Warnings.Add($"unknown setting '{prop.Name}' (a standard holds name, description, extends, lint and format; other settings belong in kscript.json).");
+                            break;
+                    }
+                }
+            }
+            finally
+            {
+                readingStandard = false;
+            }
+            PrefixWarnings(start, label);
+            AppliedStandards.Add(new AppliedStandard(label, name, description, builtIn ? null : resolved, extends));
+        }
+
+        private void PrefixWarnings(int from, string label)
+        {
+            for (int i = from; i < Warnings.Count; i++) Warnings[i] = $"standard {label}: {Warnings[i]}";
+        }
+
+        /// <summary>How a resolved standard is shown: its built-in name, or its path relative to the project folder.</summary>
+        public string LabelFor(string resolved)
+        {
+            if (Standards.IsBuiltInName(resolved)) return resolved;
+            string rel = Path.GetRelativePath(Directory, resolved).Replace('\\', '/');
+            return Path.IsPathRooted(rel) ? resolved : rel;
+        }
+
+        /// <summary>Records that the layer being read set a setting.</summary>
+        private void Set(string key) => Sources[key] = source;
+
+        /// <summary>
+        /// Sets a lint rule. A prefix such as KS6* replaces what earlier layers said about the codes it covers, so a
+        /// project's "KS6*": "off" turns off a standard's "KS6001": "error" too. In one layer, the longest match wins.
+        /// </summary>
+        private void SetRule(string key, string severity)
+        {
+            if (key.EndsWith('*'))
+            {
+                string prefix = key.Substring(0, key.Length - 1);
+                foreach (string other in Lint.Rules.Keys.ToList())
+                {
+                    if (string.Equals(other, key, StringComparison.OrdinalIgnoreCase) || !other.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (Sources.TryGetValue("lint.rules." + other, out string from) && from == source) continue;
+                    Lint.Rules.Remove(other);
+                    Sources.Remove("lint.rules." + other);
+                }
+            }
+            Lint.Rules.Remove(key); // keep the spelling of the layer that set it last
+            Lint.Rules[key] = severity;
+            Set("lint.rules." + key);
         }
 
         private static void ReadApp(JsonElement e, ProjectConfig config)
@@ -531,14 +734,24 @@ namespace KScript.Projects
             {
                 switch (p.Name)
                 {
+                    case "include" when config.readingStandard:
+                    case "exclude" when config.readingStandard:
+                        config.Warnings.Add($"lint.{p.Name} belongs in the project's kscript.json, not in a standard.");
+                        break;
                     case "include":
                         config.Lint.Include = Strings(p.Value, "lint.include", config) ?? config.Lint.Include;
+                        config.Set("lint.include");
                         break;
                     case "exclude":
                         config.Lint.Exclude = Strings(p.Value, "lint.exclude", config) ?? config.Lint.Exclude;
+                        config.Set("lint.exclude");
                         break;
                     case "warningsAsErrors":
-                        if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False) config.Lint.WarningsAsErrors = p.Value.GetBoolean();
+                        if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False)
+                        {
+                            config.Lint.WarningsAsErrors = p.Value.GetBoolean();
+                            config.Set("lint.warningsAsErrors");
+                        }
                         else config.Warnings.Add($"lint.warningsAsErrors should be true or false.");
                         break;
                     case "rules":
@@ -552,7 +765,7 @@ namespace KScript.Projects
                             else if (!Regex.IsMatch(rule.Name, @"^KS\d{0,4}\*?$", RegexOptions.IgnoreCase))
                                 config.Warnings.Add($"lint.rules key '{rule.Name}' should be a code such as KS3003, or a prefix such as KS3*.");
                             else
-                                config.Lint.Rules[rule.Name] = value;
+                                config.SetRule(rule.Name, value);
                         }
                         break;
                     default:
@@ -636,32 +849,34 @@ namespace KScript.Projects
                         {
                             config.Format.IndentSize = size;
                             config.Format.UseTabs = false;
+                            config.Set("format.indent");
                         }
                         else if (p.Value.ValueKind == JsonValueKind.String && string.Equals(p.Value.GetString().Trim(), "tab", StringComparison.OrdinalIgnoreCase))
                         {
                             config.Format.UseTabs = true;
+                            config.Set("format.indent");
                         }
                         else config.Warnings.Add("format.indent should be a number of spaces from 1 to 16, or \"tab\".");
                         break;
                     case "tabWidth":
-                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int tab) && tab >= 1 && tab <= 16) config.Format.IndentSize = tab;
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int tab) && tab >= 1 && tab <= 16) { config.Format.IndentSize = tab; config.Set("format.tabWidth"); }
                         else config.Warnings.Add("format.tabWidth should be a number from 1 to 16.");
                         break;
                     case "printWidth":
-                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int width) && width >= 20) config.Format.PrintWidth = width;
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int width) && width >= 20) { config.Format.PrintWidth = width; config.Set("format.printWidth"); }
                         else config.Warnings.Add("format.printWidth should be a number of columns (20 or more).");
                         break;
                     case "maxBlankLines":
-                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int blank) && blank >= 0) config.Format.MaxBlankLines = blank;
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int blank) && blank >= 0) { config.Format.MaxBlankLines = blank; config.Set("format.maxBlankLines"); }
                         else config.Warnings.Add("format.maxBlankLines should be 0 or more.");
                         break;
                     case "endOfLine":
                         string eol = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString().Trim().ToLowerInvariant() : null;
-                        if (eol == "auto" || eol == "lf" || eol == "crlf") config.Format.EndOfLine = eol;
+                        if (eol == "auto" || eol == "lf" || eol == "crlf") { config.Format.EndOfLine = eol; config.Set("format.endOfLine"); }
                         else config.Warnings.Add("format.endOfLine should be \"auto\", \"lf\" or \"crlf\".");
                         break;
                     case "enabled":
-                        if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False) config.Format.Enabled = p.Value.GetBoolean();
+                        if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False) { config.Format.Enabled = p.Value.GetBoolean(); config.Set("format.enabled"); }
                         else config.Warnings.Add("format.enabled should be true or false.");
                         break;
                     case "rules":
@@ -682,17 +897,27 @@ namespace KScript.Projects
                             else if (on == null)
                                 config.Warnings.Add($"format.rules.{rule.Name} should be true or false (or \"on\" / \"off\").");
                             else
+                            {
                                 config.Format.Rules[known] = on.Value;
+                                config.Set("format.rules." + known);
+                            }
                         }
                         break;
                     case "preserve":
                         config.Format.Preserve = Strings(p.Value, "format.preserve", config) ?? config.Format.Preserve;
+                        config.Set("format.preserve");
+                        break;
+                    case "include" when config.readingStandard:
+                    case "exclude" when config.readingStandard:
+                        config.Warnings.Add($"format.{p.Name} belongs in the project's kscript.json, not in a standard.");
                         break;
                     case "include":
                         config.Format.Include = Strings(p.Value, "format.include", config) ?? config.Format.Include;
+                        config.Set("format.include");
                         break;
                     case "exclude":
                         config.Format.Exclude = Strings(p.Value, "format.exclude", config) ?? config.Format.Exclude;
+                        config.Set("format.exclude");
                         break;
                     default:
                         config.Warnings.Add($"unknown setting 'format.{p.Name}' (expected enabled, rules, indent, tabWidth, printWidth, maxBlankLines, endOfLine, preserve, include or exclude).");

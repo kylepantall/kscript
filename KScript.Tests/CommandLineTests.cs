@@ -91,6 +91,7 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("kscript ide install", Kscript("ide", "help").Out);
         Assert.Contains("Usage: kscript app build", Kscript("app", "--help").Out);
         Assert.Contains("1 file checked: 0 errors", Kscript("check", script, "--warnaserror").Out);
+        Assert.Contains("kscript:recommended", Kscript("check", "--print-config", dir).Out);
         Assert.Contains("1 file checked: all formatted", Kscript("fmt", script, "--check").Out);
         Assert.Equal(0, Kscript("css", Write("site.ks.css", "a { color: red; }")).Code);
         Assert.Equal(0, Kscript("make", "--dir", dir).Code);

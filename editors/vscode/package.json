@@ -51,7 +51,11 @@
       {
         "id": "jsonc",
         "filenames": [
-          "kscript.json"
+          "kscript.json",
+          "kscript-standard.json"
+        ],
+        "filenamePatterns": [
+          "*.kscript-standard.json"
         ]
       }
     ],
@@ -154,6 +158,10 @@
       {
         "fileMatch": "kscript.json",
         "url": "./schemas/kscript.schema.json"
+      },
+      {
+        "fileMatch": ["kscript-standard.json", "*.kscript-standard.json"],
+        "url": "./schemas/kscript-standard.schema.json"
       }
     ],
     "menus": {

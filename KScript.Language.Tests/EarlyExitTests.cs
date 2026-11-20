@@ -276,5 +276,38 @@ namespace KScript.Language.Tests
                 Directory.Delete(dir, true);
             }
         }
+
+        [Fact]
+        public void IsOnThroughTheRecommendedStandardOnly()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "kscript-ks6001-std-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                string path = Path.Combine(dir, "a.ks.xml");
+                string script = Script("<fn name=\"f\" params=\"n\"><if test=\"$n\"><echo>a</echo></if><else><echo>b</echo></else></fn>");
+                List<Diagnostic> Lint(ProjectConfig config) => LintRules.Apply(Analyze(script, path).Diagnostics, config, path);
+
+                // Outside a project, and in a project that doesn't name a standard, kscript:recommended applies.
+                Assert.Contains(Lint(null), d => d.Code == DiagnosticCodes.PreferEarlyExit && d.Severity == DiagnosticSeverity.Warning);
+                Assert.Contains(Lint(ProjectConfig.Parse("{}", Path.Combine(dir, "kscript.json"))), d => d.Code == DiagnosticCodes.PreferEarlyExit);
+
+                // kscript:strict makes it an error; no standard at all leaves style rules off.
+                Assert.Contains(Lint(ProjectConfig.Parse("{ \"standard\": \"kscript:strict\" }", Path.Combine(dir, "kscript.json"))),
+                    d => d.Code == DiagnosticCodes.PreferEarlyExit && d.Severity == DiagnosticSeverity.Error);
+                Assert.DoesNotContain(Lint(ProjectConfig.Parse("{ \"standard\": [] }", Path.Combine(dir, "kscript.json"))), d => d.Code == DiagnosticCodes.PreferEarlyExit);
+
+                // A team standard that doesn't extend kscript:recommended starts with style rules off too, and can turn one on.
+                File.WriteAllText(Path.Combine(dir, "team.json"), "{ \"lint\": { \"rules\": { \"KS6001\": \"info\" } } }");
+                Assert.Contains(Lint(ProjectConfig.Parse("{ \"standard\": \"team.json\" }", Path.Combine(dir, "kscript.json"))),
+                    d => d.Code == DiagnosticCodes.PreferEarlyExit && d.Severity == DiagnosticSeverity.Information);
+                File.WriteAllText(Path.Combine(dir, "team.json"), "{ \"format\": { \"indent\": 4 } }");
+                Assert.DoesNotContain(Lint(ProjectConfig.Parse("{ \"standard\": \"team.json\" }", Path.Combine(dir, "kscript.json"))), d => d.Code == DiagnosticCodes.PreferEarlyExit);
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
     }
 }
