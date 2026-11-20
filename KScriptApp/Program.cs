@@ -16,6 +16,7 @@ namespace KScript
             Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
+            Console.WriteLine("       kscript css [file-or-folder]... [--out folder] [--var name=value]   Compile .ks.css, .ks.scss and .ks.sass stylesheets.");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
             Console.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
@@ -106,7 +107,7 @@ namespace KScript
         static string[] TakeEnvironment(string[] args)
         {
             var rest = new List<string>();
-            bool anywhere = args.Length > 0 && (args[0] == "serve" || args[0] == "test");
+            bool anywhere = args.Length > 0 && (args[0] == "serve" || args[0] == "test" || args[0] == "css");
             bool before = true;
             for (int i = 0; i < args.Length; i++)
             {
@@ -184,6 +185,11 @@ namespace KScript
             if (args[0] == "serve")
             {
                 return Serve(args.Skip(1).ToArray());
+            }
+
+            if (args[0] == "css")
+            {
+                return KScript.Style.CssCommand.Run(args.Skip(1).ToArray(), Console.Out, Console.Error);
             }
 
             if (args[0] == "test")

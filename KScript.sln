@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Test", "KScript.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.AI", "KScript.AI\KScript.AI.csproj", "{7DA01542-E263-4DD1-AB16-A37E0DD304FE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Style", "KScript.Style\KScript.Style.csproj", "{A4BB498B-0CA2-4CA4-96B8-EFDC1D835E06}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -108,5 +110,9 @@ Global
 		{7DA01542-E263-4DD1-AB16-A37E0DD304FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7DA01542-E263-4DD1-AB16-A37E0DD304FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7DA01542-E263-4DD1-AB16-A37E0DD304FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A4BB498B-0CA2-4CA4-96B8-EFDC1D835E06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A4BB498B-0CA2-4CA4-96B8-EFDC1D835E06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A4BB498B-0CA2-4CA4-96B8-EFDC1D835E06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A4BB498B-0CA2-4CA4-96B8-EFDC1D835E06}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

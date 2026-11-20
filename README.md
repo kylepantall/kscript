@@ -95,7 +95,7 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 | --- | --- |
 | `KScript.Syntax/` | The parser shared by the interpreter and the editor tools: markup, expressions, `{ }` templates, and the metadata types elements and commands are described with. |
 | `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
-| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/` | Packages: each registers its elements, commands and methods, with their documentation. |
+| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/`, `KScript.Style/` | Packages: each registers its elements, commands and methods, with their documentation. |
 | `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
 | `KScript.Test/` | The KScript.Test package and `kscript test`: finding test files, running them, and the console and JUnit reports. |
 | `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript ide` and `kscript update`. |
@@ -317,6 +317,7 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
 | `KScript.AI` | `@llm(prompt, options)`, `<llm to system schema tools>`, `@chat(system)` with `->ask()` `->history()` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
+| `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast`, `@css_var`, `@css_vars`; `<stylesheet src to vars>` (see [Stylesheets](#stylesheets-kscript-css)). |
 | `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](#testing-scripts-kscript-test)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).
@@ -444,6 +445,46 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
 
 See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter, and [`samples/life-lab`](samples/life-lab) for a game whose rules are a KScript script shared with a terminal version and a Mac app.
+
+## Stylesheets: kscript css
+
+A file ending in `.ks.css`, `.ks.scss` or `.ks.sass` is a stylesheet written in KScript. It is ordinary CSS (or Sass), with KScript elements such as `<let>`, `<for>` and `<if>` between the rules and `{$name}` or `{ @fn(...) }` in the text. `theme.ks.css` compiles to `theme.css`, `theme.ks.scss` to `theme.scss` and `theme.ks.sass` to `theme.sass`, so a theme kept in JSON becomes a stylesheet:
+
+```json
+{ "colors": { "primary": "#3355ff", "surface": "#ffffff" }, "space": { "sm": 4, "md": 8, "lg": 16 } }
+```
+
+```css
+<let name="theme" value="@read_json('theme.json')" />
+:root {
+  { @css_vars($theme.colors, 'color') }        /* --color-primary: #3355ff; --color-surface: #ffffff; */
+}
+
+<for each="name, px" in="$theme.space">
+.p-{$name} { padding: {@rem($px)}; }
+</for>
+
+.button {
+  background: var(--color-primary);
+  color: {@contrast($theme.colors.primary)};   /* black or white, whichever reads better */
+}
+.button:hover { background: {@darken($theme.colors.primary, '10%')}; }
+h1 { font-size: {@fluid(28, 48)}; }            /* 28px on phones, growing to 48px on wide screens */
+
+@media {@up('md')} {
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+}
+<if test="$vars.dark ?? false">
+@media (prefers-color-scheme: dark) { :root { --color-surface: #111; } }
+</if>
+```
+
+- **Braces.** A `{` is KScript only when `$name`, `@name(` or `!` comes next. Every other brace is CSS, and Sass's own `#{$var}` is left alone. An element alone on its line leaves no blank line behind.
+- **Screen widths.** `@up('md')` gives `(min-width: 768px)`, `@down('md')` gives `(max-width: 767.98px)`, and there is `@between('sm', 'lg')`. The names are sm 640, md 768, lg 1024, xl 1280 and xxl 1536, and `<let name="breakpoints" value="{ md: 800 }" />` sets your own. A number (`@up(900)`), `'900px'` or `'48em'` works too.
+- **Sizes.** `@rem(24)` gives `1.5rem`. `@fluid(min, max, from?, to?)` gives a `clamp()` that grows from `min` px on screens up to `from` (default 640) to `max` px from `to` (default 1280).
+- **Colours.** `@lighten`, `@darken`, `@mix(a, b, weight)`, `@alpha(colour, opacity)` and `@contrast(background, dark?, light?)` read `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `hsl()` and the common names. `@css_var('gap', '4px')` gives `var(--gap, 4px)`.
+- **Building.** `kscript css` compiles every stylesheet in the current folder (or the files and folders you name), skipping `node_modules`, `.git` and partials whose names start with `_`. `--out public/css` writes the results to another folder, and `--var dark=true` sets `$vars.dark`. From a script, `<stylesheet src="theme.ks.css" to="public/theme.css" vars="{ dark: true }" />` and `@stylesheet(path, vars)` do the same. `$config` works in stylesheets too.
+- **Serving.** `kscript serve` serves `theme.css` compiled from `theme.ks.css` on each request, unless a real `theme.css` is there, and never serves the `.ks.css` source itself. If a stylesheet fails, the error comes back as a CSS comment with status 500.
 
 ## Starting a project: kscript make project
 

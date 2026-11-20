@@ -254,7 +254,7 @@ namespace KScript.Runtime
         private static readonly Regex Number = new Regex(@"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$");
 
         /// <summary>Text from an environment variable or .env file: true/false and plain numbers become those types.</summary>
-        internal static object Scalar(string value)
+        public static object Scalar(string value)
         {
             if (value == "true") return true;
             if (value == "false") return false;

@@ -224,6 +224,7 @@ namespace KScript.Runtime
             ("KScript.Net", "KScript.Net.NetPackage, KScript.Net", "HTTP requests and downloads."),
             ("KScript.Markdown", "KScript.Markdown.MarkdownPackage, KScript.Markdown", "Markdown to HTML."),
             ("KScript.Web", "KScript.Web.WebPackage, KScript.Web", "Web pages run by kscript serve: layouts, components and live blocks."),
+            ("KScript.Style", "KScript.Style.StylePackage, KScript.Style", "Stylesheets written in KScript (.ks.css, .ks.scss, .ks.sass), with colour, size and responsive helpers."),
             ("KScript.Test", "KScript.Testing.TestPackage, KScript.Test", "Tests run by kscript test: <test>, <describe>, <expect>, <assert> and <capture>."),
             ("KScript.UI", "KScript.UI.UIPackage, KScript.UI", "Desktop windows with buttons, text and inputs."),
             ("KScript.AI", "KScript.AI.AIPackage, KScript.AI", "Language models: @llm, @chat and <llm>."),

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>KScript.Style</RootNamespace>
+    <AssemblyName>KScript.Style</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.0.0</Version>
+    <Product>KScript</Product>
+    <Description>KScript.Style: stylesheets written in KScript (.ks.css, .ks.scss, .ks.sass), with colour, size and responsive helpers.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+  </ItemGroup>
+
+</Project>

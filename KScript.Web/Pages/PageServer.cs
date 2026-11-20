@@ -17,7 +17,7 @@ namespace KScript.Pages
     /// <summary>What a URL maps to in a site folder.</summary>
     public sealed class PageRoute
     {
-        public enum RouteKind { Page, Static, NotFound }
+        public enum RouteKind { Page, Static, NotFound, Stylesheet }
 
         public RouteKind Kind { get; init; }
 
@@ -67,6 +67,17 @@ namespace KScript.Pages
             // Nor are the settings $config reads (config.json, config.staging.yaml), which may hold secrets.
             if (segments.Count > 0 && IsConfigFile(segments[^1]))
                 return NotFound();
+
+            // Stylesheets written in KScript are served compiled (theme.css from theme.ks.css), never as written.
+            if (segments.Count > 0 && KScript.Style.Stylesheets.IsStylesheet(segments[^1]))
+                return NotFound();
+            if (segments.Count > 0 && segments[^1].EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+            {
+                string rel = string.Join("/", segments);
+                string source = rel.Substring(0, rel.Length - 4) + ".ks.css";
+                if (!File.Exists(Path.Combine(Root, rel)) && File.Exists(Path.Combine(Root, source)))
+                    return new PageRoute { Kind = PageRoute.RouteKind.Stylesheet, File = source };
+            }
 
             // Exact file
             if (segments.Count > 0)
@@ -233,6 +244,25 @@ namespace KScript.Pages
                     string full = Path.Combine(site.Root, route.File);
                     if (!types.TryGetContentType(full, out string contentType)) contentType = "application/octet-stream";
                     return new PageResult { ContentType = contentType, FilePath = full };
+                }
+
+                case PageRoute.RouteKind.Stylesheet:
+                {
+                    try
+                    {
+                        string css = KScript.Style.Stylesheets.Compile(Path.Combine(site.Root, route.File), null, h =>
+                        {
+                            h.FileRoot = site.Root;
+                            h.FileRootName = "the site folder";
+                            h.CanWriteFiles = false;
+                        });
+                        return new PageResult { ContentType = "text/css; charset=utf-8", Body = css };
+                    }
+                    catch (KScript.Runtime.KScriptException ex)
+                    {
+                        // The browser ignores a broken stylesheet, so the error goes into it as a comment too.
+                        return new PageResult { Status = 500, ContentType = "text/css; charset=utf-8", Body = $"/* {ex.ToString().Replace("*/", "* /")} */" };
+                    }
                 }
 
                 case PageRoute.RouteKind.Page:

@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+    <ProjectReference Include="..\KScript.Style\KScript.Style.csproj" />
     <ProjectReference Include="..\KScript.Markdown\KScript.Markdown.csproj" />
   </ItemGroup>
 

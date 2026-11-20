@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+    <ProjectReference Include="..\KScript.Style\KScript.Style.csproj" />
     <ProjectReference Include="..\KScript.Terminal\KScript.Terminal.csproj" />
     <ProjectReference Include="..\KScript.Math\KScript.Math.csproj" />
     <ProjectReference Include="..\KScript.IO\KScript.IO.csproj" />
