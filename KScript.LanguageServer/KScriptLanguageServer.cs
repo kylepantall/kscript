@@ -414,6 +414,10 @@ namespace KScript.LanguageServer
                 if (item.SortText != null) json["sortText"] = item.SortText;
                 if (item.FilterText != null) json["filterText"] = item.FilterText;
                 if (item.Deprecated) json["tags"] = new JsonArray(1);
+                if (item.AdditionalEdits != null)
+                {
+                    json["additionalTextEdits"] = new JsonArray(item.AdditionalEdits.Select(e => (JsonNode)new JsonObject { ["range"] = Range(a.Source, e.Span), ["newText"] = e.NewText }).ToArray());
+                }
                 items.Add(json);
             }
             return new JsonObject { ["isIncomplete"] = false, ["items"] = items };
@@ -768,6 +772,7 @@ namespace KScript.LanguageServer
             CompletionKind.Keyword => 14,     // Keyword
             CompletionKind.File => 17,        // File
             CompletionKind.Folder => 19,      // Folder
+            CompletionKind.Module => 9,       // Module
             _ => 15,                          // Snippet
         };
 

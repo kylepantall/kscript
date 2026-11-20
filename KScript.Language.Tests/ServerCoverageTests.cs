@@ -277,7 +277,7 @@ namespace KScript.Language.Tests
         public void KindsMapToTheProtocol()
         {
             int[] completion = Enum.GetValues<CompletionKind>().Select(KScriptLanguageServer.CompletionKindToLsp).ToArray();
-            Assert.Equal(new[] { 10, 5, 12, 6, 6, 21, 3, 3, 2, 5, 14, 17, 15, 19 }, completion);
+            Assert.Equal(new[] { 10, 5, 12, 6, 6, 21, 3, 3, 2, 5, 14, 17, 15, 19, 9 }, completion);
             int[] outline = Enum.GetValues<OutlineKind>().Select(KScriptLanguageServer.OutlineKindToLsp).ToArray();
             Assert.Equal(new[] { 12, 13, 14, 2, 8 }, outline);
         }

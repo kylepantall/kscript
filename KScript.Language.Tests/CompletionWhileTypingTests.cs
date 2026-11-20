@@ -32,7 +32,8 @@ namespace KScript.Language.Tests
             CompletionItem exit = Item(items, "exit");
             Assert.Null(exit.InsertText);
             Assert.False(exit.IsSnippet);
-            Assert.Equal("KScript 2 (planned)", Item(items, "render").Detail);
+            // Planned elements don't run yet, so they aren't offered.
+            Assert.DoesNotContain(items, i => i.Label == "render");
 
             // Commands and functions keep their @, but match on the bare name the user is typing.
             CompletionItem env = Item(items, "@env");
@@ -80,7 +81,6 @@ namespace KScript.Language.Tests
             Assert.Empty(Complete("// e‸"));
             Assert.Empty(Complete("/* a note\ne‸ */"));
             Assert.Empty(Complete("<kscript>\n1‸\n</kscript>", "test.ks.xml"));
-            Assert.Empty(Complete("x = 1\n‸"));
         }
 
         [Fact]

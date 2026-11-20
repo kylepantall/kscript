@@ -114,6 +114,36 @@ namespace KScript.Language.Analysis
             }
         }
 
+        private static readonly (string Name, string Type, string Description)[] RequestVariables =
+        {
+            ("json", KType.Any, "The request body read as JSON."),
+            ("body", KType.Any, "The JSON body, or the raw body when it isn't JSON."),
+            ("query", KType.Map, "The query string's values."),
+            ("form", KType.Map, "The posted form's values."),
+            ("input", KType.Map, "Query, form and JSON values together."),
+            ("headers", KType.Map, "The request headers."),
+            ("cookies", KType.Map, "The request cookies."),
+        };
+
+        private void DeclareRequestVariables(MarkupElement e, Scope inner)
+        {
+            int at = e.ContentSpan.Start;
+            inner.Declare(BuiltIn("request"), at);
+            foreach (var (name, type, description) in RequestVariables)
+            {
+                Symbol symbol = new Symbol { Name = name, Kind = SymbolKind.BuiltIn, Shape = new TypeShape(type), Description = description };
+                result.Symbols.Add(symbol);
+                inner.Declare(symbol, at);
+            }
+            string path = e.GetAttributeValue("path");
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(path ?? string.Empty, @"\{(\w+)[?*]?\}"))
+            {
+                Symbol parameter = new Symbol { Name = m.Groups[1].Value, Kind = SymbolKind.BuiltIn, Shape = new TypeShape(KType.String), Description = $"The {{{m.Groups[1].Value}}} part of the path." };
+                result.Symbols.Add(parameter);
+                inner.Declare(parameter, at);
+            }
+        }
+
         private Symbol BuiltIn(string name)
         {
             (string type, string description) = catalog.BuiltInVariables[name];
@@ -574,12 +604,25 @@ namespace KScript.Language.Analysis
                 case "catch":
                 {
                     // $err is visible in the when="..." test as well as the body.
-                    Scope catchScope = new Scope(scope, e.Span);
+                    // In a .kscript file the catch follows the try's { } block, outside the try's own scope.
+                    Scope outer = scope;
+                    while (outer.Parent != null && !outer.Span.Contains(e.Span.Start))
+                    {
+                        outer = outer.Parent;
+                    }
+                    Scope catchScope = new Scope(outer, e.Span);
                     DeclareFromAttribute(e, "as", catchScope, e.Span.Start, SymbolKind.Variable, ErrorShape());
                     AnalyzeAttributes(e, info, catchScope, skip: "as");
                     WalkChildren(e.Children, new Scope(catchScope, e.ContentSpan), markupMode);
                     return;
                 }
+
+                case "Get" or "Post" or "Put" or "Patch" or "Delete" or "Options" or "Any" or "Route" when info.Package == "KScript.Http" && inner != scope:
+                    // An inline handler gets what a controller can ask for: $request, $json, $query... and the path's {parameters}.
+                    AnalyzeAttributes(e, info, scope);
+                    DeclareRequestVariables(e, inner);
+                    WalkChildren(e.Children, inner, markupMode);
+                    return;
 
                 case "on":
                     AnalyzeAttributes(e, info, scope);
