@@ -66,6 +66,7 @@ namespace KScript.Documents
             p.Element(new ElementInfo("Document", "A document. Its content (Section, Paragraph, List, Table, Figure, Math...) is laid out by the template and saved where to: says, or kept in into:. Statements such as for, if and let work inside it.", ContentKind.Statements, style.ToArray())
             {
                 Context = ElementContext.Script,
+                DeclaresType = KType.Document,
                 Example = "KScript.Document(template: paper, title: \"Gliders\", author: \"Ada Lovelace\", to: \"gliders.pdf\") {\n  Section(title: Introduction) {\n    Paragraph \"A glider moves one cell every \\( 4 \\) generations.\"\n  }\n}",
             }, DocumentElements.Document);
 

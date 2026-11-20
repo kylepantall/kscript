@@ -242,6 +242,21 @@ public class ScaffolderTests
     }
 
     [Fact]
+    public void DocumentBuildsPdfAndWord()
+    {
+        using var site = new TempSite();
+        Assert.Equal(0, Make(site.Root, "document", "annual_report").Code);
+        string script = Read(site, "annual-report.kscript");
+        Assert.Contains("title: \"Annual Report\"", script);
+        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(new StringWriter(), "")).RunFile(Path.Combine(site.Root, "annual-report.kscript"));
+        Assert.StartsWith("%PDF-", File.ReadAllText(Path.Combine(site.Root, "annual-report.pdf")));
+        Assert.True(File.Exists(Path.Combine(site.Root, "annual-report.docx")));
+
+        Assert.Equal(0, Make(site.Root, "document", "annual_report", "--format", "xml").Code);
+        Assert.Contains("<KScript.Document", Read(site, "annual-report.ks.xml"));
+    }
+
+    [Fact]
     public void ExistingFilesNeedForce()
     {
         using var site = new TempSite(("_components/hero.html", "mine"));
@@ -305,7 +320,7 @@ public class ScaffolderTests
         using var site = new TempSite();
         var (code, output, _) = Make(site.Root, "templates");
         Assert.Equal(0, code);
-        foreach (var f in new[] { "component.html", "page.html", "markdown.md", "layout.html", "script.kscript", "test.kscript" })
+        foreach (var f in new[] { "component.html", "page.html", "markdown.md", "layout.html", "script.kscript", "test.kscript", "document.kscript" })
         {
             Assert.Contains($"Created _templates/{f}", output);
             Assert.True(File.Exists(Path.Combine(site.Root, "_templates", f)));

@@ -261,6 +261,7 @@ namespace KScript.Scaffolding
             "layout" => "main",
             "script" => "tidy-downloads",
             "test" => "checkout",
+            "document" => "annual-report",
             _ => "Example",
         };
 

@@ -71,6 +71,9 @@ namespace KScript.Metadata
         /// <summary>True if attributes other than the listed ones are allowed (they become variables, as in <c>&lt;layout&gt;</c>).</summary>
         public bool AllowsExtraAttributes { get; init; }
 
+        /// <summary>The type of the variable its declare-variable attribute (to:, into:) makes, when not text.</summary>
+        public string DeclaresType { get; init; }
+
         /// <summary>True if the element is in the KScript 2 design but no package implements it yet.</summary>
         public bool Planned => Package == null;
 
