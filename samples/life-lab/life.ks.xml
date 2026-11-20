@@ -1,0 +1,125 @@
+<kscript>
+  <!--
+    Life Lab in the terminal.
+
+      kscript life.ks.xml                      interactive: step, play, pick patterns, edit cells
+      kscript life.ks.xml glider 60            play a pattern for 60 generations, then stop
+      kscript life.ks.xml my-pattern.cells 200 the same with a pattern file in the plaintext .cells format
+
+    The rules live in lib/life.ks.xml, shared with the browser and Mac versions.
+  -->
+  <import package="KScript.Terminal" />
+  <import package="KScript.IO" />
+  <import src="lib/life.ks.xml" />
+
+  <!-- Two characters per cell keeps the board roughly square in most terminal fonts. -->
+  <let name="board_w" value="@min(40, ((@terminal_width() - 4) / 2)->floor())" />
+  <let name="board_h" value="20" />
+  <let name="frame_ms" value="70" />
+
+  <fn name="draw" params="world, title = ''">
+    <if test="@is_terminal()">
+      <clear />
+    </if>
+    <let name="s" value="@summary($world)" />
+    <echo>{ @bold('Life Lab') } { @dim('·') } { $world.pattern } { $title ne '' ? @dim('· ' + $title) : '' }</echo>
+    <echo>{ $world.grid->map(fn($row) => '  ' + $row->chars()->map(fn($c) => $c eq $alive_cell ? @color('██', 'green') : @dim('· '))->join(''))->join(@char_of(10)) }</echo>
+    <echo>  Generation { @bold($s.generation) }   Alive { $s.population } ({ $s.density }%)   Born { $s.births }   Died { $s.deaths }</echo>
+    <echo>  { @color($s.status, $s.status eq 'Extinct' ? 'red' : $s.status eq 'Evolving' ? 'cyan' : 'yellow') }   { @dim($s.size + ', edges ' + $s.edges) }</echo>
+  </fn>
+
+  <fn name="play" params="world, generations: int">
+    <!-- Animates at a terminal; when the output is redirected only the last frame is printed. -->
+    <let name="w" value="$world" />
+    <for each="i" in="0..$generations">
+      <set name="w" value="@advance($w, 1)" />
+      <if test="@is_terminal()">
+        <call fn="draw" args="$w, 'playing ' + ($i + 1) + '/' + $generations" />
+        <wait ms="$frame_ms" />
+      </if>
+      <if test="@population($w.grid) eq 0">
+        <break />
+      </if>
+    </for>
+    <return value="$w" />
+  </fn>
+
+  <fn name="load_pattern" params="name_or_path, wrap = true">
+    <if test="$patterns->has($name_or_path)">
+      <return value="@pattern_world($name_or_path, $board_w, $board_h, $wrap)" />
+    </if>
+    <if test="not @exists($name_or_path)">
+      <throw type="Pattern" message="'{$name_or_path}' isn't a pattern name or a file. Patterns: { $patterns->keys()->join(', ') }." />
+    </if>
+    <let name="rows" value="@parse_cells(@read_text($name_or_path))" />
+    <return value="@new_world(@place(@blank(@max($board_w, @width($rows) + 2), @max($board_h, @height($rows) + 2)), $rows), $wrap, @file($name_or_path)->name())" />
+  </fn>
+
+  <!-- kscript life.ks.xml <pattern> [generations]: play and stop. -->
+  <if test="$args->count() gt 0">
+    <let name="world" value="@load_pattern($args[0])" />
+    <let name="world" value="@play($world, ($args[1] ?? '100')->to_int(100))" />
+    <call fn="draw" args="$world, 'done'" />
+    <exit />
+  </if>
+
+  <!-- Interactive -->
+  <let name="world" value="@pattern_world('glider', $board_w, $board_h)" />
+  <let name="actions">{
+    'Step one generation': 'step',
+    'Play 25 generations': 'play25',
+    'Play 100 generations': 'play100',
+    'Choose a pattern': 'pattern',
+    'Random soup': 'random',
+    'Flip a cell': 'edit',
+    'Load a .cells file': 'file',
+    'Switch edges (wrap / walls)': 'edges',
+    'Clear the board': 'clear',
+    'Quit': 'quit'
+  }</let>
+
+  <while test="true">
+    <call fn="draw" args="$world" />
+    <echo />
+    <menu to="action" options="$actions">What next?</menu>
+    <match value="$action">
+      <case is="'step'"><set name="world" value="@advance($world, 1)" /></case>
+      <case is="'play25'"><set name="world" value="@play($world, 25)" /></case>
+      <case is="'play100'"><set name="world" value="@play($world, 100)" /></case>
+      <case is="'pattern'">
+        <menu to="name" options="$patterns->keys()">Which pattern?</menu>
+        <echo>{ @dim($patterns[$name].about) }</echo>
+        <set name="world" value="@pattern_world($name, $board_w, $board_h, $world.wrap)" />
+      </case>
+      <case is="'random'">
+        <input to="density" type="number" default="30">How full, in percent? [30] </input>
+        <set name="world" value="@new_world(@random_grid($board_w, $board_h, $density->clamp(1, 100)), $world.wrap, 'random ' + $density + '%')" />
+      </case>
+      <case is="'edit'">
+        <input to="where">Cell to flip, as column row (from 1, e.g. 5 3): </input>
+        <let name="xy" value="$where->trim()->split(' ')->reject(fn($p) => $p eq '')->map(fn($p) => $p->to_int(0) - 1)" />
+        <if test="$xy->count() eq 2 and $xy[0] ge 0 and $xy[1] ge 0 and $xy[0] lt @width($world.grid) and $xy[1] lt @height($world.grid)">
+          <set name="world" value="@edit_world($world, @toggle($world.grid, $xy[0], $xy[1]))" />
+        </if>
+        <else>
+          <echo>{ @color('That cell is off the board.', 'red') }</echo>
+          <wait seconds="1" />
+        </else>
+      </case>
+      <case is="'file'">
+        <input to="path">Pattern file: </input>
+        <try>
+          <set name="world" value="@load_pattern($path->trim(), $world.wrap)" />
+          <catch as="err">
+            <echo>{ @color($err.message, 'red') }</echo>
+            <wait seconds="1.5" />
+          </catch>
+        </try>
+      </case>
+      <case is="'edges'"><set name="world" value="$world->merge({ wrap: not $world.wrap })" /></case>
+      <case is="'clear'"><set name="world" value="@new_world(@blank(@width($world.grid), @height($world.grid)), $world.wrap)" /></case>
+      <case is="'quit'"><break /></case>
+    </match>
+  </while>
+  <echo>Bye!</echo>
+</kscript>

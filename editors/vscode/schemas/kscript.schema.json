@@ -54,6 +54,18 @@
         "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
       }
     },
+    "app": {
+      "type": "object",
+      "description": "Used by kscript app build, which packages a script as a desktop app.",
+      "additionalProperties": false,
+      "properties": {
+        "main": { "type": "string", "description": "The script the app runs, relative to kscript.json. Usually one whose root is <KScript.Window>." },
+        "name": { "type": "string", "description": "The app's name in the Dock, Start menu or launcher. Defaults to the project's name." },
+        "id": { "type": "string", "description": "A reverse-DNS id such as com.example.lifelab (the macOS bundle id)." },
+        "version": { "type": "string", "description": "The app's version, such as 1.0.0." },
+        "icon": { "type": "string", "description": "An icon file relative to kscript.json: .icns for macOS, .ico for Windows, .png for Linux." }
+      }
+    },
     "test": {
       "type": "object",
       "description": "Used by kscript test.",

@@ -387,7 +387,7 @@ namespace KScript.Language.Tests
             if (kind != DocumentKind.Script)
             {
                 // Whitespace next to a block-level tag never shows.
-                s = Regex.Replace(s, @"\s*(</?(html|head|body|title|meta|link|div|p|ul|ol|li|main|nav|section|h[1-6]|table|tr|td|th|thead|tbody|header|footer|form|layout|slot|import|live|pre|textarea|script|style|article|aside)\b[^>]*>)\s*", "$1");
+                s = Regex.Replace(s, @"\s*(</?(html|head|body|title|meta|link|div|p|ul|ol|li|main|nav|section|h[1-6]|table|tr|td|th|thead|tbody|header|footer|form|layout|slot|import|live|pre|textarea|script|style|article|aside|dl|dt|dd|fieldset|figure|figcaption|blockquote|details|summary|option|select)\b[^>]*>)\s*", "$1");
             }
             return s;
         }

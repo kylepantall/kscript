@@ -29,6 +29,7 @@
     <ProjectReference Include="..\KScript.Markdown\KScript.Markdown.csproj" />
     <ProjectReference Include="..\KScript.Web\KScript.Web.csproj" />
     <ProjectReference Include="..\KScript.Test\KScript.Test.csproj" />
+    <ProjectReference Include="..\KScript.UI\KScript.UI.csproj" />
   </ItemGroup>
 
 </Project>

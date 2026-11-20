@@ -509,6 +509,13 @@ namespace KScript.Pages
                     hasHandler = true;
                     continue;
                 }
+                if (a.Name == "every" && el.HasAttr("on-tick"))
+                {
+                    // <span on-tick="..." every="200">: how often, in milliseconds, the tick handler runs.
+                    double ms = Values.ToNumber(TryWholeExpression(a.Value ?? string.Empty, out string everyExpr, out _) ? Eval(everyExpr, scope, state) : a.Value, "every");
+                    sb.Append(" data-ks-every=\"").Append(Values.ToStr(Math.Max(16, Math.Round(ms)))).Append('"');
+                    continue;
+                }
                 if (a.Name == "bind")
                 {
                     if (state.LiveScope == null) throw new PageException("bind only works inside a <live> block.");

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>KScript.UI</RootNamespace>
+    <AssemblyName>KScript.UI</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.0.0</Version>
+    <Product>KScript</Product>
+    <Description>KScript.UI: desktop windows with buttons, text, inputs and timers, on macOS, Windows and Linux (Avalonia).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+    <PackageReference Include="Avalonia" Version="11.3.23" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.23" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.23" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Tests" />
+  </ItemGroup>
+
+</Project>

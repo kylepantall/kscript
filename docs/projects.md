@@ -44,6 +44,13 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
     "indent": 2,           // spaces per level, or "tab"; used by kscript fmt and Format Document
     "printWidth": 120,     // start tags past this column get one attribute per line
     "exclude": ["vendor"]  // see docs/formatting.md for every format setting
+  },
+  "app": {
+    "main": "app.ks.xml",       // what `kscript app build` packages (see Desktop apps)
+    "name": "My App",           // shown in the Dock, Start menu or launcher (default: the project's name)
+    "id": "com.example.myapp",  // the macOS bundle id
+    "version": "1.0.0",
+    "icon": "icon.icns"         // .icns for macOS, .ico for Windows, .png for Linux
   }
 }
 ```
@@ -54,6 +61,7 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
 - `format` sets the style for `kscript fmt` and the editor's Format Document. See [Formatting](formatting.md) for every setting.
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
 - `kscript serve` never serves `kscript.json`.
+- `app` is read by `kscript app build`, which packages a desktop app (see [Desktop apps](desktop.md#packaging-an-app-kscript-app-build)).
 
 ## Generating files: kscript make
 

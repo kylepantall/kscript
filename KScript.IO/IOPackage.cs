@@ -295,19 +295,61 @@ namespace KScript.IO
         private static string KnownFolder(CallContext c, string name)
         {
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string Special(Environment.SpecialFolder folder, string xdg, string fallback) =>
+                (OperatingSystem.IsLinux() ? XdgUserDir(home, xdg) : null)
+                ?? (Environment.GetFolderPath(folder) is { Length: > 0 } d && d != home ? d : System.IO.Path.Combine(home, fallback));
+
             return name.Trim().ToLowerInvariant() switch
             {
                 "home" => home,
-                "desktop" => Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) is { Length: > 0 } d ? d : System.IO.Path.Combine(home, "Desktop"),
-                "documents" => Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) is { Length: > 0 } d ? d : System.IO.Path.Combine(home, "Documents"),
-                "downloads" => System.IO.Path.Combine(home, "Downloads"),
-                "music" => Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) is { Length: > 0 } d ? d : System.IO.Path.Combine(home, "Music"),
-                "pictures" => Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) is { Length: > 0 } d ? d : System.IO.Path.Combine(home, "Pictures"),
-                "videos" => Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) is { Length: > 0 } d ? d : System.IO.Path.Combine(home, "Videos"),
+                "desktop" => Special(Environment.SpecialFolder.DesktopDirectory, "DESKTOP", "Desktop"),
+                "documents" => Special(Environment.SpecialFolder.MyDocuments, "DOCUMENTS", "Documents"),
+                "downloads" => (OperatingSystem.IsLinux() ? XdgUserDir(home, "DOWNLOAD") : null)
+                    ?? (OperatingSystem.IsWindows() ? WindowsDownloads() : null)
+                    ?? System.IO.Path.Combine(home, "Downloads"),
+                "music" => Special(Environment.SpecialFolder.MyMusic, "MUSIC", "Music"),
+                "pictures" => Special(Environment.SpecialFolder.MyPictures, "PICTURES", "Pictures"),
+                "videos" => Special(Environment.SpecialFolder.MyVideos, "VIDEOS", OperatingSystem.IsMacOS() ? "Movies" : "Videos"),
                 "appdata" => Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "temp" => System.IO.Path.GetTempPath(),
                 _ => throw c.Error($"@known_folder() doesn't know '{name}'. Use home, desktop, documents, downloads, music, pictures, videos, appdata or temp.", "Argument"),
             };
         }
+
+        /// <summary>Reads XDG_&lt;key&gt;_DIR from the environment or ~/.config/user-dirs.dirs (Linux desktops rename these folders per language).</summary>
+        private static string XdgUserDir(string home, string key)
+        {
+            string value = Environment.GetEnvironmentVariable("XDG_" + key + "_DIR");
+            if (string.IsNullOrEmpty(value))
+            {
+                string config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x ? x : System.IO.Path.Combine(home, ".config");
+                string file = System.IO.Path.Combine(config, "user-dirs.dirs");
+                if (!File.Exists(file)) return null;
+                string prefix = "XDG_" + key + "_DIR=";
+                value = File.ReadLines(file).Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith(prefix, StringComparison.Ordinal))?.Substring(prefix.Length).Trim('"');
+            }
+            if (string.IsNullOrEmpty(value)) return null;
+            value = value.Replace("$HOME", home);
+            // XDG uses $HOME itself for folders that are turned off; that's no answer for "downloads".
+            return System.IO.Path.IsPathRooted(value) && System.IO.Path.GetFullPath(value).TrimEnd('/') != home.TrimEnd('/') ? value : null;
+        }
+
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+        private static string WindowsDownloads()
+        {
+            var downloads = new Guid("374DE290-123F-4565-9164-39C4925E467B");
+            if (SHGetKnownFolderPath(downloads, 0, IntPtr.Zero, out IntPtr path) != 0) return null;
+            try
+            {
+                return System.Runtime.InteropServices.Marshal.PtrToStringUni(path);
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FreeCoTaskMem(path);
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern int SHGetKnownFolderPath([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPStruct)] Guid id, uint flags, IntPtr token, out IntPtr path);
     }
 }

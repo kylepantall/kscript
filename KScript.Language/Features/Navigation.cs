@@ -21,90 +21,27 @@ namespace KScript.Language.Features
             ExpressionRegion region = cursor.Region;
             int index = cursor.LocalIndex;
 
-            // The innermost call whose parentheses contain the cursor.
-            var calls = region.Nodes.SelectMany(n => n.DescendantsAndSelf())
-                .Select(n => (Node: n, Args: ArgumentsOf(n)))
-                .Where(x => x.Args != null && index > x.Args.Span.Start && (index < x.Args.Span.End || !x.Args.Closed || index == x.Args.Span.End && !x.Args.Closed))
-                .OrderBy(x => x.Args.Span.Length)
-                .ToList();
-            if (calls.Count == 0)
+            (ExprNode node, ArgumentList args) = InnermostCall(region, index);
+            if (node == null)
             {
                 return null;
             }
 
-            (ExprNode node, ArgumentList args) = calls[0];
             int active = CountCommas(region.Source.Value, args.Span.Start + 1, index);
             SignatureHelpResult help = new SignatureHelpResult();
+            help.Signatures.AddRange(SignaturesFor(analysis, region, node, out int piped));
+            active += piped;
 
-            void AddCallable(CallableInfo c)
+            // A named argument (name: value) highlights the parameter of that name.
+            ArgumentNode current = args.Arguments.LastOrDefault(a => a.Span.Start <= index);
+            if (current?.Name != null && CountCommas(region.Source.Value, current.Span.Start, index) == 0)
             {
-                foreach (Signature s in c.Signatures)
+                int signature = help.Signatures.FindIndex(sig => sig.Parameters.Any(p => ParameterName(p.Label) == current.Name));
+                if (signature >= 0)
                 {
-                    help.Signatures.Add(new SignatureInfo
-                    {
-                        Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
-                        Documentation = c.Description,
-                        Parameters = s.Parameters.Select(p => (p.Label, p.Description)).ToList(),
-                    });
-                }
-            }
-
-            void AddFunction(Symbol fn, int piped)
-            {
-                help.Signatures.Add(new SignatureInfo
-                {
-                    Label = fn.TypedSignature,
-                    Documentation = fn.Description,
-                    Parameters = fn.Parameters.Select(p => (p.Label, (string)null)).ToList(),
-                });
-                active += piped;
-            }
-
-            switch (node)
-            {
-                case CommandCallNode c:
-                {
-                    Symbol fn = analysis.RootScope.Lookup(c.Name, int.MaxValue);
-                    PipeNode pipe = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<PipeNode>().FirstOrDefault(p => p.Right == c);
-                    if (fn?.Kind == SymbolKind.Function)
-                    {
-                        AddFunction(fn, pipe != null ? 1 : 0);
-                    }
-                    else if (Catalog.GetCommand(c.Name) is CallableInfo command)
-                    {
-                        AddCallable(command);
-                        active += pipe != null ? 1 : 0;
-                    }
-                    break;
-                }
-
-                case MethodCallNode m:
-                {
-                    TypeShape receiver = InferAt(analysis, region, m.Target);
-                    foreach (CallableInfo method in Catalog.GetMethods(m.Name, receiver.Type).Where(x => KType.Accepts(x.ReceiverType, receiver.Type)))
-                    {
-                        AddCallable(method);
-                    }
-                    break;
-                }
-
-                case CallNode call when call.Callee is IdentifierNode id:
-                {
-                    Symbol fn = analysis.RootScope.Lookup(id.Name, int.MaxValue);
-                    PipeNode pipe = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<PipeNode>().FirstOrDefault(p => p.Right == call);
-                    if (fn?.Kind == SymbolKind.Function)
-                    {
-                        AddFunction(fn, pipe != null ? 1 : 0);
-                    }
-                    else if (pipe != null)
-                    {
-                        TypeShape receiver = InferAt(analysis, region, pipe.Left);
-                        foreach (CallableInfo method in Catalog.GetMethods(id.Name, receiver.Type).Where(x => KType.Accepts(x.ReceiverType, receiver.Type)))
-                        {
-                            AddCallable(method);
-                        }
-                    }
-                    break;
+                    help.ActiveSignature = signature;
+                    help.ActiveParameter = help.Signatures[signature].Parameters.ToList().FindIndex(p => ParameterName(p.Label) == current.Name);
+                    return help;
                 }
             }
 

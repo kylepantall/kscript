@@ -598,13 +598,14 @@ namespace KScript.Runtime
 
         internal object InvokeCommand(CommandDefinition command, CallContext call)
         {
+            call = ArgumentBinder.Bind(command.Info, call);
             CallableInfoCheck(command.Info, call);
             return command.Handler(call);
         }
 
         private static void CallableInfoCheck(Metadata.CallableInfo info, CallContext call)
         {
-            int count = call.Args.Count + call.Named.Count;
+            int count = call.Args.Count - call.Skipped.Count + call.Named.Count;
             if (count < info.MinArgs)
                 throw new KScriptException($"{call.Display} needs {(info.MinArgs == info.MaxArgs ? string.Empty : "at least ")}{info.MinArgs} argument{(info.MinArgs == 1 ? string.Empty : "s")}: {info.Labels.First()}.", "Argument");
             if (call.Args.Count > info.MaxArgs)
@@ -686,7 +687,7 @@ namespace KScript.Runtime
 
         private object InvokeMethodDefinition(MethodDefinition method, object target, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx)
         {
-            var call = new CallContext(this, method.Name, args, named, scope, ctx.Module, isMethod: true);
+            var call = ArgumentBinder.Bind(method.Info, new CallContext(this, method.Name, args, named, scope, ctx.Module, isMethod: true));
             CallableInfoCheck(method.Info, call);
             if (method.Receiver == "number" && target is string s) target = Values.ToNumber(s, call.Display);
             return method.Handler(target, call);

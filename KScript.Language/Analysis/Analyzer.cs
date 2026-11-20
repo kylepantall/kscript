@@ -197,6 +197,7 @@ namespace KScript.Language.Analysis
             string src = e.GetAttributeValue("src")?.Trim();
             string full = ResolvePath(src);
             Dictionary<string, (FunctionParameter[] Params, ExternalLocation Location, string Description)> exported = ReadExports(full);
+            Dictionary<string, (ExternalLocation Location, string Description)> constants = ReadConstantExports(full);
 
             MarkupAttribute asAttr = e.GetAttribute("as");
             if (!string.IsNullOrWhiteSpace(asAttr?.ValueText))
@@ -217,6 +218,13 @@ namespace KScript.Language.Analysis
                     foreach (string name in exported.Keys)
                     {
                         alias.Shape.Fields.TryAdd(name, new FieldInfo(name, new TypeShape(KType.Fn), null, exported[name].Description));
+                    }
+                }
+                if (constants != null)
+                {
+                    foreach (string name in constants.Keys)
+                    {
+                        alias.Shape.Fields.TryAdd(name, new FieldInfo(name, TypeShape.Unknown, null, constants[name].Description));
                     }
                 }
                 result.Symbols.Add(alias);
@@ -248,12 +256,23 @@ namespace KScript.Language.Analysis
                         result.Symbols.Add(fn);
                         root.Declare(fn, 0);
                     }
+                    foreach (var constant in constants ?? new Dictionary<string, (ExternalLocation, string)>())
+                    {
+                        root.Declare(ImportedConstant(constant.Key, at, e, full, src, constant.Value), 0);
+                    }
                 }
                 return;
             }
 
             foreach ((string name, TextSpan span) in SplitNames(namesAttr.Value))
             {
+                if (constants != null && constants.TryGetValue(name, out var constant) && exported?.ContainsKey(name) != true)
+                {
+                    Symbol c = ImportedConstant(name, span, e, full, src, constant);
+                    result.References.Add(new SymbolReference(c, span, true, true));
+                    root.Declare(c, 0);
+                    continue;
+                }
                 Symbol fn = new Symbol
                 {
                     Name = name,
@@ -281,6 +300,53 @@ namespace KScript.Language.Analysis
                 result.References.Add(new SymbolReference(fn, span, true, true));
                 root.Declare(fn, 0);
             }
+        }
+
+        private Symbol ImportedConstant(string name, TextSpan at, MarkupElement import, string full, string src, (ExternalLocation Location, string Description) constant)
+        {
+            Symbol symbol = new Symbol
+            {
+                Name = name,
+                Kind = SymbolKind.Constant,
+                DeclarationSpan = at,
+                DeclaringElement = import,
+                SourcePath = full,
+                Description = constant.Description ?? $"Imported from {src}",
+                Shape = TypeShape.Unknown,
+            };
+            result.ExternalDeclarations[symbol] = constant.Location;
+            result.Symbols.Add(symbol);
+            return symbol;
+        }
+
+        /// <summary>The top-level &lt;let const="yes"&gt; values of another script, which it exports along with its functions.</summary>
+        private Dictionary<string, (ExternalLocation Location, string Description)> ReadConstantExports(string path)
+        {
+            string text = path != null ? files.ReadText(path) : null;
+            if (text == null)
+            {
+                return null;
+            }
+
+            SourceText other = new SourceText(text);
+            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path));
+            Dictionary<string, (ExternalLocation, string)> constants = new Dictionary<string, (ExternalLocation, string)>(StringComparer.Ordinal);
+            MarkupElement root = doc.RootElements.FirstOrDefault();
+            if (root == null)
+            {
+                return constants;
+            }
+            foreach (MarkupElement let in root.ChildElements.Where(x => x.Name == "let" && IsYes(x.GetAttributeValue("const"))))
+            {
+                MarkupAttribute nameAttr = let.GetAttribute("name");
+                if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
+                {
+                    continue;
+                }
+                TextSpan span = nameAttr.Value.SourceSpan;
+                constants[nameAttr.ValueText.Trim().TrimStart('$')] = (new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), let.GetAttributeValue("description"));
+            }
+            return constants;
         }
 
         /// <summary>The top-level functions of another script, read from disk (or the editor) without analysing it fully.</summary>
@@ -607,7 +673,10 @@ namespace KScript.Language.Analysis
                 {
                     // <button on-click="count += 1">: statements run on the server when the event fires.
                     RequireLive(e, attr);
-                    AnalyzeStatements(attr.Value, e, attr, scope, declare: false, requireEffect: true);
+                    // $event (value, checked, key) describes the browser event the handler runs for.
+                    Scope handlerScope = new Scope(scope, e.Span);
+                    handlerScope.Declare(BuiltIn("event"), e.Span.Start);
+                    AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
                 }
                 else if (attr.Name == "bind" && Kind != DocumentKind.Script)
                 {
@@ -871,6 +940,13 @@ namespace KScript.Language.Analysis
                 case AttributeKind.DeclareVariable:
                     CheckIdentifier(attr.Value);
                     break;
+                case AttributeKind.Statements:
+                {
+                    Scope handlerScope = new Scope(scope, e.Span);
+                    handlerScope.Declare(BuiltIn("event"), e.Span.Start);
+                    AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
+                    break;
+                }
             }
         }
 
