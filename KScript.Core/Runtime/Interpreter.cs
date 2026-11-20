@@ -47,7 +47,7 @@ namespace KScript.Runtime
         public Module LoadText(string text, string path = null)
         {
             var source = new SourceText(text);
-            MarkupDocument document = MarkupParser.Parse(source, DocumentKind.Script);
+            MarkupDocument document = MarkupParser.Parse(source, DocumentKind.Script, path);
             var module = new Module(this, path, source, document);
             if (module.Path != null) loading.Add(module.Path);
             try
@@ -799,7 +799,7 @@ namespace KScript.Runtime
                 value = GetParse(module, v, ParseMode.Expression).Root;
                 valueContext = new EvalContext(module, v);
             }
-            scope.Declare(name, new UserFunction(name, parameters, e, value, valueContext, scope, module, e.GetAttributeValue("description")));
+            scope.Declare(name, new UserFunction(name, parameters, e, value, valueContext, scope, module, e.Documentation));
         }
 
         /// <summary>Starts a function on another thread (&lt;spawn&gt;). The run waits for spawned functions before it ends.</summary>

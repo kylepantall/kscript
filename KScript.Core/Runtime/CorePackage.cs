@@ -105,7 +105,8 @@ namespace KScript.Runtime
                 Example = "<do>$x = 3; $total += $price * $qty</do>",
             }, run =>
             {
-                run.RunStatements(declare: false);
+                // In a .kscript file x = 3 declares x if it isn't in scope yet.
+                run.RunStatements(declare: false, declareNew: run.Module.Document?.Syntax == SourceSyntax.Code);
                 return null;
             });
 

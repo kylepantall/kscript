@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <None Include="..\samples\kscript2\**\*" LinkBase="samples" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\samples\code-format\**\*" LinkBase="samples\code-format" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

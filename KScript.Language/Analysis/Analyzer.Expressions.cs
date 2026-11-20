@@ -176,6 +176,7 @@ namespace KScript.Language.Analysis
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
                 result.References.Add(new SymbolReference(fn, nameSpan, false, false));
+                ReportIfDeprecated(fn, nameSpan);
                 if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn))
                     && !CheckNamedArguments($"@{fn.Name}()", c.Arguments, piped, SlotsOf(fn, scope), region, full))
                 {
@@ -260,6 +261,7 @@ namespace KScript.Language.Analysis
                         if (fn != null && fn.Kind == SymbolKind.Function)
                         {
                             result.References.Add(new SymbolReference(fn, span, false, false));
+                            ReportIfDeprecated(fn, span);
                             if (!CheckNamedArguments($"@{fn.Name}()", call.Arguments, 1, SlotsOf(fn, scope), region, region.Source.ToSource(call.Span)))
                             {
                                 CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
