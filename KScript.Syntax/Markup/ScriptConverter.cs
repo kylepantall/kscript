@@ -296,6 +296,13 @@ namespace KScript.Syntax.Markup
                             {
                                 break;
                             }
+                            if (!c.IsDoc && IsTrailing(nodes, i) && sb.Length > 0 && sb[sb.Length - 1] == '\n')
+                            {
+                                // <let ... />  <!-- note --> stays on its line: count = 0 // note
+                                sb.Length--;
+                                sb.Append(" // ").Append(XmlExamples(c.Text.Trim())).Append('\n');
+                                break;
+                            }
                             FlushBlank(ref blankRuns);
                             WriteComment(c, indent);
                             previous = null;
@@ -328,6 +335,15 @@ namespace KScript.Syntax.Markup
                     sb.Append('\n');
                 }
                 blankRuns = 0;
+            }
+
+            /// <summary>A one-line comment written after an element on the same line.</summary>
+            private static bool IsTrailing(IReadOnlyList<MarkupNode> nodes, int index)
+            {
+                if (nodes[index] is not MarkupComment c || c.Text.Contains('\n') || c.Text.Trim().Length == 0) return false;
+                int before = index - 1;
+                if (before >= 0 && nodes[before] is MarkupText space && space.IsWhitespace && !space.Value.Contains('\n')) before--;
+                return before >= 0 && before < index && nodes[before] is MarkupElement;
             }
 
             private static MarkupElement NextElement(IReadOnlyList<MarkupNode> nodes, int index)
@@ -887,8 +903,11 @@ namespace KScript.Syntax.Markup
 
             public ConversionResult Result { get; } = new ConversionResult();
 
+            private SourceText source;
+
             public void WriteDocument(MarkupDocument document)
             {
+                source = document.Source;
                 WriteNodes(document.Children, 0);
                 Result.Text = sb.ToString().TrimEnd('\n') + "\n";
             }
@@ -914,6 +933,11 @@ namespace KScript.Syntax.Markup
                 {
                     switch (nodes[i])
                     {
+                        case MarkupComment c when comment.Count == 0 && IsTrailing(nodes, i) && sb.Length > 0 && sb[sb.Length - 1] == '\n':
+                            // count = 0 // note stays on its line: <let ... /> <!-- note -->
+                            sb.Length--;
+                            sb.Append(" <!-- ").Append(c.Text.Trim().Replace("--", "- -")).Append(" -->\n");
+                            break;
                         case MarkupComment c:
                             // Consecutive // lines become one XML comment. (/// lines are descriptions, not comments.)
                             comment.AddRange(c.Text.Replace("\r\n", "\n").Split('\n'));
@@ -932,6 +956,17 @@ namespace KScript.Syntax.Markup
                     }
                 }
                 FlushComment();
+            }
+
+            /// <summary>A one-line // comment written after a statement on the same line.</summary>
+            private bool IsTrailing(IReadOnlyList<MarkupNode> nodes, int index)
+            {
+                if (source == null || index == 0 || nodes[index] is not MarkupComment c || c.Text.Contains('\n') || nodes[index - 1] is not MarkupElement previous)
+                {
+                    return false;
+                }
+                int from = previous.Span.End, to = c.Span.Start;
+                return from <= to && to <= source.Length && source.Text.IndexOf('\n', from, to - from) < 0;
             }
 
             private void WriteCommentLines(List<string> lines, int indent)

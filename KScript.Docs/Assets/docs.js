@@ -26,6 +26,23 @@
     store(THEME_KEY, next);
   });
 
+  // ---------- Example format ----------
+  // Examples show in .kscript or XML. The default comes from kscript docs (the project's make.format); the reader's
+  // pick lasts for this browser tab and switches every example that hasn't been edited.
+  var FORMAT_KEY = 'kscript-docs-format';
+  var formatListeners = [];
+  function preferredFormat() { return root.dataset.format === 'xml' ? 'xml' : 'kscript'; }
+  function setPreferredFormat(f) {
+    if (f !== 'xml' && f !== 'kscript') return;
+    root.dataset.format = f;
+    try { sessionStorage.setItem(FORMAT_KEY, f); } catch (e) { }
+    formatListeners.forEach(function (listener) { listener(f); });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.fmt-tabs button');
+    if (b) setPreferredFormat(b.dataset.format);
+  });
+
   // ---------- Mobile menu ----------
   var menu = document.querySelector('.menu-toggle');
   if (menu) menu.addEventListener('click', function () {
@@ -206,7 +223,7 @@
   function makeTry(box) {
     var isPlayground = box.dataset.title === 'playground';
     var sources = { xml: box.dataset.xml, kscript: box.dataset.kscript };
-    var format = box.dataset.format || 'xml';
+    var format = sources[preferredFormat()] != null ? preferredFormat() : (box.dataset.format || 'xml');
     if (isPlayground) {
       var saved = load(PLAYGROUND_KEY);
       if (saved) {
@@ -286,11 +303,12 @@
       if (!b || b.dataset.format === format) return;
       var to = b.dataset.format;
       var unchanged = sources[format] != null && area.value === sources[format].replace(/\n$/, '');
-      if (unchanged && sources[to] != null) { setFormat(to); setCode(sources[to]); return; }
+      if (unchanged && sources[to] != null) { setFormat(to); setCode(sources[to]); setPreferredFormat(to); return; }
       post('/api/convert', { code: area.value, to: to }).then(function (r) {
         if (r.code == null) { showOutput({ bar: '<span class="status-err">Can\'t convert</span>', blocks: [{ cls: 'err', text: r.error || 'This code could not be converted.' }] }); return; }
         sources = {}; sources[to] = r.code;
         setFormat(to); setCode(r.code); save();
+        setPreferredFormat(to);
       }, offline);
     });
 
@@ -322,7 +340,7 @@
     copyButton.addEventListener('click', function () { copy(area.value, copyButton); });
     resetButton.addEventListener('click', function () {
       var f = original[format] != null ? format : (original.xml != null ? 'xml' : 'kscript');
-      if (isPlayground) { store(PLAYGROUND_KEY, null); f = box.dataset.format || 'xml'; original = { xml: box.dataset.xml, kscript: box.dataset.kscript }; }
+      if (isPlayground) { store(PLAYGROUND_KEY, null); original = { xml: box.dataset.xml, kscript: box.dataset.kscript }; f = original[preferredFormat()] != null ? preferredFormat() : (box.dataset.format || 'xml'); }
       sources = { xml: original.xml, kscript: original.kscript };
       setFormat(f); setCode(original[f] || ''); output.hidden = true; save();
     });
@@ -349,6 +367,13 @@
         area.setRangeText('\n' + indent, start, end, 'end');
         render(); save();
       }
+    });
+
+    // Another example (or the switch at the top) changed the format: follow it, unless this example was edited.
+    formatListeners.push(function (f) {
+      if (f === format) return;
+      var unchanged = sources[format] != null && area.value === sources[format].replace(/\n$/, '');
+      if (unchanged && sources[f] != null) { setFormat(f); setCode(sources[f]); }
     });
 
     setFormat(format);

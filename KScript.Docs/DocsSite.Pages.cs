@@ -96,17 +96,20 @@ namespace KScript.Docs
         {
             var sb = new StringBuilder();
             string title = page.Path == "/" ? "KScript docs" : page.Title + " · KScript docs";
-            sb.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
+            string format = Format == "xml" ? "xml" : "kscript";
+            sb.Append($"<!doctype html><html lang=\"en\" data-format=\"{format}\" data-default-format=\"{format}\"><head><meta charset=\"utf-8\">");
             sb.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
             sb.Append($"<title>{Html.H(title)}</title>");
             if (!string.IsNullOrEmpty(page.Description)) sb.Append($"<meta name=\"description\" content=\"{Html.H(page.Description)}\">");
             // Set the theme before the page draws, so dark mode doesn't flash white.
-            sb.Append("<script>try{var t=localStorage.getItem('kscript-docs-theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>");
+            // ...and the reader's example format, so a page doesn't switch from one format to the other as it loads.
+            sb.Append("<script>try{var d=document.documentElement,t=localStorage.getItem('kscript-docs-theme'),f=sessionStorage.getItem('kscript-docs-format');if(t)d.dataset.theme=t;if(f)d.dataset.format=f;}catch(e){}</script>");
             sb.Append("<link rel=\"stylesheet\" href=\"/assets/docs.css\"><link rel=\"icon\" href=\"/assets/favicon.svg\" type=\"image/svg+xml\"></head><body>");
             sb.Append("<a class=\"skip\" href=\"#content\">Skip to content</a>");
             sb.Append("<header class=\"top\"><button type=\"button\" class=\"icon menu-toggle\" aria-label=\"Menu\" aria-expanded=\"false\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\"><path d=\"M3 6h18M3 12h18M3 18h18\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg></button>");
             sb.Append($"<a class=\"brand\" href=\"/\"><img src=\"/assets/favicon.svg\" alt=\"\" width=\"24\" height=\"24\"><span>KScript</span> <span class=\"brand-docs\">docs</span></a><span class=\"version\">{Html.H(Version)}</span>");
             sb.Append("<div class=\"search\" role=\"search\"><input type=\"search\" id=\"search\" placeholder=\"Search\" aria-label=\"Search the docs\" autocomplete=\"off\" spellcheck=\"false\"><kbd class=\"search-key\">/</kbd><div class=\"results\" id=\"search-results\" role=\"listbox\" hidden></div></div>");
+            sb.Append("<div class=\"fmt-switch fmt-tabs\" role=\"group\" aria-label=\"Show examples as\" title=\"Show examples as .kscript or XML\"><button type=\"button\" data-format=\"kscript\">.kscript</button><button type=\"button\" data-format=\"xml\">XML</button></div>");
             sb.Append("<button type=\"button\" class=\"icon theme-toggle\" aria-label=\"Switch between light and dark\" title=\"Light or dark\"><svg class=\"sun\" viewBox=\"0 0 24 24\" width=\"20\" height=\"20\"><circle cx=\"12\" cy=\"12\" r=\"4\" fill=\"currentColor\"/><path d=\"M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg><svg class=\"moon\" viewBox=\"0 0 24 24\" width=\"20\" height=\"20\"><path d=\"M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z\" fill=\"currentColor\"/></svg></button></header>");
 
             sb.Append("<div class=\"layout\"><nav class=\"sidebar\" aria-label=\"Docs\">");

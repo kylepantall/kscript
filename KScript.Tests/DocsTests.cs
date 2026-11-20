@@ -504,6 +504,64 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Examples_show_in_the_projects_format_and_the_reader_can_switch()
+    {
+        // Script blocks come in both formats, with a switch; anything that doesn't convert stays as it is.
+        string pair = Html.Code("<echo>Hi</echo>", "xml");
+        Assert.StartsWith("<div class=\"code-pair\">", pair);
+        Assert.Contains("data-lang=\"xml\"", pair);
+        Assert.Contains("data-lang=\"kscript\"", pair);
+        Assert.Contains("echo \"Hi\"", WebUtility.HtmlDecode(pair));
+        Assert.Equal(2, Regex.Matches(pair, "class=\"fmt-tabs\"").Count);
+        Assert.StartsWith("<div class=\"code-pair\">", Html.Code("x = 1\n", "kscript"));
+        Assert.DoesNotContain("code-pair", Html.Code("<echo>unclosed", "xml"));
+        Assert.DoesNotContain("code-pair", Html.Code("{ \"a\": 1 }", "json"));
+
+        // The page starts in the site's format, and the reader's pick (kept for the tab) wins over it.
+        DocsSite site = DocsSite.Build();
+        string kscript = site.Render(site.Find("/"));
+        Assert.Contains("data-format=\"kscript\" data-default-format=\"kscript\"", kscript);
+        Assert.Contains("sessionStorage.getItem('kscript-docs-format')", kscript);
+        Assert.Contains("class=\"fmt-switch fmt-tabs\"", kscript);
+        site.Format = "xml";
+        Assert.Contains("data-format=\"xml\" data-default-format=\"xml\"", site.Render(site.Find("/")));
+        string css = DocsSite.ReadAsset("docs.css");
+        Assert.Contains(":root[data-format=\"kscript\"] .code-pair > .code[data-lang=\"xml\"]", css);
+        Assert.Contains("setPreferredFormat", DocsSite.ReadAsset("docs.js"));
+
+        Assert.Equal("kscript", DocsCommand.NormalizeFormat(" .KScript "));
+        Assert.Equal("kscript", DocsCommand.NormalizeFormat("ks"));
+        Assert.Equal("xml", DocsCommand.NormalizeFormat("ks.xml"));
+        Assert.Null(DocsCommand.NormalizeFormat("yaml"));
+        Assert.Null(DocsCommand.NormalizeFormat(null));
+
+        // kscript docs takes the default from the project it runs in: make.format, else .kscript.
+        string root = Path.Combine(Path.GetTempPath(), "kscript-docs-format-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "xml-project", "src"));
+            Directory.CreateDirectory(Path.Combine(root, "plain-project"));
+            Directory.CreateDirectory(Path.Combine(root, "broken"));
+            File.WriteAllText(Path.Combine(root, "xml-project", "kscript.json"), "{ \"make\": { \"format\": \"xml\" } }");
+            File.WriteAllText(Path.Combine(root, "plain-project", "kscript.json"), "{ }");
+            File.WriteAllText(Path.Combine(root, "broken", "kscript.json"), "{ nope");
+            Assert.Equal("xml", DocsCommand.ProjectFormat(Path.Combine(root, "xml-project", "src")));
+            Assert.Equal("kscript", DocsCommand.ProjectFormat(Path.Combine(root, "plain-project")));
+            Assert.Equal("kscript", DocsCommand.ProjectFormat(Path.Combine(root, "broken")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+
+        var output = new StringWriter();
+        var error = new StringWriter();
+        Assert.Equal(1, DocsCommand.Run(new[] { "--format", "yaml" }, output, error));
+        Assert.Contains("--format needs kscript or xml", error.ToString());
+        Assert.Equal(1, DocsCommand.Run(new[] { "--format" }, output, error));
+    }
+
+    [Fact]
     public void Docs_command_options()
     {
         var output = new StringWriter();
@@ -582,7 +640,7 @@ public sealed class DocsTests
         string opened = null;
         int port = DocsCommand.FreePort(DocsCommand.DefaultPort + 7);
         var before = Directory.GetDirectories(Path.GetTempPath(), "kscript-docs-*").ToHashSet();
-        var server = Task.Run(() => DocsCommand.Run(new[] { "--port", port.ToString(), "string", "replace" }, output, TextWriter.Null, stop.Token, url => opened = url));
+        var server = Task.Run(() => DocsCommand.Run(new[] { "--port", port.ToString(), "--format", "xml", "string", "replace" }, output, TextWriter.Null, stop.Token, url => opened = url));
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
         var deadline = DateTime.UtcNow.AddSeconds(60);
@@ -592,7 +650,9 @@ public sealed class DocsTests
 
         HttpResponseMessage home = http.GetAsync("/").Result;
         Assert.Equal(HttpStatusCode.OK, home.StatusCode);
-        Assert.Contains("<title>KScript docs</title>", home.Content.ReadAsStringAsync().Result);
+        string homePage = home.Content.ReadAsStringAsync().Result;
+        Assert.Contains("<title>KScript docs</title>", homePage);
+        Assert.Contains("data-default-format=\"xml\"", homePage);
         Assert.Contains("The KScript language", http.GetStringAsync("/guide/language").Result);
         Assert.Contains("string methods", http.GetStringAsync("/reference/methods/string/").Result);
         Assert.Contains("--accent", http.GetStringAsync("/assets/docs.css").Result);

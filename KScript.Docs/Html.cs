@@ -58,15 +58,46 @@ namespace KScript.Docs
             ["json"] = "JSON", ["jsonc"] = "JSON", ["yaml"] = "YAML", ["css"] = "CSS", ["text"] = "Text",
         };
 
-        /// <summary>A read-only code block with a copy button. XML and .kscript blocks can be opened in the playground.</summary>
+        /// <summary>
+        /// A read-only code block with a copy button. An XML or .kscript script is given in both formats when it converts,
+        /// and the page shows the reader's format (<see cref="DocsSite.Format"/> until they pick the other).
+        /// </summary>
         public static string Code(string code, string language)
+        {
+            string lang = (language ?? string.Empty).ToLowerInvariant();
+            if (lang == "xml" || lang == "kscript")
+            {
+                string other = lang == "xml" ? "kscript" : "xml";
+                string converted = Playground.Convert(code.Replace("\r\n", "\n").TrimEnd('\n') + "\n", other);
+                if (converted != null)
+                {
+                    string xml = lang == "xml" ? code : converted;
+                    string kscript = lang == "xml" ? converted : code;
+                    return "<div class=\"code-pair\">" + Single(xml, "xml", paired: true) + Single(kscript, "kscript", paired: true) + "</div>";
+                }
+            }
+            return Single(code, language);
+        }
+
+        /// <summary>One code block, in one language.</summary>
+        internal static string Single(string code, string language, bool paired = false)
         {
             language = string.IsNullOrEmpty(language) ? "text" : language.ToLowerInvariant();
             string label = LanguageNames.TryGetValue(language, out string name) ? name : language;
             bool script = language == "xml" || language == "kscript";
             var sb = new StringBuilder();
             sb.Append("<div class=\"code\" data-lang=\"").Append(H(language)).Append("\">");
-            sb.Append("<div class=\"code-bar\"><span class=\"code-lang\">").Append(H(label)).Append("</span><span class=\"code-actions\">");
+            sb.Append("<div class=\"code-bar\">");
+            if (paired)
+            {
+                // Both blocks of a pair carry the same switch; the page shows one of them.
+                sb.Append("<span class=\"fmt-tabs\" role=\"group\" aria-label=\"Format\">");
+                foreach (string f in new[] { "kscript", "xml" })
+                    sb.Append($"<button type=\"button\" data-format=\"{f}\" aria-pressed=\"{(f == language ? "true" : "false")}\">{(f == "xml" ? "XML" : ".kscript")}</button>");
+                sb.Append("</span>");
+            }
+            else sb.Append("<span class=\"code-lang\">").Append(H(label)).Append("</span>");
+            sb.Append("<span class=\"code-actions\">");
             if (script) sb.Append("<button type=\"button\" class=\"link open-playground\" title=\"Edit and run this in the playground\">Open in playground</button>");
             sb.Append("<button type=\"button\" class=\"link copy\" title=\"Copy to the clipboard\">Copy</button></span></div>");
             sb.Append("<pre><code class=\"hl lang-").Append(H(language)).Append("\">").Append(H(code.TrimEnd('\n', '\r'))).Append("</code></pre></div>");
@@ -90,7 +121,7 @@ namespace KScript.Docs
             if (title != null) sb.Append(" data-title=\"").Append(H(title)).Append('"');
             if (input != null) sb.Append(" data-input=\"").Append(H(input)).Append('"');
             sb.Append('>');
-            sb.Append(Code(code, format));
+            sb.Append(Single(code, format));
             sb.Append("</div>");
             return sb.ToString();
         }

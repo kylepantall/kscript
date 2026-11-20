@@ -283,3 +283,16 @@ button.link:hover { color: var(--fg); background: var(--bg); }
   .top, .sidebar, .toc, .pager, .edit, .try-bar { display: none; }
   .layout { display: block; }
 }
+
+/* Example format: every script example comes in .kscript and XML; the page shows the reader's format. */
+.fmt-tabs { display: inline-flex; background: var(--bg-code); border: 1px solid var(--border); border-radius: 7px; padding: 2px; }
+.fmt-tabs button { border: 0; background: none; color: var(--fg-soft); font: inherit; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 5px; cursor: pointer; }
+.fmt-tabs button:hover { color: var(--fg); }
+:root[data-format="kscript"] .fmt-tabs button[data-format="kscript"],
+:root[data-format="xml"] .fmt-tabs button[data-format="xml"] { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.code-bar .fmt-tabs { margin-left: -8px; }
+:root[data-format="kscript"] .code-pair > .code[data-lang="xml"],
+:root[data-format="xml"] .code-pair > .code[data-lang="kscript"] { display: none; }
+.fmt-switch { flex: none; }
+.fmt-switch button { font-size: 12.5px; padding: 4px 10px; }
+@media (max-width: 720px) { .fmt-switch button { padding: 3px 7px; font-size: 11.5px; } }
