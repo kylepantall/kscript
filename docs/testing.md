@@ -40,7 +40,7 @@ The exit code is 0 when every test passed and 1 when any test failed, a test fil
 
 ## Test files and folders
 
-- A test file is a normal script named `name.test.ks.xml` (or `name.test.xml`). Test files can use KScript.Test without an `<import>`, and so can the editor.
+- A test file is a normal script named `name.test.ks.xml` (or `name.test.xml`), or `name.test.kscript` in the [.kscript format](code-format.md). Test files can use KScript.Test without an import, and so can the editor.
 - `kscript test` with no paths runs every test file in the current project: the folder of the nearest `kscript.json`, or the current folder if there isn't one. Folders whose names start with `.`, and `node_modules`, `bin` and `obj`, are skipped.
 - `kscript test tests/cart` runs the test files in a folder, and `kscript test tests/cart.test.ks.xml` (or just `kscript tests/cart.test.ks.xml`) runs one file. You can give several paths.
 - `kscript make test checkout` creates `tests/checkout.test.ks.xml` in the project, and `kscript make project` starts new projects with the rules of a small to-do app in `lib/`, a script, and tests for both.
@@ -171,7 +171,7 @@ Colours are used when the output is a terminal; set `NO_COLOR` to turn them off 
 {
   "packages": ["KScript.IO"],            // imported by every script, including tests
   "test": {
-    "include": ["tests/**/*.test.ks.xml"],  // default: **/*.test.ks.xml and **/*.test.xml
+    "include": ["tests/**/*.test.ks.xml"],  // default: **/*.test.ks.xml, **/*.test.xml and **/*.test.kscript
     "exclude": ["tests/slow"],              // default: _templates, node_modules, .git
     "timeout": 10,                          // seconds per test; 0 for no limit (default 10)
     "packages": ["KScript.Terminal"]        // imported by test files only
@@ -183,6 +183,6 @@ Colours are used when the output is a terminal; set `NO_COLOR` to turn them off 
 
 ## In the editor
 
-The language server treats `*.test.ks.xml` files as importing KScript.Test, so `<test>`, `<expect>` and the rest get completion, hover and checking, and `$case` from `each` is known inside the test. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.
+The language server treats `*.test.ks.xml` and `*.test.kscript` files as importing KScript.Test, so `<test>`, `<expect>` and the rest get completion, hover and checking, and `$case` from `each` is known inside the test. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.
 
 `<expect>`, `<assert>` and `<capture>` also work in ordinary scripts that `<import package="KScript.Test" />`: a failed check stops the script with an `Assertion` error. `<test>` and `<describe>` only work under `kscript test`.

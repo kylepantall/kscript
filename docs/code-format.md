@@ -137,9 +137,38 @@ kscript convert tour.ks.xml --stdout    # print instead of writing
 
 Options: `--to xml|kscript`, `--out file`, `--stdout`, `--force` (replace an existing file). Comments, doc comments
 and blank lines are kept, and expressions are copied as written. Where one meaning has two spellings, the converter
-picks one (`<call fn="greet" args="'x'" />` becomes `@greet('x')`; `x = 3` becomes `<let>` or `<set>`), so the first
-conversion may tidy a file, and converting back and forth after that changes nothing. It warns when something can't
-be carried over exactly, such as a `<let>` inside a block that hides an outer variable of the same name.
+picks one (`<call fn="greet" args="'x'" />` becomes `@greet('x')`; `x = 3` becomes `<let>` or `<set>`; `const x = 1`
+becomes `<const>`), so the first conversion may tidy a file, and converting back and forth after that changes nothing.
+It warns when something can't be carried over exactly, such as a `<let>` inside a block that hides an outer variable
+of the same name.
+
+Converting keeps a project working in the new format:
+
+- An import of a script that is converted in the same run, or already has a converted version, points at the new
+  file (`<import src="lib/tasks.ks.xml" />` becomes `import "lib/tasks.kscript"`). An import of a script that stays
+  in the old format is kept, with a note; the two formats can import each other.
+- File names in comments and strings that name a converted script are renamed too (`@run_script('hello.ks.xml')`),
+  and one-line XML examples in comments are written the .kscript way.
+- Converting a folder also converts its tests (`name.test.ks.xml` becomes `name.test.kscript`), renames converted
+  files in its `.html` and `.md` pages, and updates the project's `kscript.json`: `"main"` and other file names, and
+  each `*.ks.xml` include pattern gains a `*.kscript` twin.
+
+```
+kscript convert . --to kscript     # the whole project
+```
+
+Test files can be written in this format: `name.test.kscript` files get KScript.Test without an import and run with
+`kscript test` like XML ones.
+
+```
+import "../lib/strings.kscript"
+
+describe(name: slugify) {
+  test(name: joins words with dashes) {
+    expect(value: @slugify('Hello World'), equals: 'hello-world')
+  }
+}
+```
 
 ## Editors
 

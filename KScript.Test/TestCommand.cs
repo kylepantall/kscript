@@ -51,7 +51,7 @@ namespace KScript.Testing
                     case "--help":
                     case "-h":
                         output.WriteLine("Usage: " + Usage);
-                        output.WriteLine("Runs *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests.");
+                        output.WriteLine("Runs *.test.ks.xml and *.test.kscript files (or the files test.include names in kscript.json). With no paths, runs the current project's tests.");
                         return 0;
                     default:
                         if (arg.StartsWith("--", StringComparison.Ordinal)) return Fail(error, $"Unknown option '{arg}'. Usage: {Usage}");
@@ -80,7 +80,7 @@ namespace KScript.Testing
             if (missing.Count > 0) return 1;
             if (files.Count == 0)
             {
-                error.WriteLine($"No test files found in {string.Join(", ", paths)}. Test files are named like greet.test.ks.xml; create one with kscript make test greet.");
+                error.WriteLine($"No test files found in {string.Join(", ", paths)}. Test files are named like greet.test.ks.xml or greet.test.kscript; create one with kscript make test greet.");
                 return 1;
             }
 

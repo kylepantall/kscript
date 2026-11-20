@@ -86,7 +86,7 @@ kscript make project my-app --template ../starters/api   # any folder
     "warningsAsErrors": false                               // same as kscript check --warnaserror
   },
   "test": {
-    "include": ["tests/**/*.test.ks.xml"],  // what `kscript test` runs (default: **/*.test.ks.xml and **/*.test.xml)
+    "include": ["tests/**/*.test.ks.xml"],  // what `kscript test` runs (default: **/*.test.ks.xml, **/*.test.xml and **/*.test.kscript)
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
     "packages": ["KScript.Terminal"]        // imported by test files only

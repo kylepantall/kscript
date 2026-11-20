@@ -75,14 +75,15 @@ namespace KScript.Projects
         public List<string> Packages { get; set; } = new List<string>();
 
         public const double DefaultTimeout = 10;
-        public static readonly string[] DefaultInclude = { "**/*.test.ks.xml", "**/*.test.xml" };
+        public static readonly string[] DefaultInclude = { "**/*.test.ks.xml", "**/*.test.xml", "**/*.test.kscript" };
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
 
-        /// <summary>True for a file named like a test: <c>name.test.ks.xml</c> or <c>name.test.xml</c>.</summary>
+        /// <summary>True for a file named like a test: <c>name.test.ks.xml</c>, <c>name.test.xml</c> or <c>name.test.kscript</c>.</summary>
         public static bool IsTestFileName(string path)
         {
             string name = Path.GetFileName(path ?? string.Empty);
-            return name.EndsWith(".test.ks.xml", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".test.xml", StringComparison.OrdinalIgnoreCase);
+            return name.EndsWith(".test.ks.xml", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".test.xml", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith(".test.kscript", StringComparison.OrdinalIgnoreCase);
         }
     }
 
