@@ -7,6 +7,7 @@ The page features you already have keep working. `kscript serve` sends each requ
 ```sh
 kscript serve samples/http-app      # then open http://localhost:8080/people
 kscript routes samples/http-app     # print the route table
+kscript openapi samples/http-app    # the OpenAPI document, made from the routes
 ```
 
 [`samples/http-app`](../samples/http-app) is a complete site: web routes in XML, API routes in the `.kscript` format, a controller, views, custom middleware and a `kscript.json`.
@@ -299,10 +300,39 @@ Group(middleware: auth) {
     "write_files": true,                        // false: controllers can only read files
     "cors": { "origins": ["*"], "methods": ["GET", "POST"], "headers": ["Content-Type", "Authorization"], "credentials": false },
     "auth": { "token_env": "API_TOKEN" },
-    "throttle": { "limit": 60, "seconds": 60 }
+    "throttle": { "limit": 60, "seconds": 60 },
+    "openapi": { "routes": "auto", "title": "People API", "version": "1.2.0" }  // or false
   }
 }
 ```
+
+## API docs: OpenAPI
+
+The routes already say everything an API document needs, so KScript writes one for you. While `kscript serve` runs, open `/_api` for a page that lists every endpoint with its parameters, body and answers, plus a form to try each one. Tools such as Postman, client generators and gateways read the same document at `/_openapi.json` or `/_openapi.yaml`. `kscript openapi` writes it to the terminal or a file:
+
+```sh
+kscript openapi                          # JSON
+kscript openapi --yaml --out openapi.yaml
+```
+
+The document is OpenAPI 3.1. Each part comes from the code:
+
+| In the document | From |
+| --- | --- |
+| paths and methods | the routes. `{id?}` and `{path*}` become `{id}` and `{path}`. A route for any method is listed under GET, POST, PUT, PATCH and DELETE. Redirects are left out. |
+| path parameters | the controller's typed parameter (`id: int` is an integer), else the `where` rule (`int`, `number`, `uuid`, or a `pattern` for `slug`, `alpha` and regular expressions). |
+| query parameters | `query: Search`: each field of the type is a query parameter, required unless it is optional. |
+| request body | `json: NewPerson` or `body: NewPerson` as `application/json`, `form: T` as a form, `input: T` as either. |
+| success answer | `/// @returns Person[]` (a type, then any words) for the schema. The status is 200, or the 2xx a `@response(..., status: 201)` gives. Views are `text/html`. |
+| error answers | `@abort(404)` and `status: 409` in the controller. 422 for typed input that doesn't fit (the body lists the `problems`), 400 for a JSON body that isn't JSON, 404 for a path parameter with a type or rule, 401 for `auth`, 429 for `throttle`, 304 for `etag`. Errors share the `Error` schema. |
+| summary, description | the controller's `///` doc comment (the first line is the summary, the rest the description), or one on the route itself. `@param id ...` describes a parameter. |
+| deprecated | `@deprecated` in the doc comment. |
+| security | the `auth` middleware, as a bearer token scheme. Every middleware is also listed under `x-middleware`. |
+| schemas | each `type` and `enum` the routes use, with field descriptions and required fields, in `components.schemas`. |
+| tags | the controller's import name (`people` for `people.show`). |
+| info | `http.openapi.title` and `version`, else the project's `name` and `app.version`. |
+
+Only the API routes (from `api.*` files) are included when there are any, otherwise every route. Set `http.openapi.routes` to `"all"` or `"api"` to choose. `"openapi": false` stops `kscript serve` answering `/_api`, `/_openapi.json` and `/_openapi.yaml`, for example on a public server. `kscript openapi` still works.
 
 ## Editor and kscript check
 
@@ -313,6 +343,7 @@ Route files get the same checking and completion as scripts:
 - Names in a list are checked and completed one by one, inside `[ ]` too.
 - Route elements are only offered inside `KScript.Routes` or `Group`.
 - `{id}` in `path` isn't read as a `{ }` expression.
+- Doc comments on controllers show in hover, and also become the [API docs](#api-docs-openapi).
 
 ## How it runs
 

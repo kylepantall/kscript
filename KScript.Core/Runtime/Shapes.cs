@@ -508,18 +508,45 @@ namespace KScript.Runtime
         {
             var defs = new Dictionary<string, object>(StringComparer.Ordinal);
             var schema = new Dictionary<string, object> { ["$schema"] = "https://json-schema.org/draft/2020-12/schema" };
-            foreach (var kv in ObjectSchema(root, root, defs)) schema[kv.Key] = kv.Value;
+            foreach (var kv in ObjectSchema(root, root, defs, "#/$defs/")) schema[kv.Key] = kv.Value;
             if (defs.Count > 0) schema["$defs"] = defs;
             return schema;
         }
 
-        private static Dictionary<string, object> ObjectSchema(RecordType type, RecordType root, Dictionary<string, object> defs)
+        /// <summary>
+        /// A type as written where a type goes (<c>Person</c>, <c>Person[]</c>, <c>int</c>), as JSON Schema for an
+        /// OpenAPI document: named &lt;type&gt;s and &lt;enum&gt;s go in <paramref name="defs"/> and are referred to as
+        /// <c>{refBase}Name</c> (<c>#/components/schemas/Person</c>). Null when the type isn't one KScript knows.
+        /// </summary>
+        public static Dictionary<string, object> SchemaFor(string type, Scope scope, Module module, Dictionary<string, object> defs, string refBase)
+        {
+            TypeRef t = TypeRef.Parse(type);
+            if (t == null) return null;
+            return SchemaOf(t, scope, module, null, defs, refBase, named: true);
+        }
+
+        /// <summary>The named type (a &lt;type&gt; or &lt;enum&gt;) a type refers to, or null: <c>Person</c> for <c>Person[]?</c>.</summary>
+        public static object ResolveNamed(string type, Scope scope, Module module)
+        {
+            TypeRef t = TypeRef.Parse(type);
+            if (t == null || t.IsBuiltIn) return null;
+            try
+            {
+                return Resolve(t, scope, module);
+            }
+            catch (KScriptException)
+            {
+                return null;
+            }
+        }
+
+        private static Dictionary<string, object> ObjectSchema(RecordType type, RecordType root, Dictionary<string, object> defs, string refBase)
         {
             var properties = new Dictionary<string, object>(StringComparer.Ordinal);
             var required = new List<object>();
             foreach (FieldDefinition f in type.Fields)
             {
-                Dictionary<string, object> property = SchemaOf(f.Type, type, root, defs);
+                Dictionary<string, object> property = SchemaOf(f.Type, type.Closure, type.Module, root, defs, refBase, named: false);
                 if (f.Description != null) property["description"] = f.Description;
                 if (f.Computed) property["readOnly"] = true;
                 properties[f.Name] = property;
@@ -533,10 +560,10 @@ namespace KScript.Runtime
             return schema;
         }
 
-        private static Dictionary<string, object> SchemaOf(TypeRef t, RecordType owner, RecordType root, Dictionary<string, object> defs)
+        private static Dictionary<string, object> SchemaOf(TypeRef t, Scope scope, Module module, RecordType root, Dictionary<string, object> defs, string refBase, bool named)
         {
-            if (t.ListDepth > 0) return new Dictionary<string, object> { ["type"] = "array", ["items"] = SchemaOf(t.Item, owner, root, defs) };
-            if (t.Inline != null) return ObjectSchema(t.Inline, root, defs);
+            if (t.ListDepth > 0) return new Dictionary<string, object> { ["type"] = "array", ["items"] = SchemaOf(t.Item, scope, module, root, defs, refBase, named) };
+            if (t.Inline != null) return ObjectSchema(t.Inline, root, defs, refBase);
             switch (t.Name)
             {
                 case "string": return new Dictionary<string, object> { ["type"] = "string" };
@@ -553,21 +580,35 @@ namespace KScript.Runtime
             object resolved;
             try
             {
-                resolved = Resolve(t, owner.Closure, owner.Module);
+                resolved = Resolve(t, scope, module);
             }
             catch (KScriptException)
             {
-                return new Dictionary<string, object>();
+                // Names other packages give meaning to, when they are there.
+                return t.Name.ToLowerInvariant() switch
+                {
+                    "email" => new Dictionary<string, object> { ["type"] = "string", ["format"] = "email" },
+                    "uuid" => new Dictionary<string, object> { ["type"] = "string", ["format"] = "uuid" },
+                    "url" or "uri" => new Dictionary<string, object> { ["type"] = "string", ["format"] = "uri" },
+                    "password" => new Dictionary<string, object> { ["type"] = "string", ["format"] = "password" },
+                    _ => named ? null : new Dictionary<string, object>(),
+                };
             }
-            if (resolved is EnumType e) return new Dictionary<string, object> { ["type"] = "string", ["enum"] = e.Names.Cast<object>().ToList() };
+            if (resolved is EnumType e)
+            {
+                var values = new Dictionary<string, object> { ["type"] = "string", ["enum"] = e.Names.Cast<object>().ToList() };
+                if (refBase == "#/$defs/") return values;
+                defs.TryAdd(e.Name, values);
+                return new Dictionary<string, object> { ["$ref"] = refBase + e.Name };
+            }
             var record = (RecordType)resolved;
-            if (record == root) return new Dictionary<string, object> { ["$ref"] = "#" };
+            if (root != null && record == root) return new Dictionary<string, object> { ["$ref"] = "#" };
             if (!defs.ContainsKey(record.Name))
             {
                 defs[record.Name] = null;
-                defs[record.Name] = ObjectSchema(record, root, defs);
+                defs[record.Name] = ObjectSchema(record, root, defs, refBase);
             }
-            return new Dictionary<string, object> { ["$ref"] = "#/$defs/" + record.Name };
+            return new Dictionary<string, object> { ["$ref"] = refBase + record.Name };
         }
 
         #endregion

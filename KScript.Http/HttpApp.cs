@@ -37,12 +37,16 @@ namespace KScript.Http
         {
             SiteRoot = Path.GetFullPath(siteRoot);
             Settings = project?.Http ?? new HttpSettings();
+            Project = project;
             Log = log;
             Files = FindRouteFiles();
         }
 
         public string SiteRoot { get; }
         public HttpSettings Settings { get; }
+
+        /// <summary>The project, or null; the OpenAPI document takes its title and version from it.</summary>
+        public ProjectConfig Project { get; }
         public TextWriter Log { get; }
         public IReadOnlyList<RouteFileInfo> Files { get; }
         public bool HasRoutes => Files.Count > 0;
@@ -224,6 +228,8 @@ namespace KScript.Http
             {
                 return ErrorPage(ex);
             }
+
+            if (Settings.OpenApi.Enabled && OpenApiPage(path, table) is PageResult docs) return docs;
 
             if (table.Match(request.Method, path) == null && !IsApiPath(path)) return null;
 
@@ -486,6 +492,24 @@ namespace KScript.Http
             };
             foreach (var h in response.Headers) page.Headers[h.Key] = Values.ToStr(h.Value);
             return page;
+        }
+
+        /// <summary>The paths of the OpenAPI document and its page, served while http.openapi is on.</summary>
+        public static readonly string[] OpenApiPaths = { "/_openapi.json", "/_openapi.yaml", "/_api" };
+
+        /// <summary>/_openapi.json, /_openapi.yaml or the /_api page; null for any other path.</summary>
+        public PageResult OpenApiPage(string path, RouteTable table)
+        {
+            path = path.TrimEnd('/');
+            if (!OpenApiPaths.Contains(path, StringComparer.Ordinal)) return null;
+            if (path == "/_api") return new PageResult { Body = OpenApiViewer.Page(Settings.OpenApi.Title ?? Project?.Name) };
+            Dictionary<string, object> document = OpenApi.Document(this, table, Project);
+            var result = path.EndsWith(".json", StringComparison.Ordinal)
+                ? new PageResult { ContentType = "application/json; charset=utf-8", Body = OpenApi.ToJson(document) }
+                : new PageResult { ContentType = "application/yaml; charset=utf-8", Body = OpenApi.ToYaml(document) };
+            result.Headers["Access-Control-Allow-Origin"] = "*";
+            result.Headers["Cache-Control"] = "no-cache";
+            return result;
         }
 
         private static PageResult ErrorPage(KScriptException ex) =>

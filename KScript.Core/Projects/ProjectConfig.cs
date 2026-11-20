@@ -228,6 +228,33 @@ namespace KScript.Projects
         public double ThrottleSeconds { get; set; } = 60;
 
         public static readonly string[] DefaultRouteNames = { "routes", "api", "routes/web", "routes/api" };
+
+        /// <summary>The <c>http.openapi</c> section: the OpenAPI document made from the routes.</summary>
+        public OpenApiSettings OpenApi { get; } = new OpenApiSettings();
+    }
+
+    /// <summary>
+    /// The OpenAPI document <c>kscript serve</c> makes from the routes (at /_openapi.json, /_openapi.yaml and the
+    /// /_api page) and <c>kscript openapi</c> writes. <c>"openapi": false</c> turns the served copies off.
+    /// </summary>
+    public sealed class OpenApiSettings
+    {
+        /// <summary>False stops kscript serve answering /_openapi.json, /_openapi.yaml and /_api.</summary>
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>info.title. Defaults to the project's name.</summary>
+        public string Title { get; set; }
+
+        /// <summary>info.version. Defaults to app.version, then 1.0.0.</summary>
+        public string Version { get; set; }
+
+        /// <summary>info.description.</summary>
+        public string Description { get; set; }
+
+        /// <summary>Which routes: "api" (from api.* files), "all", or "auto" (the API routes if there are any, otherwise all).</summary>
+        public string Routes { get; set; } = "auto";
+
+        public static readonly string[] RouteChoices = { "auto", "api", "all" };
     }
 
     public sealed class ProjectConfig
@@ -799,8 +826,39 @@ namespace KScript.Projects
                             }
                         }
                         break;
+                    case "openapi":
+                        ReadOpenApi(p.Value, http.OpenApi, config);
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'http.{p.Name}' (expected routes, middleware, groups, views, api_prefix, write_files, cors, auth or throttle).");
+                        config.Warnings.Add($"unknown setting 'http.{p.Name}' (expected routes, middleware, groups, views, api_prefix, write_files, cors, auth, throttle or openapi).");
+                        break;
+                }
+            }
+        }
+
+        private static void ReadOpenApi(JsonElement e, OpenApiSettings openApi, ProjectConfig config)
+        {
+            if (e.ValueKind == JsonValueKind.True || e.ValueKind == JsonValueKind.False)
+            {
+                openApi.Enabled = e.ValueKind == JsonValueKind.True;
+                return;
+            }
+            if (!Object(e, "http.openapi", config)) return;
+            foreach (var o in e.EnumerateObject())
+            {
+                switch (o.Name)
+                {
+                    case "enabled": openApi.Enabled = Bool(o.Value, "http.openapi.enabled", config) ?? openApi.Enabled; break;
+                    case "title": openApi.Title = String(o.Value, "http.openapi.title", config) ?? openApi.Title; break;
+                    case "version": openApi.Version = String(o.Value, "http.openapi.version", config) ?? openApi.Version; break;
+                    case "description": openApi.Description = String(o.Value, "http.openapi.description", config) ?? openApi.Description; break;
+                    case "routes":
+                        string routes = String(o.Value, "http.openapi.routes", config);
+                        if (routes != null && OpenApiSettings.RouteChoices.Contains(routes)) openApi.Routes = routes;
+                        else if (routes != null) config.Warnings.Add($"http.openapi.routes should be {string.Join(", ", OpenApiSettings.RouteChoices)}, not '{routes}'.");
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'http.openapi.{o.Name}' (expected enabled, title, version, description or routes).");
                         break;
                 }
             }
