@@ -114,6 +114,7 @@ reported).
 | KS6003 | A variable, constant or loop variable whose value is never read, including one that is only ever set. A script's top-level constants are exported like its functions, so they count as used when an importing file uses them. In pages, only a function's own variables are checked, because a layout or component may read the rest. |
 | KS6004 | A function parameter the body never reads. For a lambda, only the parameters after the last one it reads, since the caller decides what it is passed: write `fn($_y) => ...` to keep the position. |
 | KS6005 | An import nothing uses: an `as` alias, a name in `names="..."`, a whole script, or a package none of whose elements, commands, methods or variables appear. |
+| KS6006 | Not unused code, but a style hint: a list of names written as one string in a `.kscript` file (`Middleware(use: "log, cors")`). Write it as an array, `use: [log, cors]`; the quick fix does it for you. XML attributes are text, so `use="log, cors"` is fine there. |
 
 The project is the folder with the nearest `kscript.json` and everything under it (hidden folders, `bin`, `obj` and
 `node_modules` are skipped). A script outside a project is checked against the other files in its own folder. A
@@ -183,51 +184,76 @@ fn pack(size: Size, gift: bool = false) => 'Packing ' + $size
 echo "{ @pack(large) } { @pack(size: small, gift) } { $Size.medium }"
 ```
 
-A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
+A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. A list of an enum takes an array of bare values too: with `fn pack_all(sizes: Size[])`, write `@pack_all([large, small])`. Anywhere else, a bare word in an array is an error, because names of variables start with `$` (`[$max_items, 3]`) and functions are passed with `@` (`[@twice]`). Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
 
 ## Typed data
 
 `type` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught.
 
+A type is a block with one field per line, `name: type`:
+
+```kscript try
+type User {
+  login: string
+  id: int
+}
+
+type Repo {
+  name: string
+  stars: int from stargazers_count
+  owner: User
+}
+
+repo = $Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })
+echo "$repo.name has $repo.stars stars, owned by $repo.owner.login"
+```
+
+`stars: int from stargazers_count` reads the field from a key with another name, and `owner: User` is another type, so the nested data is checked and turned into a `User` record too. `$Repo->from(data)` maps a map, a list of maps or JSON text.
+
+### Field lines
+
+A field line is `name[?][: type] [from path] [= default | => value]`. Each part is optional except the name:
+
 ```kscript
 enum Visibility { public, private, internal }
-type Owner(fields: "login: string, id: int, avatar_url?: string")
 
 /// A GitHub repository.
 type Repo {
   name: string
   /// How many people starred it.
   stars: int from stargazers_count
-  owner: Owner
+  owner: User
   owner_name: string from owner.login
   topics: string[] = []
-  license: string? from license.name
+  license?: string from license.name
   visibility: Visibility
   updated: date from updated_at
   label => $name + ' (' + $stars + ' stars)'
 }
 ```
 
-A short type fits on one line: `fields` takes `name: type` pairs like `fn` params, with `?` for an optional field and `= value` for a default. Bigger ones list their fields in a block, one `name: type` per line:
-
-| Attribute | What it does |
+| Part | What it does |
 | --- | --- |
-| `type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Defaults to `any`. |
-| `from` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. |
-| `default` | The value when the data has none. The field is then optional. |
-| `optional` | `yes` lets the value be missing or null. So does ending the name or the type with `?`. |
-| `value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
-| `description` | Shown on hover and in completion. |
+| `: type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Without it the field takes any value. |
+| `?` after the name | The value can be missing or null. |
+| `from path` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. Quote a path that has spaces. |
+| `= default` | The value when the data has none. The field is then optional. |
+| `=> value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
+| `///` above the line | Shown on hover and in completion. |
 
-On `type`, `sample: data/repo.json` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. Fields in the block and `fields` replace the sampled fields they name. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
+The type itself takes options in brackets: `type Repo(extra: error) { … }`. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. `sample: data/repo.json` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. Lines in the block replace the sampled fields they name. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
 
-Data meets a type in these places:
+A small type can also go on one line, with the fields written like `fn` parameters: `type Point(fields: "x: int, y: int")`. `kscript convert` writes it as a block.
+
+In XML, a type is `<type name="Repo">` with a `<field name="stars" type="int" from="stargazers_count" />` element for each line, or a `fields="..."` attribute for the one-line form. Switch the examples to **XML** to see them.
+
+### Where data meets a type
 
 ```kscript
 repo = @fetch($url)->check()->json(as: $Repo) // KScript.Net
 repos = @read_json('repos.json', as: $Repo) // KScript.IO; a list maps item by item
-user = @json($text, as: $Owner)
-user = $Owner->from($data) // a map, a list or JSON text
+user = @json($text, as: $User)
+user = $User->from($data) // a map, a list or JSON text
 repo: Repo = $data // also on const and plain assignment
 fn show(repo: Repo, tags: string[]) {
   // …
@@ -245,24 +271,6 @@ The response from https://api.github.com/... doesn't fit Repo (2 problems):
 ```
 
 In a `catch`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo->fields()` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
-
-In a `.kscript` file, a type is a block with one field per line, and an enum lists its values in braces (see [the .kscript format](code-format.md)):
-
-```
-enum Visibility { public, private, internal }
-type Owner(fields: "login: string, id: int")
-
-/// A GitHub repository.
-type Repo(extra: error) {
-  name: string
-  /// How many people starred it.
-  stars: int from stargazers_count
-  owner_name: string from owner.login
-  topics: string[] = []
-  license?: string from license.name
-  label => $name + ' (' + $stars + ' stars)'
-}
-```
 
 ## Values and methods
 

@@ -25,6 +25,12 @@ namespace KScript.Metadata
 
         /// <summary>Set when the attribute is deprecated; it still works, with a warning.</summary>
         public Deprecation Deprecated { get; internal set; }
+
+        /// <summary>True for a list of names, written <c>[index, show]</c> in .kscript and <c>"index, show"</c> in XML (see <see cref="NameList"/>).</summary>
+        public bool NameList { get; init; }
+
+        /// <summary>A list of names: <see cref="NameList"/>, or any list of function names.</summary>
+        public bool IsNameList => NameList || Kind == AttributeKind.FunctionReferences;
     }
 
     public sealed class ElementInfo

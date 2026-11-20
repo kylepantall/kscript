@@ -1,6 +1,11 @@
 --- make
-description: A KScript script, run with kscript <file>
-to: {{ dir }}{{ kebab }}{{ ext }}
-hint: Run it: kscript {{ dir }}{{ kebab }}{{ ext }}
+description: A KScript script in scripts/, run with kscript <file>
+category: Scripts and data
+usage: <name> [--format kscript|xml]
+--format: kscript or xml (default the project's make.format)
+example: kscript make script tidy-downloads
+example: kscript make script tools/backup --format xml
+to: {{ paths.scripts }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Run it: kscript {{ paths.scripts }}/{{ dir }}{{ kebab }}{{ ext }}
 ---
 echo "Hello from {{ title }}!"

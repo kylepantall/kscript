@@ -75,7 +75,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `stars: int from stargazers_count` (in a type) | `<field name="stars" type="int" from="stargazers_count" />` |
 | `topics?: string[] = []`, `label => $name + '!'` | `<field name="topics?" type="string[]" default="[]" />`, `<field name="label" value="$name + '!'" />` |
 
-A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Typed data](language.md#typed-data) for what each part does.
+A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Field lines](language.md#field-lines) for what each part does.
 
 Any other name is an element: `name(attribute: value, ...) "text" { children }`, each part optional.
 
@@ -98,6 +98,9 @@ Row(gap: 8, wrap) {
   expressions, as before.
 - In `name(...)` a value runs to the next `,` or `)` outside brackets; quote it to include a comma. A bare name such
   as `wrap` means `wrap="yes"`.
+- A list of names is an array: `Middleware(use: [secure_headers, json_only])`, `Resource(..., only: [index, show])`.
+  The XML form writes the same list as text, `use="secure_headers, json_only"`, and `kscript convert` turns one into
+  the other. The old string form (`use: "a, b"`) still works in `.kscript`, with a KS6006 hint to use the array.
 - Expressions are kept as written, so raw `<` and `>` work (`lt` and `gt` still do).
 - The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. A file whose only
   statement is `kscript { }` or a `KScript.*` element (such as `KScript.Window(...) { }`) uses that element as the

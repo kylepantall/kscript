@@ -2,7 +2,10 @@
   <!-- The shape of GitHub's repository data. Other scripts import these types. -->
   <enum name="Visibility" values="public, private, internal" />
 
-  <type name="Owner" fields="login: string, id: int" />
+  <type name="Owner">
+    <field name="login" type="string" />
+    <field name="id" type="int" />
+  </type>
 
   <type name="Repo" description="A GitHub repository.">
     <field name="name" type="string" />

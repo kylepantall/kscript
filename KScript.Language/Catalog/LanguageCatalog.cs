@@ -70,6 +70,9 @@ namespace KScript.Language.Catalog
         public ElementInfo GetElement(string name) =>
             name == null ? null : exactElements.TryGetValue(name, out ElementInfo exact) ? exact : elements.TryGetValue(name, out ElementInfo e) ? e : null;
 
+        /// <summary>True when an element's attribute holds a list of names, such as &lt;Middleware use&gt; or &lt;Resource only&gt;.</summary>
+        public bool IsNameList(string element, string attribute) => GetElement(element)?.GetAttribute(attribute)?.IsNameList == true;
+
         public RetiredInfo GetRetiredElement(string name) => name != null && retiredElements.TryGetValue(name, out RetiredInfo r) ? r : null;
 
         public RetiredInfo GetRetiredAttribute(string name) => name != null && retiredAttributes.TryGetValue(name, out RetiredInfo r) ? r : null;

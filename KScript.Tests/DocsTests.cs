@@ -286,7 +286,7 @@ public sealed class DocsTests
 
         string core = site.Find("/reference/core").Body;
         Assert.Contains("nothing to import", core);
-        Assert.Contains("Follows <code>&lt;if&gt;</code>", core);
+        Assert.Contains("Follows <span class=\"f-xml\"><code>&lt;if&gt;</code></span><span class=\"f-ks\"><code>if</code></span>", core);
         Assert.Contains("&lt;elif&gt;", core);
 
         string http = site.Find("/reference/http").Body;
@@ -765,7 +765,7 @@ public sealed class DocsTests
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Requests are retried for you.</p>", package);
         Assert.Contains("<tr class=\"deprecated\"><td><del><code>tone</code></del>", package);
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Renamed. Use <code>sound</code> instead.</p>", package);
-        Assert.Contains("<del><code>&lt;old-beep&gt;</code></del>", package);
+        Assert.Contains("<del><span class=\"f-xml\"><code>&lt;old-beep&gt;</code></span><span class=\"f-ks\"><code>old-beep</code></span></del>", package);
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong></p>", package);
         Assert.Contains("title=\"Deprecated\"><del><code>-&gt;shout()</code></del></a>", package);
         Assert.Contains("<del class=\"param\"", site.Find("/reference/retiring").Body);
@@ -841,6 +841,41 @@ public sealed class DocsTests
             if (File.Exists(path)) return path;
         }
         return null;
+    }
+
+    [Fact]
+    public void The_reference_names_elements_the_way_the_readers_format_writes_them()
+    {
+        DocsSite site = Site.Value;
+        DocPage core = site.Find("/reference/core");
+        string html = site.Render(core);
+
+        // Headings, the table of contents and cross references carry both names; the page shows the reader's.
+        Assert.Contains("<span class=\"f-xml\"><code>&lt;break&gt;</code></span><span class=\"f-ks\"><code>break</code></span>", core.Body);
+        Assert.Contains("<span class=\"f-xml\"><code>&lt;let&gt;</code></span><span class=\"f-ks\"><code>name = value</code></span>", core.Body);
+        Assert.Contains("<span class=\"f-xml\"><code>&lt;for&gt;</code></span><span class=\"f-ks\"><code>for item in list</code></span>", core.Body);
+        Assert.Contains("<h2 id=\"elements\"><span class=\"f-xml\">Elements</span><span class=\"f-ks\">Statements</span></h2>", core.Body);
+        Assert.Contains("A loop: <code>break</code> and <code>continue</code> work inside.", core.Body);
+        // Descriptions that name elements read the .kscript way too.
+        Assert.Contains("<span class=\"f-ks\">A branch of match:", core.Body);
+        Assert.Contains("<span class=\"f-xml\">A branch of &lt;match&gt;:", core.Body);
+        Assert.Contains("<a href=\"#el-break\"><span class=\"f-xml\">&lt;break&gt;</span><span class=\"f-ks\">break</span></a>", html);
+        Assert.Contains("<a href=\"#elements\"><span class=\"f-xml\">Elements</span><span class=\"f-ks\">Statements</span></a>", html);
+        Assert.Equal("KScript.Window", DocsSite.CodeName(site.Catalog.GetElement("Window")));
+        Assert.Contains("A file made of a <code>KScript.Window { }</code> block imports it for you.", site.Find("/reference/ui").Body);
+
+        string css = DocsSite.ReadAsset("docs.css");
+        Assert.Contains(":root[data-format=\"kscript\"] .f-xml, :root:not([data-format=\"kscript\"]) .f-ks { display: none; }", css);
+
+        // Search matches either name, and shows the reader's.
+        var search = JsonDocument.Parse(site.SearchJson()).RootElement.EnumerateArray().ToList();
+        JsonElement brk = search.Single(e => e.GetProperty("t").GetString() == "<break>");
+        Assert.Equal("break", brk.GetProperty("c").GetString());
+        Assert.Equal("name = value", search.Single(e => e.GetProperty("t").GetString() == "<let>").GetProperty("c").GetString());
+        Assert.False(search.Single(e => e.GetProperty("t").GetString() == "@now()").TryGetProperty("c", out _));
+        string js = DocsSite.ReadAsset("docs.js");
+        Assert.Contains("var text = ks && e.c ? e.c : e.t;", js);
+        Assert.Contains("var kind = ks && e.k === 'element' ? 'statement' : e.k;", js);
     }
 
     #endregion
