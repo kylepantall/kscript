@@ -223,11 +223,64 @@ namespace KScript.Projects
         /// <summary>The environment variable that holds the bearer token the auth middleware accepts.</summary>
         public string AuthTokenEnv { get; set; } = "API_TOKEN";
 
+        /// <summary>Sign-in settings for KScript.Auth (http.auth in kscript.json).</summary>
+        public AuthSettings Auth { get; } = new AuthSettings();
+
         /// <summary>Requests per window for the throttle middleware, per client address.</summary>
         public int ThrottleLimit { get; set; } = 60;
         public double ThrottleSeconds { get; set; } = 60;
 
         public static readonly string[] DefaultRouteNames = { "routes", "api", "routes/web", "routes/api" };
+    }
+
+    /// <summary>
+    /// How KScript.Auth signs people in: http.auth in kscript.json. Every setting has a safe default, so an app only
+    /// sets what it wants to change.
+    /// </summary>
+    public sealed class AuthSettings
+    {
+        /// <summary>Where the auth middleware sends people who aren't signed in.</summary>
+        public string Login { get; set; } = "/login";
+
+        /// <summary>Where the guest middleware sends people who are already signed in, and where @intended() goes by default.</summary>
+        public string Home { get; set; } = "/";
+
+        /// <summary>Where sessions are kept: file (the app's state folder, so they last across restarts) or memory.</summary>
+        public string Sessions { get; set; } = "file";
+
+        /// <summary>A folder for users, sessions and tokens, relative to the site folder. Null means the app's own data and state folders.</summary>
+        public string Folder { get; set; }
+
+        /// <summary>Seconds a session lasts without a request before it ends.</summary>
+        public double Lifetime { get; set; } = 2 * 60 * 60;
+
+        /// <summary>Seconds a "remember me" sign-in lasts.</summary>
+        public double Remember { get; set; } = 30 * 24 * 60 * 60;
+
+        /// <summary>The session cookie's name.</summary>
+        public string Cookie { get; set; } = "ks_session";
+
+        /// <summary>True or false forces the cookie's Secure flag; null sets it for https requests.</summary>
+        public bool? Secure { get; set; }
+
+        /// <summary>The cookie's SameSite: Lax (the default), Strict or None.</summary>
+        public string SameSite { get; set; } = "Lax";
+
+        /// <summary>False turns off the CSRF check that web routes get when their file imports KScript.Auth.</summary>
+        public bool Csrf { get; set; } = true;
+
+        /// <summary>Failed sign-ins allowed per email and address before @attempt() waits.</summary>
+        public int Attempts { get; set; } = 5;
+
+        /// <summary>Seconds the failed sign-ins are counted over, and how long @attempt() then waits.</summary>
+        public double Lockout { get; set; } = 60;
+
+        /// <summary>Seconds a password reset token works for.</summary>
+        public double ResetLifetime { get; set; } = 60 * 60;
+
+        public static readonly string[] SameSiteValues = { "Lax", "Strict", "None" };
+
+        public static readonly string[] SettingNames = { "token_env", "login", "home", "sessions", "folder", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime" };
     }
 
     public sealed class ProjectConfig
@@ -817,11 +870,7 @@ namespace KScript.Projects
                         break;
                     case "auth":
                         if (!Object(p.Value, "http.auth", config)) break;
-                        foreach (var a in p.Value.EnumerateObject())
-                        {
-                            if (a.Name == "token_env") http.AuthTokenEnv = String(a.Value, "http.auth.token_env", config) ?? http.AuthTokenEnv;
-                            else config.Warnings.Add($"unknown setting 'http.auth.{a.Name}' (expected token_env).");
-                        }
+                        foreach (var a in p.Value.EnumerateObject()) ReadAuth(a, http, config);
                         break;
                     case "throttle":
                         if (!Object(p.Value, "http.throttle", config)) break;
@@ -846,6 +895,63 @@ namespace KScript.Projects
                         break;
                 }
             }
+        }
+
+        private static void ReadAuth(JsonProperty a, HttpSettings http, ProjectConfig config)
+        {
+            AuthSettings auth = http.Auth;
+            string name = "http.auth." + a.Name;
+            switch (a.Name)
+            {
+                case "token_env": http.AuthTokenEnv = String(a.Value, name, config) ?? http.AuthTokenEnv; break;
+                case "login": auth.Login = String(a.Value, name, config) ?? auth.Login; break;
+                case "home": auth.Home = String(a.Value, name, config) ?? auth.Home; break;
+                case "folder": auth.Folder = String(a.Value, name, config) ?? auth.Folder; break;
+                case "cookie": auth.Cookie = String(a.Value, name, config) ?? auth.Cookie; break;
+                case "secure": auth.Secure = Bool(a.Value, name, config) ?? auth.Secure; break;
+                case "csrf": auth.Csrf = Bool(a.Value, name, config) ?? auth.Csrf; break;
+                case "sessions":
+                    string kind = String(a.Value, name, config);
+                    if (kind == "file" || kind == "memory") auth.Sessions = kind;
+                    else if (kind != null) config.Warnings.Add($"{name} should be file or memory.");
+                    break;
+                case "same_site":
+                    string site = String(a.Value, name, config);
+                    string known = AuthSettings.SameSiteValues.FirstOrDefault(v => string.Equals(v, site, StringComparison.OrdinalIgnoreCase));
+                    if (known != null) auth.SameSite = known;
+                    else if (site != null) config.Warnings.Add($"{name} should be Lax, Strict or None.");
+                    break;
+                case "attempts":
+                    if (a.Value.ValueKind == JsonValueKind.Number && a.Value.TryGetInt32(out int attempts) && attempts > 0) auth.Attempts = attempts;
+                    else config.Warnings.Add($"{name} should be a whole number above 0.");
+                    break;
+                case "lifetime": auth.Lifetime = Duration(a.Value, name, config) ?? auth.Lifetime; break;
+                case "remember": auth.Remember = Duration(a.Value, name, config) ?? auth.Remember; break;
+                case "lockout": auth.Lockout = Duration(a.Value, name, config) ?? auth.Lockout; break;
+                case "reset_lifetime": auth.ResetLifetime = Duration(a.Value, name, config) ?? auth.ResetLifetime; break;
+                default:
+                    config.Warnings.Add($"unknown setting '{name}' (expected {string.Join(", ", AuthSettings.SettingNames)}).");
+                    break;
+            }
+        }
+
+        /// <summary>A length of time in seconds: a number of seconds, or text such as "90s", "15m", "2h", "30d" or "1w".</summary>
+        private static double? Duration(JsonElement e, string name, ProjectConfig config)
+        {
+            if (e.ValueKind == JsonValueKind.Number && e.TryGetDouble(out double n) && n > 0) return n;
+            if (e.ValueKind == JsonValueKind.String && Seconds(e.GetString()) is double seconds) return seconds;
+            config.Warnings.Add($"{name} should be a number of seconds, or text such as \"15m\", \"2h\" or \"30d\".");
+            return null;
+        }
+
+        /// <summary>Seconds in text such as "90", "90s", "15m", "2h", "30d" or "1w"; null if it isn't one.</summary>
+        public static double? Seconds(string text)
+        {
+            System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(text ?? string.Empty, @"^\s*(\d+(?:\.\d+)?)\s*(s|m|h|d|w)?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!m.Success) return null;
+            double amount = double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            double seconds = amount * (m.Groups[2].Value.ToLowerInvariant() switch { "m" => 60, "h" => 3600, "d" => 86400, "w" => 604800, _ => 1 });
+            return seconds > 0 ? seconds : null;
         }
 
         private static bool? Bool(JsonElement e, string name, ProjectConfig config)

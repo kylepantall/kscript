@@ -41,6 +41,7 @@
     <ProjectReference Include="..\KScript.Http\KScript.Http.csproj" />
     <ProjectReference Include="..\KScript.Storage\KScript.Storage.csproj" />
     <ProjectReference Include="..\KScript.Cache\KScript.Cache.csproj" />
+    <ProjectReference Include="..\KScript.Auth\KScript.Auth.csproj" />
     <ProjectReference Include="..\KScript.Test\KScript.Test.csproj" />
     <ProjectReference Include="..\KScript.UI\KScript.UI.csproj" />
     <ProjectReference Include="..\KScriptApp\KScriptApp.csproj" />

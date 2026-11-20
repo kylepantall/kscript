@@ -304,6 +304,7 @@ namespace KScript.Runtime
             ("KScript.Storage", "KScript.Storage.StoragePackage, KScript.Storage", "App folders for config, data, cache, state and logs, in the right place on each platform."),
             ("KScript.Cache", "KScript.Caching.CachePackage, KScript.Cache", "A cache of values by key, with time limits: in memory, or in files in the app's cache folder."),
             ("KScript.Http", "KScript.Http.HttpPackage, KScript.Http", "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve."),
+            ("KScript.Auth", "KScript.Auth.AuthPackage, KScript.Auth", "Sign-in for kscript serve apps: users, sessions, the auth and guest middleware, CSRF, password resets and API tokens."),
             ("KScript.Test", "KScript.Testing.TestPackage, KScript.Test", "Tests run by kscript test: <test>, <describe>, <expect>, <assert> and <capture>."),
             ("KScript.UI", "KScript.UI.UIPackage, KScript.UI", "Desktop windows with buttons, text and inputs."),
             ("KScript.AI", "KScript.AI.AIPackage, KScript.AI", "Language models: @llm, @chat and <llm>."),

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
+using KScript.Auth;
 using KScript.Pages;
 using KScript.Projects;
 using KScript.Runtime;
@@ -37,11 +38,18 @@ namespace KScript.Http
         {
             SiteRoot = Path.GetFullPath(siteRoot);
             Settings = project?.Http ?? new HttpSettings();
+            projectRoot = project?.FilePath != null ? Path.GetDirectoryName(Path.GetFullPath(project.FilePath)) : SiteRoot;
             Log = log;
             Files = FindRouteFiles();
         }
 
         public string SiteRoot { get; }
+
+        private readonly string projectRoot;
+        private AuthApp auth;
+
+        /// <summary>The app's users, sessions and tokens (KScript.Auth), with http.auth's settings.</summary>
+        public AuthApp Auth => auth ??= AuthApp.For(projectRoot, Settings.Auth);
         public HttpSettings Settings { get; }
         public TextWriter Log { get; }
         public IReadOnlyList<RouteFileInfo> Files { get; }
@@ -171,6 +179,7 @@ namespace KScript.Http
                 CanWriteFiles = Settings.WriteFiles,
             };
             host.Items[HttpPackage.ContextKey] = ctx;
+            host.Items[AuthRequest.HostKey] = ctx.Auth;
             return new Interpreter(host, options: new InterpreterOptions { MaxSteps = MaxSteps, MaxCallDepth = 200 });
         }
 
@@ -242,6 +251,9 @@ namespace KScript.Http
             Complete(request);
             PageResult result = null;
             OnBigStack(() => result = HandleHere(request));
+            // The session (KScript.Auth) is saved once the request is answered, and its cookie sent.
+            List<string> cookies = RequestHooks.Finish(request);
+            result?.Cookies.AddRange(cookies);
             return result;
         }
 
@@ -312,6 +324,10 @@ namespace KScript.Http
             {
                 return ToPage(abort.Response, method);
             }
+            catch (KScriptException ex) when (ClientErrors.TryGetValue(ex.Type, out int status))
+            {
+                return ToPage(ClientError(ctx, ex, status), method);
+            }
             catch (KScriptException ex)
             {
                 return ToPage(Failure(ctx, ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message), method);
@@ -320,6 +336,30 @@ namespace KScript.Http
             {
                 return ToPage(Failure(ctx, (ex.Location != null ? ex.Location + ": " : string.Empty) + ex.Message), method);
             }
+        }
+
+        /// <summary>
+        /// Errors that are the client's doing, by type, and the status they are answered with instead of 500:
+        /// <c>throw Unauthorized "Sign in first"</c> is a 401. KScript.Auth throws Validation (from @register) and
+        /// TooManyRequests (from @attempt).
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, int> ClientErrors = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["Unauthorized"] = 401,
+            ["Forbidden"] = 403,
+            ["NotFound"] = 404,
+            ["Validation"] = 422,
+            ["TooManyRequests"] = 429,
+        };
+
+        private static HttpResponse ClientError(RequestContext ctx, KScriptException ex, int status)
+        {
+            HttpResponse response = ctx.ErrorResponse(status, ex.Message);
+            if (ex.Fields.TryGetValue("problems", out object problems) && response.ContentType.StartsWith("application/json", StringComparison.Ordinal))
+                response = HttpResponse.Json(new Dictionary<string, object> { ["error"] = ex.Message, ["status"] = (double)status, ["problems"] = problems }, status);
+            if (ex.Fields.TryGetValue("retry_after", out object wait)) response.Headers["Retry-After"] = Values.ToStr(wait);
+            if (status == 401) response.Headers["WWW-Authenticate"] = "Bearer";
+            return response;
         }
 
         private HttpResponse Failure(RequestContext ctx, string message)

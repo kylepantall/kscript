@@ -1,3 +1,4 @@
+using KScript.Auth;
 using KScript.Pages;
 using KScript.Projects;
 using KScript.Runtime;
@@ -36,6 +37,11 @@ namespace KScript.Http
             host != null && host.Items.TryGetValue(HttpPackage.ContextKey, out object value) ? value as RequestContext : null;
 
         public HttpApp App { get; }
+
+        private AuthRequest auth;
+
+        /// <summary>The request's session and signed-in user (KScript.Auth), read when first needed.</summary>
+        public AuthRequest Auth => auth ??= AuthRequest.For(Request, App.Auth);
         public HttpSettings Settings => App.Settings;
         public RouteTable Table { get; } = new RouteTable();
         public Dictionary<string, object> Request { get; }
