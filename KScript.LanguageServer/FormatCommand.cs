@@ -109,6 +109,12 @@ namespace KScript.LanguageServer
                     return 2;
                 }
 
+                if (config != null && !config.Format.Enabled)
+                {
+                    output.WriteLine($"{shown}: skipped (format.enabled is false in {config.FilePath})");
+                    continue;
+                }
+
                 byte[] bytes = File.ReadAllBytes(file);
                 bool bom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
                 string original = new UTF8Encoding(false).GetString(bytes, bom ? 3 : 0, bytes.Length - (bom ? 3 : 0));

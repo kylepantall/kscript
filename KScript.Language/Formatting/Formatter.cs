@@ -160,14 +160,24 @@ namespace KScript.Language.Formatting
                             EmitItem(items[i], 0);
                             continue;
                         }
-                        NewLine(0, BlankLines(sep));
+                        NewLineAt(IndentAt(0, items[i].Start, 0), BlankLines(sep));
                     }
                     EmitItem(items[i], 0);
                 }
             }
 
             TrimTrailingWhitespace();
-            sb.Append(eol);
+            if (options.FinalNewline)
+            {
+                sb.Append(eol);
+            }
+            else
+            {
+                // Keep the file's own ending: the whitespace after the last node, with blank lines tidied like any others.
+                int last = items[items.Count - 1].End;
+                int newlines = text.Substring(last).Count(c => c == '\n');
+                for (int i = 0; i < Math.Min(newlines, MaxBlank + 1); i++) sb.Append(eol);
+            }
         }
 
         #endregion
@@ -180,6 +190,61 @@ namespace KScript.Language.Formatting
             public MarkupNode Node;
             public int Start;
             public int End;
+
+            /// <summary>Copied exactly: a region between kscript-fmt: off and on, or the node after kscript-fmt-ignore.</summary>
+            public bool Verbatim;
+        }
+
+        /// <summary>The comments that switch formatting off for part of a file.</summary>
+        public const string OffDirective = "kscript-fmt: off";
+        public const string OnDirective = "kscript-fmt: on";
+        public const string IgnoreDirective = "kscript-fmt-ignore";
+
+        private string Directive(Item item)
+        {
+            if (!(item.Node is MarkupComment c)) return null;
+            string body = text.Substring(c.Span.Start, c.Span.Length);
+            if (body.StartsWith("<!--", StringComparison.Ordinal)) body = body.Substring(4);
+            if (body.EndsWith("-->", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 3);
+            body = string.Join(" ", body.Split((char[])null, StringSplitOptions.RemoveEmptyEntries));
+            if (string.Equals(body, OffDirective, StringComparison.OrdinalIgnoreCase) || string.Equals(body, "kscript-fmt:off", StringComparison.OrdinalIgnoreCase)) return OffDirective;
+            if (string.Equals(body, OnDirective, StringComparison.OrdinalIgnoreCase) || string.Equals(body, "kscript-fmt:on", StringComparison.OrdinalIgnoreCase)) return OnDirective;
+            if (body.StartsWith(IgnoreDirective, StringComparison.OrdinalIgnoreCase)) return IgnoreDirective;
+            return null;
+        }
+
+        /// <summary>
+        /// Applies the ignore comments among a container's children: everything from &lt;!-- kscript-fmt: off --&gt; to
+        /// &lt;!-- kscript-fmt: on --&gt; (or the end of the container) becomes one item copied exactly, and so does the
+        /// node right after &lt;!-- kscript-fmt-ignore --&gt;.
+        /// </summary>
+        private List<Item> ApplyDirectives(List<Item> items)
+        {
+            List<Item> result = new List<Item>();
+            for (int i = 0; i < items.Count; i++)
+            {
+                string directive = Directive(items[i]);
+                if (directive == OffDirective)
+                {
+                    int j = i + 1;
+                    while (j < items.Count && Directive(items[j]) != OnDirective) j++;
+                    int last = Math.Min(j, items.Count - 1);
+                    Item region = new Item { Node = items[i].Node, Start = items[i].Start, End = items[last].End, Verbatim = true };
+                    protectedSpans.Add(TextSpan.FromBounds(region.Start, region.End));
+                    result.Add(region);
+                    i = last;
+                    continue;
+                }
+                result.Add(items[i]);
+                if (directive == IgnoreDirective && i + 1 < items.Count)
+                {
+                    Item next = items[++i];
+                    next.Verbatim = true;
+                    protectedSpans.Add(TextSpan.FromBounds(next.Start, next.End));
+                    result.Add(next);
+                }
+            }
+            return result;
         }
 
         /// <summary>The children of a container, with whitespace-only text dropped and skipped source (such as &lt;!doctype&gt;) kept.</summary>
@@ -197,7 +262,7 @@ namespace KScript.Language.Formatting
                 pos = child.Span.End;
             }
             AddGap(items, pos, contentEnd);
-            return items;
+            return ApplyDirectives(items);
         }
 
         private void AddGap(List<Item> items, int start, int end)
@@ -256,7 +321,7 @@ namespace KScript.Language.Formatting
         private bool CanBreak(bool flow, string separator, bool before, bool after)
         {
             if (separator.Length > 0) return true;
-            if (flow) return false;
+            if (flow || !options.StatementPerLine) return false;
             return before || after;
         }
 
@@ -305,6 +370,11 @@ namespace KScript.Language.Formatting
 
         private void EmitItem(Item item, int depth)
         {
+            if (item.Verbatim)
+            {
+                AppendShifted(item.Start, item.End, old => old, keepTrailing: true);
+                return;
+            }
             switch (item.Node)
             {
                 case MarkupElement e:
@@ -327,6 +397,7 @@ namespace KScript.Language.Formatting
                 return;
             }
 
+            int own = lineIndent;
             AppendStartTag(e, depth);
             if (e.SelfClosing || !e.StartTagClosed || IsVoid(e))
             {
@@ -361,7 +432,7 @@ namespace KScript.Language.Formatting
                         EmitItem(items[i], depth + 1);
                         continue;
                     }
-                    NewLine(depth + 1, i == 0 ? 0 : BlankLines(sep));
+                    NewLineAt(IndentAt(depth + 1, items[i].Start, own + options.IndentSize), i == 0 && options.CollapseBlankLines ? 0 : BlankLines(sep));
                     EmitItem(items[i], depth + 1);
                 }
 
@@ -371,7 +442,7 @@ namespace KScript.Language.Formatting
                     string sep = text.Substring(last.End, contentEnd - last.End);
                     if (CanBreak(flow, sep, !flow, IsBlock(last)))
                     {
-                        NewLine(depth, 0);
+                        NewLineAt(IndentAt(depth, contentEnd, own), BlankLines(sep, closing: true));
                     }
                 }
             }
@@ -406,18 +477,18 @@ namespace KScript.Language.Formatting
             {
                 // The smallest indent of the lines that can move becomes one level deeper than the element.
                 int min = MinIndent(start + firstBreak + 1, end);
-                int target = (depth + 1) * options.IndentSize;
+                int target = options.Indent ? (depth + 1) * options.IndentSize : min;
                 int delta = min == int.MaxValue ? 0 : target - min;
 
                 int bodyEnd = endsOnOwnLine ? start + lastBreak : end;
                 if (bodyEnd > start + firstBreak)
                 {
-                    lineIndent = target;
+                    lineIndent = min == int.MaxValue ? 0 : target;
                     AppendShifted(start + firstBreak, bodyEnd, old => old + delta, keepTrailing, dropFirstLine: true);
                 }
                 if (endsOnOwnLine)
                 {
-                    NewLine(depth, 0);
+                    NewLineAt(IndentAt(depth, end, depth * options.IndentSize), 0);
                 }
             }
             else
@@ -459,7 +530,13 @@ namespace KScript.Language.Formatting
             string oneLine = "<" + e.Name + string.Concat(attributes.Select(a => " " + a)) + close;
             int firstLine = oneLine.IndexOf('\n');
             bool tooLong = CurrentColumn() + (firstLine < 0 ? oneLine.Length : firstLine) > options.PrintWidth;
-            if (attributes.Count < 2 || !(tooLong || WasWrapped(e)))
+            if (!options.TidyTags || (!options.WrapAttributes && WasWrapped(e)))
+            {
+                // Kept exactly as written.
+                sb.Append(Normalise(text.Substring(e.StartTagSpan.Start, e.StartTagSpan.Length)).Replace("\n", eol));
+                return;
+            }
+            if (attributes.Count < 2 || !options.WrapAttributes || !(tooLong || WasWrapped(e)))
             {
                 sb.Append(oneLine.Replace("\n", eol));
                 return;
@@ -496,7 +573,26 @@ namespace KScript.Language.Formatting
 
         #region Lines
 
-        private void NewLine(int depth, int blankLines) => NewLineAt(depth * options.IndentSize, blankLines);
+        /// <summary>
+        /// The indent for something at a nesting depth. With the indent rule off, a line keeps the indentation it had
+        /// (when it started a line in the source).
+        /// </summary>
+        private int IndentAt(int depth, int sourceOffset, int relative)
+        {
+            if (options.Indent)
+            {
+                return depth * options.IndentSize;
+            }
+            // A line that already existed keeps its indent; a new one goes one level in from its parent's line.
+            return StartsLine(sourceOffset) ? OldLineIndent(sourceOffset) : relative;
+        }
+
+        private bool StartsLine(int offset)
+        {
+            int i = offset;
+            while (i > 0 && (text[i - 1] == ' ' || text[i - 1] == '\t')) i--;
+            return i == 0 || text[i - 1] == '\n';
+        }
 
         private void NewLineAt(int columns, int blankLines)
         {
@@ -510,11 +606,14 @@ namespace KScript.Language.Formatting
             lineIndent = columns;
         }
 
-        private int BlankLines(string separator)
+        private int BlankLines(string separator, bool closing = false)
         {
             int newlines = separator.Count(c => c == '\n');
-            return Math.Max(0, Math.Min(newlines - 1, options.MaxBlankLines));
+            if (!options.CollapseBlankLines) return Math.Max(0, newlines - 1);
+            return closing ? 0 : Math.Max(0, Math.Min(newlines - 1, options.MaxBlankLines));
         }
+
+        private int MaxBlank => options.CollapseBlankLines ? options.MaxBlankLines : int.MaxValue;
 
         /// <summary>
         /// Copies source text, re-indenting every line after the first with <paramref name="indentFor"/> (old columns to
@@ -577,13 +676,14 @@ namespace KScript.Language.Formatting
 
         private void AppendLine(string line, bool exact)
         {
+            exact |= !options.TrimTrailingWhitespace;
             sb.Append(exact ? line : line.TrimEnd());
             if (exact) keptUpTo = sb.Length;
         }
 
         private void FlushBlanks(ref int pending)
         {
-            int n = Math.Min(pending, options.MaxBlankLines);
+            int n = Math.Min(pending, MaxBlank);
             if (n > 0) TrimTrailingWhitespace();
             for (int i = 0; i < n; i++) sb.Append(eol);
             pending = 0;
@@ -594,6 +694,7 @@ namespace KScript.Language.Formatting
 
         private void TrimTrailingWhitespace()
         {
+            if (!options.TrimTrailingWhitespace) return;
             int i = sb.Length;
             while (i > keptUpTo && (sb[i - 1] == ' ' || sb[i - 1] == '\t')) i--;
             sb.Length = i;

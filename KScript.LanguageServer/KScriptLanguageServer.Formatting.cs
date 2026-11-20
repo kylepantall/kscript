@@ -25,7 +25,12 @@ namespace KScript.LanguageServer
             JsonNode o = p?["options"];
             int? tabSize = o?["tabSize"] is JsonValue t && t.TryGetValue(out int size) ? size : null;
             bool? insertSpaces = o?["insertSpaces"] is JsonValue s && s.TryGetValue(out bool spaces) ? spaces : null;
-            FormatOptions options = FormatOptions.From(ProjectFor(doc.Path), tabSize, insertSpaces);
+            KScript.Projects.ProjectConfig project = ProjectFor(doc.Path);
+            if (project != null && (!project.Format.Enabled || project.IsFormatExcluded(doc.Path)))
+            {
+                return new JsonArray();
+            }
+            FormatOptions options = FormatOptions.From(project, tabSize, insertSpaces);
 
             FormatResult result = Formatter.Format(doc.Text, doc.Kind, options);
             if (!result.Succeeded)

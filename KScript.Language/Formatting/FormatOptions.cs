@@ -37,6 +37,26 @@ namespace KScript.Language.Formatting
         /// </summary>
         public HashSet<string> Preserve { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>Re-indent elements by how deeply they are nested. Off: every line keeps its indentation.</summary>
+        public bool Indent { get; set; } = true;
+
+        /// <summary>Put each statement (and block-level element) on its own line. Off: line breaks are only changed where there already was whitespace.</summary>
+        public bool StatementPerLine { get; set; } = true;
+
+        /// <summary>One space between attributes and <c>&lt;x /&gt;</c> for self-closing tags. Off: start tags are kept as written.</summary>
+        public bool TidyTags { get; set; } = true;
+
+        /// <summary>One attribute per line for long or already-wrapped start tags. Off: tags are never wrapped or joined.</summary>
+        public bool WrapAttributes { get; set; } = true;
+
+        public bool TrimTrailingWhitespace { get; set; } = true;
+
+        /// <summary>Shrink runs of blank lines to <see cref="MaxBlankLines"/>. Off: blank lines are kept.</summary>
+        public bool CollapseBlankLines { get; set; } = true;
+
+        /// <summary>End the file with exactly one newline. Off: the file ends as it did.</summary>
+        public bool FinalNewline { get; set; } = true;
+
         public static FormatOptions Default => new FormatOptions();
 
         /// <summary>
@@ -62,6 +82,19 @@ namespace KScript.Language.Formatting
                 _ => EndOfLine.Auto,
             };
             foreach (string name in f.Preserve) options.Preserve.Add(name);
+            foreach (var rule in f.Rules)
+            {
+                switch (rule.Key)
+                {
+                    case "indent": options.Indent = rule.Value; break;
+                    case "statementPerLine": options.StatementPerLine = rule.Value; break;
+                    case "tidyTags": options.TidyTags = rule.Value; break;
+                    case "wrapAttributes": options.WrapAttributes = rule.Value; break;
+                    case "trimTrailingWhitespace": options.TrimTrailingWhitespace = rule.Value; break;
+                    case "collapseBlankLines": options.CollapseBlankLines = rule.Value; break;
+                    case "finalNewline": options.FinalNewline = rule.Value; break;
+                }
+            }
             return options;
         }
     }

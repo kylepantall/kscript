@@ -115,6 +115,18 @@ namespace KScript.Projects
 
         public static readonly string[] DefaultInclude = { "**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html" };
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
+
+        /// <summary>False turns formatting off for the whole project (kscript fmt skips it, the editor makes no changes).</summary>
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>Rules turned on or off by name, from "rules": { "statementPerLine": false }. Unlisted rules are on.</summary>
+        public Dictionary<string, bool> Rules { get; } = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The formatter's rules, each of which can be turned off in format.rules.</summary>
+        public static readonly string[] RuleNames =
+        {
+            "indent", "statementPerLine", "tidyTags", "wrapAttributes", "trimTrailingWhitespace", "collapseBlankLines", "finalNewline",
+        };
     }
 
     /// <summary>
@@ -412,6 +424,31 @@ namespace KScript.Projects
                         if (eol == "auto" || eol == "lf" || eol == "crlf") config.Format.EndOfLine = eol;
                         else config.Warnings.Add("format.endOfLine should be \"auto\", \"lf\" or \"crlf\".");
                         break;
+                    case "enabled":
+                        if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False) config.Format.Enabled = p.Value.GetBoolean();
+                        else config.Warnings.Add("format.enabled should be true or false.");
+                        break;
+                    case "rules":
+                        if (!Object(p.Value, "format.rules", config)) break;
+                        foreach (var rule in p.Value.EnumerateObject())
+                        {
+                            bool? on = rule.Value.ValueKind switch
+                            {
+                                JsonValueKind.True => true,
+                                JsonValueKind.False => false,
+                                JsonValueKind.String when string.Equals(rule.Value.GetString().Trim(), "on", StringComparison.OrdinalIgnoreCase) => true,
+                                JsonValueKind.String when string.Equals(rule.Value.GetString().Trim(), "off", StringComparison.OrdinalIgnoreCase) => false,
+                                _ => null,
+                            };
+                            string known = FormatSettings.RuleNames.FirstOrDefault(n => string.Equals(n, rule.Name, StringComparison.OrdinalIgnoreCase));
+                            if (known == null)
+                                config.Warnings.Add($"format.rules: there is no rule '{rule.Name}'. Rules: {string.Join(", ", FormatSettings.RuleNames)}.");
+                            else if (on == null)
+                                config.Warnings.Add($"format.rules.{rule.Name} should be true or false (or \"on\" / \"off\").");
+                            else
+                                config.Format.Rules[known] = on.Value;
+                        }
+                        break;
                     case "preserve":
                         config.Format.Preserve = Strings(p.Value, "format.preserve", config) ?? config.Format.Preserve;
                         break;
@@ -422,7 +459,7 @@ namespace KScript.Projects
                         config.Format.Exclude = Strings(p.Value, "format.exclude", config) ?? config.Format.Exclude;
                         break;
                     default:
-                        config.Warnings.Add($"unknown setting 'format.{p.Name}' (expected indent, tabWidth, printWidth, maxBlankLines, endOfLine, preserve, include or exclude).");
+                        config.Warnings.Add($"unknown setting 'format.{p.Name}' (expected enabled, rules, indent, tabWidth, printWidth, maxBlankLines, endOfLine, preserve, include or exclude).");
                         break;
                 }
             }

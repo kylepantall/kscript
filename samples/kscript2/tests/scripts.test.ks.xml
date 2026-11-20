@@ -41,7 +41,9 @@
 
     <test name="prints the cart">
       <capture to="out">
-        <for each="item" in="$cart"><echo>- {$item}</echo></for>
+        <for each="item" in="$cart">
+          <echo>- {$item}</echo>
+        </for>
       </capture>
       <expect value="$out" equals="'- apple'" />
     </test>

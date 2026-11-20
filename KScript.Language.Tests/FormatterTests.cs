@@ -230,6 +230,84 @@ namespace KScript.Language.Tests
                 "</kscript>"), Fmt(input, options: options));
         }
 
+        // ---- rules and ignore comments ----------------------------------------------------------------------------
+
+        [Fact]
+        public void FormatOffRegionsAreKeptExactly()
+        {
+            string input = "<kscript>\n<!-- kscript-fmt: off -->\n<let   name=\"grid\" value=\"[\n   [1, 0],\n   [0, 1] ]\"/>   \n      <echo>x</echo>\n<!-- kscript-fmt: on -->\n<echo>y</echo>\n</kscript>\n";
+            Assert.Equal(Lines(
+                "<kscript>",
+                "  <!-- kscript-fmt: off -->",
+                "<let   name=\"grid\" value=\"[",
+                "   [1, 0],",
+                "   [0, 1] ]\"/>   ",
+                "      <echo>x</echo>",
+                "<!-- kscript-fmt: on -->",
+                "  <echo>y</echo>",
+                "</kscript>"), Fmt(input));
+        }
+
+        [Fact]
+        public void FormatOffRunsToTheEndOfItsElement()
+        {
+            string input = "<kscript>\n<if test=\"yes\">\n<!-- kscript-fmt: off -->\n<echo>a</echo>\n</if>\n<echo>b</echo>\n</kscript>\n";
+            Assert.Equal(Lines(
+                "<kscript>",
+                "  <if test=\"yes\">",
+                "    <!-- kscript-fmt: off -->",
+                "<echo>a</echo>",
+                "  </if>",
+                "  <echo>b</echo>",
+                "</kscript>"), Fmt(input));
+        }
+
+        [Fact]
+        public void IgnoreCommentKeepsTheNextElement()
+        {
+            string input = "<kscript>\n<!-- kscript-fmt-ignore: hand aligned -->\n<for each=\"i\" in=\"1..3\"><echo>$i</echo></for>\n<for each=\"i\" in=\"1..3\"><echo>$i</echo></for>\n</kscript>\n";
+            Assert.Equal(Lines(
+                "<kscript>",
+                "  <!-- kscript-fmt-ignore: hand aligned -->",
+                "  <for each=\"i\" in=\"1..3\"><echo>$i</echo></for>",
+                "  <for each=\"i\" in=\"1..3\">",
+                "    <echo>$i</echo>",
+                "  </for>",
+                "</kscript>"), Fmt(input));
+        }
+
+        [Fact]
+        public void RulesCanBeTurnedOff()
+        {
+            string input = "<kscript>   \n    <let   name=\"a\"/>\n\n\n\n <if test=\"yes\"><echo>x</echo>\n   </if>\n</kscript>";
+
+            Assert.Equal("<kscript>\n  <let   name=\"a\"/>\n\n  <if test=\"yes\">\n    <echo>x</echo>\n  </if>\n</kscript>\n",
+                Fmt(input, options: new FormatOptions { TidyTags = false }));
+            Assert.Equal("<kscript>\n  <let name=\"a\" />\n\n  <if test=\"yes\"><echo>x</echo>\n  </if>\n</kscript>\n",
+                Fmt(input, options: new FormatOptions { StatementPerLine = false }));
+            Assert.Equal("<kscript>\n    <let name=\"a\" />\n\n <if test=\"yes\">\n   <echo>x</echo>\n   </if>\n</kscript>\n",
+                Fmt(input, options: new FormatOptions { Indent = false }));
+            Assert.Equal("<kscript>\n  <let name=\"a\" />\n\n\n\n  <if test=\"yes\">\n    <echo>x</echo>\n  </if>\n</kscript>\n",
+                Fmt(input, options: new FormatOptions { CollapseBlankLines = false }));
+            Assert.Equal("<kscript>\n  <let name=\"a\" />\n\n  <if test=\"yes\">\n    <echo>x</echo>\n  </if>\n</kscript>",
+                Fmt(input, options: new FormatOptions { FinalNewline = false }));
+            Assert.Contains("    a   \n", Fmt("<kscript>\n<echo>\n  a   \n  b\n</echo>\n</kscript>\n", options: new FormatOptions { TrimTrailingWhitespace = false }));
+            Assert.Contains("    a\n", Fmt("<kscript>\n<echo>\n  a   \n  b\n</echo>\n</kscript>\n"));
+        }
+
+        [Fact]
+        public void WrapAttributesOffKeepsTagsAsWritten()
+        {
+            string value = new string('a', 120);
+            string input = $"<kscript>\n<let name=\"x\" value=\"'{value}'\" />\n<test name=\"a\"\n   each=\"c\" in=\"$cases\" />\n</kscript>\n";
+            Assert.Equal(Lines(
+                "<kscript>",
+                $"  <let name=\"x\" value=\"'{value}'\" />",
+                "  <test name=\"a\"",
+                "   each=\"c\" in=\"$cases\" />",
+                "</kscript>"), Fmt(input, options: new FormatOptions { WrapAttributes = false }));
+        }
+
         // ---- pages ------------------------------------------------------------------------------------------------
 
         [Fact]
@@ -517,6 +595,17 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ProjectsCanTurnFormattingOff()
+        {
+            Write("kscript.json", "{ \"format\": { \"enabled\": false } }");
+            string script = Write("a.ks.xml", Messy);
+            (int code, string output) = Run(dir, "--check");
+            Assert.Equal(0, code);
+            Assert.Contains("skipped (format.enabled is false", output);
+            Assert.Equal(Messy, File.ReadAllText(script));
+        }
+
+        [Fact]
         public void FormatSettingsAreRead()
         {
             ProjectConfig config = ProjectConfig.Parse(
@@ -530,6 +619,17 @@ namespace KScript.Language.Tests
             Assert.Equal(EndOfLine.CrLf, options.EndOfLine);
             Assert.Contains("echo", options.Preserve);
             Assert.Contains(config.Warnings, w => w.Contains("format.nope"));
+
+            ProjectConfig rules = ProjectConfig.Parse(
+                "{ \"format\": { \"enabled\": false, \"rules\": { \"statementPerLine\": false, \"tidytags\": \"off\", \"bogus\": false, \"indent\": 3 } } }",
+                Path.Combine(dir, "kscript.json"));
+            Assert.False(rules.Format.Enabled);
+            FormatOptions ruled = FormatOptions.From(rules);
+            Assert.False(ruled.StatementPerLine);
+            Assert.False(ruled.TidyTags);
+            Assert.True(ruled.Indent);
+            Assert.Contains(rules.Warnings, w => w.Contains("no rule 'bogus'"));
+            Assert.Contains(rules.Warnings, w => w.Contains("format.rules.indent should be true or false"));
 
             // Without a "format" section the editor's settings are used.
             FormatOptions editor = FormatOptions.From(null, editorTabSize: 4, editorInsertSpaces: false);

@@ -41,7 +41,7 @@ becomes
 - **Text is never rewrapped.** Multi-line element text keeps its own layout and moves to the new indent as a block. That is safe because KScript removes the indentation that the lines of element text share, so `<echo>` prints the same thing.
 - **Attribute values** are kept exactly as written, including values that span several lines.
 - **Comments** are kept; a multi-line comment moves as a block.
-- **Raw content** is kept exactly, trailing spaces included: CDATA sections, and in pages the content of `<pre>`, `<textarea>`, `<script>` and `<style>`. `<markdown>` keeps its trailing spaces (two spaces at the end of a line are a line break in Markdown). Add your own elements to `format.preserve`.
+- **Raw content** is kept exactly, trailing spaces included: CDATA sections, and in pages the content of `<pre>`, `<textarea>`, `<script>` and `<style>`. `<markdown>` keeps its trailing spaces (two spaces at the end of a line are a line break in Markdown). Add your own elements to `format.preserve`, or use the [ignore comments](#leaving-part-of-a-file-alone).
 - **Pages render the same.** In a page, a line break only goes where there was already whitespace or next to a block-level element such as `<div>` or `<li>`, so inline elements written side by side (`<b>a</b><i>b</i>`) stay together. An inline row written on one line, like a `<nav>` of links, stays on one line. In script elements whose content is text, such as `<echo>`, no whitespace is added between child elements either.
 - `<!doctype>`, `<?xml ?>`, a byte order mark and the file's line endings (unless `endOfLine` says otherwise) are kept.
 
@@ -60,6 +60,8 @@ Put style settings under `"format"` in `kscript.json`. Every setting is optional
     "maxBlankLines": 1,       // blank lines kept in a row
     "endOfLine": "auto",      // auto (keep each file's), lf or crlf
     "preserve": ["pre-like"], // elements whose content is kept exactly
+    "rules": {},              // turn rules off, e.g. { "statementPerLine": false }; see below
+    "enabled": true,          // false: no formatting anywhere in this project
     "include": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html"],
     "exclude": ["_templates", "node_modules", ".git"]
   }
@@ -67,6 +69,52 @@ Put style settings under `"format"` in `kscript.json`. Every setting is optional
 ```
 
 In the editor, the editor's own tab settings (`editor.tabSize`, `editor.insertSpaces`) are used for anything `kscript.json` doesn't set. When a project sets `format.indent`, that wins, so everyone on the project gets the same result.
+
+## Turning rules off
+
+Each thing the formatter does is a rule you can turn off under `format.rules` (`true`/`false`, or `"on"`/`"off"`). Every rule is on unless you list it:
+
+| Rule | What it does | When it's off |
+| --- | --- | --- |
+| `indent` | Indents elements by nesting. | Lines keep the indentation they have. |
+| `statementPerLine` | Puts each statement (and block-level element) on its own line. | Line breaks only change where there already was whitespace, so one-liners like `<for ...><echo>$i</echo></for>` stay. |
+| `tidyTags` | One space between attributes, `<x />` for self-closing tags. | Start tags are kept exactly as written. |
+| `wrapAttributes` | One attribute per line for long start tags, and for tags already written that way. | Tags are never wrapped or joined. |
+| `trimTrailingWhitespace` | Removes spaces at the ends of lines of text. | They're kept. |
+| `collapseBlankLines` | Shrinks runs of blank lines to `maxBlankLines`. | Blank lines are kept. |
+| `finalNewline` | Ends the file with exactly one newline. | The file ends as it did. |
+
+```jsonc
+{
+  "format": {
+    "rules": { "statementPerLine": false, "wrapAttributes": false }
+  }
+}
+```
+
+`"enabled": false` turns formatting off for the whole project: `kscript fmt` skips its files and Format Document makes no changes. `format.exclude` leaves particular files and folders alone.
+
+## Leaving part of a file alone
+
+Comments switch the formatter off for part of a file:
+
+```xml
+<kscript>
+  <!-- kscript-fmt: off -->
+  <let name="grid" value="[
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1] ]" />
+  <!-- kscript-fmt: on -->
+
+  <!-- kscript-fmt-ignore: kept on one line on purpose -->
+  <for each="i" in="1..3"><echo>$i</echo></for>
+</kscript>
+```
+
+- Everything from `<!-- kscript-fmt: off -->` to `<!-- kscript-fmt: on -->` is kept exactly. Without an `on`, it runs to the end of the element the comment is in (or the end of the file).
+- `<!-- kscript-fmt-ignore -->` keeps the element (or comment) right after it exactly. Anything after `kscript-fmt-ignore` in the comment is yours, for saying why.
+- Only the comment's own line is re-indented, so the region moves with the code around it.
 
 ## In the editor
 
