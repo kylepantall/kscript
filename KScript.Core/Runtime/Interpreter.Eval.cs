@@ -24,7 +24,7 @@ namespace KScript.Runtime
         /// </summary>
         public object EvaluateTyped(DecodedText text, Scope scope, Module module, string type)
         {
-            string kind = Shapes.RawTextKind(SafeType(type), scope, module);
+            string kind = Shapes.RawTextKind(TypeRef.Parse(type), scope, module);
             if (kind == null) return EvaluateText(text, scope, module);
             ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
             if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(text.Value, kind)) return text.Value.Trim();
@@ -35,12 +35,6 @@ namespace KScript.Runtime
 
         /// <summary>Text that is plainly a handle (<c>@a--b</c>, which would otherwise read as @a - -b), for a handle type.</summary>
         internal static bool LooksRaw(string text, string kind) => kind == "handle" && RawHandle.IsMatch(text.Trim());
-
-        private static TypeRef SafeType(string type)
-        {
-            try { return TypeRef.Parse(type); }
-            catch (KScriptException) { return null; }
-        }
 
         /// <summary>True if <paramref name="node"/> is only bare words, numbers and the operators between them (<c>my-post</c>, <c>H4cmW12in</c>).</summary>
         internal static bool IsRawWord(ExprNode node, string kind, Scope scope, Module module)

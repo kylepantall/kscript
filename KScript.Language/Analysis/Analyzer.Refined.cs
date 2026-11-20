@@ -182,7 +182,8 @@ namespace KScript.Language.Analysis
                     }
                     return TypeArgumentProblem(t, lower, converted);
                 }
-                return null;
+                bool fits = lower is "int" or "float" or "number" ? literal is double : lower == "string" && literal is string;
+                return fits ? TypeArgumentProblem(t, lower, literal) : null;
             }
 
             Symbol symbol = scope?.Lookup(name, offset) ?? result.RootScope.Lookup(name, int.MaxValue);

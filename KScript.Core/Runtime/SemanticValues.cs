@@ -349,7 +349,7 @@ namespace KScript.Runtime
                 {
                     return BCrypt.Net.BCrypt.Verify(secret, hash);
                 }
-                catch (BCrypt.Net.SaltParseException)
+                catch (Exception ex) when (ex is BCrypt.Net.SaltParseException || ex is FormatException)
                 {
                     // Falls through to the error below.
                 }

@@ -424,13 +424,13 @@ namespace KScript.Runtime
                 return;
             }
             object converted = Shapes.Convert(interpreter, value, field.Type.WithOptional(field.Optional), $"{Type.Name}.{name}", Type.Closure, Type.Module);
-            bool had = TryGetValue(name, out object old);
+            // Every field is set when a record is made, so there is always an old value to put back.
+            TryGetValue(name, out object old);
             this[name] = converted;
             if (Type.Validators.Count == 0) return;
             List<string> failures = Shapes.Failures(interpreter, this);
             if (failures.Count == 0) return;
-            if (had) this[name] = old;
-            else Remove(name);
+            this[name] = old;
             var error = new KScriptException($"{Type.Name}.{name} can't be set to that: the {Type.Name} {failures[0]}.", "Shape");
             error.Fields["problems"] = failures.Select(f => (object)new Dictionary<string, object> { ["path"] = "$", ["field"] = null, ["message"] = f + "." }).ToList();
             throw error;
@@ -553,11 +553,9 @@ namespace KScript.Runtime
                     return "word";
                 case RecordType r:
                     return r.ReadsText ? "word" : null;
-                case RefinedType t:
-                    string root = t.Root();
-                    return root == SemanticTypes.Handle ? "handle" : TextRoots.Contains(root) ? "word" : null;
                 default:
-                    return null;
+                    string root = ((RefinedType)resolved).Root();
+                    return root == SemanticTypes.Handle ? "handle" : TextRoots.Contains(root) ? "word" : null;
             }
         }
 
@@ -721,6 +719,7 @@ namespace KScript.Runtime
         {
             TypeRef t = TypeRef.Parse(name);
             if (t == null) return false;
+            if (t.Args != null) t = t.ArgBase;
             if (t.IsBuiltIn || t.ListDepth > 0) return true;
             return scope.TryGet(t.Name, out object found) && (found is RefinedType || found is EnumType);
         }
@@ -731,7 +730,7 @@ namespace KScript.Runtime
             if (baseType.Optional) throw run.Error($"with=\"{baseName}\": a type's base can't allow null. Write {name}? where the type is used instead.", "with", "Syntax");
             if (run.Has("fields") || run.Has("sample"))
                 throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it has rules (min, max, pattern, validate...) rather than fields.", run.Has("fields") ? "fields" : "sample", "Syntax");
-            if (!baseType.IsBuiltIn && baseType.ListDepth == 0 && run.Scope.TryGet(baseType.Name, out object found) && found is RefinedType inner) baseType = TypeRef.Of(inner);
+            if (!baseType.IsBuiltIn && baseType.Args == null && baseType.ListDepth == 0 && run.Scope.TryGet(baseType.Name, out object found) && found is RefinedType inner) baseType = TypeRef.Of(inner);
             TypeRules rules = TypeRules.Read(run.Element, run);
             foreach (MarkupElement e in run.ChildElements)
             {
@@ -788,8 +787,9 @@ namespace KScript.Runtime
                     {
                         conflicts[f.Name] = $"{type.Name} gets '{f.Name}' from {origin[f.Name].Name} ({existing.Type}) and {b.Name} ({f.Type}). Declare {f.Name} in {type.Name} to choose.";
                     }
-                    else if (f.Type.Inline is RefinedType rules)
+                    else if (f.Type.Inline is RefinedType || f.Type.Args != null && f.Type.ListDepth == 0)
                     {
+                        RefinedType rules = f.Type.Inline as RefinedType ?? f.Type.Refined(b.Closure, b.Module);
                         // Both bases have the field: the second one's rules apply on top of the first's.
                         var both = new RefinedType(rules.Name, existing.Type.WithOptional(false), rules.Rules, null, rules.Closure, rules.Module);
                         type.SetField(existing.WithType(TypeRef.Of(both, 0, existing.Type.Optional && f.Type.Optional), existing.Optional && f.Optional));
@@ -802,6 +802,7 @@ namespace KScript.Runtime
         /// <summary>The name of the type under any field rules: string for <c>string(min: 1)</c>.</summary>
         private static string BaseName(TypeRef t)
         {
+            if (t.Args != null) t = t.ArgBase.WithOptional(t.Optional);
             while (t.Inline is RefinedType r && r.Name == r.Base.WithOptional(false).ToString()) t = r.Base;
             return t.WithOptional(false).ToString();
         }
@@ -822,7 +823,8 @@ namespace KScript.Runtime
         {
             string target = BaseName(inherited);
             if (own.ListDepth != inherited.ListDepth) return false;
-            for (int depth = 0; depth < 64; depth++)
+            // Each step goes down to a base declared before, so this ends.
+            while (true)
             {
                 if (BaseName(own) == target || own.WithOptional(false).ToString() == target) return true;
                 object resolved = own.Inline ?? (own.IsBuiltIn ? null : scope.TryGet(own.Name, out object f) ? f : null);
@@ -840,7 +842,6 @@ namespace KScript.Runtime
                         return false;
                 }
             }
-            return false;
         }
 
         /// <summary><c>login: string</c>, <c>avatar_url?: string</c>, <c>tags: string[] = []</c> or just <c>name</c>.</summary>

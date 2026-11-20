@@ -199,6 +199,8 @@ namespace KScript.Language.Features
                     SymbolKind.Parameter => SemanticTokenType.Parameter,
                     SymbolKind.Import => SemanticTokenType.Namespace,
                     SymbolKind.FrontMatter => SemanticTokenType.Property,
+                    // A <type> or <enum> by name (Age in with [Age], or where it is declared) is coloured as a type.
+                    _ when r.Symbol.Shape.Type == KType.Type || r.Symbol.EnumValues != null => SemanticTokenType.Type,
                     _ => SemanticTokenType.Variable,
                 };
                 tokens.Add(new SemanticToken(r.Span, type,

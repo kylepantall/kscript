@@ -196,7 +196,7 @@ namespace KScript.Runtime
             foreach (Parameter p in Parameters.Where(p => p.Type != null))
             {
                 TypeRef t = TypeRef.Parse(p.Type);
-                if (!t.IsSimple || t.IsBuiltIn) continue;
+                if (!t.IsSimple || t.IsBuiltIn || t.Args != null) continue;
                 object declared;
                 try
                 {

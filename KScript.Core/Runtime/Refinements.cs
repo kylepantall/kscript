@@ -176,7 +176,7 @@ namespace KScript.Runtime
             if (OneOf is List<object> oneOf)
             {
                 List<object> items = oneOf.Select(convert).ToList();
-                if (!items.Any(o => Values.StrictEquals(o, value))) yield return $"must be one of {string.Join(", ", items.Select(Values.ToStr))}";
+                if (!items.Any(o => Values.StrictEquals(o, value))) yield return $"must be one of {string.Join(", ", items.Select(o => o == null ? "null" : Values.ToStr(o)))}";
             }
             if (Not is List<object> reserved && reserved.Select(convert).Any(o => Values.StrictEquals(o, value))) yield return $"is reserved ('{Values.ToStr(value)}')";
             foreach (string problem in OptionProblems(value)) yield return problem;
@@ -405,22 +405,15 @@ namespace KScript.Runtime
         internal string Root()
         {
             RefinedType t = this;
-            for (int depth = 0; depth < 64; depth++)
+            while (true)
             {
                 if (t.Base.ListDepth > 0) return "list";
                 if (t.Base.Inline is RefinedType inner) { t = inner; continue; }
-                if (t.Base.IsBuiltIn) return t.Base.Name;
-                if (t.Closure.TryGet(t.Base.Name, out object found) && found is RefinedType next) { t = next; continue; }
-                return t.Base.Name;
+                // A base with arguments (uuid(v: 4), Age(max: 9)) comes down to the type before them.
+                TypeRef b = t.Base.Args != null ? t.Base.ArgBase : t.Base;
+                if (!b.IsBuiltIn && t.Closure.TryGet(b.Name, out object found) && found is RefinedType next) { t = next; continue; }
+                return b.Name;
             }
-            return "any";
         }
-
-        internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
-        {
-            ("from", "value", "Converts the value to this type and checks its rules. Fails with every problem it finds.", "any"),
-            ("check", "value", "The problems that stop the value fitting this type, as { path, field, message } maps. Empty when it fits.", "list"),
-            ("name", "", "The type's name.", "string"),
-        };
     }
 }
