@@ -435,7 +435,8 @@ namespace KScript.Language.Agents
                 w.Append($"  - `{package}`{(description != null ? ": " + description : string.Empty)}\n");
             }
             w.Append(End).Append('\n');
-            return Fit(w.ToString(), AgentsBudget);
+            // The raw string constants have the source file's line endings (CRLF in a Windows checkout).
+            return Fit(w.ToString().Replace("\r\n", "\n"), AgentsBudget);
         }
 
         private static string Count(int n, string one, string many = null) => $"{n} {(n == 1 ? one : many ?? one + "s")}";
