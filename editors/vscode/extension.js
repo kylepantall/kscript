@@ -6,10 +6,13 @@ const { LanguageClient, TransportKind, State } = require('vscode-languageclient/
 const { resolveServer, versionOf, supportsLsp } = require('./src/server');
 const { isSiteFolder } = require('./src/site');
 const { registerBlockDividers } = require('./src/blocks');
+const { watchedPath, watchBinary } = require('./src/watch');
 
 const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-needed';
 
 let client;
+let binaryWatcher;
+let restarting = false;
 let status;
 let output;
 
@@ -44,6 +47,7 @@ async function startClient(context) {
   }
 
   const version = versionOf(server);
+  watchServerBinary(context, server, version);
   output.appendLine(`Using ${server.command}${version ? ` (kscript ${version})` : ''}, found via ${server.source}.`);
   if (version && !supportsLsp(version)) {
     const choice = await vscode.window.showWarningMessage(
@@ -89,7 +93,29 @@ async function startClient(context) {
   }
 }
 
+/** Restarts the language server when its kscript is replaced, e.g. by `kscript update`, so it doesn't keep running the old one. */
+function watchServerBinary(context, server, version) {
+  if (binaryWatcher) binaryWatcher.dispose();
+  binaryWatcher = watchBinary(watchedPath(server), async () => {
+    if (restarting) return;
+    restarting = true;
+    try {
+      output.appendLine(`${watchedPath(server)} changed; restarting the language server.`);
+      await stopClient();
+      await startClient(context);
+      const now = versionOf(server);
+      if (now && now !== version) vscode.window.showInformationMessage(`KScript updated to ${now}. The language server has restarted.`);
+    } finally {
+      restarting = false;
+    }
+  });
+}
+
 async function stopClient() {
+  if (binaryWatcher) {
+    binaryWatcher.dispose();
+    binaryWatcher = undefined;
+  }
   if (client) {
     const old = client;
     client = undefined;
