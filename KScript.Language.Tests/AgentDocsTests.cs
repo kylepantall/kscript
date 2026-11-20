@@ -553,12 +553,12 @@ namespace KScript.Language.Tests
             Write("main.kscript", "fn one() => 1\nfn two() => 2\n");
             List<string> logs = Logs(Saved(main), Saved(Path.Combine(dir, "AGENTS.md")), Saved(null),
                 new JsonObject { ["method"] = "textDocument/didSave", ["params"] = new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = "untitled:1" } } });
-            Assert.Contains(logs, l => l.StartsWith("Updated agent docs: AGENTS.md", StringComparison.Ordinal));
+            Assert.Contains(logs, l => l.StartsWith("agents: updated AGENTS.md", StringComparison.Ordinal));
             Assert.Contains("@two()", Read(".kscript/agents/index.md"));
-            Assert.DoesNotContain(Logs(Saved(main)), l => l.StartsWith("Updated", StringComparison.Ordinal));
+            Assert.DoesNotContain(Logs(Saved(main)), l => l.StartsWith("agents:", StringComparison.Ordinal));
 
             Write("kscript.json", "{ \"standard\": \"missing-standard\" }");
-            Assert.Contains(Logs(Saved(main)), l => l.StartsWith("Could not update the agent docs", StringComparison.Ordinal));
+            Assert.Contains(Logs(Saved(main)), l => l.StartsWith("agents: ", StringComparison.Ordinal) && l.Contains("standard"));
         }
     }
 }

@@ -88,4 +88,49 @@ public sealed class AgentsCliTests : IDisposable
         Assert.Contains("lib/a.ks.xml", File.ReadAllText(Path.Combine(dir, ".kscript", "agents", "index.md")));
         Assert.DoesNotContain("lib/a.kscript", File.ReadAllText(Path.Combine(dir, ".kscript", "agents", "index.md")));
     }
+
+    [Fact]
+    public void WatchRunsFromTheCommandLine()
+    {
+        Write("main.kscript", "fn one() => 1\n");
+        Assert.Equal(2, Kscript("watch", dir).Code);
+        Assert.Equal(0, Kscript("agents", dir).Code);
+        Write("main.kscript", "fn one() => 1\nfn two() => 2\n");
+        Assert.Equal(1, Kscript("watch", dir, "--check").Code);
+        var once = Kscript("watch", dir, "--once");
+        Assert.Equal(0, once.Code);
+        Assert.Contains("agents: updated", once.Out);
+        Assert.Contains("kscript watch [folder] [--once] [--check]", Kscript("--help").Out);
+
+        var o = new StringWriter { NewLine = "\n" };
+        Assert.Equal(0, new CommandLine { Out = o, Error = new StringWriter(), Cancellation = new CancellationToken(true) }.Run(new[] { "watch", dir }));
+        Assert.Contains("Watching", o.ToString());
+    }
+
+    [Fact]
+    public void ServeKeepsTheAgentDocsUpToDate()
+    {
+        Write("kscript.json", "{ \"name\": \"site\", \"serve\": { \"port\": 0, \"host\": \"127.0.0.1\" } }");
+        Write("index.html", "<h1>Hi</h1>");
+        Write("lib/tasks.kscript", "fn one() => 1\n");
+        Assert.Equal(0, Kscript("agents", dir).Code);
+        string index = Path.Combine(dir, ".kscript", "agents", "index.md");
+
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var o = new StringWriter();
+        var e = new StringWriter();
+        Task<int> serving = Task.Run(() => new CommandLine { Out = TextWriter.Synchronized(o), Error = e, Cancellation = stop.Token }.Run(new[] { "serve", dir }));
+        Thread.Sleep(500);
+        Write("lib/tasks.kscript", "fn one() => 1\nfn two() => 2\n");
+        bool updated = SpinWait.SpinUntil(() => { try { return File.ReadAllText(index).Contains("@two()"); } catch (IOException) { return false; } }, 15_000);
+        stop.Cancel();
+        Assert.True(updated, o.ToString() + e);
+        Assert.Equal(0, serving.Result);
+
+        // Without agent docs, serve watches nothing.
+        Directory.Delete(Path.Combine(dir, ".kscript"), true);
+        var cmd = new CommandLine { Out = new StringWriter(), Error = new StringWriter() };
+        cmd.WatchOutputs(dir, new CancellationToken(true));
+        cmd.WatchOutputs(Path.Combine(dir, "missing"), new CancellationToken(true));
+    }
 }

@@ -76,7 +76,7 @@ namespace KScript.LanguageServer
 
                 foreach (string file in changed) output.WriteLine($"wrote {file}");
                 int tokens = AgentDocs.EstimateTokens(File.ReadAllText(Path.Combine(root, AgentDocs.AgentsFile)));
-                output.WriteLine(changed.Count == 0 ? $"Agent docs{where} are up to date." : $"Agent docs{where} updated: AGENTS.md is about {tokens:N0} tokens. The editor keeps .kscript/agents up to date on save.");
+                output.WriteLine(changed.Count == 0 ? $"Agent docs{where} are up to date." : $"Agent docs{where} updated: AGENTS.md is about {tokens:N0} tokens. The editor (on save), kscript serve and kscript watch keep them up to date.");
                 return 0;
             }
             catch (ProjectConfigException ex)

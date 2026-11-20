@@ -158,6 +158,7 @@ kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI
 kscript fmt                    # tidy every script and page (--check for CI)
 kscript agents                 # AGENTS.md and compact docs for coding agents, made from your code
+kscript watch                  # keep the agent docs (and other generated files) up to date as you code
 kscript ide install            # add the extension to VS Code, Cursor, VSCodium or Windsurf
 kscript compile --target all   # build programs for macOS, Windows and Linux that run without kscript
 kscript update                 # get the latest release

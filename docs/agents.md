@@ -7,11 +7,27 @@ say what your functions really take and return, and they stay short, so an agent
 kscript agents            # write AGENTS.md and .kscript/agents
 kscript agents --check    # write nothing; fail if they are out of date (for CI)
 kscript agents --print    # print AGENTS.md's generated part
+kscript watch             # rewrite them each time a file changes, until Ctrl+C
 kscript check --format json   # problems as JSON, with fixes as exact text edits
 ```
 
-`kscript make project` (and `--bare`) writes them for you. After that, the editor rewrites `.kscript/agents` and
-AGENTS.md each time you save a script, so they never fall behind the code.
+`kscript make project` (and `--bare`) writes them for you. After that they keep themselves up to date: the editor
+rewrites `.kscript/agents` and AGENTS.md each time you save a script, and `kscript serve` and `kscript watch` do the
+same whenever a file changes, so edits made anywhere (another editor, a coding agent, `git pull`) are picked up too.
+
+## Watching
+
+`kscript watch` builds everything the project makes from its code, then rebuilds it a moment after its files stop
+changing. Today that is the agent docs; other generated files join the same watch as packages add them, so one
+command, the editor and `kscript serve` keep all of them in step with the code.
+
+```sh
+kscript watch            # build, then rebuild on every change until Ctrl+C
+kscript watch --once     # build once and stop
+kscript watch --check    # write nothing; fail if anything is out of date (for CI)
+```
+
+It ignores its own files, hidden folders (such as `.git` and `.kscript`), `bin`, `obj`, `node_modules` and `dist`.
 
 ## What gets written
 

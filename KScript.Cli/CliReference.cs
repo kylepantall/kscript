@@ -45,6 +45,14 @@ namespace KScript
                     O("--print", "Print AGENTS.md's generated section instead of writing files."),
                 },
                 "kscript agents\nkscript agents --check", "agents"),
+            new CliCommand("watch", "kscript watch [folder] [--once] [--check]",
+                "Rebuild everything the project makes from its code (the agent docs, and more as packages add to it) each time a file changes, until Ctrl+C. kscript serve and the editor (on save) do the same.",
+                new[]
+                {
+                    O("--once", "Build once and stop."),
+                    O("--check", "Write nothing; fail if anything is out of date (for CI)."),
+                },
+                "kscript watch\nkscript watch --check", "agents"),
             new CliCommand("fmt", "kscript fmt [file-or-folder]... [--check]",
                 "Tidy scripts and pages.",
                 new[] { O("--check", "Only report files that would change, and fail if any would (for CI).") },
