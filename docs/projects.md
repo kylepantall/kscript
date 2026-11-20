@@ -104,7 +104,8 @@ kscript make project my-app --template ../starters/api   # any folder
   "serve": {
     "root": ".",          // the site folder, relative to kscript.json
     "port": 8080,         // --port and --host on the command line still win
-    "host": "localhost"
+    "host": "localhost",
+    "docs": true          // also serve the docs, with a page about this project (see docs/web.md)
   },
   "http": {
     "middleware": ["log"],                     // routes, middleware and their settings (see docs/http.md)

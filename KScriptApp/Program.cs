@@ -49,14 +49,18 @@ namespace KScript
         void PrintUsage(TextWriter output) => CliReference.PrintUsage(output);
 
         /// <summary>
-        /// kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder. In a project, the nearest
-        /// kscript.json gives the defaults (serve.root, serve.port, serve.host); options on the command line win.
+        /// kscript serve [folder] [--port N] [--host H] [--with-docs]: serves KScript pages from a folder. In a project, the
+        /// nearest kscript.json gives the defaults (serve.root, serve.port, serve.host, serve.docs); options on the
+        /// command line win. --with-docs also serves the docs, with a page about the project, on localhost; compiled
+        /// sites (<paramref name="allowDocs"/> false) and the production environment never do.
         /// </summary>
-        int Serve(string[] args)
+        int Serve(string[] args, bool allowDocs = true)
         {
             string folder = null;
             int? port = null;
             string host = null;
+            bool? withDocs = null;
+            int? docsPort = null;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -78,6 +82,21 @@ namespace KScript
                             return 1;
                         }
                         host = args[++i];
+                        break;
+                    case "--with-docs":
+                        withDocs = true;
+                        break;
+                    case "--no-docs":
+                        withDocs = false;
+                        break;
+                    case "--docs-port":
+                        if (i + 1 >= args.Length || !int.TryParse(args[++i], out int dp) || dp < 1 || dp > 65535)
+                        {
+                            Error.WriteLine("--docs-port needs a number, e.g. --docs-port 4180");
+                            return 1;
+                        }
+                        docsPort = dp;
+                        withDocs ??= true;
                         break;
                     default:
                         folder = args[i];
@@ -106,6 +125,22 @@ namespace KScript
                     folder = project.SiteRoot;
                 port ??= project.Serve.Port;
                 host ??= project.Serve.Host;
+                docsPort ??= project.Serve.DocsPort;
+                withDocs ??= project.Serve.Docs;
+            }
+
+            // The docs (which run examples) are for working on the site: never for a compiled program or in production.
+            System.Threading.Tasks.Task docs = System.Threading.Tasks.Task.CompletedTask;
+            using var stopDocs = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            if (withDocs == true)
+            {
+                string environment = project?.ConfigOptions(EnvironmentName).Environment ?? EnvironmentName ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
+                if (!allowDocs)
+                    withDocs = false;
+                else if (string.Equals(environment, "production", StringComparison.OrdinalIgnoreCase))
+                    Error.WriteLine("Docs: not served in the production environment.");
+                else if (Directory.Exists(folder ?? "."))
+                    docs = KScript.Docs.DocsCommand.ServeProjectAsync(folder ?? ".", project, docsPort, port ?? 8080, Out, Error, stopDocs.Token);
             }
 
             try
@@ -126,6 +161,11 @@ namespace KScript
             {
                 Error.WriteLine($"Could not start the server: {ex.Message}");
                 return 1;
+            }
+            finally
+            {
+                stopDocs.Cancel();
+                docs.GetAwaiter().GetResult();
             }
         }
 
@@ -328,7 +368,7 @@ namespace KScript
             CompiledApp.Manifest app = CompiledApp.Read(manifest);
             return app.Kind switch
             {
-                "site" => Serve(new[] { app.Main }.Concat(args).ToArray()),
+                "site" => Serve(new[] { app.Main }.Concat(args).ToArray(), allowDocs: false),
                 "window" => RunWindow(app.Main, args),
                 _ => RunScript(app.Main, args),
             };

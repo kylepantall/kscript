@@ -37,6 +37,13 @@ namespace KScript.Language.Analysis
             Analyze(text, path, files, catalog, kind, projectWide: true);
 
         /// <summary>
+        /// Analyses one file without reading the rest of the project for calls to its functions: for listing what a
+        /// file declares (as the docs' project page does), where unused-function warnings don't matter.
+        /// </summary>
+        public static DocumentAnalysis AnalyzeFile(string text, string path, IFileSystem files = null, LanguageCatalog catalog = null) =>
+            Analyze(text, path, files, catalog, null, projectWide: false);
+
+        /// <summary>
         /// With <paramref name="projectWide"/> false, functions are not checked for use (KS6002), so no other file in
         /// the project is read for calls. That is how files that import this one are analysed.
         /// </summary>

@@ -50,6 +50,26 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
 - **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
 
+## Docs while you work: --with-docs
+
+`kscript serve --with-docs` also serves these docs on localhost, next to the site, with a page about your project at `/project`:
+
+```sh
+kscript serve --with-docs
+# Serving /home/me/shop on http://localhost:8080
+# Docs for shop: http://localhost:4180/project
+```
+
+The project page is built from the project itself, and is rebuilt when a script changes:
+
+- **How code is written here**: the project's format (`make.format`), standard, layout and lint rules, the packages every script gets, and the folders `kscript make` puts files in.
+- **Routes**: what `kscript routes` lists, with what answers each route and its middleware.
+- **Functions, types and constants**: everything each script declares at its top level, with its `///` doc comment (`@param`, `@returns`, `@example`, `@deprecated`), file by file. Search finds them too.
+
+Examples show in the project's format, and the switch at the top shows them in the other. The docs listen on localhost only, even when the site is served with `--host 0.0.0.0`, because their examples run code. `--docs-port 4190` picks their port (4180, or a free one, otherwise).
+
+To have them every time, set `"docs": true` in the `serve` section of kscript.json (and `"docs_port"` to pick the port); `--no-docs` turns them off for one run. The docs are for working on a site: compiled programs (`kscript compile`) never serve them, and neither does `kscript serve` in the `production` environment (`--env production`, or `KSCRIPT_ENV=production`).
+
 For controllers, JSON APIs and middleware, add a route file: see [Routes, controllers and middleware](http.md). Routes are matched before pages, and anything they don't match is served as described here.
 
 See `Example Sites/team` for a complete site with a layout, a component, a Markdown page, a dynamic route and a JSON endpoint.

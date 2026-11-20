@@ -96,7 +96,7 @@ namespace KScript.Docs
             ["language-server.md"] = "how the language server is built, for contributors",
         };
 
-        private static readonly string[] SectionOrder = { "Start here", "Language", "Build", "Tools", "Reference", "Methods by type", "More" };
+        private static readonly string[] SectionOrder = { ProjectSection, "Start here", "Language", "Build", "Tools", "Reference", "Methods by type", "More" };
 
         public List<DocPage> Pages { get; } = new List<DocPage>();
         public List<SearchEntry> Search { get; } = new List<SearchEntry>();
