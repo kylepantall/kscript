@@ -346,4 +346,104 @@ public sealed class ProjectDocsTests : IDisposable
         Assert.Equal(1, code);
         Assert.Contains("Could not start the docs server", error.ToString());
     }
+
+    [Fact]
+    public void The_projects_docs_are_written_as_markdown_once_turned_on()
+    {
+        WriteProject();
+        Write("lib/strings.kscript", Strings.Replace("/// @example @slugify('Hello World')", "/// @example\n/// @slugify('a')\n/// @slugify('b')"));
+        var output = new ProjectDocsOutput();
+        Assert.Equal("docs", output.Name);
+        Assert.False(output.IsEnabled(dir));
+        Assert.False(output.IsEnabled(null));
+        Assert.True(output.Owns(".kscript/docs/project.md"));
+        Assert.False(output.Owns("lib/strings.kscript"));
+
+        var stdout = new StringWriter();
+        Assert.Equal(0, ProjectDocsOutput.Start(Path.Combine(dir, "lib"), stdout, TextWriter.Null));
+        Assert.Contains("Wrote ", stdout.ToString());
+        Assert.True(output.IsEnabled(dir));
+        string md = File.ReadAllText(Path.Combine(dir, ProjectDocsOutput.File));
+        Assert.StartsWith("# shop\n", md);
+        Assert.Contains("- New scripts, routes and tests are `.ks.xml` files.", md);
+        Assert.Contains("`KS6001` off", md);
+        Assert.Contains("- Every script can use `KScript.IO` without importing it.", md);
+        Assert.Contains("| GET | `/hi` | `hi` | inline |", md);
+        Assert.Contains("```xml\n<import src=\"lib/strings.kscript\" />\n```", md);
+        Assert.Contains("### @slugify(text: string): string (fn)", md);
+        Assert.Contains("- `text`: What to turn into a slug.", md);
+        Assert.Contains("Returns The slug.", md);
+        Assert.Contains("Example:\n\n```\n@slugify('a')\n@slugify('b')\n```", md);
+        Assert.Contains("**Deprecated.** Use slugify.", md);
+        Assert.Contains("<field name=\"id\" type=\"int\" from=\"user_id\" />", md);
+        Assert.Contains("In `lib/strings.kscript`, line 9.", md);
+
+        // Nothing changed: nothing is written, and check agrees.
+        Assert.Empty(output.Write(dir, check: false));
+        stdout = new StringWriter();
+        Assert.Equal(0, ProjectDocsOutput.Start(dir, stdout, TextWriter.Null));
+        Assert.Contains("Up to date:", stdout.ToString());
+
+        // A change is found by check without writing, then written.
+        Write("lib/more.kscript", "fn hello() => 'hi'\n");
+        Assert.Equal(new[] { ProjectDocsOutput.File }, output.Write(dir, check: true));
+        Assert.DoesNotContain("@hello", File.ReadAllText(Path.Combine(dir, ProjectDocsOutput.File)));
+        Assert.Equal(new[] { ProjectDocsOutput.File }, output.Write(dir, check: false));
+        Assert.Contains("### @hello()", File.ReadAllText(Path.Combine(dir, ProjectDocsOutput.File)));
+
+        // kscript registers it, so kscript watch keeps it up to date.
+        CommandLine.AddProjectOutputs();
+        Assert.Contains(KScript.Language.Outputs.ProjectOutputs.All, o => o is ProjectDocsOutput);
+        Assert.Equal(0, new CommandLine { Out = TextWriter.Null, Error = TextWriter.Null }.Run(new[] { "watch", dir, "--check" }));
+    }
+
+    [Fact]
+    public void The_markdown_follows_the_projects_format_and_says_what_is_missing()
+    {
+        Write("site/lib/a.kscript", "const size = 3\n");
+        Write("site/routes.ks.xml", "<KScript.Routes>\n  <Get path=\"/a\" name=\"x\" view=\"a\" />\n  <Get path=\"/b\" name=\"x\" view=\"b\" />\n</KScript.Routes>\n");
+        string md = ProjectDocsOutput.Markdown(ProjectGuide.Read(Path.Combine(dir, "site"), null));
+        Assert.Contains("```kscript\nimport \"lib/a.kscript\"\n```", md);
+        Assert.Contains("```kscript\nconst size = 3\n```", md);
+        Assert.Contains("The routes couldn't be read: ", md);
+        Assert.DoesNotContain("Standard:", md);
+
+        Write("empty/index.html", "<h1>Hi</h1>");
+        Assert.Contains("No script declares", ProjectDocsOutput.Markdown(ProjectGuide.Read(Path.Combine(dir, "empty"), null)));
+
+        int max = ProjectGuide.MaxFiles;
+        try
+        {
+            ProjectGuide.MaxFiles = 0;
+            Assert.Contains("more than 0 scripts", ProjectDocsOutput.Markdown(ProjectGuide.Read(Path.Combine(dir, "site"), null)));
+        }
+        finally
+        {
+            ProjectGuide.MaxFiles = max;
+        }
+    }
+
+    [Fact]
+    public void Docs_project_writes_them_from_the_command_line_and_reports_failures()
+    {
+        Write("p/kscript.json", "{ \"name\": \"p\" }");
+        string cwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(Path.Combine(dir, "p"));
+            var output = new StringWriter();
+            Assert.Equal(0, DocsCommand.Run(new[] { "--project" }, output, TextWriter.Null));
+            Assert.True(File.Exists(Path.Combine(dir, "p", ProjectDocsOutput.File)));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+
+        // .kscript is a file, so the folder can't be made.
+        Write("q/.kscript", "x");
+        var error = new StringWriter();
+        Assert.Equal(1, ProjectDocsOutput.Start(Path.Combine(dir, "q"), TextWriter.Null, error));
+        Assert.Contains("Could not write the project's docs", error.ToString());
+    }
 }

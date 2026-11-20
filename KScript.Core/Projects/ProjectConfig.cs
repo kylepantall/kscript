@@ -347,6 +347,45 @@ namespace KScript.Projects
         /// </summary>
         public List<string> Packages { get; set; } = new List<string>();
 
+        /// <summary>
+        /// The "types" section: defaults for built-in types, used wherever the type is used without arguments of its
+        /// own, such as <c>"uuid": { "v": 4 }</c> or <c>"password": { "min": 12 }</c>. Arguments where a type is used
+        /// (<c>password(min: 8)</c>) replace these.
+        /// </summary>
+        public Dictionary<string, Dictionary<string, object>> Types { get; } = new Dictionary<string, Dictionary<string, object>>(StringComparer.Ordinal);
+
+        private static void ReadTypes(JsonElement e, ProjectConfig config)
+        {
+            if (e.ValueKind != JsonValueKind.Object)
+            {
+                config.Warnings.Add("types should be an object, such as \"types\": { \"uuid\": { \"v\": 4 } }.");
+                return;
+            }
+            foreach (JsonProperty type in e.EnumerateObject())
+            {
+                string name = type.Name.Trim().ToLowerInvariant();
+                if (!KScript.Runtime.Values.DeclarableTypes.Contains(name) || name is "any" or "fn")
+                {
+                    config.Warnings.Add($"types: '{type.Name}' isn't a built-in type. Defaults can be set for: {string.Join(", ", KScript.Runtime.Values.DeclarableTypes.Where(t => t is not ("any" or "fn")))}.");
+                    continue;
+                }
+                if (type.Value.ValueKind != JsonValueKind.Object)
+                {
+                    config.Warnings.Add($"types.{type.Name} should be an object of rules, such as {{ \"min\": 12 }}.");
+                    continue;
+                }
+                var options = (Dictionary<string, object>)KScript.Runtime.Values.FromJson(type.Value);
+                KScript.Runtime.TypeRules rules = KScript.Runtime.TypeRules.FromOptions(options, out string error);
+                string problem = error ?? rules.ProblemFor(name, $"types.{name}");
+                if (problem != null)
+                {
+                    config.Warnings.Add($"types.{type.Name}: {problem}");
+                    continue;
+                }
+                config.Types[name] = options;
+            }
+        }
+
         /// <summary>Unknown keys and values that were ignored.</summary>
         public List<string> Warnings { get; } = new List<string>();
 
@@ -487,6 +526,9 @@ namespace KScript.Projects
                         case "http":
                             ReadHttp(prop.Value, config);
                             break;
+                        case "types":
+                            ReadTypes(prop.Value, config);
+                            break;
                         case "paths":
                             ReadPaths(prop.Value, config);
                             break;
@@ -499,7 +541,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, serve, http, lint, test, config, format, make or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, types, serve, http, lint, test, config, format, make or app).");
                             break;
                     }
                 }

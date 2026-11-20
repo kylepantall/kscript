@@ -22,6 +22,8 @@
   --hl-num: #0a6c8f;
   --hl-kw: #8250df;
   --hl-com: #8a909c;
+  --hl-type: #0b7a75;
+  --hl-re: #a3460c;
   --radius: 10px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -51,6 +53,8 @@
   --hl-num: #6cd3f0;
   --hl-kw: #c4a2ff;
   --hl-com: #737a88;
+  --hl-type: #5fd4c8;
+  --hl-re: #ff9e64;
   color-scheme: dark;
 }
 
@@ -202,6 +206,8 @@ button.link:hover { color: var(--fg); background: var(--bg); }
 .hl-num { color: var(--hl-num); }
 .hl-kw { color: var(--hl-kw); font-weight: 600; }
 .hl-com { color: var(--hl-com); font-style: italic; }
+.hl-type { color: var(--hl-type); }
+.hl-re { color: var(--hl-re); }
 .hl-br { color: var(--fg-faint); }
 
 /* Try it */

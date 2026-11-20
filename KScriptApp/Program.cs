@@ -302,8 +302,16 @@ namespace KScript
             return KScript.Http.HttpServer.ListRoutes(folder ?? ".", project, Out, Error);
         }
 
+        /// <summary>
+        /// Adds the outputs that live outside KScript.Language (the project's docs) to ProjectOutputs. Its own method,
+        /// so compiled programs, which never call <see cref="Run"/> and leave KScript.Docs out, never load it.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        internal static void AddProjectOutputs() => KScript.Language.Outputs.ProjectOutputs.Add(new KScript.Docs.ProjectDocsOutput());
+
         public int Run(string[] args)
         {
+            AddProjectOutputs();
             if (args.Length > 0 && args[0] == "lsp")
             {
                 // stdout carries the protocol, so nothing else may write to it.
