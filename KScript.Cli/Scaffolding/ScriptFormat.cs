@@ -47,7 +47,7 @@ namespace KScript.Scaffolding
         {
             if (format != Xml || !MarkupParser.IsCodePath(templateFile)) return (path, content);
             // The parser and converter report problems as diagnostics, never by throwing.
-            ConversionResult result = ScriptConverter.ToXml(CodeParser.Parse(content));
+            ConversionResult result = ScriptConverter.ToXml(CodeParser.Parse(content), nameList: global::KScript.Language.Catalog.LanguageCatalog.Default.IsNameList);
             if (MarkupParser.IsCodePath(path)) path = ScriptConverter.ConvertedPath(path);
             // Lay it out as kscript fmt would, so a new project passes kscript fmt --check.
             string text = global::KScript.Language.Formatting.Formatter.Format(result.Text, path)?.Text ?? result.Text;

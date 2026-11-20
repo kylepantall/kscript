@@ -950,6 +950,7 @@ namespace KScript.Language.Analysis
 
         private void AnalyzeAttribute(MarkupElement e, MarkupAttribute attr, AttributeInfo a, Scope scope)
         {
+            CheckNameListString(e, attr, a);
             switch (a.Kind)
             {
                 case AttributeKind.Expression:

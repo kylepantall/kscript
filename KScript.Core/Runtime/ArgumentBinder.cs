@@ -30,6 +30,20 @@ namespace KScript.Runtime
     }
 
     /// <summary>
+    /// An array argument with bare words in it, such as <c>[large, small]</c> in <c>@pack([large, small])</c>. The
+    /// words are values of the parameter's enum when it is a list of one (<c>sizes: Size[]</c>), and an error otherwise.
+    /// </summary>
+    public sealed class BareList
+    {
+        public BareList(IReadOnlyList<object> items) => Items = items;
+
+        /// <summary>The items: <see cref="BareWord"/>s and the values of the other expressions.</summary>
+        public IReadOnlyList<object> Items { get; }
+
+        public BareWord FirstWord => Items.OfType<BareWord>().First();
+    }
+
+    /// <summary>
     /// A positional argument written after a named one: <c>@join_path(base: $folder, ['archive', $name])</c>. It
     /// fills the first parameter that is still empty.
     /// </summary>
@@ -50,9 +64,13 @@ namespace KScript.Runtime
     public static class ArgumentBinder
     {
         /// <summary>One parameter, as the binder sees it.</summary>
-        public sealed record Slot(string Name, bool Required, bool Variadic = false, IReadOnlyCollection<string> Values = null, string TypeName = null)
+        public sealed record Slot(string Name, bool Required, bool Variadic = false, IReadOnlyCollection<string> Values = null, string TypeName = null,
+            IReadOnlyCollection<string> ItemValues = null)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
+
+            /// <summary>A list of an enum (<c>sizes: Size[]</c>), whose items can be written bare.</summary>
+            public bool IsEnumList => ItemValues != null && ItemValues.Count > 0;
 
             public static Slot From(ParameterInfo p) => new Slot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.Values);
         }
@@ -65,7 +83,7 @@ namespace KScript.Runtime
         public static CallContext Bind(CallableInfo info, CallContext call)
         {
             if (info.Signatures.Count == 0) return Plain(call);
-            bool simple = call.Named.Count == 0 && !call.Args.Any(a => a is BareWord || a is LatePositional);
+            bool simple = call.Named.Count == 0 && !call.Args.Any(a => a is BareWord || a is LatePositional || a is BareList);
             if (simple && !info.Signatures.Any(s => s.Parameters.Any(p => p.Values.Count > 0))) return call;
 
             KScriptException first = null;
@@ -108,7 +126,8 @@ namespace KScript.Runtime
         /// </summary>
         public static CallContext Plain(CallContext call)
         {
-            BareWord bare = call.Args.OfType<BareWord>().FirstOrDefault() ?? call.Named.Values.OfType<BareWord>().FirstOrDefault();
+            BareWord bare = call.Args.OfType<BareWord>().FirstOrDefault() ?? call.Named.Values.OfType<BareWord>().FirstOrDefault()
+                ?? call.Args.Concat(call.Named.Values).Select(a => a is LatePositional l ? l.Value : a).OfType<BareList>().Select(l => l.FirstWord).FirstOrDefault();
             if (bare != null) throw NotAValue(call, bare, null);
             if (!call.Args.Any(a => a is LatePositional)) return call;
             return new CallContext(call.Interpreter, call.Name, call.Args.Select(a => a is LatePositional l ? l.Value : a).ToList(), call.Named,
@@ -257,6 +276,39 @@ namespace KScript.Runtime
                 if (free < bound.Count) bound[free] = value;
                 else bound.Add(value);
                 skipped.Remove(free);
+            }
+
+            // [large, small]: bare words are values of a list-of-enum parameter, and nothing anywhere else.
+            for (int i = 0; i < bound.Count; i++)
+            {
+                if (!(bound[i] is BareList list)) continue;
+                Slot slot = i < slots.Count ? slots[i] : slots.LastOrDefault(s => s.Variadic);
+                var items = new List<object>(list.Items.Count);
+                foreach (object item in list.Items)
+                {
+                    if (!(item is BareWord word))
+                    {
+                        items.Add(item);
+                        continue;
+                    }
+                    string value = slot?.IsEnumList == true && !word.Negated
+                        ? slot.ItemValues.FirstOrDefault(v => string.Equals(v, word.Name.Trim(), StringComparison.OrdinalIgnoreCase))
+                        : null;
+                    if (value == null)
+                    {
+                        error = slot?.IsEnumList == true
+                            ? new KScriptException($"'{word.Name}' isn't a {slot.TypeName}." + Hint(word.Name, slot.ItemValues) + $" Use {Or(slot.ItemValues)}.", "Argument")
+                            : NotAValue(call, word, null);
+                        return false;
+                    }
+                    items.Add(value);
+                }
+                bound[i] = items;
+            }
+            foreach (string key in rest.Where(r => r.Value is BareList).Select(r => r.Key).ToList())
+            {
+                error = NotAValue(call, ((BareList)rest[key]).FirstWord, null);
+                return false;
             }
 
             for (int i = 0; i < slots.Count; i++)

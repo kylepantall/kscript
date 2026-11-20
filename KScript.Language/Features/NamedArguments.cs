@@ -51,6 +51,9 @@ namespace KScript.Language.Features
                     Details = fn.Parameters.Select(p => (p.Name,
                         p.Type != null ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type && x.EnumValues != null)?.EnumValues : null,
                         p.Type == KType.Bool)).ToList(),
+                    ItemValues = fn.Parameters.Select(p => p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal)
+                        ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type.Substring(0, p.Type.Length - 2).Trim() && x.EnumValues != null)?.EnumValues
+                        : null).ToList(),
                 });
             }
 
@@ -225,6 +228,49 @@ namespace KScript.Language.Features
 
         /// <summary>The flag a bare-word argument sets (<c>recursive</c> or <c>not recursive</c>), or null.</summary>
         internal static string FlagName(ArgumentNode a) => a.Name == null ? Analysis.Analyzer.BareWord(a)?.Word : null;
+
+        /// <summary>Inside an array argument (<c>@pack_all([large, ‸])</c>), the values of the enum its parameter is a list of.</summary>
+        private List<CompletionItem> ListItemCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)
+        {
+            string text = region.Source.Value;
+            int p = wordStart;
+            while (p > 0 && char.IsWhiteSpace(text[p - 1]))
+            {
+                p--;
+            }
+            if (p == 0 || (text[p - 1] != '[' && text[p - 1] != ','))
+            {
+                return new List<CompletionItem>();
+            }
+            (ExprNode node, ArgumentList args) = InnermostCall(region, wordStart);
+            ArgumentNode arg = args?.Arguments.FirstOrDefault(a => a.Value is ListNode && a.Value.Span.Start < wordStart && wordStart <= a.Value.Span.End);
+            if (arg == null)
+            {
+                return new List<CompletionItem>();
+            }
+            List<SignatureInfo> signatures = SignaturesFor(analysis, region, node, out int piped);
+            int position = piped + args.Arguments.TakeWhile(a => a != arg).Count(a => a.Name == null);
+            var items = new List<CompletionItem>();
+            foreach (SignatureInfo signature in signatures.Where(s => s.ItemValues != null && s.Details != null))
+            {
+                int index = arg.Name != null ? signature.Details.ToList().FindIndex(d => d.Name == arg.Name) : position;
+                if (index < 0 || index >= signature.ItemValues.Count || signature.ItemValues[index] == null)
+                {
+                    continue;
+                }
+                string name = signature.Details[index].Name;
+                items.AddRange(signature.ItemValues[index].Select(value => new CompletionItem
+                {
+                    Label = value,
+                    Kind = CompletionKind.Value,
+                    Detail = name,
+                    Documentation = $"A value for the items of `{name}` in `{signature.Label}`.",
+                    ReplaceSpan = replace,
+                    SortText = "000" + value,
+                }));
+            }
+            return items.GroupBy(i => i.Label).Select(g => g.First()).ToList();
+        }
 
         /// <summary>Right after <c>name:</c> in a call, the enum values that parameter takes.</summary>
         private List<CompletionItem> NamedValueCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)

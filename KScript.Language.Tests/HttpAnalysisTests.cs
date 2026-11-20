@@ -67,6 +67,50 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ListsCanBeArrays()
+        {
+            DocumentAnalysis a = Analyzer.Analyze(
+                "KScript.Routes {\n  import \"controllers/people.ks.xml\" as people\n  fn stamp(request, next) => $next($request)\n  Middleware(use: [stamp, cors, throttle:30, admin])\n  Resource(path: \"/people\", to: people, only: [index, show])\n  Route(methods: [get, post], path: \"/both\", to: people.index)\n  Group(middleware: [auth]) {\n    Get(path: \"/\", to: people.show)\n  }\n}\n",
+                Path.Combine(Site, "routes.kscript"), Files);
+            TestHelpers.AssertClean(a);
+        }
+
+        [Fact]
+        public void NamesInAnArrayAreChecked()
+        {
+            DocumentAnalysis a = Analyzer.Analyze("KScript.Routes {\n  Middleware(use: [cors, stmap])\n}\n", Path.Combine(Site, "routes.kscript"), Files);
+            Diagnostic d = TestHelpers.AssertSingle(a, DiagnosticCodes.UndefinedFunction);
+            Assert.StartsWith("No function named 'stmap'", d.Message);
+            Assert.Equal("stmap", a.Markup.Source.Text.Substring(d.Span.Start, d.Span.Length));
+        }
+
+        [Fact]
+        public void AStringListSuggestsAnArray()
+        {
+            string text = "KScript.Routes {\n  fn stamp(request, next) => $next($request)\n  Middleware(use: \"stamp, cors\")\n}\n";
+            DocumentAnalysis a = Analyzer.Analyze(text, Path.Combine(Site, "routes.kscript"), Files);
+            Diagnostic d = Assert.Single(a.Diagnostics, x => x.Code == DiagnosticCodes.PreferArrayList);
+            Assert.Contains("use: [stamp, cors]", d.Message);
+            Assert.Equal("KScript.Routes {\n  fn stamp(request, next) => $next($request)\n  Middleware(use: [stamp, cors])\n}\n", AnalyzerTests.Apply(text, d.Fixes[0].Changes));
+
+            // XML attributes are always text, and one name needs no list.
+            Assert.DoesNotContain(Analyze("<fn name=\"stamp\" params=\"request, next\" value=\"$next($request)\" /><Middleware use=\"stamp, cors\" />").Diagnostics, x => x.Code == DiagnosticCodes.PreferArrayList);
+            Assert.DoesNotContain(Analyzer.Analyze("KScript.Routes {\n  Middleware(use: \"cors\")\n}\n", Path.Combine(Site, "routes.kscript"), Files).Diagnostics, x => x.Code == DiagnosticCodes.PreferArrayList);
+        }
+
+        [Fact]
+        public void NamesInAnArrayComplete()
+        {
+            string text = "KScript.Routes {\n  import \"controllers/people.ks.xml\" as people\n  Get(path: \"/\", to: people.index, middleware: [cors, ‸])\n}\n";
+            int offset = text.IndexOf('‸');
+            text = text.Remove(offset, 1);
+            DocumentAnalysis analysis = Service.Analyze(text, Path.Combine(Site, "routes.kscript"));
+            List<string> labels = Service.GetCompletions(analysis, offset).Select(i => i.Label).ToList();
+            Assert.Contains("throttle", labels);
+            Assert.Contains("people.show", labels);
+        }
+
+        [Fact]
         public void RoutesBelongInsideRoutes()
         {
             DocumentAnalysis a = Analyzer.Analyze("<kscript>\n<import package=\"KScript.Http\" />\n<Get path=\"/\" redirect=\"/\" />\n</kscript>", Path.Combine(Site, "x.ks.xml"), Files);
@@ -77,7 +121,7 @@ namespace KScript.Language.Tests
         public void TheCodeFormatWorksToo()
         {
             DocumentAnalysis a = Analyzer.Analyze(
-                "KScript.Routes(middleware: admin) {\n  import \"controllers/people.ks.xml\" as people\n  Get(path: \"/people/{id}\", to: people.show)\n  Group(prefix: \"/v2\", middleware: \"cors, throttle:5\") {\n    Get(path: \"/\", to: people.index)\n  }\n}\n",
+                "KScript.Routes(middleware: admin) {\n  import \"controllers/people.ks.xml\" as people\n  Get(path: \"/people/{id}\", to: people.show)\n  Group(prefix: \"/v2\", middleware: [cors, throttle:5]) {\n    Get(path: \"/\", to: people.index)\n  }\n}\n",
                 Path.Combine(Site, "api.kscript"), Files);
             TestHelpers.AssertClean(a);
         }

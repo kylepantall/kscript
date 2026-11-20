@@ -778,6 +778,7 @@ namespace KScript.Language.Features
             List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false);
             start.InsertRange(0, ParameterNameCompletions(analysis, region, wordStart, replace));
             start.InsertRange(0, NamedValueCompletions(analysis, region, wordStart, replace));
+            start.InsertRange(0, ListItemCompletions(analysis, region, wordStart, replace));
             return start;
         }
 

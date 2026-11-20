@@ -20,13 +20,13 @@ namespace KScript.Syntax.Markup
     public static class ScriptConverter
     {
         /// <summary>Converts a file's text to the other format, chosen by its path (.kscript becomes XML, anything else .kscript).</summary>
-        public static ConversionResult Convert(string text, string path, Func<string, string> importPath = null)
+        public static ConversionResult Convert(string text, string path, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
         {
             if (MarkupParser.IsCodePath(path))
             {
-                return ToXml(CodeParser.Parse(text), importPath);
+                return ToXml(CodeParser.Parse(text), importPath, nameList);
             }
-            return ToCode(MarkupParser.Parse(text, DocumentKind.Script), importPath);
+            return ToCode(MarkupParser.Parse(text, DocumentKind.Script), importPath, nameList);
         }
 
         /// <summary>The path a converted file gets: x.ks.xml or x.xml becomes x.kscript, and x.kscript becomes x.ks.xml.</summary>
@@ -50,16 +50,21 @@ namespace KScript.Syntax.Markup
         /// Rewrites the <c>src</c> of each &lt;import&gt; (given as written, trimmed); null or a function that returns
         /// its input keeps every import as it is. <c>kscript convert</c> uses it to point imports at converted files.
         /// </param>
-        public static ConversionResult ToCode(MarkupDocument document, Func<string, string> importPath = null)
+        /// <param name="nameList">
+        /// True for an element's attribute that holds a list of names (<c>&lt;Middleware use&gt;</c>), such as
+        /// LanguageCatalog.IsNameList. Such lists are written <c>[a, b]</c> in
+        /// .kscript and <c>"a, b"</c> in XML. Null leaves every value as written.
+        /// </param>
+        public static ConversionResult ToCode(MarkupDocument document, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
         {
-            var writer = new CodeWriter { ImportPath = importPath ?? (s => s) };
+            var writer = new CodeWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? ((_, _) => false) };
             writer.WriteDocument(document);
             return writer.Result;
         }
 
-        public static ConversionResult ToXml(MarkupDocument document, Func<string, string> importPath = null)
+        public static ConversionResult ToXml(MarkupDocument document, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
         {
-            var writer = new XmlWriter { ImportPath = importPath ?? (s => s) };
+            var writer = new XmlWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? ((_, _) => false) };
             writer.WriteDocument(document);
             return writer.Result;
         }
@@ -240,6 +245,9 @@ namespace KScript.Syntax.Markup
         {
             public Func<string, string> ImportPath { get; init; }
 
+            /// <summary>True for an element's attribute that holds a list of names.</summary>
+            public Func<string, string, bool> NameList { get; init; }
+
             private readonly StringBuilder sb = new StringBuilder();
             private readonly Scopes scopes = new Scopes();
 
@@ -399,7 +407,7 @@ namespace KScript.Syntax.Markup
                 {
                     return m.Value;
                 }
-                var writer = new CodeWriter { ImportPath = ImportPath };
+                var writer = new CodeWriter { ImportPath = ImportPath, NameList = NameList };
                 writer.WriteDocument(doc);
                 string text = writer.Result.Text.Trim();
                 return text.Length == 0 || text.Contains('\n') ? m.Value : text;
@@ -465,7 +473,7 @@ namespace KScript.Syntax.Markup
                         return;
                     case "echo" when Only("value", "format", "newline") && !e.ChildElements.Any():
                         {
-                            string options = string.Join(", ", e.Attributes.Where(a => a.Name != "value").Select(FormatAttribute));
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name != "value").Select(a => FormatAttribute(e, a)));
                             sb.Append(pad).Append("echo").Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
                             string text = TrimLayout(TextOf(e));
                             if (Attr("value") is string v)
@@ -558,7 +566,7 @@ namespace KScript.Syntax.Markup
                             {
                                 WriteDoc(e, indent);
                             }
-                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description")).Select(FormatAttribute));
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description")).Select(a => FormatAttribute(e, a)));
                             sb.Append(pad).Append("type ").Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
                             if (!e.ChildElements.Any())
                             {
@@ -796,7 +804,7 @@ namespace KScript.Syntax.Markup
                 sb.Append(pad).Append(e.Name);
                 if (e.Attributes.Count > 0)
                 {
-                    sb.Append('(').Append(string.Join(", ", e.Attributes.Select(FormatAttribute))).Append(')');
+                    sb.Append('(').Append(string.Join(", ", e.Attributes.Select(a => FormatAttribute(e, a)))).Append(')');
                 }
                 List<MarkupNode> content = e.Children.Where(c => !(c is MarkupText t && t.IsWhitespace)).ToList();
                 bool hasElements = content.Any(c => c is MarkupElement);
@@ -822,11 +830,17 @@ namespace KScript.Syntax.Markup
 
             private int LineOf(MarkupElement e) => source.GetPosition(e.Span.Start).Line + 1;
 
-            private static string FormatAttribute(MarkupAttribute a)
+            private string FormatAttribute(MarkupElement e, MarkupAttribute a)
             {
                 if (a.Value == null || a.ValueText.Trim() == "yes")
                 {
                     return a.Name;
+                }
+                if (NameList(e.Name, a.Name) && global::KScript.Metadata.NameList.Names(a.ValueText) is { Count: > 1 } names
+                    && names.All(n => IsSafeBare(n)))
+                {
+                    // <Middleware use="log, cors"> becomes Middleware(use: [log, cors]).
+                    return a.Name + ": [" + string.Join(", ", names) + "]";
                 }
                 return a.Name + ": " + FormatValue(a.ValueText);
             }
@@ -913,6 +927,9 @@ namespace KScript.Syntax.Markup
         private sealed class XmlWriter
         {
             public Func<string, string> ImportPath { get; init; }
+
+            /// <summary>True for an element's attribute that holds a list of names.</summary>
+            public Func<string, string, bool> NameList { get; init; }
 
             private readonly StringBuilder sb = new StringBuilder();
             private readonly Scopes scopes = new Scopes();
@@ -1061,6 +1078,11 @@ namespace KScript.Syntax.Markup
                     if (a.Value != null && e.Name == "import" && a.Name == "src")
                     {
                         sb.Append("=\"").Append(EscapeAttribute(ImportPath(a.ValueText.Trim()))).Append('"');
+                    }
+                    else if (a.Value != null && NameList(e.Name, a.Name) && global::KScript.Metadata.NameList.IsArray(a.ValueText))
+                    {
+                        // Middleware(use: [log, cors]) becomes <Middleware use="log, cors">.
+                        sb.Append("=\"").Append(EscapeAttribute(string.Join(", ", global::KScript.Metadata.NameList.Names(a.ValueText)))).Append('"');
                     }
                     else if (a.Value != null)
                     {

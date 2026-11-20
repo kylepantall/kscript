@@ -3,10 +3,13 @@ KScript.Routes(middleware: api) {
   import "controllers/people.ks.xml" as people
   import "middleware/security.ks.xml"
 
-  Get(path: "/health", to: people.health)
-  Resource(path: "/people", to: people, only: "index, show")
+  // Every API response gets the security headers.
+  Middleware(use: [secure_headers])
 
-  Group(middleware: "auth, json_only") {
-    Resource(path: "/people", to: people, only: "store, update, destroy")
+  Get(path: "/health", to: people.health)
+  Resource(path: "/people", to: people, only: [index, show])
+
+  Group(middleware: [auth, json_only]) {
+    Resource(path: "/people", to: people, only: [store, update, destroy])
   }
 }

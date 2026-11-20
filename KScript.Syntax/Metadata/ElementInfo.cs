@@ -22,6 +22,12 @@ namespace KScript.Metadata
 
         /// <summary>True for text that is used as written, without <c>{ }</c> interpolation, such as a route path <c>/people/{id}</c>.</summary>
         public bool Literal { get; init; }
+
+        /// <summary>True for a list of names, written <c>[index, show]</c> in .kscript and <c>"index, show"</c> in XML (see <see cref="NameList"/>).</summary>
+        public bool NameList { get; init; }
+
+        /// <summary>A list of names: <see cref="NameList"/>, or any list of function names.</summary>
+        public bool IsNameList => NameList || Kind == AttributeKind.FunctionReferences;
     }
 
     public sealed class ElementInfo
