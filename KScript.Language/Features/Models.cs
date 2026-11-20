@@ -65,6 +65,9 @@ namespace KScript.Language.Features
 
         /// <summary>Per parameter: its name, the enum values it takes (or null), and whether it is a yes/no flag.</summary>
         internal IReadOnlyList<(string Name, IReadOnlyList<string> Values, bool Flag)> Details { get; init; }
+
+        /// <summary>Per parameter: the enum values its items take when it is a list of an enum (<c>sizes: Size[]</c>), or null.</summary>
+        internal IReadOnlyList<IReadOnlyList<string>> ItemValues { get; init; }
     }
 
     public sealed class SignatureHelpResult

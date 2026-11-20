@@ -127,6 +127,36 @@ public sealed class ConvertProjectTests : IDisposable
     }
 
     [Fact]
+    public void ListsOfNamesBecomeArrays()
+    {
+        Func<string, string, bool> lists = KScript.Language.Catalog.LanguageCatalog.Default.IsNameList;
+        string xml = "<KScript.Routes>\n  <Middleware use=\"log, cors, throttle:30\" />\n  <Resource path=\"/p\" to=\"people\" only=\"index, show\" />\n  <Get path=\"/\" redirect=\"/p\" middleware=\"auth\" />\n</KScript.Routes>";
+        string code = ScriptConverter.Convert(xml, "routes.ks.xml", nameList: lists).Text;
+        Assert.Contains("Middleware(use: [log, cors, throttle:30])", code);
+        Assert.Contains("only: [index, show]", code);
+        Assert.Contains("middleware: auth", code);
+
+        string back = ScriptConverter.Convert(code, "routes.kscript", nameList: lists).Text;
+        Assert.Contains("<Middleware use=\"log, cors, throttle:30\" />", back);
+        Assert.Contains("only=\"index, show\"", back);
+
+        // Without the catalog, values are kept as written.
+        Assert.Contains("use: \"log, cors, throttle:30\"", ScriptConverter.Convert(xml, "routes.ks.xml").Text);
+    }
+
+    [Theory]
+    [InlineData("[log, cors]", "log|cors")]
+    [InlineData("log, cors", "log|cors")]
+    [InlineData(" [ a ,b,  throttle:30 ] ", "a|b|throttle:30")]
+    [InlineData("[]", "")]
+    [InlineData("people.show", "people.show")]
+    public void NameListsReadBothForms(string text, string expected)
+    {
+        Assert.Equal(expected, string.Join("|", KScript.Metadata.NameList.Names(text)));
+        Assert.Equal(text.Trim().StartsWith('['), KScript.Metadata.NameList.IsArray(text));
+    }
+
+    [Fact]
     public void ConstElementsBecomeConstDeclarations()
     {
         var result = ScriptConverter.Convert("<kscript>\n  <const name=\"file\" value=\"'a.json'\" />\n  <const name=\"n\" type=\"int\">3</const>\n</kscript>", "x.ks.xml");

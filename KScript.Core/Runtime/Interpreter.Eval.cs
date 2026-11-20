@@ -280,12 +280,21 @@ namespace KScript.Runtime
             foreach (ArgumentNode a in arguments)
             {
                 // A bare word (downloads, recursive, not recursive) means something only to the parameter it lands on.
-                object value = BareWordOf(a.Value, scope, ctx, afterNamed: named != null && a.Name == null) ?? Evaluate(a.Value, scope, ctx);
+                object value = BareWordOf(a.Value, scope, ctx, afterNamed: named != null && a.Name == null) ?? BareListOf(a.Value, scope, ctx) ?? Evaluate(a.Value, scope, ctx);
                 if (a.Name != null) (named ??= new Dictionary<string, object>(StringComparer.Ordinal))[a.Name] = value;
                 else if (named != null && !(value is BareWord)) args.Add(new LatePositional(value));
                 else args.Add(value);
             }
             return (args, named);
+        }
+
+        /// <summary>An array with bare words in it, <c>[large, small]</c>, for the binder to resolve against the parameter; null otherwise.</summary>
+        private BareList BareListOf(ExprNode node, Scope scope, EvalContext ctx)
+        {
+            if (!(node is ListNode list) || !list.Items.Any(i => i is IdentifierNode)) return null;
+            var words = list.Items.Select(i => i is IdentifierNode ? BareWordOf(i, scope, ctx, afterNamed: false) : null).ToList();
+            if (words.All(w => w == null)) return null;
+            return new BareList(list.Items.Select((item, n) => words[n] ?? Evaluate(item, scope, ctx)).ToList());
         }
 
         private static BareWord BareWordOf(ExprNode node, Scope scope, EvalContext ctx, bool afterNamed)

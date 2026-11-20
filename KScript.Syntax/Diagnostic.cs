@@ -120,6 +120,9 @@ namespace KScript.Syntax
         /// <summary>An import (a script, a name from one, or a package) that nothing uses.</summary>
         public const string UnusedImport = "KS6005";
 
+        /// <summary>A list of names written as one string in a .kscript file (<c>use: "log, cors"</c>) rather than an array (<c>use: [log, cors]</c>).</summary>
+        public const string PreferArrayList = "KS6006";
+
         /// <summary>
         /// True for the unused-code rules (KS6002-KS6005). Editors show their code faded, as unnecessary, as well as
         /// (or instead of) underlining it.

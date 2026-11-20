@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using KScript.Runtime;
+using KScript.Language.Catalog;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
 
@@ -165,11 +166,11 @@ namespace KScript.Docs
             {
                 var xml = MarkupParser.Parse(AsScript(code, "xml"), DocumentKind.Script);
                 if (xml.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
-                return ScriptConverter.ToCode(xml).Text?.TrimEnd() + "\n";
+                return ScriptConverter.ToCode(xml, nameList: LanguageCatalog.Default.IsNameList).Text?.TrimEnd() + "\n";
             }
             var parsed = CodeParser.Parse(code);
             if (parsed.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)) return null;
-            string text = ScriptConverter.ToXml(parsed).Text;
+            string text = ScriptConverter.ToXml(parsed, nameList: LanguageCatalog.Default.IsNameList).Text;
             return text == null ? null : Unwrap(text);
         }
 

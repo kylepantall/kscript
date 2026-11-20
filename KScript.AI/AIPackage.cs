@@ -136,7 +136,7 @@ namespace KScript.AI
                 new A("to", K.DeclareVariable, "The variable that receives the answer.", true),
                 new A("system", K.Template, "The system prompt."),
                 new A("schema", K.Expression, "Ask for structured output: a map describing the fields, such as `{ category: 'bug|feature', urgency: 'int 1-5' }`. The answer is then a map."),
-                new A("tools", K.FunctionReferences, "<fn> functions the model may call, comma separated."),
+                new A("tools", K.FunctionReferences, "<fn> functions the model may call: [lookup, weather]."),
                 new A("model", K.Text, "The model to use (default: claude-opus-5-5, or KSCRIPT_AI_MODEL)."),
                 new A("max-tokens", K.Expression, "The longest answer, in tokens (default 16000)."))
             {
@@ -146,7 +146,7 @@ namespace KScript.AI
             {
                 string name = run.VariableName("to");
                 var tools = new List<AiTool>();
-                foreach (string fn in (run.Raw("tools") ?? string.Empty).Split(',').Select(t => t.Trim().TrimStart('@', '$')).Where(t => t.Length > 0))
+                foreach (string fn in NameList.Names(run.Raw("tools")).Select(t => t.TrimStart('@', '$')).Where(t => t.Length > 0))
                 {
                     if (!run.Scope.TryGet(fn, out object value))
                         throw run.Error($"tools=\"{run.Raw("tools")}\": there is no function called {fn}. Declare it with <fn name=\"{fn}\" ...>.", "tools", "Name");

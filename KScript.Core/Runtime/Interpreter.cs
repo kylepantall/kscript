@@ -684,7 +684,7 @@ namespace KScript.Runtime
 
         private static void DeclareExports(Module imported, string names, Scope scope)
         {
-            IEnumerable<string> wanted = names == null ? imported.Exports.Keys : names.Split(',').Select(n => n.Trim().TrimStart('@', '$')).Where(n => n.Length > 0);
+            IEnumerable<string> wanted = names == null ? imported.Exports.Keys : NameList.Names(names).Select(n => n.TrimStart('@', '$')).Where(n => n.Length > 0);
             foreach (string name in wanted)
             {
                 if (!imported.Exports.TryGetValue(name, out object value))
