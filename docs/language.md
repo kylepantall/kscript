@@ -188,7 +188,7 @@ A parameter typed with an enum only takes its values (`'large'` or bare `large`)
 
 ## Typed data
 
-`type` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught.
+`type` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught. Fields can also be `email`, `password`, `handle`, `uuid` or `regex`, and types can add rules to other types or join them. See [Types and validation](types.md).
 
 A type is a block with one field per line, `name: type`:
 
@@ -234,7 +234,7 @@ type Repo {
 
 | Part | What it does |
 | --- | --- |
-| `: type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Without it the field takes any value. |
+| `: type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`, `email`, `password`, `handle`, `uuid`, `regex`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Rules can follow in brackets: `string(min: 1)`. Without it the field takes any value. |
 | `?` after the name | The value can be missing or null. |
 | `from path` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. Quote a path that has spaces. |
 | `= default` | The value when the data has none. The field is then optional. |

@@ -21,6 +21,9 @@
           "include": "#typeDeclaration"
         },
         {
+          "include": "#typeRule"
+        },
+        {
           "include": "#import"
         },
         {
@@ -138,7 +141,7 @@
       ]
     },
     "assignment": {
-      "match": "^\\s*([A-Za-z_][\\w-]*)(?=\\s*(?::\\s*[\\w.\\[\\]?]+\\s*)?(?:=(?![=>])|\\+=|-=|\\*=|/=|%=|\\?\\?=|\\+\\+|--))",
+      "match": "^\\s*([A-Za-z_][\\w-]*)(?=\\s*(?::\\s*[\\w.]+(?:\\([^)]*\\))?[\\[\\]?]*\\s*)?(?:=(?![=>])|\\+=|-=|\\*=|/=|%=|\\?\\?=|\\+\\+|--))",
       "captures": {
         "1": {
           "name": "variable.other.assignment.kscript"
@@ -193,6 +196,9 @@
     "expression": {
       "patterns": [
         {
+          "include": "#typeAnnotation"
+        },
+        {
           "include": "#comments"
         },
         {
@@ -200,6 +206,9 @@
         },
         {
           "include": "#string"
+        },
+        {
+          "include": "#literals"
         },
         {
           "include": "#variable"
@@ -352,15 +361,101 @@
       ]
     },
     "typeDeclaration": {
-      "match": "\\b(type|enum)\\s+([A-Za-z_]\\w*)",
-      "captures": {
-        "1": {
-          "name": "storage.type.kscript"
+      "patterns": [
+        {
+          "begin": "\\b(type)\\s+([A-Za-z_]\\w*)\\s+(with)\\s*(\\[)",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.kscript"
+            },
+            "2": {
+              "name": "entity.name.type.kscript"
+            },
+            "3": {
+              "name": "storage.modifier.kscript"
+            },
+            "4": {
+              "name": "punctuation.section.brackets.kscript"
+            }
+          },
+          "end": "\\]",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.brackets.kscript"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#typeName"
+            }
+          ]
         },
-        "2": {
+        {
+          "match": "\\b(type|enum)\\s+([A-Za-z_]\\w*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.kscript"
+            },
+            "2": {
+              "name": "entity.name.type.kscript"
+            }
+          }
+        }
+      ]
+    },
+    "typeName": {
+      "patterns": [
+        {
+          "match": "(?<![\\w$@.-])(string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex)(?![\\w-])",
+          "name": "support.type.builtin.kscript"
+        },
+        {
+          "match": "(?<![\\w$@.-])[A-Z]\\w*",
           "name": "entity.name.type.kscript"
         }
+      ]
+    },
+    "typeAnnotation": {
+      "match": "(?<=[\\w?])\\s*(:)\\s*(?!(?:not|true|false|null|yes|no)\\b)((?:string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex)(?![\\w-])|[A-Z]\\w*)(?=\\s*(?:\\(|\\[\\]|\\?|=|,|\\)|$|from\\b|=>|;|\\}|//))",
+      "captures": {
+        "1": {
+          "name": "punctuation.separator.type.kscript"
+        },
+        "2": {
+          "patterns": [
+            {
+              "include": "#typeName"
+            }
+          ]
+        }
       }
+    },
+    "typeRule": {
+      "match": "^\\s*(min|max|pattern|one_of|not|validate|normalize|parse)\\s*(:)(?!\\s*(?:[A-Za-z_][\\w.\\[\\]?]*)\\s*(?:=|$|from\\b|//))",
+      "captures": {
+        "1": {
+          "name": "keyword.other.rule.kscript"
+        },
+        "2": {
+          "name": "punctuation.separator.kscript"
+        }
+      }
+    },
+    "literals": {
+      "patterns": [
+        {
+          "match": "(?<![\\w)\\]$'\"])/(?![\\s/*])(?:\\\\.|\\[(?:\\\\.|[^\\]\\\\\\n])*\\]|[^/\\\\\\n\\[])+/[imsx]*(?!\\w)",
+          "name": "string.regexp.kscript"
+        },
+        {
+          "match": "(?<![\\w.%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?![\\w]|-(?!>))",
+          "name": "string.unquoted.email.kscript"
+        },
+        {
+          "match": "(?<![\\w-])[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?![\\w-]|-(?!>))",
+          "name": "constant.other.uuid.kscript"
+        }
+      ]
     }
   }
 }

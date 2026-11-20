@@ -12,17 +12,26 @@ namespace KScript.Language.Analysis
     /// </summary>
     public sealed partial class Analyzer
     {
+        /// <remarks><paramref name="RawText"/>: how a bare word is read for the parameter's type, as text ("word") or a handle ("handle").</remarks>
         internal readonly record struct ParameterSlot(string Name, bool Required, bool Variadic, bool Flag = false, IReadOnlyList<string> Values = null, string TypeName = null,
-            IReadOnlyList<string> ItemValues = null)
+            IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
 
             /// <summary>A list of an enum (<c>sizes: Size[]</c>): its items can be written bare, <c>[large, small]</c>.</summary>
             public bool IsEnumList => ItemValues != null && ItemValues.Count > 0;
 
-            public string Match(string word) => IsEnum ? Values.FirstOrDefault(v => string.Equals(v, word.Trim(), StringComparison.OrdinalIgnoreCase)) : null;
+            public string Match(string word)
+            {
+                if (IsEnum)
+                {
+                    return Values.FirstOrDefault(v => string.Equals(v, word.Trim(), StringComparison.OrdinalIgnoreCase));
+                }
+                return RawText != null && (RawText == "handle" || !word.StartsWith('@')) ? word : null;
+            }
 
             public string MatchItem(string word) => IsEnumList ? ItemValues.FirstOrDefault(v => string.Equals(v, word.Trim(), StringComparison.OrdinalIgnoreCase)) : null;
+
         }
 
         /// <summary>Bare words inside an array argument (<c>[large, small]</c>), waiting for their call to say whether the parameter is a list of an enum.</summary>
@@ -36,17 +45,18 @@ namespace KScript.Language.Analysis
                 .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null)).ToList())
                 .ToList();
 
-        private static List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
+        private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
             new List<List<ParameterSlot>>
             {
                 fn.Parameters.Select(p =>
                 {
                     Symbol type = p.Type != null && !KType.Declarable.Contains(p.Type) && p.Type != "number" && p.Type != "date" && p.Type != "any"
                         ? scope?.Lookup(p.Type, int.MaxValue) : null;
+                    string raw = type?.EnumValues == null ? RawTextKindOf(p.Type, scope, int.MaxValue) : null;
                     string itemType = p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal) ? p.Type.Substring(0, p.Type.Length - 2).Trim() : null;
                     Symbol item = itemType != null && !KType.Declarable.Contains(itemType) ? scope?.Lookup(itemType, int.MaxValue) : null;
                     return new ParameterSlot(p.Name, !p.HasDefault, false, p.Type == KType.Bool, type?.EnumValues, type?.EnumValues != null ? type.Name : item?.EnumValues != null ? item.Name : null,
-                        item?.EnumValues);
+                        item?.EnumValues, raw, p.Type);
                 }).ToList(),
             };
 
@@ -64,10 +74,52 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>Reports the bare words of a call that nothing claimed, as before: they aren't values.</summary>
+        /// <summary>Arguments such as <c>@kyle</c> that name no function: a handle, if the parameter takes one.</summary>
+        private readonly HashSet<ArgumentNode> pendingHandles = new HashSet<ArgumentNode>();
+
+        /// <summary>True for <c>@name</c> (no parentheses) where nothing is called name: it can only be a handle.</summary>
+        private bool IsUnknownReference(ExprNode node, Scope scope, ExpressionRegion region) =>
+            node is CommandCallNode { ArgumentList: null } c && !c.Name.Contains('.')
+            && catalog.GetCommand(c.Name) == null && catalog.GetRetiredCommand(c.Name) == null
+            && scope.Lookup(c.Name, region.Source.ToSource(c.Span.Start))?.Kind != SymbolKind.Function;
+
+        /// <summary>An argument that reached its parameter: a waiting <c>@kyle</c> is a handle there, and a literal is checked against the type.</summary>
+        private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
+        {
+            if (pendingHandles.Contains(a))
+            {
+                if (slot.RawText != "handle")
+                {
+                    return;
+                }
+                pendingHandles.Remove(a);
+                CheckLiteralFits("@" + ((CommandCallNode)a.Value).Name, slot.Type, region.Source.ToSource(a.Value.Span), null, 0);
+                return;
+            }
+            if (slot.Type == null || slot.IsEnum)
+            {
+                return;
+            }
+            if (BareWord(a) is (string word, false, IdentifierNode node) && slot.RawText != null)
+            {
+                CheckLiteralFits(word, slot.Type, region.Source.ToSource(node.Span), null, 0);
+            }
+            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Number } literal)
+            {
+                object value = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, System.Globalization.CultureInfo.InvariantCulture) : literal.Value;
+                CheckLiteralFits(value, slot.Type, region.Source.ToSource(literal.Span), null, 0);
+            }
+        }
+
         private void FlushBare(IEnumerable<ArgumentNode> args, ExpressionRegion region, Scope scope)
         {
             foreach (ArgumentNode a in args)
             {
+                if (pendingHandles.Remove(a))
+                {
+                    AnalyzeExpr(a.Value, region, scope, ExprContext.Argument);
+                    continue;
+                }
                 if (pendingBareItems.Remove(a, out List<IdentifierNode> items))
                 {
                     foreach (IdentifierNode item in items)
@@ -159,6 +211,7 @@ namespace KScript.Language.Analysis
                     {
                         CheckEnumLiteral(display, a, signature[index], region);
                     }
+                    ClaimTyped(a, signature[index], region);
                     Fill(index, a, a.Name);
                     continue;
                 }
@@ -169,6 +222,7 @@ namespace KScript.Language.Analysis
                     if (!seenNamed && !neg && slot?.Match(w) != null)
                     {
                         pendingBare.Remove(a);
+                        ClaimTyped(a, slot.Value, region);
                         Fill(positional, a, slot.Value.Name);
                         positional++;
                         continue;
@@ -221,6 +275,7 @@ namespace KScript.Language.Analysis
                 if (SlotAt(positional) is ParameterSlot s)
                 {
                     CheckEnumLiteral(display, a, s, region);
+                    ClaimTyped(a, s, region);
                     ResolveEnumItems(display, a, s, region);
                 }
                 filled[positional] = a;
@@ -264,6 +319,7 @@ namespace KScript.Language.Analysis
                 else
                 {
                     CheckEnumLiteral(display, a, slot.Value, region);
+                    ClaimTyped(a, slot.Value, region);
                     ResolveEnumItems(display, a, slot.Value, region);
                 }
                 filled[free] = a;

@@ -1,3 +1,4 @@
+using System.Globalization;
 using KScript.Language.Catalog;
 using KScript.Syntax.Markup;
 using KScript.Syntax;
@@ -83,6 +84,15 @@ namespace KScript.Language.Analysis
                     AnalyzeLambda(lambda, region, scope);
                     return;
 
+                case BinaryNode { Operator: "==" or "!=" or "===" or "!==" } compare
+                    when HandleSide(compare.Left, compare.Right, region, scope) is CommandCallNode handle:
+                {
+                    // $user.handle == @kyle: next to a handle, an @name that isn't a function is a handle.
+                    AnalyzeExpr(handle == compare.Right ? compare.Left : compare.Right, region, scope, ExprContext.Value);
+                    CheckLiteralFits("@" + handle.Name, "handle", region.Source.ToSource(handle.Span), null, 0);
+                    return;
+                }
+
                 default:
                     foreach (ExprNode child in node.Children)
                     {
@@ -122,6 +132,11 @@ namespace KScript.Language.Analysis
                 if (BareWord(arg) is var (word, _, node) && scope.Lookup(word, region.Source.ToSource(node.Span.Start))?.Kind != SymbolKind.Import)
                 {
                     pendingBare.Add(arg);
+                    continue;
+                }
+                if (IsUnknownReference(arg.Value, scope, region))
+                {
+                    pendingHandles.Add(arg);
                     continue;
                 }
                 if (arg.Value is ListNode list && list.Items.Any(i => i is IdentifierNode))
@@ -420,11 +435,28 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            List<CallableInfo> candidates = catalog.GetMethods(name, receiver.Type).ToList();
             string arrow = pipe ? "|> " : "->";
+            if (receiver.Methods.TryGetValue(name, out Symbol own))
+            {
+                // A method the record's <type> declares with <fn>.
+                result.References.Add(new SymbolReference(own, nameSpan, false, false));
+                if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(own, result.RootScope), region, nameSpan))
+                {
+                    return;
+                }
+                int required = own.Parameters.Count(p => !p.HasDefault);
+                if (count >= 0 && (count < required || count > own.Parameters.Count))
+                {
+                    Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
+                        $"{arrow}{name}() takes {(required == own.Parameters.Count ? required.ToString(CultureInfo.InvariantCulture) : $"{required} to {own.Parameters.Count}")} argument{(own.Parameters.Count == 1 ? string.Empty : "s")}, but {count} {(count == 1 ? "was" : "were")} given.");
+                }
+                return;
+            }
+
+            List<CallableInfo> candidates = catalog.GetMethods(name, receiver.Type).ToList();
             if (candidates.Count == 0)
             {
-                IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Select(m => m.Name)
+                IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Select(m => m.Name).Concat(receiver.Methods.Keys)
                     .Concat(pipe ? result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name) : Enumerable.Empty<string>());
                 string suggestion = Suggestions.Closest(name, names);
                 Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod,
@@ -434,8 +466,9 @@ namespace KScript.Language.Analysis
             }
 
             // A declared type is held to: an int parameter has no string methods.
+            // Text with a meaning of its own (an email, a handle) keeps the string methods.
             List<CallableInfo> applicable = candidates.Where(m => receiver.Declared
-                ? m.ReceiverType == KType.Any || m.ReceiverType == receiver.Type
+                ? m.ReceiverType == KType.Any || m.ReceiverType == receiver.Type || (m.ReceiverType == KType.String && IsSemanticText(receiver.Type))
                 : KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
             usedPackages.UnionWith(applicable.Select(m => m.Package).Where(p => p != null));
             if (applicable.Count == 0 && receiver.Declared)
@@ -484,6 +517,22 @@ namespace KScript.Language.Analysis
                     SuggestFix(span, member.Name, target.Fields.Keys, n => n));
             }
         }
+
+        /// <summary>The <c>@name</c> side of a comparison with a handle, when nothing is called name; otherwise null.</summary>
+        private CommandCallNode HandleSide(ExprNode left, ExprNode right, ExpressionRegion region, Scope scope)
+        {
+            if (IsUnknownReference(right, scope, region) && Infer(left, region).Type == KType.Handle)
+            {
+                return (CommandCallNode)right;
+            }
+            if (IsUnknownReference(left, scope, region) && Infer(right, region).Type == KType.Handle)
+            {
+                return (CommandCallNode)left;
+            }
+            return null;
+        }
+
+        private static bool IsSemanticText(string type) => type == KType.Email || type == KType.Handle || type == KType.Uuid || type == KType.Regex;
 
         private static string Plural(string type) => type switch
         {

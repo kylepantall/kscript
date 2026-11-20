@@ -75,7 +75,13 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `stars: int from stargazers_count` (in a type) | `<field name="stars" type="int" from="stargazers_count" />` |
 | `topics?: string[] = []`, `label => $name + '!'` | `<field name="topics?" type="string[]" default="[]" />`, `<field name="label" value="$name + '!'" />` |
 
-A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Field lines](language.md#field-lines) for what each part does.
+| `type Admin with [User, Auditable] { … }` | `<type name="Admin" with="User, Auditable">` |
+| `type Age with [int] { min: 0; max: 150 }` | `<type name="Age" with="int" min="0" max="150" />` |
+| `validate: $value > 0, 'too small'` (in a type) | `<validate test="$value > 0" message="too small" />` |
+| `normalize: $value->lower()` (in a type) | `<normalize value="$value->lower()" />` |
+| `fn area() => $w * $h` (in a type) | `<fn name="area" value="$w * $h" />` inside the `<type>` |
+
+A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Field lines](language.md#field-lines) for what each part does. A type's block can also hold rule lines (`min:`, `max:`, `pattern:`, `one_of:`, `not:`, `parse:`, `validate:` and `normalize:`) and `fn` methods. A line such as `max: int` is still a field: a rule's value is a value, not a type. See [Types and validation](types.md) for the rules.
 
 Any other name is an element: `name(attribute: value, ...) "text" { children }`, each part optional.
 
