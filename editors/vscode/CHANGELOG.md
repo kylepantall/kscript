@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Completion while typing: a word at the start of a statement now offers keywords (`echo`, `if`, `for`, `fn`, `return`, ...), `@commands`, your functions and variables, with no trigger character needed. In XML scripts a bare word on its own line offers elements and adds the `<`. In expressions, typing `e` now matches `@env` and `$email` (they filter on the bare name).
+- Enter on an empty `///` line in a `.kscript` file ends the doc comment instead of starting another `///` line.
 - Shorthand conditions: `<if $user.is_logged_in>`, `<elif …>`, `<while …>`, `<match …>` and `<assert … />` are highlighted, checked and completed like `test="…"`, in scripts and pages. The `<if>`, `<elif>`, `<while>` and `<match>` snippets use the short form.
 - The language server restarts by itself when the `kscript` binary changes (after `kscript update`, a reinstall, or a rebuild of a source `KScript.dll`), so the editor stops showing errors from the old version. A notice names the new version.
 - When the `kscript` it finds is an older release than the extension, the extension says so and offers to run `kscript update`.
