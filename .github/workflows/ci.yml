@@ -54,6 +54,9 @@ jobs:
       - name: Check KScript 2 samples
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab "Example Scripts" --warnaserror
 
+      - name: Check KScript formatting
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab "Example Scripts" "Example Sites/team"
+
       - name: Run KScript tests
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab
 

@@ -27,7 +27,9 @@
 
     <test name="the .cells format is read, comments and all">
       <let name="nl" value="@char_of(10)" />
-      <expect value="@parse_cells('!Name: glider' + $nl + '.O' + $nl + '..*' + $nl + 'ooo')" equals="['.O.', '..O', 'OOO']" />
+      <expect
+        value="@parse_cells('!Name: glider' + $nl + '.O' + $nl + '..*' + $nl + 'ooo')"
+        equals="['.O.', '..O', 'OOO']" />
     </test>
 
     <test name="an empty pattern is an error">
@@ -126,7 +128,9 @@
     </test>
 
     <test name="the menu works with typed answers">
-      <let name="run" value="@run_script('../life.ks.xml', { input: '4' + @char_of(10) + '2' + @char_of(10) + '1' + @char_of(10) + '10' + @char_of(10) })" />
+      <let
+        name="run"
+        value="@run_script('../life.ks.xml', { input: '4' + @char_of(10) + '2' + @char_of(10) + '1' + @char_of(10) + '10' + @char_of(10) })" />
       <expect value="$run.code" equals="0" />
       <expect value="$run.output" contains="'Life Lab · blinker'" />
       <expect value="$run.output" contains="'Bye!'" />

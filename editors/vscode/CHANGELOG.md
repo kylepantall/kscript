@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Formatting: **Format Document** and format on save tidy scripts and `kscript serve` pages with the same formatter as `kscript fmt`: indentation by nesting, one statement per line, tidy start tags, no trailing spaces. Text, attribute values, comments, CDATA and `<pre>`/`<textarea>`/`<script>`/`<style>` content are kept. The style comes from the `format` section of `kscript.json`, which the extension now validates and completes, or else from your editor's tab settings. Each rule can be turned off in `format.rules`, and `<!-- kscript-fmt: off -->` / `<!-- kscript-fmt: on -->` or `<!-- kscript-fmt-ignore -->` leave parts of a file alone.
 - Types everywhere: functions know what they return (from `value="..."` or their `<return>`s, including imported ones), so `<let name="p" value="@person()" />` offers `$p.name`. Parameters take the type of their default (`count = 0`), `match` expressions the type of their arms, and a variable declared as `null` takes the type of the first value `<set>` gives it.
 - Inlay hints show types you haven't written: `<let name="people": list<{ name: string, age: number }>`, `<for each="p": { name, age }>` and `params="x: int" → number`. Turn them off with `editor.inlayHints.enabled`.
 - Hovers show structural types (`{ name: string, address: { city: string } }`, `list<number>`), and method completions show what each method returns, with the value's own methods first.

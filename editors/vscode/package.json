@@ -179,6 +179,7 @@
     ],
     "configurationDefaults": {
       "[kscript]": {
+        "editor.defaultFormatter": "kylepantall.kscript",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
           "other": "on",

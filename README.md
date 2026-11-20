@@ -27,7 +27,7 @@ kscript hello.ks.xml
 - **An editor that understands your code.** The VS Code extension knows the type of every value, so `$person.` offers that person's fields and `$name->` offers string methods, including what your own functions return.
 - **Batteries included, loaded only when used.** Files, HTTP, maths, Markdown, terminal prompts and web pages come as packages. A script imports the ones it needs, and a terminal script never loads the web server.
 - **One binary, every OS.** Install a single file that has the .NET runtime built in. The same script behaves the same on all three platforms, down to how numbers are printed.
-- **Everything else you need is built in.** `kscript make` scaffolds projects and files, `kscript test` runs your tests, `kscript check` lints for CI, and `kscript serve` runs your site.
+- **Everything else you need is built in.** `kscript make` scaffolds projects and files, `kscript test` runs your tests, `kscript check` lints for CI, `kscript fmt` tidies your files, and `kscript serve` runs your site.
 
 ## Scripts that read like what they do
 
@@ -145,6 +145,7 @@ kscript make project my-site   # a site with a layout, a component, a script, te
 kscript serve                  # run it
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI
+kscript fmt                    # tidy every script and page (--check for CI)
 kscript ide install            # add the extension to VS Code, Cursor, VSCodium or Windsurf
 kscript app build              # package a <KScript.Window> script as a desktop app
 kscript update                 # get the latest release
@@ -195,6 +196,7 @@ Then save the first example above as `hello.ks.xml`, run `kscript hello.ks.xml`,
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
 - [Desktop apps](docs/desktop.md): `<KScript.Window>`, its elements, and `kscript app build`
 - [Testing](docs/testing.md): `kscript test` and every check
+- [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI
 

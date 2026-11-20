@@ -16,7 +16,7 @@ namespace KScript.LanguageServer
     /// The KScript language server. Speaks LSP 3.17 over a pair of streams (stdio for <c>kscript lsp</c>) with full
     /// document sync. All the language work is done by <see cref="LanguageService"/>; this class only translates.
     /// </summary>
-    public sealed class KScriptLanguageServer
+    public sealed partial class KScriptLanguageServer
     {
         public static readonly string[] TokenTypes = { "variable", "parameter", "function", "method", "property", "keyword", "operator", "string", "number", "namespace", "type" };
         public static readonly string[] TokenModifiers = { "declaration", "readonly", "defaultLibrary" };
@@ -191,6 +191,7 @@ namespace KScript.LanguageServer
                 case "kscript/blocks": return Blocks(p);
                 case "textDocument/codeAction": return CodeActions(p);
                 case "textDocument/documentLink": return DocumentLinks(p);
+                case "textDocument/formatting": return Formatting(p);
             }
 
             handled = !isRequest;
@@ -219,6 +220,7 @@ namespace KScript.LanguageServer
                 ["documentLinkProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["inlayHintProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["foldingRangeProvider"] = true,
+                ["documentFormattingProvider"] = true,
                 ["semanticTokensProvider"] = new JsonObject
                 {
                     ["legend"] = new JsonObject
