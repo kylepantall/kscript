@@ -271,7 +271,7 @@ namespace KScript.Runtime
 
             KScriptPackage owner = Packages.FindElement(name, module.Packages).FirstOrDefault();
             if (owner != null)
-                throw Located(new KScriptException($"<{name}> is part of {owner.Name}. Add <import package=\"{owner.Name}\" /> at the top of the script.", "Import"), module, e.NameSpan.Start);
+                throw Located(new KScriptException($"{module.ElementHint(name)} is part of {owner.Name}. Add {module.ImportHint(owner.Name)} at the top of the script.", "Import"), module, e.NameSpan.Start);
 
             throw Located(new KScriptException($"Unknown element <{name}>." + SuggestElement(name, module.Elements.Keys), "Syntax"), module, e.NameSpan.Start);
         }

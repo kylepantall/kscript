@@ -226,6 +226,54 @@ public class CodeFormatTests
     }
 
     [Fact]
+    public void BlockCommentsWorkOnTheirOwnLinesAtLineEndsAndInsideExpressions()
+    {
+        const string code = "/*\n  Header\n    indented\n*/\n"
+            + "x = 1 /* inline */\n"
+            + "echo \"x is $x\" /* trailing */\n"
+            + "/* one */ echo \"two\"\n"
+            + "list = [\n  1, /* first */\n  2  // second\n]\n"
+            + "y = $x + /* mid */ 2\n"
+            + "z = $x /* a\n  multi-line trailing */\n"
+            + "/**\n * Star style\n * second\n */\n"
+            + "if $x > 0 {\n  /* nested */\n  echo \"{ $list->count() } $y $z\"\n}\n";
+        Assert.Equal("x is 1\ntwo\n2 3 1\n", Run(code));
+
+        MarkupDocument doc = CodeParser.Parse(code);
+        Assert.Empty(doc.Diagnostics);
+        List<MarkupComment> comments = doc.DescendantNodes().OfType<MarkupComment>().ToList();
+        Assert.Equal(new[] { "Header\n  indented", "inline", "trailing", "one", "a\nmulti-line trailing", "Star style\nsecond", "nested" },
+            comments.Select(c => c.Text));
+        Assert.All(comments, c => Assert.True(c.IsBlock));
+
+        // Converting keeps every comment: XML has one kind, so they come back as // lines.
+        string xml = ScriptConverter.Convert(code, "a.kscript").Text;
+        Assert.Contains("<let name=\"x\" value=\"1\" /> <!-- inline -->", xml);
+        Assert.Contains("<echo>x is $x</echo> <!-- trailing -->", xml);
+        Assert.Contains("$x + /* mid */ 2", xml);
+        string back = ScriptConverter.Convert(xml, "a.ks.xml").Text;
+        Assert.StartsWith("// Header\n//   indented\nx = 1 // inline\necho \"x is $x\" // trailing\n// one\n", back);
+        Assert.Contains("// Star style\n// second\n", back);
+        Assert.Equal("x is 1\ntwo\n2 3 1\n", Run(back));
+    }
+
+    [Fact]
+    public void MissingPackageErrorsUseTheFilesFormat()
+    {
+        var element = Assert.Throws<KScriptException>(() => Run("Row(gap: 8) {\n}"));
+        Assert.Equal("Row is part of KScript.UI. Add import KScript.UI at the top of the script.", element.Message);
+        var command = Assert.Throws<KScriptException>(() => Run("echo @sqrt(4)"));
+        Assert.Contains("Add import KScript.Math at the top", command.Message);
+        Assert.DoesNotContain("<import", command.Message);
+    }
+
+    [Fact]
+    public void AnUnclosedBlockCommentIsAnError()
+    {
+        Assert.Contains(CodeParser.Parse("x = 1\n/* never closed\necho \"x\"").Diagnostics, d => d.Message.Contains("missing its closing */"));
+    }
+
+    [Fact]
     public void ImportsInsideABlockSayWhereTheyGo()
     {
         var error = Assert.Throws<KScriptException>(() => Run("if true {\n  import KScript.Math\n}"));

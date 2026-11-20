@@ -617,7 +617,7 @@ namespace KScript.Runtime
 
             KScriptPackage owner = Packages.FindCommand(name, module?.Packages).FirstOrDefault();
             if (owner != null)
-                throw Fail(node, ctx, $"@{name}() is part of {owner.Name}. Add <import package=\"{owner.Name}\" /> at the top of the script.", "Import");
+                throw Fail(node, ctx, $"@{name}() is part of {owner.Name}. Add {ImportHint(module, owner.Name)} at the top of the script.", "Import");
 
             IEnumerable<string> known = (module?.Commands.Keys ?? Enumerable.Empty<string>()).Concat(scope.Names().Where(n => scope.TryGet(n, out object f) && f is ICallable));
             throw Fail(node, ctx, $"Unknown command @{name}()." + Suggest(name, known).Replace("Did you mean ", "Did you mean @"), "Name");
@@ -756,7 +756,7 @@ namespace KScript.Runtime
             string type = Values.TypeOf(target);
             KScriptPackage owner = Packages.FindMethod(name, ctx.Module?.Packages).FirstOrDefault(p => p.Methods.Any(m => m.Name == name && (m.Receiver == type || m.Receiver == "any")));
             if (owner != null)
-                throw Fail(node, ctx, $"->{name}() on a {type} is part of {owner.Name}. Add <import package=\"{owner.Name}\" /> at the top of the script.", "Import");
+                throw Fail(node, ctx, $"->{name}() on a {type} is part of {owner.Name}. Add {ImportHint(ctx.Module, owner.Name)} at the top of the script.", "Import");
 
             IEnumerable<string> known = ctx.Module?.Methods.Values.Where(m => m.Receiver == type || m.Receiver == "any").Select(m => m.Name) ?? Enumerable.Empty<string>();
             string noun = type switch { "list" => "Lists", "map" => "Maps", "string" => "Text values", "number" => "Numbers", "date" => "Dates", "bool" => "Bools", "fn" => "Functions", _ => $"Values of type {type}" };
@@ -765,5 +765,8 @@ namespace KScript.Runtime
         }
 
         #endregion
+
+        private static string ImportHint(Module module, string package) =>
+            module?.ImportHint(package) ?? $"<import package=\"{package}\" />";
     }
 }

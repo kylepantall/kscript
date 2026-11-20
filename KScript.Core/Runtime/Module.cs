@@ -65,6 +65,15 @@ namespace KScript.Runtime
         public SourceText Source { get; }
         public MarkupDocument Document { get; }
 
+        /// <summary>True for a .kscript file, so messages show code in that format.</summary>
+        public bool IsCode => Document?.Syntax == SourceSyntax.Code;
+
+        /// <summary>How this file imports a package: <c>import KScript.UI</c> or <c>&lt;import package="KScript.UI" /&gt;</c>.</summary>
+        public string ImportHint(string package) => IsCode ? $"import {package}" : $"<import package=\"{package}\" />";
+
+        /// <summary>An element as this file writes it: <c>Row</c> in .kscript, <c>&lt;Row&gt;</c> in XML.</summary>
+        public string ElementHint(string name) => IsCode ? name : $"<{name}>";
+
         /// <summary>The root element: &lt;kscript&gt;, or a package element such as &lt;KScript.Window&gt;.</summary>
         public MarkupElement Root { get; internal set; }
 

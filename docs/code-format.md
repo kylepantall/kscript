@@ -102,7 +102,9 @@ Row(gap: 8, wrap) {
 - The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. A file whose only
   statement is `kscript { }` or a `KScript.*` element (such as `KScript.Window(...) { }`) uses that element as the
   root. `import` goes at that top level, not inside another block.
-- `//` and `/* */` are comments.
+- `//` and `/* */` are comments. Either can go on its own lines, at the end of a line, or inside an expression
+  that spans lines (`[1, /* first */ 2]`). `kscript convert` keeps them; XML has one kind of comment, so they come
+  back from XML as `//` lines.
 
 ## Doc comments
 
