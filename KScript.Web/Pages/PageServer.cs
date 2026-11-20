@@ -237,7 +237,16 @@ namespace KScript.Pages
                     result = ErrorPage(ex);
                 }
 
-                await WriteAsync(http.Response, result);
+                http.Response.StatusCode = result.Status;
+                foreach (var h in result.Headers) http.Response.Headers[h.Key] = h.Value;
+                if (result.Status != 304 && !(result.Status >= 300 && result.Status < 400 && result.Body.Length == 0))
+                {
+                    http.Response.ContentType = result.ContentType;
+                    if (result.FilePath != null)
+                        await http.Response.SendFileAsync(result.FilePath);
+                    else
+                        await http.Response.WriteAsync(result.Body, Encoding.UTF8);
+                }
 
                 log?.WriteLine($"{http.Request.Method} {http.Request.Path}{http.Request.QueryString} -> {result.Status} ({(DateTime.UtcNow - started).TotalMilliseconds:0} ms)");
             });
@@ -260,30 +269,6 @@ namespace KScript.Pages
             }
             await app.StopAsync();
             return 0;
-        }
-
-        /// <summary>
-        /// Writes a result to the response. Files are copied with a plain FileStream rather than SendFileAsync: on
-        /// macOS, SendFileAsync in a self-contained single-file kscript crashed the process with an
-        /// AccessViolationException (kscript docs, v0.4.0).
-        /// </summary>
-        internal static async Task WriteAsync(HttpResponse response, PageResult result)
-        {
-            response.StatusCode = result.Status;
-            foreach (var h in result.Headers) response.Headers[h.Key] = h.Value;
-            if (result.Status == 304 || (result.Status >= 300 && result.Status < 400 && result.Body.Length == 0)) return;
-
-            response.ContentType = result.ContentType;
-            if (result.FilePath == null)
-            {
-                await response.WriteAsync(result.Body, Encoding.UTF8);
-                return;
-            }
-
-            using var file = new FileStream(result.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 64 * 1024, FileOptions.SequentialScan);
-            response.ContentLength = file.Length;
-            if (HttpMethods.IsHead(response.HttpContext.Request.Method)) return;
-            await file.CopyToAsync(response.Body, 64 * 1024, response.HttpContext.RequestAborted);
         }
 
         /// <summary>Handles one request. Separate from Kestrel so it can be tested directly.</summary>
