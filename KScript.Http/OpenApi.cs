@@ -354,7 +354,7 @@ namespace KScript.Http
             ["required"] = new List<object> { "error", "status" },
         };
 
-        private static string Reason(int status) => status switch
+        internal static string Reason(int status) => status switch
         {
             200 => "OK",
             201 => "Created",

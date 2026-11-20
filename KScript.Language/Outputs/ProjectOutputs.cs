@@ -47,7 +47,7 @@ namespace KScript.Language.Outputs
     /// </summary>
     public static class ProjectOutputs
     {
-        private static readonly List<IProjectOutput> outputs = new List<IProjectOutput> { new AgentsOutput() };
+        private static readonly List<IProjectOutput> outputs = new List<IProjectOutput> { new AgentsOutput(), new OpenApiOutput() };
 
         public static IReadOnlyList<IProjectOutput> All
         {

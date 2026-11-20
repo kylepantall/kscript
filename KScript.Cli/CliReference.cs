@@ -46,7 +46,7 @@ namespace KScript
                 },
                 "kscript agents\nkscript agents --check", "agents"),
             new CliCommand("watch", "kscript watch [folder] [--once] [--check]",
-                "Rebuild everything the project makes from its code (the agent docs, and more as packages add to it) each time a file changes, until Ctrl+C. kscript serve and the editor (on save) do the same.",
+                "Rebuild everything the project makes from its code (the agent docs, the OpenAPI file http.openapi.file names, and more as packages add to it) each time a file changes, until Ctrl+C. kscript serve and the editor (on save) do the same.",
                 new[]
                 {
                     O("--once", "Build once and stop."),
