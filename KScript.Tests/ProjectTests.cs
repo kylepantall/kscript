@@ -144,7 +144,9 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,app,format,lint,name,packages,serve,standard,test", Keys(props));
+        Assert.Equal("$schema,app,format,http,lint,name,packages,serve,standard,test", Keys(props));
+        Assert.Equal("api_prefix,auth,cors,groups,middleware,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
+        Assert.Equal("credentials,headers,methods,origins", Keys(props.GetProperty("http").GetProperty("properties").GetProperty("cors").GetProperty("properties")));
         Assert.Equal("icon,id,main,name,version", Keys(props.GetProperty("app").GetProperty("properties")));
         Assert.Equal("host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
@@ -225,7 +227,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "My Site");
 
-        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.html", "site.css", "scripts/hello.ks.xml", "lib/greeting.ks.xml", "lib/tasks.ks.xml", "desktop.ks.xml", "tests/greeting.test.ks.xml", "tests/tasks.test.ks.xml", ".vscode/extensions.json", ".gitignore" })
+        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.html", "site.css", "scripts/hello.ks.xml", "lib/greeting.ks.xml", "lib/tasks.ks.xml", "desktop.ks.xml", "tests/greeting.test.ks.xml", "tests/tasks.test.ks.xml", ".vscode/extensions.json", ".gitignore", "api.ks.xml", "controllers/tasks.ks.xml" })
         {
             Assert.True(File.Exists(Path.Combine(root, f)), f + " is created");
             Assert.Contains(f, output);
@@ -263,6 +265,22 @@ public class MakeProjectTests : IDisposable
         Assert.Equal(PageRoute.RouteKind.NotFound, site.Resolve("/.vscode/extensions.json").Kind);
         Assert.Equal(PageRoute.RouteKind.NotFound, site.Resolve("/scripts/hello.ks.xml").Kind);
         Assert.Equal(PageRoute.RouteKind.NotFound, site.Resolve("/desktop.ks.xml").Kind);
+
+        // The JSON API (KScript.Http) answers under /api.
+        Assert.Contains("kscript routes", output);
+        Assert.Equal(new[] { "log" }, config.Http.Middleware);
+        var api = new KScript.Http.HttpApp(root, config);
+        PageResult tasks = api.Handle(new Dictionary<string, object> { ["method"] = "GET", ["path"] = "/api/tasks" });
+        Assert.Equal(200, tasks.Status);
+        Assert.Contains("Try the web app", tasks.Body);
+        PageResult added = api.Handle(new Dictionary<string, object>
+        {
+            ["method"] = "POST", ["path"] = "/api/tasks", ["body"] = "{\"title\": \"Ship it\"}",
+            ["headers"] = new Dictionary<string, object> { ["content-type"] = "application/json" },
+        });
+        Assert.Equal(201, added.Status);
+        Assert.Contains("Ship it", File.ReadAllText(Path.Combine(root, "data", "tasks.json")));
+        Assert.Equal(204, api.Handle(new Dictionary<string, object> { ["method"] = "DELETE", ["path"] = "/api/tasks/1" }).Status);
     }
 
     [Fact]
@@ -319,6 +337,21 @@ public class MakeProjectTests : IDisposable
         Assert.Null(config.App.Main);
         Assert.DoesNotContain("desktop.ks.xml", File.ReadAllText(Path.Combine(root, "tasks.html")));
         Assert.DoesNotContain("app build", File.ReadAllText(Path.Combine(root, "index.html")));
+    }
+
+    [Fact]
+    public void NoHttpLeavesTheApiOut()
+    {
+        using var parent = new TempSite();
+        var (code, output, err) = Make(parent.Root, "site", "--no-http");
+        Assert.True(code == 0, err);
+        string root = Path.Combine(parent.Root, "site");
+        Assert.False(File.Exists(Path.Combine(root, "api.ks.xml")));
+        Assert.False(Directory.Exists(Path.Combine(root, "controllers")));
+        Assert.DoesNotContain("kscript routes", output);
+        var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
+        Assert.Empty(config.Warnings);
+        Assert.Empty(config.Http.Middleware);
     }
 
     [Fact]

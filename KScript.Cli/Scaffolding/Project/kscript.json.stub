@@ -7,6 +7,11 @@
     "port": {{ port }},
     "host": "localhost"
   },
+{{#if http}}
+  "http": {
+    "middleware": ["log"]
+  },
+{{/if}}
 {{#if desktop}}
   "app": {
     "main": "desktop.ks.xml",

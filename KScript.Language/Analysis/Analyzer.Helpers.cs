@@ -248,6 +248,12 @@ namespace KScript.Language.Analysis
 
         private Symbol ReferenceFunction(string name, TextSpan span, Scope scope)
         {
+            int dot = name.IndexOf('.');
+            if (dot > 0 && dot < name.Length - 1)
+            {
+                ReferenceImportedFunction(name, dot, span, scope);
+                return null;
+            }
             Symbol fn = scope.Lookup(name, int.MaxValue);
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
@@ -267,6 +273,29 @@ namespace KScript.Language.Analysis
                 $"No function named '{name}'. Declare it with <fn name=\"{name}\">." + (suggestion != null ? $" Did you mean '{suggestion}'?" : string.Empty),
                 SuggestFix(span, name, candidates, n => n));
             return null;
+        }
+
+        /// <summary><c>people.show</c> in a function name attribute: a function of a script (or package) imported with as="people".</summary>
+        private void ReferenceImportedFunction(string name, int dot, TextSpan span, Scope scope)
+        {
+            string aliasName = name.Substring(0, dot), member = name.Substring(dot + 1);
+            TextSpan aliasSpan = new TextSpan(span.Start, dot);
+            TextSpan memberSpan = TextSpan.FromBounds(span.Start + dot + 1, span.End);
+            Symbol import = scope.Lookup(aliasName, aliasSpan.Start);
+            if (import?.Kind != SymbolKind.Import)
+            {
+                IEnumerable<string> aliases = result.Symbols.Where(s => s.Kind == SymbolKind.Import).Select(s => s.Name);
+                Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
+                    $"Nothing is imported as '{aliasName}'. Import it with <import src=\"...\" as=\"{aliasName}\" />.",
+                    SuggestFix(aliasSpan, aliasName, aliases, n => n));
+                return;
+            }
+            result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+            if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member))
+            {
+                Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{aliasName}' has no '{member}'.",
+                    SuggestFix(memberSpan, member, import.Shape.Fields.Keys, n => n));
+            }
         }
 
         private void CheckFunctionArgumentCount(Symbol fn, int count, TextSpan span)

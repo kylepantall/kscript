@@ -147,6 +147,55 @@ namespace KScript.Projects
     /// }
     /// </code>
     /// </summary>
+    /// <summary>
+    /// The "http" section: route files, middleware and its settings, for KScript.Http (routes, controllers and
+    /// middleware served by <c>kscript serve</c>).
+    /// </summary>
+    public sealed class HttpSettings
+    {
+        /// <summary>A route file and how its routes are mounted.</summary>
+        public sealed class RouteFile
+        {
+            public string File { get; set; }
+            public string Prefix { get; set; } = string.Empty;
+
+            /// <summary>True for API routes: errors and missing routes answer with JSON instead of HTML.</summary>
+            public bool Api { get; set; }
+        }
+
+        /// <summary>The route files, relative to the site folder. Null means the defaults (routes.* and api.*).</summary>
+        public List<RouteFile> Routes { get; set; }
+
+        /// <summary>Middleware run for every route, by name, such as log or cors.</summary>
+        public List<string> Middleware { get; set; } = new List<string>();
+
+        /// <summary>Middleware groups: a name that stands for a list of middleware, such as "admin": ["auth", "log"].</summary>
+        public Dictionary<string, List<string>> Groups { get; } = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The folder @view() looks in first, relative to the site folder. It is never served as pages.</summary>
+        public string Views { get; set; } = "views";
+
+        /// <summary>The prefix of api.* route files.</summary>
+        public string ApiPrefix { get; set; } = "/api";
+
+        /// <summary>False makes controllers read-only, like pages. Writes never leave the site folder.</summary>
+        public bool WriteFiles { get; set; } = true;
+
+        public List<string> CorsOrigins { get; set; } = new List<string> { "*" };
+        public List<string> CorsMethods { get; set; } = new List<string> { "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" };
+        public List<string> CorsHeaders { get; set; } = new List<string> { "Content-Type", "Authorization" };
+        public bool CorsCredentials { get; set; }
+
+        /// <summary>The environment variable that holds the bearer token the auth middleware accepts.</summary>
+        public string AuthTokenEnv { get; set; } = "API_TOKEN";
+
+        /// <summary>Requests per window for the throttle middleware, per client address.</summary>
+        public int ThrottleLimit { get; set; } = 60;
+        public double ThrottleSeconds { get; set; } = 60;
+
+        public static readonly string[] DefaultRouteNames = { "routes", "api" };
+    }
+
     public sealed class ProjectConfig
     {
         public const string FileName = "kscript.json";
@@ -165,6 +214,7 @@ namespace KScript.Projects
         public TestSettings Test { get; } = new TestSettings();
         public FormatSettings Format { get; } = new FormatSettings();
         public AppSettings App { get; } = new AppSettings();
+        public HttpSettings Http { get; } = new HttpSettings();
 
         /// <summary>
         /// Packages every script in the project imports without an &lt;import&gt;, such as KScript.Terminal.
@@ -303,6 +353,9 @@ namespace KScript.Projects
                         case "app":
                             ReadApp(prop.Value, config);
                             break;
+                        case "http":
+                            ReadHttp(prop.Value, config);
+                            break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
                             foreach (string package in config.Packages)
@@ -312,7 +365,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, serve, lint, test, format or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, serve, http, lint, test, format or app).");
                             break;
                     }
                 }
@@ -495,6 +548,123 @@ namespace KScript.Projects
                         break;
                 }
             }
+        }
+
+        private static void ReadHttp(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "http", config)) return;
+            HttpSettings http = config.Http;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "routes":
+                        if (p.Value.ValueKind != JsonValueKind.Array)
+                        {
+                            config.Warnings.Add("http.routes should be a list of route files, e.g. [\"routes.ks.xml\", { \"file\": \"api.ks.xml\", \"prefix\": \"/api\", \"api\": true }].");
+                            break;
+                        }
+                        http.Routes = new List<HttpSettings.RouteFile>();
+                        foreach (JsonElement item in p.Value.EnumerateArray())
+                        {
+                            if (item.ValueKind == JsonValueKind.String)
+                            {
+                                http.Routes.Add(new HttpSettings.RouteFile { File = item.GetString() });
+                                continue;
+                            }
+                            if (item.ValueKind != JsonValueKind.Object)
+                            {
+                                config.Warnings.Add("http.routes: each entry is a file name or { \"file\", \"prefix\", \"api\" }.");
+                                continue;
+                            }
+                            var route = new HttpSettings.RouteFile();
+                            foreach (var f in item.EnumerateObject())
+                            {
+                                switch (f.Name)
+                                {
+                                    case "file": route.File = String(f.Value, "http.routes[].file", config); break;
+                                    case "prefix": route.Prefix = String(f.Value, "http.routes[].prefix", config) ?? string.Empty; break;
+                                    case "api": route.Api = Bool(f.Value, "http.routes[].api", config) ?? false; break;
+                                    default: config.Warnings.Add($"unknown setting 'http.routes[].{f.Name}' (expected file, prefix or api)."); break;
+                                }
+                            }
+                            if (string.IsNullOrWhiteSpace(route.File)) config.Warnings.Add("http.routes: an entry has no \"file\".");
+                            else http.Routes.Add(route);
+                        }
+                        break;
+                    case "middleware":
+                        http.Middleware = Strings(p.Value, "http.middleware", config) ?? http.Middleware;
+                        break;
+                    case "groups":
+                        if (!Object(p.Value, "http.groups", config)) break;
+                        foreach (var g in p.Value.EnumerateObject())
+                        {
+                            List<string> names = Strings(g.Value, $"http.groups.{g.Name}", config);
+                            if (names != null) http.Groups[g.Name] = names;
+                        }
+                        break;
+                    case "views":
+                        http.Views = String(p.Value, "http.views", config) ?? http.Views;
+                        break;
+                    case "api_prefix":
+                        http.ApiPrefix = String(p.Value, "http.api_prefix", config) ?? http.ApiPrefix;
+                        break;
+                    case "write_files":
+                        http.WriteFiles = Bool(p.Value, "http.write_files", config) ?? http.WriteFiles;
+                        break;
+                    case "cors":
+                        if (!Object(p.Value, "http.cors", config)) break;
+                        foreach (var c in p.Value.EnumerateObject())
+                        {
+                            switch (c.Name)
+                            {
+                                case "origins": http.CorsOrigins = Strings(c.Value, "http.cors.origins", config) ?? http.CorsOrigins; break;
+                                case "methods": http.CorsMethods = Strings(c.Value, "http.cors.methods", config) ?? http.CorsMethods; break;
+                                case "headers": http.CorsHeaders = Strings(c.Value, "http.cors.headers", config) ?? http.CorsHeaders; break;
+                                case "credentials": http.CorsCredentials = Bool(c.Value, "http.cors.credentials", config) ?? http.CorsCredentials; break;
+                                default: config.Warnings.Add($"unknown setting 'http.cors.{c.Name}' (expected origins, methods, headers or credentials)."); break;
+                            }
+                        }
+                        break;
+                    case "auth":
+                        if (!Object(p.Value, "http.auth", config)) break;
+                        foreach (var a in p.Value.EnumerateObject())
+                        {
+                            if (a.Name == "token_env") http.AuthTokenEnv = String(a.Value, "http.auth.token_env", config) ?? http.AuthTokenEnv;
+                            else config.Warnings.Add($"unknown setting 'http.auth.{a.Name}' (expected token_env).");
+                        }
+                        break;
+                    case "throttle":
+                        if (!Object(p.Value, "http.throttle", config)) break;
+                        foreach (var t in p.Value.EnumerateObject())
+                        {
+                            switch (t.Name)
+                            {
+                                case "limit":
+                                    if (t.Value.ValueKind == JsonValueKind.Number && t.Value.TryGetInt32(out int limit) && limit > 0) http.ThrottleLimit = limit;
+                                    else config.Warnings.Add("http.throttle.limit should be a whole number above 0.");
+                                    break;
+                                case "seconds":
+                                    if (t.Value.ValueKind == JsonValueKind.Number && t.Value.TryGetDouble(out double seconds) && seconds > 0) http.ThrottleSeconds = seconds;
+                                    else config.Warnings.Add("http.throttle.seconds should be a number above 0.");
+                                    break;
+                                default: config.Warnings.Add($"unknown setting 'http.throttle.{t.Name}' (expected limit or seconds)."); break;
+                            }
+                        }
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'http.{p.Name}' (expected routes, middleware, groups, views, api_prefix, write_files, cors, auth or throttle).");
+                        break;
+                }
+            }
+        }
+
+        private static bool? Bool(JsonElement e, string name, ProjectConfig config)
+        {
+            if (e.ValueKind == JsonValueKind.True) return true;
+            if (e.ValueKind == JsonValueKind.False) return false;
+            config.Warnings.Add($"{name} should be true or false.");
+            return null;
         }
 
         private static void ReadServe(JsonElement e, ProjectConfig config)

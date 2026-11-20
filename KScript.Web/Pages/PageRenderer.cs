@@ -123,8 +123,19 @@ namespace KScript.Pages
 
         /// <summary>Renders a page file (relative to the site folder): .html or .md.</summary>
         public static PageResult RenderFile(PageContext ctx, string relativePath, Dictionary<string, object> parameters = null)
+            => RenderFile(ctx, relativePath, parameters, variables: null);
+
+        /// <summary>
+        /// Renders a page file with extra <paramref name="variables"/> declared for it, as a controller's
+        /// <c>@view('people/show.html', person: $p)</c> does.
+        /// </summary>
+        public static PageResult RenderFile(PageContext ctx, string relativePath, Dictionary<string, object> parameters, IReadOnlyDictionary<string, object> variables)
         {
             var scope = NewScope(ctx, parameters);
+            if (variables != null)
+            {
+                foreach (var kv in variables) scope.Declare(kv.Key, kv.Value);
+            }
             try
             {
                 string html = RenderFileInScope(ctx, relativePath, scope, slot: null);

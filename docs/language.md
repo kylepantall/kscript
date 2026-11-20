@@ -234,6 +234,7 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 | `KScript.Net` | `@fetch(url, options: { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
+| `KScript.Http` | Routes, controllers and middleware for `kscript serve`: a file whose root is `<KScript.Routes>` holds `<Get>` `<Post>` `<Put>` `<Patch>` `<Delete>` `<Any>` `<Route>` `<Resource>` `<Group>` `<Middleware>`. Controllers use `@view`, `@response`, `@redirect`, `@abort` and `@route`. See [Routes, controllers and middleware](http.md). |
 | `KScript.UI` | Desktop windows: a script whose root is `<KScript.Window>` opens one. `<Column>` `<Row>` `<Grid>` `<Text>` `<Button>` `<TextBox>` `<CheckBox>` `<Select>` `<Slider>` `<Box>` `<Spacer>` `<Timer>`, `@close_window()`. See [Desktop apps](desktop.md). |
 | `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](testing.md)). |
 

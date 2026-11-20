@@ -43,6 +43,69 @@
         "host": { "type": "string", "default": "localhost", "description": "localhost, an IP address to listen on, or * for every address." }
       }
     },
+    "http": {
+      "type": "object",
+      "description": "KScript.Http: route files, middleware and their settings for kscript serve.",
+      "additionalProperties": false,
+      "properties": {
+        "routes": {
+          "type": "array",
+          "description": "The route files, relative to the site folder. Without this, kscript serve loads routes.ks.xml (or .kscript) and api.ks.xml (under /api).",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "description": "The route file." },
+                  "prefix": { "type": "string", "description": "A path in front of every route in the file, such as /api/v1." },
+                  "api": { "type": "boolean", "description": "true: errors and missing routes are answered with JSON." }
+                }
+              }
+            ]
+          }
+        },
+        "middleware": { "type": "array", "items": { "type": "string" }, "description": "Middleware run for every route, such as [\"log\"]. Built-ins: log, cors, auth, throttle (throttle:30, auth:OTHER_TOKEN)." },
+        "groups": {
+          "type": "object",
+          "description": "Names for lists of middleware, used like a middleware name: { \"admin\": [\"auth\", \"log\"] }.",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "views": { "type": "string", "default": "views", "description": "The folder @view() looks in first. It is never served as pages." },
+        "api_prefix": { "type": "string", "default": "/api", "description": "The prefix of api.* route files." },
+        "write_files": { "type": "boolean", "default": true, "description": "false makes controllers read-only, like pages. Writes never leave the site folder." },
+        "cors": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Settings for the cors middleware.",
+          "properties": {
+            "origins": { "type": "array", "items": { "type": "string" }, "description": "Origins allowed to call the API, or [\"*\"] (the default) for any." },
+            "methods": { "type": "array", "items": { "type": "string" }, "description": "Methods allowed in preflight requests." },
+            "headers": { "type": "array", "items": { "type": "string" }, "description": "Request headers allowed in preflight requests." },
+            "credentials": { "type": "boolean", "description": "true allows cookies and Authorization from other origins." }
+          }
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Settings for the auth middleware.",
+          "properties": {
+            "token_env": { "type": "string", "default": "API_TOKEN", "description": "The environment variable holding the bearer token." }
+          }
+        },
+        "throttle": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Settings for the throttle middleware.",
+          "properties": {
+            "limit": { "type": "integer", "minimum": 1, "default": 60, "description": "Requests allowed per window, per address and route." },
+            "seconds": { "type": "number", "exclusiveMinimum": 0, "default": 60, "description": "The length of the window." }
+          }
+        }
+      }
+    },
     "lint": {
       "type": "object",
       "description": "Used by kscript check and by the editor (language server).",

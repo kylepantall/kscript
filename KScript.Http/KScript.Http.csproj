@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>KScript.Http</RootNamespace>
+    <AssemblyName>KScript.Http</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.0.0</Version>
+    <Product>KScript</Product>
+    <Description>KScript.Http: routes, controllers and middleware for kscript serve.</Description>
+    <NoWarn>$(NoWarn);IDE1006</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Tests" />
+    <InternalsVisibleTo Include="KScript.Language.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+    <ProjectReference Include="..\KScript.Web\KScript.Web.csproj" />
+  </ItemGroup>
+
+</Project>
