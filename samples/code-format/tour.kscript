@@ -13,7 +13,8 @@ total = $total + $price * $qty
 total += 1
 x = 3
 $x += 1
-$x = 3; $total += $price * $qty
+$x = 3
+$total += $price * $qty
 echo "$x $total"
 const config = { debug: false, retries: 3 }
 echo "Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for braces."
@@ -34,11 +35,21 @@ echo "Youngest: {$sorted[0].name}"
 echo $names |> @to_lower() |> @greet('Hi')
 
 // Loops
-for i in 0..10 { echo $i }
-for i in 0..100 step 5 { echo $i }
-for item at k in $colours { echo "$k: $item" }
-for key, value in $config { echo "$key = $value" }
-while $n < 3 { $n += 1 }
+for i in 0..10 {
+  echo $i
+}
+for i in 0..100 step 5 {
+  echo $i
+}
+for item at k in $colours {
+  echo "$k: $item"
+}
+for key, value in $config {
+  echo "$key = $value"
+}
+while $n < 3 {
+  $n += 1
+}
 
 // Branches
 score = 80
@@ -51,10 +62,18 @@ if $score >= 90 {
 }
 choice = 2
 match $choice {
-  case 1 { @greet('settings') }
-  case 2, 3 { echo "Coming soon" }
-  when $choice > 9 { echo "Out of range" }
-  default { echo "Unknown option" }
+  case 1 {
+    @greet('settings')
+  }
+  case 2, 3 {
+    echo "Coming soon"
+  }
+  when $choice > 9 {
+    echo "Out of range"
+  }
+  default {
+    echo "Unknown option"
+  }
 }
 label = match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }
 echo $label

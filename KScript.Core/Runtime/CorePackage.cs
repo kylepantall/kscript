@@ -101,13 +101,20 @@ namespace KScript.Runtime
                 new A("fields", K.Fields, "A short type's fields on one line, like fn params: `login: string, id: int, avatar_url?: string`. Bigger types list their fields one per line instead (<field> elements)."),
                 new A("sample", K.Path, "A JSON file holding an example of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
                 new A("extra", K.Enum, "Keys in the data that the type doesn't list: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
+                new A("with", K.TypeNames, "Other types this one is made from. Types with fields are joined: `with=\"User, Auditable\"` has all their fields and rules, and fits wherever they do. One built-in type, such as `with=\"int\"` or `with=\"handle\"`, makes a type with rules instead of fields: min, max, pattern, one_of, not, <validate> and <normalize>.", false, Values.DeclarableTypes),
+                new A("min", K.Text, "The smallest value allowed: a number for numbers, a date for dates, the length for text (a handle's name without its @), the count for lists. Needs with=\"...\" naming one built-in type."),
+                new A("max", K.Text, "The largest value allowed: a number for numbers, a date for dates, the length for text, the count for lists. Needs with=\"...\" naming one built-in type."),
+                new A("pattern", K.Text, "A regular expression the value's text must match: `^[a-z0-9-]+$`. On a type with fields, its named groups fill the fields of the same name, so the type can be made from text."),
+                new A("parse", K.Expression, "On a type with fields: an expression that turns text into a map of the fields, with the text as $value and the pattern's match (if any) as $match."),
+                new A("one_of", K.Text, "The only values allowed: `gb, ie` or `['gb', 'ie']`. Compared after converting and normalising."),
+                new A("not", K.Text, "Values that aren't allowed, such as reserved names: `['@admin', '@root']`."),
                 new A("description", K.Text, "What the type is, shown on hover."))
             {
                 Example = "<type name=\"User\">\n  <field name=\"login\" type=\"string\" />\n  <field name=\"id\" type=\"int\" />\n</type>\n<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int\" from=\"stargazers_count\" />\n  <field name=\"owner\" type=\"User\" />\n</type>\n<let name=\"repo\" value=\"$Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })\" />\n<echo>$repo.name has $repo.stars stars</echo>",
             }, run =>
             {
-                RecordType type = Shapes.Declare(run);
-                run.Scope.Declare(type.Name, type, isConst: true);
+                IKObject type = Shapes.Declare(run);
+                run.Scope.Declare(type.ToText(), type, isConst: true);
                 return null;
             });
 
@@ -135,10 +142,30 @@ namespace KScript.Runtime
                 new A("default", K.Expression, "The value when the data has none (makes the field optional)."),
                 new A("optional", K.Bool, "yes lets the value be missing or null."),
                 new A("value", K.Expression, "Works the field out from the others (they are $name) instead of reading it: `$first + ' ' + $last`."),
+                new A("min", K.Text, "The smallest value allowed: a number, a date, or the length of text or a list."),
+                new A("max", K.Text, "The largest value allowed: a number, a date, or the length of text or a list."),
+                new A("pattern", K.Text, "A regular expression the value's text must match."),
+                new A("one_of", K.Text, "The only values allowed: `gb, ie` or `['gb', 'ie']`."),
+                new A("not", K.Text, "Values that aren't allowed, such as reserved names."),
                 new A("description", K.Text, "What the field holds, shown on hover and completion."))
             {
                 MustBeInside = new[] { "type", "error" },
             }, run => throw run.Error("<field> must be directly inside <type> or <error>.", null, "Syntax"));
+
+            p.Element(new ElementInfo("validate", "A rule a <type> checks: the test must be true. In a type made from one other type, the value is `$value`. In a type with fields, each field is a variable (`$end > $start`). Every rule that fails is reported, with its message.", ContentKind.Empty,
+                new A("test", K.Expression, "What must be true: `$value % 5 == 0`, `$end > $start`.", true),
+                new A("message", K.Text, "What to say when it isn't, such as `must end after it starts`."))
+            {
+                MustBeInside = new[] { "type" },
+                Example = "<type name=\"Even\" with=\"int\">\n  <validate test=\"$value % 2 == 0\" message=\"must be even\" />\n</type>\n<echo>{ $Even->from(4) }</echo>",
+            }, run => throw run.Error("<validate> must be directly inside <type>.", null, "Syntax"));
+
+            p.Element(new ElementInfo("normalize", "Cleans up a value before a <type>'s rules check it, such as trimming or lower-casing. The value is `$value`; the result is converted to the type again.", ContentKind.Empty,
+                new A("value", K.Expression, "The cleaned-up value: `$value->trim()->lower()`.", true))
+            {
+                MustBeInside = new[] { "type" },
+                Example = "<type name=\"Slug\" with=\"string\" pattern=\"^[a-z0-9-]+$\">\n  <normalize value=\"$value->trim()->lower()\" />\n</type>\n<echo>{ $Slug->from(' Hello-World ') }</echo>",
+            }, run => throw run.Error("<normalize> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("set", "Changes an existing variable. Fails if the variable was never declared (a typo guard) or is const. Without `name`, the text is assignment statements.",
                 ContentKind.Expression,
@@ -378,8 +405,8 @@ namespace KScript.Runtime
             }
 
             string name = run.VariableName("name");
-            object value = run.Has("value") ? run.Eval("value") : run.EvalContent();
             string type = run.Raw("type");
+            object value = run.Has("value") ? run.EvalTyped("value", type) : run.EvalContentTyped(type);
             if (type != null) value = Shapes.Convert(run.Interpreter, value, type, "$" + name, run.Scope, run.Module);
 
             string op = run.Raw("op")?.Trim();
@@ -776,6 +803,8 @@ namespace KScript.Runtime
             p.Command("number", "value, default?", "Converts a value to a number (or returns default when it isn't one).", KType.Number, c =>
                 Values.TryNumber(c.Arg(0), out double n) ? n : c.Has(1) ? c.Arg(1) : throw c.Error($"{Values.Describe(c.Arg(0))} is not a number.", "Type"));
             p.Command("string", "value", "Converts a value to text.", KType.String, c => Values.ToStr(c.Arg(0)));
+            p.Command("uuid", "v?: int, name?: string, namespace?: string", "A new UUID. Version 4 (the default) is random. Version 8 is custom: with a name it is a SHA-256 hash of the namespace and the name, so the same name always gives the same UUID; without one it starts with the time, so newer ones sort later.", KType.Uuid,
+                c => UuidValue.New(c.Int(0, 4), c.Arg(1) == null ? null : c.Str(1), c.Arg(2) == null ? null : c.Str(2)), "@uuid()->version()");
             p.Command("type", "value", "The type of a value: string, number, bool, list, map, fn, date or null, or the name of the <type> that made a record.", KType.String, c => Shapes.TypeName(c.Arg(0)));
             p.Command("min", "values...", "The smallest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: true));
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));

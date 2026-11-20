@@ -476,9 +476,10 @@ public sealed class McpTests : IDisposable
         Assert.Contains("\n    <echo>hi</echo>", Call(server, "format_code", new { path = "p/a.ks.xml" }).Text);
         Assert.Equal("<kscript><echo>hi</echo></kscript>", File.ReadAllText(script));
 
-        var (kscript, error) = Call(server, "format_code", new { code = "echo \"hi\"" });
+        Assert.Equal("x = 1\nif $x > 0 {\n  echo \"hi\"\n}\n", Call(server, "format_code", new { code = "x=1\nif $x > 0 { echo \"hi\" }" }).Text);
+        var (kscript, error) = Call(server, "format_code", new { code = "if yes {\necho 1\n" });
         Assert.True(error);
-        Assert.Contains("not reformatted yet. The code was left as it is.", kscript);
+        Assert.Contains("The code was left as it is.", kscript);
         Assert.True(Call(server, "format_code", new { code = "<echo>unclosed" }).IsError);
         Assert.True(Call(server, "format_code").IsError);
     }

@@ -423,10 +423,10 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            if (report && type != null && !BuiltInTypes.Contains(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
+            if (report && type != null && !IsBuiltInTypeName(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
             {
                 Report(value.ToSource(new TextSpan(start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length), type.Length)),
-                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", BuiltInTypes)}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
+                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
             }
 
             if (report && def != null)
@@ -550,7 +550,7 @@ namespace KScript.Language.Analysis
         /// <summary>A type without its [] and ?: Repo for Repo[]?.</summary>
         private static string TypeBase(string type)
         {
-            string t = type.TrimEnd('?').TrimEnd();
+            string t = TypeInference.WithoutTypeArguments(type.Trim()).TrimEnd('?').TrimEnd();
             while (t.EndsWith("[]", StringComparison.Ordinal))
             {
                 t = t.Substring(0, t.Length - 2).TrimEnd();

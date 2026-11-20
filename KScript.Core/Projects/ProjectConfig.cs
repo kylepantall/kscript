@@ -20,6 +20,12 @@ namespace KScript.Projects
         public string Root { get; set; } = ".";
         public int Port { get; set; } = 8080;
         public string Host { get; set; } = "localhost";
+
+        /// <summary>True to serve the docs, with a page about this project, next to the site (as <c>--with-docs</c> does).</summary>
+        public bool Docs { get; set; }
+
+        /// <summary>The port the docs are served on; null picks 4180, or a free port if that is in use.</summary>
+        public int? DocsPort { get; set; }
     }
 
     /// <summary>The <c>app</c> section: what <c>kscript compile</c> builds and how the program is named.</summary>
@@ -160,6 +166,7 @@ namespace KScript.Projects
         public static readonly string[] RuleNames =
         {
             "indent", "statementPerLine", "tidyTags", "wrapAttributes", "trimTrailingWhitespace", "collapseBlankLines", "finalNewline",
+            "spacing", "braceStyle",
         };
     }
 
@@ -341,6 +348,45 @@ namespace KScript.Projects
         /// </summary>
         public List<string> Packages { get; set; } = new List<string>();
 
+        /// <summary>
+        /// The "types" section: defaults for built-in types, used wherever the type is used without arguments of its
+        /// own, such as <c>"uuid": { "v": 4 }</c> or <c>"password": { "min": 12 }</c>. Arguments where a type is used
+        /// (<c>password(min: 8)</c>) replace these.
+        /// </summary>
+        public Dictionary<string, Dictionary<string, object>> Types { get; } = new Dictionary<string, Dictionary<string, object>>(StringComparer.Ordinal);
+
+        private static void ReadTypes(JsonElement e, ProjectConfig config)
+        {
+            if (e.ValueKind != JsonValueKind.Object)
+            {
+                config.Warnings.Add("types should be an object, such as \"types\": { \"uuid\": { \"v\": 4 } }.");
+                return;
+            }
+            foreach (JsonProperty type in e.EnumerateObject())
+            {
+                string name = type.Name.Trim().ToLowerInvariant();
+                if (!KScript.Runtime.Values.DeclarableTypes.Contains(name) || name is "any" or "fn")
+                {
+                    config.Warnings.Add($"types: '{type.Name}' isn't a built-in type. Defaults can be set for: {string.Join(", ", KScript.Runtime.Values.DeclarableTypes.Where(t => t is not ("any" or "fn")))}.");
+                    continue;
+                }
+                if (type.Value.ValueKind != JsonValueKind.Object)
+                {
+                    config.Warnings.Add($"types.{type.Name} should be an object of rules, such as {{ \"min\": 12 }}.");
+                    continue;
+                }
+                var options = (Dictionary<string, object>)KScript.Runtime.Values.FromJson(type.Value);
+                KScript.Runtime.TypeRules rules = KScript.Runtime.TypeRules.FromOptions(options, out string error);
+                string problem = error ?? rules.ProblemFor(name, $"types.{name}");
+                if (problem != null)
+                {
+                    config.Warnings.Add($"types.{type.Name}: {problem}");
+                    continue;
+                }
+                config.Types[name] = options;
+            }
+        }
+
         /// <summary>Unknown keys and values that were ignored.</summary>
         public List<string> Warnings { get; } = new List<string>();
 
@@ -481,6 +527,9 @@ namespace KScript.Projects
                         case "http":
                             ReadHttp(prop.Value, config);
                             break;
+                        case "types":
+                            ReadTypes(prop.Value, config);
+                            break;
                         case "paths":
                             ReadPaths(prop.Value, config);
                             break;
@@ -493,7 +542,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, serve, http, lint, test, config, format, make or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, types, serve, http, lint, test, config, format, make or app).");
                             break;
                     }
                 }
@@ -891,8 +940,15 @@ namespace KScript.Projects
                     case "host":
                         config.Serve.Host = String(p.Value, "serve.host", config) ?? "localhost";
                         break;
+                    case "docs":
+                        config.Serve.Docs = Bool(p.Value, "serve.docs", config) ?? false;
+                        break;
+                    case "docs_port":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int docsPort) && docsPort > 0 && docsPort < 65536) config.Serve.DocsPort = docsPort;
+                        else config.Warnings.Add($"serve.docs_port should be a number from 1 to 65535.");
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port or host).");
+                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port, host, docs or docs_port).");
                         break;
                 }
             }

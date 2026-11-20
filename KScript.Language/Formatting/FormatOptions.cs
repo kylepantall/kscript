@@ -57,6 +57,12 @@ namespace KScript.Language.Formatting
         /// <summary>End the file with exactly one newline. Off: the file ends as it did.</summary>
         public bool FinalNewline { get; set; } = true;
 
+        /// <summary>.kscript files: spaces after commas and colons, around assignments and before a block's '{'. Off: spacing inside lines is kept.</summary>
+        public bool Spacing { get; set; } = true;
+
+        /// <summary>.kscript files: <c>} else {</c>, <c>} catch {</c> on one line. Off: else and catch stay on the line they are on.</summary>
+        public bool BraceStyle { get; set; } = true;
+
         public static FormatOptions Default => new FormatOptions();
 
         /// <summary>
@@ -93,6 +99,8 @@ namespace KScript.Language.Formatting
                     case "trimTrailingWhitespace": options.TrimTrailingWhitespace = rule.Value; break;
                     case "collapseBlankLines": options.CollapseBlankLines = rule.Value; break;
                     case "finalNewline": options.FinalNewline = rule.Value; break;
+                    case "spacing": options.Spacing = rule.Value; break;
+                    case "braceStyle": options.BraceStyle = rule.Value; break;
                 }
             }
             return options;

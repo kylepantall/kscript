@@ -37,6 +37,13 @@ namespace KScript.Language.Analysis
             Analyze(text, path, files, catalog, kind, projectWide: true);
 
         /// <summary>
+        /// Analyses one file without reading the rest of the project for calls to its functions: for listing what a
+        /// file declares (as the docs' project page does), where unused-function warnings don't matter.
+        /// </summary>
+        public static DocumentAnalysis AnalyzeFile(string text, string path, IFileSystem files = null, LanguageCatalog catalog = null) =>
+            Analyze(text, path, files, catalog, null, projectWide: false);
+
+        /// <summary>
         /// With <paramref name="projectWide"/> false, functions are not checked for use (KS6002), so no other file in
         /// the project is read for calls. That is how files that import this one are analysed.
         /// </summary>
@@ -195,7 +202,7 @@ namespace KScript.Language.Analysis
             Dictionary<string, Symbol> seen = new Dictionary<string, Symbol>(StringComparer.Ordinal);
             foreach (MarkupElement e in result.Markup.DescendantElements())
             {
-                if (IsKScriptElementName(e, "fn"))
+                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && IsKScriptElementName(owner, "type")))
                 {
                     MarkupAttribute nameAttr = e.GetAttribute("name");
                     string name = nameAttr?.ValueText?.Trim();
@@ -1118,9 +1125,17 @@ namespace KScript.Language.Analysis
             }
 
             ExpressionRegion region = null;
-            if (valueAttr?.Value != null)
+            string declaredType = e.GetAttributeValue("type")?.Trim();
+            if (valueAttr?.Value != null && CheckTypedValue(valueAttr.Value, declaredType, scope, e.Span.Start))
+            {
+                // Raw text for its type: @kyle for a handle, red for an enum.
+            }
+            else if (valueAttr?.Value != null)
             {
                 region = AnalyzeExpressionRegion(valueAttr.Value, RegionKind.Expression, scope, e, valueAttr);
+            }
+            else if (hasText && CheckTypedValue(text.Content, declaredType, scope, e.Span.Start))
+            {
             }
             else if (hasText)
             {

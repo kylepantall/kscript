@@ -66,15 +66,17 @@ namespace KScript
                     O("--junit file", "Also write a JUnit XML report, for CI."),
                 },
                 "kscript test\nkscript test tests/cart.test.ks.xml --filter total", "testing"),
-            new CliCommand("serve", "kscript serve [site folder] [--port 8080] [--host localhost] [--env name]",
+            new CliCommand("serve", "kscript serve [site folder] [--port 8080] [--host localhost] [--env name] [--with-docs [--docs-port 4180]]",
                 "Serve pages, and routes.ks.xml / api.ks.xml routes.",
                 new[]
                 {
                     O("--port, -p N", "The port to listen on (default 8080, or serve.port in kscript.json)."),
                     O("--host H", "The address to listen on: localhost (default), 0.0.0.0 or * for every address."),
                     O("--env name", "The environment for $config."),
+                    O("--with-docs", "Also serve the docs on localhost, with a page about this project: its conventions, routes, and the functions, types and constants its scripts declare. serve.docs in kscript.json turns it on by default; --no-docs turns it off. Never for compiled programs or the production environment."),
+                    O("--docs-port N", "The port for the docs (default 4180, or a free one if that is in use)."),
                 },
-                "kscript serve\nkscript serve site --port 3000", "web"),
+                "kscript serve\nkscript serve site --port 3000\nkscript serve --with-docs", "web"),
             new CliCommand("routes", "kscript routes [site folder]",
                 "List the routes of a site.", Array.Empty<CliOption>(), "kscript routes samples/http-app", "http"),
             new CliCommand("openapi", "kscript openapi [site folder] [--yaml] [--out file]",
@@ -85,15 +87,16 @@ namespace KScript
                     O("--out file", "Write to a file instead of the terminal."),
                 },
                 "kscript openapi\nkscript openapi --yaml --out openapi.yaml", "http"),
-            new CliCommand("docs", "kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open]",
+            new CliCommand("docs", "kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open] [--project]",
                 "Open these docs: a local website with every package, element, command and method, and examples you can run.",
                 new[]
                 {
                     O("--port N", "The port to serve the docs on (default 4180, or a free port if that one is taken)."),
                     O("--format kscript|xml", "Show examples as .kscript or XML (default: the project's make.format, else .kscript)."),
                     O("--no-open", "Don't open a browser; just print the address."),
+                    O("--project", "Write .kscript/docs/project.md, the docs of this project's own code (its conventions, routes, functions and types). From then on kscript watch, kscript serve and saving in the editor keep it up to date."),
                 },
-                "kscript docs\nkscript docs replace\nkscript docs --format xml"),
+                "kscript docs\nkscript docs replace\nkscript docs --format xml\nkscript docs --project"),
             new CliCommand("mcp", "kscript mcp [--format kscript|xml] [--dir folder] [--http [--port 4181]]",
                 "Serve these docs to AI coding assistants (Claude Code, Cursor, VS Code...) over MCP, offline.",
                 new[]
