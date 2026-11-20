@@ -73,6 +73,10 @@ jobs:
           $k check xml-app --warnaserror
           $k fmt --check xml-app
           $k test xml-app
+          $k make project bare-tool --bare
+          $k check bare-tool --warnaserror
+          $k test bare-tool
+          $k bare-tool/main.kscript
 
   vscode:
     name: VS Code extension

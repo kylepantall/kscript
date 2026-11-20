@@ -1,0 +1,11 @@
+// Run every test in the project with: kscript test
+test(name: "main{{ ext }} says hello") {
+  run = @run_script('../main{{ ext }}')
+  expect(value: $run.code, equals: 0)
+  expect(value: $run.output, equals: 'Hello, World!')
+}
+
+test(name: "main{{ ext }} greets the name it is given") {
+  run = @run_script('../main{{ ext }}', options: { args: ['ellie'] })
+  expect(value: $run.output, equals: 'Hello, Ellie!')
+}
