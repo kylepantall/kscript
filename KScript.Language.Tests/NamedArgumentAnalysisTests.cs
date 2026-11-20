@@ -190,6 +190,16 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ListsOfOtherParametersOfferNoEnumValues()
+        {
+            (DocumentAnalysis a, int offset) = At(Script(Sizes + "<echo>{ @plain([‸]) }</echo>"));
+            Assert.DoesNotContain("medium", (Service.GetCompletions(a, offset) ?? new List<CompletionItem>()).Select(c => c.Label));
+
+            (a, offset) = At(Script(Sizes + "<echo>{ @pack_all(other: [‸]) }</echo>"));
+            Assert.DoesNotContain("medium", (Service.GetCompletions(a, offset) ?? new List<CompletionItem>()).Select(c => c.Label));
+        }
+
+        [Fact]
         public void HoverExplainsBareWords()
         {
             (DocumentAnalysis a, int offset) = At(Script(IO + "<echo>{ @known_folder(down‸loads) }</echo>"));
