@@ -429,7 +429,46 @@ namespace KScript.Http
             };
             if (wanted == null) return interpreter.Call(route.Controller, new object[] { request });
             var named = wanted.Where(available.ContainsKey).ToDictionary(n => n, n => available[n], StringComparer.Ordinal);
+            if (route.Controller is UserFunction typed) CheckTypedParameters(ctx, interpreter, typed, named, parameters);
             return interpreter.Call(route.Controller, Array.Empty<object>(), named);
+        }
+
+        /// <summary>
+        /// Maps request data into a controller's typed parameters before it runs: <c>params="json: NewPerson"</c>
+        /// turns the body into a NewPerson record. Data that doesn't fit is the client's mistake, so it is answered
+        /// with 422 and every problem (or 404 for a path parameter), instead of a 500 from inside the controller.
+        /// </summary>
+        private static void CheckTypedParameters(RequestContext ctx, Interpreter interpreter, UserFunction fn, Dictionary<string, object> named, Dictionary<string, object> pathParams)
+        {
+            foreach (Parameter p in fn.Parameters)
+            {
+                if (p.Type == null || !named.TryGetValue(p.Name, out object value)) continue;
+                bool fromPath = pathParams.ContainsKey(p.Name);
+                string what = fromPath ? $"The {{{p.Name}}} in the path" : p.Name switch
+                {
+                    "json" or "body" => "The request body",
+                    "query" => "The query string",
+                    "form" => "The form",
+                    "input" => "The request's input",
+                    _ => $"The request's {p.Name}",
+                };
+                try
+                {
+                    named[p.Name] = Shapes.Convert(interpreter, value, p.Type, what, fn.Closure, fn.Module);
+                }
+                catch (KScriptException ex) when (ex.Type == "Shape" || ex.Type == "Type" || ex.Type == "Argument")
+                {
+                    if (fromPath) throw new HttpAbortSignal(ctx.ErrorResponse(404, ex.Message));
+                    HttpResponse response = ctx.ErrorResponse(422, ex.Message);
+                    if (response.ContentType.StartsWith("application/json", StringComparison.Ordinal))
+                    {
+                        var body = new Dictionary<string, object> { ["error"] = ex.Message, ["status"] = 422.0 };
+                        if (ex.Fields.TryGetValue("problems", out object problems)) body["problems"] = problems;
+                        response = HttpResponse.Json(body, 422);
+                    }
+                    throw new HttpAbortSignal(response);
+                }
+            }
         }
 
         private static PageResult ToPage(HttpResponse response, string method)

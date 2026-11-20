@@ -4,6 +4,9 @@
 
   <const name="file" value="'data/people.json'" />
 
+  <!--- What a client sends to add a person. A body that doesn't fit is answered with 422 and every problem. -->
+  <type name="NewPerson" fields="name: string, age?: int, role?: string" />
+
   <fn name="all" value="@read_json($file)" />
 
   <fn name="find" params="id">
@@ -38,8 +41,8 @@
     <return value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
   </fn>
 
-  <fn name="store" params="json">
-    <if test="$json == null or ($json.name ?? '') == ''">
+  <fn name="store" params="json: NewPerson">
+    <if test="$json.name->trim() == ''">
       <return value="@response({ error: 'A person needs a name.' }, status: 422)" />
     </if>
     <let name="people" value="@all()" />
