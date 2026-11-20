@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 
+using KScript.Runtime;
+
 using Markdig;
 
 namespace KScript.Pages
@@ -66,7 +68,7 @@ namespace KScript.Pages
         public static Dictionary<string, object> Document(string text)
         {
             var (meta, body, _) = SplitFrontMatter(text);
-            string title = meta.TryGetValue("title", out var t) && t != null ? PageValues.ToStr(t) : FirstHeading(body);
+            string title = meta.TryGetValue("title", out var t) && t != null ? Values.ToStr(t) : FirstHeading(body);
             return new Dictionary<string, object>
             {
                 ["html"] = ToHtml(body),
@@ -80,6 +82,22 @@ namespace KScript.Pages
         {
             var m = Regex.Match(body ?? string.Empty, @"^#{1,6}\s+(.+?)\s*#*\s*$", RegexOptions.Multiline);
             return m.Success ? m.Groups[1].Value : null;
+        }
+
+        /// <summary>Escapes a value inserted into Markdown, so it shows as written instead of becoming formatting or HTML.</summary>
+        public static string Escape(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return string.Empty;
+            var sb = new System.Text.StringBuilder(s.Length + 8);
+            foreach (char c in s)
+            {
+                if ("\\`*_[]#|~".IndexOf(c) >= 0) sb.Append('\\').Append(c);
+                else if (c == '<') sb.Append("&lt;");
+                else if (c == '>') sb.Append("&gt;");
+                else if (c == '&') sb.Append("&amp;");
+                else sb.Append(c);
+            }
+            return sb.ToString();
         }
 
         /// <summary>Removes the common leading indentation, so Markdown nested inside indented HTML still works.</summary>

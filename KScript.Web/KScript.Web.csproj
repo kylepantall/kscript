@@ -30,7 +30,6 @@
   <ItemGroup>
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
     <ProjectReference Include="..\KScript.Markdown\KScript.Markdown.csproj" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
 </Project>

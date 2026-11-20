@@ -83,33 +83,36 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>Gives a module a package (and the packages it needs). With an alias, its commands are reached as <c>@alias.name</c>.</summary>
+        private void AddPackage(Module module, KScriptPackage package, string alias)
+        {
+            if (alias != null)
+            {
+                module.Aliases[alias] = new ImportNamespace(alias, package);
+            }
+            if (module.packages.Contains(package))
+            {
+                return;
+            }
+            module.packages.Add(package);
+            foreach (string required in package.Requires)
+            {
+                KScriptPackage dependency = Packages.Get(required) ?? throw new KScriptException($"{package.Name} needs {required}, which isn't installed.", "Import");
+                AddPackage(module, dependency, null);
+            }
+            foreach (var e in package.Elements) module.Elements[e.Key] = e.Value;
+            if (alias == null || package == Packages.Core)
+            {
+                foreach (var c in package.Commands) module.Commands[c.Key] = c.Value;
+            }
+            foreach (MethodDefinition m in package.Methods) module.Methods[m.Receiver + ":" + m.Name] = m;
+            foreach (var v in package.Variables) module.Variables[v.Key] = v.Value;
+            foreach (var f in package.EchoFormats) module.EchoFormats[f.Key] = f.Value;
+        }
+
         private void ResolveImports(Module module)
         {
-            void Add(KScriptPackage package, string alias)
-            {
-                if (alias != null)
-                {
-                    module.Aliases[alias] = new ImportNamespace(alias, package);
-                }
-                if (module.packages.Contains(package))
-                {
-                    return;
-                }
-                module.packages.Add(package);
-                foreach (string required in package.Requires)
-                {
-                    KScriptPackage dependency = Packages.Get(required) ?? throw new KScriptException($"{package.Name} needs {required}, which isn't installed.", "Import");
-                    Add(dependency, null);
-                }
-                foreach (var e in package.Elements) module.Elements[e.Key] = e.Value;
-                if (alias == null || package == Packages.Core)
-                {
-                    foreach (var c in package.Commands) module.Commands[c.Key] = c.Value;
-                }
-                foreach (MethodDefinition m in package.Methods) module.Methods[m.Receiver + ":" + m.Name] = m;
-                foreach (var v in package.Variables) module.Variables[v.Key] = v.Value;
-                foreach (var f in package.EchoFormats) module.EchoFormats[f.Key] = f.Value;
-            }
+            void Add(KScriptPackage package, string alias) => AddPackage(module, package, alias);
 
             Add(Packages.Core, null);
             foreach (string name in Options.DefaultPackages)
@@ -154,6 +157,61 @@ namespace KScript.Runtime
             {
                 throw Located(new KScriptException("<import> must be a direct child of <kscript>, before anything that uses it.", "Import"), module, misplaced.Span.Start);
             }
+        }
+
+        /// <summary>
+        /// Creates a module for a document that isn't a script, such as a web page. It has KScript.Core and the
+        /// default packages; <see cref="ImportPackage"/> and <see cref="ImportScript"/> add more. Its expressions
+        /// are evaluated with <see cref="EvaluateText"/>, <see cref="ExecuteStatements"/> and <see cref="Interpolate"/>.
+        /// </summary>
+        public Module CreateModule(string path, IEnumerable<string> packages = null)
+        {
+            var source = new SourceText(string.Empty);
+            var module = new Module(this, path, source, MarkupParser.Parse(source, DocumentKind.Page)) { HasRun = true };
+            module.Globals = new Scope();
+            AddPackage(module, Packages.Core, null);
+            foreach (string name in Options.DefaultPackages.Concat(packages ?? Enumerable.Empty<string>()))
+            {
+                AddPackage(module, GetPackage(name, module, null), null);
+            }
+            return module;
+        }
+
+        /// <summary>Adds a package to a module, as <c>&lt;import package="..." as="..." /&gt;</c> does.</summary>
+        public void ImportPackage(Module module, string packageName, string alias = null)
+        {
+            CheckAlias(alias);
+            AddPackage(module, GetPackage(packageName, module, null), alias);
+        }
+
+        /// <summary>
+        /// Loads and runs a script (once) and gives a module its exports, as <c>&lt;import src="..." /&gt;</c> does:
+        /// all of them, the comma separated <paramref name="names"/>, or under <paramref name="alias"/>.
+        /// </summary>
+        public void ImportScript(Module module, string path, Scope scope, string alias = null, string names = null)
+        {
+            CheckAlias(alias);
+            string full = System.IO.Path.GetFullPath(path);
+            if (loading.Contains(full))
+                throw new KScriptException($"{System.IO.Path.GetFileName(full)} imports itself (directly or through other scripts). Imports can't go round in a circle.", "Import");
+            if (!modulesByPath.TryGetValue(full, out Module imported))
+            {
+                if (!File.Exists(full)) throw new KScriptException($"There is no script at {path}.", "FileNotFound") { File = full };
+                imported = Load(full);
+            }
+            RunModule(imported);
+            if (alias != null)
+            {
+                module.Aliases[alias] = new ImportNamespace(alias, imported);
+                return;
+            }
+            DeclareExports(imported, names, scope);
+        }
+
+        private static void CheckAlias(string alias)
+        {
+            if (alias != null && (alias.Length == 0 || !Lexer.IsIdentStart(alias[0]) || !alias.All(Lexer.IsIdentChar)))
+                throw new KScriptException($"as=\"{alias}\" isn't a name. Use letters, digits and _, such as as=\"math\".", "Import");
         }
 
         private KScriptPackage GetPackage(string name, Module module, MarkupElement import)
@@ -442,6 +500,9 @@ namespace KScript.Runtime
         #region Errors
 
         /// <summary>Fills in an error's file, line and column from a document offset (if it has none yet).</summary>
+        /// <summary>Fills in an error's file, line and column from where it happened, if it doesn't have them yet.</summary>
+        public static KScriptException WithLocation(KScriptException ex, Module module) => Located(ex, module, null);
+
         internal static KScriptException Located(KScriptException ex, Module module, int? offset)
         {
             if (ex.HasLocation) return ex;
@@ -593,7 +654,11 @@ namespace KScript.Runtime
             if (!module.ScriptImports.TryGetValue(import, out Module imported)) return;
             RunModule(imported);
             if (import.GetAttribute("as") != null) return;
-            string names = import.GetAttributeValue("names");
+            DeclareExports(imported, import.GetAttributeValue("names"), scope);
+        }
+
+        private static void DeclareExports(Module imported, string names, Scope scope)
+        {
             IEnumerable<string> wanted = names == null ? imported.Exports.Keys : names.Split(',').Select(n => n.Trim().TrimStart('@', '$')).Where(n => n.Length > 0);
             foreach (string name in wanted)
             {

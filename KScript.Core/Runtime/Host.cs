@@ -42,6 +42,54 @@ namespace KScript.Runtime
         /// <summary>The folder relative paths are resolved against when a script has no file (scripts use their own folder).</summary>
         public string WorkingDirectory { get; set; } = Directory.GetCurrentDirectory();
 
+        /// <summary>
+        /// When set, relative file paths start in this folder and no file outside it can be read or written.
+        /// kscript serve sets it to the site folder, so a page can't reach the rest of the computer.
+        /// </summary>
+        public string FileRoot
+        {
+            get => fileRoot;
+            set => fileRoot = value == null ? null : Path.GetFullPath(value);
+        }
+
+        /// <summary>False when files may only be read, not written, moved or deleted (pages served by kscript serve).</summary>
+        public bool CanWriteFiles { get; set; } = true;
+
+        /// <summary>What <see cref="FileRoot"/> is called in errors, such as "the site folder".</summary>
+        public string FileRootName { get; set; } = "the allowed folder";
+
+        private string fileRoot;
+
+        /// <summary>
+        /// Turns a path from a script into a full path: <c>~</c> is the home folder and relative paths start in
+        /// <paramref name="baseDirectory"/> (or <see cref="FileRoot"/>). Paths outside <see cref="FileRoot"/> are refused.
+        /// </summary>
+        public string ResolvePath(string path, string baseDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(path)) throw new KScriptException("The path is empty.", "Argument");
+            if (FileRoot == null && (path == "~" || path.StartsWith("~/", StringComparison.Ordinal) || path.StartsWith("~\\", StringComparison.Ordinal)))
+                path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), path.Length > 2 ? path.Substring(2) : string.Empty);
+            if (FileRoot != null) path = path.TrimStart('/', '\\');
+            string full = Path.GetFullPath(Path.Combine(FileRoot ?? baseDirectory ?? WorkingDirectory, path));
+            CheckPath(full, path);
+            return full;
+        }
+
+        /// <summary>Throws if a full path is outside <see cref="FileRoot"/>.</summary>
+        public void CheckPath(string fullPath, string written = null)
+        {
+            if (FileRoot == null) return;
+            string root = FileRoot.EndsWith(Path.DirectorySeparatorChar) ? FileRoot : FileRoot + Path.DirectorySeparatorChar;
+            if (fullPath != FileRoot && !fullPath.StartsWith(root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                throw new KScriptException($"'{written ?? fullPath}' is outside {FileRootName}.", "Permission");
+        }
+
+        /// <summary>Throws if files can't be changed here.</summary>
+        public void CheckWrite(string what)
+        {
+            if (!CanWriteFiles) throw new KScriptException($"{what} can't change files here: files are read-only.", "Permission");
+        }
+
         /// <summary>State that packages keep for the length of a run, by key.</summary>
         public Dictionary<string, object> Items { get; } = new Dictionary<string, object>();
 

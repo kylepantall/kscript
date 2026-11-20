@@ -41,6 +41,7 @@ namespace KScript.IO
 
         public bool TryCallMethod(CallContext call, string name, out object result)
         {
+            call.Host.CheckPath(Path);
             result = name switch
             {
                 "path" => Path,
@@ -56,7 +57,7 @@ namespace KScript.IO
                 "created" => File.GetCreationTime(Path),
                 "read_text" => File.ReadAllText(Path),
                 "read_lines" => File.ReadAllLines(Path).Cast<object>().ToList(),
-                "join" => new FileValue(System.IO.Path.Combine(new[] { Path }.Concat(call.Args.Select(Values.ToStr)).ToArray())),
+                "join" => Checked(call, new FileValue(System.IO.Path.Combine(new[] { Path }.Concat(call.Args.Select(Values.ToStr)).ToArray()))),
                 "relative_to" => System.IO.Path.GetRelativePath(IOPackage.PathOf(call.Arg(0), call), Path),
                 "to_string" => Path,
                 _ => NoMethod,
@@ -70,6 +71,12 @@ namespace KScript.IO
         }
 
         private static readonly object NoMethod = new object();
+
+        private static FileValue Checked(CallContext call, FileValue file)
+        {
+            call.Host.CheckPath(file.Path);
+            return file;
+        }
 
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
@@ -99,17 +106,18 @@ namespace KScript.IO
         public override string Description => "Files and folders: read, write, list, move, copy and delete.";
 
         /// <summary>A path argument (text or a file value) resolved against the script's folder.</summary>
-        public static string PathOf(object value, CallContext c) => Resolve(value, c.Module?.Directory ?? c.Host.WorkingDirectory);
+        public static string PathOf(object value, CallContext c) => Resolve(value, c.Host, c.Module?.Directory ?? c.Host.WorkingDirectory);
 
-        private static string PathOf(ElementRun run, string attribute) => Resolve(run.Eval(attribute), run.Module.Directory);
+        private static string PathOf(ElementRun run, string attribute) => Resolve(run.Eval(attribute), run.Interpreter.Host, run.Module.Directory);
 
-        private static string Resolve(object value, string baseDirectory)
+        private static string Resolve(object value, KScriptHost host, string baseDirectory)
         {
-            string path = value is FileValue f ? f.Path : Values.ToStr(value);
-            if (string.IsNullOrWhiteSpace(path)) throw new KScriptException("The path is empty.", "Argument");
-            if (path == "~" || path.StartsWith("~/", StringComparison.Ordinal) || path.StartsWith("~\\", StringComparison.Ordinal))
-                path = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), path.Length > 2 ? path.Substring(2) : string.Empty);
-            return System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDirectory, path));
+            if (value is FileValue f)
+            {
+                host.CheckPath(f.Path);
+                return f.Path;
+            }
+            return host.ResolvePath(Values.ToStr(value), baseDirectory);
         }
 
         protected override void Register(PackageBuilder p)
@@ -156,6 +164,7 @@ namespace KScript.IO
                 Example = "<write to=\"'log.txt'\" append=\"yes\">{ @now() }: done</write>",
             }, run =>
             {
+                run.Interpreter.Host.CheckWrite("<write>");
                 string path = PathOf(run, "to");
                 object value = run.Has("value") ? run.Eval("value") : null;
                 string text = run.Has("value") ? value is Dictionary<string, object> or List<object> ? Values.ToJson(value, indented: true) : Values.ToStr(value) : run.Text();
@@ -188,6 +197,7 @@ namespace KScript.IO
                 Context = ElementContext.Script,
             }, run =>
             {
+                run.Interpreter.Host.CheckWrite("<delete>");
                 string path = PathOf(run, "path");
                 if (File.Exists(path)) File.Delete(path);
                 else if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
@@ -200,6 +210,7 @@ namespace KScript.IO
                 Context = ElementContext.Script,
             }, run =>
             {
+                run.Interpreter.Host.CheckWrite("<mkdir>");
                 Directory.CreateDirectory(PathOf(run, "path"));
                 return null;
             });
@@ -207,6 +218,7 @@ namespace KScript.IO
 
         private static object Write(CallContext c, string text, bool append)
         {
+            c.Host.CheckWrite($"@{c.Name}()");
             string path = PathOf(c.Need(0), c);
             EnsureFolder(path);
             if (append) File.AppendAllText(path, text, Encoding.UTF8);
@@ -244,6 +256,7 @@ namespace KScript.IO
 
         private static bool? Transfer(ElementRun run, bool move)
         {
+            run.Interpreter.Host.CheckWrite(move ? "<move>" : "<copy>");
             string from = PathOf(run, "from");
             string to = PathOf(run, "to");
             bool overwrite = run.Flag("overwrite");
