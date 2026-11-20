@@ -2,6 +2,7 @@ using KScript.LanguageServer;
 
 namespace KScript.Language.Tests
 {
+    [Collection(WorkingDirectoryCollection.Name)]
     public sealed class CheckCommandTests : IDisposable
     {
         private readonly string dir = Path.Combine(Path.GetTempPath(), "kscript-check-" + Guid.NewGuid().ToString("N"));

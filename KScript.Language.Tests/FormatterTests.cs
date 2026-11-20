@@ -506,6 +506,7 @@ namespace KScript.Language.Tests
         }
     }
 
+    [Collection(WorkingDirectoryCollection.Name)]
     public sealed class FormatCommandTests : IDisposable
     {
         private readonly string dir = Path.Combine(Path.GetTempPath(), "kscript-fmt-" + Guid.NewGuid().ToString("N"));
