@@ -38,13 +38,18 @@ jobs:
         run: |
           # The tag (v0.1.0) becomes the binary's version, which `kscript update` compares against releases.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VERSION="${GITHUB_REF_NAME#v}"; else VERSION="0.0.0-dev"; fi
+          # No single-file compression on macOS: on macOS 26 (Apple Silicon) a compressed kscript crashes with an
+          # AccessViolationException as soon as several threads load framework code at once (kscript docs, v0.4.0).
+          # DOTNET_ReadyToRun=0 or an uncompressed bundle both avoid it.
+          COMPRESS=true
+          if [[ "${{ matrix.rid }}" == osx-* ]]; then COMPRESS=false; fi
           dotnet publish KScriptApp/KScriptApp.csproj \
             --configuration Release \
             --runtime ${{ matrix.rid }} \
             --self-contained \
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
-            -p:EnableCompressionInSingleFile=true \
+            -p:EnableCompressionInSingleFile=$COMPRESS \
             -p:DebugType=none \
             -p:Version="$VERSION" \
             --output publish
