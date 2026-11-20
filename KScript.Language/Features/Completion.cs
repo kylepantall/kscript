@@ -419,7 +419,7 @@ namespace KScript.Language.Features
                     return VariableCompletions(analysis, cursor.Offset, replace, withSigil: false);
 
                 case AttributeKind.Path:
-                    return PathCompletions(analysis, value, cursor.Offset);
+                    return PathCompletions(analysis, value, cursor.Offset, scriptsOnly: cursor.TagElement.Name == "import");
 
                 case AttributeKind.Expression:
                 case AttributeKind.ExpressionList:
@@ -436,7 +436,17 @@ namespace KScript.Language.Features
         internal static IReadOnlyList<string> TypeNames(DocumentAnalysis analysis) =>
             analysis.Symbols.Where(s => s.EnumValues != null || s.Shape.Type == KType.Type).Select(s => s.Name).Distinct().ToList();
 
-        private List<CompletionItem> PathCompletions(DocumentAnalysis analysis, DecodedText value, int offset)
+        private static readonly string[] ScriptExtensions = { ".ks.xml", ".ks", ".kscript", ".xml" };
+        private static readonly string[] PageExtensions = { ".html", ".md" };
+        private static readonly string[] SkippedFolders = { "node_modules", "bin", "obj", "_templates" };
+        private const int MaxProjectFiles = 300;
+
+        /// <summary>
+        /// Paths relative to the current file: the files and folders in the folder typed so far, and, before any
+        /// <c>/</c> is typed, every script in the project (the folder of the nearest kscript.json, or this file's
+        /// folder). An import only offers scripts; other path attributes also offer .html and .md pages.
+        /// </summary>
+        private List<CompletionItem> PathCompletions(DocumentAnalysis analysis, DecodedText value, int offset, bool scriptsOnly)
         {
             List<CompletionItem> items = new List<CompletionItem>();
             if (analysis.Path == null)
@@ -444,28 +454,119 @@ namespace KScript.Language.Features
                 return items;
             }
 
-            string dir = Path.GetDirectoryName(Path.GetFullPath(analysis.Path));
+            string self = Path.GetFullPath(analysis.Path);
+            string dir = Path.GetDirectoryName(self);
             int index = value.FromSource(offset);
             string typed = index >= 0 ? value.Value.Substring(0, index) : string.Empty;
             int slash = typed.LastIndexOf('/');
             string sub = slash >= 0 ? typed.Substring(0, slash) : string.Empty;
-            string folder = Path.Combine(dir, sub);
+            string folder = Path.GetFullPath(Path.Combine(dir, sub));
             TextSpan replace = TextSpan.FromBounds(value.ToSource(slash + 1), offset);
+            string[] extensions = scriptsOnly ? ScriptExtensions : ScriptExtensions.Concat(PageExtensions).ToArray();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
 
-            foreach (string pattern in new[] { "*.xml", "*.html", "*.md" })
+            foreach (string d in Files.ListDirectories(folder).OrderBy(d => d, StringComparer.Ordinal))
             {
-                foreach (string file in Files.ListFiles(folder, pattern))
+                string name = Path.GetFileName(d);
+                if (name.StartsWith('.') || SkippedFolders.Contains(name))
                 {
-                    string name = Path.GetFileName(file);
-                    if (string.Equals(Path.GetFullPath(file), Path.GetFullPath(analysis.Path), StringComparison.OrdinalIgnoreCase))
+                    continue;
+                }
+                items.Add(new CompletionItem { Label = name + "/", Kind = CompletionKind.Folder, ReplaceSpan = replace, SortText = "1" + name });
+            }
+            foreach (string file in FilesWith(folder, extensions))
+            {
+                if (PathEquals(file, self))
+                {
+                    continue;
+                }
+                string name = Path.GetFileName(file);
+                seen.Add(Path.GetRelativePath(dir, file).Replace('\\', '/'));
+                items.Add(new CompletionItem { Label = name, Kind = CompletionKind.File, ReplaceSpan = replace, SortText = "0" + name });
+            }
+
+            if (slash < 0)
+            {
+                TextSpan whole = TextSpan.FromBounds(value.ToSource(0), offset);
+                foreach (string file in ProjectScripts(ProjectRoot(dir), extensions))
+                {
+                    string relative = Path.GetRelativePath(dir, file).Replace('\\', '/');
+                    if (PathEquals(file, self) || !seen.Add(relative))
                     {
                         continue;
                     }
-                    items.Add(new CompletionItem { Label = name, Kind = CompletionKind.File, ReplaceSpan = replace });
+                    items.Add(new CompletionItem
+                    {
+                        Label = relative,
+                        Kind = CompletionKind.File,
+                        ReplaceSpan = whole,
+                        SortText = (relative.StartsWith("../", StringComparison.Ordinal) ? "3" : "2") + relative,
+                    });
                 }
             }
             return items;
         }
+
+        private IEnumerable<string> FilesWith(string folder, string[] extensions) =>
+            Files.ListFiles(folder, "*")
+                .Where(f => extensions.Any(x => f.EndsWith(x, StringComparison.OrdinalIgnoreCase)))
+                .Where(f => !f.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || LooksLikeScript(f))
+                .OrderBy(f => f, StringComparer.Ordinal);
+
+        /// <summary>A plain .xml file is offered only when it is a script (starts with &lt;kscript&gt;).</summary>
+        private bool LooksLikeScript(string path)
+        {
+            string text = Files.ReadText(path);
+            return text != null && text.AsSpan(0, Math.Min(text.Length, 512)).IndexOf("<kscript", StringComparison.Ordinal) >= 0;
+        }
+
+        /// <summary>The folder of the nearest kscript.json above <paramref name="dir"/>, or the folder itself.</summary>
+        private string ProjectRoot(string dir)
+        {
+            for (string d = dir; d != null; d = Path.GetDirectoryName(d))
+            {
+                if (Files.FileExists(Path.Combine(d, KScript.Projects.ProjectConfig.FileName)))
+                {
+                    return d;
+                }
+            }
+            return dir;
+        }
+
+        /// <summary>Script files under a folder, breadth first, skipping hidden and build folders.</summary>
+        private IEnumerable<string> ProjectScripts(string root, string[] extensions)
+        {
+            var queue = new Queue<(string Dir, int Depth)>();
+            queue.Enqueue((root, 0));
+            int count = 0;
+            while (queue.Count > 0 && count < MaxProjectFiles)
+            {
+                (string d, int depth) = queue.Dequeue();
+                foreach (string file in FilesWith(d, extensions))
+                {
+                    if (++count > MaxProjectFiles)
+                    {
+                        yield break;
+                    }
+                    yield return file;
+                }
+                if (depth >= 8)
+                {
+                    continue;
+                }
+                foreach (string child in Files.ListDirectories(d).OrderBy(c => c, StringComparer.Ordinal))
+                {
+                    string name = Path.GetFileName(child);
+                    if (!name.StartsWith('.') && !SkippedFolders.Contains(name))
+                    {
+                        queue.Enqueue((child, depth + 1));
+                    }
+                }
+            }
+        }
+
+        private static bool PathEquals(string a, string b) =>
+            string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
         private List<CompletionItem> FrontMatterCompletions(DocumentAnalysis analysis, int offset)
         {

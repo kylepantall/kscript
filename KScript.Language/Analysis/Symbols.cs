@@ -41,6 +41,12 @@ namespace KScript.Language.Analysis
         /// <summary>For records made by a &lt;type&gt;, and for the type itself: the type's name, shown instead of its fields.</summary>
         public string Name { get; init; }
 
+        /// <summary>
+        /// True when the type was written (<c>person: int</c>, <c>type="string"</c>), so the value is held to it: a
+        /// declared number has no string methods, though a number that merely came from somewhere may be text.
+        /// </summary>
+        public bool Declared { get; init; }
+
         /// <summary>True for records of a &lt;type&gt; without extra="keep": reading a field it doesn't list is a mistake.</summary>
         public bool Closed { get; init; }
 

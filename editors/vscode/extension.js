@@ -166,7 +166,7 @@ async function activate(context) {
     vscode.commands.registerCommand('kscript.runTests', () => runTests()),
     vscode.commands.registerCommand('kscript.runTestsInFile', (uri) => {
       const file = uri && uri.fsPath ? uri : vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri;
-      if (!file) return vscode.window.showInformationMessage('Open a .test.ks.xml file to run its tests.');
+      if (!file) return vscode.window.showInformationMessage('Open a .test.ks.xml or .test.kscript file to run its tests.');
       return runTests(file);
     }),
     vscode.workspace.onDidChangeConfiguration(async (e) => {
