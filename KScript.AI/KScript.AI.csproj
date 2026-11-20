@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>KScript.AI</RootNamespace>
+    <AssemblyName>KScript.AI</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.0.0</Version>
+    <Product>KScript</Product>
+    <Description>KScript.AI: language models (Claude) in scripts: @llm, @chat and &lt;llm&gt;.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+    <PackageReference Include="Anthropic" Version="13.11.0" />
+  </ItemGroup>
+
+</Project>

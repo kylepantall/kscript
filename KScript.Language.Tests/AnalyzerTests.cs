@@ -115,7 +115,7 @@ namespace KScript.Language.Tests
         [InlineData("<echo>Use {{ and }}.</echo>")]
         [InlineData("<let name=\"u\" value=\"null\" /><echo>{ $u?.name ?? 'guest' }</echo>")]
         [InlineData("<let name=\"x\" value=\"match 2 { 1 => 'a', _ => 'b' }\" />")]
-        [InlineData("<let name=\"c\" value=\"@chat(system: 'Be kind.')\" /><echo>{ $c->ask('hi') }</echo>")]
+        [InlineData("<import package=\"KScript.AI\" /><let name=\"c\" value=\"@chat(system: 'Be kind.')\" /><echo>{ $c->ask('hi') }</echo>")]
         [InlineData("<let name=\"n\" type=\"int\" value=\"'3'\" /><echo>{ $n->round() }</echo>")]
         [InlineData("<marray name=\"cfg\"><item key=\"a\">1</item></marray><echo>$cfg.a</echo>")]
         [InlineData("<if test=\"$args->count() gt 0 and 1 &lt; 2\"></if>")]

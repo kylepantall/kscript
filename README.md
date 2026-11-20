@@ -95,7 +95,7 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 | --- | --- |
 | `KScript.Syntax/` | The parser shared by the interpreter and the editor tools: markup, expressions, `{ }` templates, and the metadata types elements and commands are described with. |
 | `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
-| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/` | Packages: each registers its elements, commands and methods, with their documentation. |
+| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/` | Packages: each registers its elements, commands and methods, with their documentation. |
 | `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
 | `KScript.Test/` | The KScript.Test package and `kscript test`: finding test files, running them, and the console and JUnit reports. |
 | `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript ide` and `kscript update`. |
@@ -228,9 +228,51 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 | `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
+| `KScript.AI` | `@llm(prompt, options)`, `<llm to system schema tools>`, `@chat(system)` with `->ask()` `->history()` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
 | `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](#testing-scripts-kscript-test)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).
+
+## Language models: KScript.AI
+
+`KScript.AI` lets a script ask Claude. The API key comes from the `ANTHROPIC_API_KEY` environment variable (or a profile saved by `ant auth login`), never from the script. Scripts use `claude-opus-5-5` unless they ask for another model, or `KSCRIPT_AI_MODEL` names one.
+
+```xml
+<kscript>
+  <import package="KScript.AI" />
+
+  <!-- One question, one answer. -->
+  <echo>{ @llm('Write a haiku about XML.') }</echo>
+
+  <!-- A prompt written as a template, with a system prompt. -->
+  <let name="customer" value="{ name: 'Ann' }" />
+  <let name="message" value="'My order is late arrived.'" />
+  <llm to="reply" system="You answer customer emails politely and briefly.">
+    {$customer.name} wrote: {$message}
+  </llm>
+
+  <!-- Structured output: the answer is a map with these fields. -->
+  <let name="report" value="'The login page spins forever on Safari.'" />
+  <llm to="ticket" schema="{ category: 'bug|feature|question', urgency: 'int 1-5', summary: 'one line' }">
+    Triage this report: {$report}
+  </llm>
+  <echo>{$ticket.category} ({$ticket.urgency}): {$ticket.summary}</echo>
+
+  <!-- Tools: the model may call your <fn> functions, and sees what they return. -->
+  <fn name="order_status" params="id: int" description="The shipping status of an order." value="$id == 42 ? 'shipped' : 'unknown'" />
+  <llm to="answer" tools="order_status">Where is order 42?</llm>
+
+  <!-- A conversation that remembers what was said. -->
+  <let name="chat" value="@chat('You are a patient maths tutor.')" />
+  <echo>{ $chat->ask('What is a prime number?') }</echo>
+  <echo>{ $chat->ask('Is 91 one?') }</echo>
+</kscript>
+```
+
+- **`@llm(prompt, options)`**: `options` is a model name, or a map with `model`, `system`, `schema`, `tools` (a list such as `[@order_status]`) and `max_tokens` (16,000 by default).
+- **Schemas**: each field is required. `'string'`, `'number'`, `'int'`, `'bool'` and `'date'` name a type, `'int 1-5'` gives a range, `'a|b|c'` lists the choices, a map is a nested object, `['string']` is a list, and any other text describes a string field.
+- **Tools** are `<fn>` functions. Their `params` (with types such as `id: int`) and `description` tell the model how to call them. If a tool fails, the model is told the error and can carry on.
+- **Errors** have the type `AI`, so a `<try>` with `<catch as="e">` can check `$e.type` and handle a missing key, a refusal, or an answer cut off by `max_tokens`. When Claude's safety checks decline a request, the API first retries it on a fallback model.
 
 ## Web pages: kscript serve
 
@@ -455,5 +497,5 @@ See [docs/testing.md](docs/testing.md) for every element, check and setting.
 
 ## Roadmap
 
-KScript 2 is landing in steps. Scripts and `kscript serve` pages already share one interpreter; desktop windows (`KScript.UI`) and language models (`KScript.AI`) come next.
+KScript 2 is landing in steps. Scripts and `kscript serve` pages share one interpreter and scripts can ask language models (`KScript.AI`); desktop windows (`KScript.UI`) come next.
 
