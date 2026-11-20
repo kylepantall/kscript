@@ -334,7 +334,7 @@ namespace KScript.Runtime
                     {
                         // <echo format="json">{ "a": 1 }</echo> is JSON written out, used as it is.
                         bool literalJson = e.GetAttributeValue("format")?.Trim() == "json" && JsonText.IsValid(content.Value);
-                        if (!literalJson) GetTemplate(module, content, bareReferences: true, check: true);
+                        if (!literalJson) GetTemplate(module, content, bareReferences: true, check: true, info.LiteralText);
                     }
                     else if (info.Content == ContentKind.AssignmentStatements
                         || (info.Content == ContentKind.Expression && e.GetAttribute("name") == null && info.GetAttribute("name") != null))
@@ -444,14 +444,14 @@ namespace KScript.Runtime
             return result;
         }
 
-        internal Template GetTemplate(Module module, DecodedText text, bool bareReferences, bool check = false)
+        internal Template GetTemplate(Module module, DecodedText text, bool bareReferences, bool check = false, TextLiterals literals = TextLiterals.None)
         {
             Template template;
             lock (module.TemplateCache)
             {
                 if (!module.TemplateCache.TryGetValue(text, out template))
                 {
-                    template = TemplateParser.Parse(text.Value, bareReferences);
+                    template = TemplateParser.Parse(text.Value, bareReferences, literals);
                     module.TemplateCache[text] = template;
                 }
             }

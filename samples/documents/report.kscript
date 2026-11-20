@@ -1,0 +1,60 @@
+import KScript.Document
+
+// A report with a title page, contents, chapters on new pages, a table built from data and Markdown content.
+
+quarters = [
+  { quarter: 'Q1', visitors: 12400, signups: 610 },
+  { quarter: 'Q2', visitors: 15100, signups: 790 },
+  { quarter: 'Q3', visitors: 17800, signups: 1020 },
+  { quarter: 'Q4', visitors: 21300, signups: 1310 },
+]
+total = $quarters->map(fn($q) => $q.signups)->sum()
+
+KScript.Document(template: report, title: "Annual Report 2026", subtitle: "Life Lab: a year in numbers", author: "The Life Lab team", date: "December 2026", into: report) {
+  Contents
+
+  Section(title: Summary) {
+    Paragraph "Life Lab grew every quarter this year. **$total people** signed up, and visits rose by \( 72\% \) from the first quarter to the last."
+
+    List {
+      Item "Visitors went up every quarter (Table [#tab-growth])."
+      Item "Sign-ups more than doubled."
+      Item "The desktop app shipped in the third quarter."
+    }
+  }
+
+  Section(title: Growth, new-page) {
+    Table(caption: "Visitors and sign-ups by quarter.", id: tab-growth, data: $quarters, columns: { Quarter: 'quarter', Visitors: 'visitors', 'Sign-ups': 'signups' }, align: "lrr")
+
+    Paragraph "The conversion rate is the share of visitors who sign up:"
+
+    Math(numbered: no) "r = \frac{\text{sign-ups}}{\text{visitors}}"
+
+    Section(title: By quarter) {
+      for q in $quarters {
+        Paragraph "**$q.quarter:** { $q.visitors } visitors, { $q.signups } sign-ups, a rate of { ($q.signups / $q.visitors * 100)->round(1) }%."
+      }
+    }
+  }
+
+  Section(title: Next year, new-page) {
+    Markdown "
+      We plan three things for next year:
+
+      1. A **pattern library** that people can share.
+      2. Faster simulation for grids over 1000 cells across.
+      3. A guide for teachers.
+
+      > Life is what happens when you're busy making other plans.
+
+      | Goal | Target |
+      |------|-------:|
+      | Sign-ups | 6000 |
+      | Shared patterns | 500 |
+    "
+  }
+}
+
+$report->save('report.pdf')
+$report->save('report.docx')
+echo "Wrote report.pdf ({ $report->pages() } pages, { $report->words() } words) and report.docx."

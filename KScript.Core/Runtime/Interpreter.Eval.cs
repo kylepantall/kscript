@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using System.Globalization;
 using System.Text;
 
@@ -47,10 +48,10 @@ namespace KScript.Runtime
             Interpolate(text, scope, module, bareReferences, escape, Values.ToStr);
 
         /// <summary>As <see cref="Interpolate(DecodedText, Scope, Module, bool, Func{string, string})"/>, turning each value into text with <paramref name="format"/>.</summary>
-        public string Interpolate(DecodedText text, Scope scope, Module module, bool bareReferences, Func<string, string> escape, Func<object, string> format)
+        public string Interpolate(DecodedText text, Scope scope, Module module, bool bareReferences, Func<string, string> escape, Func<object, string> format, TextLiterals literals = TextLiterals.None)
         {
             if (text == null) return string.Empty;
-            Template template = GetTemplate(module, text, bareReferences);
+            Template template = GetTemplate(module, text, bareReferences, literals: literals);
             if (!template.Expressions.Any()) return string.Concat(template.Segments.Select(s => s.Text));
             var ctx = new EvalContext(module, text);
             var sb = new StringBuilder(text.Value.Length + 16);

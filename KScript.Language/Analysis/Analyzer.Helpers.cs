@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Language.Catalog;
 using KScript.Syntax.Markup;
 using KScript.Syntax;
@@ -51,14 +52,15 @@ namespace KScript.Language.Analysis
             return region;
         }
 
-        private void AnalyzeTemplate(DecodedText text, Scope scope, MarkupElement element, MarkupAttribute attribute, bool allowBare)
+        private void AnalyzeTemplate(DecodedText text, Scope scope, MarkupElement element, MarkupAttribute attribute, bool allowBare, TextLiterals literals = TextLiterals.None)
         {
+            if (literals == TextLiterals.All) return;
             if (text.Value.IndexOf('{') < 0 && (!allowBare || (text.Value.IndexOf('$') < 0 && text.Value.IndexOf('@') < 0)))
             {
                 return;
             }
 
-            Template template = TemplateParser.Parse(text.Value, allowBare);
+            Template template = TemplateParser.Parse(text.Value, allowBare, literals);
             if (!template.Expressions.Any())
             {
                 return;

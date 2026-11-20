@@ -645,7 +645,7 @@ namespace KScript.Language.Analysis
                         }
                         if (child is MarkupText text)
                         {
-                            AnalyzeTemplate(text.Content, scope, e, null, allowBare: Kind == DocumentKind.Script);
+                            AnalyzeTemplate(text.Content, scope, e, null, allowBare: Kind == DocumentKind.Script, info.LiteralText);
                         }
                         else if (child is MarkupElement ce)
                         {
