@@ -275,7 +275,17 @@ public sealed class ProjectDocsTests : IDisposable
             var error = new StringWriter();
             var cli = new CommandLine { Out = output, Error = error, Cancellation = stop.Token };
             string[] all = args.Concat(new[] { "--port", TestServer.FreePort().ToString() }).ToArray();
-            int code = compiled ? cli.RunCompiled(manifest, all) : cli.Run(all);
+            string env = Environment.GetEnvironmentVariable("KSCRIPT_ENV");
+            int code;
+            try
+            {
+                code = compiled ? cli.RunCompiled(manifest, all) : cli.Run(all);
+            }
+            finally
+            {
+                // --env sets KSCRIPT_ENV for the scripts it runs.
+                Environment.SetEnvironmentVariable("KSCRIPT_ENV", env);
+            }
             Assert.True(code == 0, error.ToString());
             Assert.DoesNotContain("Docs for", output.ToString());
             if (args.Contains("production")) Assert.Contains("Docs: not served in the production environment.", error.ToString());

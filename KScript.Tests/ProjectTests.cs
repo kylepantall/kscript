@@ -151,7 +151,7 @@ public class ProjectConfigTests
         Assert.Equal("format", Keys(props.GetProperty("make").GetProperty("properties")));
         Assert.Equal("environment,files,prefix,required,root,user", Keys(props.GetProperty("config").GetProperty("properties")));
         Assert.Equal(props.GetProperty("config").GetProperty("properties").GetProperty("files").GetProperty("default").EnumerateArray().Select(e => e.GetString()), KScript.Runtime.ConfigOptions.DefaultFiles);
-        Assert.Equal("host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
+        Assert.Equal("docs,docs_port,host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
         Assert.Equal("exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
         Assert.Equal("enabled,endOfLine,exclude,include,indent,maxBlankLines,preserve,printWidth,rules,tabWidth", Keys(props.GetProperty("format").GetProperty("properties")));
