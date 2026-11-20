@@ -2,13 +2,39 @@
   "$schema": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
   "name": "{{ kebab }}",
   "standard": "kscript:recommended",
+{{#if web}}
+  "serve": {
+    "root": ".",
+    "port": {{ port }}
+  },
+{{else}}
+{{#if api}}
+  "serve": {
+    "root": ".",
+    "port": {{ port }}
+  },
+{{/if}}
+{{/if}}
+{{#if api}}
+  "http": {
+    "middleware": ["log"]
+  },
+{{/if}}
+{{#if desktop}}
+  "app": {
+    "main": "desktop{{ ext }}",
+    "name": "{{ title }}",
+    "id": "app.kscript.{{ kebab }}",
+    "version": "1.0.0"
+  },
+{{/if}}
   // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
   "make": {
     "format": "{{ format }}"
   },
   "lint": {
-    "include": ["**/*.kscript", "**/*.ks.xml"],
-    "exclude": ["_templates", "node_modules"]
+    "include": [{{#if web}}"**/*.html", {{/if}}"**/*.kscript", "**/*.ks.xml"],
+    "exclude": ["_templates", "node_modules"{{#if desktop}}, "dist"{{/if}}]
   },
   "test": {
     "include": ["tests/**/*.test.kscript", "tests/**/*.test.ks.xml"]

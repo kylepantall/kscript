@@ -77,6 +77,10 @@ jobs:
           $k check bare-tool --warnaserror
           $k test bare-tool
           $k bare-tool/main.kscript
+          $k make project bare-app --bare --web --api --desktop
+          $k check bare-app --warnaserror
+          $k fmt --check bare-app
+          $k test bare-app
 
   compile:
     name: kscript compile (${{ matrix.name }})
