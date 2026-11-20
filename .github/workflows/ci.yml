@@ -187,6 +187,70 @@ jobs:
           test -s docs.css && test -s docs.js && test -s favicon.svg
           grep -q "docs ok" run.json
 
+  native-aot:
+    name: Native AOT (linux, experimental)
+    # Checks that kscript still builds and runs as a Native AOT binary: no new trim or AOT warnings, and the
+    # commands that matter work. Releases still ship the single-file build; this job only keeps the AOT path open.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish with PublishAot
+        run: |
+          dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime linux-x64 \
+            -p:PublishAot=true -p:TrimmerSingleWarn=false -p:DebugType=none -p:Version=0.0.0-aot --output aot | tee aot.log
+          # The one warning left is inside ASP.NET Core 8 (JsonOptions), on a path kscript doesn't use.
+          grep -o "warning IL[0-9]*: [^[]*" aot.log | sort -u | grep -v "Microsoft.AspNetCore.Http.Json.JsonOptions" > warnings.txt || true
+          if [ -s warnings.txt ]; then echo "New trim or AOT warnings:"; cat warnings.txt; exit 1; fi
+          ls -l aot
+
+      - name: Run, check and test scripts
+        run: |
+          k="$PWD/aot/KScript"
+          printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.xml
+          "$k" smoke.xml | tee smoke.out
+          grep -q "kscript ok: 3" smoke.out
+          "$k" "Example Scripts/Find Oldest Person.xml"
+          "$k" check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" --warnaserror
+          "$k" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" "Example Sites/team"
+          "$k" test samples/kscript2 samples/life-lab
+          "$k" openapi samples/http-app | grep -q '"openapi": "3.1.0"'
+          time "$k" --version
+
+      - name: Serve a site, the docs and MCP
+        run: |
+          k="$PWD/aot/KScript"
+          (cd samples/http-app && "$k" serve --port 8092 > ../../serve.log 2>&1 &)
+          "$k" docs --no-open --port 8098 > docs.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8092/people > people.html && curl -sf http://localhost:8098/ > docs.html && break; sleep 1; done
+          curl -sf http://localhost:8092/_openapi.json | grep -q '"openapi"'
+          curl -sf http://localhost:8098/assets/search.json | grep -q '"t":'
+          curl -sf -X POST http://localhost:8098/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
+            -d '{"code":"<echo>docs ok</echo>"}' | grep -q "docs ok"
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | "$k" mcp | tee mcp.out
+          grep -q "search_docs" mcp.out
+          cat serve.log docs.log
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - name: Language server smoke test
+        working-directory: editors/vscode
+        run: |
+          npm ci
+          npm run smoke -- ../../aot/KScript
+
   vscode:
     name: VS Code extension
     runs-on: ubuntu-latest

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 using KScript.Metadata;
@@ -378,6 +379,26 @@ namespace KScript.Runtime
         }
 
         /// <summary>The package, loading its assembly if needed; null if it isn't registered or isn't installed.</summary>
+        /// <remarks>
+        /// Built-in packages are found by type name, so a build that leaves a package's assembly out (kscript compile)
+        /// still runs. The DynamicDependency attributes tell the trimmer and Native AOT to keep each package class
+        /// and its constructor, which is all <see cref="Type.GetType(string, bool)"/> and Activator need here.
+        /// </remarks>
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Terminal.TerminalPackage", "KScript.Terminal")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Mathematics.MathPackage", "KScript.Math")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.IO.IOPackage", "KScript.IO")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Net.NetPackage", "KScript.Net")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Markdown.MarkdownPackage", "KScript.Markdown")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Web.WebPackage", "KScript.Web")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Style.StylePackage", "KScript.Style")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Storage.StoragePackage", "KScript.Storage")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Caching.CachePackage", "KScript.Cache")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Http.HttpPackage", "KScript.Http")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Testing.TestPackage", "KScript.Test")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.UI.UIPackage", "KScript.UI")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.AI.AIPackage", "KScript.AI")]
+        [UnconditionalSuppressMessage("Trimming", "IL2057", Justification = "Built-in package types are kept by the DynamicDependency attributes above.")]
+        [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "Built-in package types are kept by the DynamicDependency attributes above.")]
         public KScriptPackage Get(string name)
         {
             Entry entry;

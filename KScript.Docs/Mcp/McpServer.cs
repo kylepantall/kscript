@@ -142,7 +142,7 @@ namespace KScript.Docs.Mcp
             var tools = new JsonArray();
             foreach (Tool t in Tools.All)
             {
-                tools.Add(new JsonObject
+                tools.Add((JsonNode)new JsonObject
                 {
                     ["name"] = t.Name,
                     ["title"] = t.Title,
@@ -175,7 +175,7 @@ namespace KScript.Docs.Mcp
             var resources = new JsonArray();
             foreach (DocPage page in Docs.Pages)
             {
-                resources.Add(new JsonObject
+                resources.Add((JsonNode)new JsonObject
                 {
                     ["uri"] = DocsMarkdown.UriOf(page.Path),
                     ["name"] = page.Path == "/" ? "home" : page.Path.Trim('/'),

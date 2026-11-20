@@ -98,7 +98,7 @@ namespace KScript.AI
             if (block.TryPickText(out BetaTextBlock text)) return AiBlock.FromText(text.Text);
             if (block.TryPickToolUse(out BetaToolUseBlock use))
             {
-                return new AiBlock { Kind = AiBlockKind.ToolUse, Id = use.ID, Name = use.Name, Input = JsonSerializer.SerializeToElement(use.Input) };
+                return new AiBlock { Kind = AiBlockKind.ToolUse, Id = use.ID, Name = use.Name, Input = JsonSerializer.SerializeToElement(use.Input, AiJsonContext.Default.IReadOnlyDictionaryStringJsonElement) };
             }
             return new AiBlock { Kind = AiBlockKind.Other, Raw = block };
         }
@@ -118,7 +118,7 @@ namespace KScript.AI
                         break;
                     case AiBlockKind.ToolUse:
                         if (i < lastFallback) break;
-                        content.Add(new BetaToolUseBlockParam { ID = b.Id, Name = b.Name, Input = b.Input.Deserialize<Dictionary<string, JsonElement>>() });
+                        content.Add(new BetaToolUseBlockParam { ID = b.Id, Name = b.Name, Input = b.Input.Deserialize(AiJsonContext.Default.DictionaryStringJsonElement) });
                         break;
                     case AiBlockKind.ToolResult:
                         content.Add(new BetaToolResultBlockParam { ToolUseID = b.Id, Content = b.Text, IsError = b.IsError });
@@ -144,7 +144,7 @@ namespace KScript.AI
             if (isThinking) return new BetaThinkingBlockParam { Thinking = thinking.Thinking, Signature = thinking.Signature };
             if (isRedacted) return new BetaRedactedThinkingBlockParam { Data = redacted.Data };
             if (block.TryPickFallback(out BetaFallbackBlock fallback))
-                return JsonSerializer.Deserialize<BetaFallbackBlockParam>(JsonSerializer.Serialize(fallback));
+                return BetaFallbackBlockParam.FromRawUnchecked(fallback.RawData);
             return null;
         }
     }

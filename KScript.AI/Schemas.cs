@@ -16,10 +16,10 @@ namespace KScript.AI
         {
             if (value is not Dictionary<string, object> map)
                 throw new KScriptException($"{where} needs a map of fields, such as {{ category: 'bug|feature', urgency: 'int 1-5' }}, but got {Values.Describe(value)}.", "Argument");
-            return ToJson(Field(map, where)).Deserialize<Dictionary<string, JsonElement>>();
+            return ToJson(Field(map, where)).Deserialize(AiJsonContext.Default.DictionaryStringJsonElement);
         }
 
-        private static JsonElement ToJson(object o) => JsonSerializer.SerializeToElement(o);
+        private static JsonElement ToJson(Dictionary<string, object> o) => JsonSerializer.SerializeToElement(o, AiJsonContext.Default.DictionaryStringObject);
 
         private static Dictionary<string, object> Field(object spec, string where) => spec switch
         {

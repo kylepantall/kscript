@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Formats.Tar;
 using System.IO;
 using System.IO.Compression;
@@ -28,7 +29,7 @@ namespace KScript.Updates
         public string RuntimeId { get; set; } = SelfUpdater.RuntimeId();
         public string Token { get; set; } = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
         /// <summary>The installed binary to replace, or null when running from a .NET build.</summary>
-        public string TargetPath { get; set; } = SelfUpdater.InstalledBinaryPath(typeof(SelfUpdater).Assembly.Location, Environment.ProcessPath);
+        public string TargetPath { get; set; } = SelfUpdater.InstalledBinaryPath(SelfUpdater.AssemblyLocation(), Environment.ProcessPath);
         public bool Windows { get; set; } = OperatingSystem.IsWindows();
         public HttpMessageHandler Handler { get; set; } = new HttpClientHandler();
         /// <summary>Runs a binary with --version: its output, or null when it doesn't start.</summary>
@@ -292,6 +293,10 @@ namespace KScript.Updates
             output.WriteLine($"Updated kscript {current} -> {latestTag.TrimStart('v')} ({target})");
             return ide ? await IdeCommand.UpdateInstalledAsync(latestTag, force, checkOnly: false, output, error, env.IdeHost) : 0;
         }
+
+        /// <summary>Where kscript's own assembly is on disk: empty in a single-file or Native AOT build, which is how those are told apart.</summary>
+        [UnconditionalSuppressMessage("SingleFile", "IL3000", Justification = "An empty location is the signal: it means kscript is one binary.")]
+        internal static string AssemblyLocation() => typeof(SelfUpdater).Assembly.Location;
 
         /// <summary>The path of the running single-file binary, or null when running as a framework-dependent dll.</summary>
         internal static string InstalledBinaryPath(string assemblyLocation, string path)

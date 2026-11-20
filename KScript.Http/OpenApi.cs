@@ -384,9 +384,10 @@ namespace KScript.Http
         {
             WriteIndented = true,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            TypeInfoResolver = OpenApiJsonContext.Default,
         };
 
-        public static string ToJson(Dictionary<string, object> document) => JsonSerializer.Serialize(document, JsonOptions) + "\n";
+        public static string ToJson(Dictionary<string, object> document) => JsonSerializer.Serialize(document, JsonOptions.GetTypeInfo(typeof(Dictionary<string, object>))) + "\n";
 
         /// <summary>The document as YAML (block style, strings quoted when they need it).</summary>
         public static string ToYaml(Dictionary<string, object> document)
@@ -459,7 +460,7 @@ namespace KScript.Http
             string s = value.ToString();
             bool plain = s.Length > 0 && Regex.IsMatch(s, @"^[A-Za-z_/$][A-Za-z0-9_./{}$ -]*$") && !s.EndsWith(" ", StringComparison.Ordinal)
                 && !Regex.IsMatch(s, "^(true|false|null|yes|no|on|off|~)$", RegexOptions.IgnoreCase) && !s.Contains(": ") && !s.Contains(" #");
-            return plain ? s : JsonSerializer.Serialize(s, JsonOptions);
+            return plain ? s : JsonSerializer.Serialize(s, JsonOptions.GetTypeInfo(typeof(string)));
         }
 
         #endregion

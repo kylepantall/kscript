@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 using KScript.Language.Catalog;
@@ -263,8 +264,21 @@ namespace KScript.Docs
         #region Output
 
         /// <summary>The search index the page script loads.</summary>
-        public string SearchJson() => JsonSerializer.Serialize(Search.Select(s => new { t = s.Title, c = s.CodeTitle, u = s.Url, s = s.Section, k = s.Kind, d = s.Text }),
-            new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+        /// <remarks>Built as JSON nodes rather than serialised, so it needs no reflection (Native AOT). Null fields are left out.</remarks>
+        public string SearchJson()
+        {
+            var entries = new JsonArray();
+            foreach (SearchEntry s in Search)
+            {
+                var entry = new JsonObject();
+                foreach ((string key, string value) in new[] { ("t", s.Title), ("c", s.CodeTitle), ("u", s.Url), ("s", s.Section), ("k", s.Kind), ("d", s.Text) })
+                {
+                    if (value != null) entry[key] = value;
+                }
+                entries.Add((JsonNode)entry);
+            }
+            return entries.ToJsonString();
+        }
 
         /// <summary>
         /// Writes the site as a folder that kscript serve can serve: the rendered pages in _pages (never served

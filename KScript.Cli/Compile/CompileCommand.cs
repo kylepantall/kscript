@@ -22,7 +22,7 @@ namespace KScript.Compile
         /// <summary>The release runtime id of this computer, such as osx-arm64.</summary>
         public string HostRuntime { get; set; } = SelfUpdater.RuntimeId();
         /// <summary>The running kscript when it is a release (single-file) build, else null.</summary>
-        public string CurrentBinary { get; set; } = SelfUpdater.InstalledBinaryPath(typeof(CompileCommand).Assembly.Location, Environment.ProcessPath);
+        public string CurrentBinary { get; set; } = SelfUpdater.InstalledBinaryPath(SelfUpdater.AssemblyLocation(), Environment.ProcessPath);
         /// <summary>Where kscript keeps the runtimes it downloads for other platforms.</summary>
         public string RuntimeCache { get; set; } = DefaultCache();
         public HttpMessageHandler Handler { get; set; } = new HttpClientHandler();

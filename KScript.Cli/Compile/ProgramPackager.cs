@@ -86,14 +86,14 @@ namespace KScript.Compile
         }
 
         /// <summary>The manifest the program reads when it starts.</summary>
-        internal static byte[] Manifest(ProgramPlan plan) => JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object>
+        internal static byte[] Manifest(ProgramPlan plan) => Encoding.UTF8.GetBytes(new JsonObject
         {
             ["name"] = plan.Name,
             ["version"] = plan.Version,
             ["kind"] = plan.Kind.ToString().ToLowerInvariant(),
             ["main"] = "app/" + plan.Main,
-            ["packages"] = plan.Packages.ToArray(),
-        }, new JsonSerializerOptions { WriteIndented = true });
+            ["packages"] = new JsonArray(plan.Packages.Select(p => (JsonNode)p).ToArray()),
+        }.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
 
         /// <summary>True when the kscript assembly knows the compiled-program property (0.4.0 and later).</summary>
         internal static bool SupportsPrograms(byte[] assembly) =>
