@@ -64,26 +64,6 @@ namespace KScript.Pages
             return value;
         }
 
-        /// <summary>A Markdown document as a map: <c>html</c>, <c>meta</c> (front matter), <c>title</c> and <c>text</c>.</summary>
-        public static Dictionary<string, object> Document(string text)
-        {
-            var (meta, body, _) = SplitFrontMatter(text);
-            string title = meta.TryGetValue("title", out var t) && t != null ? Values.ToStr(t) : FirstHeading(body);
-            return new Dictionary<string, object>
-            {
-                ["html"] = ToHtml(body),
-                ["meta"] = meta,
-                ["title"] = title,
-                ["text"] = body,
-            };
-        }
-
-        private static string FirstHeading(string body)
-        {
-            var m = Regex.Match(body ?? string.Empty, @"^#{1,6}\s+(.+?)\s*#*\s*$", RegexOptions.Multiline);
-            return m.Success ? m.Groups[1].Value : null;
-        }
-
         /// <summary>Escapes a value inserted into Markdown, so it shows as written instead of becoming formatting or HTML.</summary>
         public static string Escape(string s)
         {

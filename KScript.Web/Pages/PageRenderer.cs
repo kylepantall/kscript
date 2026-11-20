@@ -72,21 +72,8 @@ namespace KScript.Pages
             return File.ReadAllText(full);
         }
 
-        internal bool SiteFileExists(string path)
-        {
-            try { return File.Exists(ResolveSitePath(path)); }
-            catch (PageException) { return false; }
-        }
-
-        internal List<object> ListSiteFiles(string dir, string pattern, string where)
-        {
-            string full = ResolveSitePath(dir, where);
-            if (!Directory.Exists(full)) return new List<object>();
-            return Directory.GetFiles(full, pattern)
-                .OrderBy(f => f, StringComparer.Ordinal)
-                .Select(f => (object)Path.GetRelativePath(SiteRoot, f).Replace('\\', '/'))
-                .ToList();
-        }
+        /// <summary>For paths the renderer builds itself (such as _components/name.html), which stay in the site.</summary>
+        internal bool SiteFileExists(string path) => File.Exists(Path.Combine(SiteRoot, path));
     }
 
     /// <summary>

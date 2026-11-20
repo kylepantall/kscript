@@ -324,8 +324,7 @@ namespace KScript.IO
                 "pictures" => Special(Environment.SpecialFolder.MyPictures, "PICTURES", "Pictures"),
                 "videos" => Special(Environment.SpecialFolder.MyVideos, "VIDEOS", OperatingSystem.IsMacOS() ? "Movies" : "Videos"),
                 "appdata" => Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "temp" => System.IO.Path.GetTempPath(),
-                _ => throw c.Error($"@known_folder() doesn't know '{name}'. Use home, desktop, documents, downloads, music, pictures, videos, appdata or temp.", "Argument"),
+                _ => System.IO.Path.GetTempPath(), // temp: the name's type allows only these names
             };
         }
 
@@ -347,6 +346,8 @@ namespace KScript.IO
             return System.IO.Path.IsPathRooted(value) && System.IO.Path.GetFullPath(value).TrimEnd('/') != home.TrimEnd('/') ? value : null;
         }
 
+        // Runs only on Windows, so a Linux coverage run can't reach it.
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
         [System.Runtime.Versioning.SupportedOSPlatform("windows")]
         private static string WindowsDownloads()
         {

@@ -102,4 +102,35 @@ public sealed class IOTests : IDisposable
         Assert.Equal("true true true true true true true true\ntrue true true\n", output);
         Assert.Contains("'attic' isn't a valid name", Fails("<echo>{ @known_folder('attic') }</echo>").Message);
     }
+    [Fact]
+    public void Linux_desktops_can_rename_the_known_folders()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string[] names = { "XDG_CONFIG_HOME", "XDG_DOWNLOAD_DIR", "XDG_DESKTOP_DIR", "XDG_MUSIC_DIR", "XDG_PICTURES_DIR", "XDG_DOCUMENTS_DIR", "XDG_VIDEOS_DIR" };
+        var saved = names.ToDictionary(n => n, Environment.GetEnvironmentVariable);
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        try
+        {
+            foreach (string n in names) Environment.SetEnvironmentVariable(n, null);
+            File.WriteAllText(P("user-dirs.dirs"), "# written by xdg-user-dirs-update\nXDG_DOWNLOAD_DIR=\"$HOME/Telechargements\"\nXDG_DESKTOP_DIR=\"$HOME/\"\nXDG_VIDEOS_DIR=\"\"\n");
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
+            Environment.SetEnvironmentVariable("XDG_PICTURES_DIR", "/srv/pictures");
+            Environment.SetEnvironmentVariable("XDG_DOCUMENTS_DIR", "relative/docs");
+
+            string Folder(string name) => Run($"<echo>{{ @known_folder('{name}') }}</echo>").TrimEnd('\n');
+            Assert.Equal(Path.Combine(home, "Telechargements"), Folder("downloads"));
+            Assert.Equal("/srv/pictures", Folder("pictures"));
+            Assert.NotEqual(home, Folder("desktop"));      // $HOME means turned off, so the usual folder is used
+            Assert.NotEqual("relative/docs", Folder("documents"));
+            Assert.NotEqual(string.Empty, Folder("videos"));
+            Assert.NotEqual(string.Empty, Folder("music"));  // not in the file at all
+
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", P("nowhere"));
+            Assert.Equal(Path.Combine(home, "Downloads"), Folder("downloads"));
+        }
+        finally
+        {
+            foreach (var kv in saved) Environment.SetEnvironmentVariable(kv.Key, kv.Value);
+        }
+    }
 }

@@ -4,12 +4,14 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace KScript.Pages
@@ -192,7 +194,7 @@ namespace KScript.Pages
     /// <summary><c>kscript serve</c>: serves a site folder, rendering KScript pages on each request.</summary>
     public static class PageServer
     {
-        public static async Task<int> RunAsync(string siteFolder, int port, string host, TextWriter log)
+        public static async Task<int> RunAsync(string siteFolder, int port, string host, TextWriter log, CancellationToken stop = default)
         {
             var site = new PageSite(siteFolder);
 
@@ -237,7 +239,9 @@ namespace KScript.Pages
             string url = host == "localhost" ? $"http://localhost:{port}" : $"http://{host}:{port}";
             log?.WriteLine($"Serving {site.Root} on {url}");
             log?.WriteLine("Press Ctrl+C to stop.");
-            await app.RunAsync();
+            await app.StartAsync(stop);
+            await app.WaitForShutdownAsync(stop);
+            await app.StopAsync();
             return 0;
         }
 

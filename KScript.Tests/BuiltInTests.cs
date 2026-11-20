@@ -31,6 +31,18 @@ internal sealed class ProbePackage : KScriptPackage
     protected override void Register(PackageBuilder p)
     {
         p.Command("probe", "", "A value with its own methods.", "probe", c => new ProbeValue());
+        p.Command("on_starting_thread", "fail", "Runs on the thread that started the script and says whether that is another thread.", "bool", c =>
+        {
+            bool fail = Values.Truthy(c.Arg(0));
+            int here = Environment.CurrentManagedThreadId;
+            int there = 0;
+            c.Interpreter.InvokeOnStartingThread(() =>
+            {
+                if (fail) throw new KScriptException("refused on the starting thread", "Probe");
+                there = Environment.CurrentManagedThreadId;
+            });
+            return there != here;
+        });
         p.Command("lambda_params", "fn", "The parameter names of a lambda.", "list", c => ((Lambda)c.Arg(0)).Parameters.Cast<object>().ToList());
         p.Element(new KScript.Metadata.ElementInfo("needs-x", "Reads an attribute it didn't declare as required.", KScript.Metadata.ContentKind.Empty,
             new KScript.Metadata.AttributeInfo("x", KScript.Metadata.AttributeKind.Template, "Something.")), run => { run.RequiredTemplate("x"); return null; });
@@ -313,6 +325,12 @@ public sealed class BuiltInTests : IDisposable
         Assert.Equal("hi you a, b\n", Run("<echo>{ @probe() |> hello('you') } { @lambda_params(fn($a, $b) => 1) }</echo>"));
         Assert.Contains("<needs-x> needs a x attribute: Something.", Assert.Throws<KScriptException>(() => Run("<needs-x />")).Message);
         Assert.Contains("<needs-y> needs a y attribute.", Assert.Throws<KScriptException>(() => Run("<needs-y />")).Message);
+        Assert.Equal("hi you\n", Run("<echo>{ @probe()->hello(x: 1, 'you') }</echo>"));
+        Assert.Equal("true\n", Run("<echo>{ @on_starting_thread(false) }</echo>"));
+        Assert.Contains("refused on the starting thread", Assert.Throws<KScriptException>(() => Run("<echo>{ @on_starting_thread(true) }</echo>")).Message);
+        int ran = 0;
+        new Interpreter(KScriptHost.ForText(new StringWriter()), registry).InvokeOnStartingThread(() => ran = Environment.CurrentManagedThreadId);
+        Assert.Equal(Environment.CurrentManagedThreadId, ran);
         Assert.Same(PackageRegistry.Default.Get("Math"), PackageRegistry.Default.Get("Math").Variables["pi"].Package);
         Assert.Equal("ok\nfin\n", Body("<try><echo>ok</echo><catch /><finally><echo>fin</echo></finally></try><try><do>1</do></try>"));
         Assert.Contains("There is no function called m.pi", Fails("<import package=\"KScript.Math\" as=\"m\" /><call fn=\"m.pi\" />").Message);
@@ -322,10 +340,13 @@ public sealed class BuiltInTests : IDisposable
     public void Project_files_warn_about_settings_they_do_not_know()
     {
         string path = Path.Combine(dir, "kscript.json");
-        File.WriteAllText(path, "{ \"lint\": { \"warningsAsErrors\": \"maybe\", \"colour\": 1 }, \"test\": { \"timeout\": \"soon\", \"packages\": [\"Nope\"], \"speed\": 1 }, \"name\": 5 }");
+        File.WriteAllText(path, "{ \"lint\": { \"warningsAsErrors\": \"maybe\", \"colour\": 1 }, \"test\": { \"timeout\": \"soon\", \"packages\": [\"Nope\"], \"speed\": 1 }, \"name\": 5, " +
+            "\"app\": { \"colour\": 1 }, \"format\": { \"indent\": 40, \"tabWidth\": 0, \"printWidth\": 5, \"maxBlankLines\": -1, \"endOfLine\": \"cr\", \"enabled\": \"yes\" } }");
         ProjectConfig config = ProjectConfig.Load(path);
         string warnings = string.Join("\n", config.Warnings);
         Assert.Contains("lint.warningsAsErrors should be true or false.", warnings);
+        foreach (string expected in new[] { "unknown setting 'app.colour'", "format.indent should be", "format.tabWidth should be", "format.printWidth should be", "format.maxBlankLines should be", "format.endOfLine should be", "format.enabled should be" })
+            Assert.Contains(expected, warnings);
         Assert.Contains("unknown setting 'lint.colour'", warnings);
         Assert.Contains("test.timeout should be a number of seconds", warnings);
         Assert.Contains("test.packages: there is no package 'Nope'.", warnings);
