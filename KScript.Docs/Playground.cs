@@ -89,6 +89,9 @@ namespace KScript.Docs
             return "<kscript>" + code + "\n</kscript>";
         }
 
+        /// <summary>Cancels a run once its time is up; tests replace it with one that is already cancelled.</summary>
+        internal static Func<TimeSpan, CancellationTokenSource> StartTimer = limit => new CancellationTokenSource(limit);
+
         public static PlaygroundResult Run(string code, string format = "xml", string input = null, TimeSpan? timeout = null)
         {
             format = format == "kscript" ? "kscript" : "xml";
@@ -107,7 +110,7 @@ namespace KScript.Docs
             var output = new LimitedWriter(MaxOutput);
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var limit = timeout ?? DefaultTimeout;
-            using var cancel = new CancellationTokenSource(limit);
+            using var cancel = StartTimer(limit);
             try
             {
                 var host = new KScriptHost(output, output, new StringReader(input ?? string.Empty))

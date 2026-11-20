@@ -131,7 +131,23 @@ public sealed class MergedFeatureCoverageTests : IDisposable
     public void Playground_stops_a_run_that_is_cancelled_between_statements()
     {
         string code = string.Concat(Enumerable.Repeat("<echo />\n", 3000));
-        PlaygroundResult result = Playground.Run(code, timeout: TimeSpan.FromTicks(1));
+        Func<TimeSpan, CancellationTokenSource> original = Playground.StartTimer;
+        PlaygroundResult result;
+        try
+        {
+            // Already cancelled, so the run stops at its first cancellation check, which is between statements.
+            Playground.StartTimer = _ =>
+            {
+                var cancelled = new CancellationTokenSource();
+                cancelled.Cancel();
+                return cancelled;
+            };
+            result = Playground.Run(code, timeout: TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            Playground.StartTimer = original;
+        }
         Assert.Equal(3, result.ExitCode);
         Assert.StartsWith("Stopped: the example ran for longer than", result.Error);
     }
