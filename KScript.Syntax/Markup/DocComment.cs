@@ -33,11 +33,17 @@ namespace KScript.Syntax.Markup
         /// <summary>The @deprecated text: empty when deprecated without a reason, null when not deprecated.</summary>
         public string Deprecated { get; private set; }
 
+        /// <summary>
+        /// True when the doc says <c>@public</c>: the function is part of an API used from outside the project, so it
+        /// is never reported as unused (KS6002) even when nothing in the project calls it.
+        /// </summary>
+        public bool IsPublic { get; private set; }
+
         public IReadOnlyList<string> Examples => examples;
 
         public IReadOnlyList<string> SeeAlso => see;
 
-        public bool IsEmpty => Summary.Length == 0 && paramList.Count == 0 && Returns == null && Deprecated == null && examples.Count == 0 && see.Count == 0;
+        public bool IsEmpty => Summary.Length == 0 && paramList.Count == 0 && Returns == null && Deprecated == null && !IsPublic && examples.Count == 0 && see.Count == 0;
 
         private readonly List<(string, string)> paramList = new List<(string, string)>();
         private readonly List<string> examples = new List<string>();
@@ -45,7 +51,7 @@ namespace KScript.Syntax.Markup
 
         public string ParamText(string name) => paramList.FirstOrDefault(p => p.Item1 == name).Item2;
 
-        private static readonly string[] Tags = { "param", "returns", "return", "example", "deprecated", "see" };
+        private static readonly string[] Tags = { "param", "returns", "return", "example", "deprecated", "see", "public" };
 
         /// <summary>Parses doc text. Returns null for null or blank text.</summary>
         public static DocComment Parse(string text)
@@ -108,6 +114,9 @@ namespace KScript.Syntax.Markup
                     case "deprecated":
                         current.Append(rest).Append('\n');
                         finish = t => doc.Deprecated = Clean(t);
+                        break;
+                    case "public":
+                        doc.IsPublic = true;
                         break;
                     case "see":
                         current.Append(rest).Append('\n');

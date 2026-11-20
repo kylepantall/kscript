@@ -54,7 +54,7 @@
   <!-- Grids -->
 
   <fn name="blank" params="width: int, height: int" description="An empty grid.">
-    <return value="(0..$height)->map(fn($y) => $dead_cell->repeat($width))" />
+    <return value="(0..$height)->map(fn($_y) => $dead_cell->repeat($width))" />
   </fn>
 
   <fn
@@ -113,7 +113,7 @@
     name="random_grid"
     params="width: int, height: int, density = 30"
     description="A grid where about density percent of the cells are alive.">
-    <return value="(0..$height)->map(fn($y) => (0..$width)->map(fn($x) => @random(low: 1, high: 100) le $density ? $alive_cell : $dead_cell)->join(''))" />
+    <return value="(0..$height)->map(fn($_y) => (0..$width)->map(fn($_x) => @random(low: 1, high: 100) le $density ? $alive_cell : $dead_cell)->join(''))" />
   </fn>
 
   <fn
@@ -166,7 +166,7 @@
     <let name="w" value="@width($grid)" />
     <let name="h" value="@height($grid)" />
     <let name="ones" value="$grid->map(fn($row) => $row->chars()->map(fn($c) => $c eq $alive_cell ? 1 : 0))" />
-    <let name="none" value="(0..$w)->map(fn($x) => 0)" />
+    <let name="none" value="(0..$w)->map(fn($_x) => 0)" />
     <let name="row_at" value="fn($y) => $wrap ? $ones[($y + $h) % $h] : ($y ge 0 and $y lt $h ? $ones[$y] : $none)" />
     <return value="(0..$h)->map(fn($y) => @next_row(above: $row_at($y - 1), row: $ones[$y], below: $row_at($y + 1), w: $w, wrap: $wrap))" />
   </fn>
@@ -223,7 +223,7 @@
     params="world, generations: int = 1"
     description="Runs a world forward, counting births and deaths and keeping a short history for spotting cycles. Stops early once nothing is left alive.">
     <let name="w" value="$world" />
-    <for each="i" in="0..$generations">
+    <for each="_i" in="0..$generations">
       <if test="@population($w.grid) eq 0">
         <break />
       </if>

@@ -60,6 +60,7 @@ namespace KScript.Language.Analysis
                     if (member.Target is IdentifierNode alias && scope.Lookup(alias.Name, region.Source.ToSource(alias.Span.Start)) is Symbol s && s.Kind == SymbolKind.Import)
                     {
                         result.References.Add(new SymbolReference(s, region.Source.ToSource(alias.Span), false, false));
+                        NoteMemberUse(s, member.Name);
                     }
                     else
                     {
@@ -234,6 +235,7 @@ namespace KScript.Language.Analysis
                 return;
             }
             result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+            NoteMemberUse(import, member);
             if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member))
             {
                 Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{aliasName}' has no '{member}'.",
@@ -298,6 +300,7 @@ namespace KScript.Language.Analysis
                     if (import?.Kind == SymbolKind.Import)
                     {
                         result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+                        NoteMemberUse(import, member.Name);
                         if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member.Name))
                         {
                             TextSpan memberSpan = region.Source.ToSource(member.NameSpan);
@@ -365,6 +368,8 @@ namespace KScript.Language.Analysis
         {
             TextSpan span = region.Source.ToSource(lambda.Span);
             Scope inner = new Scope(scope, span);
+            List<Symbol> declared = new List<Symbol>();
+            lambdaParameters.Add(declared);
             for (int i = 0; i < lambda.Parameters.Count; i++)
             {
                 ParameterNode p = lambda.Parameters[i];
@@ -374,7 +379,9 @@ namespace KScript.Language.Analysis
                     pSpan = TextSpan.FromBounds(pSpan.Start + 1, pSpan.End);
                 }
                 TypeShape shape = parameterShapes != null && i < parameterShapes.Length ? parameterShapes[i] : TypeShape.Unknown;
-                inner.Declare(NewVariable(p.Name, pSpan, region.Element, SymbolKind.Parameter, shape), span.Start);
+                Symbol symbol = NewVariable(p.Name, pSpan, region.Element, SymbolKind.Parameter, shape);
+                inner.Declare(symbol, span.Start);
+                declared.Add(symbol);
             }
             AnalyzeExpr(lambda.Body, region, inner, ExprContext.Value);
         }
@@ -400,6 +407,7 @@ namespace KScript.Language.Analysis
             }
 
             List<CallableInfo> applicable = candidates.Where(m => KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
+            usedPackages.UnionWith(applicable.Select(m => m.Package).Where(p => p != null));
             if (applicable.Count == 0)
             {
                 Report(nameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,

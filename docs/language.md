@@ -72,6 +72,33 @@ empty list) are not flagged, since there is nothing to return from. KS6001 comes
 [standard](standards.md), `kscript:recommended`. To turn it off for a project, set
 `"lint": { "rules": { "KS6001": "off" } }` in `kscript.json` (or in a standard your projects share).
 
+### Unused code
+
+`kscript check` and the editor also point out code that does nothing. In the editor it is drawn faded, with quick
+fixes to delete it or to rename it with a leading `_`, which marks it as unused on purpose (`_` names are never
+reported).
+
+| Code | What it flags |
+| --- | --- |
+| KS6002 | A function nothing calls. Calls from the other files of the project count: a library function another script imports and calls, a controller a route file names (`to="people.show"`, or `<Resource to="people">` for its index, store, show, update and destroy), and middleware named in `kscript.json`. A function that only calls itself is still unused. |
+| KS6003 | A variable, constant or loop variable whose value is never read, including one that is only ever set. A script's top-level constants are exported like its functions, so they count as used when an importing file uses them. In pages, only a function's own variables are checked, because a layout or component may read the rest. |
+| KS6004 | A function parameter the body never reads. For a lambda, only the parameters after the last one it reads, since the caller decides what it is passed: write `fn($_y) => ...` to keep the position. |
+| KS6005 | An import nothing uses: an `as` alias, a name in `names="..."`, a whole script, or a package none of whose elements, commands, methods or variables appear. |
+
+The project is the folder with the nearest `kscript.json` and everything under it (hidden folders, `bin`, `obj` and
+`node_modules` are skipped). A script outside a project is checked against the other files in its own folder. A
+function that is part of an API used from outside the project can say so with `@public` in its doc comment:
+
+```xml
+<!--- Kept for scripts that still call it.
+@public -->
+<fn name="titlecase" params="text" value="$text->upper()" />
+```
+
+Like KS6001, these come from the default [standard](standards.md), `kscript:recommended`, as warnings
+(`kscript:strict` makes them errors). A project can change or turn off each one in `kscript.json`, such as
+`"lint": { "rules": { "KS6004": "off" } }`.
+
 ## Functions
 
 ```xml

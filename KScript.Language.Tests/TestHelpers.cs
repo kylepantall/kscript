@@ -20,8 +20,16 @@ namespace KScript.Language.Tests
 
         public static string Script(string body) => "<kscript>\n" + body + "\n</kscript>";
 
+        /// <summary>Analyzes a document, without the unused-code rules (KS6002-KS6005): most test snippets declare things they never use.</summary>
         public static DocumentAnalysis Analyze(string text, string path = "test.ks.xml", IFileSystem files = null) =>
-            Analyzer.Analyze(text, path, files ?? EmptyFileSystem.Instance);
+            WithoutUnused(Analyzer.Analyze(text, path, files ?? EmptyFileSystem.Instance));
+
+        /// <summary>Drops the unused-code diagnostics (UnusedCodeTests covers them).</summary>
+        public static DocumentAnalysis WithoutUnused(DocumentAnalysis a)
+        {
+            a.Diagnostics.RemoveAll(d => DiagnosticCodes.IsUnnecessary(d.Code));
+            return a;
+        }
 
         public static string Describe(DocumentAnalysis a) =>
             string.Join("\n", a.Diagnostics.Select(d => $"{a.Source.GetPosition(d.Span.Start)} {d.Code} '{a.Source[d.Span]}': {d.Message}"));

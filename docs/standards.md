@@ -32,7 +32,7 @@ standard, build it on top of KScript's, and share it between projects. Each proj
 
 | Standard | What it sets |
 | --- | --- |
-| `kscript:recommended` | The default. Style rules (KS6xxx, such as [KS6001 early returns](language.md#early-returns-instead-of-else)) are warnings. The formatter's layout is written out in full: `printWidth` 120, `maxBlankLines` 1, `endOfLine` auto, and every format rule on. The indent is left to the editor's tab settings (2 for `kscript fmt`), so set `format.indent` in your own standard to pin it. |
+| `kscript:recommended` | The default. Style rules (KS6xxx, such as [KS6001 early returns](language.md#early-returns-instead-of-else) and the [unused code](language.md#unused-code) rules KS6002 to KS6005) are warnings. The formatter's layout is written out in full: `printWidth` 120, `maxBlankLines` 1, `endOfLine` auto, and every format rule on. The indent is left to the editor's tab settings (2 for `kscript fmt`), so set `format.indent` in your own standard to pin it. |
 | `kscript:strict` | Extends `kscript:recommended`. Style rules are errors, and `lint.warningsAsErrors` is on, so `kscript check` fails on any warning. |
 
 The correctness checks (KS1xxx to KS5xxx: unknown elements, undefined variables, wrong argument counts and so on) are

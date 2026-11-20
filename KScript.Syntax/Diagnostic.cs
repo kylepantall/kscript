@@ -107,5 +107,24 @@ namespace KScript.Syntax
 
         /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
         public const string PreferEarlyExit = "KS6001";
+
+        /// <summary>A function that nothing calls: not its own file, and not any file in the project that imports it.</summary>
+        public const string UnusedFunction = "KS6002";
+
+        /// <summary>A variable or constant whose value is never read.</summary>
+        public const string UnusedVariable = "KS6003";
+
+        /// <summary>A function or lambda parameter the body never reads.</summary>
+        public const string UnusedParameter = "KS6004";
+
+        /// <summary>An import (a script, a name from one, or a package) that nothing uses.</summary>
+        public const string UnusedImport = "KS6005";
+
+        /// <summary>
+        /// True for the unused-code rules (KS6002-KS6005). Editors show their code faded, as unnecessary, as well as
+        /// (or instead of) underlining it.
+        /// </summary>
+        public static bool IsUnnecessary(string code) =>
+            code == UnusedFunction || code == UnusedVariable || code == UnusedParameter || code == UnusedImport;
     }
 }

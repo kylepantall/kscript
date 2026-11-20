@@ -27,6 +27,10 @@
       <expect value="@place(@blank(width: 3, height: 2), rows: ['OOOO'], left: 1, top: 1)" equals="['...', '.OO']" />
     </test>
 
+    <test name="grids print as text">
+      <expect value="@to_text(['O.', '.O'], alive: '#', dead: '-')" equals="'#-' + @char_of(10) + '-#'" />
+    </test>
+
     <test name="the .cells format is read, comments and all">
       <let name="nl" value="@char_of(10)" />
       <expect

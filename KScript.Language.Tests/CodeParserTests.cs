@@ -217,7 +217,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void OneAssignmentDeclaresThenChanges()
         {
-            AssertNoDiagnostics("total = 0\nfor i in 0..3 {\n  total += $i\n  last = $i\n}\necho $total");
+            AssertNoDiagnostics("total = 0\nfor i in 0..3 {\n  total += $i\n  last = $i\n  echo $last\n}\necho $total");
 
             DocumentAnalysis a = Analyzer.Analyze("for i in 0..3 {\n  tmp = $i\n}\necho $tmp\ncount += 1\nconst k = 1\nk = 2", "test.kscript");
             Assert.Contains(a.Diagnostics, d => d.Code == "KS4001" && d.Message.Contains("$tmp"));
@@ -245,7 +245,7 @@ namespace KScript.Language.Tests
             DocumentAnalysis ok = Analyzer.Analyze("x = 2\necho \"{ $x * 2 }\"", "test.kscript");
             Assert.Empty(ok.Diagnostics);
 
-            const string text = "x = 2\necho \"{ $y }\"";
+            const string text = "x = 2\necho \"{ $x + $y }\"";
             DocumentAnalysis bad = Analyzer.Analyze(text, "test.kscript");
             Diagnostic d = Assert.Single(bad.Diagnostics);
             Assert.Equal("KS4001", d.Code);

@@ -26,6 +26,9 @@ async function run() {
     return d.length > 0 ? d : null;
   }, 'diagnostics');
   assert.ok(diagnostics.some((d) => /Did you mean \$total/.test(d.message)), JSON.stringify(diagnostics.map((d) => d.message)));
+  // $total is only read through the typo, so it is unused: faded, with the Unnecessary tag.
+  const unused = diagnostics.find((d) => String((d.code && d.code.value) || d.code) === 'KS6003');
+  assert.ok(unused && (unused.tags || []).includes(vscode.DiagnosticTag.Unnecessary), JSON.stringify(diagnostics));
 
   const completions = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, new vscode.Position(2, 12));
   assert.ok(completions.items.some((i) => (i.label.label || i.label) === 'total'), 'variables are completed');

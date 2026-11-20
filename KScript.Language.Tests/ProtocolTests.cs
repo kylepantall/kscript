@@ -245,6 +245,26 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void UnusedCodeIsTaggedUnnecessary()
+        {
+            Initialize();
+            Open("<kscript>\n  <let name=\"spare\" value=\"1\" />\n  <echo>{ $nope }</echo>\n</kscript>");
+            JsonArray diagnostics = Diagnostics();
+            JsonNode unused = diagnostics.Single(d => d["code"].GetValue<string>() == "KS6003");
+            Assert.Equal(1, Assert.Single(unused["tags"].AsArray()).GetValue<int>());
+            Assert.Null(diagnostics.Single(d => d["code"].GetValue<string>() == "KS4001")["tags"]);
+
+            JsonArray actions = Request("textDocument/codeAction", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = Uri },
+                ["range"] = Range(1, 14, 1, 14),
+                ["context"] = new JsonObject { ["diagnostics"] = new JsonArray() },
+            })["result"].AsArray();
+            Assert.Equal(new[] { "Remove $spare", "Rename to _spare (unused on purpose)" }, actions.Select(a => a["title"].GetValue<string>()));
+            Assert.All(actions, a => Assert.Equal(1, a["diagnostics"][0]["tags"][0].GetValue<int>()));
+        }
+
+                [Fact]
         public void UnknownRequestsGetMethodNotFound()
         {
             Initialize();

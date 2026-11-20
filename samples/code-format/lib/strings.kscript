@@ -8,6 +8,7 @@ fn slugify(text) {
   return $text->lower()->replace(' ', '-')
 }
 
-/// Upper-cases text.
+/// Upper-cases text. Kept for scripts outside this project that still call it.
+/// @public
 /// @deprecated Use $text->upper() instead.
 fn titlecase(text) => $text->upper()

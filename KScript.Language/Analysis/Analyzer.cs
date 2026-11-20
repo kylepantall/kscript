@@ -33,10 +33,19 @@ namespace KScript.Language.Analysis
         private DocumentKind Kind => result.Kind;
 
         /// <summary>Analyzes a document. The kind is chosen from the path's extension unless given.</summary>
-        public static DocumentAnalysis Analyze(string text, string path = null, IFileSystem files = null, LanguageCatalog catalog = null, DocumentKind? kind = null)
+        public static DocumentAnalysis Analyze(string text, string path = null, IFileSystem files = null, LanguageCatalog catalog = null, DocumentKind? kind = null) =>
+            Analyze(text, path, files, catalog, kind, projectWide: true);
+
+        /// <summary>
+        /// With <paramref name="projectWide"/> false, functions are not checked for use (KS6002), so no other file in
+        /// the project is read for calls. That is how files that import this one are analysed.
+        /// </summary>
+        internal static DocumentAnalysis Analyze(string text, string path, IFileSystem files, LanguageCatalog catalog, DocumentKind? kind, bool projectWide)
         {
             DocumentKind documentKind = kind ?? MarkupParser.KindFromPath(path);
-            return RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog)).result;
+            Analyzer analyzer = RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog));
+            analyzer.CheckUnused(projectWide);
+            return analyzer.result;
         }
 
         #region Driver
@@ -487,6 +496,7 @@ namespace KScript.Language.Analysis
 
             CheckAttributes(e, info);
             CheckPlacement(e, info, previous);
+            NoteResourceUses(e, info, scope);
             CheckElse(e, previous, markupMode);
             RequirePackage(info.Package, e.NameSpan, $"<{e.Name}>");
             if (Kind != DocumentKind.Script && !info.Context.HasFlag(ElementContext.Page))
@@ -711,7 +721,10 @@ namespace KScript.Language.Analysis
                 {
                     // <input bind="query">: two-way binding to a <state> variable.
                     RequireLive(e, attr);
-                    ReferenceVariableByName(attr.Value, scope, isWrite: true, mustBeMutable: true);
+                    if (ReferenceVariableByName(attr.Value, scope, isWrite: true, mustBeMutable: true) is Symbol bound)
+                    {
+                        boundVariables.Add(bound);
+                    }
                 }
                 else
                 {
@@ -950,7 +963,12 @@ namespace KScript.Language.Analysis
                     AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: false);
                     break;
                 case AttributeKind.VariableReference:
-                    ReferenceVariableByName(attr.Value, scope, isWrite: true, mustBeMutable: true);
+                    Symbol target = ReferenceVariableByName(attr.Value, scope, isWrite: true, mustBeMutable: true);
+                    if (target != null && attr.Name == "bind")
+                    {
+                        // A bound control shows the value as well as changing it.
+                        boundVariables.Add(target);
+                    }
                     break;
                 case AttributeKind.FunctionReference:
                     ReferenceFunctionByName(attr.Value, scope);
@@ -1338,11 +1356,14 @@ namespace KScript.Language.Analysis
             MarkupAttribute paramsAttr = e.GetAttribute("params");
             if (paramsAttr?.Value != null)
             {
+                List<Symbol> declared = new List<Symbol>();
                 foreach (FunctionParameter p in ParseParameters(paramsAttr.Value, report: true))
                 {
                     Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, ParameterShape(p, e.Span.Start));
                     body.Declare(symbol, e.Span.Start);
+                    declared.Add(symbol);
                 }
+                functionParameters[e] = declared;
             }
 
             foreach (MarkupAttribute attr in e.Attributes.Where(a => a.Name != "params" && a.Name != "name"))

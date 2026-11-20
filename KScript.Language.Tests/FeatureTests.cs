@@ -273,7 +273,7 @@ namespace KScript.Language.Tests
             RenameResult rename = Service.Rename(a, offset, "count");
             Assert.Null(rename.Error);
             string renamed = AnalyzerTests.Apply(a.Source.Text, rename.Changes);
-            DocumentAnalysis after = Service.Analyze(renamed, "test.ks.xml");
+            DocumentAnalysis after = WithoutUnused(Service.Analyze(renamed, "test.ks.xml"));
             AssertClean(after);
             Assert.Equal(5, after.Symbols.Single(s => s.Name == "count").Let(s => after.ReferencesTo(s).Count()));
             Assert.Contains("n2", renamed);

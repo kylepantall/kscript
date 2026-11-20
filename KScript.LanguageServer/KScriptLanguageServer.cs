@@ -376,14 +376,7 @@ namespace KScript.LanguageServer
                 JsonArray diagnostics = new JsonArray();
                 foreach (Diagnostic d in doc.Analysis.Diagnostics)
                 {
-                    diagnostics.Add(new JsonObject
-                    {
-                        ["range"] = Range(doc.Analysis.Source, d.Span),
-                        ["severity"] = (int)d.Severity,
-                        ["code"] = d.Code,
-                        ["source"] = "kscript",
-                        ["message"] = d.Message,
-                    });
+                    diagnostics.Add(DiagnosticJson(doc.Analysis.Source, d));
                 }
                 connection.SendNotification("textDocument/publishDiagnostics", new JsonObject
                 {
@@ -657,6 +650,24 @@ namespace KScript.LanguageServer
             return new JsonObject { ["data"] = data };
         }
 
+        /// <summary>A diagnostic as LSP sends it. Unused code (KS6002-KS6005) is tagged Unnecessary (1), which editors show faded.</summary>
+        private static JsonObject DiagnosticJson(SourceText source, Diagnostic d)
+        {
+            JsonObject json = new JsonObject
+            {
+                ["range"] = Range(source, d.Span),
+                ["severity"] = (int)d.Severity,
+                ["code"] = d.Code,
+                ["source"] = "kscript",
+                ["message"] = d.Message,
+            };
+            if (DiagnosticCodes.IsUnnecessary(d.Code))
+            {
+                json["tags"] = new JsonArray(1);
+            }
+            return json;
+        }
+
         private JsonNode CodeActions(JsonNode p)
         {
             DocumentAnalysis a = Analysis(p, out OpenDocument doc);
@@ -673,14 +684,7 @@ namespace KScript.LanguageServer
                     ["title"] = fix.Title,
                     ["kind"] = "quickfix",
                     ["isPreferred"] = d.Fixes.Count == 1,
-                    ["diagnostics"] = new JsonArray(new JsonObject
-                    {
-                        ["range"] = Range(a.Source, d.Span),
-                        ["severity"] = (int)d.Severity,
-                        ["code"] = d.Code,
-                        ["source"] = "kscript",
-                        ["message"] = d.Message,
-                    }),
+                    ["diagnostics"] = new JsonArray(DiagnosticJson(a.Source, d)),
                     ["edit"] = new JsonObject { ["changes"] = new JsonObject { [doc.Uri] = Edits(a.Source, fix.Changes) } },
                 });
             }

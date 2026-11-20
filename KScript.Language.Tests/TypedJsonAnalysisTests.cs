@@ -45,7 +45,7 @@ namespace KScript.Language.Tests
 
         private const string DocPath = "/tmp/shapes/test.ks.xml";
 
-        private static DocumentAnalysis Open(string body) => Service.Analyze(Script(body), DocPath);
+        private static DocumentAnalysis Open(string body) => WithoutUnused(Service.Analyze(Script(body), DocPath));
 
         private static List<string> Labels(string body)
         {

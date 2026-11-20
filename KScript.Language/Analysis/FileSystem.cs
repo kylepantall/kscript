@@ -11,6 +11,9 @@ namespace KScript.Language.Analysis
         string ReadText(string path);
 
         IEnumerable<string> ListFiles(string directory, string pattern);
+
+        /// <summary>The folders directly inside a folder, used to look through a whole project. None by default.</summary>
+        IEnumerable<string> ListDirectories(string directory) => Array.Empty<string>();
     }
 
     public sealed class DiskFileSystem : IFileSystem
@@ -38,6 +41,18 @@ namespace KScript.Language.Analysis
             try
             {
                 return Directory.Exists(directory) ? Directory.GetFiles(directory, pattern) : Array.Empty<string>();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        public IEnumerable<string> ListDirectories(string directory)
+        {
+            try
+            {
+                return Directory.Exists(directory) ? Directory.GetDirectories(directory) : Array.Empty<string>();
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {

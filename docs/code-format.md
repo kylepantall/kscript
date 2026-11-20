@@ -124,7 +124,8 @@ fn hello(who) => @greet($who)
 ```
 
 `kscript check` and the editor warn about a `@param` that names no parameter (KS4007) and about calls to a
-`@deprecated` function (KS4008). XML scripts write the same text in a `<!--- ... -->` comment (three dashes) just
+`@deprecated` function (KS4008). `@public` marks a function used from outside the project, so it is never reported as
+[unused](language.md#unused-code) (KS6002). XML scripts write the same text in a `<!--- ... -->` comment (three dashes) just
 before the element, or in its `description` attribute.
 
 ## Converting

@@ -68,6 +68,13 @@ namespace KScript.Language.Analysis
         public Dictionary<(Symbol Alias, string Member), ExternalLocation> ExternalMembers { get; } = new Dictionary<(Symbol, string), ExternalLocation>();
         public Scope RootScope { get; internal set; }
 
+        /// <summary>
+        /// The names this document uses from the scripts it imports, as (full path of the script, name): a call to an
+        /// imported function, or <c>lib.slugify</c> through an alias. It is how a script's functions count as used
+        /// when only another file calls them.
+        /// </summary>
+        public HashSet<(string Path, string Name)> ExternalUses { get; } = new HashSet<(string, string)>();
+
         /// <summary>The packages a script imports (always KScript.Core). Empty for pages.</summary>
         public IReadOnlyList<string> ImportedPackages { get; internal set; } = new[] { "KScript.Core" };
 

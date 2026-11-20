@@ -46,7 +46,7 @@ namespace KScript.Language.Tests
         internal static DocumentAnalysis Check(string body, string file = "test.ks.xml", IFileSystem files = null, LanguageCatalog catalog = null)
         {
             string text = file.EndsWith(".html", StringComparison.Ordinal) || body.StartsWith("<kscript", StringComparison.Ordinal) ? body : body.StartsWith("!", StringComparison.Ordinal) ? body.Substring(1) : Script(body);
-            return Analyzer.Analyze(text, Path.Combine(Folder, file), files ?? new Files(), catalog);
+            return WithoutUnused(Analyzer.Analyze(text, Path.Combine(Folder, file), files ?? new Files(), catalog));
         }
 
         private static void Has(DocumentAnalysis a, string code, string fragment)
