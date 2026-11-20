@@ -62,6 +62,9 @@ namespace KScript.Metadata
 
         /// <summary>The fields of a &lt;type&gt; on one line: <c>login: string, id?: int, tags: string[] = []</c>.</summary>
         Fields,
+
+        /// <summary>An error type: a built-in such as Validation or one an &lt;error&gt; declares. Some attributes take a list: <c>[IO, Network]</c>.</summary>
+        ErrorType,
     }
 
     /// <summary>Which parts of an element's text are used as written rather than interpolated.</summary>

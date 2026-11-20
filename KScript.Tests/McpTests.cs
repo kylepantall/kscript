@@ -253,6 +253,13 @@ public sealed class McpTests : IDisposable
         }
         Assert.DoesNotContain("only.", docs.Element(new ElementInfo("bare", "Bare.", ContentKind.Empty), "kscript"));
 
+        // Agent notes from the package show up in lookups too.
+        Assert.Contains("\n- Avoid: Loops.\n", docs.Element(new ElementInfo("noisy", "Noisy.", ContentKind.Empty) { Agent = new AgentNotes(avoid: "Loops.") }, "kscript"));
+        Assert.Contains("\n- Pitfall: Returns a new list", docs.Callable(docs.Catalog.GetMethods("push", "list").First(), "kscript"));
+        string noted = docs.Callable(new CallableInfo(CallableKind.Command, "n", "N.", Array.Empty<Signature>()) { Agent = new AgentNotes(prefer: "P.") }, "kscript");
+        Assert.Contains("- Prefer: P.", noted);
+        Assert.DoesNotContain("- Avoid", docs.Callable(new CallableInfo(CallableKind.Command, "m", "M.", Array.Empty<Signature>()) { Agent = new AgentNotes(llm: "only a line") }, "kscript"));
+
         var planned = new CallableInfo(CallableKind.Command, "someday", "Not yet.", Array.Empty<Signature>()) { ReturnType = null };
         string plannedMd = docs.Callable(planned, "kscript");
         Assert.Contains("# @someday()\n", plannedMd);

@@ -37,12 +37,16 @@ namespace KScript.Http
         {
             SiteRoot = Path.GetFullPath(siteRoot);
             Settings = project?.Http ?? new HttpSettings();
+            Project = project;
             Log = log;
             Files = FindRouteFiles();
         }
 
         public string SiteRoot { get; }
         public HttpSettings Settings { get; }
+
+        /// <summary>The project, or null; the OpenAPI document takes its title and version from it.</summary>
+        public ProjectConfig Project { get; }
         public TextWriter Log { get; }
         public IReadOnlyList<RouteFileInfo> Files { get; }
         public bool HasRoutes => Files.Count > 0;
@@ -225,6 +229,8 @@ namespace KScript.Http
                 return ErrorPage(ex);
             }
 
+            if (Settings.OpenApi.Enabled && OpenApiPage(path, table) is PageResult docs) return docs;
+
             if (table.Match(request.Method, path) == null && !IsApiPath(path)) return null;
 
             Dictionary<string, object> map = await PageServer.BuildRequestAsync(request);
@@ -312,6 +318,10 @@ namespace KScript.Http
             {
                 return ToPage(abort.Response, method);
             }
+            catch (KScriptException ex) when (ErrorTypes.StatusOf(ex) is int status)
+            {
+                return ToPage(ErrorAnswer(ctx, ex, status), method);
+            }
             catch (KScriptException ex)
             {
                 return ToPage(Failure(ctx, ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message), method);
@@ -320,6 +330,21 @@ namespace KScript.Http
             {
                 return ToPage(Failure(ctx, (ex.Location != null ? ex.Location + ": " : string.Empty) + ex.Message), method);
             }
+        }
+
+        /// <summary>
+        /// An error whose type carries a status (<c>error NotFound(status: 404)</c>, or a built-in such as Validation) is
+        /// the client's answer, not a crash: that status and the message, without the file and line. API routes answer
+        /// JSON with the error's type and fields too: <c>{ "error": "...", "status": 404, "type": "NotFound", "id": 42 }</c>.
+        /// </summary>
+        private HttpResponse ErrorAnswer(RequestContext ctx, KScriptException ex, int status)
+        {
+            Log?.WriteLine($"  {status} {ex.Type}: {ex.Message}");
+            HttpResponse response = ctx.ErrorResponse(status, ex.Message);
+            if (!response.ContentType.StartsWith("application/json", StringComparison.Ordinal)) return response;
+            var body = new Dictionary<string, object> { ["error"] = ex.Message, ["status"] = (double)status, ["type"] = ex.Type };
+            foreach (var kv in ex.Fields) body.TryAdd(kv.Key, kv.Value);
+            return HttpResponse.Json(body, status);
         }
 
         private HttpResponse Failure(RequestContext ctx, string message)
@@ -486,6 +511,24 @@ namespace KScript.Http
             };
             foreach (var h in response.Headers) page.Headers[h.Key] = Values.ToStr(h.Value);
             return page;
+        }
+
+        /// <summary>The paths of the OpenAPI document and its page, served while http.openapi is on.</summary>
+        public static readonly string[] OpenApiPaths = { "/_openapi.json", "/_openapi.yaml", "/_api" };
+
+        /// <summary>/_openapi.json, /_openapi.yaml or the /_api page; null for any other path.</summary>
+        public PageResult OpenApiPage(string path, RouteTable table)
+        {
+            path = path.TrimEnd('/');
+            if (!OpenApiPaths.Contains(path, StringComparer.Ordinal)) return null;
+            if (path == "/_api") return new PageResult { Body = OpenApiViewer.Page(Settings.OpenApi.Title ?? Project?.Name) };
+            Dictionary<string, object> document = OpenApi.Document(this, table, Project);
+            var result = path.EndsWith(".json", StringComparison.Ordinal)
+                ? new PageResult { ContentType = "application/json; charset=utf-8", Body = OpenApi.ToJson(document) }
+                : new PageResult { ContentType = "application/yaml; charset=utf-8", Body = OpenApi.ToYaml(document) };
+            result.Headers["Access-Control-Allow-Origin"] = "*";
+            result.Headers["Cache-Control"] = "no-cache";
+            return result;
         }
 
         private static PageResult ErrorPage(KScriptException ex) =>

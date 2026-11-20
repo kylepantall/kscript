@@ -204,7 +204,7 @@ namespace KScript.Docs.Mcp
         {
             string name = DocsSite.ElementName(e);
             var sb = new StringBuilder($"{new string('#', level)} <{name}>{(e.Deprecated != null ? " (deprecated)" : string.Empty)}\n\n");
-            sb.Append($"Package: {e.Package ?? "planned (not in the interpreter yet)"}\n{Deprecated(e.Deprecated)}\n{e.Description}\n");
+            sb.Append($"Package: {e.Package ?? "planned (not in the interpreter yet)"}\n{Deprecated(e.Deprecated)}\n{e.Description}\n{Agent(e.Agent)}");
             var facts = new List<string>
             {
                 e.Content switch
@@ -249,7 +249,7 @@ namespace KScript.Docs.Mcp
             }
             sb.Append($"\nPackage: {c.Package ?? "planned (not in the interpreter yet)"}");
             if (c.Package != null && c.Package != "KScript.Core") sb.Append($" (`{ImportLine(c.Package, format)}`)");
-            sb.Append($"\n{Deprecated(c.Deprecated)}\n{c.Description}\n");
+            sb.Append($"\n{Deprecated(c.Deprecated)}\n{c.Description}\n{Agent(c.Agent)}");
 
             var parameters = c.Signatures.SelectMany(s => s.Parameters).GroupBy(p => p.Name).Select(g => g.First()).ToList();
             // Parameters get a list when there is more to say than the signature shows, as on the site.
@@ -278,6 +278,17 @@ namespace KScript.Docs.Mcp
         {
             string code = DocsSite.ExampleScript(example);
             return "\nExample:\n\n```" + Code(code, "xml", format, out _) + "```\n";
+        }
+
+        /// <summary>The package's notes for coding agents (prefer, avoid, pitfall), as a list, or nothing.</summary>
+        internal static string Agent(AgentNotes notes)
+        {
+            if (notes == null) return string.Empty;
+            var lines = new List<string>();
+            if (notes.Prefer != null) lines.Add("- Prefer: " + notes.Prefer);
+            if (notes.Avoid != null) lines.Add("- Avoid: " + notes.Avoid);
+            if (notes.Pitfall != null) lines.Add("- Pitfall: " + notes.Pitfall);
+            return lines.Count == 0 ? string.Empty : "\n" + string.Join("\n", lines) + "\n";
         }
 
         /// <summary>"**Deprecated.** Why. Use x instead." on a line of its own, or nothing when it isn't deprecated.</summary>

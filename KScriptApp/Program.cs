@@ -49,10 +49,23 @@ namespace KScript
         void PrintUsage(TextWriter output) => CliReference.PrintUsage(output);
 
         /// <summary>
+        /// While kscript serve runs, keeps what the project makes from its code (the agent docs and the other
+        /// <see cref="KScript.Language.Outputs.ProjectOutputs"/>) up to date as files change. Does nothing when the
+        /// project has none turned on. Its own method, so compiled sites (which leave KScript.Language out) never load it.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        internal void WatchOutputs(string root, System.Threading.CancellationToken stop)
+        {
+            if (!Directory.Exists(root) || KScript.Language.Outputs.ProjectOutputs.Enabled(root).Count == 0) return;
+            var watcher = new KScript.Language.Outputs.ProjectWatcher(root, null, line => Out.WriteLine($"Watch: {line}"));
+            _ = watcher.RunAsync(stop);
+        }
+
+        /// <summary>
         /// kscript serve [folder] [--port N] [--host H]: serves KScript pages from a folder. In a project, the nearest
         /// kscript.json gives the defaults (serve.root, serve.port, serve.host); options on the command line win.
         /// </summary>
-        int Serve(string[] args)
+        int Serve(string[] args, bool watch = true)
         {
             string folder = null;
             int? port = null;
@@ -108,8 +121,10 @@ namespace KScript
                 host ??= project.Serve.Host;
             }
 
+            using var watching = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
             try
             {
+                if (watch) WatchOutputs(project?.Directory ?? Path.GetFullPath(folder ?? "."), watching.Token);
                 return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
@@ -126,6 +141,10 @@ namespace KScript
             {
                 Error.WriteLine($"Could not start the server: {ex.Message}");
                 return 1;
+            }
+            finally
+            {
+                watching.Cancel();
             }
         }
 
@@ -152,6 +171,65 @@ namespace KScript
                 rest.Add(a);
             }
             return rest.ToArray();
+        }
+
+        /// <summary>kscript openapi [folder] [--yaml] [--out file]: the OpenAPI document made from a site's routes.</summary>
+        int OpenApi(string[] args)
+        {
+            string output = null, folder = null;
+            bool yaml = false;
+            for (int i = 0; i < args.Length; i++)
+            {
+                switch (args[i])
+                {
+                    case "--yaml": yaml = true; break;
+                    case "--json": yaml = false; break;
+                    case "--out":
+                    case "-o":
+                        if (i + 1 >= args.Length)
+                        {
+                            Error.WriteLine("--out needs a file name.");
+                            return 1;
+                        }
+                        output = args[++i];
+                        break;
+                    default:
+                        if (args[i].StartsWith("-", StringComparison.Ordinal))
+                        {
+                            Error.WriteLine($"Unknown option '{args[i]}' for kscript openapi. Use --yaml or --out file.");
+                            return 1;
+                        }
+                        folder = args[i];
+                        break;
+                }
+            }
+            if (output != null && (output.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || output.EndsWith(".yml", StringComparison.OrdinalIgnoreCase))) yaml = true;
+            if (!TryFindSite(ref folder, out KScript.Projects.ProjectConfig project)) return 1;
+            return KScript.Http.HttpServer.WriteOpenApi(folder ?? ".", project, yaml, output, Out, Error);
+        }
+
+        /// <summary>The site folder for a command given an optional folder: the project's site root when it names the project.</summary>
+        bool TryFindSite(ref string folder, out KScript.Projects.ProjectConfig project)
+        {
+            project = null;
+            try
+            {
+                project = KScript.Projects.ProjectConfig.FindAndLoad(folder ?? ".");
+            }
+            catch (KScript.Projects.ProjectConfigException ex)
+            {
+                Error.WriteLine(ex.Message);
+                return false;
+            }
+            string given = folder == null ? null : Path.GetFullPath(folder);
+            if (project != null && (given == null || string.Equals(given.TrimEnd(Path.DirectorySeparatorChar), project.Directory, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)))
+                folder = project.SiteRoot;
+            if (!Directory.Exists(folder ?? "."))
+            {
+                Error.WriteLine($"Site folder not found: {folder}");
+                return false;
+            }
+            return true;
         }
 
         /// <summary>kscript routes [folder]: the route table of a site (the project's site root by default).</summary>
@@ -238,8 +316,25 @@ namespace KScript
             {
                 if (args.Contains("--print-config"))
                     return KScript.LanguageServer.CheckCommand.PrintConfig(args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Out);
-                return KScript.LanguageServer.CheckCommand.Run(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)), Out,
-                    warningsAsErrors: args.Contains("--warnaserror"));
+                int formatAt = Array.IndexOf(args, "--format");
+                string format = formatAt > 0 && formatAt + 1 < args.Length ? args[formatAt + 1] : args.FirstOrDefault(a => a.StartsWith("--format=", StringComparison.Ordinal))?.Substring(9) ?? "text";
+                if (format != "text" && format != "json")
+                {
+                    Error.WriteLine($"Unknown --format '{format}'. Use text or json.");
+                    return 2;
+                }
+                IEnumerable<string> paths = args.Skip(1).Where((a, i) => !a.StartsWith("--", StringComparison.Ordinal) && !(formatAt > 0 && i + 1 == formatAt + 1));
+                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: args.Contains("--warnaserror"), json: format == "json");
+            }
+
+            if (args.Length > 0 && args[0] == "watch")
+            {
+                return RunWatch(args.Skip(1).ToArray());
+            }
+
+            if (args.Length > 0 && args[0] == "agents")
+            {
+                return KScript.LanguageServer.AgentsCommand.Run(args.Skip(1), Out);
             }
 
             if (args.Length > 0 && args[0] == "fmt")
@@ -271,6 +366,11 @@ namespace KScript
             if (args[0] == "routes")
             {
                 return Routes(args.Skip(1).ToArray());
+            }
+
+            if (args[0] == "openapi")
+            {
+                return OpenApi(args.Skip(1).ToArray());
             }
 
             if (args[0] == "convert")
@@ -328,7 +428,7 @@ namespace KScript
             CompiledApp.Manifest app = CompiledApp.Read(manifest);
             return app.Kind switch
             {
-                "site" => Serve(new[] { app.Main }.Concat(args).ToArray()),
+                "site" => Serve(new[] { app.Main }.Concat(args).ToArray(), watch: false),
                 "window" => RunWindow(app.Main, args),
                 _ => RunScript(app.Main, args),
             };
@@ -359,6 +459,22 @@ namespace KScript
 
         /// <summary>Opens a URL for kscript docs (tests replace it).</summary>
         public Action<string> OpenBrowser { get; init; }
+
+        /// <summary>kscript watch: rebuilds the project's outputs as files change, until Ctrl+C.</summary>
+        int RunWatch(string[] args)
+        {
+            using var cancel = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            ConsoleCancelEventHandler stop = (_, e) => e.Cancel = StopOnFirstCtrlC(cancel);
+            Console.CancelKeyPress += stop;
+            try
+            {
+                return KScript.LanguageServer.WatchCommand.Run(args, Out, cancel.Token);
+            }
+            finally
+            {
+                Console.CancelKeyPress -= stop;
+            }
+        }
 
         /// <summary>kscript docs: Ctrl+C stops the docs server, which then removes its files.</summary>
         int RunDocs(string[] args)

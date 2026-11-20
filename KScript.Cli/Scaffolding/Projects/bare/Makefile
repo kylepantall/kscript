@@ -5,7 +5,7 @@
 # kscript commands directly.
 KSCRIPT ?= kscript
 
-.PHONY: run test check fmt compile help{{#if web}} serve{{else}}{{#if api}} serve{{/if}}{{/if}}{{#if api}} routes{{/if}}{{#if desktop}} desktop app{{/if}}
+.PHONY: run test check fmt agents compile help{{#if web}} serve{{else}}{{#if api}} serve{{/if}}{{/if}}{{#if api}} routes{{/if}}{{#if desktop}} desktop app{{/if}}
 
 run:
 	$(KSCRIPT) main{{ ext }}
@@ -18,6 +18,9 @@ check:
 
 fmt:
 	$(KSCRIPT) fmt
+
+agents:
+	$(KSCRIPT) agents
 {{#if web}}
 
 serve:

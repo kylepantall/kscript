@@ -24,11 +24,12 @@ What it makes:
 | `tasks.html` | A to-do list in a [`<live>`](web.md#reactive-pages-with-live-no-javascript) block, with no JavaScript. |
 | `lib/tasks.kscript` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app, the API and the tests. |
 | `desktop.kscript` | The same to-do list as a [`<KScript.Window>`](desktop.md) desktop app. |
-| `routes/api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). |
+| `routes/api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). While `kscript serve` runs, its docs are at `/_api` ([OpenAPI](http.md#api-docs-openapi)). |
 | `config/config.yaml` | Settings every script and page reads as `$config` (`config.root` in `kscript.json` points there). |
 | `lib/greeting.kscript`, `scripts/hello.kscript` | A function and a command-line script that uses it. |
 | `tests/tasks.test.kscript`, `tests/greeting.test.kscript` | Tests for the rules and the script, run with `kscript test`. |
 | `.vscode/extensions.json`, `.gitignore` | Asks VS Code to install the KScript extension; keeps built apps (`dist/`) out of git. |
+| `AGENTS.md`, `CLAUDE.md`, `.kscript/agents/` | Docs for coding agents, made from the project's code and kept up to date by the editor (see [Coding agents](agents.md)). |
 
 Scripts, tests, routes and the desktop app are written in the [.kscript format](code-format.md). `--format xml` writes them as XML (`.ks.xml`) instead, and records `"make": { "format": "xml" }` in `kscript.json` so that later `kscript make script` and `kscript make test` follow suit. Pages stay HTML either way.
 
@@ -36,7 +37,7 @@ Scripts, tests, routes and the desktop app are written in the [.kscript format](
 
 ### A bare project: --bare
 
-`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.yaml`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation: no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
+`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.yaml`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation and the [agent docs](agents.md) (`AGENTS.md`): no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
 
 Add pieces to a bare project with options, in any mix:
 
@@ -50,7 +51,7 @@ kscript make project my-app --bare --desktop     # a script plus an empty KScrip
 
 ### The Makefile
 
-Every new project has a `Makefile`, so common commands are short: `make serve`, `make test`, `make check`, `make fmt`, `make compile`, and `make routes`, `make desktop` and `make app` when the project has an API or desktop app. Any other target is passed to `kscript make`, with `name=` as the name and `args=` for options:
+Every new project has a `Makefile`, so common commands are short: `make serve`, `make test`, `make check`, `make fmt`, `make agents`, `make compile`, and `make routes`, `make desktop` and `make app` when the project has an API or desktop app. Any other target is passed to `kscript make`, with `name=` as the name and `args=` for options:
 
 ```sh
 make page name=contact                          # kscript make page contact
@@ -183,6 +184,7 @@ kscript make window settings                          # settings.kscript, a desk
 kscript make document annual-report                   # documents/annual-report.kscript, a PDF and Word document
 kscript make config staging                           # config/config.staging.yaml
 kscript make test checkout                            # tests/checkout.test.kscript
+kscript make error PaymentFailed --status 402 --fields "order: int"   # errors/payment-failed.kscript
 kscript make                                          # list every type
 ```
 
@@ -208,6 +210,7 @@ my-app/
   styles/          make css
   lib/             make module, const, cache, storage and logger
   types/           make type, make enum
+  errors/          make error
   jobs/            make job
   documents/       make document
   config/          make config

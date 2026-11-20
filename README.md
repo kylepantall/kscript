@@ -158,6 +158,8 @@ kscript serve                  # run it
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI
 kscript fmt                    # tidy every script and page (--check for CI)
+kscript agents                 # AGENTS.md and compact docs for coding agents, made from your code
+kscript watch                  # keep the agent docs (and other generated files) up to date as you code
 kscript ide install            # add the extension to VS Code, Cursor, VSCodium or Windsurf
 kscript compile --target all   # build programs for macOS, Windows and Linux that run without kscript
 kscript update                 # get the latest release
@@ -216,6 +218,7 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Programs](docs/compile.md): `kscript compile`, targets, icons and what a program holds
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
+- [Coding agents](docs/agents.md): `kscript agents`, AGENTS.md, agent doc tags and `kscript check --format json`
 - [Standards](docs/standards.md): shareable lint and format standards, `kscript:recommended` and `kscript check --print-config`
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI

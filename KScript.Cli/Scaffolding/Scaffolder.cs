@@ -356,6 +356,7 @@ namespace KScript.Scaffolding
             "env" => "base",
             "locale" => "fr",
             "logger" => "alerts",
+            "error" => "PaymentFailed",
             "document" => "annual-report",
             _ => "Example",
         };
@@ -372,6 +373,7 @@ namespace KScript.Scaffolding
             ["const"] = "const",
             ["enum"] = "enum",
             ["type"] = "type",
+            ["error"] = "error",
         };
 
         /// <summary>The command directory's sections, in order, and the built-in types in each.</summary>
@@ -379,7 +381,7 @@ namespace KScript.Scaffolding
         {
             ("Routes and APIs", new[] { "route", "controller", "request", "middleware", "view" }),
             ("Pages and styles", new[] { "page", "markdown", "layout", "component", "partial", "css" }),
-            ("Scripts and data", new[] { "script", "module", "type", "enum", "const", "storage", "cache", "job" }),
+            ("Scripts and data", new[] { "script", "module", "type", "enum", "error", "const", "storage", "cache", "job" }),
             ("Desktop apps", new[] { "window" }),
             ("Documents", new[] { "document" }),
             ("Settings", new[] { "config", "env", "locale", "logger" }),

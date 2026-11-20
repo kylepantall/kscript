@@ -164,6 +164,12 @@ namespace KScript.Runtime
                 ("type->fields", "<type name=\"User\" fields=\"login: string, id: int\" />\n<echo>{ $User->fields()->map(fn($f) => $f.name) }</echo>"),
                 ("type->name", "<type name=\"User\" fields=\"login: string\" />\n<echo>{ $User->name() }</echo>"),
 
+                // Errors
+                ("error->is", "<try>\n  <throw value=\"FileNotFound('No settings.json')\" />\n  <catch as=\"err\"><echo>{ $err->is(IO) }</echo></catch>\n</try>"),
+                ("error->chain", "<error name=\"PersonNotFound\" extends=\"NotFound\" />\n<try>\n  <throw value=\"PersonNotFound()\" />\n  <catch as=\"err\"><echo>{ $err->chain() }</echo></catch>\n</try>"),
+                ("error_type->new", "<error name=\"OutOfStock\" fields=\"item: string\" message=\"{$item} is out of stock\" />\n<let name=\"e\" value=\"$OutOfStock->new(item: 'tea')\" />\n<echo>{ $e.message }</echo>"),
+                ("error_type->fields", "<error name=\"OutOfStock\" fields=\"item: string, left?: int\" />\n<echo>{ $OutOfStock->fields()->map(fn($f) => $f.name) }</echo>"),
+
                 // Config and logging
                 ("config->get", "$config->get('server.port', 8080)"),
                 ("config->has", "$config->has('database.url')"),

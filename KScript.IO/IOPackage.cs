@@ -228,6 +228,11 @@ namespace KScript.IO
                 return null;
             });
             RegisterExamples(p);
+            p.AgentNotes(
+                ("@join_path", new AgentNotes(prefer: "@join_path(base: $dir, ['reports', 'a.txt']) over joining text with / or \\.")),
+                ("@read_json", new AgentNotes(prefer: "@read_json($path, as: $Type) checks the data's shape.", pitfall: "A missing file throws FileNotFound: check @exists($path) or catch it.")),
+                ("@read_text", new AgentNotes(pitfall: "A missing file throws FileNotFound: check @exists($path) or catch it.")),
+                ("@known_folder", new AgentNotes(prefer: "@known_folder(downloads) over building paths from $env.HOME.")));
         }
 
         /// <summary>Usage examples, shown in hover and run by kscript docs.</summary>

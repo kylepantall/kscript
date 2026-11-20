@@ -103,6 +103,24 @@
             "limit": { "type": "integer", "minimum": 1, "default": 60, "description": "Requests allowed per window, per address and route." },
             "seconds": { "type": "number", "exclusiveMinimum": 0, "default": 60, "description": "The length of the window." }
           }
+        },
+        "openapi": {
+          "description": "The OpenAPI 3.1 document made from the routes. kscript serve answers /_openapi.json, /_openapi.yaml and the /_api page; kscript openapi writes it. false turns the served copies off.",
+          "default": true,
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "default": true, "description": "false stops kscript serve answering /_openapi.json, /_openapi.yaml and /_api." },
+                "title": { "type": "string", "description": "info.title. Defaults to the project's name." },
+                "version": { "type": "string", "description": "info.version. Defaults to app.version, then 1.0.0." },
+                "description": { "type": "string", "description": "info.description." },
+                "routes": { "enum": ["auto", "api", "all"], "default": "auto", "description": "Which routes: api (from api.* files), all, or auto (the API routes if there are any, otherwise all)." }
+              }
+            }
+          ]
         }
       }
     },
