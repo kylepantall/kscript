@@ -137,7 +137,8 @@ namespace KScript.Docs
             }
 
             result.Milliseconds = watch.ElapsedMilliseconds;
-            result.Output = Ansi.Replace(output.ToString(), string.Empty);
+            // The docs page shows output the same on every OS, so Windows line endings become \n.
+            result.Output = Ansi.Replace(output.ToString(), string.Empty).Replace("\r\n", "\n");
             result.Truncated = output.Truncated;
             return result;
         }
