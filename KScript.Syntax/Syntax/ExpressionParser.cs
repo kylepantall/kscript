@@ -64,17 +64,12 @@ namespace KScript.Syntax
             List<ExprNode> nodes = new List<ExprNode>();
             while (p.Peek().Kind != TokenKind.EndOfInput)
             {
-                int before = p.index;
                 nodes.Add(p.ParseRootExpression());
                 if (!p.Peek().Is(","))
                 {
                     break;
                 }
                 p.Advance();
-                if (p.index == before)
-                {
-                    break;
-                }
             }
             p.ExpectEnd();
             return new ParseResult(text, nodes, p.errors);
@@ -587,7 +582,6 @@ namespace KScript.Syntax
             Expect("{", "after the match value");
             while (!Peek().Is("}") && Peek().Kind != TokenKind.EndOfInput)
             {
-                int before = index;
                 MatchArmNode arm = new MatchArmNode();
                 if (Peek().IsWord("_") || (Peek().Kind == TokenKind.Identifier && Peek().Text == "_"))
                 {
@@ -607,10 +601,6 @@ namespace KScript.Syntax
                     break;
                 }
                 Advance();
-                if (index == before)
-                {
-                    break;
-                }
             }
             Token close = Expect("}", "to close the match");
             match.Span = TextSpan.FromBounds(keyword.Span.Start, Math.Max(close.Span.End, lastEnd));
@@ -623,17 +613,12 @@ namespace KScript.Syntax
             ListNode list = new ListNode();
             while (!Peek().Is("]") && Peek().Kind != TokenKind.EndOfInput)
             {
-                int before = index;
                 list.Items.Add(ParseExpr());
                 if (!Peek().Is(","))
                 {
                     break;
                 }
                 Advance();
-                if (index == before)
-                {
-                    break;
-                }
             }
             Token close = Expect("]", "to close the list");
             list.Span = TextSpan.FromBounds(open.Span.Start, Math.Max(close.Span.End, lastEnd));
@@ -688,7 +673,6 @@ namespace KScript.Syntax
         {
             while (!Peek().Is(")") && Peek().Kind != TokenKind.EndOfInput)
             {
-                int before = index;
                 ArgumentNode arg = new ArgumentNode();
                 Token first = Peek();
                 if (first.Kind == TokenKind.Identifier && !Lexer.Keywords.Contains(first.Text) && Peek(1).Is(":"))
@@ -706,10 +690,6 @@ namespace KScript.Syntax
                     break;
                 }
                 Advance();
-                if (index == before)
-                {
-                    break;
-                }
             }
 
             Token close = Peek();

@@ -46,7 +46,7 @@ namespace KScript.Syntax.Markup
             {
                 return -1;
             }
-            for (int i = 0; i < map.Length; i++)
+            for (int i = 0; i < map.Length - 1; i++)
             {
                 if (map[i] >= offset)
                 {
