@@ -997,6 +997,13 @@ namespace KScript.Syntax.Markup
                 }
 
                 sb.Append(Pad(indent)).Append('<').Append(tag);
+                if (attributes.Count == 1 && attributes[0].Name == ShorthandCondition.AttributeFor(tag)
+                    && ShorthandCondition.CanWrite(attributes[0].ValueText))
+                {
+                    // <if $ready> rather than <if test="$ready">.
+                    sb.Append(' ').Append(attributes[0].ValueText.Trim());
+                    attributes.Clear();
+                }
                 foreach (MarkupAttribute a in attributes)
                 {
                     sb.Append(' ').Append(a.Name);

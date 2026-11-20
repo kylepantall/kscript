@@ -14,7 +14,7 @@
       <button on-click="count -= 1">−</button>
       <button on-click="count = 0">Reset</button>
       <button on-click="count += 1">+</button>
-      <if test="$count ge 10">
+      <if $count ge 10>
         <p class="note">Double digits!</p>
       </if>
     </live>
@@ -74,7 +74,7 @@
       <label><input type="number" bind="celsius"> °C</label>
       <input type="range" min="-30" max="50" bind="celsius">
       <p class="big">{ ($c * 9 / 5 + 32)->round(digits: 1) } °F</p>
-      <match value="$c">
+      <match $c>
         <case when="$it lt 0">
           <p class="note">Freezing.</p>
         </case>

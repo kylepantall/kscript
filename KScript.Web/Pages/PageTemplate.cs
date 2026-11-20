@@ -187,9 +187,19 @@ namespace KScript.Pages
                     string tagName = text.Substring(i + 1, j - i - 1);
                     var el = new PageElement { Name = tagName.ToLowerInvariant(), SourceName = tagName, Line = startLine };
 
-                    // Attributes
+                    // Attributes, or a shorthand head: <if $ready> means <if test="$ready">.
                     bool closed = false;
-                    while (j < text.Length)
+                    string shorthand = KScript.Syntax.Markup.ShorthandCondition.AttributeFor(el.Name);
+                    KScript.Syntax.Markup.ShorthandCondition.Head head = default;
+                    bool scanned = shorthand != null && KScript.Syntax.Markup.ShorthandCondition.Scan(text, j, out head);
+                    if (scanned)
+                    {
+                        el.Attributes.Add(new PageAttribute { Name = shorthand, SourceName = shorthand, Value = text.Substring(head.Start, head.End - head.Start), Quote = '"' });
+                        el.SelfClosing = head.SelfClosing;
+                        closed = head.Closed;
+                        j = head.TagEnd;
+                    }
+                    while (!scanned && j < text.Length)
                     {
                         while (j < text.Length && char.IsWhiteSpace(text[j])) j++;
                         if (j >= text.Length) break;

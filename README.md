@@ -50,9 +50,9 @@ Find everything over 1 MB in a folder, list it largest first, and offer to move 
     <echo>Nothing over 1 MB in {$folder}.</echo>
   </else>
 
-  <if test="$big->count() gt 0">
+  <if $big->count() gt 0>
     <confirm to="ok">Move them to an archive folder?</confirm>
-    <if test="$ok">
+    <if $ok>
       <for each="f" in="$big">
         <move from="$f" to="@join_path(base: $folder, ['archive', $f->name()])" />
       </for>

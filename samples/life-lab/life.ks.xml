@@ -18,7 +18,7 @@
   <let name="frame_ms" value="70" />
 
   <fn name="draw" params="world, title = ''">
-    <if test="@is_terminal()">
+    <if @is_terminal()>
       <clear />
     </if>
     <let name="s" value="@summary($world)" />
@@ -33,11 +33,11 @@
     <let name="w" value="$world" />
     <for each="i" in="0..$generations">
       <set name="w" value="@advance($w, generations: 1)" />
-      <if test="@is_terminal()">
+      <if @is_terminal()>
         <call fn="draw" args="$w, 'playing ' + ($i + 1) + '/' + $generations" />
         <wait ms="$frame_ms" />
       </if>
-      <if test="@population($w.grid) eq 0">
+      <if @population($w.grid) eq 0>
         <break />
       </if>
     </for>
@@ -45,10 +45,10 @@
   </fn>
 
   <fn name="load_pattern" params="name_or_path, wrap = true">
-    <if test="$patterns->has($name_or_path)">
+    <if $patterns->has($name_or_path)>
       <return value="@pattern_world($name_or_path, width: $board_w, height: $board_h, wrap: $wrap)" />
     </if>
-    <if test="not @exists($name_or_path)">
+    <if not @exists($name_or_path)>
       <throw
         type="Pattern"
         message="'{$name_or_path}' isn't a pattern name or a file. Patterns: { $patterns->keys()->join(', ') }." />
@@ -58,7 +58,7 @@
   </fn>
 
   <!-- kscript life.ks.xml <pattern> [generations]: play and stop. -->
-  <if test="$args->count() gt 0">
+  <if $args->count() gt 0>
     <let name="world" value="@load_pattern($args[0])" />
     <let name="world" value="@play($world, generations: ($args[1] ?? '100')->to_int(default: 100))" />
     <call fn="draw" args="$world, 'done'" />
@@ -80,11 +80,11 @@
     'Quit': 'quit'
   }</let>
 
-  <while test="true">
+  <while true>
     <call fn="draw" args="$world" />
     <echo />
     <menu to="action" options="$actions">What next?</menu>
-    <match value="$action">
+    <match $action>
       <case is="'step'">
         <set name="world" value="@advance($world, generations: 1)" />
       </case>
@@ -110,7 +110,7 @@
         <let
           name="xy"
           value="$where->trim()->split(' ')->reject(fn($p) => $p eq '')->map(fn($p) => $p->to_int(default: 0) - 1)" />
-        <if test="not ($xy->count() eq 2 and $xy[0] ge 0 and $xy[1] ge 0 and $xy[0] lt @width($world.grid) and $xy[1] lt @height($world.grid))">
+        <if not ($xy->count() eq 2 and $xy[0] ge 0 and $xy[1] ge 0 and $xy[0] lt @width($world.grid) and $xy[1] lt @height($world.grid))>
           <echo>{ @color('That cell is off the board.', colour: 'red') }</echo>
           <wait seconds="1" />
           <continue />
