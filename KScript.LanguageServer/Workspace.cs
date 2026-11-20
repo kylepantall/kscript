@@ -55,6 +55,8 @@ namespace KScript.LanguageServer
 
         public IEnumerable<string> ListFiles(string directory, string pattern) => disk.ListFiles(directory, pattern);
 
+        public IEnumerable<string> ListDirectories(string directory) => disk.ListDirectories(directory);
+
         public static string UriToPath(string uri)
         {
             if (uri == null || !uri.StartsWith("file:", StringComparison.OrdinalIgnoreCase))

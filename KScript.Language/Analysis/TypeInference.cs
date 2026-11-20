@@ -271,9 +271,9 @@ namespace KScript.Language.Analysis
             }
             TypeShape shape = t.ToLowerInvariant() switch
             {
-                "int" or "float" or "number" => new TypeShape(KType.Number),
-                "string" => new TypeShape(KType.String),
-                "bool" => new TypeShape(KType.Bool),
+                "int" or "float" or "number" => new TypeShape(KType.Number) { Declared = depth == 0 },
+                "string" => new TypeShape(KType.String) { Declared = depth == 0 },
+                "bool" => new TypeShape(KType.Bool) { Declared = depth == 0 },
                 "list" => new TypeShape(KType.List),
                 "map" => new TypeShape(KType.Map),
                 "fn" => new TypeShape(KType.Fn),
