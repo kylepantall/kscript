@@ -13,7 +13,7 @@
       "description": "Packages every script in the project uses without an <import>. KScript.Core is always imported.",
       "items": {
         "type": "string",
-        "enum": ["KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web", "KScript.UI", "KScript.AI"]
+        "enum": ["KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web", "KScript.Test", "KScript.UI", "KScript.AI"]
       },
       "uniqueItems": true
     },
@@ -52,6 +52,40 @@
           "examples": [{ "KS3003": "off", "KS4*": "error" }]
         },
         "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
+      }
+    },
+    "test": {
+      "type": "object",
+      "description": "Used by kscript test.",
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["**/*.test.ks.xml", "**/*.test.xml"],
+          "description": "The test files kscript test runs, as globs relative to kscript.json."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["_templates", "node_modules", ".git"],
+          "description": "Files and folders that are never run as tests."
+        },
+        "timeout": {
+          "type": "number",
+          "minimum": 0,
+          "default": 10,
+          "description": "Seconds one test may run before it fails (0 for no limit). timeout=\"...\" on a <test> and --timeout win."
+        },
+        "packages": {
+          "type": "array",
+          "description": "Packages every test file imports, on top of the project's packages. KScript.Test is always imported in test files.",
+          "items": {
+            "type": "string",
+            "enum": ["KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web", "KScript.UI", "KScript.AI"]
+          },
+          "uniqueItems": true
+        }
       }
     }
   }

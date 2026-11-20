@@ -113,6 +113,12 @@ async function activate(context) {
     }),
     vscode.commands.registerCommand('kscript.showOutput', () => output.show()),
     vscode.commands.registerCommand('kscript.showSetup', () => vscode.env.openExternal(vscode.Uri.parse(INSTALL_URL))),
+    vscode.commands.registerCommand('kscript.runTests', () => runTests()),
+    vscode.commands.registerCommand('kscript.runTestsInFile', (uri) => {
+      const file = uri && uri.fsPath ? uri : vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri;
+      if (!file) return vscode.window.showInformationMessage('Open a .test.ks.xml file to run its tests.');
+      return runTests(file);
+    }),
     vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (e.affectsConfiguration('kscript.server') || e.affectsConfiguration('kscript.pages')) {
         await stopClient();
@@ -122,6 +128,28 @@ async function activate(context) {
   );
 
   await startClient(context);
+}
+
+/** Runs `kscript test` as a task: the whole workspace folder, or one test file. */
+async function runTests(file) {
+  const server = resolveServer(config().get('server.path', ''), []);
+  if (server.error) {
+    vscode.window.showWarningMessage(`${server.error} Install KScript to run tests.`);
+    return;
+  }
+  const folder = (file && vscode.workspace.getWorkspaceFolder(file)) || (vscode.workspace.workspaceFolders || [])[0];
+  if (file) {
+    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === file.toString());
+    if (doc && doc.isDirty) await doc.save();
+  }
+  // A process execution passes each argument as is, so paths with spaces work in every shell.
+  const args = [...server.args, 'test', ...(file ? [file.fsPath] : [])];
+  const execution = new vscode.ProcessExecution(server.command, args, folder ? { cwd: folder.uri.fsPath } : {});
+  const task = new vscode.Task({ type: 'kscript', command: 'test', file: file ? file.fsPath : undefined },
+    folder || vscode.TaskScope.Workspace, file ? `test ${vscode.workspace.asRelativePath(file)}` : 'test', 'kscript', execution);
+  task.group = vscode.TaskGroup.Test;
+  task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, clear: true };
+  await vscode.tasks.executeTask(task);
 }
 
 function deactivate() {

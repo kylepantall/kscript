@@ -227,6 +227,28 @@ namespace KScript.Language.Analysis
             MarkupAttribute namesAttr = e.GetAttribute("names");
             if (namesAttr?.Value == null)
             {
+                // <import src="lib.ks.xml" /> with neither as nor names brings in every exported function.
+                if (string.IsNullOrWhiteSpace(asAttr?.ValueText) && exported != null)
+                {
+                    MarkupAttribute srcAttr = e.GetAttribute("src");
+                    TextSpan at = srcAttr?.Value != null ? TrimmedSpan(srcAttr.Value) : e.NameSpan;
+                    foreach (var export in exported)
+                    {
+                        Symbol fn = new Symbol
+                        {
+                            Name = export.Key,
+                            Kind = SymbolKind.Function,
+                            DeclarationSpan = at,
+                            DeclaringElement = e,
+                            SourcePath = full,
+                            Description = export.Value.Description ?? $"Imported from {src}",
+                        };
+                        fn.Parameters.AddRange(export.Value.Params);
+                        result.ExternalDeclarations[fn] = export.Value.Location;
+                        result.Symbols.Add(fn);
+                        root.Declare(fn, 0);
+                    }
+                }
                 return;
             }
 
@@ -397,7 +419,7 @@ namespace KScript.Language.Analysis
 
             // Elements that build their own scopes (fn, catch) must not also get an empty content scope,
             // or Scope.Innermost would find the empty one first.
-            bool ownScopes = info.Name == "fn" || info.Name == "catch";
+            bool ownScopes = info.Name == "fn" || info.Name == "catch" || (info.Name == "test" && info.Package == "KScript.Test" && e.GetAttribute("each") != null);
             Scope inner = e.SelfClosing || !e.StartTagClosed || ownScopes ? scope : new Scope(scope, e.ContentSpan);
             List<Action> declareAfter = new List<Action>();
 
@@ -422,6 +444,17 @@ namespace KScript.Language.Analysis
 
                 case "do":
                     AnalyzeStatementsContent(e, scope, declare: false);
+                    return;
+
+                case "test" when info.Package == "KScript.Test" && e.GetAttribute("each") != null:
+                    AnalyzeTestEach(e, info, scope, markupMode);
+                    return;
+
+                case "expect-error" when info.Package == "KScript.Test":
+                    // <expect-error as="err"> declares the caught error after the element, shaped like <catch as>.
+                    AnalyzeAttributes(e, info, scope, skip: "as");
+                    WalkChildren(e.Children, inner, markupMode);
+                    DeclareFromAttribute(e, "as", scope, e.Span.End, SymbolKind.Variable, ErrorShape());
                     return;
 
                 case "for":
@@ -1037,6 +1070,38 @@ namespace KScript.Language.Analysis
                 local = TextSpan.FromBounds(local.Start + 1, local.End);
             }
             return region.Source.ToSource(local);
+        }
+
+        /// <summary>
+        /// &lt;test each="case" in="[...]" name="… {$case.x}"&gt;: the item (and index) are visible in the name, the
+        /// other attributes and the body, like a loop variable.
+        /// </summary>
+        private void AnalyzeTestEach(MarkupElement e, ElementInfo info, Scope outer, bool markupMode)
+        {
+            TypeShape itemShape = TypeShape.Unknown;
+            MarkupAttribute inAttr = e.GetAttribute("in");
+            if (inAttr?.Value != null)
+            {
+                ExpressionRegion region = AnalyzeExpressionRegion(inAttr.Value, RegionKind.Expression, outer, e, inAttr);
+                if (region.Parse.Root != null)
+                {
+                    TypeShape collection = Infer(region.Parse.Root, region);
+                    itemShape = collection.Type == KType.List ? collection.Element ?? TypeShape.Unknown : TypeShape.Unknown;
+                }
+            }
+
+            Scope testScope = new Scope(outer, e.Span);
+            DeclareFromAttribute(e, "each", testScope, e.Span.Start, SymbolKind.LoopVariable, itemShape);
+            DeclareFromAttribute(e, "index", testScope, e.Span.Start, SymbolKind.LoopVariable, new TypeShape(KType.Number));
+
+            foreach (MarkupAttribute attr in e.Attributes.Where(a => a.Name != "in" && a.Name != "each" && a.Name != "index"))
+            {
+                if (attr.Value != null && info.GetAttribute(attr.Name) is AttributeInfo ai)
+                {
+                    AnalyzeAttribute(e, attr, ai, testScope);
+                }
+            }
+            WalkChildren(e.Children, e.SelfClosing || !e.StartTagClosed ? testScope : new Scope(testScope, e.ContentSpan), markupMode);
         }
 
         private void AnalyzeFor(MarkupElement e, Scope outer, Scope body)

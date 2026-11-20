@@ -143,13 +143,22 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,lint,name,packages,serve", Keys(props));
+        Assert.Equal("$schema,lint,name,packages,serve,test", Keys(props));
         Assert.Equal("host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
+        Assert.Equal("exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
 
         // Every key the schema allows is one ProjectConfig reads.
-        var c = Parse("""{ "$schema": "x", "name": "n", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false } }""");
+        var c = Parse("""{ "$schema": "x", "name": "n", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] } }""");
         Assert.Empty(c.Warnings);
+        Assert.Equal(5, c.Test.Timeout);
+        Assert.Equal(
+            props.GetProperty("test").GetProperty("properties").GetProperty("include").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
+            TestSettings.DefaultInclude);
+        Assert.Equal(
+            props.GetProperty("test").GetProperty("properties").GetProperty("exclude").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
+            TestSettings.DefaultExclude);
+        Assert.Equal(TestSettings.DefaultTimeout, props.GetProperty("test").GetProperty("properties").GetProperty("timeout").GetProperty("default").GetDouble());
         Assert.Equal(
             props.GetProperty("lint").GetProperty("properties").GetProperty("exclude").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
             LintSettings.DefaultExclude);
@@ -177,7 +186,7 @@ public class MakeProjectTests
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "My Site");
 
-        foreach (var f in new[] { "kscript.json", "index.html", "about.md", "_layout.html", "_components/site-nav.html", "site.css", "scripts/hello.ks.xml", ".vscode/extensions.json" })
+        foreach (var f in new[] { "kscript.json", "index.html", "about.md", "_layout.html", "_components/site-nav.html", "site.css", "scripts/hello.ks.xml", "lib/greeting.ks.xml", "tests/greeting.test.ks.xml", ".vscode/extensions.json" })
         {
             Assert.True(File.Exists(Path.Combine(root, f)), f + " is created");
             Assert.Contains(f, output);

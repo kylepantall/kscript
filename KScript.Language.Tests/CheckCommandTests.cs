@@ -210,7 +210,7 @@ namespace KScript.Language.Tests
             KScript.Scaffolding.ProjectScaffolder.Create(dir, "site");
             (int code, string output) = Run(true, Path.Combine(dir, "site"));
             Assert.True(code == 0, output);
-            Assert.Contains("5 files checked: 0 errors, 0 warnings.", output);
+            Assert.Contains("7 files checked: 0 errors, 0 warnings.", output);
         }
     }
 }

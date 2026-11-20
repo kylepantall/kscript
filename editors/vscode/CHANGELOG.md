@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Tests: **KScript: Run Tests** runs `kscript test` for the workspace, and test files (`*.test.ks.xml`) get a Run Tests button in the editor title bar. Test files know the KScript.Test elements (`<test>`, `<describe>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`) without an import, and `kscript.json` completes the new `test` settings.
 - Completion knows more about your data: `@read_json('data/people.json')` reads the file, so `$person.` offers `name`, `age` and so on, and nested objects and lists work too.
 - Lambda parameters take the type of the list's items: in `$people->filter(fn($p) => $p.age gt 18)`, `$p.` completes its fields. This also works for `|>` pipes, `reduce` and `sort`, and `->map(fn($p) => $p.name)` is known to be a list of text.
 - Components: `<person-card ` offers the component's props, which are the variables its file uses without declaring. Completing a component name fills in every prop.

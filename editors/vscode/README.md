@@ -45,6 +45,8 @@ A `kscript.json` at the top of a project (created by `kscript make project`) set
 
 - **KScript: Restart Language Server**: after updating `kscript` or changing settings.
 - **KScript: Show Language Server Output**: the server's log, also opened by clicking **KScript** in the status bar.
+- **KScript: Run Tests**: runs `kscript test` for the workspace folder in a task.
+- **KScript: Run Tests in This File**: runs the open test file. Test files (`*.test.ks.xml`) also get a run button in the editor title bar.
 
 ## Troubleshooting
 
