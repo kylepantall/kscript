@@ -34,9 +34,10 @@ namespace KScript.Docs
                 {
                     case "--help":
                     case "-h":
-                        output.WriteLine("Usage: kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open]");
+                        output.WriteLine("Usage: kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open] | kscript docs --project");
                         output.WriteLine("Opens the KScript docs in your browser: guides, the reference for every package, and examples you can run.");
                         output.WriteLine("Examples show in the project's make.format (kscript.json), or .kscript outside a project; --format picks one.");
+                        output.WriteLine("kscript docs --project writes .kscript/docs/project.md, the docs of this project's own code, and keeps it up to date from then on.");
                         return 0;
                     case "--port":
                     case "-p":
@@ -59,6 +60,8 @@ namespace KScript.Docs
                     case "--no-open":
                         openBrowser = false;
                         break;
+                    case "--project":
+                        return ProjectDocsOutput.Start(Directory.GetCurrentDirectory(), output, error);
                     default:
                         if (args[i].StartsWith("-", StringComparison.Ordinal) && !args[i].StartsWith("->", StringComparison.Ordinal))
                         {
