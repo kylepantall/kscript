@@ -237,6 +237,7 @@
         "editor.suggest.showSnippets": false
       },
       "[kscript-code]": {
+        "editor.defaultFormatter": "kylepantall.kscript",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
           "other": "on",

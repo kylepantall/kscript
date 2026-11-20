@@ -80,7 +80,7 @@ jobs:
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" --warnaserror
 
       - name: Check KScript formatting
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" "Example Sites/team"
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/code-format "Example Scripts" "Example Sites/team"
 
       - name: Run KScript tests
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab
