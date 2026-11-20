@@ -159,11 +159,11 @@ namespace KScript.Language.Analysis
             return true;
         }
 
-        private void ReferenceVariableByName(DecodedText value, Scope scope, bool isWrite, bool mustBeMutable)
+        private Symbol ReferenceVariableByName(DecodedText value, Scope scope, bool isWrite, bool mustBeMutable)
         {
             if (value == null || !CheckIdentifier(value))
             {
-                return;
+                return null;
             }
             TextSpan span = TrimmedSpan(value);
             string name = value.Value.Trim();
@@ -172,7 +172,7 @@ namespace KScript.Language.Analysis
                 name = name.Substring(1);
                 span = TextSpan.FromBounds(span.Start + 1, span.End);
             }
-            ReferenceVariable(name, span, scope, isWrite, mustBeMutable, span.Start);
+            return ReferenceVariable(name, span, scope, isWrite, mustBeMutable, span.Start);
         }
 
         private Symbol ReferenceVariable(string name, TextSpan span, Scope scope, bool isWrite, bool mustBeMutable, int offset)

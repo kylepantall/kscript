@@ -29,6 +29,13 @@ namespace KScript.Runtime
         /// <summary>True when a person is at a terminal (so prompts can use colours, cursor keys and so on).</summary>
         public bool IsInteractive { get; }
 
+        /// <summary>
+        /// True when output may use ANSI colours: a person is at a terminal and NO_COLOR isn't set, or FORCE_COLOR is
+        /// set. Colours are never written to files, pipes or tests unless asked for.
+        /// </summary>
+        public bool UseColour =>
+            Environment.GetEnvironmentVariable("FORCE_COLOR") != null || (IsInteractive && Environment.GetEnvironmentVariable("NO_COLOR") == null);
+
         /// <summary>Command line arguments after the script path: <c>$args</c>.</summary>
         public IReadOnlyList<string> Arguments { get; set; } = Array.Empty<string>();
 

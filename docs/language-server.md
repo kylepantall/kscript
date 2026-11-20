@@ -32,6 +32,19 @@ kscript-vscode.vsix` installs a local build.
 | `KScript.LanguageServer` | A small JSON-RPC/LSP layer over `KScript.Language`, plus `kscript check`. |
 | `KScript.Language.Tests` | Parser, analyzer, feature, protocol and catalog contract tests. |
 
+### Types
+
+`TypeInference` gives every expression a `TypeShape`: a type, the fields of a map and the item shape of a list.
+Shapes come from literals, the catalog's return types, `@read_json` files, loop and lambda items, parameter
+types and defaults, and what functions return (`Analyzer.Types.cs`). A function's return type comes from its
+`value` or its `<return>`s; because a call can come before the function, `Analyzer.Analyze` repeats the analysis
+(at most five passes) until the return types stop changing. Imported files are analysed for their functions'
+return types and top-level variables. `<set>` fills in a variable whose type wasn't known (declared as `null`).
+
+Shapes drive member completion, hovers (`TypeShape.Pretty`), inlay hints (`textDocument/inlayHint`) and method
+details. The server also answers `textDocument/foldingRange` and its own `kscript/blocks` request, which the VS Code
+extension uses to draw notebook-style lines between a script's top-level blocks.
+
 The parsers never throw and keep exact source positions (including through `&lt;` entities), so every feature works
 on half-typed code. Entry points: `ExpressionParser.ParseExpression`, `TemplateParser.Parse`, `MarkupParser.Parse`
 and `Analyzer.Analyze`.

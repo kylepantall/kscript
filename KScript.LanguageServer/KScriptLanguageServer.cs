@@ -18,7 +18,7 @@ namespace KScript.LanguageServer
     /// </summary>
     public sealed class KScriptLanguageServer
     {
-        public static readonly string[] TokenTypes = { "variable", "parameter", "function", "method", "property", "keyword", "operator", "string", "number", "namespace" };
+        public static readonly string[] TokenTypes = { "variable", "parameter", "function", "method", "property", "keyword", "operator", "string", "number", "namespace", "type" };
         public static readonly string[] TokenModifiers = { "declaration", "readonly", "defaultLibrary" };
 
         private readonly JsonRpcConnection connection;
@@ -186,6 +186,9 @@ namespace KScript.LanguageServer
                 case "textDocument/rename": return Rename(p);
                 case "textDocument/documentSymbol": return DocumentSymbols(p);
                 case "textDocument/semanticTokens/full": return SemanticTokens(p);
+                case "textDocument/inlayHint": return InlayHints(p);
+                case "textDocument/foldingRange": return FoldingRanges(p);
+                case "kscript/blocks": return Blocks(p);
                 case "textDocument/codeAction": return CodeActions(p);
                 case "textDocument/documentLink": return DocumentLinks(p);
             }
@@ -214,6 +217,8 @@ namespace KScript.LanguageServer
                 ["documentSymbolProvider"] = true,
                 ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix") },
                 ["documentLinkProvider"] = new JsonObject { ["resolveProvider"] = false },
+                ["inlayHintProvider"] = new JsonObject { ["resolveProvider"] = false },
+                ["foldingRangeProvider"] = true,
                 ["semanticTokensProvider"] = new JsonObject
                 {
                     ["legend"] = new JsonObject
@@ -483,6 +488,66 @@ namespace KScript.LanguageServer
                 throw new LspException(ErrorCodes.RequestFailed, result.Error);
             }
             return new JsonObject { ["changes"] = new JsonObject { [doc.Uri] = Edits(a.Source, result.Changes) } };
+        }
+
+        private JsonNode FoldingRanges(JsonNode p)
+        {
+            DocumentAnalysis a = Analysis(p, out _);
+            if (a == null)
+            {
+                return null;
+            }
+            JsonArray ranges = new JsonArray();
+            foreach (FoldingRegion r in service.GetFoldingRegions(a))
+            {
+                JsonObject json = new JsonObject { ["startLine"] = r.StartLine, ["endLine"] = r.EndLine };
+                if (r.IsComment) json["kind"] = "comment";
+                ranges.Add(json);
+            }
+            return ranges;
+        }
+
+        /// <summary>KScript's own request: the top-level blocks of a script, for the editor's notebook-style divider lines.</summary>
+        private JsonNode Blocks(JsonNode p)
+        {
+            DocumentAnalysis a = Analysis(p, out _);
+            JsonArray blocks = new JsonArray();
+            if (a != null)
+            {
+                foreach (CodeBlock b in service.GetBlocks(a))
+                {
+                    blocks.Add(new JsonObject { ["range"] = Range(a.Source, b.Span), ["label"] = b.Label });
+                }
+            }
+            return new JsonObject { ["blocks"] = blocks };
+        }
+
+        private JsonNode InlayHints(JsonNode p)
+        {
+            DocumentAnalysis a = Analysis(p, out _);
+            if (a == null)
+            {
+                return null;
+            }
+            TextSpan? range = null;
+            if (p["range"] is JsonNode r)
+            {
+                range = TextSpan.FromBounds(Offset(a.Source, r["start"]), Offset(a.Source, r["end"]));
+            }
+            JsonArray hints = new JsonArray();
+            foreach (InlayHint hint in service.GetInlayHints(a, range))
+            {
+                JsonObject json = new JsonObject
+                {
+                    ["position"] = Position(a.Source.GetPosition(hint.Offset)),
+                    ["label"] = hint.Label,
+                    ["kind"] = 1,
+                    ["paddingLeft"] = false,
+                };
+                if (hint.Tooltip != null) json["tooltip"] = new JsonObject { ["kind"] = "markdown", ["value"] = hint.Tooltip };
+                hints.Add(json);
+            }
+            return hints;
         }
 
         private JsonNode DocumentSymbols(JsonNode p)

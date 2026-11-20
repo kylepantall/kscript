@@ -1,12 +1,41 @@
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Syntax;
+using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
+using Group = System.Text.RegularExpressions.Group;
 
 namespace KScript.Language.Features
 {
     public sealed partial class LanguageService
     {
+        private static readonly System.Text.RegularExpressions.Regex ParameterType =
+            new System.Text.RegularExpressions.Regex(@"(?<![\w$'""])\$?[A-Za-z_]\w*\s*:\s*([A-Za-z_]\w*)");
+
+        /// <summary>Type names: params="count: int" and &lt;let type="list"&gt;.</summary>
+        private static void AddTypeNameTokens(DocumentAnalysis analysis, List<SemanticToken> tokens)
+        {
+            foreach (MarkupElement e in analysis.Markup.DescendantElements())
+            {
+                if (e.Name == "fn" && e.GetAttribute("params")?.Value is DecodedText ps)
+                {
+                    foreach (System.Text.RegularExpressions.Match m in ParameterType.Matches(ps.Value))
+                    {
+                        Group g = m.Groups[1];
+                        if (KType.Declarable.Contains(g.Value))
+                        {
+                            tokens.Add(new SemanticToken(ps.ToSource(new TextSpan(g.Index, g.Length)), SemanticTokenType.Type, SemanticTokenModifiers.None));
+                        }
+                    }
+                }
+                if ((e.Name == "let" || e.Name == "set" || e.Name == "state") && e.GetAttribute("type")?.Value is DecodedText type && KType.Declarable.Contains(type.Value.Trim()))
+                {
+                    int lead = type.Value.Length - type.Value.TrimStart().Length;
+                    tokens.Add(new SemanticToken(type.ToSource(new TextSpan(lead, type.Value.Trim().Length)), SemanticTokenType.Type, SemanticTokenModifiers.None));
+                }
+            }
+        }
+
         /// <summary>
         /// Tokens for the KScript inside attributes and text, so editors colour expressions instead of showing them as
         /// plain strings. Markup itself is left to the editor's XML/HTML grammar.
@@ -113,6 +142,8 @@ namespace KScript.Language.Features
                 tokens.Add(new SemanticToken(r.Span, type,
                     (r.IsDeclaration ? SemanticTokenModifiers.Declaration : 0) | (r.Symbol.IsConst ? SemanticTokenModifiers.Readonly : 0)));
             }
+
+            AddTypeNameTokens(analysis, tokens);
 
             return tokens.Where(t => t.Span.Length > 0).GroupBy(t => t.Span.Start).Select(g => g.First()).OrderBy(t => t.Span.Start).ToList();
         }

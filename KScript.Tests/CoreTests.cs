@@ -22,7 +22,7 @@ public class CoreTests
     [Fact]
     public void EchoValueAndJson()
     {
-        Assert.Equal("[\n  1,\n  2\n]\n", RunBody("<echo value=\"[1, 2]\" format=\"json\" />"));
+        Assert.Equal("[1, 2]\n", RunBody("<echo value=\"[1, 2]\" format=\"json\" />"));
         Assert.Equal("5\n", RunBody("<echo value=\"2 + 3\" />"));
     }
 

@@ -104,6 +104,11 @@
           ],
           "default": "off",
           "description": "Log the messages between VS Code and the language server."
+        },
+        "kscript.blocks.dividers": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Draw a thin line between the top-level blocks of a script (functions, loops and comment-headed sections), like cells in a notebook."
         }
       }
     },
@@ -171,10 +176,59 @@
           }
         }
       }
+    ],
+    "configurationDefaults": {
+      "[kscript]": {
+        "editor.semanticHighlighting.enabled": true,
+        "editor.quickSuggestions": {
+          "other": "on",
+          "comments": "off",
+          "strings": "on"
+        },
+        "editor.suggest.showStatusBar": true,
+        "editor.wordBasedSuggestions": "off"
+      }
+    },
+    "semanticTokenScopes": [
+      {
+        "language": "kscript",
+        "scopes": {
+          "type": [
+            "support.type.kscript"
+          ],
+          "variable.readonly": [
+            "variable.other.constant.kscript"
+          ],
+          "parameter": [
+            "variable.parameter.kscript"
+          ],
+          "property": [
+            "variable.other.property.kscript"
+          ],
+          "method.defaultLibrary": [
+            "support.function.kscript"
+          ],
+          "function.defaultLibrary": [
+            "support.function.kscript"
+          ]
+        }
+      }
+    ],
+    "colors": [
+      {
+        "id": "kscript.blockDivider",
+        "description": "The line drawn between the top-level blocks of a KScript script.",
+        "defaults": {
+          "dark": "#ffffff26",
+          "light": "#0000001f",
+          "highContrast": "contrastBorder",
+          "highContrastLight": "contrastBorder"
+        }
+      }
     ]
   },
   "scripts": {
-    "check": "node --check extension.js && node --check src/server.js && node --check src/site.js",
+    "check": "node --check extension.js && node --check src/server.js && node --check src/site.js && node --check src/blocks.js",
     "test": "node --test test/unit/*.test.js",
     "smoke": "node test/smoke.js",
     "package": "vsce package --no-dependencies --skip-license -o kscript-vscode.vsix",
@@ -188,7 +242,9 @@
   "devDependencies": {
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.1",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
   },
   "icon": "icon.png",
   "homepage": "https://github.com/kylepantall/kscript#readme",
