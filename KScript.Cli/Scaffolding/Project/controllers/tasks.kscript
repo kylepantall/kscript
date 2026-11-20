@@ -1,0 +1,29 @@
+--- make
+when: http
+---
+// The API's controller: each function answers a route in api{{ ext }}. A map or list it returns is sent as JSON.
+// The rules come from lib/tasks{{ ext }}, the same file the web page and the tests use.
+import KScript.IO
+import KScript.Http
+import "../lib/tasks{{ ext }}"
+
+const file = 'data/tasks.json'
+
+/// The saved tasks, or the starter tasks before anything is saved.
+fn load() => @exists($file) ? @read_json($file) : @starter_tasks()
+
+/// GET /api/tasks
+fn index() => @load()
+
+/// POST /api/tasks with a JSON title
+fn store(json) {
+  tasks = @add_task(@load(), title: $json.title ?? '')
+  @write_json($file, $tasks)
+  return @response($tasks->last(), status: 201)
+}
+
+/// DELETE /api/tasks/:id
+fn destroy(id: int) {
+  @write_json($file, @remove_task(@load(), id: $id))
+  return null
+}

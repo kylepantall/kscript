@@ -27,6 +27,8 @@
   <ItemGroup>
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
     <ProjectReference Include="..\KScript.Web\KScript.Web.csproj" />
+    <!-- The formatter, so XML output of kscript make is laid out as kscript fmt would. -->
+    <ProjectReference Include="..\KScript.Language\KScript.Language.csproj" />
   </ItemGroup>
 
 </Project>
