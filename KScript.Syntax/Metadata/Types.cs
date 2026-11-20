@@ -21,6 +21,7 @@ namespace KScript.Metadata
         public const string Password = "password";
         public const string Handle = "handle";
         public const string Uuid = "uuid";
+        public const string Regex = "regex";
 
         public const string Response = "response";
         public const string Chat = "chat";
@@ -47,7 +48,7 @@ namespace KScript.Metadata
             }
 
             // Values are typed on use: a string that holds a number can use number methods, and anything prints as a string.
-            if (receiver == String && (actual == Number || actual == Bool || actual == File || actual == Date || actual == Email || actual == Handle || actual == Uuid))
+            if (receiver == String && (actual == Number || actual == Bool || actual == File || actual == Date || actual == Email || actual == Handle || actual == Uuid || actual == Regex))
             {
                 return true;
             }

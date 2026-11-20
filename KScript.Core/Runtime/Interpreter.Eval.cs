@@ -144,6 +144,7 @@ namespace KScript.Runtime
                         LiteralKind.Number => double.Parse(lit.Value, NumberStyles.Float, CultureInfo.InvariantCulture),
                         LiteralKind.String => lit.Value,
                         LiteralKind.Bool => lit.Value == "true",
+                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid => TypedLiteral(lit, ctx),
                         _ => null,
                     };
 
@@ -741,9 +742,28 @@ namespace KScript.Runtime
             return method.Handler(target, call);
         }
 
+        /// <summary>A regex, email or UUID written without quotes. One that isn't valid fails at the literal.</summary>
+        private object TypedLiteral(LiteralNode lit, EvalContext ctx)
+        {
+            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, _ => SemanticTypes.Uuid };
+            if (SemanticTypes.TryConvert(type, lit.Value, out object value, out string reason)) return value;
+            throw Fail(lit, ctx, $"{lit.Value} isn't {(type == SemanticTypes.Email ? "an" : "a")} {type}: {reason}.", "Syntax");
+        }
+
         /// <summary>Calls <c>value->name(args)</c>.</summary>
         public object InvokeMethod(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
         {
+            // A <type>'s own methods: fn inside the type, with the record's fields (and $this) as variables.
+            if (target is Record record && record.Type.OwnMethods.TryGetValue(name, out MarkupElement methodElement))
+            {
+                Scope methodScope = record.Type.Closure.Child();
+                foreach (KeyValuePair<string, object> field in record) methodScope.Declare(field.Key, field.Value);
+                methodScope.Declare("this", record);
+                DeclareFunction(methodElement, methodScope, record.Type.Module);
+                methodScope.TryGet(name, out object fn);
+                return Call((ICallable)fn, args, named, scope, ctx.Module);
+            }
+
             // A package's methods for its own objects come first, so their arguments are bound by name (and flags) like commands'.
             bool defined = TryFindMethod(target, name, ctx.Module, out MethodDefinition method);
             if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);

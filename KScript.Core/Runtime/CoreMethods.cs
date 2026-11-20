@@ -55,6 +55,21 @@ namespace KScript.Runtime
             p.Method(KType.Handle, "name", "", "The handle without its @.", KType.String, (t, c) => ((HandleName)t).Name);
             p.Method(KType.Uuid, "version", "", "The UUID's version: 4 for random ones, 8 for custom ones (0 for the nil UUID).", KType.Number, (t, c) => (double)((UuidValue)t).Version);
 
+            string rx = KType.Regex;
+            static System.Text.RegularExpressions.Regex R(object t) => ((RegexValue)t).Regex;
+            p.Method(rx, "test", "text: string", "yes if the text matches somewhere (use ^ and $ to match all of it).", KType.Bool, (t, c) => R(t).IsMatch(c.Str(0)));
+            p.Method(rx, "match", "text: string", "The first match: { text, index, groups, captures }, where groups holds named groups (?<name>...) and captures numbered ones. null if none.", KType.Map,
+                (t, c) => R(t).Match(c.Str(0)) is { Success: true } m ? RegexValue.MatchMap(R(t), m) : null);
+            p.Method(rx, "match_all", "text: string", "Every match, as { text, index, groups, captures } maps.", KType.List,
+                (t, c) => R(t).Matches(c.Str(0)).Select(m => (object)RegexValue.MatchMap(R(t), m)).ToList());
+            p.Method(rx, "replace", "text: string, with", "The text with every match replaced. with is text, where $1 and ${name} are groups, or fn($match) returning text.", KType.String, (t, c) =>
+                c.Arg(1) is ICallable f
+                    ? R(t).Replace(c.Str(0), m => Values.ToStr(c.Call(f, RegexValue.MatchMap(R(t), m))))
+                    : R(t).Replace(c.Str(0), c.Str(1)));
+            p.Method(rx, "split", "text: string", "The text split at every match.", KType.List, (t, c) => R(t).Split(c.Str(0)).Select(x => (object)x).ToList());
+            p.Method(rx, "pattern", "", "The pattern, without slashes or flags.", KType.String, (t, c) => ((RegexValue)t).Pattern);
+            p.Method(rx, "flags", "", "The flags, such as i.", KType.String, (t, c) => ((RegexValue)t).Flags);
+
             string pw = KType.Password;
             p.Method(pw, "hash", "algorithm?: string", "A hash to store instead of the password: argon2id (the default) or bcrypt, with a new random salt each time.", KType.String,
                 (t, c) => ((PasswordValue)t).Hash(c.Arg(0) is null ? ((PasswordValue)t).Algorithm : c.Str(0)));

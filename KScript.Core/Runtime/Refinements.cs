@@ -48,7 +48,7 @@ namespace KScript.Runtime
 
         internal string MinText => Text("min");
         internal string MaxText => Text("max");
-        internal string PatternText => Text("pattern");
+        internal string PatternText => Options.TryGetValue("pattern", out object p) && p is RegexValue r ? r.Text : Text("pattern");
         internal List<object> OneOf => Options.TryGetValue("one_of", out object v) ? v as List<object> : null;
         internal List<object> Not => Options.TryGetValue("not", out object v) ? v as List<object> : null;
 
@@ -97,15 +97,15 @@ namespace KScript.Runtime
         private string Compile()
         {
             if (PatternText == null) return null;
-            try
+            // A regex value or literal (/^[a-z]+$/i) keeps its flags; plain text is the pattern itself.
+            if (Options["pattern"] is RegexValue value)
             {
-                pattern = new Regex(PatternText, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+                pattern = value.Regex;
                 return null;
             }
-            catch (ArgumentException ex)
-            {
-                return $"pattern '{PatternText}' isn't a regular expression: {ex.Message}";
-            }
+            if (!RegexValue.TryParse(PatternText, out RegexValue parsed, out string reason)) return $"pattern {PatternText} isn't a regular expression: {reason}.";
+            pattern = parsed.Regex;
+            return null;
         }
 
         /// <summary>These rules on top of <paramref name="defaults"/>: a rule given here replaces the default one.</summary>
@@ -232,6 +232,7 @@ namespace KScript.Runtime
                         LiteralKind.Number => double.Parse(l.Value, CultureInfo.InvariantCulture),
                         LiteralKind.Bool => l.Value == "true",
                         LiteralKind.Null => null,
+                        LiteralKind.Regex => RegexValue.TryParse(l.Value, out RegexValue regex, out _) ? regex : Unplain.Value,
                         _ => l.Value,
                     };
                 case CommandCallNode { ArgumentList: null } r:

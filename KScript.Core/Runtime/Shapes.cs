@@ -312,6 +312,21 @@ namespace KScript.Runtime
 
         internal void AddBase(RecordType type) => bases.Add(type);
 
+        /// <summary>
+        /// How text becomes a record: <c>pattern</c>'s named groups give the fields
+        /// (<c>/^(?&lt;w&gt;\d+)x(?&lt;h&gt;\d+)$/</c> turns 1920x1080 into { w: 1920, h: 1080 }), and <c>parse</c>, when
+        /// there is one, works the fields out instead (from $value, and $match when there is a pattern).
+        /// </summary>
+        internal RegexValue Pattern { get; set; }
+
+        internal DecodedText Parse { get; set; }
+
+        /// <summary>The type's own methods (<c>fn</c> inside the type), by name, with its bases' after its own.</summary>
+        internal Dictionary<string, MarkupElement> OwnMethods { get; } = new Dictionary<string, MarkupElement>(StringComparer.Ordinal);
+
+        /// <summary>True when text (a literal such as H4cmW12in) can become a record of this type.</summary>
+        internal bool ReadsText => Pattern != null || Parse != null;
+
         /// <summary>True if a record of this type can be used where <paramref name="other"/> is expected: it is that type, or joins it.</summary>
         public bool IsA(RecordType other) => this == other || bases.Any(b => b.IsA(other));
 
@@ -570,7 +585,7 @@ namespace KScript.Runtime
             List<string> with = TypeNames(run.Raw("with"));
             if (with.Count == 1 && IsRefinable(with[0], run.Scope)) return DeclareRefined(run, name, with[0]);
 
-            string rule = TypeRules.Attributes.FirstOrDefault(run.Has);
+            string rule = TypeRules.Attributes.FirstOrDefault(a => a != "pattern" && run.Has(a));
             if (rule != null)
                 throw run.Error($"{rule} only goes on a type made from one other type, such as <type name=\"Slug\" with=\"string\" {rule}=\"...\">, or on a field.", rule, "Syntax");
 
@@ -579,6 +594,13 @@ namespace KScript.Runtime
             ExtraKeys extra = extraText == "keep" ? ExtraKeys.Keep : extraText == "error" ? ExtraKeys.Error : ExtraKeys.Drop;
             var type = new RecordType(name, run.Raw("description"), extra, run.Scope, run.Module);
             Dictionary<string, string> conflicts = JoinBases(type, with, run);
+            if (run.Has("pattern"))
+            {
+                if (!RegexValue.TryParse(PatternOf(run.Element), out RegexValue pattern, out string reason))
+                    throw run.Error($"pattern on <type name=\"{name}\"> isn't a regular expression: {reason}.", "pattern", "Syntax");
+                type.Pattern = pattern;
+            }
+            if (run.Element.GetAttribute("parse")?.Value is DecodedText parse) type.Parse = parse;
 
             string sample = run.Raw("sample");
             if (sample != null)
@@ -614,7 +636,15 @@ namespace KScript.Runtime
             foreach (MarkupElement e in run.ChildElements)
             {
                 if (own.TryAddChild(e, run, allowNormalize: false)) continue;
-                if (e.Name != "field") throw run.Error($"<type> can only hold <field> and <validate> elements, not <{e.Name}>.", null, "Syntax");
+                if (e.Name == "fn")
+                {
+                    string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
+                    if (string.IsNullOrEmpty(method)) throw run.Error("A method needs a name: <fn name=\"area\" value=\"$width * $height\" />.", null, "Syntax");
+                    if (type.Field(method) != null && !type.Bases.Any(b => b.Field(method) != null)) throw run.Error($"{name} has a field and a method both called '{method}'.", null, "Syntax");
+                    type.OwnMethods[method] = e;
+                    continue;
+                }
+                if (e.Name != "field") throw run.Error($"<type> can only hold <field>, <validate> and <fn> elements, not <{e.Name}>.", null, "Syntax");
                 FieldDefinition field = ParseFieldElement(e, run);
                 if (!seen.Add(field.Name)) throw run.Error($"<type name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
                 SetOwnField(type, field, run);
@@ -627,6 +657,9 @@ namespace KScript.Runtime
             if (type.Fields.Count == 0) throw run.Error($"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.", null, "Syntax");
             return type;
         }
+
+        /// <summary>The pattern attribute's text: a regex literal (/.../i) or a plain pattern.</summary>
+        private static string PatternOf(MarkupElement e) => e.GetAttributeValue("pattern");
 
         /// <summary><c>User, Auditable</c> or <c>[User, Auditable]</c>.</summary>
         internal static List<string> TypeNames(string text)
@@ -683,6 +716,9 @@ namespace KScript.Runtime
                 if (b.IsA(type) || type.Bases.Contains(b)) throw run.Error($"<type name=\"{type.Name}\"> joins {b.Name} twice.", "with", "Syntax");
                 type.AddBase(b);
                 type.Validators.AddRange(b.Validators);
+                foreach (KeyValuePair<string, MarkupElement> m in b.OwnMethods) type.OwnMethods.TryAdd(m.Key, m.Value);
+                type.Pattern ??= b.Pattern;
+                type.Parse ??= b.Parse;
                 foreach (FieldDefinition f in b.Fields)
                 {
                     FieldDefinition existing = type.Field(f.Name);
@@ -1073,6 +1109,11 @@ namespace KScript.Runtime
         private object MapRecord(object value, RecordType type, string path, int depth)
         {
             if (value is Record existing && existing.Type.IsA(type)) return existing;
+            if (type.ReadsText && (value is string || value is ISemanticText))
+            {
+                value = ReadText(Values.ToStr(value), type, path);
+                if (value == null) return null;
+            }
             if (value is not Dictionary<string, object> source)
             {
                 Problem(path, null, $"needs a {type.Name} (a map), but got {Values.Describe(value)}.");
@@ -1118,6 +1159,44 @@ namespace KScript.Runtime
             }
             Problems.AddRange(mapper.Problems);
             return record;
+        }
+
+        /// <summary>
+        /// Text such as H4cmW12in as a map of fields: the pattern's named groups, or what parse makes of it. Null, with
+        /// a problem, when the text doesn't match.
+        /// </summary>
+        private Dictionary<string, object> ReadText(string text, RecordType type, string path)
+        {
+            Dictionary<string, object> match = null;
+            if (type.Pattern != null)
+            {
+                System.Text.RegularExpressions.Match m;
+                try
+                {
+                    m = type.Pattern.Regex.Match(text);
+                }
+                catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+                {
+                    m = System.Text.RegularExpressions.Match.Empty;
+                }
+                if (!m.Success)
+                {
+                    Problem(path, null, $"needs text matching {type.Pattern.Text} to make a {type.Name}, but got {Values.Describe(text)}.");
+                    return null;
+                }
+                match = RegexValue.MatchMap(type.Pattern.Regex, m);
+                if (type.Parse == null)
+                {
+                    return ((Dictionary<string, object>)match["groups"]).Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value);
+                }
+            }
+            Scope s = type.Closure.Child();
+            s.Declare("value", text);
+            if (match != null) s.Declare("match", match);
+            object parsed = interpreter.EvaluateText(type.Parse, s, type.Module);
+            if (parsed is Dictionary<string, object> map) return map;
+            Problem(path, null, $"parse on {type.Name} must make a map of its fields, but made {Values.Describe(parsed)}.");
+            return null;
         }
 
         /// <summary>Follows a field's path into the data. <paramref name="at"/> is the path as written in problems.</summary>

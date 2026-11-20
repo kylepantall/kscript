@@ -288,7 +288,7 @@ namespace KScript.Runtime
         #region Conversion for type="..."
 
         /// <summary>The types a <c>type</c> attribute or a parameter can declare.</summary>
-        public static readonly string[] DeclarableTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "any" };
+        public static readonly string[] DeclarableTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "regex", "any" };
 
         /// <summary>Converts a value to a declared type, or fails with a clear message.</summary>
         public static object ConvertTo(object value, string type, string what)
@@ -329,6 +329,7 @@ namespace KScript.Runtime
                 case "password":
                 case "handle":
                 case "uuid":
+                case "regex":
                 {
                     string semantic = type.Trim().ToLowerInvariant();
                     if (SemanticTypes.TryConvert(semantic, value, out object converted, out string reason)) return converted;

@@ -26,8 +26,9 @@ namespace KScript.Runtime
         public const string Password = "password";
         public const string Handle = "handle";
         public const string Uuid = "uuid";
+        public const string Regex = "regex";
 
-        public static readonly string[] Names = { Email, Password, Handle, Uuid };
+        public static readonly string[] Names = { Email, Password, Handle, Uuid, Regex };
 
         public static bool IsSemantic(string type) => Names.Contains(type);
 
@@ -51,6 +52,12 @@ namespace KScript.Runtime
                     if (value is not string hs) { reason = null; return false; }
                     if (!HandleName.TryParse(hs, out HandleName handle, out reason)) return false;
                     result = handle;
+                    return true;
+                case Regex:
+                    if (value is RegexValue) { result = value; reason = null; return true; }
+                    if (value is not string rs) { reason = null; return false; }
+                    if (!RegexValue.TryParse(rs, out RegexValue regex, out reason)) return false;
+                    result = regex;
                     return true;
                 case Uuid:
                     if (value is UuidValue) { result = value; reason = null; return true; }
@@ -589,6 +596,116 @@ namespace KScript.Runtime
         public string ToText() => Text;
 
         public override bool Equals(object obj) => obj is UuidValue u && u.Text == Text;
+
+        public override int GetHashCode() => Text.GetHashCode(StringComparison.Ordinal);
+
+        public override string ToString() => Text;
+    }
+
+    /// <summary>
+    /// A regular expression, written <c>/^[a-z]+$/i</c>. Text converts to one too: <c>'^[a-z]+$'</c>, or
+    /// <c>'/^[a-z]+$/i'</c> with flags. Flags: i (ignore case), m (^ and $ at each line), s (. matches new lines)
+    /// and x (spaces and # comments in the pattern are ignored).
+    /// </summary>
+    public sealed class RegexValue : ISemanticText
+    {
+        private RegexValue(string pattern, string flags, System.Text.RegularExpressions.Regex regex)
+        {
+            Pattern = pattern;
+            Flags = flags;
+            Regex = regex;
+        }
+
+        public string Pattern { get; }
+        public string Flags { get; }
+        public System.Text.RegularExpressions.Regex Regex { get; }
+
+        /// <summary>The literal: /pattern/flags.</summary>
+        public string Text => "/" + Pattern + "/" + Flags;
+        public string TypeName => SemanticTypes.Regex;
+
+        /// <summary>A literal <c>/pattern/flags</c>, or a bare pattern.</summary>
+        public static bool TryParse(string text, out RegexValue regex, out string reason)
+        {
+            regex = null;
+            string s = text ?? string.Empty;
+            string pattern = s;
+            string flags = string.Empty;
+            int last = s.LastIndexOf('/');
+            if (s.Length >= 2 && s[0] == '/' && last > 0 && s.Substring(last + 1).All(char.IsAsciiLetterLower))
+            {
+                pattern = s.Substring(1, last - 1);
+                flags = s.Substring(last + 1);
+            }
+            var options = System.Text.RegularExpressions.RegexOptions.CultureInvariant;
+            foreach (char f in flags)
+            {
+                switch (f)
+                {
+                    case 'i': options |= System.Text.RegularExpressions.RegexOptions.IgnoreCase; break;
+                    case 'm': options |= System.Text.RegularExpressions.RegexOptions.Multiline; break;
+                    case 's': options |= System.Text.RegularExpressions.RegexOptions.Singleline; break;
+                    case 'x': options |= System.Text.RegularExpressions.RegexOptions.IgnorePatternWhitespace; break;
+                    default:
+                        reason = $"'{f}' isn't a regex flag (use i, m, s and x)";
+                        return false;
+                }
+            }
+            if (flags.Distinct().Count() != flags.Length)
+            {
+                reason = "a flag is given twice";
+                return false;
+            }
+            try
+            {
+                regex = new RegexValue(pattern, flags, new System.Text.RegularExpressions.Regex(pattern, options, TimeSpan.FromSeconds(1)));
+                reason = null;
+                return true;
+            }
+            catch (ArgumentException ex)
+            {
+                reason = ex.Message.Replace($"Invalid pattern '{pattern}' at offset", "the pattern is invalid at character");
+                return false;
+            }
+        }
+
+        /// <summary>A match as a map: text, index, groups (by name) and captures (by number, 1 up).</summary>
+        public static Dictionary<string, object> MatchMap(System.Text.RegularExpressions.Regex regex, System.Text.RegularExpressions.Match m)
+        {
+            var groups = new Dictionary<string, object>(StringComparer.Ordinal);
+            var captures = new List<object>();
+            foreach (string name in regex.GetGroupNames().Where(n => !int.TryParse(n, out _)))
+            {
+                groups[name] = m.Groups[name].Success ? m.Groups[name].Value : null;
+            }
+            for (int i = 1; i < m.Groups.Count; i++)
+            {
+                captures.Add(m.Groups[i].Success ? m.Groups[i].Value : null);
+            }
+            return new Dictionary<string, object>
+            {
+                ["text"] = m.Value,
+                ["index"] = (double)m.Index,
+                ["groups"] = groups,
+                ["captures"] = captures,
+            };
+        }
+
+        public bool TryGetMember(string name, out object value)
+        {
+            value = null;
+            return false;
+        }
+
+        public bool TryCallMethod(CallContext call, string name, out object result)
+        {
+            result = null;
+            return false;
+        }
+
+        public string ToText() => Text;
+
+        public override bool Equals(object obj) => obj is RegexValue r && r.Text == Text;
 
         public override int GetHashCode() => Text.GetHashCode(StringComparison.Ordinal);
 
