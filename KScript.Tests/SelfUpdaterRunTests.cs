@@ -62,25 +62,32 @@ public sealed class SelfUpdaterRunTests : IDisposable
         Content = new StringContent($"{{ \"tag_name\": \"{tag}\", \"assets\": [ {{ \"name\": \"other.zip\", \"browser_download_url\": \"x\" }}, {{ \"name\": \"{asset}\", \"browser_download_url\": \"{Download}\" }} ] }}"),
     };
 
-    private static byte[] Tarball(string content)
+    private static byte[] Tarball(string content, params string[] libraries)
     {
         var archive = new MemoryStream();
         using (var gz = new GZipStream(archive, CompressionLevel.Fastest, leaveOpen: true))
         using (var tar = new TarWriter(gz))
         {
-            var entry = new PaxTarEntry(TarEntryType.RegularFile, "kscript") { DataStream = new MemoryStream(Encoding.UTF8.GetBytes(content)) };
+            tar.WriteEntry(new PaxTarEntry(TarEntryType.Directory, "./"));
+            var entry = new PaxTarEntry(TarEntryType.RegularFile, "./kscript") { DataStream = new MemoryStream(Encoding.UTF8.GetBytes(content)) };
             tar.WriteEntry(entry);
+            foreach (string library in libraries)
+                tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "./" + library) { DataStream = new MemoryStream(Encoding.UTF8.GetBytes(library + " " + content)) });
         }
         return archive.ToArray();
     }
 
-    private static byte[] Zip(string content)
+    private static byte[] Zip(string content, params string[] libraries)
     {
         var archive = new MemoryStream();
         using (var zip = new ZipArchive(archive, ZipArchiveMode.Create, leaveOpen: true))
-        using (var w = new StreamWriter(zip.CreateEntry("kscript.exe").Open()))
         {
-            w.Write(content);
+            using (var w = new StreamWriter(zip.CreateEntry("kscript.exe").Open())) w.Write(content);
+            foreach (string library in libraries)
+            {
+                using var w = new StreamWriter(zip.CreateEntry(library).Open());
+                w.Write(library + " " + content);
+            }
         }
         return archive.ToArray();
     }
@@ -125,6 +132,30 @@ public sealed class SelfUpdaterRunTests : IDisposable
         Assert.Equal("new binary", File.ReadAllText(env.TargetPath));
         Assert.Equal("Bearer", github.Requests[0].Headers.Authorization!.Scheme);
         Assert.Single(Directory.GetFiles(dir)); // the staged download is gone
+    }
+
+    [Fact]
+    public void Installs_the_ui_libraries_beside_kscript()
+    {
+        var (github, env) = Setup();
+        File.WriteAllText(Path.Combine(dir, "libSkiaSharp.so"), "old");
+        github.Routes[Download] = () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Tarball("new binary", "libSkiaSharp.so", "libHarfBuzzSharp.so")) };
+        var (code, _, error) = Update(env);
+        Assert.True(code == 0, error);
+        Assert.Equal("libSkiaSharp.so new binary", File.ReadAllText(Path.Combine(dir, "libSkiaSharp.so")));
+        Assert.Equal("libHarfBuzzSharp.so new binary", File.ReadAllText(Path.Combine(dir, "libHarfBuzzSharp.so")));
+        Assert.Equal(3, Directory.GetFiles(dir).Length);
+
+        // A library in use (here: a folder in the way) leaves kscript updated and says what to do.
+        Directory.CreateDirectory(Path.Combine(dir, "libBusy.so"));
+        github.Routes[Download] = () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Tarball("newer binary", "libBusy.so")) };
+        (code, _, error) = Update(env, "--force");
+        Assert.Equal(0, code);
+        Assert.Equal("newer binary", File.ReadAllText(env.TargetPath));
+        Assert.Contains("UI libraries couldn't be replaced", error);
+
+        var zip = new MemoryStream(Zip("exe", "libSkiaSharp.dll", "sub/"));
+        Assert.Equal(new[] { "libSkiaSharp.dll" }, SelfUpdater.ExtractCompanions(zip, "kscript-win-x64.zip", dir));
     }
 
     [Fact]

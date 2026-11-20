@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Formats.Tar;
@@ -260,18 +261,16 @@ namespace KScript.Updates
             output.WriteLine($"Downloading kscript {latestTag} ({assetName})...");
             string dir = Path.GetDirectoryName(target);
             string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}" + (env.Windows ? ".exe" : ""));
+            await using var archive = new MemoryStream();
 
             try
             {
-                await using (var archive = new MemoryStream())
+                await using (var download = await http.GetStreamAsync(downloadUrl))
                 {
-                    await using (var download = await http.GetStreamAsync(downloadUrl))
-                    {
-                        await download.CopyToAsync(archive);
-                    }
-                    archive.Position = 0;
-                    ExtractBinary(archive, assetName, staged);
+                    await download.CopyToAsync(archive);
                 }
+                archive.Position = 0;
+                ExtractBinary(archive, assetName, staged);
 
                 if (!env.Windows && !OperatingSystem.IsWindows())
                 {
@@ -287,6 +286,17 @@ namespace KScript.Updates
                 }
 
                 ReplaceBinary(staged, target, env.Windows);
+
+                // The native libraries the desktop UI needs ship beside kscript (Native AOT can't embed them).
+                archive.Position = 0;
+                try
+                {
+                    ExtractCompanions(archive, assetName, dir);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    error.WriteLine($"kscript was updated, but its UI libraries couldn't be replaced ({ex.Message}). Close any running kscript apps and run: kscript update --force");
+                }
             }
             finally
             {
@@ -322,6 +332,51 @@ namespace KScript.Updates
             }
 
             return path;
+        }
+
+        /// <summary>
+        /// Writes the other files of a release archive (the desktop UI's native libraries) into <paramref name="dir"/>,
+        /// each staged and then moved into place. Returns their names; older releases have none.
+        /// </summary>
+        internal static List<string> ExtractCompanions(Stream archive, string assetName, string dir)
+        {
+            var written = new List<string>();
+            void Write(string name, Action<string> extract)
+            {
+                name = Path.GetFileName(name);
+                if (name.Length == 0 || name == "kscript" || string.Equals(name, "kscript.exe", StringComparison.OrdinalIgnoreCase)) return;
+                string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}-{name}");
+                try
+                {
+                    extract(staged);
+                    File.Move(staged, Path.Combine(dir, name), overwrite: true);
+                    written.Add(name);
+                }
+                finally
+                {
+                    TryDelete(staged);
+                }
+            }
+
+            if (assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                using var zip = new ZipArchive(archive, ZipArchiveMode.Read, leaveOpen: true);
+                foreach (ZipArchiveEntry entry in zip.Entries) Write(entry.FullName, path => entry.ExtractToFile(path, overwrite: true));
+                return written;
+            }
+
+            using var gzip = new GZipStream(archive, CompressionMode.Decompress, leaveOpen: true);
+            using var tar = new TarReader(gzip);
+            TarEntry e;
+            while ((e = tar.GetNextEntry()) != null)
+            {
+                if (e.EntryType is TarEntryType.RegularFile or TarEntryType.V7RegularFile)
+                {
+                    TarEntry current = e;
+                    Write(current.Name, path => current.ExtractToFile(path, overwrite: true));
+                }
+            }
+            return written;
         }
 
         internal static void ExtractBinary(Stream archive, string assetName, string destination)

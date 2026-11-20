@@ -35,8 +35,9 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is far slower wit
         Write-Host "Downloading $asset ($version)..."
         $zip = Join-Path $tmp $asset
         Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-        Expand-Archive -Path $zip -DestinationPath $tmp -Force
-        $new = Join-Path $tmp 'kscript.exe'
+        $pkg = Join-Path $tmp 'pkg'
+        Expand-Archive -Path $zip -DestinationPath $pkg -Force
+        $new = Join-Path $pkg 'kscript.exe'
         if (-not (Test-Path $new)) { throw "$asset has no kscript.exe inside" }
 
         New-Item -ItemType Directory -Path $installDir -Force | Out-Null
@@ -50,6 +51,12 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is far slower wit
         }
         Move-Item $new $exe -Force
         Unblock-File $exe -ErrorAction SilentlyContinue
+        # The desktop UI's native libraries ship beside kscript.exe.
+        Get-ChildItem $pkg -File | ForEach-Object {
+            $dest = Join-Path $installDir $_.Name
+            Move-Item $_.FullName $dest -Force
+            Unblock-File $dest -ErrorAction SilentlyContinue
+        }
     } finally {
         Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }

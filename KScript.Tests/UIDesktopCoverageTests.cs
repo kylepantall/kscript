@@ -224,6 +224,17 @@ public class UIDesktopCoverageTests
     }
 
     [Fact]
+    public void A_missing_ui_library_says_how_to_get_it()
+    {
+        var missing = new TypeInitializationException("SkiaSharp.SKObject", new DllNotFoundException("libSkiaSharp"));
+        var error = Assert.Throws<KScriptException>(() => DesktopHost.Open(null, () => throw missing));
+        Assert.Contains("kscript update --force", error.Message);
+        Assert.Equal("UI", error.Type);
+        Assert.Throws<InvalidOperationException>(() => DesktopHost.Open(null, () => throw new InvalidOperationException("other")));
+        Assert.False(DesktopHost.MissingLibrary(new Exception("x")));
+    }
+
+    [Fact]
     public void Errors_get_a_window_of_their_own()
     {
         string shown = null;

@@ -57,17 +57,21 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 
 say "Downloading $asset ($VERSION)..."
 download "$url" "$tmp/$asset" || fail "could not download $url"
-tar -xzf "$tmp/$asset" -C "$tmp" || fail "could not unpack $asset"
-[ -f "$tmp/kscript" ] || fail "$asset has no kscript binary inside"
+mkdir "$tmp/pkg"
+tar -xzf "$tmp/$asset" -C "$tmp/pkg" || fail "could not unpack $asset"
+[ -f "$tmp/pkg/kscript" ] || fail "$asset has no kscript binary inside"
 
 mkdir -p "$BIN_DIR"
-chmod +x "$tmp/kscript"
+chmod +x "$tmp/pkg/kscript"
 if [ "$os" = osx ]; then
   # The binary isn't notarized: clear the quarantine flag so Gatekeeper lets it run.
-  xattr -d com.apple.quarantine "$tmp/kscript" 2>/dev/null || true
+  xattr -dr com.apple.quarantine "$tmp/pkg" 2>/dev/null || true
 fi
-# Rename into place so a running kscript isn't disturbed.
-mv -f "$tmp/kscript" "$BIN_DIR/kscript"
+# The desktop UI's native libraries ship beside kscript. Rename everything into place so a running kscript isn't disturbed.
+for file in "$tmp/pkg"/*; do
+  [ "$file" = "$tmp/pkg/kscript" ] || mv -f "$file" "$BIN_DIR/"
+done
+mv -f "$tmp/pkg/kscript" "$BIN_DIR/kscript"
 
 installed="$("$BIN_DIR/kscript" --version 2>/dev/null)" || fail "installed $BIN_DIR/kscript but it didn't run"
 say "Installed kscript $installed to $BIN_DIR/kscript"
