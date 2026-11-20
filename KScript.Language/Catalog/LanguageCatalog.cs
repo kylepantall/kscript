@@ -244,6 +244,8 @@ namespace KScript.Language.Catalog
                 ["file"] = "The script the error came from.",
                 ["line"] = "The line the error came from.",
                 ["column"] = "The column the error came from.",
+                ["status"] = "The HTTP status its error type carries, such as 404, or null.",
+                ["cause"] = "The error that led to this one, or null.",
             };
             typeFields[KType.File] = new Dictionary<string, string>
             {

@@ -313,6 +313,7 @@ namespace KScript.Projects
             ["styles"] = "styles",
             ["lib"] = "lib",
             ["types"] = "types",
+            ["errors"] = "errors",
             ["storage"] = "lib",
             ["jobs"] = "jobs",
             ["windows"] = ".",

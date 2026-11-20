@@ -183,6 +183,7 @@ kscript make module pricing --fns subtotal,total      # lib/pricing.kscript
 kscript make window settings                          # settings.kscript, a desktop window
 kscript make config staging                           # config/config.staging.yaml
 kscript make test checkout                            # tests/checkout.test.kscript
+kscript make error PaymentFailed --status 402 --fields "order: int"   # errors/payment-failed.kscript
 kscript make                                          # list every type
 ```
 
@@ -208,6 +209,7 @@ my-app/
   styles/          make css
   lib/             make module, const, cache, storage and logger
   types/           make type, make enum
+  errors/          make error
   jobs/            make job
   config/          make config
   locales/         make locale

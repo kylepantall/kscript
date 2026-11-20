@@ -318,6 +318,10 @@ namespace KScript.Http
             {
                 return ToPage(abort.Response, method);
             }
+            catch (KScriptException ex) when (ErrorTypes.StatusOf(ex) is int status)
+            {
+                return ToPage(ErrorAnswer(ctx, ex, status), method);
+            }
             catch (KScriptException ex)
             {
                 return ToPage(Failure(ctx, ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message), method);
@@ -326,6 +330,21 @@ namespace KScript.Http
             {
                 return ToPage(Failure(ctx, (ex.Location != null ? ex.Location + ": " : string.Empty) + ex.Message), method);
             }
+        }
+
+        /// <summary>
+        /// An error whose type carries a status (<c>error NotFound(status: 404)</c>, or a built-in such as Validation) is
+        /// the client's answer, not a crash: that status and the message, without the file and line. API routes answer
+        /// JSON with the error's type and fields too: <c>{ "error": "...", "status": 404, "type": "NotFound", "id": 42 }</c>.
+        /// </summary>
+        private HttpResponse ErrorAnswer(RequestContext ctx, KScriptException ex, int status)
+        {
+            Log?.WriteLine($"  {status} {ex.Type}: {ex.Message}");
+            HttpResponse response = ctx.ErrorResponse(status, ex.Message);
+            if (!response.ContentType.StartsWith("application/json", StringComparison.Ordinal)) return response;
+            var body = new Dictionary<string, object> { ["error"] = ex.Message, ["status"] = (double)status, ["type"] = ex.Type };
+            foreach (var kv in ex.Fields) body.TryAdd(kv.Key, kv.Value);
+            return HttpResponse.Json(body, status);
         }
 
         private HttpResponse Failure(RequestContext ctx, string message)
