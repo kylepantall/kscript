@@ -105,8 +105,11 @@ jobs:
 
       - name: Publish a single-file kscript
         run: |
+          # Built like release.yml: compressed, except on macOS (see the note there).
+          COMPRESS=true
+          if [[ "${{ matrix.rid }}" == osx-* ]]; then COMPRESS=false; fi
           dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained \
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=$COMPRESS \
             -p:DebugType=none -p:Version=0.0.0-ci --output publish
 
       - name: Compile and run a terminal program
