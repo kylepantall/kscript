@@ -1,6 +1,7 @@
 name: Release
 
-# Builds self-contained, single-file `kscript` binaries that run without the .NET SDK or runtime.
+# Builds `kscript` with Native AOT (kscript-<rid>: no .NET SDK or runtime needed), and the single-file build that
+# `kscript compile` makes programs from (kscript-runtime-<rid>).
 # Push a tag like v2.0.0 to publish a GitHub release, or run it by hand to get the binaries as
 # workflow artifacts.
 on:
@@ -19,12 +20,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { rid: linux-x64,   os: ubuntu-latest,  ext: '' }
-          - { rid: linux-arm64, os: ubuntu-latest,  ext: '' }
+          - { rid: linux-x64,   os: ubuntu-latest,    ext: '' }
+          # Native AOT compiles for the machine it runs on, so arm64 Linux builds on an arm64 runner.
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, ext: '' }
           # macOS binaries are built on macOS so they get the ad-hoc code signature Apple Silicon requires.
-          - { rid: osx-arm64,   os: macos-latest,   ext: '' }
-          - { rid: osx-x64,     os: macos-latest,   ext: '' }
-          - { rid: win-x64,     os: windows-latest, ext: '.exe' }
+          # The Intel build is cross-compiled on Apple Silicon.
+          - { rid: osx-arm64,   os: macos-latest,     ext: '' }
+          - { rid: osx-x64,     os: macos-latest,     ext: '' }
+          - { rid: win-x64,     os: windows-latest,   ext: '.exe' }
 
     steps:
       - uses: actions/checkout@v4
@@ -33,11 +36,27 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Publish
+      - name: Publish kscript (Native AOT)
         shell: bash
         run: |
           # The tag (v0.1.0) becomes the binary's version, which `kscript update` compares against releases.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VERSION="${GITHUB_REF_NAME#v}"; else VERSION="0.0.0-dev"; fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          # kscript itself is compiled ahead of time: it starts in tens of milliseconds and needs no .NET runtime.
+          # The desktop UI's native libraries (Skia, HarfBuzz) can't be linked in, so they ship beside it.
+          dotnet publish KScriptApp/KScriptApp.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            -p:PublishAot=true \
+            -p:DebugType=none \
+            -p:StripSymbols=true \
+            -p:Version="$VERSION" \
+            --output native
+
+      - name: Publish the program runtime (single-file)
+        shell: bash
+        run: |
+          # kscript compile builds programs from this single-file kscript (a .NET bundle it can take apart).
           # No single-file compression on macOS: on macOS 26 (Apple Silicon) a compressed kscript crashes with an
           # AccessViolationException as soon as several threads load framework code at once (kscript docs, v0.4.0).
           # DOTNET_ReadyToRun=0 or an uncompressed bundle both avoid it.
@@ -52,33 +71,50 @@ jobs:
             -p:EnableCompressionInSingleFile=$COMPRESS \
             -p:DebugType=none \
             -p:Version="$VERSION" \
-            --output publish
+            --output runtime
 
       - name: Package
         shell: bash
         run: |
-          mkdir dist
-          cp "publish/KScript${{ matrix.ext }}" "dist/kscript${{ matrix.ext }}"
+          mkdir dist runtime-dist
+          # kscript, and the native libraries beside it (no debug symbols).
+          for f in native/*; do
+            case "$f" in *.dbg|*.pdb|*.dSYM) continue ;; esac
+            cp -R "$f" dist/
+          done
+          mv "dist/KScript${{ matrix.ext }}" "dist/kscript${{ matrix.ext }}"
+          cp "runtime/KScript${{ matrix.ext }}" "runtime-dist/kscript${{ matrix.ext }}"
+          ls -l dist runtime-dist
           if [ "${{ matrix.ext }}" = ".exe" ]; then
-            (cd dist && 7z a "../kscript-${{ matrix.rid }}.zip" "kscript.exe")
+            (cd dist && 7z a "../kscript-${{ matrix.rid }}.zip" *)
+            (cd runtime-dist && 7z a "../kscript-runtime-${{ matrix.rid }}.zip" "kscript.exe")
           else
-            chmod +x dist/kscript
-            tar -czf "kscript-${{ matrix.rid }}.tar.gz" -C dist kscript
+            chmod +x dist/kscript runtime-dist/kscript
+            tar -czf "kscript-${{ matrix.rid }}.tar.gz" -C dist .
+            tar -czf "kscript-runtime-${{ matrix.rid }}.tar.gz" -C runtime-dist kscript
           fi
+          ls -l kscript-*
 
       - name: Smoke test
-        if: matrix.rid == 'linux-x64' || matrix.rid == 'osx-arm64' || matrix.rid == 'win-x64'
+        if: matrix.rid != 'osx-x64'
         shell: bash
         run: |
           printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.xml
           ./dist/kscript${{ matrix.ext }} smoke.xml | tee smoke.out
           grep -q "kscript ok: 3" smoke.out
           ./dist/kscript${{ matrix.ext }} --version
+          ./runtime-dist/kscript${{ matrix.ext }} smoke.xml | grep -q "kscript ok: 3"
+          # The native kscript compiles programs with the runtime it would download from the release.
+          mkdir hello && cp smoke.xml hello/hello.ks.xml
+          ./dist/kscript${{ matrix.ext }} compile hello/hello.ks.xml --runtime "runtime-dist/kscript${{ matrix.ext }}" --out compiled
+          ls -R compiled
 
       - uses: actions/upload-artifact@v4
         with:
           name: kscript-${{ matrix.rid }}
-          path: kscript-${{ matrix.rid }}.*
+          path: |
+            kscript-${{ matrix.rid }}.*
+            kscript-runtime-${{ matrix.rid }}.*
 
   vscode:
     name: Build the editor extension
@@ -171,6 +207,8 @@ jobs:
           sh install.sh
           ~/.kscript/bin/kscript --version | tee version.out
           grep -qx "${GITHUB_REF_NAME#v}" version.out
+          ls -l ~/.kscript/bin
+          ls ~/.kscript/bin | grep -q "^libSkiaSharp"
           ~/.kscript/bin/kscript update --check
           ~/.kscript/bin/kscript update --force
 
@@ -182,6 +220,8 @@ jobs:
           $exe = Join-Path $env:LOCALAPPDATA 'Programs\kscript\kscript.exe'
           $v = & $exe --version
           if ($v -ne $env:GITHUB_REF_NAME.TrimStart('v')) { throw "expected $env:GITHUB_REF_NAME, got $v" }
+          Get-ChildItem (Split-Path $exe)
+          if (-not (Test-Path (Join-Path (Split-Path $exe) 'libSkiaSharp.dll'))) { throw "the UI libraries weren't installed" }
           & $exe update --check
           & $exe update --force
           if ($LASTEXITCODE -ne 0) { throw "kscript update failed" }

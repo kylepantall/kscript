@@ -237,11 +237,19 @@ jobs:
           grep -q "docs ok" run.json
 
   native-aot:
-    name: Native AOT (linux, experimental)
-    timeout-minutes: 25
-    # Checks that kscript still builds and runs as a Native AOT binary: no new trim or AOT warnings, and the
-    # commands that matter work. Releases still ship the single-file build; this job only keeps the AOT path open.
-    runs-on: ubuntu-latest
+    name: Native AOT (${{ matrix.name }})
+    timeout-minutes: 30
+    # kscript releases are Native AOT builds. This publishes one per OS, fails on any new trim or AOT warning, and runs
+    # the commands that matter with it: scripts, check/fmt/test, openapi, serve, docs, MCP, KScript.AI (against a
+    # stand-in API), kscript compile and the language server.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux,   os: ubuntu-latest,  rid: linux-x64, ext: '' }
+          - { name: macos,   os: macos-latest,   rid: osx-arm64, ext: '' }
+          - { name: windows, os: windows-latest, rid: win-x64,   ext: '.exe' }
     defaults:
       run:
         shell: bash
@@ -254,39 +262,67 @@ jobs:
 
       - name: Publish with PublishAot
         run: |
-          dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime linux-x64 \
+          dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime ${{ matrix.rid }} \
             -p:PublishAot=true -p:TrimmerSingleWarn=false -p:DebugType=none -p:Version=0.0.0-aot --output aot | tee aot.log
           # Allowed: one warning inside ASP.NET Core 8 (JsonOptions), on a path kscript doesn't use. Anything else fails the job.
           grep -o "warning IL[0-9]*: [^[]*" aot.log | sort -u | grep -v "Microsoft.AspNetCore.Http.Json.JsonOptions" > warnings.txt || true
           if [ -s warnings.txt ]; then echo "New trim or AOT warnings:"; cat warnings.txt; exit 1; fi
           ls -l aot
+          echo "K=$PWD/aot/KScript${{ matrix.ext }}" >> "$GITHUB_ENV"
 
       - name: Run, check and test scripts
         run: |
-          k="$PWD/aot/KScript"
           printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.xml
-          "$k" smoke.xml | tee smoke.out
+          "$K" smoke.xml | tee smoke.out
           grep -q "kscript ok: 3" smoke.out
-          "$k" "Example Scripts/Find Oldest Person.xml"
-          "$k" check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" --warnaserror
-          "$k" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" "Example Sites/team"
-          "$k" test samples/kscript2 samples/life-lab
-          "$k" openapi samples/http-app | grep -q '"openapi": "3.1.0"'
-          time "$k" --version
+          "$K" "Example Scripts/Find Oldest Person.xml"
+          "$K" check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" --warnaserror
+          "$K" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" "Example Sites/team"
+          "$K" test samples/kscript2 samples/life-lab
+          "$K" openapi samples/http-app | grep -q '"openapi": "3.1.0"'
+          time "$K" --version
+
+      - name: KScript.AI against a stand-in API
+        timeout-minutes: 5
+        env:
+          ANTHROPIC_API_KEY: ci
+          ANTHROPIC_BASE_URL: http://127.0.0.1:8765
+        run: |
+          python3 .github/scripts/fake-claude.py 8765 &
+          sleep 2
+          printf '%s\n' 'import KScript.AI' "echo \"{ @llm('Say hi.') }\"" \
+            "llm(to: t, schema: { category: 'bug|feature', urgency: 'int 1-5' }) \"Triage: it crashes\"" 'echo "{$t.category} {$t.urgency}"' \
+            '/// The status of an order.' "fn order_status(id: int) => \$id == 42 ? 'shipped' : 'unknown'" \
+            'llm(to: a, tools: order_status) "Where is order 42?"' 'echo "{$a}"' > ai.kscript
+          "$K" ai.kscript | tee ai.out
+          grep -q "hello from claude" ai.out
+          grep -q "bug 4" ai.out
+          grep -q "tool said shipped" ai.out
+
+      - name: Compile a program with a single-file runtime
+        run: |
+          dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=false \
+            -p:DebugType=none -p:Version=0.0.0-aot --output runtime > /dev/null
+          mkdir -p "$RUNNER_TEMP/hello"
+          cp smoke.xml "$RUNNER_TEMP/hello/hello.ks.xml"
+          "$K" compile "$RUNNER_TEMP/hello/hello.ks.xml" --runtime "runtime/KScript${{ matrix.ext }}" --out "$RUNNER_TEMP/out"
+          ls -R "$RUNNER_TEMP/out"
+          program="$(find "$RUNNER_TEMP/out" -type f -name "hello${{ matrix.ext }}" | head -1)"
+          "$program" | grep -q "kscript ok: 3"
 
       - name: Serve a site, the docs and MCP
         timeout-minutes: 5
         run: |
-          k="$PWD/aot/KScript"
-          (cd samples/http-app && "$k" serve --port 8092 > ../../serve.log 2>&1 &)
-          "$k" docs --no-open --port 8098 > docs.log 2>&1 &
+          (cd samples/http-app && "$K" serve --port 8092 > ../../serve.log 2>&1 &)
+          "$K" docs --no-open --port 8098 > docs.log 2>&1 &
           for i in $(seq 1 30); do curl -sf --max-time 10 http://localhost:8092/people > people.html && curl -sf --max-time 10 http://localhost:8098/ > docs.html && break; sleep 1; done
           curl -sf --max-time 10 http://localhost:8092/_openapi.json | grep -q '"openapi"'
           curl -sf --max-time 10 http://localhost:8098/assets/search.json | grep -q '"t":'
           curl -sf --max-time 10 -X POST http://localhost:8098/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
             -d '{"code":"<echo>docs ok</echo>"}' | grep -q "docs ok"
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
-            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | "$k" mcp | tee mcp.out
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | "$K" mcp | tee mcp.out
           grep -q "search_docs" mcp.out
           cat serve.log docs.log
 
@@ -301,7 +337,7 @@ jobs:
         working-directory: editors/vscode
         run: |
           npm ci
-          npm run smoke -- ../../aot/KScript
+          npm run smoke -- "$K"
 
   vscode:
     name: VS Code extension
