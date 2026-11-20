@@ -7,6 +7,28 @@
   var timers = {};
   var ticks = {};
 
+  // A click needs the same element under the pointer when it goes down and when it comes up. While a button
+  // is held, new HTML for its block waits, so a block that redraws often (on-tick) doesn't swallow clicks.
+  var pointerDown = false;
+  var pending = {};
+
+  function flush(id) {
+    var p = pending[id];
+    if (!p) return;
+    delete pending[id];
+    var el = document.querySelector('[data-ks-live="' + id + '"]');
+    if (el) swap(el, p.html, p.keepValue);
+  }
+
+  document.addEventListener("pointerdown", function () { pointerDown = true; }, true);
+  ["pointerup", "pointercancel"].forEach(function (type) {
+    document.addEventListener(type, function () {
+      pointerDown = false;
+      // After the click this pointerup produces has been handled.
+      setTimeout(function () { Object.keys(pending).forEach(flush); }, 0);
+    }, true);
+  });
+
   // <span on-tick="..." every="200">: while an element with on-tick is in a block, its handler runs every
   // `every` milliseconds, counted from when the last answer arrived, so slow handlers never pile up.
   function scheduleTick(block) {
@@ -51,6 +73,7 @@
     var targetValue = target && target.type === "checkbox" ? target.checked : target && "value" in target ? target.value : null;
 
     queues[id] = (queues[id] || Promise.resolve()).then(function () {
+      flush(id); // start from the newest HTML, even if it was waiting for the pointer
       var current = document.querySelector('[data-ks-live="' + id + '"]');
       if (!current) return;
       var b = binds(current);
@@ -77,7 +100,9 @@
         if (!r || !el) return;
         if (!r.ok) { console.error("KScript:", r.html); el.removeAttribute("aria-busy"); scheduleTick(el); return; }
         // While typing, keep what is in the box; after an action (Add, Reset…) show what the server set.
-        swap(el, r.html, handler < 0 || eventInfo.type === "input");
+        var keepValue = handler < 0 || eventInfo.type === "input";
+        if (pointerDown) pending[id] = { html: r.html, keepValue: keepValue };
+        else swap(el, r.html, keepValue);
       });
     }).catch(function (err) {
       console.error("KScript:", err);
