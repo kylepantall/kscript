@@ -205,7 +205,7 @@ namespace KScript.Runtime
             }
 
             if (Retired.Elements.TryGetValue(name, out RetiredInfo retired))
-                throw Located(new KScriptException($"<{name}> was removed in KScript 2. {retired.Replacement} (kscript migrate can convert old scripts.)", "Retired"), module, e.NameSpan.Start);
+                throw Located(new KScriptException($"<{name}> was removed in KScript 2. {retired.Replacement}", "Retired"), module, e.NameSpan.Start);
 
             KScriptPackage owner = Packages.FindElement(name, module.Packages).FirstOrDefault();
             if (owner != null)

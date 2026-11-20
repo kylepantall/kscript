@@ -5,7 +5,6 @@ namespace KScript.Runtime
     /// <summary>
     /// KScript 1 elements, attributes and commands that KScript 2 removed, with what to write instead. The runtime
     /// stops with this message when a script uses one, and the language server shows it with a quick fix.
-    /// <c>kscript migrate</c> rewrites most of them automatically.
     /// </summary>
     public static class Retired
     {
