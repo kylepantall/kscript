@@ -176,6 +176,9 @@ namespace KScript.LanguageServer
                     return null;
                 }
                 case "textDocument/didSave":
+                    RefreshAll();
+                    RefreshAgentDocs(p?["textDocument"]?["uri"]?.GetValue<string>());
+                    return null;
                 case "workspace/didChangeWatchedFiles":
                     RefreshAll();
                     return null;
@@ -775,6 +778,33 @@ namespace KScript.LanguageServer
             CompletionKind.Module => 9,       // Module
             _ => 15,                          // Snippet
         };
+
+        /// <summary>
+        /// Autoload for coding agents: after a save, rewrites the project's AGENTS.md and .kscript/agents when the
+        /// project has them (kscript agents or kscript make project made them), so agents always read current docs.
+        /// </summary>
+        private void RefreshAgentDocs(string uri)
+        {
+            string path = uri == null ? null : Workspace.UriToPath(uri);
+            if (path == null || path.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            try
+            {
+                string root = KScript.Language.Agents.AgentDocs.FindRoot(path);
+                if (!KScript.Language.Agents.AgentDocs.IsEnabled(root))
+                {
+                    return;
+                }
+                IReadOnlyList<string> changed = KScript.Language.Agents.AgentDocs.Write(root);
+                if (changed.Count > 0) Log($"Updated agent docs: {string.Join(", ", changed)}");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or KScript.Projects.ProjectConfigException)
+            {
+                Log($"Could not update the agent docs: {ex.Message}");
+            }
+        }
 
         private void Log(string message) =>
             connection.SendNotification("window/logMessage", new JsonObject { ["type"] = 1, ["message"] = message });

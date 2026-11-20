@@ -29,6 +29,7 @@ namespace KScript.Runtime
             RegisterLogging(p);
             RegisterI18n(p);
             RegisterExamples(p);
+            RegisterAgentNotes(p);
         }
 
         #region Elements

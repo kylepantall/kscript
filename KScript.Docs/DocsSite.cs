@@ -75,6 +75,7 @@ namespace KScript.Docs
             new Guide("projects", "projects.md", "Tools", "Projects and kscript.json"),
             new Guide("formatting", "formatting.md", "Tools", "Formatting"),
             new Guide("standards", "standards.md", "Tools", "Lint standards"),
+            new Guide("agents", "agents.md", "Tools", "Coding agents", "kscript"),
             new Guide("roadmap", "roadmap.md", "More", "Roadmap"),
         };
 

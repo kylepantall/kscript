@@ -131,7 +131,9 @@ namespace KScript.Language.Agents
         #region Reading the project
 
         /// <summary>Reads a project: its settings, its scripts' top-level symbols and the packages they use.</summary>
-        public static AgentProject Read(string root, LanguageCatalog catalog = null)
+        /// <param name="format">kscript or xml, to override make.format (kscript convert passes the format it converted to).</param>
+        /// <param name="skip">Full paths of scripts to leave out, such as the originals kscript convert just replaced.</param>
+        public static AgentProject Read(string root, LanguageCatalog catalog = null, string format = null, ISet<string> skip = null)
         {
             catalog ??= LanguageCatalog.Default;
             root = Path.GetFullPath(root);
@@ -147,7 +149,7 @@ namespace KScript.Language.Agents
             var symbols = new List<AgentSymbol>();
             var scripts = new List<string>();
             int tests = 0, pages = 0;
-            foreach (string file in FilesUnder(root).OrderBy(f => f, StringComparer.Ordinal))
+            foreach (string file in FilesUnder(root).Where(f => skip?.Contains(f) != true).OrderBy(f => f, StringComparer.Ordinal))
             {
                 string relative = Path.GetRelativePath(root, file).Replace('\\', '/');
                 bool page = file.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || file.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
@@ -190,22 +192,33 @@ namespace KScript.Language.Agents
             {
                 Root = root,
                 Name = config?.Name ?? Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
-                Format = config?.Make.Format == MakeSettings.XmlFormat ? MakeSettings.XmlFormat : MakeSettings.KScriptFormat,
+                Format = (format ?? config?.Make.Format) == MakeSettings.XmlFormat ? MakeSettings.XmlFormat : MakeSettings.KScriptFormat,
                 Packages = packages.OrderBy(p => p == "KScript.Core" ? 0 : 1).ThenBy(p => p, StringComparer.Ordinal).ToList(),
                 Symbols = symbols,
                 Scripts = scripts,
                 Tests = tests,
                 Pages = pages,
                 Main = config?.App.Main,
-                Routes = RoutesOf(config?.SiteRoot ?? root, config),
+                Routes = RoutesOf(config?.SiteRoot ?? root, config, skip),
             };
         }
 
         /// <summary>The route table of a site with KScript.Http route files, or null.</summary>
-        private static string RoutesOf(string site, ProjectConfig config)
+        private static string RoutesOf(string site, ProjectConfig config, ISet<string> skip)
         {
             var table = new StringWriter();
-            return KScript.Http.HttpServer.ListRoutes(site, config, table, TextWriter.Null) == 0 ? table.ToString().TrimEnd() : null;
+            if (KScript.Http.HttpServer.ListRoutes(site, config, table, TextWriter.Null) != 0)
+            {
+                return null;
+            }
+            // Route files kscript convert just replaced are still on disk, so name their new versions instead.
+            string text = table.ToString().TrimEnd();
+            foreach (string old in skip ?? new HashSet<string>())
+            {
+                string name = Path.GetRelativePath(site, old).Replace('\\', '/');
+                text = text.Replace(" " + name + ":", " " + ScriptConverter.ConvertedPath(name) + ":", StringComparison.Ordinal);
+            }
+            return text;
         }
 
         private static IEnumerable<string> FilesUnder(string root)
@@ -255,7 +268,8 @@ namespace KScript.Language.Agents
                 {
                     continue;
                 }
-                DocComment doc = s.Doc;
+                // The element's own doc, not the symbol's description, which the analyzer fills in for types.
+                DocComment doc = DocComment.Parse(e.Documentation);
                 if (doc?.AgentHidden == true)
                 {
                     continue;
@@ -338,7 +352,7 @@ namespace KScript.Language.Agents
                 fields.AddRange(inline.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0));
             }
             string options = string.Concat(type.Attributes.Where(a => a.Name is "extra" or "sample").Select(a => $"({a.Name}: {a.ValueText?.Trim()})"));
-            return fields.Count == 0 ? $"type {s.Name}{options} {(s.Shape.Instance ?? s.Shape).Display()}" : $"type {s.Name}{options} {{ {string.Join(", ", fields)} }}";
+            return fields.Count == 0 ? $"type {s.Name}{options} {{ }}" : $"type {s.Name}{options} {{ {string.Join(", ", fields)} }}";
         }
 
         private static readonly HashSet<string> FieldBasics = new HashSet<string>(StringComparer.Ordinal) { "name", "type", "from", "default", "optional", "value", "description" };
@@ -535,13 +549,8 @@ namespace KScript.Language.Agents
             }
             foreach (IGrouping<string, AgentSymbol> file in project.Symbols.GroupBy(s => s.File))
             {
-                var e = new StringBuilder();
-                e.Append($"\n## {file.Key}\n\n");
-                foreach (AgentSymbol s in file)
-                {
-                    e.Append(SymbolLine(s));
-                }
-                entries.Add(e.ToString());
+                entries.Add($"\n## {file.Key}\n\n");
+                entries.AddRange(file.Select(SymbolLine));
             }
             return Join(w.ToString(), entries, IndexBudget, "symbols");
         }
@@ -583,7 +592,8 @@ namespace KScript.Language.Agents
                 entries.Add($"\n## {type.Key} methods\n\n");
                 entries.AddRange(type.OrderBy(m => m.Name, StringComparer.Ordinal).Select(CallableLine));
             }
-            List<ElementInfo> elements = catalog.Elements.Where(e => e.Package == package).OrderBy(e => e.Name, StringComparer.Ordinal).ToList();
+            List<ElementInfo> elements = catalog.Elements.Where(e => e.Package == package && (xml || !CodeSyntax.Contains(e.Name)))
+                .OrderBy(e => e.Name, StringComparer.Ordinal).ToList();
             if (elements.Count > 0)
             {
                 entries.Add(xml ? "\n## Elements\n\n" : "\n## Statements\n\n");
@@ -610,6 +620,13 @@ namespace KScript.Language.Agents
             if (example != null && !example.StartsWith("<", StringComparison.Ordinal) && c.Agent?.Prefer == null) e.Append($"  - e.g. `{example}`\n");
             return e.ToString();
         }
+
+        /// <summary>Core elements that .kscript writes as syntax (if, for, fn...), which AGENTS.md's crash course shows.</summary>
+        private static readonly HashSet<string> CodeSyntax = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "kscript", "if", "elif", "else", "for", "while", "match", "case", "default", "try", "catch", "finally", "break", "continue",
+            "return", "fn", "let", "set", "const", "enum", "type", "field", "do", "import", "echo", "throw", "exit",
+        };
 
         internal static string ElementLine(ElementInfo el, bool xml)
         {
@@ -648,7 +665,8 @@ namespace KScript.Language.Agents
             }
             if (shown < entries.Count)
             {
-                w.Append($"\n… {entries.Count - shown} more {what} left out to keep this file short. Use the `kscript mcp` server (lookup, search) or `kscript docs` for the rest.\n");
+                // Headings don't count: only the entries under them.
+                w.Append($"\n… {entries.Skip(shown).Count(e => e.StartsWith("- ", StringComparison.Ordinal))} more {what} left out to keep this file short. Use the `kscript mcp` server (lookup, search) or `kscript docs` for the rest.\n");
             }
             return w.ToString();
         }
@@ -692,9 +710,9 @@ namespace KScript.Language.Agents
         /// for packages the project no longer uses. With <paramref name="check"/>, writes nothing. Returns the files
         /// that changed (or would change), relative to the root.
         /// </summary>
-        public static IReadOnlyList<string> Write(string root, bool check = false, LanguageCatalog catalog = null)
+        public static IReadOnlyList<string> Write(string root, bool check = false, LanguageCatalog catalog = null, string format = null, ISet<string> skip = null)
         {
-            AgentProject project = Read(root, catalog);
+            AgentProject project = Read(root, catalog, format, skip);
             IReadOnlyDictionary<string, string> files = Render(project, catalog);
             var changed = new List<string>();
             foreach (var (relative, text) in files)
