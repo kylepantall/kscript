@@ -69,6 +69,16 @@ namespace KScript
                     O("--no-open", "Don't open a browser; just print the address."),
                 },
                 "kscript docs\nkscript docs replace\nkscript docs --format xml"),
+            new CliCommand("mcp", "kscript mcp [--format kscript|xml] [--dir folder] [--http [--port 4181]]",
+                "Serve these docs to AI coding assistants (Claude Code, Cursor, VS Code...) over MCP, offline.",
+                new[]
+                {
+                    O("--format kscript|xml", "Show examples as .kscript or XML (default: the project's make.format, else .kscript)."),
+                    O("--dir folder", "The project whose kscript.json sets the format and the check and fmt rules (default: the current folder)."),
+                    O("--http", "Serve on http://localhost:4181/mcp instead of stdin and stdout."),
+                    O("--port N", "The port for --http (default 4181)."),
+                },
+                "claude mcp add kscript -- kscript mcp\nkscript mcp --http", "mcp"),
             new CliCommand("css", "kscript css [file-or-folder]... [--out folder] [--var name=value]",
                 "Compile .ks.css, .ks.scss and .ks.sass stylesheets.",
                 new[]
