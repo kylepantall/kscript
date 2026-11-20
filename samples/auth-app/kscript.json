@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
+  // New passwords (@register, @reset_password) must be at least this long.
+  "types": { "password": { "min": 10 } },
+  "name": "auth-app",
+  "standard": "kscript:recommended",
+  "serve": {
+    "root": ".",
+    "port": 8080
+  },
+  "http": {
+    "middleware": ["log"]
+  },
+  // $config reads config/config.yaml (and config.<env>.yaml with kscript --env <env>).
+  "config": {
+    "root": "config"
+  },
+  // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
+  "make": {
+    "format": "kscript"
+  },
+  "lint": {
+    "include": ["**/*.html", "**/*.kscript", "**/*.ks.xml"],
+    "exclude": ["_templates", "node_modules"]
+  }
+}

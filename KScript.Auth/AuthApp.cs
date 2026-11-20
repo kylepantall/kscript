@@ -31,9 +31,6 @@ namespace KScript.Auth
             if (key == null || !SafeKey.IsMatch(key)) throw new KScriptException($"'{key}' isn't a record key.", "Argument");
             return key;
         }
-
-        protected static Dictionary<string, object> Copy(Dictionary<string, object> record) =>
-            (Dictionary<string, object>)Values.ParseJson(Values.ToJson(record));
     }
 
     /// <summary>Records in memory: they end when kscript does.</summary>

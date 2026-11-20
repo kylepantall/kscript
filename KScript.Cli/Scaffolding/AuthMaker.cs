@@ -79,9 +79,12 @@ namespace KScript.Scaffolding
                 bool xml = existed ? !MarkupParser.IsCodePath(full) : format == ScriptFormat.Xml;
                 bool isApi = name.StartsWith("api", StringComparison.Ordinal);
                 string text = existed ? File.ReadAllText(full).Replace("\r\n", "\n") : RouteMaker.NewRoutesFile(isApi, xml);
+                string[] paths = isApi ? new[] { "/tokens", "/me" } : Paths;
+                // A second run with --force replaces the files, but the routes are already there.
+                if (force && paths.All(p => HasPath(text, p, xml))) continue;
                 if (!force)
                 {
-                    string taken = (isApi ? new[] { "/tokens", "/me" } : Paths).FirstOrDefault(p => HasPath(text, p, xml));
+                    string taken = paths.FirstOrDefault(p => HasPath(text, p, xml));
                     if (taken != null) throw new StubException($"{file} already has a {taken} route. Remove it, or use --force to add the sign-in routes anyway.");
                 }
                 var lines = StubTemplate.Render(body, values).Trim('\n').Split('\n').Select(l => l.TrimEnd()).ToList();

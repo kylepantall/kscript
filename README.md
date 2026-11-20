@@ -126,6 +126,7 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Style` | Stylesheets written in KScript: themes from JSON, breakpoints, fluid sizes and colours |
 | `KScript.Storage` | Settings, data, caches and logs in the right folders on macOS, Windows and Linux |
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
+| `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
 

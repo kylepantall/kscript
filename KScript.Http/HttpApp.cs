@@ -353,12 +353,16 @@ namespace KScript.Http
         {
             Log?.WriteLine($"  {status} {ex.Type}: {ex.Message}");
             HttpResponse response = ctx.ErrorResponse(status, ex.Message);
+            if (response.ContentType.StartsWith("application/json", StringComparison.Ordinal))
+            {
+                var body = new Dictionary<string, object> { ["error"] = ex.Message, ["status"] = (double)status, ["type"] = ex.Type };
+                foreach (var kv in ex.Fields) body.TryAdd(kv.Key, kv.Value);
+                response = HttpResponse.Json(body, status);
+            }
+            // A TooManyRequests error with retry_after says when to come back; a 401 says how to sign in.
             if (ex.Fields.TryGetValue("retry_after", out object wait)) response.Headers["Retry-After"] = Values.ToStr(wait);
             if (status == 401) response.Headers["WWW-Authenticate"] = "Bearer";
-            if (!response.ContentType.StartsWith("application/json", StringComparison.Ordinal)) return response;
-            var body = new Dictionary<string, object> { ["error"] = ex.Message, ["status"] = (double)status, ["type"] = ex.Type };
-            foreach (var kv in ex.Fields) body.TryAdd(kv.Key, kv.Value);
-            return HttpResponse.Json(body, status);
+            return response;
         }
 
         private HttpResponse Failure(RequestContext ctx, string message)

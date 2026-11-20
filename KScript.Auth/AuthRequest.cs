@@ -87,8 +87,6 @@ namespace KScript.Auth
             }
         }
 
-        private string Address => AuthApp.Text(Request.TryGetValue("ip", out object ip) ? ip : null) ?? "unknown";
-
         private bool Https =>
             App.Settings.Secure ?? (string.Equals(AuthApp.Text(Request.GetValueOrDefault("scheme")), "https", StringComparison.OrdinalIgnoreCase)
                                     || string.Equals(Header("x-forwarded-proto"), "https", StringComparison.OrdinalIgnoreCase));
@@ -154,9 +152,7 @@ namespace KScript.Auth
             return data;
         }
 
-        /// <summary>True when the request has a session (from its cookie, or one started by this request).</summary>
-        public bool HasSession => Session(create: false) != null;
-
+        /// <summary>The session's id, or null when the request has none.</summary>
         public string SessionId => Session(create: false) != null ? sessionId : null;
 
         public object Get(string key) =>
@@ -241,9 +237,6 @@ namespace KScript.Auth
 
         /// <summary>The signed-in user: from the session, else from an API token. Null for a guest.</summary>
         public Dictionary<string, object> User => SessionUser ?? TokenUser;
-
-        /// <summary>How the user signed in: session, token or null.</summary>
-        public string Via => SessionUser != null ? "session" : TokenUser != null ? "token" : null;
 
         /// <summary>
         /// The session's user, read again from the users so changes show at once. A user who isn't in the app's
@@ -335,14 +328,6 @@ namespace KScript.Auth
             clearCookie = true;
         }
 
-        /// <summary>Ends the user's other sessions (after a password change, say). Returns how many ended.</summary>
-        public int LogoutOthers()
-        {
-            Dictionary<string, object> s = Session(create: false);
-            string id = s != null ? AuthApp.Text(s.GetValueOrDefault(UserId)) : null;
-            return id == null ? 0 : UserStore.Forget(App.Sessions, id, keep: AuthApp.KeyOf(sessionId));
-        }
-
         /// <summary>Remembers the address a guest wanted, for @intended() after they sign in. Only paths on this site are kept.</summary>
         public void RememberIntended(string url)
         {
@@ -354,7 +339,8 @@ namespace KScript.Auth
         {
             string url = AuthApp.Text(Get("_intended"));
             Forget("_intended");
-            return Safe(url) ? url : fallback ?? App.Settings.Home;
+            if (Safe(url)) return url;
+            return Safe(fallback) ? fallback : App.Settings.Home;
         }
 
         /// <summary>True for a path on this site (/people?page=2), not another site (//evil.example, https://...).</summary>

@@ -165,7 +165,7 @@ fn show(id: int) {
 }
 ```
 
-`Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404) and `Conflict` (409) are built in, so `throw Forbidden "Admins only"` works without a declaration, and an error type that extends one answers with its status. Give an error type its own status with `error PaymentFailed(status: 402)`. Unlike `@abort()`, these are ordinary errors: a `try` in the controller can still catch them. Errors without a status still answer `500`.
+`Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409) and `TooManyRequests` (429, with `Retry-After` when the error has a `retry_after` field) are built in, so `throw Forbidden "Admins only"` works without a declaration, and an error type that extends one answers with its status. Give an error type its own status with `error PaymentFailed(status: 402)`. Unlike `@abort()`, these are ordinary errors: a `try` in the controller can still catch them. Errors without a status still answer `500`.
 
 Controllers can read and write files with KScript.IO, but only inside the site folder. Set `"write_files": false` to make them read-only like pages. Anything a controller prints with `echo` goes to the server log.
 
@@ -223,7 +223,9 @@ In XML, attributes are text, so the same list is written `use="secure_headers, j
 | --- | --- |
 | `log` | Writes each request to the server log: what answered it, the route name, the status and the time. |
 | `cors` | Answers browser preflight requests and adds `Access-Control-Allow-Origin`. The allowed origins, methods, headers and credentials come from `http.cors`. |
-| `auth` | Needs `Authorization: Bearer <token>` to match the `API_TOKEN` environment variable. Set `http.auth.token_env` to use another variable, or name one per route with `auth:ADMIN_TOKEN`. If the variable isn't set, every request is refused (500), never let through. Requests that pass have `$request.authenticated` set. |
+| `auth` | Lets through a user signed in with [KScript.Auth](auth.md) (by the session cookie or an API token), and sets `$request.user`. It also accepts `Authorization: Bearer <token>` matching the `API_TOKEN` environment variable (`http.auth.token_env` names another). Anyone else is sent to `http.auth.login` (`/login`) in a browser, or gets a 401 when they want JSON. `auth:session` and `auth:token` accept only one kind of sign-in. `auth:ADMIN_TOKEN` accepts only the token in that variable, and refuses every request (500) when it isn't set. Requests that pass have `$request.authenticated` set. |
+| `guest` | Only people who aren't signed in: others are sent to `http.auth.home` (`/`), or get a 403 when they want JSON. For the sign-in and sign-up pages. |
+| `csrf` | Needs the session's CSRF token on every request except `GET`, `HEAD` and `OPTIONS`: a `_token` form field or an `X-CSRF-Token` header. Without it, `419 Page Expired`. Web routes in a file that imports KScript.Auth get it on their own (see [Forms and CSRF](auth.md#forms-and-csrf)). |
 | `throttle` | Allows 60 requests a minute per client address and route (`http.throttle`), or `throttle:30`. Over the limit gets `429` with `Retry-After`. Every response has `X-RateLimit-Limit` and `X-RateLimit-Remaining`. |
 | `etag` | Tags `GET` answers with an ETag and answers `If-None-Match` with `304 Not Modified` (see [Caching and ETags](#caching-and-etags)). `etag:weak` gives weak tags. |
 | `cache_control` | Sets `Cache-Control` on `GET` answers: `cache_control:300` (public for five minutes) or `cache_control:private;max-age=60`. |
@@ -321,7 +323,7 @@ Group(middleware: auth) {
     "api_prefix": "/api",                       // the prefix of api.* files
     "write_files": true,                        // false: controllers can only read files
     "cors": { "origins": ["*"], "methods": ["GET", "POST"], "headers": ["Content-Type", "Authorization"], "credentials": false },
-    "auth": { "token_env": "API_TOKEN" },
+    "auth": { "token_env": "API_TOKEN", "login": "/login", "lifetime": "2h" },  // and the KScript.Auth settings in auth.md
     "throttle": { "limit": 60, "seconds": 60 },
     "openapi": { "routes": "auto", "title": "People API", "version": "1.2.0" }  // or false
   }

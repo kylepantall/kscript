@@ -60,7 +60,8 @@ fn show_forgot() => @view('auth/forgot-password', data: {})
 fn send_reset(form, request) {
   token = @reset_token($form.email ?? '')
   if $token != null {
-    link = ($request.scheme ?? 'http') + '://' + ($request.headers.host ?? 'localhost') + @route('password.reset', token: $token)
+    site = ($request.scheme ?? 'http') + '://' + ($request.headers.host ?? 'localhost')
+    link = $site + @route('password.reset', token: $token)
     // Email $link to $form.email with your mail provider. Until then, it is written to the server's log.
     log "Password reset link for {$form.email}: {$link}"
   }
@@ -80,7 +81,8 @@ fn reset(form) {
     return @view('auth/reset-password', data: { token: $form.token, error: $err.message })->with_status(422)
   }
   if $user == null {
-    return @view('auth/forgot-password', data: { error: 'That link has expired or was already used. Ask for a new one.' })->with_status(422)
+    expired = 'That link has expired or was already used. Ask for a new one.'
+    return @view('auth/forgot-password', data: { error: $expired })->with_status(422)
   }
   @login($user)
   $session->flash('status', 'Your password has been changed.')

@@ -98,6 +98,9 @@ namespace KScript.Auth
             string message = ex.Fields.TryGetValue("problems", out object p) && p is List<object> problems && problems.FirstOrDefault() is Dictionary<string, object> first
                 ? AuthApp.Text(first.GetValueOrDefault("message")) ?? ex.Message
                 : ex.Message;
+            // The type's message may already name the field: "The email needs an email, but got ...".
+            string named = $"The {field} ";
+            if (message.StartsWith(named, StringComparison.Ordinal)) message = message.Substring(named.Length);
             int reason = message.IndexOf(": ", StringComparison.Ordinal);
             if (message.StartsWith("needs ", StringComparison.Ordinal))
                 return reason > 0 ? $"That isn't {(field == "email" ? "an email address" : "a valid " + field)}: {message.Substring(reason + 2)}" : $"That isn't a valid {field}.";

@@ -348,6 +348,12 @@ public sealed class AuthMakeTests : AuthSiteFixture
         Assert.Equal(1, taken.Code);
         Assert.Contains("routes/web.kscript already has a /login route", taken.Err);
         Assert.Equal(0, Make(Dir, "auth", "--force").Code);
+
+        // Running it again with --force replaces the files without adding the routes twice.
+        var again = Make(Dir, "auth", "--force");
+        Assert.Equal(0, again.Code);
+        Assert.DoesNotContain("routes/web.kscript", again.Out);
+        Assert.Single(Regex.Matches(Read("routes/web.kscript"), "accounts.show_login"));
     }
 
     [Fact]

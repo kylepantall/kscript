@@ -79,6 +79,7 @@ namespace KScript.Docs
             new Guide("stylesheets", "stylesheets.md", "Build", "Stylesheets"),
             new Guide("storage", "storage.md", "Build", "App folders: KScript.Storage", "kscript"),
             new Guide("cache", "cache.md", "Build", "Caching: KScript.Cache", "kscript"),
+            new Guide("auth", "auth.md", "Build", "Sign-in: KScript.Auth", "kscript"),
             new Guide("testing", "testing.md", "Build", "Testing"),
             new Guide("projects", "projects.md", "Tools", "Projects and kscript.json"),
             new Guide("formatting", "formatting.md", "Tools", "Formatting"),
