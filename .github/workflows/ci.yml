@@ -92,6 +92,7 @@ jobs:
           $k make middleware secure-headers
           $k make type Repo --fields "name: string, stars: int"
           $k make enum Size --values small,medium,large
+          $k make error PaymentFailed --status 402 --extends Validation --fields "order: int, reason?: string"
           $k make css theme
           $k check .
           $k fmt --check .
