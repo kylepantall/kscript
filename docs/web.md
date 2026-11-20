@@ -68,6 +68,8 @@ The project page is built from the project itself, and is rebuilt when a script 
 
 Examples show in the project's format, and the switch at the top shows them in the other. The docs listen on localhost only, even when the site is served with `--host 0.0.0.0`, because their examples run code. `--docs-port 4190` picks their port (4180, or a free one, otherwise).
 
+For the same docs as a file, run `kscript docs --project`. It writes `.kscript/docs/project.md`, Markdown that reads well in an editor, on GitHub or in a code review. From then on `kscript watch`, `kscript serve` and saving a script in the editor keep it up to date. Delete `.kscript/docs` to stop.
+
 To have them every time, set `"docs": true` in the `serve` section of kscript.json (and `"docs_port"` to pick the port); `--no-docs` turns them off for one run. The docs are for working on a site: compiled programs (`kscript compile`) never serve them, and neither does `kscript serve` in the `production` environment (`--env production`, or `KSCRIPT_ENV=production`).
 
 For controllers, JSON APIs and middleware, add a route file: see [Routes, controllers and middleware](http.md). Routes are matched before pages, and anything they don't match is served as described here.

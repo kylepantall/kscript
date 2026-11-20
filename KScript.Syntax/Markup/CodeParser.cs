@@ -133,7 +133,19 @@ namespace KScript.Syntax.Markup
                     continue;
                 }
 
-                if (fields)
+                if (fields && (Lookahead("fn ") || Lookahead("fn\t")))
+                {
+                    // A method of the type: fn width(unit: Unit) => ...
+                    int fnStart = pos;
+                    string fnDoc = TakeDoc();
+                    pos += 2;
+                    ParseFn(parent, fnStart, fnDoc);
+                }
+                else if (fields && RuleLineAhead() is string rule)
+                {
+                    ParseRule(parent, rule);
+                }
+                else if (fields)
                 {
                     ParseField(parent);
                 }
@@ -349,7 +361,7 @@ namespace KScript.Syntax.Markup
             {
                 pos++;
                 SkipSpaces();
-                TextSpan type = ReadNameSpan();
+                TextSpan type = ReadTypeSpan();
                 if (type.Length > 0)
                 {
                     AddRawAttribute(e, "type", type);
@@ -434,7 +446,12 @@ namespace KScript.Syntax.Markup
                 int q = p + 1;
                 while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
                 int typeStart = q;
-                while (q < text.Length && Lexer.IsIdentChar(text[q])) q++;
+                q = TypeEnd(q);
+                if (q < 0)
+                {
+                    // name: type(... with no closing ): parsed as an assignment, which reports the missing ).
+                    return true;
+                }
                 while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
                 return q > typeStart && q < text.Length && text[q] == '=' && (q + 1 >= text.Length || (text[q + 1] != '=' && text[q + 1] != '>'));
             }
@@ -716,6 +733,40 @@ namespace KScript.Syntax.Markup
             {
                 ParseAttributeList(e);
             }
+            SkipSpaces();
+            if (TryWord("with"))
+            {
+                // type Admin with [User, Auditable] { }: with="User, Auditable".
+                SkipSpaces();
+                if (Peek(0) == '[')
+                {
+                    int open = pos;
+                    int close = ClosingBracket(open);
+                    if (close < 0)
+                    {
+                        Error(new TextSpan(open, 1), DiagnosticCodes.UnclosedElement, "This [ is missing its closing ].");
+                        close = text.IndexOf('\n', open) is int nl && nl >= 0 ? nl : text.Length;
+                    }
+                    int s = open + 1;
+                    int end = close;
+                    while (s < end && char.IsWhiteSpace(text[s])) s++;
+                    while (end > s && char.IsWhiteSpace(text[end - 1])) end--;
+                    AddRawAttribute(e, "with", TextSpan.FromBounds(s, end));
+                    pos = Math.Min(text.Length, close + 1);
+                }
+                else
+                {
+                    TextSpan single = ReadTypeSpan();
+                    if (single.Length == 0)
+                    {
+                        Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the types to build on after 'with', such as with [User, Auditable] or with [int].");
+                    }
+                    else
+                    {
+                        AddRawAttribute(e, "with", single);
+                    }
+                }
+            }
             if (doc != null)
             {
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
@@ -850,10 +901,7 @@ namespace KScript.Syntax.Markup
                 int colon = pos++;
                 SkipSpaces();
                 int typeStart = pos;
-                while (pos < text.Length && (Lexer.IsIdentChar(text[pos]) || text[pos] is '.' or '[' or ']' or '?'))
-                {
-                    pos++;
-                }
+                ReadTypeSpan();
                 if (pos == typeStart)
                 {
                     Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the field's type after ':', such as string or int[].");
@@ -903,6 +951,182 @@ namespace KScript.Syntax.Markup
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(start, 0));
             }
             Finish(e, start);
+        }
+
+        private static readonly string[] RuleWords = { "min", "max", "pattern", "one_of", "not", "validate", "normalize", "parse" };
+
+        /// <summary>
+        /// The rule a type's line starts with (<c>min: 0</c>, <c>pattern: /^[a-z]+$/</c>, <c>validate: $value > 0, 'too small'</c>),
+        /// or null for a field. A line such as <c>max: int</c> is still a field: the value after ':' is a type and nothing more.
+        /// </summary>
+        private string RuleLineAhead()
+        {
+            string word = RuleWords.FirstOrDefault(w => Lookahead(w) && pos + w.Length < text.Length && !Lexer.IsIdentChar(text[pos + w.Length]));
+            if (word == null)
+            {
+                return null;
+            }
+            int p = pos + word.Length;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            if (p >= text.Length || text[p] != ':')
+            {
+                return null;
+            }
+            p++;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            if (p >= text.Length || !Lexer.IsIdentStart(text[p]))
+            {
+                return word;
+            }
+            int end = TypeEnd(p);
+            if (end < 0)
+            {
+                return word;
+            }
+            int saved = pos;
+            pos = end;
+            bool field = AtStatementEnd() || PeekAfterSpaces('=') || LookaheadWordAfterSpaces("from");
+            pos = saved;
+            return field ? null : word;
+        }
+
+        private bool PeekAfterSpaces(char c)
+        {
+            int p = pos;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            return p < text.Length && text[p] == c;
+        }
+
+        private bool LookaheadWordAfterSpaces(string word)
+        {
+            int saved = pos;
+            SkipSpaces();
+            bool found = TryWord(word);
+            pos = saved;
+            return found;
+        }
+
+        /// <summary>
+        /// A rule line of a type. <c>min</c>, <c>max</c>, <c>pattern</c>, <c>one_of</c>, <c>not</c> and <c>parse</c> become
+        /// attributes of the &lt;type&gt;; <c>validate: test, 'message'</c> and <c>normalize: value</c> become child elements.
+        /// </summary>
+        private void ParseRule(MarkupElement type, string rule)
+        {
+            int start = pos;
+            TextSpan nameSpan = new TextSpan(pos, rule.Length);
+            pos += rule.Length;
+            SkipSpaces();
+            pos++; // ':'
+            SkipSpaces();
+            switch (rule)
+            {
+                case "validate":
+                {
+                    MarkupElement e = Begin(type, "validate", start, nameSpan);
+                    pos = nameSpan.End;
+                    SkipSpaces();
+                    pos++;
+                    AddExpressionAttribute(e, "test", Stop.Argument);
+                    if (Peek(0) == ',')
+                    {
+                        pos++;
+                        SkipSpaces();
+                        if (Peek(0) == '\'' || Peek(0) == '"')
+                        {
+                            // The message is text, as message="..." is in XML: its quotes go.
+                            int quoteStart = pos;
+                            SkipQuoted(Peek(0));
+                            TextSpan inner = TextSpan.FromBounds(quoteStart + 1, Math.Max(quoteStart + 1, pos - 1));
+                            AddAttribute(e, "message", DecodedText.Plain(text.Substring(inner.Start, inner.Length), inner.Start), inner, null, '\0');
+                        }
+                        else
+                        {
+                            AddExpressionAttribute(e, "message", Stop.Line);
+                        }
+                    }
+                    Finish(e, start);
+                    return;
+                }
+                case "normalize":
+                {
+                    MarkupElement e = Begin(type, "normalize", start, nameSpan);
+                    pos = nameSpan.End;
+                    SkipSpaces();
+                    pos++;
+                    AddExpressionAttribute(e, "value", Stop.Line);
+                    Finish(e, start);
+                    return;
+                }
+            }
+
+            TextSpan value;
+            if (pos >= text.Length || Peek(0) is '\n' or '\r' or '}' or ';')
+            {
+                value = new TextSpan(pos, 0);
+            }
+            else if (Peek(0) == '/' && rule == "pattern")
+            {
+                value = ReadRegexSpan();
+            }
+            else if ((Peek(0) == '\'' || Peek(0) == '"') && rule is "pattern" or "min" or "max")
+            {
+                // pattern: '^[a-z]+$' is the pattern itself, without its quotes.
+                int quoteStart = pos;
+                SkipQuoted(Peek(0));
+                value = TextSpan.FromBounds(quoteStart + 1, Math.Max(quoteStart + 1, pos - 1));
+            }
+            else
+            {
+                (int s, int end) = ReadExpression(Stop.Line);
+                value = TextSpan.FromBounds(s, end);
+            }
+            if (value.Length == 0)
+            {
+                Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, $"Write the value of {rule}, such as {rule}: {RuleExample(rule)}.");
+                return;
+            }
+            if (type.GetAttribute(rule) != null)
+            {
+                Error(nameSpan, DiagnosticCodes.MarkupSyntax, $"This type already has a {rule} rule.");
+                return;
+            }
+            AddAttribute(type, rule, DecodedText.Plain(text.Substring(value.Start, value.Length), value.Start), value, nameSpan, '\0');
+        }
+
+        private static string RuleExample(string rule) => rule switch
+        {
+            "min" => "0",
+            "max" => "100",
+            "pattern" => "/^[a-z]+$/",
+            "parse" => "$value->split('x')",
+            _ => "[a, b]",
+        };
+
+        /// <summary>A regex literal such as <c>/^H(?&lt;h&gt;\d+)$/i</c>: the slashes, escapes, a [class] and the flags.</summary>
+        private TextSpan ReadRegexSpan()
+        {
+            int start = pos++;
+            bool inClass = false;
+            while (pos < text.Length && text[pos] != '\n')
+            {
+                char c = text[pos];
+                if (c == '\\')
+                {
+                    pos += 2;
+                    continue;
+                }
+                if (c == '[') inClass = true;
+                else if (c == ']') inClass = false;
+                else if (c == '/' && !inClass)
+                {
+                    pos++;
+                    while (pos < text.Length && char.IsLetter(text[pos])) pos++;
+                    return TextSpan.FromBounds(start, pos);
+                }
+                pos++;
+            }
+            Error(new TextSpan(start, 1), DiagnosticCodes.MarkupSyntax, "This regular expression is missing its closing /.");
+            return TextSpan.FromBounds(start, pos);
         }
 
         /// <summary><c>try { } catch err when test { } catch { } finally { }</c>: catch and finally go inside the try, as in XML.</summary>
@@ -1286,6 +1510,11 @@ namespace KScript.Syntax.Markup
                 {
                     break;
                 }
+                if (c == '/' && Peek(1) != '/' && Peek(1) != '*' && RegexCanStart(start) && SkipRegex())
+                {
+                    // A regex literal: its brackets and quotes are its own.
+                    continue;
+                }
                 if (c == '/' && Peek(1) == '*')
                 {
                     // At the end of a statement it is a comment of its own (kept after the statement); inside an
@@ -1359,6 +1588,60 @@ namespace KScript.Syntax.Markup
             return (start, end);
         }
 
+        /// <summary>True where a value can start, so a / begins a regex rather than dividing: after =, (, a comma, an operator or a keyword.</summary>
+        private bool RegexCanStart(int start)
+        {
+            int p = pos - 1;
+            while (p >= start && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p--;
+            }
+            if (p < start)
+            {
+                return true;
+            }
+            char before = text[p];
+            if (Lexer.IsIdentChar(before))
+            {
+                int w = p;
+                while (w >= start && Lexer.IsIdentChar(text[w]))
+                {
+                    w--;
+                }
+                string word = text.Substring(w + 1, p - w);
+                return word is "return" or "not" or "and" or "or" or "in" or "is" or "when" or "if" or "elif" or "while" or "match";
+            }
+            return before is '=' or '(' or ',' or ':' or '[' or '{' or '!' or '&' or '|' or '?' or ';' or '>' or '<' or '+' or '-' or '*' or '%';
+        }
+
+        /// <summary>Moves past a regex literal at pos (<c>/^[a-z]+$/i</c>). False, without moving, if it doesn't close on this line.</summary>
+        private bool SkipRegex()
+        {
+            int p = pos + 1;
+            bool inClass = false;
+            while (p < text.Length && text[p] != '\n')
+            {
+                char ch = text[p];
+                if (ch == '\\')
+                {
+                    p += 2;
+                    continue;
+                }
+                if (ch == '[') inClass = true;
+                else if (ch == ']') inClass = false;
+                else if (ch == '/' && !inClass)
+                {
+                    // The caller has ruled out // and /*, so the literal isn't empty.
+                    p++;
+                    while (p < text.Length && char.IsLetter(text[p])) p++;
+                    pos = p;
+                    return true;
+                }
+                p++;
+            }
+            return false;
+        }
+
         private bool ContinuesAfter(int start, int newline)
         {
             int end = newline;
@@ -1371,7 +1654,8 @@ namespace KScript.Syntax.Markup
                 return true;
             }
             string line = WithoutTrailingComments(text.Substring(start, end - start));
-            if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal)))
+            if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal))
+                && !(line.EndsWith('/') && Lexer.Tokenize(line) is { Count: > 0 } tokens && tokens[^1].Kind == TokenKind.Regex))
             {
                 return true;
             }
@@ -1490,6 +1774,101 @@ namespace KScript.Syntax.Markup
                 pos++;
                 SkipSpaces();
             }
+        }
+
+        /// <summary>
+        /// A type: a name, then any of <c>[]</c>, arguments in brackets (<c>uuid(v: 4)</c>, <c>string(min: 1)[]</c>)
+        /// and a final <c>?</c>.
+        /// </summary>
+        private TextSpan ReadTypeSpan()
+        {
+            int start = pos;
+            int end = TypeEnd(pos);
+            if (end < 0)
+            {
+                int open = text.IndexOf('(', start);
+                Error(new TextSpan(open, 1), DiagnosticCodes.UnclosedElement, "This ( is missing its closing ).");
+                end = text.IndexOf('\n', open) is int nl && nl >= 0 ? nl : text.Length;
+            }
+            pos = end;
+            return TextSpan.FromBounds(start, end);
+        }
+
+        /// <summary>Where the type starting at <paramref name="p"/> ends, or -1 if its arguments aren't closed on the line.</summary>
+        private int TypeEnd(int p)
+        {
+            int start = p;
+            while (p < text.Length && (Lexer.IsIdentChar(text[p]) || text[p] == '.'))
+            {
+                p++;
+            }
+            if (p == start)
+            {
+                return p;
+            }
+            while (p < text.Length)
+            {
+                if (text[p] == '[' && p + 1 < text.Length && text[p + 1] == ']')
+                {
+                    p += 2;
+                }
+                else if (text[p] == '(')
+                {
+                    int close = ClosingBracket(p);
+                    if (close < 0)
+                    {
+                        return -1;
+                    }
+                    p = close + 1;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            return p < text.Length && text[p] == '?' ? p + 1 : p;
+        }
+
+        /// <summary>The bracket closing the one at <paramref name="open"/>, skipping strings and nested brackets; -1 if none on this line.</summary>
+        private int ClosingBracket(int open)
+        {
+            int depth = 0;
+            char quote = '\0';
+            for (int i = open; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (quote != '\0')
+                {
+                    if (c == '\\')
+                    {
+                        i++;
+                    }
+                    else if (c == quote)
+                    {
+                        quote = '\0';
+                    }
+                    continue;
+                }
+                switch (c)
+                {
+                    case '\'' or '"':
+                        quote = c;
+                        break;
+                    case '(' or '[' or '{':
+                        depth++;
+                        break;
+                    case ')' or ']' or '}':
+                        depth--;
+                        if (depth == 0)
+                        {
+                            return i;
+                        }
+                        break;
+                    case '\n':
+                        return -1;
+                }
+            }
+            return -1;
         }
 
         private TextSpan ReadNameSpan(bool allowDash = true)

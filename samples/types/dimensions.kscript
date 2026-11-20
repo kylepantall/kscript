@@ -1,0 +1,16 @@
+import KScript.Math
+
+enum Unit { cm, in, mm }
+
+/// A size such as H4cmW12in: height 4 cm, width 12 inches.
+type Dimensions {
+  pattern: /^H(?<height>[\d.]+)(?<height_unit>cm|in|mm)W(?<width>[\d.]+)(?<width_unit>cm|in|mm)$/i
+  height: number
+  height_unit: Unit
+  width: number
+  width_unit: Unit
+  fn width_in(unit: Unit) => @convert_length($width, $width_unit, $unit)
+}
+
+size: Dimensions = H4cmW12in
+echo "{ $size.width } { $size.width_unit } is { $size->width_in(cm) } cm"
