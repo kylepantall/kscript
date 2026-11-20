@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
   "title": "KScript project settings (kscript.json)",
-  "description": "Settings for kscript serve, kscript check and the KScript language server. Commands look for kscript.json in the folder they work on and its parents.",
+  "description": "Settings for kscript serve, kscript check, kscript fmt and the KScript language server. Commands look for kscript.json in the folder they work on and its parents.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -52,6 +52,18 @@
           "examples": [{ "KS3003": "off", "KS4*": "error" }]
         },
         "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
+      }
+    },
+    "app": {
+      "type": "object",
+      "description": "Used by kscript app build, which packages a script as a desktop app.",
+      "additionalProperties": false,
+      "properties": {
+        "main": { "type": "string", "description": "The script the app runs, relative to kscript.json. Usually one whose root is <KScript.Window>." },
+        "name": { "type": "string", "description": "The app's name in the Dock, Start menu or launcher. Defaults to the project's name." },
+        "id": { "type": "string", "description": "A reverse-DNS id such as com.example.lifelab (the macOS bundle id)." },
+        "version": { "type": "string", "description": "The app's version, such as 1.0.0." },
+        "icon": { "type": "string", "description": "An icon file relative to kscript.json: .icns for macOS, .ico for Windows, .png for Linux." }
       }
     },
     "test": {
@@ -115,6 +127,79 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Settings that must be set, such as database.host. A script stops with a clear message when one is missing."
+        }
+      }
+    },
+    "format": {
+      "type": "object",
+      "description": "Used by kscript fmt and the editor's Format Document. Values set here win over the editor's tab settings.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "false turns formatting off for the project: kscript fmt skips its files and Format Document makes no changes."
+        },
+        "rules": {
+          "type": "object",
+          "description": "Turn individual formatting rules off, e.g. { \"statementPerLine\": false }. Every rule is on unless listed. To leave part of a file alone, use <!-- kscript-fmt: off --> ... <!-- kscript-fmt: on --> or <!-- kscript-fmt-ignore --> before an element.",
+          "additionalProperties": false,
+          "properties": {
+            "indent": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Re-indent elements by how deeply they are nested. Off: lines keep their indentation." },
+            "statementPerLine": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Put each statement and block-level element on its own line. Off: line breaks only change where there was already whitespace." },
+            "tidyTags": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One space between attributes, and <x /> for self-closing tags. Off: start tags are kept exactly as written." },
+            "wrapAttributes": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One attribute per line for long start tags and tags already written that way. Off: tags are never wrapped or joined." },
+            "trimTrailingWhitespace": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Remove spaces at the ends of lines of text." },
+            "collapseBlankLines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to maxBlankLines." },
+            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." }
+          }
+        },
+        "indent": {
+          "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 16 }, { "const": "tab" }],
+          "default": 2,
+          "description": "Spaces per indent level, or \"tab\" to indent with tabs."
+        },
+        "tabWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 2,
+          "description": "With \"indent\": \"tab\", how many columns a tab counts as when lining up existing text."
+        },
+        "printWidth": {
+          "type": "integer",
+          "minimum": 20,
+          "default": 120,
+          "description": "A start tag with several attributes that would run past this column gets one attribute per line."
+        },
+        "maxBlankLines": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1,
+          "description": "Blank lines kept in a row; extra ones are removed."
+        },
+        "endOfLine": {
+          "enum": ["auto", "lf", "crlf"],
+          "default": "auto",
+          "description": "Line endings to write. auto keeps the ones each file already uses."
+        },
+        "preserve": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Elements whose content is kept exactly as written, on top of <pre>, <textarea>, <script>, <style> and CDATA sections."
+        },
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html"],
+          "description": "Files kscript fmt formats in a project folder, as globs relative to kscript.json. .xml files that start with <kscript> are always included; Markdown pages are never reformatted."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["_templates", "node_modules", ".git"],
+          "description": "Files and folders kscript fmt leaves alone."
         }
       }
     }

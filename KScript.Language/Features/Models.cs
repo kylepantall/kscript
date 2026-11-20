@@ -61,6 +61,9 @@ namespace KScript.Language.Features
         public string Label { get; init; }
         public string Documentation { get; init; }
         public IReadOnlyList<(string Label, string Documentation)> Parameters { get; init; }
+
+        /// <summary>Per parameter: its name, the enum values it takes (or null), and whether it is a yes/no flag.</summary>
+        internal IReadOnlyList<(string Name, IReadOnlyList<string> Values, bool Flag)> Details { get; init; }
     }
 
     public sealed class SignatureHelpResult

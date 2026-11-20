@@ -103,7 +103,7 @@ namespace KScript.Language.Tests
         [InlineData("<if test=\"true\"></if>\n  <!-- comment -->\n  <else></else>")]
         [InlineData("<let name=\"v\" value=\"2\" /><match value=\"$v\"><case is=\"1, 2\"></case><case when=\"$v gt 9\"></case><default></default></match>")]
         [InlineData("<echo>@later(1)</echo><fn name=\"later\" params=\"x\" value=\"$x\" />")]
-        [InlineData("<fn name=\"f\" params=\"a: int, b: string = 'x'\"><return value=\"$a + $b\" /></fn><echo>{ 1 |> @f() } { @f(1, 'y') }</echo>")]
+        [InlineData("<fn name=\"f\" params=\"a: int, b: string = 'x'\"><return value=\"$a + $b\" /></fn><echo>{ 1 |> @f() } { @f(1, b: 'y') }</echo>")]
         [InlineData("<fn name=\"twice\" params=\"x\" value=\"$x * 2\" /><echo>{ 3 |> twice() }</echo>")]
         [InlineData("<fn name=\"g\" params=\"x\" value=\"$x\" /><let name=\"r\" value=\"[1]->map(@g)\" />")]
         [InlineData("<let name=\"f\" value=\"fn($x) => $x\" /><echo>{ $f->call(1) } { 1 |> $f }</echo>")]
@@ -281,7 +281,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void MatchProvidesIt()
         {
-            string page = "<let name=\"c\" value=\"'20'->to_number(0)\" /><match value=\"$c\"><case when=\"$it lt 0\"><p>Cold</p></case><default><p>{ $c->clamp(0, 9) }</p></default></match><p>{$it}</p>";
+            string page = "<let name=\"c\" value=\"'20'->to_number(default: 0)\" /><match value=\"$c\"><case when=\"$it lt 0\"><p>Cold</p></case><default><p>{ $c->clamp(min: 0, max: 9) }</p></default></match><p>{$it}</p>";
             DocumentAnalysis a = Analyze(page, Path.Combine(Site, "p.html"), SiteFiles());
             Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedVariable);
             Assert.Equal(page.LastIndexOf("it", StringComparison.Ordinal), d.Span.Start);

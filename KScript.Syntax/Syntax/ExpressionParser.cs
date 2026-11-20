@@ -675,7 +675,9 @@ namespace KScript.Syntax
             {
                 ArgumentNode arg = new ArgumentNode();
                 Token first = Peek();
-                if (first.Kind == TokenKind.Identifier && !Lexer.Keywords.Contains(first.Text) && Peek(1).Is(":"))
+                // A word followed by ':' at the start of an argument names it. Keywords count too (@range(step: 2)):
+                // no expression starts with a keyword and a colon.
+                if (first.Kind == TokenKind.Identifier && Peek(1).Is(":"))
                 {
                     Advance();
                     Advance();

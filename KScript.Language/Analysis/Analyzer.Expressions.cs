@@ -38,6 +38,7 @@ namespace KScript.Language.Analysis
 
                 case CommandCallNode c:
                     AnalyzeCommand(c, region, scope, piped: 0);
+                    FlushBare(c.Arguments, region, scope);
                     return;
 
                 case MethodCallNode m:
@@ -45,12 +46,14 @@ namespace KScript.Language.Analysis
                     AnalyzeExpr(m.Target, region, scope, ExprContext.Value);
                     TypeShape receiver = Infer(m.Target, region);
                     AnalyzeArguments(m.Arguments, region, scope, LambdaParameterShapes(m.Name, receiver));
-                    CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false);
+                    CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false, m.Arguments, region);
+                    FlushBare(m.Arguments, region, scope);
                     return;
                 }
 
                 case CallNode call:
                     AnalyzeCall(call, region, scope, piped: false, left: null);
+                    FlushBare(call.Arguments, region, scope);
                     return;
 
                 case MemberNode member:
@@ -119,6 +122,11 @@ namespace KScript.Language.Analysis
         {
             foreach (ArgumentNode arg in args)
             {
+                if (BareWord(arg) is var (word, _, node) && scope.Lookup(word, region.Source.ToSource(node.Span.Start))?.Kind != SymbolKind.Import)
+                {
+                    pendingBare.Add(arg);
+                    continue;
+                }
                 if (lambdaParameters != null && arg.Value is LambdaNode lambda)
                 {
                     AnalyzeLambda(lambda, region, scope, lambdaParameters);
@@ -168,7 +176,8 @@ namespace KScript.Language.Analysis
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
                 result.References.Add(new SymbolReference(fn, nameSpan, false, false));
-                if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn)))
+                if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn))
+                    && !CheckNamedArguments($"@{fn.Name}()", c.Arguments, piped, SlotsOf(fn, scope), region, full))
                 {
                     CheckFunctionArgumentCount(fn, count, full);
                 }
@@ -186,6 +195,10 @@ namespace KScript.Language.Analysis
             if (command != null)
             {
                 RequirePackage(command.Package, full, $"@{command.Name}()");
+                if (count >= 0 && CheckNamedArguments($"@{command.Name}()", c.Arguments, piped, SlotsOf(new[] { command }), region, full))
+                {
+                    return;
+                }
                 if (count >= 0 && command.Signatures.Count > 0 && !command.Signatures.Any(s => count >= s.MinArgs && count <= s.MaxArgs))
                 {
                     Report(full, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
@@ -247,10 +260,13 @@ namespace KScript.Language.Analysis
                         if (fn != null && fn.Kind == SymbolKind.Function)
                         {
                             result.References.Add(new SymbolReference(fn, span, false, false));
-                            CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
+                            if (!CheckNamedArguments($"@{fn.Name}()", call.Arguments, 1, SlotsOf(fn, scope), region, region.Source.ToSource(call.Span)))
+                            {
+                                CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
+                            }
                             return;
                         }
-                        CheckMethod(id.Name, span, left ?? TypeShape.Unknown, call.Arguments.Count, pipe: true);
+                        CheckMethod(id.Name, span, left ?? TypeShape.Unknown, call.Arguments.Count, pipe: true, call.Arguments, region);
                         return;
                     }
 
@@ -309,10 +325,12 @@ namespace KScript.Language.Analysis
             {
                 case CallNode call:
                     AnalyzeCall(call, region, scope, piped: true, left: Infer(pipe.Left, region));
+                    FlushBare(call.Arguments, region, scope);
                     return;
 
                 case CommandCallNode command:
                     AnalyzeCommand(command, region, scope, piped: 1);
+                    FlushBare(command.Arguments, region, scope);
                     return;
 
                 case LambdaNode lambda:
@@ -363,7 +381,7 @@ namespace KScript.Language.Analysis
             AnalyzeExpr(lambda.Body, region, inner, ExprContext.Value);
         }
 
-        private void CheckMethod(string name, TextSpan nameSpan, TypeShape receiver, int count, bool pipe)
+        private void CheckMethod(string name, TextSpan nameSpan, TypeShape receiver, int count, bool pipe, IReadOnlyList<ArgumentNode> args = null, ExpressionRegion region = null)
         {
             if (string.IsNullOrEmpty(name) || name == "call")
             {
@@ -397,6 +415,10 @@ namespace KScript.Language.Analysis
                 return;
             }
 
+            if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(applicable), region, nameSpan))
+            {
+                return;
+            }
             if (count >= 0 && !applicable.Any(m => count >= m.MinArgs && count <= m.MaxArgs))
             {
                 Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,

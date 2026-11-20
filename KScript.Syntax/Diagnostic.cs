@@ -98,5 +98,8 @@ namespace KScript.Syntax
         public const string ArgumentCount = "KS5004";
         public const string TypeMismatch = "KS5005";
         public const string PlannedFeature = "KS5006";
+        public const string UnknownParameter = "KS5007";
+        public const string NamedArgument = "KS5008";
+        public const string InvalidArgumentValue = "KS5009";
     }
 }

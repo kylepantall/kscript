@@ -207,8 +207,8 @@ public sealed class BuiltInTests : IDisposable
         List<Parameter> parameters = Parameter.ParseList("a, b: int, c = 1", out string error);
         Assert.Null(error);
         Assert.Equal("a, b: int, c = …", string.Join(", ", parameters));
-        Parameter.ParseList("a: blob", out error);
-        Assert.Contains("Unknown type 'blob' for parameter 'a'", error);
+        Parameter.ParseList("a: 9lives", out error);
+        Assert.Contains("Unknown type '9lives' for parameter 'a'", error);
 
         var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
         var interpreter = new Interpreter(KScriptHost.ForText(output));

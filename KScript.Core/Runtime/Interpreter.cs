@@ -540,17 +540,55 @@ namespace KScript.Runtime
             // (secondary threads get only 512 KB on macOS).
             int result = 0;
             System.Runtime.ExceptionServices.ExceptionDispatchInfo failure = null;
+            // The thread that called Run waits for the script, running any work the script hands it with
+            // InvokeOnStartingThread (desktop windows must live on the process's first thread on macOS).
+            var queue = new System.Collections.Concurrent.BlockingCollection<Action>();
             var thread = new Thread(() =>
             {
                 onRunThread = true;
+                startingThread = queue;
                 try { result = RunHere(module); }
                 catch (Exception ex) { failure = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex); }
-                finally { onRunThread = false; }
+                finally
+                {
+                    onRunThread = false;
+                    startingThread = null;
+                    queue.CompleteAdding();
+                }
             }, RunStackSize);
             thread.Start();
+            foreach (Action work in queue.GetConsumingEnumerable()) work();
             thread.Join();
             failure?.Throw();
             return result;
+        }
+
+        [ThreadStatic]
+        private static System.Collections.Concurrent.BlockingCollection<Action> startingThread;
+
+        /// <summary>
+        /// Runs <paramref name="work"/> on the thread that called <see cref="Run"/> (in the kscript command, the
+        /// process's main thread) and waits for it. Packages use it for work the operating system ties to that thread,
+        /// such as desktop windows on macOS. Outside a run, or on that thread already, the work runs here.
+        /// </summary>
+        public void InvokeOnStartingThread(Action work)
+        {
+            var queue = startingThread;
+            if (queue == null || queue.IsAddingCompleted)
+            {
+                work();
+                return;
+            }
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo failure = null;
+            using var done = new ManualResetEventSlim();
+            queue.Add(() =>
+            {
+                try { work(); }
+                catch (Exception ex) { failure = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex); }
+                finally { done.Set(); }
+            });
+            done.Wait();
+            failure?.Throw();
         }
 
         private const int RunStackSize = 256 * 1024 * 1024;
@@ -627,7 +665,7 @@ namespace KScript.Runtime
             {
                 string name = e.GetAttributeValue("name")?.Trim().TrimStart('$');
                 if (name == null) continue;
-                bool export = e.Name == "fn" || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
+                bool export = e.Name == "fn" || e.Name == "const" || e.Name == "enum" || (e.Name == "let" && Values.ParseBool(e.GetAttributeValue("const")) == true);
                 if (export && module.Globals.TryGet(name, out object value)) module.Exports[name] = value;
             }
         }
@@ -649,7 +687,7 @@ namespace KScript.Runtime
                 {
                     string close = Values.Closest(name, imported.Exports.Keys);
                     throw new KScriptException($"{imported.DisplayName} doesn't export '{name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                        + " Scripts export their top-level <fn> functions and <let const=\"yes\"> values.", "Import");
+                        + " Scripts export their top-level <fn> functions, <const> values and <enum> types.", "Import");
                 }
                 scope.Declare(name, value);
             }

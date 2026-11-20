@@ -7,6 +7,7 @@ Language support for [KScript](https://github.com/kylepantall/kscript): scripts 
 - Hover documentation and signature help
 - Go to definition, find references and rename
 - Outline, semantic highlighting and syntax highlighting, including `{ expressions }` in pages
+- Format Document and format on save, using the same formatter as `kscript fmt`
 
 ## Requirements
 
@@ -39,7 +40,9 @@ You can also install this extension from the command line with `kscript ide inst
 
 ## Project settings
 
-A `kscript.json` at the top of a project (created by `kscript make project`) sets the lint rules the editor uses: `lint.rules` changes or turns off a diagnostic by code (`"KS3003": "off"`), and `lint.exclude` silences files and folders such as `_templates`. The extension validates `kscript.json` and completes its settings. See the KScript README for every setting.
+A `kscript.json` at the top of a project (created by `kscript make project`) sets the lint rules the editor uses: `lint.rules` changes or turns off a diagnostic by code (`"KS3003": "off"`), and `lint.exclude` silences files and folders such as `_templates`. The extension validates `kscript.json` and completes its settings. See [Project settings](https://github.com/kylepantall/kscript/blob/master/docs/projects.md#project-settings-kscriptjson) for every setting.
+
+The `format` section of `kscript.json` sets the formatting style (`"indent": 4`, `"indent": "tab"`, `"printWidth": 100` and more); without it, Format Document follows your editor's tab settings. The extension is the default formatter for KScript scripts. For `.html` pages, choose **KScript** when VS Code asks which formatter to use. See [Formatting](https://github.com/kylepantall/kscript/blob/master/docs/formatting.md).
 
 ## Commands
 

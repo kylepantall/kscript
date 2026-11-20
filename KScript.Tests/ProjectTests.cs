@@ -143,16 +143,19 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,config,lint,name,packages,serve,test", Keys(props));
+        Assert.Equal("$schema,app,config,format,lint,name,packages,serve,test", Keys(props));
+        Assert.Equal("icon,id,main,name,version", Keys(props.GetProperty("app").GetProperty("properties")));
         Assert.Equal("environment,files,prefix,required,root", Keys(props.GetProperty("config").GetProperty("properties")));
         Assert.Equal(props.GetProperty("config").GetProperty("properties").GetProperty("files").GetProperty("default").EnumerateArray().Select(e => e.GetString()), KScript.Runtime.ConfigOptions.DefaultFiles);
         Assert.Equal("host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
         Assert.Equal("exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
+        Assert.Equal("enabled,endOfLine,exclude,include,indent,maxBlankLines,preserve,printWidth,rules,tabWidth", Keys(props.GetProperty("format").GetProperty("properties")));
 
         // Every key the schema allows is one ProjectConfig reads.
-        var c = Parse("""{ "$schema": "x", "name": "n", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] }, "config": { "environment": "e", "files": [], "prefix": "P_", "root": ".", "required": [] } }""");
+        var c = Parse("""{ "$schema": "x", "name": "n", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] }, "app": { "main": "a.ks.xml", "name": "A", "id": "x.a", "version": "1", "icon": "a.png" }, "format": { "enabled": true, "rules": { "indent": true, "statementPerLine": false, "tidyTags": "on", "wrapAttributes": "off", "trimTrailingWhitespace": true, "collapseBlankLines": true, "finalNewline": true }, "indent": 4, "tabWidth": 4, "printWidth": 100, "maxBlankLines": 1, "endOfLine": "lf", "preserve": ["echo"], "include": [], "exclude": [] }, "config": { "environment": "e", "files": [], "prefix": "P_", "root": ".", "required": [] } }""");
         Assert.Empty(c.Warnings);
+        Assert.Equal("a.ks.xml", c.App.Main);
         Assert.Equal(5, c.Test.Timeout);
         Assert.Equal(
             props.GetProperty("test").GetProperty("properties").GetProperty("include").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
@@ -167,6 +170,15 @@ public class ProjectConfigTests
         Assert.Equal(
             props.GetProperty("lint").GetProperty("properties").GetProperty("include").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
             LintSettings.DefaultInclude);
+        Assert.Equal(
+            props.GetProperty("format").GetProperty("properties").GetProperty("include").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
+            FormatSettings.DefaultInclude);
+        Assert.Equal(
+            props.GetProperty("format").GetProperty("properties").GetProperty("exclude").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
+            FormatSettings.DefaultExclude);
+        Assert.Equal(
+            string.Join(",", FormatSettings.RuleNames.OrderBy(n => n, StringComparer.Ordinal)),
+            Keys(props.GetProperty("format").GetProperty("properties").GetProperty("rules").GetProperty("properties")));
     }
 }
 

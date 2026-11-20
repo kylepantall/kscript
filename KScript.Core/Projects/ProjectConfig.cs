@@ -22,6 +22,25 @@ namespace KScript.Projects
         public string Host { get; set; } = "localhost";
     }
 
+    /// <summary>The <c>app</c> section: what <c>kscript app build</c> packages and how the app is named.</summary>
+    public sealed class AppSettings
+    {
+        /// <summary>The script the app runs, relative to kscript.json (usually one whose root is &lt;KScript.Window&gt;).</summary>
+        public string Main { get; set; }
+
+        /// <summary>The app's name, as shown in the Dock, Start menu or launcher. Defaults to the project's name.</summary>
+        public string Name { get; set; }
+
+        /// <summary>A reverse-DNS id such as com.example.lifelab (macOS bundle id). Made from the name when missing.</summary>
+        public string Id { get; set; }
+
+        /// <summary>The app's version, such as 1.0.0.</summary>
+        public string Version { get; set; }
+
+        /// <summary>An icon file relative to kscript.json: .icns for macOS, .ico for Windows, .png for Linux.</summary>
+        public string Icon { get; set; }
+    }
+
     /// <summary>The <c>lint</c> section: used by <c>kscript check</c> and by the language server.</summary>
     public sealed class LintSettings
     {
@@ -87,6 +106,49 @@ namespace KScript.Projects
     }
 
     /// <summary>
+    /// The "format" section: how <c>kscript fmt</c> and the editor's Format Document lay files out. Unset values
+    /// fall back to the formatter's defaults (or, in an editor, its tab settings).
+    /// </summary>
+    public sealed class FormatSettings
+    {
+        /// <summary>Spaces per indent level, from "indent": 2; null when not set.</summary>
+        public int? IndentSize { get; set; }
+
+        /// <summary>True for "indent": "tab"; null when not set.</summary>
+        public bool? UseTabs { get; set; }
+
+        public int? PrintWidth { get; set; }
+
+        /// <summary>"auto", "lf" or "crlf".</summary>
+        public string EndOfLine { get; set; } = "auto";
+
+        public int? MaxBlankLines { get; set; }
+
+        /// <summary>Elements whose content is kept exactly as written.</summary>
+        public List<string> Preserve { get; set; } = new List<string>();
+
+        /// <summary>Files <c>kscript fmt</c> formats in a project folder. Markdown pages are never reformatted.</summary>
+        public List<string> Include { get; set; } = new List<string>(DefaultInclude);
+
+        public List<string> Exclude { get; set; } = new List<string>(DefaultExclude);
+
+        public static readonly string[] DefaultInclude = { "**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html" };
+        public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
+
+        /// <summary>False turns formatting off for the whole project (kscript fmt skips it, the editor makes no changes).</summary>
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>Rules turned on or off by name, from "rules": { "statementPerLine": false }. Unlisted rules are on.</summary>
+        public Dictionary<string, bool> Rules { get; } = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The formatter's rules, each of which can be turned off in format.rules.</summary>
+        public static readonly string[] RuleNames =
+        {
+            "indent", "statementPerLine", "tidyTags", "wrapAttributes", "trimTrailingWhitespace", "collapseBlankLines", "finalNewline",
+        };
+    }
+
+    /// <summary>
     /// A KScript project's settings, read from <c>kscript.json</c> in the project folder. <c>kscript serve</c>,
     /// <c>kscript check</c>, <c>kscript make</c> and the language server look for it in the folder they work on and
     /// its parents, so commands run from a subfolder still find it. Comments and trailing commas are allowed.
@@ -94,6 +156,7 @@ namespace KScript.Projects
     /// {
     ///   "name": "my-site",
     ///   "serve": { "root": ".", "port": 8080, "host": "localhost" },
+    ///   "app": { "main": "app.ks.xml", "name": "My App", "icon": "icon.icns" },
     ///   "lint": {
     ///     "exclude": ["_templates", "drafts/**"],
     ///     "rules": { "KS3003": "off", "KS4*": "error" },
@@ -132,6 +195,8 @@ namespace KScript.Projects
             Root = Config.Root == null ? null : Path.GetFullPath(Path.Combine(Directory, Config.Root)),
             Required = Config.Required.ToList(),
         };
+        public FormatSettings Format { get; } = new FormatSettings();
+        public AppSettings App { get; } = new AppSettings();
 
         /// <summary>
         /// Packages every script in the project imports without an &lt;import&gt;, such as KScript.Terminal.
@@ -223,6 +288,12 @@ namespace KScript.Projects
                         case "config":
                             ReadConfig(prop.Value, config);
                             break;
+                        case "format":
+                            ReadFormat(prop.Value, config);
+                            break;
+                        case "app":
+                            ReadApp(prop.Value, config);
+                            break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
                             foreach (string package in config.Packages)
@@ -232,12 +303,31 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve, lint, test or config).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve, lint, test, config, format or app).");
                             break;
                     }
                 }
             }
             return config;
+        }
+
+        private static void ReadApp(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "app", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "main": config.App.Main = String(p.Value, "app.main", config); break;
+                    case "name": config.App.Name = String(p.Value, "app.name", config); break;
+                    case "id": config.App.Id = String(p.Value, "app.id", config); break;
+                    case "version": config.App.Version = String(p.Value, "app.version", config); break;
+                    case "icon": config.App.Icon = String(p.Value, "app.icon", config); break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'app.{p.Name}' (expected main, name, id, version or icon).");
+                        break;
+                }
+            }
         }
 
         private static void ReadServe(JsonElement e, ProjectConfig config)
@@ -361,6 +451,98 @@ namespace KScript.Projects
                         break;
                 }
             }
+        }
+
+
+        private static void ReadFormat(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "format", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "indent":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int size) && size >= 1 && size <= 16)
+                        {
+                            config.Format.IndentSize = size;
+                            config.Format.UseTabs = false;
+                        }
+                        else if (p.Value.ValueKind == JsonValueKind.String && string.Equals(p.Value.GetString().Trim(), "tab", StringComparison.OrdinalIgnoreCase))
+                        {
+                            config.Format.UseTabs = true;
+                        }
+                        else config.Warnings.Add("format.indent should be a number of spaces from 1 to 16, or \"tab\".");
+                        break;
+                    case "tabWidth":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int tab) && tab >= 1 && tab <= 16) config.Format.IndentSize = tab;
+                        else config.Warnings.Add("format.tabWidth should be a number from 1 to 16.");
+                        break;
+                    case "printWidth":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int width) && width >= 20) config.Format.PrintWidth = width;
+                        else config.Warnings.Add("format.printWidth should be a number of columns (20 or more).");
+                        break;
+                    case "maxBlankLines":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int blank) && blank >= 0) config.Format.MaxBlankLines = blank;
+                        else config.Warnings.Add("format.maxBlankLines should be 0 or more.");
+                        break;
+                    case "endOfLine":
+                        string eol = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString().Trim().ToLowerInvariant() : null;
+                        if (eol == "auto" || eol == "lf" || eol == "crlf") config.Format.EndOfLine = eol;
+                        else config.Warnings.Add("format.endOfLine should be \"auto\", \"lf\" or \"crlf\".");
+                        break;
+                    case "enabled":
+                        if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False) config.Format.Enabled = p.Value.GetBoolean();
+                        else config.Warnings.Add("format.enabled should be true or false.");
+                        break;
+                    case "rules":
+                        if (!Object(p.Value, "format.rules", config)) break;
+                        foreach (var rule in p.Value.EnumerateObject())
+                        {
+                            bool? on = rule.Value.ValueKind switch
+                            {
+                                JsonValueKind.True => true,
+                                JsonValueKind.False => false,
+                                JsonValueKind.String when string.Equals(rule.Value.GetString().Trim(), "on", StringComparison.OrdinalIgnoreCase) => true,
+                                JsonValueKind.String when string.Equals(rule.Value.GetString().Trim(), "off", StringComparison.OrdinalIgnoreCase) => false,
+                                _ => null,
+                            };
+                            string known = FormatSettings.RuleNames.FirstOrDefault(n => string.Equals(n, rule.Name, StringComparison.OrdinalIgnoreCase));
+                            if (known == null)
+                                config.Warnings.Add($"format.rules: there is no rule '{rule.Name}'. Rules: {string.Join(", ", FormatSettings.RuleNames)}.");
+                            else if (on == null)
+                                config.Warnings.Add($"format.rules.{rule.Name} should be true or false (or \"on\" / \"off\").");
+                            else
+                                config.Format.Rules[known] = on.Value;
+                        }
+                        break;
+                    case "preserve":
+                        config.Format.Preserve = Strings(p.Value, "format.preserve", config) ?? config.Format.Preserve;
+                        break;
+                    case "include":
+                        config.Format.Include = Strings(p.Value, "format.include", config) ?? config.Format.Include;
+                        break;
+                    case "exclude":
+                        config.Format.Exclude = Strings(p.Value, "format.exclude", config) ?? config.Format.Exclude;
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'format.{p.Name}' (expected enabled, rules, indent, tabWidth, printWidth, maxBlankLines, endOfLine, preserve, include or exclude).");
+                        break;
+                }
+            }
+        }
+
+        /// <summary>True when the file matches format.include and not format.exclude.</summary>
+        public bool IsFormatIncluded(string path)
+        {
+            string rel = Relative(path);
+            return rel != null && Format.Include.Any(g => GlobMatches(g, rel)) && !Format.Exclude.Any(g => GlobMatches(g, rel));
+        }
+
+        /// <summary>True when the file or folder is under the project folder and matches format.exclude.</summary>
+        public bool IsFormatExcluded(string path)
+        {
+            string rel = Relative(path);
+            return rel != null && Format.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         /// <summary>True when the file matches test.include and not test.exclude.</summary>

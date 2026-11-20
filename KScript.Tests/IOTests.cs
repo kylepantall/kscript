@@ -90,7 +90,7 @@ public sealed class IOTests : IDisposable
         string sep = Path.DirectorySeparatorChar.ToString();
         Assert.Equal($"a{sep}b{sep}c.txt\n", Run("<echo>{ @join_path('a', 'b', 'c.txt') }</echo>"));
         Assert.Equal($"{P("x")}\n", Run($"<echo>{{ @join_path(@file('.'), 'x') }}</echo>"));
-        Assert.Contains("needs at least one part", Fails("<echo>{ @join_path() }</echo>").Message);
+        Assert.Contains("needs at least 1 argument", Fails("<echo>{ @join_path() }</echo>").Message);
     }
 
     [Fact]
@@ -100,6 +100,6 @@ public sealed class IOTests : IDisposable
             "<echo>{ ['home', 'desktop', 'documents', 'downloads', 'music', 'pictures', 'videos', 'temp']->map(fn($n) => @known_folder($n)->length() > 0)->join(' ') }</echo>" +
             "<echo>{ @known_folder(' Home ') == @home() } { @known_folder('appdata') != null } { @temp_folder() == @known_folder('temp') }</echo>");
         Assert.Equal("true true true true true true true true\ntrue true true\n", output);
-        Assert.Contains("doesn't know 'attic'", Fails("<echo>{ @known_folder('attic') }</echo>").Message);
+        Assert.Contains("'attic' isn't a valid name", Fails("<echo>{ @known_folder('attic') }</echo>").Message);
     }
 }

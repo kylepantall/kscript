@@ -105,6 +105,11 @@ namespace KScript.Language.Features
 
         private HoverResult ExpressionHover(DocumentAnalysis analysis, ExpressionRegion region, int index)
         {
+            if (ArgumentNameHover(analysis, region, index) is HoverResult argument)
+            {
+                return argument;
+            }
+
             ExprNode node = NodeAt(region, index);
             switch (node)
             {
