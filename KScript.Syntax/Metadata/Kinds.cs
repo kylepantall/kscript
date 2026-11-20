@@ -60,6 +60,9 @@ namespace KScript.Metadata
         /// <summary>A type: a built-in (see the attribute's options), an &lt;enum&gt; or a &lt;type&gt;, with <c>[]</c> for a list and <c>?</c> to allow null.</summary>
         TypeName,
 
+        /// <summary>Types, comma separated or in brackets: <c>with="User, Auditable"</c>.</summary>
+        TypeNames,
+
         /// <summary>The fields of a &lt;type&gt; on one line: <c>login: string, id?: int, tags: string[] = []</c>.</summary>
         Fields,
     }

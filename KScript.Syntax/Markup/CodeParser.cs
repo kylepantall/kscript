@@ -348,7 +348,7 @@ namespace KScript.Syntax.Markup
             {
                 pos++;
                 SkipSpaces();
-                TextSpan type = ReadNameSpan();
+                TextSpan type = ReadTypeSpan();
                 if (type.Length > 0)
                 {
                     AddRawAttribute(e, "type", type);
@@ -433,7 +433,7 @@ namespace KScript.Syntax.Markup
                 int q = p + 1;
                 while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
                 int typeStart = q;
-                while (q < text.Length && Lexer.IsIdentChar(text[q])) q++;
+                q = TypeEnd(q);
                 while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
                 return q > typeStart && q < text.Length && text[q] == '=' && (q + 1 >= text.Length || (text[q + 1] != '=' && text[q + 1] != '>'));
             }
@@ -802,10 +802,7 @@ namespace KScript.Syntax.Markup
                 int colon = pos++;
                 SkipSpaces();
                 int typeStart = pos;
-                while (pos < text.Length && (Lexer.IsIdentChar(text[pos]) || text[pos] is '.' or '[' or ']' or '?'))
-                {
-                    pos++;
-                }
+                ReadTypeSpan();
                 if (pos == typeStart)
                 {
                     Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the field's type after ':', such as string or int[].");
@@ -1372,6 +1369,101 @@ namespace KScript.Syntax.Markup
                 pos++;
                 SkipSpaces();
             }
+        }
+
+        /// <summary>
+        /// A type: a name, then any of <c>[]</c>, arguments in brackets (<c>uuid(v: 4)</c>, <c>string(min: 1)[]</c>)
+        /// and a final <c>?</c>.
+        /// </summary>
+        private TextSpan ReadTypeSpan()
+        {
+            int start = pos;
+            int end = TypeEnd(pos);
+            if (end < 0)
+            {
+                int open = text.IndexOf('(', start);
+                Error(new TextSpan(open, 1), DiagnosticCodes.UnclosedElement, "This ( is missing its closing ).");
+                end = text.IndexOf('\n', open) is int nl && nl >= 0 ? nl : text.Length;
+            }
+            pos = end;
+            return TextSpan.FromBounds(start, end);
+        }
+
+        /// <summary>Where the type starting at <paramref name="p"/> ends, or -1 if its arguments aren't closed on the line.</summary>
+        private int TypeEnd(int p)
+        {
+            int start = p;
+            while (p < text.Length && (Lexer.IsIdentChar(text[p]) || text[p] == '.'))
+            {
+                p++;
+            }
+            if (p == start)
+            {
+                return p;
+            }
+            while (p < text.Length)
+            {
+                if (text[p] == '[' && p + 1 < text.Length && text[p + 1] == ']')
+                {
+                    p += 2;
+                }
+                else if (text[p] == '(')
+                {
+                    int close = ClosingBracket(p);
+                    if (close < 0)
+                    {
+                        return -1;
+                    }
+                    p = close + 1;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            return p < text.Length && text[p] == '?' ? p + 1 : p;
+        }
+
+        /// <summary>The bracket closing the one at <paramref name="open"/>, skipping strings and nested brackets; -1 if none on this line.</summary>
+        private int ClosingBracket(int open)
+        {
+            int depth = 0;
+            char quote = '\0';
+            for (int i = open; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (quote != '\0')
+                {
+                    if (c == '\\')
+                    {
+                        i++;
+                    }
+                    else if (c == quote)
+                    {
+                        quote = '\0';
+                    }
+                    continue;
+                }
+                switch (c)
+                {
+                    case '\'' or '"':
+                        quote = c;
+                        break;
+                    case '(' or '[' or '{':
+                        depth++;
+                        break;
+                    case ')' or ']' or '}':
+                        depth--;
+                        if (depth == 0)
+                        {
+                            return i;
+                        }
+                        break;
+                    case '\n':
+                        return -1;
+                }
+            }
+            return -1;
         }
 
         private TextSpan ReadNameSpan(bool allowDash = true)

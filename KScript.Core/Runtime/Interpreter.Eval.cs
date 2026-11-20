@@ -736,6 +736,8 @@ namespace KScript.Runtime
             string type = Values.TypeOf(target);
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
+            // An email or a handle is text too, so string methods work on it.
+            if (target is ISemanticText && module.Methods.TryGetValue("string:" + name, out method)) return true;
             return module.Methods.TryGetValue("any:" + name, out method);
         }
 
@@ -744,6 +746,7 @@ namespace KScript.Runtime
             var call = ArgumentBinder.Bind(method.Info, new CallContext(this, method.Name, args, named, scope, ctx.Module, isMethod: true));
             CallableInfoCheck(method.Info, call);
             if (method.Receiver == "number" && target is string s) target = Values.ToNumber(s, call.Display);
+            if (method.Receiver == "string" && target is ISemanticText text) target = text.Text;
             return method.Handler(target, call);
         }
 
