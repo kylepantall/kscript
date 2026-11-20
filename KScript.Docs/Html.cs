@@ -40,6 +40,13 @@ namespace KScript.Docs
             return Regex.Replace(WebUtility.HtmlDecode(text), @"\s+", " ").Trim();
         }
 
+        /// <summary>
+        /// The same thing as XML and as .kscript (<c>&lt;break&gt;</c> and <c>break</c>): the page shows the one in the
+        /// reader's format, and the other when they switch.
+        /// </summary>
+        public static string Dual(string xml, string kscript) =>
+            xml == kscript ? xml : $"<span class=\"f-xml\">{xml}</span><span class=\"f-ks\">{kscript}</span>";
+
         /// <summary>A heading id: "Early returns instead of else" becomes early-returns-instead-of-else.</summary>
         public static string Slug(string text)
         {
