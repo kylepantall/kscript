@@ -210,8 +210,8 @@ namespace KScript.Language.Features
         {
             if (e.MustBeInside != null && e.MustBeInside.Count > 0)
             {
-                bool inside = e.MustBeInside.Contains("fn")
-                    ? parent != null && (e.MustBeInside.Contains(parent.Name) || parent.Ancestors().Any(a => e.MustBeInside.Contains(a.Name)))
+                bool inside = e.MustBeInside.Contains("fn") || e.InsideAnyAncestor
+                    ? parent != null && (e.MustBeInside.Contains(ElementInfo.BareName(parent.Name)) || parent.Ancestors().Any(a => e.MustBeInside.Contains(ElementInfo.BareName(a.Name))))
                     : parent != null && e.MustBeInside.Contains(parent.Name);
                 if (!inside)
                 {
@@ -392,7 +392,19 @@ namespace KScript.Language.Features
 
                 case AttributeKind.FunctionReference:
                 case AttributeKind.FunctionReferences:
-                    return FunctionSymbolCompletions(analysis, replace);
+                {
+                    // Functions, functions of imported scripts (people.show), and built-in middleware (KScript.Http).
+                    List<CompletionItem> items = FunctionSymbolCompletions(analysis, replace);
+                    foreach (Symbol import in analysis.Symbols.Where(s => s.Kind == SymbolKind.Import))
+                    {
+                        foreach (FieldInfo field in import.Shape.Fields.Values.Where(f => f.Shape.Type == KType.Fn))
+                        {
+                            items.Add(new CompletionItem { Label = import.Name + "." + field.Name, Kind = CompletionKind.Function, Detail = field.Description, ReplaceSpan = replace });
+                        }
+                    }
+                    items.AddRange(a.Options.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, Detail = "built-in middleware", ReplaceSpan = replace }));
+                    return items;
+                }
 
                 case AttributeKind.VariableReference:
                     return VariableCompletions(analysis, cursor.Offset, replace, withSigil: false);

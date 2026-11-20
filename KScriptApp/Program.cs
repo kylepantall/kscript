@@ -17,7 +17,8 @@ namespace KScript
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             Console.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
             Console.WriteLine("       kscript convert <file-or-folder>... [--to xml|kscript] [--stdout]   Write the .kscript version of an XML script, or the reverse.");
-            Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
+            Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]   Serve pages, and routes.ks.xml / api.ks.xml routes.");
+            Console.WriteLine("       kscript routes [site folder]                      List the routes of a site.");
             Console.WriteLine("       kscript app build [script] [--name \"My App\"] [--out folder]   Package a script as a desktop app.");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
             Console.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
@@ -88,9 +89,14 @@ namespace KScript
 
             try
             {
-                return KScript.Pages.PageServer.RunAsync(folder ?? ".", port ?? 8080, host ?? "localhost", Console.Out).GetAwaiter().GetResult();
+                return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Console.Out).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+            catch (FileNotFoundException ex)
             {
                 Console.Error.WriteLine(ex.Message);
                 return 1;
@@ -100,6 +106,31 @@ namespace KScript
                 Console.Error.WriteLine($"Could not start the server: {ex.Message}");
                 return 1;
             }
+        }
+
+        /// <summary>kscript routes [folder]: the route table of a site (the project's site root by default).</summary>
+        static int Routes(string[] args)
+        {
+            string folder = args.FirstOrDefault(a => !a.StartsWith("-", StringComparison.Ordinal));
+            KScript.Projects.ProjectConfig project;
+            try
+            {
+                project = KScript.Projects.ProjectConfig.FindAndLoad(folder ?? ".");
+            }
+            catch (KScript.Projects.ProjectConfigException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+            string given = folder == null ? null : Path.GetFullPath(folder);
+            if (project != null && (given == null || string.Equals(given.TrimEnd(Path.DirectorySeparatorChar), project.Directory, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)))
+                folder = project.SiteRoot;
+            if (!Directory.Exists(folder ?? "."))
+            {
+                Console.Error.WriteLine($"Site folder not found: {folder}");
+                return 1;
+            }
+            return KScript.Http.HttpServer.ListRoutes(folder ?? ".", project, Console.Out, Console.Error);
         }
 
         static int Main(string[] args)
@@ -167,6 +198,11 @@ namespace KScript
             if (args[0] == "serve")
             {
                 return Serve(args.Skip(1).ToArray());
+            }
+
+            if (args[0] == "routes")
+            {
+                return Routes(args.Skip(1).ToArray());
             }
 
             if (args[0] == "convert")

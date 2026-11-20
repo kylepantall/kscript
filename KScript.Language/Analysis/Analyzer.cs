@@ -81,7 +81,9 @@ namespace KScript.Language.Analysis
             // A leading / so relative paths such as _components/card.html match too.
             string normalized = "/" + path.Replace('\\', '/');
             return System.IO.Path.GetFileName(normalized).StartsWith("_", StringComparison.Ordinal)
-                || normalized.Contains("/_components/", StringComparison.Ordinal);
+                || normalized.Contains("/_components/", StringComparison.Ordinal)
+                // KScript.Http views get their variables from the controller: @view('people/show', person: $p).
+                || normalized.Contains("/views/", StringComparison.Ordinal);
         }
 
         private void DeclareBuiltIns(Scope root)
@@ -861,8 +863,9 @@ namespace KScript.Language.Analysis
 
             if (info.MustBeInside != null && info.MustBeInside.Count > 0)
             {
-                bool ok = info.MustBeInside.Contains("fn")
-                    ? e.Ancestors().Any(a => info.MustBeInside.Contains(a.Name))
+                bool ok = info.MustBeInside.Contains("fn") || info.InsideAnyAncestor
+                    ? e.Ancestors().Any(a => info.MustBeInside.Contains(ElementInfo.BareName(a.Name))
+                        || (info.MustBeInside.Contains("fn") && catalog.GetElement(ElementInfo.BareName(a.Name))?.IsFunctionBody == true))
                     : e.Parent != null && info.MustBeInside.Contains(e.Parent.Name, StringComparer.OrdinalIgnoreCase);
                 if (!ok)
                 {
@@ -931,7 +934,7 @@ namespace KScript.Language.Analysis
                     AnalyzeExpressionRegion(attr.Value, RegionKind.ExpressionList, scope, e, attr);
                     break;
                 case AttributeKind.Template:
-                case AttributeKind.Text when attr.ValueText.Contains('{'):
+                case AttributeKind.Text when attr.ValueText.Contains('{') && !a.Literal:
                     AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: false);
                     break;
                 case AttributeKind.VariableReference:
@@ -945,7 +948,14 @@ namespace KScript.Language.Analysis
                     {
                         foreach ((string name, TextSpan span) in SplitNames(attr.Value))
                         {
-                            ReferenceFunction(name, span, scope);
+                            // Middleware lists (KScript.Http) also take built-ins and groups, with an argument: throttle:30.
+                            int colon = a.Options.Count > 0 ? name.IndexOf(':') : -1;
+                            string bare = colon > 0 ? name.Substring(0, colon).TrimEnd() : name;
+                            if (a.Options.Contains(bare) || (a.Options.Count > 0 && MiddlewareGroups().Contains(bare)))
+                            {
+                                continue;
+                            }
+                            ReferenceFunction(bare, new TextSpan(span.Start, bare.Length), scope);
                         }
                     }
                     break;

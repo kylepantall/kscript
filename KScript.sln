@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Test", "KScript.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.UI", "KScript.UI\KScript.UI.csproj", "{7B194D63-A8CD-40C5-8AD8-6B0E1A3F4E9D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Http", "KScript.Http\KScript.Http.csproj", "{D6EBE2E7-D957-4C00-AA4B-7FDF6A8AE767}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -108,5 +110,9 @@ Global
 		{7B194D63-A8CD-40C5-8AD8-6B0E1A3F4E9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7B194D63-A8CD-40C5-8AD8-6B0E1A3F4E9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7B194D63-A8CD-40C5-8AD8-6B0E1A3F4E9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6EBE2E7-D957-4C00-AA4B-7FDF6A8AE767}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6EBE2E7-D957-4C00-AA4B-7FDF6A8AE767}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6EBE2E7-D957-4C00-AA4B-7FDF6A8AE767}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6EBE2E7-D957-4C00-AA4B-7FDF6A8AE767}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

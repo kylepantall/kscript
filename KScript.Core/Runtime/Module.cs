@@ -101,6 +101,12 @@ namespace KScript.Runtime
         internal bool HasRun;
         internal bool Running;
 
+        /// <summary>The package or script imported with <c>as="alias"</c>, if there is one.</summary>
+        public bool TryGetAlias(string alias, out ImportNamespace import) => Aliases.TryGetValue(alias, out import);
+
+        /// <summary>The names imported with <c>as="..."</c>.</summary>
+        public IEnumerable<string> AliasNames => Aliases.Keys;
+
         public bool Imports(string packageName)
         {
             string name = PackageRegistry.Normalise(packageName);

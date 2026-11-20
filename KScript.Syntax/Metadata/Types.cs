@@ -20,6 +20,7 @@ namespace KScript.Metadata
         public const string Element = "element";
         public const string Error = "error";
         public const string Request = "request";
+        public const string HttpResponse = "http_response";
 
         public static readonly string[] Declarable = { "string", "int", "float", "bool", "list", "map", "fn" };
 

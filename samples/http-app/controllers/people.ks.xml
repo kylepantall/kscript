@@ -1,0 +1,65 @@
+<kscript>
+  <import package="KScript.IO" />
+  <import package="KScript.Http" />
+
+  <const name="file" value="'data/people.json'" />
+
+  <fn name="all" value="@read_json($file)" />
+
+  <fn name="find" params="id">
+    <return value="@all()->find(fn($p) => $p.id == $id)" />
+  </fn>
+
+  <!-- Pages -->
+
+  <fn name="list" params="query">
+    <let name="min" value="($query.min_age ?? '0')->to_number(default: 0)" />
+    <let name="people" value="@all() |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)" />
+    <return value="@view('people/index', people: $people, min: $min)" />
+  </fn>
+
+  <fn name="page" params="id">
+    <let name="person" value="@find($id)" />
+    <if test="$person == null">
+      <do>@abort(404, message: 'Nobody has that id.')</do>
+    </if>
+    <return value="@view('people/show', person: $person)" />
+  </fn>
+
+  <!-- JSON API: a map or list is sent as JSON -->
+
+  <fn name="health" value="{ ok: true }" />
+
+  <fn name="index" params="query">
+    <return value="@all() |> filter(fn($p) => $query.role == null or $p.role == $query.role)" />
+  </fn>
+
+  <fn name="show" params="id">
+    <return value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
+  </fn>
+
+  <fn name="store" params="json">
+    <if test="$json == null or ($json.name ?? '') == ''">
+      <return value="@response({ error: 'A person needs a name.' }, status: 422)" />
+    </if>
+    <let name="people" value="@all()" />
+    <let
+      name="person"
+      value="{ id: $people->map(fn($p) => $p.id)->max() + 1, name: $json.name, age: $json.age ?? 0, role: $json.role ?? 'Member' }" />
+    <do>@write_json($file, $people->push($person))</do>
+    <return value="@response($person, status: 201, headers: { Location: @route('people.show', id: $person.id) })" />
+  </fn>
+
+  <fn name="update" params="id, json">
+    <let name="person" value="@find($id) ?? @abort(404)" />
+    <let name="changed" value="$person->merge($json ?? {})->merge({ id: $person.id })" />
+    <do>@write_json($file, @all()->map(fn($p) => $p.id == $person.id ? $changed : $p))</do>
+    <return value="$changed" />
+  </fn>
+
+  <fn name="destroy" params="id">
+    <let name="person" value="@find($id) ?? @abort(404)" />
+    <do>@write_json($file, @all()->reject(fn($p) => $p.id == $person.id))</do>
+    <return value="@response(null, status: 204)" />
+  </fn>
+</kscript>
