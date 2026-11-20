@@ -101,8 +101,14 @@ namespace KScript.Scaffolding
                 if (string.Equals(type, "templates", StringComparison.OrdinalIgnoreCase)
                     && positional.Skip(1).Any(p => string.Equals(p, "project", StringComparison.OrdinalIgnoreCase)))
                 {
-                    if (positional.Count > 2) { error.WriteLine("Copy the project template on its own: kscript make templates project"); return 1; }
-                    return PublishProjectTemplate(fromProject ? null : root, options.ContainsKey("global"), force, output);
+                    var rest = positional.Skip(1).Where(p => !string.Equals(p, "project", StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (rest.Count > 1 || positional.Count(p => string.Equals(p, "project", StringComparison.OrdinalIgnoreCase)) > 1 || !string.Equals(positional[1], "project", StringComparison.OrdinalIgnoreCase))
+                    {
+                        error.WriteLine($"Copy one project template at a time: kscript make templates project [{string.Join("|", ProjectTemplate.BuiltInNames())}]");
+                        return 1;
+                    }
+                    string which = rest.Count == 1 ? rest[0] : options.ContainsKey("bare") ? "bare" : ProjectTemplate.DefaultName;
+                    return PublishProjectTemplate(fromProject ? null : root, which, options.ContainsKey("global"), force, output);
                 }
 
                 if (string.Equals(type, "templates", StringComparison.OrdinalIgnoreCase))
@@ -248,32 +254,35 @@ namespace KScript.Scaffolding
         /// project (or the --dir one), or, outside a project or with --global, to ~/.kscript/templates/project, where
         /// kscript make project finds it for every new project.
         /// </summary>
-        private static int PublishProjectTemplate(string dir, bool global, bool force, TextWriter output)
+        private static int PublishProjectTemplate(string dir, string name, bool global, bool force, TextWriter output)
         {
+            string folderName = ProjectTemplate.FolderFor(name);
             string folder;
             if (!global && (dir != null || KScript.Projects.ProjectConfig.FindAndLoad(Directory.GetCurrentDirectory()) != null))
             {
                 string root = dir ?? ProjectRoot();
-                folder = Path.Combine(Path.GetFullPath(root), Scaffolder.TemplatesFolder, ProjectTemplate.FolderName);
+                folder = Path.Combine(Path.GetFullPath(root), Scaffolder.TemplatesFolder, folderName);
             }
             else
             {
-                folder = Path.Combine(ProjectTemplate.UserTemplatesFolder(), ProjectTemplate.FolderName);
+                folder = Path.Combine(ProjectTemplate.UserTemplatesFolder(), folderName);
             }
 
-            var written = ProjectTemplate.Publish(folder, force);
+            var written = ProjectTemplate.Publish(folder, force, name);
             string shown = Shown(folder);
+            string what = name == ProjectTemplate.DefaultName ? "the project template" : $"the {name} project template";
             if (written.Count == 0)
             {
-                output.WriteLine($"Nothing to copy: {shown}/ already has the project template. Use --force to replace it.");
+                output.WriteLine($"Nothing to copy: {shown}/ already has {what}. Use --force to replace it.");
                 return 0;
             }
-            output.WriteLine($"Copied the project template to {shown}/:");
+            output.WriteLine($"Copied {what} to {shown}/:");
             foreach (var w in written) output.WriteLine($"  {w}");
             bool inProject = folder.Contains(Path.DirectorySeparatorChar + Scaffolder.TemplatesFolder + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+            string command = name == ProjectTemplate.DefaultName ? "kscript make project" : $"kscript make project --template {name}";
             output.WriteLine(inProject
-                ? "kscript make project now uses it for projects made inside this one. Edit, add or remove files to change what it makes."
-                : "kscript make project now uses it for every new project. Edit, add or remove files to change what it makes.");
+                ? $"{command} now uses it for projects made inside this one. Edit, add or remove files to change what it makes."
+                : $"{command} now uses it for every new project. Edit, add or remove files to change what it makes.");
             output.WriteLine($"{ProjectTemplate.ManifestName} lists its options (such as --no-desktop) and the 'Next:' lines; a '--- make' header with 'when: desktop' copies a file only when that option is on.");
             return 0;
         }
@@ -281,10 +290,14 @@ namespace KScript.Scaffolding
         private static void PrintProjectHelp(string parent, Dictionary<string, string> options, TextWriter output)
         {
             options.TryGetValue("template", out string templateOption);
+            if (templateOption == null && options.TryGetValue("bare", out string bare) && StubTemplate.IsSet(bare)) templateOption = "bare";
             var template = ProjectTemplate.Find(Path.Combine(Path.GetFullPath(parent), "new-project"), templateOption);
-            output.WriteLine("Usage: kscript make project <folder> [--no-desktop] [--port 3000] [--template <folder>] [--force] [--dry-run]");
+            output.WriteLine("Usage: kscript make project <folder> [--bare] [--template <name or folder>] [options] [--force] [--dry-run]");
             output.WriteLine();
-            output.WriteLine(template.BuiltIn ? "Template: built in" : $"Template: {Shown(template.Folder)}");
+            output.WriteLine($"Built-in templates: {string.Join(", ", ProjectTemplate.BuiltInNames())} (web is the default; --bare is --template bare).");
+            output.WriteLine();
+            string templateLabel = template.Name ?? "folder";
+            output.WriteLine(template.BuiltIn ? $"Template: {templateLabel} (built in)" : $"Template: {templateLabel}, from {Shown(template.Folder)}");
             if (template.Description != null) output.WriteLine("  " + template.Description);
             if (template.Options.Count > 0)
             {
@@ -300,8 +313,8 @@ namespace KScript.Scaffolding
                 }
             }
             output.WriteLine();
-            output.WriteLine("kscript make templates project copies the template to change it: to _templates/project in a project,");
-            output.WriteLine("or to ~/.kscript/templates/project (outside a project, or with --global) for every new project.");
+            output.WriteLine("kscript make templates project [bare] copies a template to change it: to _templates/project[-bare] in a");
+            output.WriteLine("project, or to ~/.kscript/templates/project[-bare] (outside a project, or with --global) for every new project.");
         }
 
         private static void PrintTemplates(string root, TextWriter output)
@@ -310,6 +323,7 @@ namespace KScript.Scaffolding
             output.WriteLine("       kscript make templates [type…]   copy the built-in templates to _templates/ to customise them");
             output.WriteLine("       kscript make templates project   copy the project template to customise new projects (--global for all)");
             output.WriteLine("       kscript make project <folder>    start a new web app, with a desktop app unless --no-desktop");
+            output.WriteLine("       kscript make project <folder> --bare   start a bare project: kscript.json, one script and a test");
             output.WriteLine();
             output.WriteLine("Types:");
             var all = Scaffolder.ListTemplates(root);
@@ -323,6 +337,7 @@ namespace KScript.Scaffolding
             output.WriteLine("Examples:");
             output.WriteLine("  kscript make project my-app --port 3000");
             output.WriteLine("  kscript make project my-site --no-desktop");
+            output.WriteLine("  kscript make project my-tool --bare");
             output.WriteLine("  kscript make component Hero --props title,subtitle");
             output.WriteLine("  kscript make page about --title \"About us\"");
             output.WriteLine("  kscript make page \"people/[id]\"");

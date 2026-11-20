@@ -33,6 +33,8 @@ namespace KScript.Scaffolding
         /// <summary>The folder the template was read from, or null for the built-in one.</summary>
         public string Folder { get; init; }
         public bool BuiltIn => Folder == null;
+        /// <summary>The template's name (web, bare, or the name it was asked for by), or null for a --template folder.</summary>
+        public string Name { get; init; }
         public string Description { get; init; }
         public IReadOnlyList<ProjectTemplateOption> Options { get; init; } = Array.Empty<ProjectTemplateOption>();
         /// <summary>Lines printed under "Next:" once the project is made (templates themselves).</summary>
@@ -53,64 +55,104 @@ namespace KScript.Scaffolding
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".kscript", "templates");
         }
 
+        /// <summary>The built-in template used when none is named.</summary>
+        public const string DefaultName = "web";
+
+        /// <summary>The folder a named template lives in under _templates or the user's templates: project for the default, project-bare for bare.</summary>
+        public static string FolderFor(string name) =>
+            string.IsNullOrEmpty(name) || string.Equals(name, DefaultName, StringComparison.OrdinalIgnoreCase) ? FolderName : FolderName + "-" + name.ToLowerInvariant();
+
         /// <summary>
-        /// The template for a new project in <paramref name="projectDir"/>: the --template folder if given; else
-        /// _templates/project in the project around it (for projects made inside a project, such as a monorepo);
-        /// else the user's templates/project folder; else the built-in template.
+        /// The template for a new project in <paramref name="projectDir"/>. <paramref name="templateOption"/> (--template)
+        /// is a folder (a path, relative to the current folder) or a template's name, such as bare; without it the
+        /// default (web) template is used. A name is looked up as _templates/project[-name] in the project around the new
+        /// one (for projects made inside a project, such as a monorepo), then the user's templates/project[-name]
+        /// folder, then the built-in templates.
         /// </summary>
         public static ProjectTemplate Find(string projectDir, string templateOption)
         {
-            if (!string.IsNullOrWhiteSpace(templateOption))
+            string name = string.IsNullOrWhiteSpace(templateOption) ? DefaultName : templateOption.Trim();
+            bool looksLikePath = name.Contains('/') || name.Contains('\\') || name.StartsWith('.') || Path.IsPathRooted(name);
+            if (looksLikePath || (!BuiltInNames().Contains(name, StringComparer.OrdinalIgnoreCase) && Directory.Exists(name)))
             {
-                string folder = Path.GetFullPath(templateOption);
-                if (File.Exists(Path.Combine(folder, ManifestName)) || Directory.Exists(folder)) return FromFolder(folder);
+                string folder = Path.GetFullPath(name);
+                if (Directory.Exists(folder)) return FromFolder(folder);
                 throw new StubException($"--template: there is no template folder at '{templateOption}'.");
             }
 
+            string folderName = FolderFor(name);
             string around = ProjectConfig.Find(Path.GetDirectoryName(Path.GetFullPath(projectDir)));
             if (around != null)
             {
                 string siteRoot = TryLoad(around)?.SiteRoot ?? Path.GetDirectoryName(around);
-                string inProject = Path.Combine(siteRoot, Scaffolder.TemplatesFolder, FolderName);
-                if (Directory.Exists(inProject)) return FromFolder(inProject);
+                string inProject = Path.Combine(siteRoot, Scaffolder.TemplatesFolder, folderName);
+                if (Directory.Exists(inProject)) return FromFolder(inProject, name);
             }
 
-            string user = Path.Combine(UserTemplatesFolder(), FolderName);
-            if (Directory.Exists(user)) return FromFolder(user);
-            return BuiltInTemplate();
+            string user = Path.Combine(UserTemplatesFolder(), folderName);
+            if (Directory.Exists(user)) return FromFolder(user, name);
+            if (BuiltInNames().Contains(name, StringComparer.OrdinalIgnoreCase)) return BuiltInTemplate(name);
+            throw new StubException($"There is no '{name}' project template. Built in: {string.Join(", ", BuiltInNames())}. " +
+                                    $"Add your own as ~/.kscript/templates/{folderName}/, or give --template a folder.");
         }
 
-        private static ProjectConfig TryLoad(string file)
+                private static ProjectConfig TryLoad(string file)
         {
             try { return ProjectConfig.Load(file); }
             catch (ProjectConfigException) { return null; }
         }
 
-        private static ProjectTemplate builtIn;
+        private const string ResourcePrefix = "KScript.Scaffolding.Projects/";
+        private static readonly Dictionary<string, ProjectTemplate> builtIns = new(StringComparer.OrdinalIgnoreCase);
 
-        public static ProjectTemplate BuiltInTemplate()
-        {
-            if (builtIn != null) return builtIn;
-            const string prefix = "KScript.Scaffolding.Project/";
-            var asm = typeof(ProjectTemplate).Assembly;
-            var files = asm.GetManifestResourceNames()
+        /// <summary>The names of the built-in project templates: web (the default) first.</summary>
+        public static IReadOnlyList<string> BuiltInNames() =>
+            BuiltInResources().Select(r => r.Template).Distinct(StringComparer.Ordinal)
+                .OrderBy(n => n == DefaultName ? 0 : 1).ThenBy(n => n, StringComparer.Ordinal).ToList();
+
+        /// <summary>Every embedded project template file: its template's name, its path inside it, and its text.</summary>
+        private static IEnumerable<(string Template, string Path, string Resource)> BuiltInResources() =>
+            typeof(ProjectTemplate).Assembly.GetManifestResourceNames()
                 // MSBuild writes %(RecursiveDir) with \ on Windows.
-                .Where(n => n.Replace('\\', '/').StartsWith(prefix, StringComparison.Ordinal))
+                .Select(n => (Name: n, Normal: n.Replace('\\', '/')))
+                .Where(n => n.Normal.StartsWith(ResourcePrefix, StringComparison.Ordinal) && n.Normal.IndexOf('/', ResourcePrefix.Length) > 0)
                 .Select(n =>
                 {
-                    using var stream = asm.GetManifestResourceStream(n)!;
-                    using var reader = new StreamReader(stream);
+                    string rest = n.Normal.Substring(ResourcePrefix.Length);
+                    int slash = rest.IndexOf('/');
                     // dot-vscode is .vscode: MSBuild globs skip dot folders, so the repo spells them dot-x.
-                    string rel = string.Join("/", n.Replace('\\', '/').Substring(prefix.Length).Split('/')
+                    string rel = string.Join("/", rest.Substring(slash + 1).Split('/')
                         .Select(s => s.StartsWith("dot-", StringComparison.Ordinal) ? "." + s.Substring(4) : s));
-                    return (rel, reader.ReadToEnd().Replace("\r\n", "\n"));
+                    return (rest.Substring(0, slash), rel, n.Name);
+                });
+
+        private static List<(string Path, string Source)> BuiltInFiles(string name)
+        {
+            var asm = typeof(ProjectTemplate).Assembly;
+            return BuiltInResources()
+                .Where(r => string.Equals(r.Template, name, StringComparison.OrdinalIgnoreCase))
+                .Select(r =>
+                {
+                    using var stream = asm.GetManifestResourceStream(r.Resource)!;
+                    using var reader = new StreamReader(stream);
+                    return (r.Path, reader.ReadToEnd().Replace("\r\n", "\n"));
                 })
-                .OrderBy(f => f.rel, StringComparer.Ordinal)
+                .OrderBy(f => f.Path, StringComparer.Ordinal)
                 .ToList();
-            return builtIn = Build(null, files);
         }
 
-        public static ProjectTemplate FromFolder(string folder)
+        public static ProjectTemplate BuiltInTemplate(string name = DefaultName)
+        {
+            lock (builtIns)
+            {
+                if (builtIns.TryGetValue(name, out var cached)) return cached;
+                var files = BuiltInFiles(name);
+                if (files.Count == 0) throw new StubException($"There is no built-in '{name}' project template. Built in: {string.Join(", ", BuiltInNames())}.");
+                return builtIns[name] = Build(null, files, BuiltInNames().First(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)));
+            }
+        }
+
+        public static ProjectTemplate FromFolder(string folder, string name = null)
         {
             folder = Path.GetFullPath(folder);
             var files = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
@@ -120,10 +162,10 @@ namespace KScript.Scaffolding
                 .Select(rel => (rel, File.ReadAllText(Path.Combine(folder, rel)).Replace("\r\n", "\n")))
                 .ToList();
             if (files.Count == 0) throw new StubException($"The project template at '{folder}' has no files.");
-            return Build(folder, files);
+            return Build(folder, files, name);
         }
 
-        private static ProjectTemplate Build(string folder, List<(string Path, string Source)> files)
+        private static ProjectTemplate Build(string folder, List<(string Path, string Source)> files, string name)
         {
             var manifest = files.FirstOrDefault(f => f.Path == ManifestName);
             files = files.Where(f => f.Path != ManifestName).ToList();
@@ -167,7 +209,7 @@ namespace KScript.Scaffolding
                 }
             }
 
-            return new ProjectTemplate { Folder = folder, Description = description, Options = options, Next = next, Files = files };
+            return new ProjectTemplate { Name = name, Folder = folder, Description = description, Options = options, Next = next, Files = files };
         }
 
         private static string Scalar(JsonElement v) => v.ValueKind switch
@@ -218,20 +260,11 @@ namespace KScript.Scaffolding
         /// Copies the built-in project template into <paramref name="folder"/> so it can be changed. Files already there
         /// are kept unless <paramref name="force"/>. Returns the files written, relative to the folder.
         /// </summary>
-        public static IReadOnlyList<string> Publish(string folder, bool force)
+        public static IReadOnlyList<string> Publish(string folder, bool force, string name = DefaultName)
         {
-            var template = BuiltInTemplate();
-            var all = template.Files.ToList();
-            // The manifest comes back from the embedded resources, so it is published too.
-            var asm = typeof(ProjectTemplate).Assembly;
-            using (var stream = asm.GetManifestResourceStream("KScript.Scaffolding.Project/" + ManifestName))
-            {
-                if (stream != null)
-                {
-                    using var reader = new StreamReader(stream);
-                    all.Add((ManifestName, reader.ReadToEnd().Replace("\r\n", "\n")));
-                }
-            }
+            // Every file, the manifest included.
+            var all = BuiltInFiles(name);
+            if (all.Count == 0) throw new StubException($"There is no built-in '{name}' project template. Built in: {string.Join(", ", BuiltInNames())}.");
 
             var written = new List<string>();
             foreach (var (rel, source) in all.OrderBy(f => f.Path, StringComparer.Ordinal))

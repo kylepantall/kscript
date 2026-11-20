@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
+  "name": "{{ kebab }}",
+  "standard": "kscript:recommended",
+  // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
+  "make": {
+    "format": "{{ format }}"
+  },
+  "lint": {
+    "include": ["**/*.kscript", "**/*.ks.xml"],
+    "exclude": ["_templates", "node_modules"]
+  },
+  "test": {
+    "include": ["tests/**/*.test.kscript", "tests/**/*.test.ks.xml"]
+  }
+}

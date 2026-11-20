@@ -1,0 +1,18 @@
+// kscript make project --bare reads this file to learn about the template. It is not copied into new projects.
+// Every other file in this folder is copied, with {{ }} placeholders filled in (see docs/projects.md).
+{
+  "description": "A bare-bones project: kscript.json, one script and a test. No web pages, desktop app or API.",
+  "options": {
+    "format": {
+      "default": "kscript",
+      "description": "kscript writes the script and test as .kscript files; xml writes them as .ks.xml."
+    }
+  },
+  // Printed after the project is made, under "Next:". Lines that come out empty are left out.
+  "next": [
+    "kscript main{{ ext }}{{#if xml}} {{/if}}    run the script",
+    "kscript test            run the tests in tests/",
+    "kscript check           check every script",
+    "kscript ide install     add the KScript extension to VS Code (the project also recommends it)"
+  ]
+}
