@@ -207,9 +207,10 @@ namespace KScript.Pages
 
         /// <summary>
         /// Serves a site. <paramref name="handler"/> (from KScript.Http) sees each request first; when it returns
-        /// null, the request goes to the site's pages and files.
+        /// null, the request goes to the site's pages and files. <paramref name="onStarted"/> gets the address once the
+        /// server is listening.
         /// </summary>
-        public static async Task<int> RunAsync(PageSite site, int port, string host, TextWriter log, Func<HttpRequest, Task<PageResult>> handler, CancellationToken stop = default)
+        public static async Task<int> RunAsync(PageSite site, int port, string host, TextWriter log, Func<HttpRequest, Task<PageResult>> handler, CancellationToken stop = default, Action<string> onStarted = null)
         {
 
             var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = site.Root });
@@ -251,11 +252,15 @@ namespace KScript.Pages
             });
 
             string url = host == "localhost" ? $"http://localhost:{port}" : $"http://{host}:{port}";
-            log?.WriteLine($"Serving {site.Root} on {url}");
-            log?.WriteLine("Press Ctrl+C to stop.");
+            if (onStarted == null)
+            {
+                log?.WriteLine($"Serving {site.Root} on {url}");
+                log?.WriteLine("Press Ctrl+C to stop.");
+            }
             try
             {
                 await app.StartAsync(stop);
+                onStarted?.Invoke(url);
                 await app.WaitForShutdownAsync(stop);
             }
             catch (OperationCanceledException) when (stop.IsCancellationRequested)

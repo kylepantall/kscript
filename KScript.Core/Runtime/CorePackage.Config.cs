@@ -34,7 +34,7 @@ namespace KScript.Runtime
                 new A("to", K.DeclareVariable, "Store the settings in this variable instead of changing $config."))
             {
                 Context = ElementContext.Script,
-                Example = "<config env=\"staging\" prefix=\"APP_\" require=\"database.host\" defaults=\"{ server: { port: 8080 } }\" />\n<echo>{$config.database.host}:{$config.server.port}</echo>",
+                Example = "<config env=\"staging\" prefix=\"APP_\" require=\"database.host\" defaults=\"{ server: { port: 8080 }, database: { host: 'localhost' } }\" />\n<echo>{$config.database.host}:{$config.server.port}</echo>",
             }, run =>
             {
                 ConfigValue shared = ConfigValue.For(run.Host, run.Module.Directory);

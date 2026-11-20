@@ -28,7 +28,7 @@ public sealed class CommandLineTests : IDisposable
         return path;
     }
 
-    private (int Code, string Out, string Err) Run(string[] args, Func<StringWriter, StringWriter, CommandLine> make = null)
+    private (int Code, string Out, string Err) Run(string[] args, Func<StringWriter, StringWriter, CommandLine> make = null, string compiled = "")
     {
         var o = new StringWriter { NewLine = "\n" };
         var e = new StringWriter { NewLine = "\n" };
@@ -36,8 +36,9 @@ public sealed class CommandLineTests : IDisposable
         Console.SetError(e);
         try
         {
-            CommandLine cli = make?.Invoke(o, e) ?? new CommandLine { AppFolder = dir };
-            return (cli.Run(args), o.ToString(), e.ToString());
+            CommandLine cli = make?.Invoke(o, e) ?? new CommandLine();
+            int code = compiled == "" ? cli.Run(args) : cli.RunCompiled(compiled, args);
+            return (code, o.ToString(), e.ToString());
         }
         finally
         {
@@ -84,12 +85,45 @@ public sealed class CommandLineTests : IDisposable
     }
 
     [Fact]
+    public void Help_lists_every_command()
+    {
+        string help = Kscript("--help").Out;
+        foreach (CliCommand command in CliReference.Commands)
+        {
+            foreach (string usage in command.Usage.Split('\n')) Assert.Contains(usage, help);
+        }
+        Assert.StartsWith("Usage: kscript [--env name] <script>", help);
+    }
+
+    [Fact]
+    public void Docs_opens_the_browser_and_stops_on_ctrl_c()
+    {
+        using var stop = new CancellationTokenSource();
+        string opened = null;
+        var result = Run(new[] { "docs", "--port", TestServer.FreePort().ToString() }, (o, e) => new CommandLine
+        {
+            Out = o,
+            Error = e,
+            Cancellation = stop.Token,
+            OpenBrowser = url =>
+            {
+                opened = url;
+                stop.Cancel();
+            },
+        });
+        Assert.Equal(0, result.Code);
+        Assert.StartsWith("http://localhost:", opened);
+        Assert.Contains("KScript docs: " + opened, result.Out);
+    }
+
+    [Fact]
     public void Every_subcommand_is_reached()
     {
         string script = Write("ok.ks.xml", "<kscript>\n  <echo>hi</echo>\n</kscript>\n");
         Assert.Contains("Usage: kscript update", Kscript("update", "--help").Out);
         Assert.Contains("kscript ide install", Kscript("ide", "help").Out);
-        Assert.Contains("Usage: kscript app build", Kscript("app", "--help").Out);
+        Assert.Contains("Usage: kscript compile", Kscript("compile", "--help").Out);
+        Assert.Contains("Usage: kscript docs", Kscript("docs", "--help").Out);
         Assert.Contains("1 file checked: 0 errors", Kscript("check", script, "--warnaserror").Out);
         Assert.Contains("kscript:recommended", Kscript("check", "--print-config", dir).Out);
         Assert.Contains("1 file checked: all formatted", Kscript("fmt", script, "--check").Out);
@@ -108,7 +142,7 @@ public sealed class CommandLineTests : IDisposable
     {
         byte[] exit = Encoding.ASCII.GetBytes("Content-Length: 17\r\n\r\n{\"method\":\"exit\"}");
         var output = new MemoryStream();
-        var (code, _, _) = Run(new[] { "lsp" }, (o, e) => new CommandLine { AppFolder = dir, StandardInput = () => new MemoryStream(exit), StandardOutput = () => output });
+        var (code, _, _) = Run(new[] { "lsp" }, (o, e) => new CommandLine { StandardInput = () => new MemoryStream(exit), StandardOutput = () => output });
         Assert.Equal(1, code); // exit without shutdown
     }
 
@@ -142,7 +176,7 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("boom", failed.Err);
 
         string ok = Write("loop.ks.xml", "<kscript><let name=\"n\" value=\"0\" /><while test=\"true\"><set name=\"n\" value=\"$n + 1\" /></while></kscript>");
-        var stopped = Run(new[] { ok }, (o, e) => new CommandLine { AppFolder = dir, Cancellation = new CancellationToken(true) });
+        var stopped = Run(new[] { ok }, (o, e) => new CommandLine { Cancellation = new CancellationToken(true) });
         Assert.Equal(130, stopped.Code);
     }
 
@@ -234,7 +268,7 @@ public sealed class CommandLineTests : IDisposable
         Write("site/blog/index.html", "<h1>Blog</h1>");
         Write("site/kscript.json", "{ \"serve\": { \"port\": 0, \"host\": \"127.0.0.1\" } }");
         using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-        var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site", "blog"), "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { AppFolder = dir, Cancellation = stop.Token });
+        var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site", "blog"), "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { Cancellation = stop.Token });
         Assert.True(code == 0, error);
     }
 
@@ -245,27 +279,85 @@ public sealed class CommandLineTests : IDisposable
         Write("site/index.html", "<h1>Hi</h1>");
         using var stop = new CancellationTokenSource();
         stop.Cancel();
-        var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site"), "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { AppFolder = dir, Cancellation = stop.Token });
+        var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site"), "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { Cancellation = stop.Token });
         Assert.True(code == 0, error);
     }
 
     [Fact]
-    public void Packaged_apps_run_their_script_and_show_errors_in_a_window()
+    public void Routes_and_convert_are_reached()
     {
-        string app = Path.Combine(dir, "MyApp");
-        Write("MyApp/app/kscript-app.json", "{ \"main\": \"main.ks.xml\", \"name\": \"My App\" }");
-        Write("MyApp/app/kscript.json", "{ \"packages\": [\"KScript.Math\"] }");
-        Write("MyApp/app/main.ks.xml", "<kscript><echo>{ @round(2.6) } { $args->join(',') }</echo></kscript>");
-        var (code, output, _) = Run(new[] { "-psn_0_1", "a" }, (o, e) => new CommandLine { AppFolder = app });
+        Write("api/routes.ks.xml", "<KScript.Routes>\n  <Get path=\"/hi\" view=\"home\" name=\"hi\" />\n</KScript.Routes>\n");
+        Write("api/kscript.json", "{ \"name\": \"api\" }");
+        var (code, output, error) = Kscript("routes", Path.Combine(dir, "api"));
+        Assert.True(code == 0, error);
+        Assert.Contains("/hi", output);
+        Assert.Contains("Site folder not found", Kscript("routes", Path.Combine(dir, "nowhere")).Err);
+        Write("badproject/kscript.json", "{ nope");
+        Assert.Equal(1, Kscript("routes", Path.Combine(dir, "badproject")).Code);
+        Assert.NotEqual(0, Kscript("convert").Code);
+
+        // A route file kscript.json names but that isn't there stops serve.
+        Write("broken/kscript.json", "{ \"http\": { \"routes\": [ { \"file\": \"gone.ks.xml\" } ] } }");
+        Write("broken/index.html", "<h1>Hi</h1>");
+        (code, _, error) = Kscript("serve", Path.Combine(dir, "broken"), "--port", "0");
+        Assert.Equal(1, code);
+        Assert.Contains("gone.ks.xml", error);
+    }
+
+    [Fact]
+    public void Compiled_programs_run_their_script_and_desktop_apps_show_errors_in_a_window()
+    {
+        string manifest = Write("app/kscript-app/kscript-app.json", "{ \"name\": \"Hello\", \"kind\": \"script\", \"main\": \"app/main.ks.xml\" }");
+        Write("app/kscript-app/app/kscript.json", "{ \"packages\": [\"KScript.Math\"] }");
+        Write("app/kscript-app/app/main.ks.xml", "<kscript><echo>{ @round(2.6) } { $args->join(',') }</echo></kscript>");
+        var (code, output, _) = Compiled(manifest, "a", "b");
+        Assert.Equal(0, code);
+        Assert.Contains("3 a,b", output);
+
+        Write("app/kscript-app/kscript-app.json", "{ \"name\": \"Hello\", \"kind\": \"window\", \"main\": \"app/main.ks.xml\" }");
+        (code, output, _) = Compiled(manifest, "-psn_0_1", "a");
         Assert.Equal(0, code);
         Assert.Contains("3 a", output);
 
-        Write("MyApp/app/kscript.json", "{ nope");
-        Write("MyApp/app/main.ks.xml", "<kscript><throw message=\"broken\" /></kscript>");
+        Write("app/kscript-app/app/kscript.json", "{ nope");
+        Write("app/kscript-app/app/main.ks.xml", "<kscript><throw message=\"broken\" /></kscript>");
         string shown = null;
-        (code, _, string error) = Run(Array.Empty<string>(), (o, e) => new CommandLine { AppFolder = app, ShowError = (title, message) => shown = title + ": " + message });
+        (code, _, string error) = Run(Array.Empty<string>(), (o, e) => new CommandLine { ShowError = (title, message) => shown = title + ": " + message }, manifest);
         Assert.Equal(1, code);
         Assert.Contains("broken", error);
         Assert.StartsWith("main.ks.xml: ", shown);
     }
+
+    [Fact]
+    public void Compiled_sites_are_served()
+    {
+        string manifest = Write("site/kscript-app/kscript-app.json", "{ \"name\": \"Site\", \"kind\": \"site\", \"main\": \"app\" }");
+        Write("site/kscript-app/app/index.html", "<h1>Hi</h1>");
+        using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        var (code, output, error) = Run(new[] { "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { Cancellation = stop.Token }, manifest);
+        Assert.True(code == 0, error);
+    }
+
+    [Fact]
+    public void Compiled_programs_whose_files_are_gone_say_so()
+    {
+        var (code, _, error) = Compiled(null);
+        Assert.Equal(1, code);
+        Assert.Contains("files are missing", error);
+    }
+
+    [Fact]
+    public void Compiled_programs_find_their_manifest_among_the_extracted_files()
+    {
+        string manifest = Write("x/kscript-app/kscript-app.json", "{}");
+        string search = string.Join(Path.PathSeparator, Path.Combine(dir, "nothing"), Path.Combine(dir, "x"));
+        Assert.Equal(Path.GetFullPath(manifest), CompiledApp.FindManifest("kscript-app/kscript-app.json", search));
+        Assert.Null(CompiledApp.FindManifest("kscript-app/kscript-app.json", Path.Combine(dir, "nothing")));
+        Assert.Null(CompiledApp.FindManifest(null, search));
+        Assert.Null(CompiledApp.FindManifest("kscript-app/kscript-app.json", null));
+        Assert.False(CompiledApp.IsCompiled);
+        Assert.Null(CompiledApp.FindManifest());
+    }
+
+    private (int Code, string Out, string Err) Compiled(string manifest, params string[] args) => Run(args, null, manifest);
 }

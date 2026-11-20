@@ -10,7 +10,12 @@ namespace KScript.Http
     /// </summary>
     public static class HttpServer
     {
-        public static Task<int> RunAsync(string siteFolder, ProjectConfig project, int port, string host, TextWriter log, CancellationToken stop = default)
+        /// <summary>
+        /// Serves a site. <paramref name="before"/> may answer a request before the routes and pages do (it returns
+        /// null to let them); <paramref name="started"/> gets the address once the server is listening.
+        /// </summary>
+        public static Task<int> RunAsync(string siteFolder, ProjectConfig project, int port, string host, TextWriter log, CancellationToken stop = default,
+            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> before = null, Action<string> started = null)
         {
             var site = new PageSite(siteFolder);
             var app = new HttpApp(site.Root, project, log);
@@ -27,7 +32,10 @@ namespace KScript.Http
                     log?.WriteLine($"Route error: {(ex.Location != null ? ex.Location + ": " : string.Empty)}{ex.Message}");
                 }
             }
-            return PageServer.RunAsync(site, port, host, log, app.HasRoutes ? app.HandleAsync : null, stop);
+            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> routes = app.HasRoutes ? app.HandleAsync : null;
+            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> handler = before == null ? routes : async request =>
+                await before(request) ?? (routes == null ? null : await routes(request));
+            return PageServer.RunAsync(site, port, host, log, handler, stop, onStarted: started);
         }
 
         /// <summary>kscript routes [folder]: prints every route, its name, what answers it and its middleware.</summary>

@@ -187,6 +187,29 @@ namespace KScript.Runtime
                 return def;
             }
 
+            /// <summary>
+            /// Adds usage examples to commands and methods registered above: <c>("@now", "...")</c> for a command and
+            /// <c>("string->upper", "'hi'->upper()")</c> for a method. An example is an expression (the docs show it
+            /// echoed) or statements starting with <c>&lt;</c>. Hover and <c>kscript docs</c> show them, and the docs
+            /// tests run them, so a key that names nothing is an error here.
+            /// </summary>
+            public void Examples(params (string Key, string Example)[] examples)
+            {
+                foreach (var (key, example) in examples)
+                {
+                    CallableInfo info;
+                    int arrow = key.IndexOf("->", StringComparison.Ordinal);
+                    if (key.StartsWith("@", StringComparison.Ordinal))
+                        info = package.commands.TryGetValue(key.Substring(1), out CommandDefinition c) ? c.Info : null;
+                    else if (arrow > 0)
+                        info = package.methods.FirstOrDefault(m => m.Receiver == key.Substring(0, arrow) && m.Name == key.Substring(arrow + 2))?.Info;
+                    else
+                        info = null;
+                    if (info == null) throw new InvalidOperationException($"{package.Name} has no command or method {key} to give an example to.");
+                    info.Example = example;
+                }
+            }
+
             public VariableDefinition Variable(string name, string type, string description, Func<Interpreter, Module, object> value)
             {
                 var def = new VariableDefinition(name, type, description, value, package);

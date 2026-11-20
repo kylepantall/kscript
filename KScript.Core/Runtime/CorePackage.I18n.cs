@@ -21,7 +21,7 @@ namespace KScript.Runtime
                     if (values != null && values is not Dictionary<string, object>)
                         throw new KScriptException($"@t() values should be a map, such as {{ name: $user.name, count: 3 }}, but got {Values.Describe(values)}.", "Argument");
                     return tr.Translate(c.Str(0), values as Dictionary<string, object>, c.Arg(2, "locale") is object l ? Values.ToStr(l) : null);
-                }, "<echo>{ @t('cart.items', { count: $items->count() }) }</echo>");
+                }, "<let name=\"items\" value=\"[1, 2, 3]\" />\n<echo>{ @t('cart.items', { count: $items->count() }) }</echo>");
             p.Command("has_t", "key, locale?", "True when a key has a translation in the current locale (or its fallbacks).", KType.Bool,
                 c => TranslatorFor(c.Interpreter, c.Module).Has(c.Str(0), c.Arg(1, "locale") is object l ? Values.ToStr(l) : null));
             p.Command("locale", "", "The current locale, such as fr or en-GB.", KType.String, c => TranslatorFor(c.Interpreter, c.Module).Locale);

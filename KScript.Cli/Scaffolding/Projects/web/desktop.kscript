@@ -2,7 +2,7 @@
 when: desktop
 ---
 // {{ title }} as a desktop app. Open it with: kscript desktop{{ ext }}
-// Package it with: kscript app build (the "app" section of kscript.json names this file).
+// Compile it into a program with: kscript compile (the "app" section of kscript.json names this file).
 // The rules come from lib/tasks{{ ext }}, the same file the web page (tasks.html) uses.
 KScript.Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
   import "lib/tasks{{ ext }}"

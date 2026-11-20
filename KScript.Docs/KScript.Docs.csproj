@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>KScript.Docs</RootNamespace>
+    <AssemblyName>KScript.Docs</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.0.0</Version>
+    <Product>KScript</Product>
+    <Description>kscript docs: the documentation website, built from the language catalog and docs/*.md, with a sandbox that runs the examples.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The guides are the repository's docs/*.md, built into the binary so kscript docs works offline. -->
+    <EmbeddedResource Include="..\docs\*.md" WithCulture="false" LogicalName="KScript.Docs.Guides.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets\*" WithCulture="false" LogicalName="KScript.Docs.Assets.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KScript.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KScript.Language\KScript.Language.csproj" />
+    <ProjectReference Include="..\KScript.Cli\KScript.Cli.csproj" />
+    <ProjectReference Include="..\KScript.Http\KScript.Http.csproj" />
+  </ItemGroup>
+
+</Project>

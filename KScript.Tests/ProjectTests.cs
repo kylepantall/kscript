@@ -261,7 +261,7 @@ public class MakeProjectTests : IDisposable
         Assert.Contains("<title>Home · My Site</title>", home.Body);
         Assert.Contains("<nav class=\"site-nav\">", home.Body);
         Assert.Contains("Welcome to My Site", home.Body);
-        Assert.Contains("kscript app build", home.Body);
+        Assert.Contains("kscript compile", home.Body);
 
         var about = PageRenderer.RenderFile(new PageContext(site.Root), site.Resolve("/about").File);
         Assert.Contains("About My Site", about.Body);
@@ -341,7 +341,7 @@ public class MakeProjectTests : IDisposable
         Assert.Empty(config.Warnings);
         Assert.Null(config.App.Main);
         Assert.DoesNotContain("desktop.kscript", File.ReadAllText(Path.Combine(root, "tasks.html")));
-        Assert.DoesNotContain("app build", File.ReadAllText(Path.Combine(root, "index.html")));
+        Assert.DoesNotContain("kscript compile", File.ReadAllText(Path.Combine(root, "index.html")));
     }
 
     [Fact]
