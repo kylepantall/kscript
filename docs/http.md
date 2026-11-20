@@ -323,7 +323,7 @@ Group(middleware: auth) {
     "cors": { "origins": ["*"], "methods": ["GET", "POST"], "headers": ["Content-Type", "Authorization"], "credentials": false },
     "auth": { "token_env": "API_TOKEN" },
     "throttle": { "limit": 60, "seconds": 60 },
-    "openapi": { "routes": "auto", "title": "People API", "version": "1.2.0" }  // or false
+    "openapi": { "routes": "auto", "title": "People API", "version": "1.2.0", "file": "openapi.json" }  // or false
   }
 }
 ```
@@ -355,6 +355,14 @@ The document is OpenAPI 3.1. Each part comes from the code:
 | info | `http.openapi.title` and `version`, else the project's `name` and `app.version`. |
 
 Only the API routes (from `api.*` files) are included when there are any, otherwise every route. Set `http.openapi.routes` to `"all"` or `"api"` to choose. `"openapi": false` stops `kscript serve` answering `/_api`, `/_openapi.json` and `/_openapi.yaml`, for example on a public server. `kscript openapi` still works.
+
+To keep the document in your project, for example to commit it or hand it to a client generator, set `http.openapi.file`:
+
+```json
+{ "http": { "openapi": { "file": "openapi.json" } } }
+```
+
+`kscript watch`, `kscript serve` and the editor (on save) then rewrite the file whenever the routes, controllers or types change. Name it `openapi.yaml` (or `.yml`) for YAML. The path is relative to kscript.json. `kscript watch --check` fails when the file is out of date, so CI can check it was committed.
 
 ## Editor and kscript check
 

@@ -18,8 +18,9 @@ same whenever a file changes, so edits made anywhere (another editor, a coding a
 ## Watching
 
 `kscript watch` builds everything the project makes from its code, then rebuilds it a moment after its files stop
-changing. Today that is the agent docs; other generated files join the same watch as packages add them, so one
-command, the editor and `kscript serve` keep all of them in step with the code.
+changing. Today that is the agent docs and, when `http.openapi.file` is set, the [OpenAPI document](http.md#api-docs-openapi).
+Other generated files join the same watch as packages add them, so one command, the editor and `kscript serve` keep all
+of them in step with the code.
 
 ```sh
 kscript watch            # build, then rebuild on every change until Ctrl+C

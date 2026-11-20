@@ -255,6 +255,12 @@ namespace KScript.Projects
         /// <summary>Which routes: "api" (from api.* files), "all", or "auto" (the API routes if there are any, otherwise all).</summary>
         public string Routes { get; set; } = "auto";
 
+        /// <summary>
+        /// A file, relative to kscript.json, to keep the document in: kscript watch, kscript serve and the editor (on save)
+        /// rewrite it as the routes change. A .yaml or .yml name means YAML, anything else JSON. Null writes no file.
+        /// </summary>
+        public string File { get; set; }
+
         public static readonly string[] RouteChoices = { "auto", "api", "all" };
     }
 
@@ -854,13 +860,14 @@ namespace KScript.Projects
                     case "title": openApi.Title = String(o.Value, "http.openapi.title", config) ?? openApi.Title; break;
                     case "version": openApi.Version = String(o.Value, "http.openapi.version", config) ?? openApi.Version; break;
                     case "description": openApi.Description = String(o.Value, "http.openapi.description", config) ?? openApi.Description; break;
+                    case "file": openApi.File = String(o.Value, "http.openapi.file", config) ?? openApi.File; break;
                     case "routes":
                         string routes = String(o.Value, "http.openapi.routes", config);
                         if (routes != null && OpenApiSettings.RouteChoices.Contains(routes)) openApi.Routes = routes;
                         else if (routes != null) config.Warnings.Add($"http.openapi.routes should be {string.Join(", ", OpenApiSettings.RouteChoices)}, not '{routes}'.");
                         break;
                     default:
-                        config.Warnings.Add($"unknown setting 'http.openapi.{o.Name}' (expected enabled, title, version, description or routes).");
+                        config.Warnings.Add($"unknown setting 'http.openapi.{o.Name}' (expected enabled, title, version, description, routes or file).");
                         break;
                 }
             }
