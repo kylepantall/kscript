@@ -629,6 +629,31 @@ namespace KScript.Runtime
         public string Text => "/" + Pattern + "/" + Flags;
         public string TypeName => SemanticTypes.Regex;
 
+        /// <summary>
+        /// The regex an argument stands for: a regex value (/^a+$/i, with its flags), or text that is a pattern. Text
+        /// that isn't a valid pattern fails with the reason.
+        /// </summary>
+        public static RegexValue From(object pattern, string where)
+        {
+            if (pattern is RegexValue regex) return regex;
+            string text = Values.ToStr(pattern);
+            if (TryParse(text, out regex, out string reason)) return regex;
+            throw new KScriptException($"'{text}' isn't a regular expression for {where}: {reason}.", "Value");
+        }
+
+        /// <summary>Runs a match; one that takes too long (catastrophic backtracking) stops with an error instead of hanging.</summary>
+        public static T Run<T>(RegexValue regex, Func<System.Text.RegularExpressions.Regex, T> work)
+        {
+            try
+            {
+                return work(regex.Regex);
+            }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+            {
+                throw new KScriptException($"The regular expression {regex.Text} took longer than a second to match, so it was stopped. Simplify it, such as by removing nested repeats like (a+)+.", "Timeout");
+            }
+        }
+
         /// <summary>A literal <c>/pattern/flags</c>, or a bare pattern.</summary>
         public static bool TryParse(string text, out RegexValue regex, out string reason)
         {

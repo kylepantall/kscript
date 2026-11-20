@@ -237,6 +237,21 @@ echo "{ /\d+/->match_all('3 cats, 12 dogs')->map(fn($m) => $m.text) }"
 
 `->match()` returns `{ text, index, groups, captures }`, or null when nothing matches. A regex that takes longer than a second to match stops with an error, so a bad pattern can't hang a server. In XML, write `<` inside an attribute or text as `&lt;`.
 
+## Built-in functions that take these types
+
+String methods that work with patterns take a regex literal, with its flags, or text holding a pattern. Either way, a match that takes longer than a second stops with an error:
+
+```kscript
+title = 'Hello  World, hello'
+echo "{ $title->matches(/^hello/i) } { $title->find_all(/hello/i) }"
+echo "{ $title->replace(/\s+/, ' ') } { 'tea, coffee ,milk'->split(/\s*,\s*/) }"
+echo "{ $title->replace_pattern(/(?<w>world)/i, '[${w}]') }"
+```
+
+`->replace()` and `->split()` still take plain text too, which is matched as it is written. The `list` method of a storage folder takes a wildcard such as `'*.json'` or a regex matched against each name, such as `/^notes\/.*\.md$/`.
+
+In KScript.Terminal, `input` reads the new types: `type="email"`, `handle` or `uuid` asks again with the reason when the answer doesn't fit, and `type="password"` hides what is typed and keeps the answer as a password.
+
 ## In XML
 
 In XML, the same types are attributes and elements of `<type>`:

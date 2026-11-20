@@ -70,18 +70,7 @@ namespace KScript.Runtime
 
             string rx = KType.Regex;
             static System.Text.RegularExpressions.Regex R(object t) => ((RegexValue)t).Regex;
-            // A pattern that takes too long (catastrophic backtracking) stops with an error instead of hanging.
-            static object Safe(object t, Func<object> work)
-            {
-                try
-                {
-                    return work();
-                }
-                catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
-                {
-                    throw new KScriptException($"The regular expression {Values.ToStr(t)} took longer than a second to match, so it was stopped. Simplify it, such as by removing nested repeats like (a+)+.", "Timeout");
-                }
-            }
+            static object Safe(object t, Func<object> work) => RegexValue.Run((RegexValue)t, _ => work());
             p.Method(rx, "test", "text: string", "yes if the text matches somewhere (use ^ and $ to match all of it).", KType.Bool, (t, c) => Safe(t, () => R(t).IsMatch(c.Str(0))));
             p.Method(rx, "match", "text: string", "The first match: { text, index, groups, captures }, where groups holds named groups (?<name>...) and captures numbered ones. null if none.", KType.Map,
                 (t, c) => Safe(t, () => R(t).Match(c.Str(0)) is { Success: true } m ? RegexValue.MatchMap(R(t), m) : null));
@@ -331,9 +320,12 @@ namespace KScript.Runtime
             p.Method(s, "contains", "text", "yes if the text contains this text.", KType.Bool, (t, c) => S(t).Contains(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "starts_with", "text", "yes if the text starts with this text.", KType.Bool, (t, c) => S(t).StartsWith(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "ends_with", "text", "yes if the text ends with this text.", KType.Bool, (t, c) => S(t).EndsWith(c.Str(0), StringComparison.Ordinal));
-            p.Method(s, "replace", "old, new", "The text with every old replaced by new.", s, (t, c) => c.Str(0).Length == 0 ? S(t) : S(t).Replace(c.Str(0), c.Str(1), StringComparison.Ordinal));
-            p.Method(s, "split", "separator?", "The parts between each separator (or between spaces), as a list.", KType.List, (t, c) =>
-                (c.Has(0) ? S(t).Split(c.Str(0)) : S(t).Split((char[])null, StringSplitOptions.RemoveEmptyEntries)).Cast<object>().ToList());
+            p.Method(s, "replace", "old, new", "The text with every old replaced by new. old can be a regex: ->replace(/\\s+/, ' ').", s, (t, c) =>
+                c.Arg(0) is RegexValue rx ? RegexValue.Run(rx, r => r.Replace(S(t), c.Str(1)))
+                : c.Str(0).Length == 0 ? S(t) : S(t).Replace(c.Str(0), c.Str(1), StringComparison.Ordinal));
+            p.Method(s, "split", "separator?", "The parts between each separator (or between spaces), as a list. The separator can be a regex: ->split(/\\s*,\\s*/).", KType.List, (t, c) =>
+                (c.Arg(0) is RegexValue rx ? RegexValue.Run(rx, r => r.Split(S(t)))
+                : c.Has(0) ? S(t).Split(c.Str(0)) : S(t).Split((char[])null, StringSplitOptions.RemoveEmptyEntries)).Cast<object>().ToList());
             p.Method(s, "lines", "", "The lines of the text, as a list.", KType.List, (t, c) => S(t).Replace("\r\n", "\n").Split('\n').Cast<object>().ToList());
             p.Method(s, "chars", "", "The characters, as a list.", KType.List, (t, c) => S(t).Select(ch => (object)ch.ToString()).ToList());
             p.Method(s, "index_of", "text", "Where text first occurs, or -1.", KType.Number, (t, c) => (double)S(t).IndexOf(c.Str(0), StringComparison.Ordinal));
@@ -375,11 +367,13 @@ namespace KScript.Runtime
             p.Method(s, "from_base64", "", "Base64 text decoded.", s, (t, c) => Encoding.UTF8.GetString(Convert.FromBase64String(S(t))));
             p.Method(s, "md5", "", "The MD5 hash of the text, in hex.", s, (t, c) => Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(S(t)))).ToLowerInvariant());
             p.Method(s, "sha256", "", "The SHA-256 hash of the text, in hex.", s, (t, c) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(S(t)))).ToLowerInvariant());
-            p.Method(s, "matches", "pattern", "yes if the text matches a regular expression.", KType.Bool, (t, c) => System.Text.RegularExpressions.Regex.IsMatch(S(t), c.Str(0), System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(2)));
-            p.Method(s, "find_all", "pattern", "Every match of a regular expression, as a list.", KType.List, (t, c) =>
-                System.Text.RegularExpressions.Regex.Matches(S(t), c.Str(0), System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => (object)m.Value).ToList());
-            p.Method(s, "replace_pattern", "pattern, replacement", "The text with regular expression matches replaced ($1 for groups).", s, (t, c) =>
-                System.Text.RegularExpressions.Regex.Replace(S(t), c.Str(0), c.Str(1), System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(2)));
+            // pattern is a regex (/^[a-z]+$/i, flags and all) or text holding one; either way a slow match stops after a second.
+            p.Method(s, "matches", "pattern: regex", "yes if the text matches a regular expression: ->matches(/^[a-z]+$/i).", KType.Bool, (t, c) =>
+                RegexValue.Run(RegexValue.From(c.Arg(0), "->matches()"), r => r.IsMatch(S(t))));
+            p.Method(s, "find_all", "pattern: regex", "Every match of a regular expression, as a list.", KType.List, (t, c) =>
+                RegexValue.Run(RegexValue.From(c.Arg(0), "->find_all()"), r => r.Matches(S(t)).Select(m => (object)m.Value).ToList()));
+            p.Method(s, "replace_pattern", "pattern: regex, replacement", "The text with regular expression matches replaced ($1 or ${name} for groups).", s, (t, c) =>
+                RegexValue.Run(RegexValue.From(c.Arg(0), "->replace_pattern()"), r => r.Replace(S(t), c.Str(1))));
         }
     }
 }

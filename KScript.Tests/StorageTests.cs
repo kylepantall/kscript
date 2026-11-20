@@ -192,11 +192,12 @@ public sealed class StorageTests : StorageFixture
             <do>$data->write('b.txt', '1'); $data->write('a.json', '2'); $data->write('notes/c.txt', '3'); $data->write('notes/deep/d.txt', '4')</do>
             <echo>{ $data->exists() } { $data->exists('notes') } { $data->exists('nope.txt') }</echo>
             <echo>{ $data->list() } | { $data->list('*.txt', recursive) } | { $data->list(pattern: null) }</echo>
+            <echo>{ $data->list(/^notes\/.*\.txt$/, recursive) } | { $data->list(/\.json$/) }</echo>
             <echo>{ $data->folder('notes')->list() } { $data->folder('notes')->path()->ends_with('notes') } { $data->path('notes/c.txt')->ends_with('c.txt') }</echo>
             <echo>{ $data->delete('a.json') } { $data->delete('a.json') } { $data->delete('notes/deep') }</echo>
             <echo>{ $data->clear() } { $data->list(recursive) }</echo>
             """);
-        Assert.Equal("false  0\ntrue true false\na.json, b.txt | b.txt, notes/c.txt, notes/deep/d.txt | a.json, b.txt\nc.txt true true\ntrue false true\n2\n", output);
+        Assert.Equal("false  0\ntrue true false\na.json, b.txt | b.txt, notes/c.txt, notes/deep/d.txt | a.json, b.txt\nnotes/c.txt, notes/deep/d.txt | a.json\nc.txt true true\ntrue false true\n2\n", output);
     }
 
     [Fact]

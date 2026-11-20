@@ -133,10 +133,13 @@ namespace KScript.Storage
         private object List(CallContext call)
         {
             if (!Directory.Exists(Path)) return new List<object>();
-            string pattern = call.Has(0) && call.Arg(0) != null ? call.Str(0) : "*";
+            // A regex (/\.json$/) is matched against each name, folders included; text is a wildcard such as '*.json'.
+            RegexValue regex = call.Arg(0) as RegexValue;
+            string pattern = regex == null && call.Has(0) && call.Arg(0) != null ? call.Str(0) : "*";
             var option = call.Bool(1) ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             return Directory.EnumerateFiles(Path, pattern, option)
                 .Select(f => System.IO.Path.GetRelativePath(Path, f).Replace('\\', '/'))
+                .Where(f => regex == null || RegexValue.Run(regex, r => r.IsMatch(f)))
                 .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                 .Cast<object>()
                 .ToList();
@@ -170,7 +173,7 @@ namespace KScript.Storage
             ("append", "name, text", "Adds text to the end of a file.", KType.Null),
             ("write_json", "name, value", "Writes a value to a file as indented JSON, replacing it safely.", KType.Null),
             ("delete", "name", "Deletes a file, or a folder and everything in it. True if something was deleted.", KType.Bool),
-            ("list", "pattern?, recursive?: bool", "The names of the files in the folder, such as ['notes/a.txt', 'settings.json']. pattern is a wildcard like '*.json'.", KType.List),
+            ("list", "pattern?, recursive?: bool", "The names of the files in the folder, such as ['notes/a.txt', 'settings.json']. pattern is a wildcard like '*.json', or a regex like /^notes\\/.*\\.md$/ matched against the whole name.", KType.List),
             ("folder", "name", "A folder inside this one, with the same methods.", KType.Storage),
             ("clear", "", "Deletes everything in the folder. Returns how many files were deleted.", KType.Number),
         };
