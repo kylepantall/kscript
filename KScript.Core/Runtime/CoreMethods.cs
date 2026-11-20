@@ -83,12 +83,12 @@ namespace KScript.Runtime
             p.Method(rx, "flags", "", "The flags, such as i.", KType.String, (t, c) => ((RegexValue)t).Flags);
 
             string pw = KType.Password;
-            p.Method(pw, "hash", "algorithm?: string", "A hash to store instead of the password: argon2id (the default) or bcrypt, with a new random salt each time.", KType.String,
+            p.Method(pw, "hash", "algorithm?: argon2id | bcrypt", "A hash to store instead of the password: argon2id (the default) or bcrypt, with a new random salt each time.", KType.String,
                 (t, c) => ((PasswordValue)t).Hash(c.Arg(0) is null ? ((PasswordValue)t).Algorithm : c.Str(0)));
             p.Method(pw, "verify", "hash: string", "yes if this is the password the stored hash was made from. Takes the same time whether it matches or not.", KType.Bool,
                 (t, c) => ((PasswordValue)t).Verify(c.Str(0)));
-            p.Method(pw, "needs_rehash", "hash: string", "yes if the stored hash was made with weaker settings than ->hash() uses now, so it should be replaced after a successful login.", KType.Bool,
-                (t, c) => PasswordValue.NeedsRehash(c.Str(0)));
+            p.Method(pw, "needs_rehash", "hash: string", "yes if the stored hash was made with weaker settings or another algorithm than ->hash() uses now, so it should be replaced after a successful login.", KType.Bool,
+                (t, c) => PasswordValue.NeedsRehash(c.Str(0), ((PasswordValue)t).Algorithm));
             p.Method(pw, "strength", StrengthRules, "How hard the password is to guess: { score (0 to 4), label, ok, problems }. Rules: min length (8), max, upper, lower, digit, symbol, common (yes rejects well-known passwords), not (text it mustn't contain) and score (the lowest score that passes, 3).", KType.Map,
                 (t, c) => ((PasswordValue)t).Strength(c));
             p.Method(pw, "strong", StrengthRules, "yes if the password passes ->strength() with these rules.", KType.Bool,

@@ -357,13 +357,16 @@ namespace KScript.Runtime
             throw new KScriptException("->verify() needs a hash made by ->hash() (it starts with $argon2id$ or $2b$), but got something else.", "Value");
         }
 
-        /// <summary>True if <paramref name="stored"/> was made with weaker settings than ->hash() uses now, so it should be made again at the next login.</summary>
-        public static bool NeedsRehash(string stored)
+        /// <summary>
+        /// True if <paramref name="stored"/> was made with weaker settings than ->hash() uses now, or with another
+        /// algorithm than <paramref name="algorithm"/>, so it should be made again at the next login.
+        /// </summary>
+        public static bool NeedsRehash(string stored, string algorithm = "argon2id")
         {
             string hash = (stored ?? string.Empty).Trim();
             if (TryParseArgon(hash, out int memory, out int passes, out int lanes, out _, out byte[] expected))
-                return memory < ArgonMemory || passes < ArgonPasses || lanes < ArgonLanes || expected.Length < HashBytes;
-            if (IsBcrypt(hash) && int.TryParse(hash.AsSpan(4, 2), out int cost)) return cost < BcryptCost;
+                return algorithm == "bcrypt" || memory < ArgonMemory || passes < ArgonPasses || lanes < ArgonLanes || expected.Length < HashBytes;
+            if (IsBcrypt(hash) && int.TryParse(hash.AsSpan(4, 2), out int cost)) return algorithm != "bcrypt" || cost < BcryptCost;
             throw new KScriptException("->needs_rehash() needs a hash made by ->hash() (it starts with $argon2id$ or $2b$), but got something else.", "Value");
         }
 
@@ -500,11 +503,13 @@ namespace KScript.Runtime
             if (password.Any(c => c < 128 && !char.IsLetterOrDigit(c))) pool += 33;
             if (password.Any(c => c >= 128 && !char.IsLetterOrDigit(c) || c >= 128 && char.IsLetter(c) && !char.IsUpper(c) && !char.IsLower(c))) pool += 100;
             double effective = 0;
+            int distinct = password.Distinct().Count();
             for (int i = 0; i < password.Length; i++)
             {
                 bool predictable = i > 0 && (password[i] == password[i - 1] || Math.Abs(password[i] - password[i - 1]) == 1);
                 effective += predictable ? 0.25 : 1;
             }
+            effective = Math.Min(effective, distinct * 2);
             double bits = effective * Math.Log2(Math.Max(pool, 1));
             return bits < 28 ? 0 : bits < 36 ? 1 : bits < 60 ? 2 : bits < 80 ? 3 : 4;
         }
@@ -664,9 +669,50 @@ namespace KScript.Runtime
             }
             catch (ArgumentException ex)
             {
-                reason = ex.Message.Replace($"Invalid pattern '{pattern}' at offset", "the pattern is invalid at character");
+                reason = ex.Message.Replace($"Invalid pattern '{pattern}' at offset", "the pattern is invalid at character").TrimEnd('.');
                 return false;
             }
+        }
+
+        /// <summary>
+        /// The capturing groups in the order they open in the pattern. .NET numbers unnamed groups before named
+        /// ones, so captures would otherwise come out of order when the two are mixed.
+        /// </summary>
+        internal static List<string> GroupOrder(System.Text.RegularExpressions.Regex regex)
+        {
+            string pattern = regex.ToString();
+            bool explicitOnly = (regex.Options & System.Text.RegularExpressions.RegexOptions.ExplicitCapture) != 0;
+            var order = new List<string>();
+            int unnamed = 0;
+            bool inClass = false;
+            for (int i = 0; i < pattern.Length; i++)
+            {
+                char c = pattern[i];
+                if (c == '\\') { i++; continue; }
+                if (inClass) { inClass = c != ']'; continue; }
+                if (c == '[') { inClass = true; continue; }
+                if (c != '(') continue;
+                if (i + 1 < pattern.Length && pattern[i + 1] == '?')
+                {
+                    // (?<name>...) or (?'name'...) is a named group; (?<= and (?<! look behind.
+                    if (i + 2 < pattern.Length && (pattern[i + 2] == '<' || pattern[i + 2] == '\'') && i + 3 < pattern.Length && pattern[i + 3] != '=' && pattern[i + 3] != '!')
+                    {
+                        char close = pattern[i + 2] == '<' ? '>' : '\'';
+                        int end = pattern.IndexOf(close, i + 3);
+                        if (end > 0) order.Add(pattern.Substring(i + 3, end - i - 3));
+                    }
+                    continue;
+                }
+                if (!explicitOnly) order.Add((++unnamed).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            order.RemoveAll(k => regex.GroupNumberFromName(k) < 0);
+            // Anything the scan missed keeps .NET's order at the end.
+            foreach (int n in regex.GetGroupNumbers().Where(n => n > 0))
+            {
+                string key = regex.GroupNameFromNumber(n);
+                if (!order.Contains(key)) order.Add(key);
+            }
+            return order;
         }
 
         /// <summary>A match as a map: text, index, groups (by name) and captures (by number, 1 up).</summary>
@@ -678,9 +724,10 @@ namespace KScript.Runtime
             {
                 groups[name] = m.Groups[name].Success ? m.Groups[name].Value : null;
             }
-            for (int i = 1; i < m.Groups.Count; i++)
+            foreach (string key in GroupOrder(regex))
             {
-                captures.Add(m.Groups[i].Success ? m.Groups[i].Value : null);
+                System.Text.RegularExpressions.Group g = m.Groups[key];
+                captures.Add(g.Success ? g.Value : null);
             }
             return new Dictionary<string, object>
             {

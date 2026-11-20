@@ -27,9 +27,14 @@ namespace KScript.Runtime
             string kind = Shapes.RawTextKind(SafeType(type), scope, module);
             if (kind == null) return EvaluateText(text, scope, module);
             ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
-            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module)) return text.Value.Trim();
+            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(text.Value, kind)) return text.Value.Trim();
             return EvaluateText(text, scope, module);
         }
+
+        private static readonly System.Text.RegularExpressions.Regex RawHandle = new System.Text.RegularExpressions.Regex(@"^@[\w.\-]+$");
+
+        /// <summary>Text that is plainly a handle (<c>@a--b</c>, which would otherwise read as @a - -b), for a handle type.</summary>
+        internal static bool LooksRaw(string text, string kind) => kind == "handle" && RawHandle.IsMatch(text.Trim());
 
         private static TypeRef SafeType(string type)
         {
@@ -334,6 +339,13 @@ namespace KScript.Runtime
             // @kyle names a function when there is one; otherwise it can only be a handle, for a parameter that takes one.
             if (node is CommandCallNode { ArgumentList: null } reference && !CanResolve(reference, scope, ctx))
                 return new BareWord("@" + reference.Name, false, afterNamed);
+            // small-box and v1.2 read as words for a parameter whose type is read from text.
+            if (node is BinaryNode && ctx.Origin != null && IsRawWord(node, "word", scope, ctx.Module)
+                && node.DescendantsAndSelf().OfType<IdentifierNode>().All(i => !scope.TryGet(i.Name, out _))
+                && node.Span.Start >= 0 && node.Span.Start + node.Span.Length <= ctx.Origin.Value.Length)
+            {
+                return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed);
+            }
             bool negated = false;
             if (node is UnaryNode { Operator: "not", Operand: IdentifierNode inner })
             {
@@ -849,6 +861,12 @@ namespace KScript.Runtime
 
             if (target == null)
                 throw Fail(node, ctx, $"Can't call ->{name}() on null. Use ?? to give a default, such as ($value ?? '')->{name}().", "Null");
+
+            if (target is Record typed && !(ctx.Module?.Methods.Values.Any(m => m.Name == name && m.Receiver == "map") ?? false))
+            {
+                string fields = typed.Type.OwnMethods.Count > 0 ? Suggest(name, typed.Type.OwnMethods.Keys).Replace("Did you mean ", "Did you mean ->").Replace("?", "()?") : string.Empty;
+                throw Fail(node, ctx, $"A {typed.Type.Name} has no method ->{name}().{fields} Methods are added with fn inside the type.", "Name");
+            }
 
             string type = Values.TypeOf(target);
             KScriptPackage owner = Packages.FindMethod(name, ctx.Module?.Packages).FirstOrDefault(p => p.Methods.Any(m => m.Name == name && (m.Receiver == type || m.Receiver == "any")));

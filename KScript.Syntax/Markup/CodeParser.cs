@@ -446,6 +446,11 @@ namespace KScript.Syntax.Markup
                 while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
                 int typeStart = q;
                 q = TypeEnd(q);
+                if (q < 0)
+                {
+                    // name: type(... with no closing ): parsed as an assignment, which reports the missing ).
+                    return true;
+                }
                 while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
                 return q > typeStart && q < text.Length && text[q] == '=' && (q + 1 >= text.Length || (text[q + 1] != '=' && text[q + 1] != '>'));
             }

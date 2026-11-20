@@ -103,7 +103,8 @@ namespace KScript.Runtime
                 new A("with", K.TypeNames, "Other types this one is made from. Types with fields are joined: `with=\"User, Auditable\"` has all their fields and rules, and fits wherever they do. One built-in type, such as `with=\"int\"` or `with=\"handle\"`, makes a type with rules instead of fields: min, max, pattern, one_of, not, <validate> and <normalize>.", false, Values.DeclarableTypes),
                 new A("min", K.Text, "The smallest value allowed: a number for numbers, a date for dates, the length for text (a handle's name without its @), the count for lists. Needs with=\"...\" naming one built-in type."),
                 new A("max", K.Text, "The largest value allowed: a number for numbers, a date for dates, the length for text, the count for lists. Needs with=\"...\" naming one built-in type."),
-                new A("pattern", K.Text, "A regular expression the value's text must match: `^[a-z0-9-]+$`."),
+                new A("pattern", K.Text, "A regular expression the value's text must match: `^[a-z0-9-]+$`. On a type with fields, its named groups fill the fields of the same name, so the type can be made from text."),
+                new A("parse", K.Expression, "On a type with fields: an expression that turns text into a map of the fields, with the text as $value and the pattern's match (if any) as $match."),
                 new A("one_of", K.Text, "The only values allowed: `gb, ie` or `['gb', 'ie']`. Compared after converting and normalising."),
                 new A("not", K.Text, "Values that aren't allowed, such as reserved names: `['@admin', '@root']`."),
                 new A("description", K.Text, "What the type is, shown on hover."))
