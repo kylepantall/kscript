@@ -483,6 +483,44 @@ namespace KScript.Syntax.Markup
                             scopes.Pop();
                             return;
                         }
+                    case "enum" when Only("name", "values", "description") && Attr("name") is string enumName && IsName(enumName.Trim()) && !enumName.Contains('.') && !e.ChildElements.Any() && (Attr("values") ?? string.Empty).All(c => c != '}'):
+                        {
+                            if (!chained)
+                            {
+                                WriteDoc(e, indent);
+                            }
+                            string values = string.Join(", ", (Attr("values") ?? string.Empty).Split(',').Select(v => v.Trim()).Where(v => v.Length > 0));
+                            Line(indent, "enum " + enumName.Trim() + (values.Length > 0 ? " { " + values + " }" : " { }"));
+                            return;
+                        }
+                    case "type" when Attr("name") is string typeName && IsName(typeName.Trim()) && !typeName.Contains('.') && e.Children.All(IsFieldLine):
+                        {
+                            if (!chained)
+                            {
+                                WriteDoc(e, indent);
+                            }
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description")).Select(FormatAttribute));
+                            sb.Append(pad).Append("type ").Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
+                            if (!e.ChildElements.Any())
+                            {
+                                sb.Append('\n');
+                                return;
+                            }
+                            sb.Append(" {\n");
+                            foreach (MarkupNode node in e.Children)
+                            {
+                                if (node is MarkupComment c)
+                                {
+                                    WriteComment(c, indent + 1);
+                                }
+                                else if (node is MarkupElement field)
+                                {
+                                    WriteField(field, indent + 1);
+                                }
+                            }
+                            Line(indent, "}");
+                            return;
+                        }
                     case "call" when Only("fn", "args", "to") && Attr("fn") != null && !e.Children.Any():
                         {
                             // <call fn="greet" args="'x'" to="r" /> is @greet('x'), or r = @greet('x').
@@ -525,6 +563,61 @@ namespace KScript.Syntax.Markup
                 }
 
                 WriteGeneric(e, indent, chained);
+            }
+
+            /// <summary>A &lt;field&gt; the one-line form can hold, a comment, or layout.</summary>
+            private static bool IsFieldLine(MarkupNode node)
+            {
+                if (node is MarkupComment || (node is MarkupText t && t.IsWhitespace))
+                {
+                    return true;
+                }
+                if (!(node is MarkupElement f) || f.Name != "field" || f.Children.Any(c => !(c is MarkupText ft && ft.IsWhitespace)))
+                {
+                    return false;
+                }
+                if (f.Attributes.Any(a => a.Name is not ("name" or "type" or "from" or "default" or "optional" or "value" or "description")))
+                {
+                    return false;
+                }
+                string name = f.GetAttributeValue("name")?.Trim() ?? string.Empty;
+                string type = f.GetAttributeValue("type")?.Trim();
+                string optional = f.GetAttributeValue("optional")?.Trim();
+                return IsName(name.TrimEnd('?')) && !name.Contains('.')
+                    && (type == null || (type.Length > 0 && type.All(c => Lexer.IsIdentChar(c) || c is '.' or '[' or ']' or '?')))
+                    && (optional == null || optional is "yes" or "no")
+                    && !(f.GetAttribute("default") != null && f.GetAttribute("value") != null);
+            }
+
+            /// <summary><c>&lt;field name="stars" type="int" from="stargazers_count" /&gt;</c> is <c>stars: int from stargazers_count</c>.</summary>
+            private void WriteField(MarkupElement f, int indent)
+            {
+                string Attr(string name) => f.GetAttributeValue(name)?.Trim();
+                WriteDoc(f, indent);
+                string name = Attr("name");
+                if (Attr("optional") == "yes" && !name.EndsWith('?'))
+                {
+                    name += "?";
+                }
+                var line = new StringBuilder(name);
+                if (Attr("type") is string type)
+                {
+                    line.Append(": ").Append(type);
+                }
+                if (Attr("from") is string from)
+                {
+                    bool bare = from.Length > 0 && from.All(c => !char.IsWhiteSpace(c) && c is not (';' or '}' or '=' or '"'));
+                    line.Append(" from ").Append(bare ? from : Quote(from));
+                }
+                if (Attr("default") is string defaultValue)
+                {
+                    line.Append(" = ").Append(Reindent(defaultValue, Pad(indent)));
+                }
+                else if (Attr("value") is string value)
+                {
+                    line.Append(" => ").Append(Reindent(value, Pad(indent)));
+                }
+                Line(indent, line.ToString());
             }
 
             private static bool IsName(string s) => s.Length > 0 && Lexer.IsIdentStart(s[0]) && s.All(c => Lexer.IsIdentChar(c) || c == '.');

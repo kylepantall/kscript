@@ -182,6 +182,24 @@ The response from https://api.github.com/... doesn't fit Repo (2 problems):
 
 In a `<catch>`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo->fields()` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
 
+In a `.kscript` file, a type is a block with one field per line, and an enum lists its values in braces (see [the .kscript format](code-format.md)):
+
+```
+enum Visibility { public, private, internal }
+type Owner(fields: "login: string, id: int")
+
+/// A GitHub repository.
+type Repo(extra: error) {
+  name: string
+  /// How many people starred it.
+  stars: int from stargazers_count
+  owner_name: string from owner.login
+  topics: string[] = []
+  license?: string from license.name
+  label => $name + ' (' + $stars + ' stars)'
+}
+```
+
 ## Values and methods
 
 Values are strings, numbers, bools, lists, maps, dates, functions and null, plus values packages add (files, HTTP responses). Every value has methods, called with `->` and chained:

@@ -100,7 +100,7 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary>Parses statements into a parent, up to its closing '}' (or the end of the file).</summary>
-        private void ParseBody(MarkupElement parent, bool braced)
+        private void ParseBody(MarkupElement parent, bool braced, bool fields = false)
         {
             while (true)
             {
@@ -133,7 +133,14 @@ namespace KScript.Syntax.Markup
                     continue;
                 }
 
-                ParseStatement(parent);
+                if (fields)
+                {
+                    ParseField(parent);
+                }
+                else
+                {
+                    ParseStatement(parent);
+                }
                 commentTarget = parent;
                 EndStatement();
             }
@@ -211,6 +218,8 @@ namespace KScript.Syntax.Markup
                 case "for": ParseFor(parent, start); return;
                 case "match": ParseMatch(parent, start); return;
                 case "fn": ParseFn(parent, start, doc); return;
+                case "type" when StartsDeclaration(4): ParseType(parent, start, doc); return;
+                case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
@@ -461,6 +470,8 @@ namespace KScript.Syntax.Markup
                 pos = after;
                 if (alone)
                 {
+                    // The text isn't part of the "start tag", so the editor treats it as text (completing {$x.}).
+                    e.StartTagSpan = TextSpan.FromBounds(start, span.Start);
                     AddText(e, content, span);
                     e.ContentSpan = span;
                     Finish(e, start);
@@ -676,6 +687,176 @@ namespace KScript.Syntax.Markup
             Finish(e, start);
         }
 
+        /// <summary>True at <c>type Name</c> or <c>enum Name</c>: the keyword, then a name (<c>type(...)</c> stays an element).</summary>
+        private bool StartsDeclaration(int keywordLength)
+        {
+            int p = pos + keywordLength;
+            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t'))
+            {
+                return false;
+            }
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p++;
+            }
+            return p < text.Length && Lexer.IsIdentStart(text[p]);
+        }
+
+        /// <summary>
+        /// <c>type Repo(sample: "repo.json") { name: string; stars: int from stargazers_count }</c>: a &lt;type&gt;
+        /// whose block holds one field per line.
+        /// </summary>
+        private void ParseType(MarkupElement parent, int start, string doc)
+        {
+            MarkupElement e = Begin(parent, "type", start);
+            SkipSpaces();
+            AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
+            if (Peek(0) == '(')
+            {
+                ParseAttributeList(e);
+            }
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
+            }
+            SkipSpaces();
+            if (Peek(0) == '{')
+            {
+                ParseBlock(e, fields: true);
+            }
+            else
+            {
+                // type User(fields: "login: string, id: int") needs no block.
+                e.StartTagSpan = TextSpan.FromBounds(start, pos);
+            }
+            Finish(e, start);
+        }
+
+        /// <summary><c>enum Visibility { public, private, internal }</c>: an &lt;enum&gt;; the values are separated by commas.</summary>
+        private void ParseEnum(MarkupElement parent, int start, string doc)
+        {
+            MarkupElement e = Begin(parent, "enum", start);
+            SkipSpaces();
+            AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
+            }
+            SkipSpaces();
+            e.StartTagSpan = TextSpan.FromBounds(start, pos);
+            if (Peek(0) != '{')
+            {
+                Error(new TextSpan(pos, 0), DiagnosticCodes.MarkupSyntax, "Write the values in braces: enum Size { small, medium, large }.");
+                Finish(e, start);
+                return;
+            }
+            int open = pos++;
+            int close = text.IndexOf('}', pos);
+            if (close < 0)
+            {
+                Error(new TextSpan(open, 1), DiagnosticCodes.UnclosedElement, "This { is missing its closing }.");
+                close = text.Length;
+            }
+            int s = open + 1;
+            int end = close;
+            while (s < end && char.IsWhiteSpace(text[s]))
+            {
+                s++;
+            }
+            while (end > s && char.IsWhiteSpace(text[end - 1]))
+            {
+                end--;
+            }
+            AddRawAttribute(e, "values", TextSpan.FromBounds(s, end));
+            pos = Math.Min(text.Length, close + 1);
+            Finish(e, start);
+        }
+
+        /// <summary>
+        /// One line of a type: <c>name: string</c>, <c>avatar?: string</c>, <c>stars: int from stargazers_count</c>,
+        /// <c>tags: string[] = []</c> or <c>label: string => $name + '!'</c>. Becomes a &lt;field&gt;.
+        /// </summary>
+        private void ParseField(MarkupElement parent)
+        {
+            int start = pos;
+            string doc = TakeDoc();
+            if (!Lexer.IsIdentStart(text[pos]))
+            {
+                Error(new TextSpan(pos, 1), DiagnosticCodes.MarkupSyntax, "A type holds one field per line, such as name: string.");
+                while (pos < text.Length && text[pos] != '\n' && text[pos] != ';' && text[pos] != '}')
+                {
+                    pos++;
+                }
+                return;
+            }
+            MarkupElement e = Begin(parent, "field", start, new TextSpan(start, 0));
+            ReadName(allowDash: false);
+            if (Peek(0) == '?')
+            {
+                pos++;
+            }
+            AddRawAttribute(e, "name", TextSpan.FromBounds(start, pos));
+            SkipSpaces();
+            if (Peek(0) == ':')
+            {
+                int colon = pos++;
+                SkipSpaces();
+                int typeStart = pos;
+                while (pos < text.Length && (Lexer.IsIdentChar(text[pos]) || text[pos] is '.' or '[' or ']' or '?'))
+                {
+                    pos++;
+                }
+                if (pos == typeStart)
+                {
+                    Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the field's type after ':', such as string or int[].");
+                }
+                // Kept even when empty (as the spaces after ':'), so the editor offers type names at a: |.
+                AddRawAttribute(e, "type", TextSpan.FromBounds(pos == typeStart ? colon + 1 : typeStart, pos));
+                SkipSpaces();
+            }
+            if (TryWord("from"))
+            {
+                SkipSpaces();
+                if (Peek(0) == '"')
+                {
+                    (DecodedText path, TextSpan span) = ReadString();
+                    AddAttribute(e, "from", path, span, null, '"');
+                }
+                else
+                {
+                    int pathStart = pos;
+                    while (pos < text.Length && !char.IsWhiteSpace(text[pos]) && text[pos] is not (';' or '}' or '='))
+                    {
+                        pos++;
+                    }
+                    if (pos == pathStart)
+                    {
+                        Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write where to read the field after 'from', such as owner.login.");
+                    }
+                    else
+                    {
+                        AddRawAttribute(e, "from", TextSpan.FromBounds(pathStart, pos));
+                    }
+                }
+                SkipSpaces();
+            }
+            if (Lookahead("=>"))
+            {
+                pos += 2;
+                AddExpressionAttribute(e, "value", Stop.Line);
+            }
+            else if (Peek(0) == '=')
+            {
+                pos++;
+                AddExpressionAttribute(e, "default", Stop.Line);
+            }
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(start, 0));
+            }
+            Finish(e, start);
+        }
+
         /// <summary><c>try { } catch err when test { } catch { } finally { }</c>: catch and finally go inside the try, as in XML.</summary>
         private void ParseTry(MarkupElement parent, int start)
         {
@@ -735,6 +916,7 @@ namespace KScript.Syntax.Markup
             if (Peek(0) == '"')
             {
                 (DecodedText message, TextSpan span) = ReadString();
+                e.StartTagSpan = TextSpan.FromBounds(start, span.Start);
                 AddText(e, message, span);
                 e.ContentSpan = span;
             }
@@ -886,7 +1068,7 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary>Parses '{' statements '}' into an element.</summary>
-        private void ParseBlock(MarkupElement e)
+        private void ParseBlock(MarkupElement e, bool fields = false)
         {
             SkipSpaces();
             e.StartTagSpan = TextSpan.FromBounds(e.Span.Start, pos);
@@ -896,7 +1078,7 @@ namespace KScript.Syntax.Markup
                 return;
             }
             int open = pos++;
-            ParseBody(e, braced: true);
+            ParseBody(e, braced: true, fields);
             e.ContentSpan = TextSpan.FromBounds(open + 1, Math.Max(open + 1, text[Math.Max(0, pos - 1)] == '}' ? pos - 1 : pos));
         }
 
