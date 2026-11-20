@@ -93,7 +93,17 @@ A controller is a plain `<fn>`. Its parameters are filled in by name:
 - `input`: the query, form and JSON fields together.
 - `query`, `form`, `headers`, `cookies`.
 
-A typed parameter is converted, so `params="id: int"` gives a number.
+A typed parameter is converted, so `params="id: int"` gives a number. A `<type>` maps the request data into a record, so the controller only sees data of the right shape:
+
+```xml
+<type name="NewPerson" fields="name: string, age?: int, role?: string" />
+
+<fn name="store" params="json: NewPerson">   <!-- $json is a NewPerson record -->
+  …
+</fn>
+```
+
+Data that doesn't fit is the client's mistake, so the controller doesn't run. A body, query or form that doesn't fit gets `422 Unprocessable Entity`. API routes answer with JSON that lists every problem: `{ "error": "...", "status": 422, "problems": [{ "path": "$.age", "field": "age", "message": "..." }] }`. A path parameter that doesn't fit, such as `/people/abc` for `id: int`, gets `404`.
 
 ```xml
 <!-- controllers/people.ks.xml -->
@@ -113,8 +123,10 @@ A typed parameter is converted, so `params="id: int"` gives a number.
     <return value="@view('people/show', person: $person)" />
   </fn>
 
-  <fn name="store" params="json">                  <!-- POST /api/people -->
-    <if test="($json.name ?? '') == ''">
+  <type name="NewPerson" fields="name: string, age?: int, role?: string" />
+
+  <fn name="store" params="json: NewPerson">       <!-- POST /api/people -->
+    <if test="$json.name->trim() == ''">
       <return value="@response({ error: 'A person needs a name.' }, status: 422)" />
     </if>
     …

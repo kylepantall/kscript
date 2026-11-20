@@ -554,6 +554,37 @@ public class HttpAppTests
     }
 
     [Fact]
+    public void TypedParametersMapTheRequestOrAnswer422()
+    {
+        using var site = Site(null, ("api.ks.xml", """
+            <KScript.Routes>
+              <type name="NewPerson" fields="name: string, age?: int" />
+              <fn name="store" params="json: NewPerson" value="{ name: $json.name, type: @type($json) }" />
+              <fn name="show" params="id: int" value="{ id: $id }" />
+              <fn name="search" params="query: Search" value="$query.page" />
+              <type name="Search" fields="page: int" />
+              <Post path="/people" to="store" />
+              <Get path="/people/{id}" to="show" />
+              <Get path="/search" to="search" />
+            </KScript.Routes>
+            """));
+        var app = App(site);
+        Assert.Equal("{\"name\":\"Kyle\",\"type\":\"NewPerson\"}", Send(app, "POST", "/api/people", "{\"name\": \"Kyle\", \"age\": 30}").Body);
+
+        PageResult bad = Send(app, "POST", "/api/people", "{\"age\": \"old\"}");
+        Assert.Equal(422, bad.Status);
+        Assert.Contains("The request body doesn't fit NewPerson", bad.Body);
+        Assert.Contains("\"problems\":[", bad.Body);
+        Assert.Contains("$.name", bad.Body);
+        Assert.Contains("$.age", bad.Body);
+
+        Assert.Equal("{\"id\":5}", Send(app, "GET", "/api/people/5").Body);
+        Assert.Equal(404, Send(app, "GET", "/api/people/abc").Status);
+        Assert.Equal("2", Send(app, "GET", "/api/search", query: "page=2").Body);
+        Assert.Equal(422, Send(app, "GET", "/api/search").Status);
+    }
+
+    [Fact]
     public void ResponsesCanBeChanged()
     {
         using var site = Site("""
