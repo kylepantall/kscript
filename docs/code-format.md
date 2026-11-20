@@ -14,11 +14,11 @@ fn slugify(text) => $text->lower()->replace(' ', '-')
 
 people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
 for p in $people {
-  if $p.age >= 18 {
-    echo "{ @slugify($p.name) } is an adult"
-  } else {
-    echo "$p.name is not"
+  if $p.age < 18 {
+    echo "$p.name is not an adult"
+    continue
   }
+  echo "{ @slugify($p.name) } is an adult"
 }
 ```
 

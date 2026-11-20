@@ -1,0 +1,41 @@
+--- make
+when: desktop
+---
+<!--
+  {{ title }} as a desktop app. Open it with: kscript desktop.ks.xml
+  Package it with: kscript app build (the "app" section of kscript.json names this file).
+  The rules come from lib/tasks.ks.xml, the same file the web page (tasks.html) uses.
+-->
+<KScript.Window title="{{ title }}" width="480" height="560" theme="system">
+  <import src="lib/tasks.ks.xml" />
+
+  <let name="tasks" value="@starter_tasks()" />
+  <let name="draft" value="''" />
+
+  <Text size="24" weight="bold">{{ title }}</Text>
+
+  <Row gap="8">
+    <TextBox
+      bind="draft"
+      placeholder="What needs doing?"
+      width="320"
+      on-enter="tasks = @add_task($tasks, title: $draft); draft = ''" />
+    <Button variant="primary" on-click="tasks = @add_task($tasks, title: $draft); draft = ''">Add</Button>
+  </Row>
+
+  <Column gap="4" scroll="yes">
+    <for each="t" in="$tasks">
+      <!-- A tick box needs a variable to bind to: this row's copy of the task's done flag. -->
+      <let name="done" value="$t.done" />
+      <Row gap="8">
+        <CheckBox bind="done" on-change="tasks = @toggle_task($tasks, id: $t.id)">{$t.title}</CheckBox>
+        <Button on-click="tasks = @remove_task($tasks, id: $t.id)" tooltip="Remove">✕</Button>
+      </Row>
+    </for>
+  </Column>
+
+  <Row gap="8">
+    <Text>{ @tasks_left($tasks) }</Text>
+    <Button on-click="tasks = @clear_done($tasks)" disabled="not $tasks->any(fn($t) => $t.done)">Clear done</Button>
+  </Row>
+</KScript.Window>

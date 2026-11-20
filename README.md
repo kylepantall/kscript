@@ -153,7 +153,7 @@ There is no Swift, C#, XAML or shell script to write. [`samples/life-lab`](sampl
 ## Tooling that comes with it
 
 ```sh
-kscript make project my-site   # a site with a layout, a component, a script, tests and editor settings
+kscript make project my-app    # a web app and desktop app with a layout, a live page, scripts, tests and editor settings
 kscript serve                  # run it
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI
