@@ -19,6 +19,7 @@ namespace KScript.Language.Features
         File,
         Snippet,
         Folder,
+        Module,
     }
 
     public sealed class CompletionItem
@@ -41,6 +42,9 @@ namespace KScript.Language.Features
         public string SortText { get; init; }
         public string FilterText { get; init; }
         public bool Deprecated { get; init; }
+
+        /// <summary>Edits made with the insert, such as the import a package's command needs.</summary>
+        public IReadOnlyList<TextChange> AdditionalEdits { get; init; }
 
         public override string ToString() => $"{Kind} {Label}";
     }

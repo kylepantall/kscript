@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Suggestions everywhere: completion now answers in every place you can write something, in `.kscript` and XML files alike. That covers blank lines and statement starts, inside a statement (`y = @round(‸)`), right after `=`, `echo`, `return`, `if`, `in`, an operator or `|>`, match cases, `} else`, parameter types (`fn f(a: ‸)`), `import ‸` (packages), `import a, ‸ from "lib.kscript"` (the file's functions, constants, types and enums), `KScript.‸` (`KScript.Routes`, `KScript.Window`), route handler bodies (`$request`, `$json`, `$query`, path `{parameters}`) and the empty text of `<echo>` (Ctrl+Space).
+- Only what works is suggested: no planned features, no XML-style `name="..."` arguments in `.kscript` files (they get `name: value`), only cases inside `match`, and no `$lib.` for an import alias. Picking a command or element from a package the script doesn't import adds the import line for you.
+- Docs in your format: in a `.kscript` file, hover and completion docs name elements the `.kscript` way and show examples converted to `.kscript`. Element names in descriptions are no longer swallowed as HTML ("in its file or `describe`").
+- Statement snippets in both formats: `if`, `elif`, `else`, `for`, `while`, `fn`, `try`, `catch`, `match`, `case`, `type`, `enum`, `describe`, `test`, `Get`/`Post` routes and more.
+- VS Code's own word and snippet suggestions are off in KScript files, so only KScript's suggestions show (no unrelated snippets from other extensions). Typing `>` at the end of a start tag in a `.ks.xml` file adds the end tag (`kscript.autoCloseTags`).
 - Completion while typing: a word at the start of a statement now offers keywords (`echo`, `if`, `for`, `fn`, `return`, ...), `@commands`, your functions and variables, with no trigger character needed. In XML scripts a bare word on its own line offers elements and adds the `<`. In expressions, typing `e` now matches `@env` and `$email` (they filter on the bare name).
 - Enter on an empty `///` line in a `.kscript` file ends the doc comment instead of starting another `///` line.
 - Shorthand conditions: `<if $user.is_logged_in>`, `<elif …>`, `<while …>`, `<match …>` and `<assert … />` are highlighted, checked and completed like `test="…"`, in scripts and pages. The `<if>`, `<elif>`, `<while>` and `<match>` snippets use the short form.
