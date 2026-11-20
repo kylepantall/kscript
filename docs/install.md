@@ -45,7 +45,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 
 Run `kscript docs` to open the documentation in your browser. It is built into `kscript`, so it works offline and matches the version you have. `kscript docs replace` opens it with a search for "replace".
 
-Run a script with `kscript script.ks.xml [arguments]`. The arguments are in `$args`, a list. The exit code is 0, the code given to `<exit code="..."/>`, or 3 when the script stops with an error (printed as `file:line:column: Type: message`). Ctrl+C stops a script; `<finally>` blocks still run.
+Run a script with `kscript script.kscript [arguments]`. The arguments are in `$args`, a list. The exit code is 0, the code given to `exit`, or 3 when the script stops with an error (printed as `file:line:column: Type: message`). Ctrl+C stops a script; `<finally>` blocks still run.
 
 ## Editor support
 

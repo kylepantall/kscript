@@ -26,6 +26,7 @@ namespace KScript.Docs
         {
             int? port = null;
             bool openBrowser = true;
+            string format = null;
             var words = new List<string>();
             for (int i = 0; i < args.Length; i++)
             {
@@ -33,8 +34,9 @@ namespace KScript.Docs
                 {
                     case "--help":
                     case "-h":
-                        output.WriteLine("Usage: kscript docs [search words] [--port 4180] [--no-open]");
+                        output.WriteLine("Usage: kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open]");
                         output.WriteLine("Opens the KScript docs in your browser: guides, the reference for every package, and examples you can run.");
+                        output.WriteLine("Examples show in the project's make.format (kscript.json), or .kscript outside a project; --format picks one.");
                         return 0;
                     case "--port":
                     case "-p":
@@ -44,6 +46,15 @@ namespace KScript.Docs
                             return 1;
                         }
                         port = p;
+                        break;
+                    case "--format":
+                    case "-f":
+                        format = i + 1 < args.Length ? NormalizeFormat(args[++i]) : null;
+                        if (format == null)
+                        {
+                            error.WriteLine("--format needs kscript or xml, e.g. --format xml");
+                            return 1;
+                        }
                         break;
                     case "--no-open":
                         openBrowser = false;
@@ -70,7 +81,9 @@ namespace KScript.Docs
             string folder = Path.Combine(Path.GetTempPath(), "kscript-docs-" + Guid.NewGuid().ToString("N"));
             try
             {
-                DocsSite.Build().WriteTo(folder);
+                DocsSite site = DocsSite.Build();
+                site.Format = format ?? ProjectFormat(Directory.GetCurrentDirectory());
+                site.WriteTo(folder);
                 string query = words.Count == 0 ? string.Empty : "/?q=" + Uri.EscapeDataString(string.Join(" ", words));
                 return KScript.Http.HttpServer.RunAsync(folder, null, chosen, "localhost", null, stop,
                     before: request => HandleApiAsync(request, chosen),
@@ -89,6 +102,30 @@ namespace KScript.Docs
             finally
             {
                 TryDelete(folder);
+            }
+        }
+
+        /// <summary>"kscript" or "xml" for the names kscript.json and kscript make accept; null for anything else.</summary>
+        internal static string NormalizeFormat(string format)
+        {
+            switch ((format ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "kscript": case ".kscript": case "ks": case "code": return "kscript";
+                case "xml": case "ks.xml": case ".ks.xml": return "xml";
+                default: return null;
+            }
+        }
+
+        /// <summary>The make.format of the project a folder is in, or .kscript outside a project (or if kscript.json can't be read).</summary>
+        internal static string ProjectFormat(string folder)
+        {
+            try
+            {
+                return NormalizeFormat(KScript.Projects.ProjectConfig.FindAndLoad(folder)?.Make.Format) ?? "kscript";
+            }
+            catch (KScript.Projects.ProjectConfigException)
+            {
+                return "kscript";
             }
         }
 

@@ -134,6 +134,16 @@ public sealed class ConvertProjectTests : IDisposable
     }
 
     [Fact]
+    public void EndOfLineCommentsStayOnTheirLine()
+    {
+        var code = ScriptConverter.Convert("<kscript>\n  <let name=\"count\" value=\"0\" />   <!-- declare -->\n  <!-- own line -->\n  <echo>x</echo>\n</kscript>", "x.ks.xml");
+        Assert.Equal("count = 0 // declare\n// own line\necho \"x\"\n", code.Text);
+
+        var xml = ScriptConverter.Convert("count = 0 // declare\nif true {\n  echo \"x\" // a -- b\n} // end\n// own line\necho \"y\"\n", "x.kscript");
+        Assert.Equal("<kscript>\n  <let name=\"count\" value=\"0\" /> <!-- declare -->\n  <if true>\n    <echo>x</echo> <!-- a - - b -->\n  </if> <!-- end -->\n  <!-- own line -->\n  <echo>y</echo>\n</kscript>\n", xml.Text);
+    }
+
+    [Fact]
     public void TestFilesConvertAndRunAsKscript()
     {
         Write("lib/m.ks.xml", "<kscript>\n  <fn name=\"double\" params=\"x\" value=\"$x * 2\" />\n</kscript>");

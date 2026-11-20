@@ -93,6 +93,12 @@ namespace KScript.Docs
         public LanguageCatalog Catalog { get; }
         public string Version { get; }
 
+        /// <summary>
+        /// The format examples show in until the reader picks the other: "kscript" (the default) or "xml", from
+        /// <c>kscript docs --format</c> or the project's <c>make.format</c>. The reader's pick lasts for the browser tab.
+        /// </summary>
+        public string Format { get; set; } = "kscript";
+
         private DocsSite(LanguageCatalog catalog, string version)
         {
             Catalog = catalog;

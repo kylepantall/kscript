@@ -60,14 +60,15 @@ namespace KScript
                 "kscript serve\nkscript serve site --port 3000", "web"),
             new CliCommand("routes", "kscript routes [site folder]",
                 "List the routes of a site.", Array.Empty<CliOption>(), "kscript routes samples/http-app", "http"),
-            new CliCommand("docs", "kscript docs [search words] [--port 4180] [--no-open]",
+            new CliCommand("docs", "kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open]",
                 "Open these docs: a local website with every package, element, command and method, and examples you can run.",
                 new[]
                 {
                     O("--port N", "The port to serve the docs on (default 4180, or a free port if that one is taken)."),
+                    O("--format kscript|xml", "Show examples as .kscript or XML (default: the project's make.format, else .kscript)."),
                     O("--no-open", "Don't open a browser; just print the address."),
                 },
-                "kscript docs\nkscript docs replace"),
+                "kscript docs\nkscript docs replace\nkscript docs --format xml"),
             new CliCommand("css", "kscript css [file-or-folder]... [--out folder] [--var name=value]",
                 "Compile .ks.css, .ks.scss and .ks.sass stylesheets.",
                 new[]

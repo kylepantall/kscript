@@ -4,24 +4,22 @@
 
 **One readable language for your scripts, your websites and your desktop apps.**
 
-KScript is an open source language that looks like the HTML you already know. The same elements, expressions and functions run a terminal script, render a web page, update that page live as people click and type, and draw native desktop windows, all from one small binary on Windows, macOS and Linux. There is no JavaScript to write, no build step, no `node_modules` and no virtual environment.
+KScript is an open source language for scripts, web pages and desktop apps. You write it in the short `.kscript` format, or as XML that looks like the HTML you already know; both run the same. The same statements, expressions and functions run a terminal script, render a web page, update that page live as people click and type, and draw native desktop windows, all from one small binary on Windows, macOS and Linux. There is no JavaScript to write, no build step, no `node_modules` and no virtual environment.
 
-```xml
-<kscript>
-  <import package="KScript.Terminal" />
+```kscript
+import KScript.Terminal
 
-  <input to="name">What's your name? </input>
-  <echo>Hello, { $name->trim()->title() }!</echo>
-</kscript>
+input(to: name) "What's your name? "
+echo "Hello, { $name->trim()->title() }!"
 ```
 
 ```sh
-kscript hello.ks.xml
+kscript hello.kscript
 ```
 
 ## Why KScript
 
-- **Learn it once, use it everywhere.** Scripts and web pages run on the same interpreter, so a function you write for a script works in a page unchanged. Import it with `<import src="lib/text.ks.xml" />` and call it.
+- **Learn it once, use it everywhere.** Scripts and web pages run on the same interpreter, so a function you write for a script works in a page unchanged. Import it with `import "lib/text.kscript"` and call it.
 - **Interactive pages with no JavaScript.** Put a `<live>` block in a page and its buttons, inputs and forms run KScript handlers like `on-click="count += 1"` on the server. Only that block is redrawn. You write no JavaScript and no API, and there is no build step.
 - **Mistakes show up before anything runs.** Unknown elements, bad attributes, missing imports and syntax errors are reported before the first line runs, so a typo near the end can't leave a job half done. The errors say what to write instead.
 - **An editor that understands your code.** The VS Code extension knows the type of every value, so `$person.` offers that person's fields and `$name->` offers string methods, including what your own functions return.
@@ -33,52 +31,49 @@ kscript hello.ks.xml
 
 Find everything over 1 MB in a folder, list it largest first, and offer to move it into an archive:
 
-```xml
-<kscript>
-  <import package="KScript.IO" />
-  <import package="KScript.Terminal" />
+```kscript
+import KScript.IO
+import KScript.Terminal
 
-  <let name="folder" value="$args[0] ?? @known_folder(downloads)" />
-  <let name="big" value="@files($folder, pattern: '*', recursive)
-      |> filter(fn($f) => $f->size() gt 1000000)
-      |> sort_by(fn($f) => -$f->size())" />
+folder = $args[0] ?? @known_folder(downloads)
+big = @files($folder, pattern: '*', recursive)
+  |> filter(fn($f) => $f->size() gt 1000000)
+  |> sort_by(fn($f) => -$f->size())
 
-  <for each="f" in="$big">
-    <echo>{ @bold($f->name()) }  { ($f->size() / 1000000)->round(digits: 1) } MB</echo>
-  </for>
-  <else>
-    <echo>Nothing over 1 MB in {$folder}.</echo>
-  </else>
+for f in $big {
+  echo "{ @bold($f->name()) }  { ($f->size() / 1000000)->round(digits: 1) } MB"
+} else {
+  echo "Nothing over 1 MB in {$folder}."
+}
 
-  <if $big->count() gt 0>
-    <confirm to="ok">Move them to an archive folder?</confirm>
-    <if $ok>
-      <for each="f" in="$big">
-        <move from="$f" to="@join_path(base: $folder, ['archive', $f->name()])" />
-      </for>
-    </if>
-  </if>
-</kscript>
+if $big->count() gt 0 {
+  confirm(to: ok) "Move them to an archive folder?"
+  if $ok {
+    for f in $big {
+      move(from: $f, to: @join_path(base: $folder, ['archive', $f->name()]))
+    }
+  }
+}
 ```
 
 You get real values (strings, numbers, lists, maps, dates, files), methods on all of them with `->`, pipes with `|>`, lambdas with `fn($x) => …`, `try`/`catch`, and functions you call like commands. Calling an API takes one line too:
 
-```xml
-<import package="KScript.Net" />
-<let name="repo" value="@fetch('https://api.github.com/repos/kylepantall/kscript')->check()->json()" />
-<echo>{$repo.full_name} has {$repo.stargazers_count} stars</echo>
+```kscript
+import KScript.Net
+repo = @fetch('https://api.github.com/repos/kylepantall/kscript')->check()->json()
+echo "{$repo.full_name} has {$repo.stargazers_count} stars"
 ```
 
 Declare the shape of the data once and the response is checked and turned into records your editor knows the fields of. Every mismatch is reported at once, with its JSON path:
 
-```xml
-<type name="Repo">
-  <field name="name" type="string" />
-  <field name="stars" type="int" from="stargazers_count" />
-  <field name="owner" type="string" from="owner.login" />
-</type>
-<let name="repo" value="@fetch($url)->check()->json(as: Repo)" />
-<echo>{$repo.name} by {$repo.owner} has {$repo.stars} stars</echo>
+```kscript
+type Repo {
+  name: string
+  stars: int from stargazers_count
+  owner: string from owner.login
+}
+repo = @fetch($url)->check()->json(as: Repo)
+echo "{$repo.name} by {$repo.owner} has {$repo.stars} stars"
 ```
 
 ## Web pages that react without JavaScript
@@ -111,9 +106,9 @@ kscript serve "Example Sites/team"    # then open http://localhost:8080/demo
 
 ## Packages: import what you use
 
-```xml
-<import package="KScript.Math" as="math" />    <!-- then @math.sqrt(2) -->
-<import src="lib/strings.ks.xml" />            <!-- your own functions -->
+```kscript
+import KScript.Math as math // then @math.sqrt(2)
+import "lib/strings.kscript" // your own functions
 ```
 
 | Package | What it gives you |
@@ -127,26 +122,26 @@ kscript serve "Example Sites/team"    # then open http://localhost:8080/demo
 | `KScript.Web` | Pages, layouts, components and `<live>` blocks for `kscript serve` |
 | `KScript.Test` | Tests for `kscript test` |
 | `KScript.UI` | Native desktop windows, which `kscript compile` turns into Mac, Windows and Linux apps |
-| `KScript.AI` | Language models: `@llm`, `@chat` and `<llm>`, with Claude |
+| `KScript.AI` | Language models: `@llm`, `@chat` and `llm`, with Claude |
 | `KScript.Style` | Stylesheets written in KScript: themes from JSON, breakpoints, fluid sizes and colours |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
 
 ## Desktop apps, still just KScript
 
-A script whose root is `<KScript.Window>` opens a native window on macOS, Windows or Linux. It works like `<live>`: the `<let>` elements hold the state, the rest is the layout, and the window is redrawn after every handler.
+A `KScript.Window { }` block opens a native window on macOS, Windows or Linux. It works like `<live>`: the variables hold the state, the rest is the layout, and the window is redrawn after every handler.
 
-```xml
-<KScript.Window title="Counter" width="320" height="200">
-  <let name="count" value="0" />
-  <Text size="32">{$count}</Text>
-  <Button variant="primary" on-click="count += 1">Add one</Button>
-</KScript.Window>
+```kscript
+KScript.Window(title: Counter, width: 320, height: 200) {
+  count = 0
+  Text(size: 32) "{$count}"
+  Button(variant: primary, on-click: count += 1) "Add one"
+}
 ```
 
 ```sh
-kscript counter.ks.xml           # opens the window
-kscript compile counter.ks.xml --target all   # Counter.app for Macs, Counter.exe for Windows, a Linux program
+kscript counter.kscript          # opens the window
+kscript compile counter.kscript --target all   # Counter.app for Macs, Counter.exe for Windows, a Linux program
 ```
 
 There is no Swift, C#, XAML or shell script to write, and the programs `kscript compile` builds run on computers without kscript. It works for terminal scripts and sites too, and keeps only the packages the script imports. [`samples/life-lab`](samples/life-lab) is Conway's Game of Life with one rules script shared by a terminal version, a web page and a desktop app.
@@ -170,10 +165,10 @@ The editor extension shows errors as you type and gives completion, hover docs, 
 
 Tests are KScript too:
 
-```xml
-<test name="greets by name">
-  <expect value="@greeting('Joan')" equals="'Hello, Joan!'" />
-</test>
+```kscript
+test(name: greets by name) {
+  expect(value: @greeting('Joan'), equals: 'Hello, Joan!')
+}
 ```
 
 ## How it compares
@@ -201,7 +196,7 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/kylepantall/kscript/master/install.ps1 | iex
 ```
 
-Then save the first example above as `hello.ks.xml`, run `kscript hello.ks.xml`, and run `kscript ide install` to set up your editor. [`samples/kscript2/`](samples/kscript2) and [`Example Sites/team`](Example%20Sites/team) have more to read and run.
+Then save the first example above as `hello.kscript`, run `kscript hello.kscript`, and run `kscript ide install` to set up your editor. [`samples/kscript2/`](samples/kscript2) and [`Example Sites/team`](Example%20Sites/team) have more to read and run.
 
 ## Documentation
 
