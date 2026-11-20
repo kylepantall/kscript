@@ -107,7 +107,7 @@ namespace KScript.Scaffolding
             if (rawName.Split('/').Any(s => s == ".." || s == "." || s.Length == 0) || Path.IsPathRooted(rawName) || rawName.Contains(':'))
                 throw new StubException($"'{request.Name}' is not a valid name. Use letters, digits, - and _, with / for folders (e.g. blog/first-post).");
 
-            var values = Values(template, rawName, request.Options);
+            var values = Values(template, rawName, request.Options, KScript.Projects.ProjectConfig.FindAndLoad(root));
             var (header, body) = SplitHeader(template.Source, template.FileName);
 
             if (string.Equals(template.Type, "component", StringComparison.OrdinalIgnoreCase))
@@ -128,6 +128,9 @@ namespace KScript.Scaffolding
                 : values["dir"] + values["kebab"] + Path.GetExtension(template.FileName);
             to = to.Replace('\\', '/').TrimStart('/');
 
+            string content = StubTemplate.Render(body, values);
+            (to, content) = ScriptFormat.Apply(template.FileName, to, content, values["format"]);
+
             string full = Path.GetFullPath(Path.Combine(root, to));
             string rootWithSlash = root.EndsWith(Path.DirectorySeparatorChar) ? root : root + Path.DirectorySeparatorChar;
             if (!full.StartsWith(rootWithSlash, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase))
@@ -137,7 +140,6 @@ namespace KScript.Scaffolding
             if (exists && !request.Force)
                 throw new StubException($"{to} already exists. Use --force to replace it.");
 
-            string content = StubTemplate.Render(body, values);
             string hint = header.TryGetValue("hint", out var h) ? StubTemplate.Render(h, values).Trim() : null;
 
             if (!request.DryRun)
@@ -200,7 +202,7 @@ namespace KScript.Scaffolding
 
         // ---- values ----------------------------------------------------------------------------------------------
 
-        private static Dictionary<string, string> Values(StubInfo template, string rawName, Dictionary<string, string> options)
+        private static Dictionary<string, string> Values(StubInfo template, string rawName, Dictionary<string, string> options, KScript.Projects.ProjectConfig project)
         {
             var segments = rawName.Split('/');
             string name = segments[^1];
@@ -236,6 +238,7 @@ namespace KScript.Scaffolding
             foreach (var kv in options ?? new Dictionary<string, string>())
                 values[kv.Key.Replace('-', '_')] = kv.Value;
 
+            ScriptFormat.AddValues(values, ScriptFormat.Resolve(options, project));
             return values;
         }
 
@@ -257,6 +260,7 @@ namespace KScript.Scaffolding
             "markdown" => "blog/first-post",
             "layout" => "main",
             "script" => "tidy-downloads",
+            "test" => "checkout",
             _ => "Example",
         };
 

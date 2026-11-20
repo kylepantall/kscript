@@ -111,7 +111,7 @@ public class DesktopSampleTests : IDisposable
         try
         {
             new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(new StringWriter(), ""), options: new KScript.Runtime.InterpreterOptions { Timeout = TimeSpan.FromSeconds(60) })
-                .RunFile(Path.Combine(dir, "todo", "desktop.ks.xml"));
+                .RunFile(Path.Combine(dir, "todo", "desktop.kscript"));
         }
         finally
         {

@@ -629,7 +629,7 @@ public class HttpSettingsTests
             { "http": {
                 "routes": ["web.ks.xml", { "file": "api/v1.ks.xml", "prefix": "/api/v1", "api": true }],
                 "middleware": ["log"], "groups": { "admin": ["auth", "log"] }, "views": "templates", "api_prefix": "/rest",
-                "write_files": false, "cors": { "origins": ["https://a.test"], "credentials": true },
+                "write_files": false, "cors": { "origins": ["https://a.test"], "methods": ["GET"], "headers": ["X-A"], "credentials": true },
                 "auth": { "token_env": "MY_TOKEN" }, "throttle": { "limit": 10, "seconds": 30 }
             } }
             """, "/tmp/kscript.json");
@@ -642,6 +642,8 @@ public class HttpSettingsTests
         Assert.Equal("/rest", c.Http.ApiPrefix);
         Assert.False(c.Http.WriteFiles);
         Assert.True(c.Http.CorsCredentials);
+        Assert.Equal(new[] { "GET" }, c.Http.CorsMethods);
+        Assert.Equal(new[] { "X-A" }, c.Http.CorsHeaders);
         Assert.Equal("MY_TOKEN", c.Http.AuthTokenEnv);
         Assert.Equal(10, c.Http.ThrottleLimit);
         Assert.Equal(30, c.Http.ThrottleSeconds);
@@ -653,6 +655,12 @@ public class HttpSettingsTests
     [InlineData("""{ "http": { "routes": [{ "prefix": "/a" }] } }""", "has no \"file\"")]
     [InlineData("""{ "http": { "throttle": { "limit": 0 } } }""", "http.throttle.limit")]
     [InlineData("""{ "http": { "write_files": "yes" } }""", "http.write_files should be true or false")]
+    [InlineData("""{ "http": { "routes": [3] } }""", "each entry is a file name")]
+    [InlineData("""{ "http": { "routes": [{ "file": "a.ks.xml", "extra": 1 }] } }""", "http.routes[].extra")]
+    [InlineData("""{ "http": { "cors": { "nope": 1 } } }""", "http.cors.nope")]
+    [InlineData("""{ "http": { "auth": { "nope": 1 } } }""", "http.auth.nope")]
+    [InlineData("""{ "http": { "throttle": { "seconds": 0 } } }""", "http.throttle.seconds")]
+    [InlineData("""{ "http": { "throttle": { "nope": 1 } } }""", "http.throttle.nope")]
     public void WarnsAboutMistakes(string json, string warning) =>
         Assert.Contains(ProjectConfig.Parse(json, "/tmp/kscript.json").Warnings, w => w.Contains(warning));
 }

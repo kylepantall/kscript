@@ -11,6 +11,8 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 
+using KScript.Ide;
+
 namespace KScript.Updates
 {
     /// <summary>
@@ -31,6 +33,15 @@ namespace KScript.Updates
         public HttpMessageHandler Handler { get; set; } = new HttpClientHandler();
         /// <summary>Runs a binary with --version: its output, or null when it doesn't start.</summary>
         public Func<string, string> RunVersion { get; set; } = binary => SelfUpdater.RunVersion(binary);
+
+        private IIdeHost ideHost;
+
+        /// <summary>The editors whose KScript extension is updated too; by default the real machine, using the same GitHub settings.</summary>
+        public IIdeHost IdeHost
+        {
+            get => ideHost ??= new SystemIdeHost(Handler, Repository, CurrentVersion, Token);
+            set => ideHost = value;
+        }
     }
 
     public static class SelfUpdater
@@ -118,6 +129,7 @@ namespace KScript.Updates
         {
             bool checkOnly = args.Contains("--check");
             bool force = args.Contains("--force");
+            bool ide = !args.Contains("--no-ide");
             string tag = null;
             for (int i = 0; i < args.Length; i++)
             {
@@ -136,17 +148,19 @@ namespace KScript.Updates
                 }
                 else if (args[i] == "--help" || args[i] == "-h")
                 {
-                    output.WriteLine("Usage: kscript update [--check] [--force] [--version <tag>]");
+                    output.WriteLine("Usage: kscript update [--check] [--force] [--version <tag>] [--no-ide]");
                     output.WriteLine("  --check           Only report whether a newer release exists.");
                     output.WriteLine("  --force           Reinstall even when already up to date.");
                     output.WriteLine("  --version <tag>   Install a specific release, e.g. v0.1.0.");
+                    output.WriteLine("  --no-ide          Leave the KScript extension in your editors as it is.");
+                    output.WriteLine("The KScript extension is updated to the same release in every editor that has it (VS Code, Cursor, VSCodium, Windsurf).");
                     return 0;
                 }
             }
 
             try
             {
-                return RunAsync(checkOnly, force, tag, output, error, environment ?? new UpdateEnvironment()).GetAwaiter().GetResult();
+                return RunAsync(checkOnly, force, ide, tag, output, error, environment ?? new UpdateEnvironment()).GetAwaiter().GetResult();
             }
             catch (HttpRequestException ex)
             {
@@ -163,7 +177,7 @@ namespace KScript.Updates
             }
         }
 
-        static async Task<int> RunAsync(bool checkOnly, bool force, string tag, TextWriter output, TextWriter error, UpdateEnvironment env)
+        static async Task<int> RunAsync(bool checkOnly, bool force, bool ide, string tag, TextWriter output, TextWriter error, UpdateEnvironment env)
         {
             string repo = env.Repository;
             string current = env.CurrentVersion;
@@ -215,13 +229,14 @@ namespace KScript.Updates
                 output.WriteLine(newer
                     ? $"kscript {latestTag.TrimStart('v')} is available (you have {current}). Run: kscript update"
                     : $"kscript {current} is up to date (latest release: {latestTag}).");
-                return 0;
+                return ide ? await IdeCommand.UpdateInstalledAsync(latestTag, force, checkOnly: true, output, error, env.IdeHost) : 0;
             }
 
             if (!newer && !force && tag == null)
             {
+                // The CLI is current, but an editor may still have an older extension.
                 output.WriteLine($"kscript {current} is up to date.");
-                return 0;
+                return ide ? await IdeCommand.UpdateInstalledAsync(latestTag, force, checkOnly: false, output, error, env.IdeHost) : 0;
             }
 
             if (downloadUrl == null)
@@ -275,7 +290,7 @@ namespace KScript.Updates
             }
 
             output.WriteLine($"Updated kscript {current} -> {latestTag.TrimStart('v')} ({target})");
-            return 0;
+            return ide ? await IdeCommand.UpdateInstalledAsync(latestTag, force, checkOnly: false, output, error, env.IdeHost) : 0;
         }
 
         /// <summary>The path of the running single-file binary, or null when running as a framework-dependent dll.</summary>

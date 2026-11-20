@@ -196,6 +196,39 @@ public sealed class CommandLineTests : IDisposable
     }
 
     [Fact]
+    public void Routes_and_convert()
+    {
+        Assert.Contains("Usage: kscript convert", Kscript("convert", "--help").Out);
+
+        Write("site/kscript.json", "{ \"serve\": { \"root\": \"public\" } }");
+        Write("site/public/routes.ks.xml", "<KScript.Routes><Get path=\"/hi\"><return value=\"'hi'\" /></Get></KScript.Routes>");
+        var listed = Kscript("routes", Path.Combine(dir, "site"));
+        Assert.True(listed.Code == 0, listed.Err);
+        Assert.Contains("/hi", listed.Out);
+
+        string cwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(Path.Combine(dir, "site"));
+            Assert.Contains("/hi", Kscript("routes").Out);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+
+        Assert.Contains("Site folder not found", Kscript("routes", Path.Combine(dir, "nowhere")).Err);
+        Write("broken/kscript.json", "{ nope");
+        Assert.Equal(1, Kscript("routes", Path.Combine(dir, "broken")).Code);
+
+        // A route file kscript.json names but that isn't there stops kscript serve.
+        Write("missing/kscript.json", "{ \"http\": { \"routes\": [\"nope.ks.xml\"] } }");
+        var serve = Kscript("serve", Path.Combine(dir, "missing"));
+        Assert.Equal(1, serve.Code);
+        Assert.Contains("there is no route file nope.ks.xml", serve.Err);
+    }
+
+    [Fact]
     public void Serve_runs_until_stopped()
     {
         Write("site/index.html", "<h1>Hi</h1>");
@@ -203,6 +236,17 @@ public sealed class CommandLineTests : IDisposable
         Write("site/kscript.json", "{ \"serve\": { \"port\": 0, \"host\": \"127.0.0.1\" } }");
         using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
         var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site", "blog"), "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { Cancellation = stop.Token });
+        Assert.True(code == 0, error);
+    }
+
+    [Fact]
+    public void Serve_stopped_before_it_has_started_is_a_normal_stop()
+    {
+        // On a slow machine Ctrl+C can come before the server has finished starting.
+        Write("site/index.html", "<h1>Hi</h1>");
+        using var stop = new CancellationTokenSource();
+        stop.Cancel();
+        var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site"), "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { Cancellation = stop.Token });
         Assert.True(code == 0, error);
     }
 

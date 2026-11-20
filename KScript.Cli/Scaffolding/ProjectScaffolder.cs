@@ -51,7 +51,12 @@ namespace KScript.Scaffolding
             var given = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in options ?? new Dictionary<string, string>()) given[kv.Key.Replace('-', '_')] = kv.Value;
             given.Remove("template", out string templateOption);
-            if (templateOption != null && !Path.IsPathRooted(templateOption)) templateOption = Path.Combine(Directory.GetCurrentDirectory(), templateOption);
+            // --bare is short for --template bare.
+            if (given.Remove("bare", out string bare) && StubTemplate.IsSet(bare))
+            {
+                if (templateOption != null) throw new StubException("Use --bare or --template, not both.");
+                templateOption = "bare";
+            }
             var template = ProjectTemplate.Find(dir, templateOption);
 
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -69,6 +74,15 @@ namespace KScript.Scaffolding
                 if (o.Default != null) values[o.Name.Replace('-', '_')] = o.Default;
             foreach (var kv in given) values[kv.Key] = kv.Value;
 
+            // Scripts are .kscript unless --format xml, or the project this one is made inside says otherwise.
+            string outerConfig = ProjectConfig.Find(Path.GetDirectoryName(dir));
+            ProjectConfig outerProject = null;
+            if (outerConfig != null) { try { outerProject = ProjectConfig.Load(outerConfig); } catch (ProjectConfigException) { } }
+            var formatOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (given.TryGetValue("format", out string givenFormat)) formatOptions["format"] = givenFormat;
+            else if (outerProject?.Make.Format == null && values.TryGetValue("format", out string templateFormat)) formatOptions["format"] = templateFormat;
+            ScriptFormat.AddValues(values, ScriptFormat.Resolve(formatOptions, outerProject));
+
             if (given.TryGetValue("port", out string port) && !(int.TryParse(port, out int p) && p > 0 && p < 65536))
                 throw new StubException($"--port should be a number from 1 to 65535, not '{port}'.");
 
@@ -79,7 +93,7 @@ namespace KScript.Scaffolding
                 var known = template.Options.Select(o => o.Name.Replace('-', '_')).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 foreach (string key in given.Keys.Where(k => !known.Contains(k)).OrderBy(k => k, StringComparer.Ordinal))
                 {
-                    if (key is "type" or "input" or "name" or "kebab" or "snake" or "pascal" or "camel" or "title") continue;
+                    if (key is "type" or "input" or "name" or "kebab" or "snake" or "pascal" or "camel" or "title" or "format") continue;
                     notes.Add($"Note: the project template has no '{key.Replace('_', '-')}' option, so --{key.Replace('_', '-')} was not used. Its options: {string.Join(", ", template.Options.Select(o => o.Name))}.");
                 }
             }
@@ -95,7 +109,7 @@ namespace KScript.Scaffolding
             if (!force && File.Exists(dir))
                 throw new StubException($"{Display(raw)} is a file, not a folder.");
 
-            string outer = ProjectConfig.Find(Path.GetDirectoryName(dir));
+            string outer = outerConfig;
             if (outer != null) notes.Add($"Note: this project is inside another one ({outer}). Its own kscript.json applies to its files.");
 
             if (!dryRun)

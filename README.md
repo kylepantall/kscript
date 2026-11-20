@@ -155,6 +155,7 @@ There is no Swift, C#, XAML or shell script to write, and the programs `kscript 
 
 ```sh
 kscript make project my-app    # a web app and desktop app with a layout, a live page, scripts, tests and editor settings
+kscript make project my-tool --bare   # just kscript.json, a script and a test
 kscript serve                  # run it
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI

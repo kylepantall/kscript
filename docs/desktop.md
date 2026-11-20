@@ -43,6 +43,6 @@ kscript compile counter.ks.xml --target all          # for every platform
 
 This builds `dist/mac-arm64/Counter.app` for a Mac, `dist/win-x64/Counter.exe` for Windows (with the app's icon, and no console window), and `dist/linux-x64/Counter` with a `.desktop` file for Linux. Each one holds the script's folder (or its whole `kscript.json` project, so imports and data files come along) and only the parts of kscript the app uses, so it runs on computers without kscript or .NET. In a project, the [`app` section of `kscript.json`](projects.md#project-settings-kscriptjson) names the main script, the app's name, version and icon, so `kscript compile` needs no arguments. See [Programs](compile.md) for the targets, icons and signing.
 
-`kscript make project my-app` starts a project with a desktop app already set up: `desktop.ks.xml` and the `app` section of `kscript.json` (leave them out with `--no-desktop`).
+`kscript make project my-app` starts a project with a desktop app already set up: `desktop.kscript` and the `app` section of `kscript.json` (leave them out with `--no-desktop`).
 
 [`samples/life-lab/desktop.ks.xml`](../samples/life-lab/desktop.ks.xml) is a complete example: the Game of Life with a clickable board, a timer and controls, sharing its rules with a terminal and a browser version.

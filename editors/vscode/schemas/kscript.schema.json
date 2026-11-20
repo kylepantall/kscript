@@ -133,6 +133,14 @@
         "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
       }
     },
+    "make": {
+      "type": "object",
+      "description": "Settings for kscript make.",
+      "additionalProperties": false,
+      "properties": {
+        "format": { "enum": ["kscript", "xml"], "default": "kscript", "description": "The format kscript make writes scripts, tests, routes and desktop apps in: kscript (.kscript files) or xml (.ks.xml). --format on the command line wins." }
+      }
+    },
     "app": {
       "type": "object",
       "description": "Used by kscript compile, which builds a script, desktop app or site into a program for macOS, Windows and Linux.",
@@ -153,7 +161,7 @@
         "include": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["**/*.test.ks.xml", "**/*.test.xml"],
+          "default": ["**/*.test.kscript", "**/*.test.ks.xml", "**/*.test.xml"],
           "description": "The test files kscript test runs, as globs relative to kscript.json."
         },
         "exclude": {
