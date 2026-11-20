@@ -12,7 +12,45 @@ A folder covers the same files as `kscript check`: scripts everywhere, and `.htm
 
 ## What it changes
 
-The formatter only touches whitespace that can't change what a file does:
+The formatter only touches whitespace that can't change what a file does.
+
+### .kscript files
+
+- Blocks are indented by nesting, and so are the lines inside a `( )`, `[ ]` or `{ }` that spans several lines. A statement continued on the next line (after `+`, `,` or `=`, or before `|>` or `->`) goes one level further in.
+- Each statement goes on its own line: a one-line block such as `for i in 1..3 { echo $i }` is opened up, and statements joined with `;` are split.
+- `else`, `elif`, `catch` and `finally` go on the line of the `}` before them: `} else {`.
+- Spacing inside a line: one space after commas and colons (`add(1, 2)`, `{ a: 1 }`), around `=` and `=>`, before a block's `{` and before a `//` comment at the end of a line.
+- A call, array or map that runs past `printWidth` puts one item per line.
+- Trailing spaces are removed, runs of blank lines shrink to `maxBlankLines` (and go entirely at the start and end of a block), and the file ends with exactly one newline.
+
+```kscript
+x=add(1 ,2)
+for i in 1..$x { echo $i }
+if $x > 2{
+echo 'big'
+}
+else {
+echo 'small'
+}
+```
+
+becomes
+
+```kscript
+x = add(1, 2)
+for i in 1..$x {
+  echo $i
+}
+if $x > 2 {
+  echo 'big'
+} else {
+  echo 'small'
+}
+```
+
+Text in quotes, comments (`//`, `///` and `/* */`), enum values and match cases written on one line (`label = match $n { 1 => 'one', _ => 'many' }`) are kept as they are. After formatting, `kscript fmt` reads the file again and checks that it is the same program, statement for statement; if it isn't, the file is left alone with an error (please report it).
+
+### XML scripts and pages
 
 - Elements are indented by how deeply they're nested, and each statement in a script goes on its own line.
 - Start tags are tidied: one space between attributes, and `<let name="x"/>` becomes `<let name="x" />`. A tag with several attributes that would run past `printWidth` gets one attribute per line, and so does a tag you already wrote that way.
@@ -85,6 +123,10 @@ Each thing the formatter does is a rule you can turn off under `format.rules` (`
 | `trimTrailingWhitespace` | Removes spaces at the ends of lines of text. | They're kept. |
 | `collapseBlankLines` | Shrinks runs of blank lines to `maxBlankLines`. | Blank lines are kept. |
 | `finalNewline` | Ends the file with exactly one newline. | The file ends as it did. |
+| `spacing` | `.kscript` files: one space after commas and colons, around `=` and `=>`, and before a block's `{`. | Spacing inside lines is kept. |
+| `braceStyle` | `.kscript` files: `} else {`, `} catch {` on one line. | `else` and `catch` stay on the line they're on. |
+
+In `.kscript` files, `tidyTags` does nothing, `wrapAttributes` wraps long calls, arrays and maps, and `statementPerLine` opens up one-line blocks and splits `;`.
 
 ```jsonc
 {
@@ -118,12 +160,22 @@ Comments switch the formatter off for part of a file:
 - `<!-- kscript-fmt-ignore -->` keeps the element (or comment) right after it exactly. Anything after `kscript-fmt-ignore` in the comment is yours, for saying why.
 - Only the comment's own line is re-indented, so the region moves with the code around it.
 
+In `.kscript` files the same comments are written with `//`. `// kscript-fmt: off` runs to `// kscript-fmt: on` or the end of the block it is in, and `// kscript-fmt-ignore` keeps the next statement, with any block it opens:
+
+```kscript
+// kscript-fmt-ignore: a grid reads better this way
+grid = [1, 0, 0,
+        0, 1, 0,
+        0, 0, 1]
+```
+
 ## In the editor
 
 The VS Code extension is the default formatter for KScript files, so **Format Document** (Shift+Alt+F, or Shift+Option+F on macOS) works straight away. To format on save:
 
 ```json
-"[kscript]": { "editor.formatOnSave": true }
+"[kscript]": { "editor.formatOnSave": true },
+"[kscript-code]": { "editor.formatOnSave": true }
 ```
 
 VS Code has its own HTML formatter, which doesn't know about KScript elements or `{ }`. To use KScript's for pages, pick **KScript** when VS Code asks which formatter to use, or set it for a site's workspace:

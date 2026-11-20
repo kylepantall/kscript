@@ -185,6 +185,8 @@ describe(name: slugify) {
 The VS Code extension colours `.kscript` files with their own grammar (language "KScript (code)"), and errors,
 hover, completion and go to definition come from the language server as for XML scripts.
 
-## Not done yet
+## Formatting
 
-- No formatter for this format: `kscript fmt` and Format Document leave `.kscript` files as they are.
+`kscript fmt` and Format Document tidy `.kscript` files: indentation, one statement per line, `} else {`, and spacing
+after commas and colons and around `=`. The rules, the settings in `kscript.json` and the `// kscript-fmt: off` comments
+are described in [Formatting](formatting.md).
