@@ -26,6 +26,9 @@ namespace KScript.Metadata
         /// </summary>
         public IReadOnlyList<string> Values { get; }
 
+        /// <summary>Set when the parameter is deprecated; it still works, with a warning.</summary>
+        public Deprecation Deprecated { get; internal set; }
+
         public bool IsFlag => Type == KType.Bool;
 
         public string Label => (Variadic ? Name + "..." : Optional ? Name + "?" : Name)
@@ -104,6 +107,9 @@ namespace KScript.Metadata
 
         /// <summary>A short usage example, shown in hover.</summary>
         public string Example { get; set; }
+
+        /// <summary>Set when the command or method is deprecated; it still works, with a warning.</summary>
+        public Deprecation Deprecated { get; internal set; }
 
         /// <summary>For methods: the type the method is for.</summary>
         public string ReceiverType { get; init; } = KType.Any;

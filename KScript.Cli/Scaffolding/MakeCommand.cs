@@ -92,6 +92,16 @@ namespace KScript.Scaffolding
                     return 1;
                 }
 
+                if (options.ContainsKey("list") && positional.Count == 0)
+                {
+                    PrintDirectory(root, output);
+                    return 0;
+                }
+                if (help && positional.Count == 1 && !string.Equals(type, "templates", StringComparison.OrdinalIgnoreCase))
+                {
+                    PrintType(Scaffolder.FindTemplate(root, type), output);
+                    return 0;
+                }
                 if (help || positional.Count == 0)
                 {
                     PrintTemplates(root, output);
@@ -130,6 +140,19 @@ namespace KScript.Scaffolding
                 {
                     error.WriteLine(TooManyNames(root, positional, args.Where((_, i) => !positionalAt.Contains(i))));
                     return 1;
+                }
+
+                if (string.Equals(Scaffolder.FindTemplate(root, type).Type, "route", StringComparison.OrdinalIgnoreCase))
+                {
+                    var route = RouteMaker.Make(new MakeRequest { Type = "route", Name = positional[1], Root = root, Options = options, DryRun = dryRun });
+                    foreach (var (action, path) in route.Files)
+                    {
+                        string where = fromProject && root != "." ? Path.GetRelativePath(Directory.GetCurrentDirectory(), Path.Combine(Path.GetFullPath(root), path)).Replace('\\', '/') : path;
+                        output.WriteLine($"{(dryRun ? "Would " + (action == "Created" ? "create" : "add" + action.Substring("Added".Length)) : action)} {where}");
+                    }
+                    output.WriteLine("  " + route.Route.Replace("\n", "\n  "));
+                    output.WriteLine(route.Hint);
+                    return 0;
                 }
 
                 var result = Scaffolder.Make(new MakeRequest { Type = type, Name = positional[1], Root = root, Options = options, Force = force, DryRun = dryRun });
@@ -325,23 +348,76 @@ namespace KScript.Scaffolding
             output.WriteLine("       kscript make project <folder>    start a new web app, with a desktop app unless --no-desktop");
             output.WriteLine("       kscript make project <folder> --bare   start a bare project: kscript.json, one script and a test");
             output.WriteLine();
-            output.WriteLine("Types:");
             var all = Scaffolder.ListTemplates(root);
             int width = all.Max(t => t.Type.Length) + 2;
-            foreach (var t in all)
+            foreach (var (category, types) in Grouped(all))
             {
-                string source = t.BuiltIn ? "" : t.OverridesBuiltIn ? $"  [{Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}, replaces built-in]" : $"  [{Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}]";
-                output.WriteLine($"  {t.Type.PadRight(width)}{t.Description ?? ""}{source}");
+                output.WriteLine(category + ":");
+                foreach (var t in types)
+                {
+                    string source = t.BuiltIn ? "" : t.OverridesBuiltIn ? $"  [{Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}, replaces built-in]" : $"  [{Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}]";
+                    output.WriteLine($"  {t.Type.PadRight(width)}{t.Description ?? ""}{source}");
+                }
+                output.WriteLine();
             }
+            output.WriteLine("kscript make --list shows every type's options and examples; kscript make <type> --help shows one.");
             output.WriteLine();
             output.WriteLine("Examples:");
             output.WriteLine("  kscript make project my-app --port 3000");
             output.WriteLine("  kscript make project my-site --no-desktop");
             output.WriteLine("  kscript make project my-tool --bare");
+            output.WriteLine("  kscript make route users --api");
+            output.WriteLine("  kscript make controller people --resource");
             output.WriteLine("  kscript make component Hero --props title,subtitle");
             output.WriteLine("  kscript make page about --title \"About us\"");
             output.WriteLine("  kscript make page \"people/[id]\"");
             output.WriteLine("  kscript make markdown blog/first-post --layout _layouts/blog.html");
         }
-    }
+    
+        /// <summary>The templates by the command directory's sections; a project's own types go under "Your templates".</summary>
+        public static List<(string Category, List<StubInfo> Types)> Grouped(IReadOnlyList<StubInfo> all)
+        {
+            var groups = new List<(string, List<StubInfo>)>();
+            foreach (var t in all)
+            {
+                string category = t.Category ?? Scaffolder.Categories.FirstOrDefault(c => c.Types.Contains(t.Type, StringComparer.OrdinalIgnoreCase)).Name ?? "Your templates";
+                int at = groups.FindIndex(g => g.Item1 == category);
+                if (at < 0) groups.Add((category, new List<StubInfo> { t }));
+                else groups[at].Item2.Add(t);
+            }
+            var order = Scaffolder.Categories.Select(c => c.Name).ToList();
+            return groups.OrderBy(g => order.IndexOf(g.Item1) is int i && i >= 0 ? i : int.MaxValue).ToList();
+        }
+
+        /// <summary>kscript make --list: every type, by section, with its usage, options and examples.</summary>
+        private static void PrintDirectory(string root, TextWriter output)
+        {
+            output.WriteLine("kscript make: every type of file it can make. kscript make <type> --help shows one; kscript make templates");
+            output.WriteLine("copies them to _templates/ to change what they make.");
+            foreach (var (category, types) in Grouped(Scaffolder.ListTemplates(root)))
+            {
+                output.WriteLine();
+                output.WriteLine(category);
+                output.WriteLine(new string('-', category.Length));
+                foreach (var t in types)
+                {
+                    output.WriteLine();
+                    PrintType(t, output, indent: "  ");
+                }
+            }
+        }
+
+        private static void PrintType(StubInfo t, TextWriter output, string indent = "")
+        {
+            output.WriteLine($"{indent}kscript make {t.Type} {t.Usage ?? "<name>"}");
+            if (t.Description != null) output.WriteLine($"{indent}  {t.Description}");
+            if (!t.BuiltIn) output.WriteLine($"{indent}  From {Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}{(t.OverridesBuiltIn ? ", which replaces the built-in template" : "")}.");
+            if (t.Options.Count > 0)
+            {
+                int width = t.Options.Max(o => o.Name.Length) + 2;
+                foreach (var o in t.Options) output.WriteLine($"{indent}    {o.Name.PadRight(width)}{o.Description}");
+            }
+            foreach (string e in t.Examples) output.WriteLine($"{indent}  $ {e}");
+        }
+}
 }

@@ -53,7 +53,7 @@ namespace KScript.Language.Features
                 ElementInfo info = Catalog.GetElement(e.Name);
                 if (info != null)
                 {
-                    return new HoverResult(ElementMarkdown(info), span);
+                    return new HoverResult(ElementMarkdown(info, analysis.Markup.Syntax == SourceSyntax.Code), span);
                 }
                 RetiredInfo retired = Catalog.GetRetiredElement(e.Name);
                 if (retired != null)
@@ -74,7 +74,7 @@ namespace KScript.Language.Features
                 AttributeInfo a = info?.GetAttribute(cursor.Attribute.Name);
                 if (a != null)
                 {
-                    return new HoverResult($"**{a.Name}** ({KindLabel(a.Kind)}{(a.Required ? ", required" : string.Empty)})\n\n{a.Description}{OptionsLine(a)}", cursor.Attribute.NameSpan);
+                    return new HoverResult($"**{a.Name}** ({KindLabel(a.Kind)}{(a.Required ? ", required" : string.Empty)})\n\n{DeprecationLine(a.Deprecated, a.Name)}{a.Description}{OptionsLine(a)}", cursor.Attribute.NameSpan);
                 }
                 RetiredInfo retired = Catalog.GetRetiredAttribute(cursor.Attribute.Name);
                 if (retired != null)
@@ -189,33 +189,78 @@ namespace KScript.Language.Features
 
         #region Markdown
 
-        internal static string ElementMarkdown(ElementInfo e)
+        /// <summary>"**Deprecated.** Why. Use X instead." and a blank line, or empty when not deprecated.</summary>
+        internal static string DeprecationLine(Deprecation d, string subject)
+        {
+            if (d == null)
+            {
+                return string.Empty;
+            }
+            string rest = d.Describe(subject).Substring(subject.Length + " is deprecated.".Length).Trim();
+            return rest.Length == 0 ? "**Deprecated.**\n\n" : "**Deprecated.** " + rest + "\n\n";
+        }
+
+        /// <summary>An element's docs, written for the file: <paramref name="code"/> shows names and the example in .kscript form.</summary>
+        internal static string ElementMarkdown(ElementInfo e, bool code = false)
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("**<").Append(e.Name).Append(">**");
+            sb.Append(code ? "**" + e.Name + "**" : "**<" + e.Name + ">**");
             if (e.Planned)
             {
                 sb.Append(" (KScript 2, planned: no package implements it yet)");
             }
-            sb.Append("\n\n").Append(e.Description);
+            sb.Append("\n\n").Append(DeprecationLine(e.Deprecated, code ? e.Name : "<" + e.Name + ">")).Append(TagsAsCode(e.Description, code));
             if (e.Package != null && e.Package != "KScript.Core")
             {
                 sb.Append("\n\nFrom ").Append(e.Package).Append(e.Context == ElementContext.Page ? " (pages)." : ".");
             }
             if (e.Attributes.Count > 0)
             {
-                sb.Append("\n\n| Attribute | |\n|---|---|\n");
+                sb.Append(code ? "\n\n| Argument | |\n|---|---|\n" : "\n\n| Attribute | |\n|---|---|\n");
                 foreach (AttributeInfo a in e.Attributes)
                 {
-                    sb.Append("| `").Append(a.Name).Append('`').Append(a.Required ? " (required)" : string.Empty).Append(" | ")
-                      .Append(a.Description.Replace("|", "\\|").Replace("\n", " ")).Append(" |\n");
+                    sb.Append("| ").Append(a.Deprecated != null ? "~~`" + a.Name + "`~~" : "`" + a.Name + "`").Append(a.Required ? " (required)" : string.Empty).Append(" | ")
+                      .Append((DeprecationLine(a.Deprecated, a.Name).Trim() + " " + TagsAsCode(a.Description, code)).Trim().Replace("|", "\\|").Replace("\n", " ")).Append(" |\n");
                 }
             }
             if (!string.IsNullOrEmpty(e.Example))
             {
-                sb.Append("\n```xml\n").Append(e.Example).Append("\n```");
+                string example = code ? ExampleAsCode(e.Example) : null;
+                sb.Append(example != null ? "\n```kscript\n" + example : "\n```xml\n" + e.Example).Append("\n```");
             }
             return sb.ToString();
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex TagMention = new System.Text.RegularExpressions.Regex(@"<(/?)([A-Za-z][\w.-]*)(\s*/)?>");
+
+        /// <summary>
+        /// Markdown hides a bare &lt;describe&gt; as an HTML tag, so element names in prose become code: <c>`&lt;describe&gt;`</c>,
+        /// or <c>`describe`</c> in a .kscript file. Text already in backticks is left as it is.
+        /// </summary>
+        internal static string TagsAsCode(string text, bool code)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+            string[] parts = text.Split('`');
+            for (int i = 0; i < parts.Length; i += 2)
+            {
+                parts[i] = TagMention.Replace(parts[i], m => code ? "`" + m.Groups[2].Value + "`" : "`" + m.Value + "`");
+            }
+            return string.Join("`", parts);
+        }
+
+        /// <summary>An XML example in .kscript form, or null when it doesn't convert cleanly.</summary>
+        internal static string ExampleAsCode(string xml)
+        {
+            MarkupDocument document = MarkupParser.Parse("<kscript>\n" + xml + "\n</kscript>", DocumentKind.Script);
+            if (document.Diagnostics.Count > 0)
+            {
+                return null;
+            }
+            ConversionResult converted = ScriptConverter.ToCode(document);
+            return converted.Warnings.Count > 0 ? null : converted.Text.Trim();
         }
 
         internal static string CallableMarkdown(CallableInfo c, TypeShape receiver = null)
@@ -232,9 +277,17 @@ namespace KScript.Language.Features
                 sb.Append('\n');
             }
             sb.Append("```\n");
+            if (c.Deprecated != null)
+            {
+                sb.Append('\n').Append(DeprecationLine(c.Deprecated, c.Prefix + c.Name).TrimEnd());
+            }
             if (!string.IsNullOrEmpty(c.Description))
             {
                 sb.Append('\n').Append(c.Description);
+            }
+            foreach (ParameterInfo p in c.Signatures.SelectMany(s => s.Parameters).Where(p => p.Deprecated != null).GroupBy(p => p.Name).Select(g => g.First()))
+            {
+                sb.Append("\n\n").Append(DeprecationLine(p.Deprecated, "`" + p.Name + "`").TrimEnd());
             }
             if (c.Kind == CallableKind.Method && c.ReceiverType != KType.Any)
             {

@@ -1289,8 +1289,9 @@ namespace KScript.Syntax.Markup
                 if (c == '/' && Peek(1) == '*')
                 {
                     // At the end of a statement it is a comment of its own (kept after the statement); inside an
-                    // expression it stays there, and the expression lexer skips it. A new line inside doesn't end it.
-                    if (brackets.Count == 0 && TrailingCommentAt(pos))
+                    // expression, or after an operator that continues on the next line (x = 1 + /* tax */), it stays
+                    // there, and the expression lexer skips it. A new line inside doesn't end it.
+                    if (brackets.Count == 0 && TrailingCommentAt(pos) && !ContinuesAfter(start, pos))
                     {
                         break;
                     }
@@ -1370,10 +1371,6 @@ namespace KScript.Syntax.Markup
                 return true;
             }
             string line = WithoutTrailingComments(text.Substring(start, end - start));
-            if (line.Length == 0)
-            {
-                return true;
-            }
             if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal)))
             {
                 return true;

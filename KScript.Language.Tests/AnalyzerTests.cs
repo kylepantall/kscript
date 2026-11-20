@@ -48,7 +48,7 @@ namespace KScript.Language.Tests
         [InlineData("<fn name=\"f\" params=\"a, a\"></fn>", DiagnosticCodes.DuplicateDeclaration, "a", null)]
         [InlineData("<fn name=\"f\"></fn><fn name=\"f\"></fn>", DiagnosticCodes.DuplicateDeclaration, "f", null)]
         [InlineData("<fn name=\"f\" params=\"a = 1, b\"></fn>", DiagnosticCodes.InvalidAttributeValue, "b", "default")]
-        [InlineData("<fn name=\"f\" params=\"a: number\"></fn>", DiagnosticCodes.InvalidAttributeValue, "number", "Unknown type")]
+        [InlineData("<fn name=\"f\" params=\"a: nmber\"></fn>", DiagnosticCodes.InvalidAttributeValue, "nmber", "Unknown type")]
         [InlineData("<call fn=\"nothing\" />", DiagnosticCodes.UndefinedFunction, "nothing", null)]
         [InlineData("<echo>{ ~people }</echo>", DiagnosticCodes.RetiredSigil, "~people", "$people")]
         // Expressions

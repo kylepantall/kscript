@@ -1,7 +1,10 @@
 // The shape of GitHub's repository data. Other scripts import these types.
 enum Visibility { public, private, internal }
 
-type Owner(fields: "login: string, id: int")
+type Owner {
+  login: string
+  id: int
+}
 
 /// A GitHub repository.
 type Repo {

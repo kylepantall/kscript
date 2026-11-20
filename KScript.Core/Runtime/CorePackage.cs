@@ -97,12 +97,12 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("type", "Declares the shape of some data, such as an API response. `->json(as: Repo)`, `$Repo->from($data)`, `<let type=\"Repo\">` and `repo: Repo` parameters check data against it and turn it into a record: a map whose fields the editor knows. Every problem is reported at once, with its JSON path.",
                 ContentKind.Statements,
                 new A("name", K.DeclareVariable, "The type's name, used as `type=\"Repo\"`, `as: Repo` and $Repo.", true),
-                new A("fields", K.Fields, "The fields on one line, like fn params: `login: string, id: int, avatar_url?: string, tags: string[] = []`."),
+                new A("fields", K.Fields, "A short type's fields on one line, like fn params: `login: string, id: int, avatar_url?: string`. Bigger types list their fields one per line instead (<field> elements)."),
                 new A("sample", K.Path, "A JSON file holding an example of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
                 new A("extra", K.Enum, "Keys in the data that the type doesn't list: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
                 new A("description", K.Text, "What the type is, shown on hover."))
             {
-                Example = "<type name=\"User\" fields=\"login: string, id: int\" />\n<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int\" from=\"stargazers_count\" />\n  <field name=\"owner\" type=\"User\" />\n</type>\n<let name=\"repo\" value=\"$Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })\" />\n<echo>$repo.name has $repo.stars stars</echo>",
+                Example = "<type name=\"User\">\n  <field name=\"login\" type=\"string\" />\n  <field name=\"id\" type=\"int\" />\n</type>\n<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int\" from=\"stargazers_count\" />\n  <field name=\"owner\" type=\"User\" />\n</type>\n<let name=\"repo\" value=\"$Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })\" />\n<echo>$repo.name has $repo.stars stars</echo>",
             }, run =>
             {
                 RecordType type = Shapes.Declare(run);
@@ -127,7 +127,7 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("field", "One field of a <type> or <error>.", ContentKind.Empty,
+            p.Element(new ElementInfo("field", "One field of a <type> or <error>: in a .kscript file, one line of the block, `stars: int from stargazers_count`.", ContentKind.Empty,
                 new A("name", K.Text, "The field's name. End it with ? to make it optional.", true),
                 new A("type", K.TypeName, "The field's type: a built-in such as string or int, an <enum>, another <type>, T[] for a list, T? to allow null. Defaults to any.", false, Values.DeclarableTypes),
                 new A("from", K.Text, "Where to read the value, when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`."),

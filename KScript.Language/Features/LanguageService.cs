@@ -79,6 +79,12 @@ namespace KScript.Language.Features
             }
 
             ExpressionRegion region = analysis.RegionAt(offset);
+            if (region != null && code && c.InStartTag && !c.InAttributeName && !c.InAttributeValue && region.Element == c.TagElement)
+            {
+                // A .kscript statement such as y = @round(1) is all start tag: inside it, the cursor is in its expression.
+                c.InStartTag = false;
+                c.InElementName = false;
+            }
             if (region != null && (!c.InStartTag || c.InAttributeValue))
             {
                 c.Region = region;

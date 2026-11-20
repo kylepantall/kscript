@@ -17,10 +17,10 @@ A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a rou
 
 | File | Routes |
 | --- | --- |
-| `routes.kscript` or `routes.ks.xml` | Web routes, mounted at `/`. |
-| `api.kscript` or `api.ks.xml` | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
+| `routes/web.kscript`, or `routes.kscript` at the top (or `.ks.xml`) | Web routes, mounted at `/`. |
+| `routes/api.kscript`, or `api.kscript` at the top (or `.ks.xml`) | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
 
-`http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)).
+`http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)). `kscript make route users` adds a route and makes its controller (see [Generating files](projects.md#generating-files-kscript-make)): `kscript make route "people/{id}" --api`, `kscript make route people --resource`, and `kscript make controller`, `request`, `middleware` and `view` for the rest.
 
 ```kscript
 // routes.kscript
@@ -80,7 +80,11 @@ A controller is a plain `fn`. Its parameters are filled in by name:
 A typed parameter is converted, so `id: int` gives a number. A `type` maps the request data into a record, so the controller only sees data of the right shape:
 
 ```kscript
-type NewPerson(fields: "name: string, age?: int, role?: string")
+type NewPerson {
+  name: string
+  age?: int
+  role?: string
+}
 
 fn store(json: NewPerson) {
   // $json is a NewPerson record
@@ -110,7 +114,11 @@ kscript {
     return @view('people/show', person: $person)
   }
 
-  type NewPerson(fields: "name: string, age?: int, role?: string")
+  type NewPerson {
+    name: string
+    age?: int
+    role?: string
+  }
 
   fn store(json: NewPerson) {
     // POST /api/people
@@ -145,8 +153,10 @@ error PersonNotFound(message: "No person with id {$id}") extends NotFound {
   id: int
 }
 
+people = { 1: { name: "Ada" } }
+
 fn show(id: int) {
-  person = @db_find($id)
+  person = $people[$id]
   if $person == null {
     throw PersonNotFound(id: $id) // GET /api/people/7 answers 404: { "error": "No person with id 7", "status": 404, "type": "PersonNotFound", "id": 7 }
   }
@@ -303,7 +313,7 @@ Group(middleware: auth) {
 ```jsonc
 {
   "http": {
-    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes.* and api.*
+    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes/web.*, routes/api.*, routes.* and api.*
     "middleware": ["log"],                      // for every route
     "groups": { "api": ["cors", "throttle"] },  // names for lists of middleware
     "views": "views",                           // where @view() looks first; never served

@@ -74,7 +74,7 @@ namespace KScript.Http
             {
                 string found = RouteExtensions.Select(ext => Path.Combine(SiteRoot, name + ext)).FirstOrDefault(File.Exists);
                 if (found == null) continue;
-                bool api = name == "api";
+                bool api = name == "api" || name.EndsWith("/api", StringComparison.Ordinal);
                 files.Add(new RouteFileInfo { Path = found, Prefix = api ? Settings.ApiPrefix : string.Empty, Api = api });
             }
             return files;

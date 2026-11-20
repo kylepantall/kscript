@@ -127,6 +127,12 @@ expect(value: $err.line, type: number)
 For one expression, `throws` is shorter: it passes when working out the value stops with an error of that type.
 
 ```kscript
+error PersonNotFound extends NotFound
+
+fn find_person(id: int) {
+  throw PersonNotFound "No person with id {$id}"
+}
+
 expect(value: @find_person(99), throws: PersonNotFound)
 expect(value: @json('nope'), throws: Format) // Json extends Format
 ```

@@ -190,45 +190,70 @@ A parameter typed with an enum only takes its values (`'large'` or bare `large`)
 
 `type` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught.
 
+A type is a block with one field per line, `name: type`:
+
+```kscript try
+type User {
+  login: string
+  id: int
+}
+
+type Repo {
+  name: string
+  stars: int from stargazers_count
+  owner: User
+}
+
+repo = $Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })
+echo "$repo.name has $repo.stars stars, owned by $repo.owner.login"
+```
+
+`stars: int from stargazers_count` reads the field from a key with another name, and `owner: User` is another type, so the nested data is checked and turned into a `User` record too. `$Repo->from(data)` maps a map, a list of maps or JSON text.
+
+### Field lines
+
+A field line is `name[?][: type] [from path] [= default | => value]`. Each part is optional except the name:
+
 ```kscript
 enum Visibility { public, private, internal }
-type Owner(fields: "login: string, id: int, avatar_url?: string")
 
 /// A GitHub repository.
 type Repo {
   name: string
   /// How many people starred it.
   stars: int from stargazers_count
-  owner: Owner
+  owner: User
   owner_name: string from owner.login
   topics: string[] = []
-  license: string? from license.name
+  license?: string from license.name
   visibility: Visibility
   updated: date from updated_at
   label => $name + ' (' + $stars + ' stars)'
 }
 ```
 
-A short type fits on one line: `fields` takes `name: type` pairs like `fn` params, with `?` for an optional field and `= value` for a default. Bigger ones list their fields in a block, one `name: type` per line:
-
-| Attribute | What it does |
+| Part | What it does |
 | --- | --- |
-| `type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Defaults to `any`. |
-| `from` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. |
-| `default` | The value when the data has none. The field is then optional. |
-| `optional` | `yes` lets the value be missing or null. So does ending the name or the type with `?`. |
-| `value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
-| `description` | Shown on hover and in completion. |
+| `: type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Without it the field takes any value. |
+| `?` after the name | The value can be missing or null. |
+| `from path` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. Quote a path that has spaces. |
+| `= default` | The value when the data has none. The field is then optional. |
+| `=> value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
+| `///` above the line | Shown on hover and in completion. |
 
-On `type`, `sample: data/repo.json` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. Fields in the block and `fields` replace the sampled fields they name. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
+The type itself takes options in brackets: `type Repo(extra: error) { … }`. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. `sample: data/repo.json` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. Lines in the block replace the sampled fields they name. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
 
-Data meets a type in these places:
+A small type can also go on one line, with the fields written like `fn` parameters: `type Point(fields: "x: int, y: int")`. `kscript convert` writes it as a block.
+
+In XML, a type is `<type name="Repo">` with a `<field name="stars" type="int" from="stargazers_count" />` element for each line, or a `fields="..."` attribute for the one-line form. Switch the examples to **XML** to see them.
+
+### Where data meets a type
 
 ```kscript
 repo = @fetch($url)->check()->json(as: $Repo) // KScript.Net
 repos = @read_json('repos.json', as: $Repo) // KScript.IO; a list maps item by item
-user = @json($text, as: $Owner)
-user = $Owner->from($data) // a map, a list or JSON text
+user = @json($text, as: $User)
+user = $User->from($data) // a map, a list or JSON text
 repo: Repo = $data // also on const and plain assignment
 fn show(repo: Repo, tags: string[]) {
   // …
@@ -246,24 +271,6 @@ The response from https://api.github.com/... doesn't fit Repo (2 problems):
 ```
 
 In a `catch`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo->fields()` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
-
-In a `.kscript` file, a type is a block with one field per line, and an enum lists its values in braces (see [the .kscript format](code-format.md)):
-
-```
-enum Visibility { public, private, internal }
-type Owner(fields: "login: string, id: int")
-
-/// A GitHub repository.
-type Repo(extra: error) {
-  name: string
-  /// How many people starred it.
-  stars: int from stargazers_count
-  owner_name: string from owner.login
-  topics: string[] = []
-  license?: string from license.name
-  label => $name + ' (' + $stars + ' stars)'
-}
-```
 
 ## Values and methods
 
@@ -327,7 +334,7 @@ try {
 - **Rethrowing and wrapping.** A bare `throw` inside a catch rethrows the error it is handling, unchanged. `throw $e` does the same with a saved error. To add context, wrap it: `throw ConfigBroken(path: $path, cause: $e)`, then `$err.cause.message` reads the original.
 - **Making one without throwing.** `$OutOfStock->new(item: 'tea')` gives the error as a value, to return or throw later.
 - **Status.** `status` is the HTTP status a [KScript.Http route](http.md#errors-and-status-codes) answers with when nothing catches the error. A type inherits it, and its fields and message, from the type it extends.
-- **Exports.** Top-level error types are exported, like functions and types, so `import "lib/errors.kscript"` brings them in. `kscript make error PaymentFailed --status 402 --extends Validation --fields "order: int"` writes one to `lib/errors/`.
+- **Exports.** Top-level error types are exported, like functions and types, so `import "errors/payment-failed.kscript"` brings them in. `kscript make error PaymentFailed --status 402 --extends Validation --fields "order: int"` writes one to `errors/`.
 
 The built-in error types, which KScript itself raises, form a tree that `catch` follows:
 
