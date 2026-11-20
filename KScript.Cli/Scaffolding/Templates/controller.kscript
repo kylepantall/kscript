@@ -1,0 +1,67 @@
+--- make
+description: A controller in controllers/: functions that answer routes
+category: Routes and APIs
+usage: <name> [--resource] [--actions index,export]
+--resource: Write index, show, store, update and destroy, for Resource(path: "/people", to: people)
+--actions: The functions to write, comma separated (default index)
+example: kscript make controller people --resource
+example: kscript make controller reports --actions index,export
+example: kscript make controller admin/users --resource
+defaults: actions=index
+to: {{ paths.controllers }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Give it a route: kscript make route {{ path }}{{#if resource}} --resource{{/if}}
+---
+{{#unless append}}
+// The {{ title }} controller: each function answers a route. A map or list it returns is sent as JSON, and text as HTML.
+// Parameters are filled in by name: path parameters such as {id}, json, query, form, input, headers and request.
+// @response, @view and @abort come from import KScript.Http.
+{{#if actions has store}}
+import KScript.Http
+{{/if}}
+
+{{/unless}}
+{{#each actions}}
+{{#if item is index}}
+/// GET /{{ url }}: the list.
+fn index() {
+  return []
+}
+
+{{/if}}
+{{#if item is show}}
+/// GET /{{ url }}/:{{ params ?? id }}: one of them.
+fn show({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{else}}id{{/each}}) {
+  return { {{#each params}}{{ item }}: ${{ item }}{{#unless last}}, {{/unless}}{{else}}id: $id{{/each}} }
+}
+
+{{/if}}
+{{#if item is store}}
+/// POST /{{ url }}: adds one from the JSON body.
+fn store(json) {
+  return @response($json, status: 201)
+}
+
+{{/if}}
+{{#if item is update}}
+/// PUT or PATCH /{{ url }}/:{{ params ?? id }}: changes one.
+fn update({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{else}}id{{/each}}, json) {
+  return { {{#each params}}{{ item }}: ${{ item }}, {{else}}id: $id, {{/each}}changes: $json }
+}
+
+{{/if}}
+{{#if item is destroy}}
+/// DELETE /{{ url }}/:{{ params ?? id }}: removes one. Returning nothing answers 204 No Content.
+fn destroy({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{else}}id{{/each}}) {
+  log "Removed {{#each params}}{${{ item }}}{{#unless last}} {{/unless}}{{else}}{$id}{{/each}}"
+  return null
+}
+
+{{/if}}
+{{#unless item in index, show, store, update, destroy}}
+/// {{ item | title }}.
+fn {{ item | snake }}({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{/each}}) {
+  return { action: '{{ item | snake }}'{{#each params}}, {{ item }}: ${{ item }}{{/each}} }
+}
+
+{{/unless}}
+{{/each}}

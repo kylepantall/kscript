@@ -1,5 +1,11 @@
 --- make
 description: An HTML page; its path is its URL (people/[id] matches /people/42)
+category: Pages and styles
+usage: <path> [--title "Title"] [--layout _layout.html]
+--title: The page title (default from the name)
+--layout: The layout it uses (default _layout.html, made if it is missing)
+example: kscript make page about --title "About us"
+example: kscript make page "people/[id]"
 to: {{ dir }}{{ kebab }}.html
 hint: Run kscript serve and open /{{ url }}
 ---

@@ -62,6 +62,8 @@ namespace KScript.Docs
                 {
                     sb.Append("<div class=\"example\"><div class=\"example-label\">Example</div>").Append(Html.Code(c.Example, "sh")).Append("</div>");
                 }
+                if (c.Name == "make")
+                    sb.Append("<p class=\"hint\">Every type it makes, with its options: <a href=\"/cli/make\">kscript make commands</a>.</p>");
                 if (c.Guide != null && Guides.FirstOrDefault(g => g.Slug == c.Guide) is Guide guide)
                     sb.Append($"<p class=\"hint\">More in <a href=\"/guide/{guide.Slug}\">{Html.H(guide.NavTitle)}</a>.</p>");
                 sb.Append("</section>");

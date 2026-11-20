@@ -1,0 +1,25 @@
+--- make
+description: Settings that every script and page reads as $config: config.yaml, or config.<env>.yaml for one environment
+category: Settings
+usage: <base|environment>
+example: kscript make config base
+example: kscript make config staging
+example: kscript make config production
+to: {{ paths.config }}/config{{#unless name in base, default, config}}.{{ kebab }}{{/unless}}.yaml
+hint: Read it as $config.app.name{{#unless name in base, default, config}}; kscript --env {{ kebab }} (or KSCRIPT_ENV={{ kebab }}) lays it over config.yaml{{/unless}}
+---
+{{#if name in base, default, config}}
+# Settings for every environment. Scripts and pages read them as $config (see docs/language.md).
+# config.<env>.yaml files (kscript make config staging) are laid over these with kscript --env <env>.
+app:
+  name: My app
+  debug: false
+
+logging:
+  level: info
+{{else}}
+# Settings for {{ kebab }}, laid over config.yaml with kscript --env {{ kebab }} (or KSCRIPT_ENV={{ kebab }}).
+# Maps merge field by field, so only list what's different here.
+app:
+  debug: {{#if name in dev, development, local, test}}true{{else}}false{{/if}}
+{{/if}}

@@ -13,7 +13,7 @@
     },
     "http": {
       "default": true,
-      "description": "Add a JSON API (api.kscript and controllers/tasks.kscript, served under /api by KScript.Http). --no-http leaves it out."
+      "description": "Add a JSON API (routes/api.kscript and controllers/tasks.kscript, served under /api by KScript.Http). --no-http leaves it out."
     },
     "port": {
       "default": 8080,
@@ -24,7 +24,7 @@
   "next": [
     "kscript serve           serve the site at http://localhost:{{ port }} (settings in kscript.json)",
     "{{#if desktop}}kscript desktop{{ ext }}{{#if xml}} {{/if}} open the desktop app; kscript compile builds it as a program{{/if}}",
-    "{{#if http}}kscript routes          list the API routes in api{{ ext }} (GET http://localhost:{{ port }}/api/tasks){{/if}}",
+    "{{#if http}}kscript routes          list the API routes in routes/api{{ ext }} (GET http://localhost:{{ port }}/api/tasks){{/if}}",
     "kscript test            run the tests in tests/",
     "kscript check           check every page and script",
     "kscript ide install     add the KScript extension to VS Code (the project also recommends it)"

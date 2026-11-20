@@ -4,7 +4,7 @@ when: http
 // The JSON API, served by kscript serve under /api (see docs/http.md). kscript routes lists the routes.
 // GET /api/tasks gives the tasks; POST /api/tasks with { "title": "..." } adds one.
 KScript.Routes(middleware: cors) {
-  import "controllers/tasks{{ ext }}" as tasks
+  import "../controllers/tasks{{ ext }}" as tasks
 
   Get(path: "/health") {
     return { ok: true }
