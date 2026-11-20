@@ -3,7 +3,7 @@
 
 const vscode = require('vscode');
 const { LanguageClient, TransportKind, State } = require('vscode-languageclient/node');
-const { resolveServer, versionOf, supportsLsp } = require('./src/server');
+const { resolveServer, versionOf, supportsLsp, isOlderThan } = require('./src/server');
 const { isSiteFolder } = require('./src/site');
 const { registerBlockDividers } = require('./src/blocks');
 const { watchedPath, watchBinary } = require('./src/watch');
@@ -13,6 +13,7 @@ const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-neede
 let client;
 let binaryWatcher;
 let restarting = false;
+let warnedOlder;
 let status;
 let output;
 
@@ -52,12 +53,19 @@ async function startClient(context) {
   if (version && !supportsLsp(version)) {
     const choice = await vscode.window.showWarningMessage(
       `kscript ${version} is too old for the editor features. Run "kscript update" to get the latest release.`, 'Open Terminal');
-    if (choice === 'Open Terminal') {
-      const terminal = vscode.window.createTerminal('kscript update');
-      terminal.show();
-      terminal.sendText(`"${server.command}" update`);
-    }
+    if (choice === 'Open Terminal') runUpdate(server);
     return;
+  }
+
+  // An older kscript works, but may lack what this extension expects. Ask once per version, without waiting.
+  const extensionVersion = context.extension && context.extension.packageJSON.version;
+  if (server.command !== 'dotnet' && isOlderThan(version, extensionVersion) && warnedOlder !== version) {
+    warnedOlder = version;
+    vscode.window.showWarningMessage(
+      `kscript ${version} is older than the KScript extension (${extensionVersion}), so some editor features may be missing or wrong. Update kscript?`,
+      'Run kscript update').then((choice) => {
+      if (choice === 'Run kscript update') runUpdate(server);
+    });
   }
 
   const serverOptions = {
@@ -91,6 +99,13 @@ async function startClient(context) {
   } catch (err) {
     vscode.window.showErrorMessage(`Couldn't start the KScript language server (${server.command} ${server.args.join(' ')}): ${err && err.message ? err.message : err}`);
   }
+}
+
+/** Runs `kscript update` in a terminal. The binary watcher restarts the server when it finishes. */
+function runUpdate(server) {
+  const terminal = vscode.window.createTerminal('kscript update');
+  terminal.show();
+  terminal.sendText(`"${server.command}" update`);
 }
 
 /** Restarts the language server when its kscript is replaced, e.g. by `kscript update`, so it doesn't keep running the old one. */
