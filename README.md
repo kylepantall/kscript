@@ -38,8 +38,8 @@ Find everything over 1 MB in a folder, list it largest first, and offer to move 
   <import package="KScript.IO" />
   <import package="KScript.Terminal" />
 
-  <let name="folder" value="$args[0] ?? @known_folder(name: 'downloads')" />
-  <let name="big" value="@files($folder, pattern: '*', recursive: true)
+  <let name="folder" value="$args[0] ?? @known_folder(downloads)" />
+  <let name="big" value="@files($folder, pattern: '*', recursive)
       |> filter(fn($f) => $f->size() gt 1000000)
       |> sort_by(fn($f) => -$f->size())" />
 
@@ -54,7 +54,7 @@ Find everything over 1 MB in a folder, list it largest first, and offer to move 
     <confirm to="ok">Move them to an archive folder?</confirm>
     <if test="$ok">
       <for each="f" in="$big">
-        <move from="$f" to="@join_path($folder, 'archive', $f->name())" />
+        <move from="$f" to="@join_path(base: $folder, ['archive', $f->name()])" />
       </for>
     </if>
   </if>

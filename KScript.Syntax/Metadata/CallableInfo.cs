@@ -2,12 +2,14 @@ namespace KScript.Metadata
 {
     public sealed class ParameterInfo
     {
-        public ParameterInfo(string name, bool optional = false, bool variadic = false, string description = null)
+        public ParameterInfo(string name, bool optional = false, bool variadic = false, string description = null, string type = null, IReadOnlyList<string> values = null)
         {
             Name = name;
             Optional = optional;
             Variadic = variadic;
             Description = description;
+            Type = type;
+            Values = values ?? Array.Empty<string>();
         }
 
         public string Name { get; }
@@ -15,7 +17,19 @@ namespace KScript.Metadata
         public bool Variadic { get; }
         public string Description { get; }
 
-        public string Label => Variadic ? Name + "..." : Optional ? Name + "?" : Name;
+        /// <summary>The parameter's type when it is declared: bool for a flag (<c>recursive</c> / <c>not recursive</c>), or null.</summary>
+        public string Type { get; }
+
+        /// <summary>
+        /// The values the parameter allows, when it is an enum (<c>name: home|desktop|downloads</c>). A call may write
+        /// them bare: <c>@known_folder(downloads)</c>.
+        /// </summary>
+        public IReadOnlyList<string> Values { get; }
+
+        public bool IsFlag => Type == KType.Bool;
+
+        public string Label => (Variadic ? Name + "..." : Optional ? Name + "?" : Name)
+            + (Values.Count > 0 ? ": " + string.Join(" | ", Values) : Type != null ? ": " + Type : string.Empty);
     }
 
     /// <summary>One way to call a command or method.</summary>
@@ -29,7 +43,10 @@ namespace KScript.Metadata
 
         public int MaxArgs => Parameters.Any(p => p.Variadic) ? int.MaxValue : Parameters.Count;
 
-        /// <summary>Parses "a, b?, rest..." into a signature.</summary>
+        /// <summary>
+        /// Parses "a, b?, rest..." into a signature. A parameter may give a type, "recursive?: bool", or the values it
+        /// allows, "name: home|desktop|downloads".
+        /// </summary>
         public static Signature Parse(string parameters)
         {
             if (string.IsNullOrWhiteSpace(parameters))
@@ -37,9 +54,28 @@ namespace KScript.Metadata
                 return new Signature();
             }
             return new Signature(parameters.Split(',').Select(p => p.Trim()).Select(p =>
-                p.EndsWith("...") ? new ParameterInfo(p.Substring(0, p.Length - 3), variadic: true)
-                : p.EndsWith("?") ? new ParameterInfo(p.Substring(0, p.Length - 1), optional: true)
-                : new ParameterInfo(p)).ToArray());
+            {
+                string type = null;
+                string[] values = null;
+                int colon = p.IndexOf(':');
+                if (colon >= 0)
+                {
+                    string spec = p.Substring(colon + 1).Trim();
+                    p = p.Substring(0, colon).Trim();
+                    if (spec.Contains('|'))
+                    {
+                        values = spec.Split('|').Select(v => v.Trim()).Where(v => v.Length > 0).ToArray();
+                        type = KType.String;
+                    }
+                    else
+                    {
+                        type = spec;
+                    }
+                }
+                return p.EndsWith("...") ? new ParameterInfo(p.Substring(0, p.Length - 3), variadic: true, type: type, values: values)
+                    : p.EndsWith("?") ? new ParameterInfo(p.Substring(0, p.Length - 1), optional: true, type: type, values: values)
+                    : new ParameterInfo(p, type: type, values: values);
+            }).ToArray());
         }
     }
 

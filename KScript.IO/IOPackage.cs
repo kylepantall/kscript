@@ -141,19 +141,19 @@ namespace KScript.IO
             });
             p.Command("is_file", "path", "True if a file is at the path.", KType.Bool, c => File.Exists(PathOf(c.Need(0), c)));
             p.Command("is_folder", "path", "True if a folder is at the path.", KType.Bool, c => Directory.Exists(PathOf(c.Need(0), c)));
-            p.Command("files", "folder, pattern?, recursive?", "The files in a folder, as file values. pattern is a wildcard like '*.txt'.", KType.List,
+            p.Command("files", "folder, pattern?, recursive?: bool", "The files in a folder, as file values. pattern is a wildcard like '*.txt'.", KType.List,
                 c => List(c, Directory.EnumerateFiles), "<for each=\"f\" in=\"@files('.', '*.log')\"><echo>{$f->name()}</echo></for>");
-            p.Command("folders", "folder, pattern?, recursive?", "The folders in a folder, as file values.", KType.List, c => List(c, Directory.EnumerateDirectories));
-            p.Command("join_path", "parts...", "Joins parts of a path with the right separator.", KType.String, c =>
+            p.Command("folders", "folder, pattern?, recursive?: bool", "The folders in a folder, as file values.", KType.List, c => List(c, Directory.EnumerateDirectories));
+            p.Command("join_path", "base, parts...", "Joins a folder and the parts below it with the right separator. Parts may be a list: @join_path(base: $folder, ['archive', $name]).", KType.String, c =>
             {
-                if (c.Count == 0) throw c.Error("@join_path() needs at least one part.", "Argument");
-                return System.IO.Path.Combine(c.Args.Select(a => a is FileValue f ? f.Path : Values.ToStr(a)).ToArray());
+                static IEnumerable<object> Flatten(object a) => a is List<object> list ? list.SelectMany(Flatten) : new[] { a };
+                return System.IO.Path.Combine(c.Args.SelectMany(Flatten).Select(a => a is FileValue f ? f.Path : Values.ToStr(a)).ToArray());
             });
             p.Command("full_path", "path", "The absolute path.", KType.String, c => PathOf(c.Need(0), c));
             p.Command("cwd", "", "The folder kscript was run from.", KType.String, c => c.Host.WorkingDirectory);
             p.Command("home", "", "The user's home folder.", KType.String, c => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
             p.Command("temp_folder", "", "The folder for temporary files.", KType.String, c => System.IO.Path.GetTempPath());
-            p.Command("known_folder", "name", "A standard folder: home, desktop, documents, downloads, music, pictures, videos, appdata or temp.", KType.String, c => KnownFolder(c, c.Str(0)));
+            p.Command("known_folder", "name: home|desktop|documents|downloads|music|pictures|videos|appdata|temp", "A standard folder: home, desktop, documents, downloads, music, pictures, videos, appdata or temp.", KType.String, c => KnownFolder(c, c.Str(0)));
 
             p.Element(new ElementInfo("write", "Writes the element text (or value) to a file. Folders are created as needed.", ContentKind.Template,
                 new A("to", K.Expression, "The file to write.", true),
