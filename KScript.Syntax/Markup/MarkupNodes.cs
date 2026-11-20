@@ -15,6 +15,13 @@ namespace KScript.Syntax.Markup
         Markdown,
     }
 
+    /// <summary>How a script is written: as XML (<c>.ks.xml</c>), or in the brace-and-newline format (<c>.kscript</c>).</summary>
+    public enum SourceSyntax
+    {
+        Xml,
+        Code,
+    }
+
     /// <summary>
     /// Text with XML/HTML entities decoded, and a map from each decoded character back to its offset in the document,
     /// so positions inside an attribute or a text node can be reported exactly.
@@ -85,6 +92,27 @@ namespace KScript.Syntax.Markup
 
     public sealed class MarkupComment : MarkupNode
     {
+        /// <summary>The text between &lt;!-- and --&gt;.</summary>
+        public string Text { get; internal set; } = string.Empty;
+
+        /// <summary>A doc comment, &lt;!--- ... --&gt;: documents the element after it, like /// in a .kscript file.</summary>
+        public bool IsDoc => Text.StartsWith("-", StringComparison.Ordinal) && !Text.StartsWith("--", StringComparison.Ordinal);
+
+        /// <summary>The doc comment's text with the leading '-' and the common indentation removed, or null.</summary>
+        public string DocText
+        {
+            get
+            {
+                if (!IsDoc)
+                {
+                    return null;
+                }
+                string[] lines = Text.Substring(1).Replace("\r\n", "\n").Split('\n');
+                IEnumerable<string> rest = lines.Skip(1).Select(l => l.TrimEnd());
+                int indent = rest.Where(l => l.Trim().Length > 0).Select(l => l.Length - l.TrimStart().Length).DefaultIfEmpty(0).Min();
+                return string.Join("\n", new[] { lines[0].Trim() }.Concat(rest.Select(l => l.Length >= indent ? l.Substring(indent) : l.TrimStart()))).Trim();
+            }
+        }
     }
 
     public sealed class MarkupAttribute
@@ -147,6 +175,35 @@ namespace KScript.Syntax.Markup
             }
         }
 
+        /// <summary>
+        /// The element's documentation: its description attribute, or a &lt;!--- doc comment --&gt; just before it.
+        /// </summary>
+        public string Documentation
+        {
+            get
+            {
+                string description = GetAttributeValue("description");
+                if (description != null)
+                {
+                    return description;
+                }
+                List<MarkupNode> siblings = Parent?.Children;
+                int index = siblings?.IndexOf(this) ?? -1;
+                for (int i = index - 1; i >= 0; i--)
+                {
+                    switch (siblings[i])
+                    {
+                        case MarkupText t when t.IsWhitespace:
+                            continue;
+                        case MarkupComment c when c.IsDoc:
+                            return c.DocText;
+                    }
+                    break;
+                }
+                return null;
+            }
+        }
+
         public IEnumerable<MarkupElement> Ancestors()
         {
             for (MarkupElement e = Parent; e != null; e = e.Parent)
@@ -177,6 +234,10 @@ namespace KScript.Syntax.Markup
     {
         public SourceText Source { get; internal set; }
         public DocumentKind Kind { get; internal set; }
+
+        /// <summary>Xml for markup files; Code for <c>.kscript</c> files, which <see cref="CodeParser"/> turns into the same tree.</summary>
+        public SourceSyntax Syntax { get; internal set; }
+
         public List<MarkupNode> Children { get; } = new List<MarkupNode>();
         public FrontMatter FrontMatter { get; internal set; }
         public List<Diagnostic> Diagnostics { get; } = new List<Diagnostic>();

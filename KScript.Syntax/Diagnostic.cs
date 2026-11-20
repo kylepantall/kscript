@@ -60,7 +60,7 @@ namespace KScript.Syntax
         public override string ToString() => $"{Severity} {Code} {Span}: {Message}";
     }
 
-    /// <summary>Diagnostic codes. KS1xxx are markup, KS2xxx expressions, KS3xxx elements, KS4xxx names and KS5xxx calls.</summary>
+    /// <summary>Diagnostic codes. KS1xxx are markup, KS2xxx expressions, KS3xxx elements, KS4xxx names, KS5xxx calls and KS6xxx style.</summary>
     public static class DiagnosticCodes
     {
         public const string MarkupSyntax = "KS1001";
@@ -91,6 +91,8 @@ namespace KScript.Syntax
         public const string DuplicateDeclaration = "KS4004";
         public const string UndefinedFunction = "KS4005";
         public const string RetiredSigil = "KS4006";
+        public const string DocParameter = "KS4007";
+        public const string Deprecated = "KS4008";
 
         public const string UnknownCommand = "KS5001";
         public const string RetiredCommand = "KS5002";
@@ -101,5 +103,9 @@ namespace KScript.Syntax
         public const string UnknownParameter = "KS5007";
         public const string NamedArgument = "KS5008";
         public const string InvalidArgumentValue = "KS5009";
+        public const string UnknownField = "KS5010";
+
+        /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
+        public const string PreferEarlyExit = "KS6001";
     }
 }

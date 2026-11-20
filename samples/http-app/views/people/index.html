@@ -1,0 +1,11 @@
+<layout src="/_layout.html" title="People">
+  <h1>People aged {$min} and over</h1>
+  <ul>
+    <for each="p" in="$people">
+      <li><a href="/people/{$p.id}">{$p.name}</a> ({$p.age}, {$p.role})</li>
+    </for>
+    <else>
+      <li>Nobody matches.</li>
+    </else>
+  </ul>
+</layout>

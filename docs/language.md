@@ -46,6 +46,31 @@ Variables belong to the block they are declared in. `{{` and `}}` are literal br
 </match>
 ```
 
+### Early returns instead of else
+
+Inside a function or a loop, end a branch early instead of writing `<else>`: `<return>` in a function,
+`<continue />` or `<break />` in a loop. The main path then stays at the left edge and each special case is dealt with
+first.
+
+```xml
+<fn name="grade" params="score">
+  <if test="$score ge 90">
+    <return value="'A'" />
+  </if>
+  <if test="$score ge 75">
+    <return value="'B'" />
+  </if>
+  <return value="'C'" />
+</fn>
+```
+
+`kscript check` and the editor warn about `<else>` and `<elif>` with KS6001 there, and at the top of a script when
+every branch before already ends with `<return>`, `<break>`, `<continue>`, `<throw>` or `<exit>`. The quick fix
+removes the `<else>` (or turns `<elif>` into a separate `<if>`) and, when the chain is the last statement of the
+function or loop, adds the `<return />` or `<continue />` for you. Pages, `<live>` blocks and `<for>`…`<else>` (for an
+empty list) are not flagged, since there is nothing to return from. To turn the rule off for a project, set
+`"lint": { "rules": { "KS6001": "off" } }` in `kscript.json`.
+
 ## Functions
 
 ```xml
@@ -99,6 +124,63 @@ A yes/no parameter can be written as a bare word: `recursive` sets it to yes and
 ```
 
 A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
+
+## Typed data
+
+`<type>` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught.
+
+```xml
+<enum name="Visibility" values="public, private, internal" />
+<type name="Owner" fields="login: string, id: int, avatar_url?: string" />
+
+<type name="Repo" description="A GitHub repository.">
+  <field name="name" type="string" />
+  <field name="stars" type="int" from="stargazers_count" description="How many people starred it." />
+  <field name="owner" type="Owner" />
+  <field name="owner_name" type="string" from="owner.login" />
+  <field name="topics" type="string[]" default="[]" />
+  <field name="license" type="string?" from="license.name" />
+  <field name="visibility" type="Visibility" />
+  <field name="updated" type="date" from="updated_at" />
+  <field name="label" value="$name + ' (' + $stars + ' stars)'" />
+</type>
+```
+
+A short type fits on one line: `fields` takes `name: type` pairs like `fn` params, with `?` for an optional field and `= value` for a default. Bigger ones use `<field>` elements:
+
+| Attribute | What it does |
+| --- | --- |
+| `type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`), an `<enum>`, another `<type>`, `T[]` for a list, `T?` to allow null. Defaults to `any`. |
+| `from` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. |
+| `default` | The value when the data has none. The field is then optional. |
+| `optional` | `yes` lets the value be missing or null. So does ending the name or the type with `?`. |
+| `value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
+| `description` | Shown on hover and in completion. |
+
+On `<type>`, `sample="data/repo.json"` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. `<field>`s and `fields` replace the sampled fields they name. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
+
+Data meets a type in these places:
+
+```xml
+<let name="repo" value="@fetch($url)->check()->json(as: Repo)" />   <!-- KScript.Net -->
+<let name="repos" value="@read_json('repos.json', as: Repo)" />     <!-- KScript.IO; a list maps item by item -->
+<let name="user" value="@json($text, as: Owner)" />
+<let name="user" value="$Owner->from($data)" />                    <!-- a map, a list or JSON text -->
+<let name="repo" type="Repo" value="$data" />                       <!-- also on <const> and <set> -->
+<fn name="show" params="repo: Repo, tags: string[]">…</fn>
+```
+
+`as:` takes the type bare (`as: Repo`), as a value (`as: $Repo`) or as text (`as: 'Repo[]'`). `@type($repo)` is `'Repo'`. A record still works everywhere a map does, but reading or setting a field the type doesn't have is an error, and setting a field converts the value to the field's type.
+
+When the data doesn't fit, mapping fails with one `Shape` error that lists every problem with its JSON path:
+
+```text
+The response from https://api.github.com/... doesn't fit Repo (2 problems):
+  $.stargazers_count: needs an int, but got the string 'lots'.
+  $.visibility: must be a Visibility (public, private, internal), but got the string 'secret'.
+```
+
+In a `<catch>`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo->fields()` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
 
 ## Values and methods
 
@@ -272,6 +354,7 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
 | `KScript.AI` | `@llm(prompt, options)`, `<llm to system schema tools>`, `@chat(system)` with `->ask()` `->history()` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
 | `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast`, `@css_var`, `@css_vars`; `<stylesheet src to vars>` (see [Stylesheets](stylesheets.md)). |
+| `KScript.Http` | Routes, controllers and middleware for `kscript serve`: a file whose root is `<KScript.Routes>` holds `<Get>` `<Post>` `<Put>` `<Patch>` `<Delete>` `<Any>` `<Route>` `<Resource>` `<Group>` `<Middleware>`. Controllers use `@view`, `@response`, `@redirect`, `@abort` and `@route`. See [Routes, controllers and middleware](http.md). |
 | `KScript.UI` | Desktop windows: a script whose root is `<KScript.Window>` opens one. `<Column>` `<Row>` `<Grid>` `<Text>` `<Button>` `<TextBox>` `<CheckBox>` `<Select>` `<Slider>` `<Box>` `<Spacer>` `<Timer>`, `@close_window()`. See [Desktop apps](desktop.md). |
 | `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](testing.md)). |
 

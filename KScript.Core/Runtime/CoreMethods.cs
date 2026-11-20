@@ -30,7 +30,7 @@ namespace KScript.Runtime
         private static void RegisterMethods(PackageBuilder p)
         {
             // Any value.
-            p.Method(KType.Any, "type", "", "The value's type: string, number, bool, list, map, fn, date or null.", KType.String, (t, c) => Values.TypeOf(t));
+            p.Method(KType.Any, "type", "", "The value's type: string, number, bool, list, map, fn, date or null, or the name of the <type> that made a record.", KType.String, (t, c) => Shapes.TypeName(t));
             p.Method(KType.Any, "to_string", "", "The value as text.", KType.String, (t, c) => Values.ToStr(t));
             p.Method(KType.Any, "to_json", "indented?: bool", "The value as JSON text.", KType.String, (t, c) => Values.ToJson(t, c.Bool(0)));
             p.Method(KType.Any, "is_null", "", "yes if the value is null.", KType.Bool, (t, c) => t == null);
@@ -295,7 +295,9 @@ namespace KScript.Runtime
             p.Method(s, "escape", "", "The text HTML-escaped.", s, (t, c) => Values.HtmlEscape(S(t)));
             p.Method(s, "url_encode", "", "The text escaped for a URL.", s, (t, c) => Uri.EscapeDataString(S(t)));
             p.Method(s, "url_decode", "", "URL-escaped text decoded.", s, (t, c) => Uri.UnescapeDataString(S(t)));
-            p.Method(s, "json", "", "Parses the text as JSON.", KType.Any, (t, c) => Values.ParseJson(S(t)));
+            p.Method(s, "json", "as?: type", "Parses the text as JSON. With as: a <type>, the data is checked and turned into records.", KType.Any, (t, c) => Shapes.MapJson(c, Values.ParseJson(S(t)), 0));
+            foreach (var m in RecordType.Methods)
+                p.Method(KType.Type, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((RecordType)t).TryCallMethod(c, m.Name, out object r) ? r : null);
             p.Method(s, "to_number", "default?", "The text as a number, or default when it isn't one.", KType.Number, (t, c) =>
                 Values.TryNumber(S(t), out double d) ? d : c.Has(0) ? c.Arg(0) : throw c.Error($"'{S(t)}' is not a number. Pass a default: ->to_number(0).", "Type"));
             p.Method(s, "to_int", "default?", "The text as a whole number, or default when it isn't one.", KType.Number, (t, c) =>

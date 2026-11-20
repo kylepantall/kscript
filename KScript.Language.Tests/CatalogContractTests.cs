@@ -261,7 +261,7 @@ namespace KScript.Language.Tests
                 .Select(f => (Name: f.Name, Code: (string)f.GetValue(null)))
                 .ToList();
             Assert.Equal(codes.Count, codes.Select(c => c.Code).Distinct().Count());
-            Assert.All(codes, c => Assert.Matches("^KS[1-5][0-9]{3}$", c.Code));
+            Assert.All(codes, c => Assert.Matches("^KS[1-6][0-9]{3}$", c.Code));
         }
 
         [Fact]

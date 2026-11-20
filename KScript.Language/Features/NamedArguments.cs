@@ -1,3 +1,4 @@
+using KScript.Syntax.Markup;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Syntax;
@@ -34,18 +35,19 @@ namespace KScript.Language.Features
                         Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
                         Documentation = c.Description,
                         Parameters = s.Parameters.Select(p => (p.Label, p.Description)).ToList(),
-                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : null, p.IsFlag)).ToList(),
+                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : null, p.IsFlag)).ToList(),
                     });
                 }
             }
 
             void AddFunction(Symbol fn)
             {
+                DocComment doc = fn.Doc;
                 signatures.Add(new SignatureInfo
                 {
                     Label = fn.TypedSignature,
-                    Documentation = fn.Description,
-                    Parameters = fn.Parameters.Select(p => (p.Label, (string)null)).ToList(),
+                    Documentation = doc != null ? doc.ToMarkdown(includeParams: false) : fn.Description,
+                    Parameters = fn.Parameters.Select(p => (p.Label, doc?.ParamText(p.Name))).ToList(),
                     Details = fn.Parameters.Select(p => (p.Name,
                         p.Type != null ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type && x.EnumValues != null)?.EnumValues : null,
                         p.Type == KType.Bool)).ToList(),

@@ -231,11 +231,11 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>The type of a parameter: its declared type, or the type of a literal default (<c>count = 0</c>).</summary>
-        private static TypeShape ParameterShape(FunctionParameter p)
+        private TypeShape ParameterShape(FunctionParameter p, int offset)
         {
             if (p.Type != null)
             {
-                return new TypeShape(p.Type == "int" || p.Type == "float" ? KType.Number : p.Type);
+                return TypeNamed(p.Type, offset) ?? TypeShape.Unknown;
             }
             if (p.Default == null)
             {

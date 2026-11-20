@@ -210,8 +210,8 @@ namespace KScript.Language.Features
         {
             if (e.MustBeInside != null && e.MustBeInside.Count > 0)
             {
-                bool inside = e.MustBeInside.Contains("fn")
-                    ? parent != null && (e.MustBeInside.Contains(parent.Name) || parent.Ancestors().Any(a => e.MustBeInside.Contains(a.Name)))
+                bool inside = e.MustBeInside.Contains("fn") || e.InsideAnyAncestor
+                    ? parent != null && (e.MustBeInside.Contains(ElementInfo.BareName(parent.Name)) || parent.Ancestors().Any(a => e.MustBeInside.Contains(ElementInfo.BareName(a.Name))))
                     : parent != null && e.MustBeInside.Contains(parent.Name);
                 if (!inside)
                 {
@@ -387,12 +387,27 @@ namespace KScript.Language.Features
                 case AttributeKind.Enum:
                     return a.Options.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
+                case AttributeKind.TypeName:
+                    return a.Options.Concat(TypeNames(analysis)).Distinct().Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
+
                 case AttributeKind.Bool:
                     return new[] { "yes", "no" }.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
                 case AttributeKind.FunctionReference:
                 case AttributeKind.FunctionReferences:
-                    return FunctionSymbolCompletions(analysis, replace);
+                {
+                    // Functions, functions of imported scripts (people.show), and built-in middleware (KScript.Http).
+                    List<CompletionItem> items = FunctionSymbolCompletions(analysis, replace);
+                    foreach (Symbol import in analysis.Symbols.Where(s => s.Kind == SymbolKind.Import))
+                    {
+                        foreach (FieldInfo field in import.Shape.Fields.Values.Where(f => f.Shape.Type == KType.Fn))
+                        {
+                            items.Add(new CompletionItem { Label = import.Name + "." + field.Name, Kind = CompletionKind.Function, Detail = field.Description, ReplaceSpan = replace });
+                        }
+                    }
+                    items.AddRange(a.Options.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, Detail = "built-in middleware", ReplaceSpan = replace }));
+                    return items;
+                }
 
                 case AttributeKind.VariableReference:
                     return VariableCompletions(analysis, cursor.Offset, replace, withSigil: false);
@@ -410,6 +425,10 @@ namespace KScript.Language.Features
                     return new List<CompletionItem>();
             }
         }
+
+        /// <summary>The &lt;type&gt;s and &lt;enum&gt;s a document declares or imports.</summary>
+        internal static IReadOnlyList<string> TypeNames(DocumentAnalysis analysis) =>
+            analysis.Symbols.Where(s => s.EnumValues != null || s.Shape.Type == KType.Type).Select(s => s.Name).Distinct().ToList();
 
         private List<CompletionItem> PathCompletions(DocumentAnalysis analysis, DecodedText value, int offset)
         {

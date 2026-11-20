@@ -1,0 +1,5 @@
+[
+  { "id": 1, "name": "Joseph", "age": 28, "role": "Developer" },
+  { "id": 2, "name": "Joan", "age": 82, "role": "Founder" },
+  { "id": 3, "name": "Ellie", "age": 12, "role": "Intern" }
+]

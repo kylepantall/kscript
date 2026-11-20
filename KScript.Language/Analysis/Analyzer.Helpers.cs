@@ -213,7 +213,9 @@ namespace KScript.Language.Analysis
                 .Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import).Select(s => s.Name);
             string suggestion = Suggestions.Closest(name, candidates);
             string message = isWrite
-                ? $"${name} is not defined. Declare it first with <let name=\"{name}\" ... />."
+                ? (result.Markup.Syntax == SourceSyntax.Code
+                    ? $"${name} is not defined, so it can't be updated. Give it a starting value first: {name} = ..."
+                    : $"${name} is not defined. Declare it first with <let name=\"{name}\" ... />.")
                 : $"${name} is not defined." + (suggestion != null ? $" Did you mean ${suggestion}?" : string.Empty);
             Report(span, DiagnosticSeverity.Error, isWrite ? DiagnosticCodes.SetUndeclared : DiagnosticCodes.UndefinedVariable, message,
                 suggestion != null ? new[] { new QuickFix($"Change to ${suggestion}", new TextChange(span, suggestion)) } : null);
@@ -235,12 +237,28 @@ namespace KScript.Language.Analysis
             ReferenceFunction(name, span, scope);
         }
 
+        /// <summary>A call to a function whose doc comment says @deprecated gets a warning with the reason.</summary>
+        private void ReportIfDeprecated(Symbol fn, TextSpan span)
+        {
+            if (fn.Doc?.Deprecated is string reason)
+            {
+                Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.Deprecated, $"@{fn.Name} is deprecated." + (reason.Length > 0 ? " " + reason : string.Empty));
+            }
+        }
+
         private Symbol ReferenceFunction(string name, TextSpan span, Scope scope)
         {
+            int dot = name.IndexOf('.');
+            if (dot > 0 && dot < name.Length - 1)
+            {
+                ReferenceImportedFunction(name, dot, span, scope);
+                return null;
+            }
             Symbol fn = scope.Lookup(name, int.MaxValue);
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
                 result.References.Add(new SymbolReference(fn, span, false, false));
+                ReportIfDeprecated(fn, span);
                 return fn;
             }
 
@@ -255,6 +273,29 @@ namespace KScript.Language.Analysis
                 $"No function named '{name}'. Declare it with <fn name=\"{name}\">." + (suggestion != null ? $" Did you mean '{suggestion}'?" : string.Empty),
                 SuggestFix(span, name, candidates, n => n));
             return null;
+        }
+
+        /// <summary><c>people.show</c> in a function name attribute: a function of a script (or package) imported with as="people".</summary>
+        private void ReferenceImportedFunction(string name, int dot, TextSpan span, Scope scope)
+        {
+            string aliasName = name.Substring(0, dot), member = name.Substring(dot + 1);
+            TextSpan aliasSpan = new TextSpan(span.Start, dot);
+            TextSpan memberSpan = TextSpan.FromBounds(span.Start + dot + 1, span.End);
+            Symbol import = scope.Lookup(aliasName, aliasSpan.Start);
+            if (import?.Kind != SymbolKind.Import)
+            {
+                IEnumerable<string> aliases = result.Symbols.Where(s => s.Kind == SymbolKind.Import).Select(s => s.Name);
+                Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
+                    $"Nothing is imported as '{aliasName}'. Import it with <import src=\"...\" as=\"{aliasName}\" />.",
+                    SuggestFix(aliasSpan, aliasName, aliases, n => n));
+                return;
+            }
+            result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+            if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member))
+            {
+                Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{aliasName}' has no '{member}'.",
+                    SuggestFix(memberSpan, member, import.Shape.Fields.Keys, n => n));
+            }
         }
 
         private void CheckFunctionArgumentCount(Symbol fn, int count, TextSpan span)
@@ -374,7 +415,7 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            if (report && type != null && !KType.Declarable.Contains(type) && !DeclaredEnums().Contains(type))
+            if (report && type != null && !KType.Declarable.Contains(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
             {
                 Report(value.ToSource(new TextSpan(start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length), type.Length)),
                     DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", KType.Declarable)}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
@@ -508,6 +549,17 @@ namespace KScript.Language.Analysis
 
         #endregion
     
+        /// <summary>A type without its [] and ?: Repo for Repo[]?.</summary>
+        private static string TypeBase(string type)
+        {
+            string t = type.TrimEnd('?').TrimEnd();
+            while (t.EndsWith("[]", StringComparison.Ordinal))
+            {
+                t = t.Substring(0, t.Length - 2).TrimEnd();
+            }
+            return t;
+        }
+
         private HashSet<string> declaredEnums;
 
         /// <summary>The names of the &lt;enum&gt; types declared anywhere in this document.</summary>

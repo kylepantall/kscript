@@ -25,7 +25,7 @@ function registerBlockDividers(vscode, context, getClient) {
   const enabled = () => vscode.workspace.getConfiguration('kscript').get('blocks.dividers', true);
 
   async function refresh(editor) {
-    if (!editor || editor.document.languageId !== 'kscript') return;
+    if (!editor || !['kscript', 'kscript-code'].includes(editor.document.languageId)) return;
     const client = getClient();
     if (!enabled() || !client || !client.isRunning()) {
       editor.setDecorations(decoration, []);

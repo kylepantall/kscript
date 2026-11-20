@@ -97,7 +97,9 @@ namespace KScript.Language.Formatting
 
         /// <summary>Formats a document, choosing how to parse it from its path (as the analyzer does).</summary>
         public static FormatResult Format(string text, string path, FormatOptions options = null) =>
-            Format(text, MarkupParser.KindFromPath(path), options);
+            MarkupParser.IsCodePath(path)
+                ? new FormatResult { Error = ".kscript files are not reformatted yet." }
+                : Format(text, MarkupParser.KindFromPath(path), options);
 
         public static FormatResult Format(string text, DocumentKind kind, FormatOptions options = null)
         {

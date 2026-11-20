@@ -130,7 +130,7 @@ namespace KScript.IO
             p.Command("read_text", "path", "The text of a file. Relative paths are from the script's folder.", KType.String, c => File.ReadAllText(PathOf(c.Need(0), c)),
                 "<let name=\"config\" value=\"@read_text('config.json') |> @json()\" />");
             p.Command("read_lines", "path", "The lines of a file.", KType.List, c => File.ReadAllLines(PathOf(c.Need(0), c)).Cast<object>().ToList());
-            p.Command("read_json", "path", "A JSON file read into maps and lists.", KType.Any, c => Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))));
+            p.Command("read_json", "path, as?: type", "A JSON file read into maps and lists. With as: a <type>, the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))), 1));
             p.Command("read_yaml", "path", "A YAML file read into maps and lists.", KType.Any, c =>
             {
                 string path = PathOf(c.Need(0), c);

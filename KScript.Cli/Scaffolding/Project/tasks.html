@@ -1,0 +1,27 @@
+<import src="lib/tasks.ks.xml" />
+<layout src="_layout.html" title="Tasks">
+  <h1>Tasks</h1>
+  <p>This list runs in the browser with no JavaScript: each click runs KScript on the server. The rules are in <code>lib/tasks.ks.xml</code>{{#if desktop}}, which the desktop app (<code>desktop.ks.xml</code>) uses too{{/if}}.</p>
+
+  <live id="tasks">
+    <state name="tasks" value="@starter_tasks()" />
+    <state name="draft" value="''" />
+
+    <form class="add-task" on-submit="tasks = @add_task($tasks, title: $draft); draft = ''">
+      <input bind="draft" placeholder="What needs doing?" autocomplete="off">
+      <button>Add</button>
+    </form>
+
+    <ul class="tasks">
+      <for each="t" in="$tasks">
+        <li class="{ $t.done ? 'done' : '' }">
+          <label><input type="checkbox" checked="{$t.done}" on-change="tasks = @toggle_task($tasks, id: $t.id)"> {$t.title}</label>
+          <button class="remove" title="Remove" on-click="tasks = @remove_task($tasks, id: $t.id)">✕</button>
+        </li>
+      </for>
+    </ul>
+
+    <p class="note">{ @tasks_left($tasks) }</p>
+    <button on-click="tasks = @clear_done($tasks)" disabled="{ not $tasks->any(fn($t) => $t.done) }">Clear done</button>
+  </live>
+</layout>

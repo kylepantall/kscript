@@ -1,0 +1,406 @@
+using KScript.Metadata;
+using KScript.Runtime;
+using KScript.Syntax.Markup;
+
+using A = KScript.Metadata.AttributeInfo;
+using K = KScript.Metadata.AttributeKind;
+
+namespace KScript.Http
+{
+    /// <summary>
+    /// KScript.Http: routes, controllers and middleware for <c>kscript serve</c>, in the spirit of Laravel's
+    /// routes/web.php and routes/api.php. A file whose root is &lt;KScript.Routes&gt; maps HTTP methods and paths to
+    /// controller functions, views or redirects. Controllers are ordinary &lt;fn&gt;s; what they return becomes the
+    /// response (a map or list is JSON, text is HTML, <c>@view()</c> renders a page). Middleware is a
+    /// <c>fn($request, $next)</c> or a built-in (log, cors, auth, throttle), applied to the whole file, a
+    /// &lt;Group&gt; or one route.
+    /// </summary>
+    public sealed class HttpPackage : KScriptPackage
+    {
+        /// <summary>Where the request being handled is kept in <see cref="KScriptHost.Items"/>.</summary>
+        public const string ContextKey = "KScript.Http.Request";
+
+        /// <summary>The middleware that ship with KScript.Http.</summary>
+        public static readonly string[] BuiltInMiddleware = { "log", "cors", "auth", "throttle" };
+
+        /// <summary>The method elements: &lt;Get&gt;, &lt;Post&gt;... and the HTTP method each answers.</summary>
+        public static readonly (string Element, string Method)[] MethodElements =
+        {
+            ("Get", "GET"), ("Post", "POST"), ("Put", "PUT"), ("Patch", "PATCH"), ("Delete", "DELETE"), ("Options", "OPTIONS"), ("Any", null),
+        };
+
+        public static readonly string[] HttpMethods = { "get", "post", "put", "patch", "delete", "options", "head" };
+
+        public override string Name => "KScript.Http";
+
+        public override string Description => "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve.";
+
+        private static A Middleware(string description) =>
+            new A("middleware", K.FunctionReferences, description, false, BuiltInMiddleware);
+
+        protected override void Register(PackageBuilder p)
+        {
+            p.Element(new ElementInfo("Routes", "A route file: maps HTTP methods and paths to controllers, views and redirects. kscript serve loads routes.ks.xml (or routes.kscript) and api.ks.xml (under /api, with JSON errors). Its <import>, <fn> and <let> children run on every request before the route is matched.", ContentKind.Statements,
+                new A("prefix", K.Text, "A path in front of every route in the file, such as /v1."),
+                Middleware("Middleware for every route in the file, comma separated: built-ins (log, cors, auth, throttle:30) or <fn>s taking ($request, $next)."),
+                new A("name", K.Text, "Put in front of every route name, such as admin."),
+                new A("api", K.Bool, "yes: errors and missing routes are answered with JSON (api.* files are API files already)."))
+            {
+                Context = ElementContext.Script,
+                Example = "<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n  <Middleware use=\"log\" />\n  <Get path=\"/\" view=\"home.html\" />\n  <Get path=\"/people/{id}\" to=\"people.show\" name=\"people.show\" />\n</KScript.Routes>",
+            }, RunRoutes);
+
+            foreach (var (element, method) in MethodElements)
+            {
+                string what = method == null ? "any method" : method;
+                p.Element(new ElementInfo(element, $"A route for {what} requests to a path. It is answered by a controller (to), a view, a redirect, or the statements inside it (<return value=\"...\" />).", ContentKind.Statements, RouteAttributes())
+                {
+                    Context = ElementContext.Script,
+                    MustBeInside = new[] { "Routes", "Group" },
+                    InsideAnyAncestor = true,
+                    IsFunctionBody = true,
+                    Example = "<KScript.Routes>\n  " + (method == "GET" || method == null
+                        ? $"<{element} path=\"/people/{{id}}\" to=\"people.show\" name=\"people.show\" where=\"id: int\" />"
+                        : $"<{element} path=\"/people/{{id}}\" to=\"people.{(method == "DELETE" ? "destroy" : method == "POST" ? "store" : "update")}\" middleware=\"auth\" />") + "\n</KScript.Routes>",
+                }, run => AddRoute(run, method == null ? Array.Empty<string>() : new[] { method }));
+            }
+
+            var routeAttrs = RouteAttributes().ToList();
+            routeAttrs.Insert(1, new A("methods", K.Text, "The HTTP methods, comma separated: get, post.", true));
+            p.Element(new ElementInfo("Route", "A route for several HTTP methods at once.", ContentKind.Statements, routeAttrs.ToArray())
+            {
+                Context = ElementContext.Script,
+                MustBeInside = new[] { "Routes", "Group" },
+                    InsideAnyAncestor = true,
+                IsFunctionBody = true,
+                Example = "<KScript.Routes>\n  <Route methods=\"get, post\" path=\"/contact\" to=\"contact.handle\" />\n</KScript.Routes>",
+            }, run =>
+            {
+                var methods = run.RequiredRaw("methods").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(m => m.ToUpperInvariant()).ToList();
+                foreach (string m in methods)
+                {
+                    if (!HttpMethods.Contains(m.ToLowerInvariant()))
+                        throw run.Error($"'{m}' isn't an HTTP method. Use {string.Join(", ", HttpMethods)}.", "methods", "Http");
+                }
+                return AddRoute(run, methods);
+            });
+
+            p.Element(new ElementInfo("Group", "Routes that share a path prefix, middleware or a name prefix.", ContentKind.Statements,
+                new A("prefix", K.Text, "A path in front of every route inside, such as /admin."),
+                Middleware("Middleware for every route inside, comma separated."),
+                new A("name", K.Text, "Put in front of every route name inside, such as admin."))
+            {
+                Context = ElementContext.Script,
+                MustBeInside = new[] { "Routes", "Group" },
+                    InsideAnyAncestor = true,
+                Example = "<KScript.Routes>\n  <Group prefix=\"/admin\" middleware=\"auth\" name=\"admin.\">\n    <Get path=\"/\" to=\"admin.dashboard\" name=\"home\" />\n  </Group>\n</KScript.Routes>",
+            }, run =>
+            {
+                RequestContext ctx = Context(run);
+                ctx.Push(run.Raw("prefix"), run.Raw("middleware"), run.Raw("name"), api: null);
+                try
+                {
+                    run.Run(run.Element.Children, run.Scope.Child());
+                }
+                finally
+                {
+                    ctx.Pop();
+                }
+                return null;
+            });
+
+            p.Element(new ElementInfo("Middleware", "Middleware for the routes that follow it in this file or group.", ContentKind.Empty,
+                new A("use", K.FunctionReferences, "Built-ins (log, cors, auth, throttle:30) or <fn>s taking ($request, $next), comma separated.", true, BuiltInMiddleware))
+            {
+                Context = ElementContext.Script,
+                MustBeInside = new[] { "Routes", "Group" },
+                    InsideAnyAncestor = true,
+                Example = "<KScript.Routes>\n  <Middleware use=\"log, cors\" />\n</KScript.Routes>",
+            }, run =>
+            {
+                Context(run).Top.Middleware.AddRange(ResolveMiddleware(run, run.RequiredRaw("use")));
+                return null;
+            });
+
+            p.Element(new ElementInfo("Resource", "The usual routes of a JSON resource, answered by the functions a controller script exports: index (GET path), store (POST path), show (GET path/{id}), update (PUT and PATCH path/{id}) and destroy (DELETE path/{id}). Functions the controller doesn't have get no route.", ContentKind.Empty,
+                new A("path", K.Text, "The resource's path, such as /people.", true) { Literal = true },
+                new A("to", K.Text, "The controller: the name a script is imported as (<import src=\"...\" as=\"people\" />).", true),
+                new A("only", K.Text, "Only these actions, comma separated: index, show."),
+                new A("except", K.Text, "All actions but these, comma separated."),
+                new A("name", K.Text, "The route name prefix (people gives people.index, people.show...). The default is the controller's name."),
+                new A("param", K.Text, "The name of the path parameter, id by default."),
+                Middleware("Middleware for these routes, comma separated."))
+            {
+                Context = ElementContext.Script,
+                MustBeInside = new[] { "Routes", "Group" },
+                    InsideAnyAncestor = true,
+                Example = "<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n  <Resource path=\"/people\" to=\"people\" middleware=\"auth\" />\n</KScript.Routes>",
+            }, AddResource);
+
+            p.Command("view", "name, data...",
+                "Renders a page from the views folder (or the site folder) with its layout, giving it the named values as variables: @view('people/show.html', person: $p). The extension may be left off.",
+                KType.HttpResponse, View, "<return value=\"@view('people/show', person: $person)\" />");
+            p.Command("response", "body?, status?: number, type?, headers?: map",
+                "A response with a status code and headers. A map or list body is sent as JSON, text as HTML (or the type you give).",
+                KType.HttpResponse, Response, "<return value=\"@response($person, status: 201)\" />");
+            p.Command("redirect", "to, status?: number", "A redirect to another address (302 Found by default; 301 for a permanent move).",
+                KType.HttpResponse, c => Redirect(c.Str(0), c.Has(1, "status") ? (int)Values.ToNumber(c.Arg(1, "status"), "status") : 302),
+                "<return value=\"@redirect('/people')\" />");
+            p.Command("abort", "status: number, message?", "Stops the request with an error status, such as @abort(404) or @abort(403, 'Admins only').",
+                KType.Any, c =>
+                {
+                    int status = (int)Values.ToNumber(c.Arg(0, "status"), "status");
+                    string message = c.Has(1, "message") ? Values.ToStr(c.Arg(1, "message")) : null;
+                    throw new HttpAbortSignal(RequestContext.Current(c.Host)?.ErrorResponse(status, message) ?? HttpResponse.Text(message ?? ReasonPhrase(status), status));
+                }, "<if test=\"$person == null\"><do>@abort(404)</do></if>");
+            p.Command("route", "name, params...", "The address of a named route, with its {parameters} filled in: @route('people.show', id: 3) is /people/3. Other values become the query.",
+                KType.String, c =>
+                {
+                    RequestContext ctx = RequestContext.Current(c.Host) ?? throw c.Error("@route() works while kscript serve handles a request.", "Http");
+                    var values = new Dictionary<string, object>(c.Named, StringComparer.Ordinal);
+                    if (c.Count > 1 && c.Arg(1) is Dictionary<string, object> map) foreach (var kv in map) values[kv.Key] = kv.Value;
+                    return ctx.Table.Url(c.Str(0), values);
+                }, "<a href=\"{@route('people.show', id: $p.id)}\">");
+
+            foreach (var m in HttpResponse.Methods)
+                p.Method(KType.HttpResponse, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((HttpResponse)t).TryCallMethod(c, m.Name, out object r) ? r : null);
+
+            p.Variable("request", KType.Request,
+                "The request being handled: method, path, url, query, form, json (the body read as JSON), input (query, form and json together), headers, cookies, params, ip and route (its name).",
+                (i, m) => RequestContext.Current(i.Host)?.Request);
+        }
+
+        private static A[] RouteAttributes() => new[]
+        {
+            new A("path", K.Text, "The path, with {name} parameters: /people/{id}. {name?} is optional and {name*} takes the rest of the path.", true) { Literal = true },
+            new A("to", K.FunctionReference, "The controller: a <fn> (show) or a function of an imported script (people.show). Its parameters are filled by name: path parameters, request, json, query, form, input, headers."),
+            new A("view", K.Text, "Answer with this view instead, from the views folder, with the path parameters as variables."),
+            new A("redirect", K.Text, "Answer with a redirect to this address instead."),
+            new A("status", K.Expression, "The redirect's status code, 302 by default."),
+            new A("name", K.Text, "A name for the route, for @route('name', ...)."),
+            Middleware("Middleware for this route, comma separated."),
+            new A("where", K.Text, "Rules for the parameters: where=\"id: int, slug: slug\". Rules: number, int, alpha, alnum, slug, uuid or a regular expression.") { Literal = true },
+        };
+
+        internal static RequestContext Context(ElementRun run) =>
+            RequestContext.Current(run.Host) ?? throw run.Error($"<{run.Element.Name}> only works in route files served by kscript serve (or listed by kscript routes).", null, "Context");
+
+        private static bool? RunRoutes(ElementRun run)
+        {
+            RequestContext ctx = Context(run);
+            bool? api = run.Has("api") ? run.Flag("api") : null;
+            ctx.Push(run.Raw("prefix"), run.Raw("middleware"), run.Raw("name"), api);
+            try
+            {
+                run.Run(run.Element.Children, run.Scope);
+            }
+            finally
+            {
+                ctx.Pop();
+            }
+            return null;
+        }
+
+        private static bool? AddRoute(ElementRun run, IReadOnlyList<string> methods)
+        {
+            RequestContext ctx = Context(run);
+            string to = run.Raw("to")?.Trim();
+            string view = run.Raw("view")?.Trim();
+            string redirect = run.Raw("redirect")?.Trim();
+            bool inline = run.Element.ChildElements.Any() || run.Element.Children.OfType<MarkupText>().Any(t => !t.IsWhitespace);
+            int answers = (to != null ? 1 : 0) + (view != null ? 1 : 0) + (redirect != null ? 1 : 0) + (inline ? 1 : 0);
+            if (answers == 0)
+                throw run.Error($"<{run.Element.Name}> needs something to answer with: to=\"controller.action\", view=\"page.html\", redirect=\"/somewhere\", or statements inside it.", null, "Http");
+            if (answers > 1)
+                throw run.Error($"<{run.Element.Name}> has more than one answer. Use only one of to, view, redirect or statements inside it.", null, "Http");
+
+            RoutePattern pattern;
+            try
+            {
+                pattern = new RoutePattern(RoutePattern.Join(ctx.Prefix, run.RequiredRaw("path")), run.Raw("where"));
+            }
+            catch (KScriptException ex)
+            {
+                throw run.Error(ex.Message, "path", "Http");
+            }
+
+            var middleware = ctx.MiddlewareFor(run).Concat(ResolveMiddleware(run, run.Raw("middleware"))).ToList();
+            string name = run.Raw("name")?.Trim();
+            ctx.Add(run, new Route
+            {
+                Methods = methods,
+                Pattern = pattern,
+                Name = name != null ? ctx.NamePrefix + name : null,
+                Middleware = middleware,
+                Controller = to != null ? ResolveFunction(run, to, "to") : null,
+                ControllerName = to,
+                View = view,
+                RedirectTo = redirect,
+                RedirectStatus = run.Has("status") ? (int)run.Number("status", 302) : 302,
+                Inline = inline ? run.Element : null,
+                Module = run.Module,
+                Scope = run.Scope,
+                Api = ctx.Api,
+                File = run.Module.Path,
+                Line = run.Module.Source.GetPosition(run.Element.Span.Start).Line + 1,
+            });
+            return null;
+        }
+
+        private static readonly (string Action, string[] Methods, bool Member)[] ResourceActions =
+        {
+            ("index", new[] { "GET" }, false),
+            ("store", new[] { "POST" }, false),
+            ("show", new[] { "GET" }, true),
+            ("update", new[] { "PUT", "PATCH" }, true),
+            ("destroy", new[] { "DELETE" }, true),
+        };
+
+        private static bool? AddResource(ElementRun run)
+        {
+            RequestContext ctx = Context(run);
+            string to = run.RequiredRaw("to").Trim();
+            if (!run.Module.TryGetAlias(to, out ImportNamespace controller) || controller.Module == null)
+                throw run.Error($"<Resource to=\"{to}\"> names a controller script imported with as=\"{to}\": <import src=\"controllers/{to}.ks.xml\" as=\"{to}\" />.", "to", "Http");
+            HashSet<string> only = Names(run.Raw("only")), except = Names(run.Raw("except"));
+            foreach (string action in only.Concat(except).Where(a => !ResourceActions.Any(r => r.Action == a)))
+                throw run.Error($"'{action}' isn't a resource action. Actions: {string.Join(", ", ResourceActions.Select(r => r.Action))}.", only.Contains(action) ? "only" : "except", "Http");
+
+            string param = run.Raw("param")?.Trim() ?? "id";
+            string prefix = (run.Raw("name")?.Trim() ?? to) + ".";
+            var middleware = ctx.MiddlewareFor(run).Concat(ResolveMiddleware(run, run.Raw("middleware"))).ToList();
+            string basePath = RoutePattern.Join(ctx.Prefix, run.RequiredRaw("path"));
+            foreach (var (action, methods, member) in ResourceActions)
+            {
+                if (only.Count > 0 && !only.Contains(action)) continue;
+                if (except.Contains(action)) continue;
+                if (!controller.TryGet(action, out object fn) || fn is not ICallable callable)
+                {
+                    if (only.Contains(action)) throw run.Error($"{controller.Display} has no {action} function for <Resource only=\"...{action}\">.", "only", "Http");
+                    continue;
+                }
+                ctx.Add(run, new Route
+                {
+                    Methods = methods,
+                    Pattern = new RoutePattern(member ? RoutePattern.Join(basePath, "{" + param + "}") : basePath),
+                    Name = ctx.NamePrefix + prefix + action,
+                    Middleware = middleware,
+                    Controller = callable,
+                    ControllerName = to + "." + action,
+                    Module = run.Module,
+                    Scope = run.Scope,
+                    Api = ctx.Api,
+                    File = run.Module.Path,
+                    Line = run.Module.Source.GetPosition(run.Element.Span.Start).Line + 1,
+                });
+            }
+            return null;
+        }
+
+        private static HashSet<string> Names(string list) =>
+            new HashSet<string>((list ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.Ordinal);
+
+        /// <summary>
+        /// Finds a controller or middleware function: a <c>&lt;fn&gt;</c> in scope (<c>show</c>), a function of a
+        /// script or package imported with as (<c>people.show</c>), or a command.
+        /// </summary>
+        internal static ICallable ResolveFunction(ElementRun run, string text, string attribute)
+        {
+            string name = text.Trim().TrimStart('@');
+            int dot = name.IndexOf('.');
+            if (dot > 0)
+            {
+                string alias = name[..dot], member = name[(dot + 1)..];
+                if (!run.Module.TryGetAlias(alias, out ImportNamespace ns))
+                {
+                    string close = Values.Closest(alias, run.Module.AliasNames);
+                    throw run.Error($"Nothing is imported as '{alias}'. Import the controller with <import src=\"controllers/{alias}.ks.xml\" as=\"{alias}\" />." + (close != null ? $" Did you mean {close}?" : string.Empty), attribute, "Http");
+                }
+                if (ns.TryGet(member, out object found))
+                {
+                    if (found is ICallable fn) return fn;
+                    if (found is CommandDefinition cmd) return Command(run.Interpreter, cmd);
+                    throw run.Error($"{ns.Display}'s '{member}' is {Values.Describe(found)}, not a function.", attribute, "Http");
+                }
+                string suggestion = Values.Closest(member, ns.Names);
+                throw run.Error($"{ns.Display} has no function '{member}'." + (suggestion != null ? $" Did you mean {alias}.{suggestion}?" : $" It exports: {string.Join(", ", ns.Names)}."), attribute, "Http");
+            }
+
+            if (run.Scope.TryGet(name, out object value) && value is ICallable callable) return callable;
+            if (run.Module.Commands.TryGetValue(name, out CommandDefinition command))
+                return Command(run.Interpreter, command);
+            string near = Values.Closest(name, run.Scope.Names().Where(n => run.Scope.TryGet(n, out object f) && f is ICallable));
+            throw run.Error($"No function named '{name}'. Declare it with <fn name=\"{name}\"> or import a controller (<import src=\"...\" as=\"people\" /> then people.{name})."
+                + (near != null ? $" Did you mean {near}?" : string.Empty), attribute, "Http");
+        }
+
+        private static ICallable Command(Interpreter interpreter, CommandDefinition cmd) =>
+            new NativeFunction(cmd.Name, call => interpreter.InvokeCommand(cmd, call));
+
+        /// <summary>Reads a middleware list: <c>log, cors, auth:ADMIN_TOKEN, throttle:30, my_check</c>.</summary>
+        internal static List<MiddlewareRef> ResolveMiddleware(ElementRun run, string list)
+        {
+            var result = new List<MiddlewareRef>();
+            if (string.IsNullOrWhiteSpace(list)) return result;
+            RequestContext ctx = Context(run);
+            foreach (string raw in list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                int colon = raw.IndexOf(':');
+                string name = colon > 0 ? raw[..colon].Trim() : raw;
+                string argument = colon > 0 ? raw[(colon + 1)..].Trim() : null;
+                if (ctx.Settings.Groups.TryGetValue(name, out List<string> group))
+                {
+                    result.AddRange(ResolveMiddleware(run, string.Join(",", group)));
+                    continue;
+                }
+                // A <fn> of the same name replaces a built-in; a variable such as $log does not.
+                if (BuiltInMiddleware.Contains(name) && !(run.Scope.TryGet(name, out object own) && own is ICallable))
+                {
+                    result.Add(new MiddlewareRef(name, argument, null));
+                    continue;
+                }
+                result.Add(new MiddlewareRef(name, argument, ResolveFunction(run, name, "middleware")));
+            }
+            return result;
+        }
+
+        private static object View(CallContext c)
+        {
+            RequestContext ctx = RequestContext.Current(c.Host) ?? throw c.Error("@view() works while kscript serve handles a request.", "Http");
+            var data = new Dictionary<string, object>(StringComparer.Ordinal);
+            if (c.Count > 1 && c.Arg(1) is Dictionary<string, object> map)
+            {
+                foreach (var kv in map) data[kv.Key] = kv.Value;
+            }
+            foreach (var kv in c.Named) data[kv.Key] = kv.Value;
+            return ctx.RenderView(c.Str(0), data);
+        }
+
+        private static object Response(CallContext c)
+        {
+            object body = c.Arg(0, "body");
+            int status = c.Has(1, "status") && c.Arg(1, "status") != null ? (int)Values.ToNumber(c.Arg(1, "status"), "status") : 200;
+            HttpResponse response = body is HttpResponse existing ? existing : body is string || body == null
+                ? new HttpResponse(status, Values.ToStr(body))
+                : HttpResponse.Json(body, status);
+            response.Status = status;
+            if (c.Has(2, "type") && c.Arg(2, "type") != null) response.ContentType = Values.ToStr(c.Arg(2, "type"));
+            if (c.Has(3, "headers") && c.Arg(3, "headers") is Dictionary<string, object> headers)
+            {
+                foreach (var kv in headers) response.Headers[kv.Key] = Values.ToStr(kv.Value);
+            }
+            return response;
+        }
+
+        internal static HttpResponse Redirect(string to, int status)
+        {
+            var response = new HttpResponse(status, string.Empty, null);
+            response.Headers["Location"] = to;
+            return response;
+        }
+
+        internal static string ReasonPhrase(int status) =>
+            Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(status) is { Length: > 0 } phrase ? phrase : "Error " + status;
+    }
+}

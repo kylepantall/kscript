@@ -293,9 +293,20 @@ namespace KScript.Language.Features
                 // Built-in values such as $request or $err: their type name doesn't show the fields.
                 sb.Append("\n\nFields: ").Append(string.Join(", ", s.Shape.Fields.Keys.Select(k => "`" + k + "`")));
             }
-            if (!string.IsNullOrEmpty(s.Description))
+            DocComment doc = s.Kind is SymbolKind.Function or SymbolKind.Constant or SymbolKind.Variable ? s.Doc : null;
+            if (doc != null)
+            {
+                sb.Append("\n\n").Append(doc.ToMarkdown());
+            }
+            else if (!string.IsNullOrEmpty(s.Description))
             {
                 sb.Append("\n\n").Append(s.Description);
+            }
+            if (s.Kind == SymbolKind.Parameter && s.DeclaringElement != null
+                && analysis.Symbols.FirstOrDefault(f => f.Kind == SymbolKind.Function && f.DeclaringElement == s.DeclaringElement)?.Doc?.ParamText(s.Name) is string paramDoc
+                && paramDoc.Length > 0)
+            {
+                sb.Append("\n\n").Append(paramDoc);
             }
             if (s.Kind != SymbolKind.BuiltIn && s.DeclarationSpan.Length > 0 && s.SourcePath == null)
             {

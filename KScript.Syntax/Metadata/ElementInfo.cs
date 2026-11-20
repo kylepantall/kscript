@@ -19,6 +19,9 @@ namespace KScript.Metadata
 
         /// <summary>Another attribute that can stand in for this one when it is required (<c>value</c> or element text).</summary>
         public bool SatisfiedByContent { get; init; }
+
+        /// <summary>True for text that is used as written, without <c>{ }</c> interpolation, such as a route path <c>/people/{id}</c>.</summary>
+        public bool Literal { get; init; }
     }
 
     public sealed class ElementInfo
@@ -45,6 +48,19 @@ namespace KScript.Metadata
         public IReadOnlyList<string> MustFollow { get; init; }
 
         public IReadOnlyList<string> MustBeInside { get; init; }
+
+        /// <summary>True if <see cref="MustBeInside"/> may be any ancestor (a route inside an &lt;if&gt;), not only the parent.</summary>
+        public bool InsideAnyAncestor { get; init; }
+
+        /// <summary>
+        /// True if the element's content runs like a function body, so &lt;return&gt; works inside it (a route
+        /// answered by the statements inside it).
+        /// </summary>
+        public bool IsFunctionBody { get; init; }
+
+        /// <summary>An element name without the KScript. prefix: KScript.Routes is Routes.</summary>
+        public static string BareName(string name) =>
+            name != null && name.StartsWith("KScript.", StringComparison.Ordinal) ? name.Substring(8) : name;
 
         /// <summary>True for loops, which make <c>&lt;break/&gt;</c> and <c>&lt;continue/&gt;</c> valid inside.</summary>
         public bool IsLoop { get; init; }

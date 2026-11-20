@@ -110,6 +110,39 @@ namespace KScript.Language.Analysis
             root.Declare(alias, 0);
         }
 
+        private HashSet<string> middlewareGroups;
+
+        /// <summary>The middleware group names in the nearest kscript.json's http.groups (KScript.Http).</summary>
+        private HashSet<string> MiddlewareGroups()
+        {
+            if (middlewareGroups != null)
+            {
+                return middlewareGroups;
+            }
+            middlewareGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (string dir = directory; dir != null; dir = System.IO.Path.GetDirectoryName(dir))
+            {
+                string file = System.IO.Path.Combine(dir, ProjectConfig.FileName);
+                if (!files.FileExists(file))
+                {
+                    continue;
+                }
+                try
+                {
+                    string text = files.ReadText(file);
+                    if (text != null)
+                    {
+                        middlewareGroups.UnionWith(ProjectConfig.Parse(text, file).Http.Groups.Keys);
+                    }
+                }
+                catch (ProjectConfigException)
+                {
+                }
+                break;
+            }
+            return middlewareGroups;
+        }
+
         /// <summary>The packages listed in the nearest kscript.json (with test.packages for a test file).</summary>
         private IEnumerable<string> ProjectPackages(bool isTestFile)
         {

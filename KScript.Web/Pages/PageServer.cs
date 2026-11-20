@@ -70,12 +70,20 @@ namespace KScript.Pages
             return ext == ".json" && name.StartsWith("config.", StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Top-level folders that are never served, such as the views folder of KScript.Http (views are only
+        /// rendered by controllers, with their data).
+        /// </summary>
+        public HashSet<string> HiddenFolders { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         public PageRoute Resolve(string urlPath)
         {
             string path = Uri.UnescapeDataString((urlPath ?? "/").Split('?')[0]).Replace('\\', '/');
             var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
 
             if (segments.Any(s => s == ".." || s.StartsWith("_", StringComparison.Ordinal) || s.StartsWith(".", StringComparison.Ordinal)))
+                return NotFound();
+            if (segments.Count > 0 && HiddenFolders.Contains(segments[0]))
                 return NotFound();
             // The project's settings file is not part of the site.
             if (segments.Count > 0 && string.Equals(segments[^1], Projects.ProjectConfig.FileName, StringComparison.OrdinalIgnoreCase))
@@ -194,9 +202,15 @@ namespace KScript.Pages
     /// <summary><c>kscript serve</c>: serves a site folder, rendering KScript pages on each request.</summary>
     public static class PageServer
     {
-        public static async Task<int> RunAsync(string siteFolder, int port, string host, TextWriter log, CancellationToken stop = default)
+        public static Task<int> RunAsync(string siteFolder, int port, string host, TextWriter log, CancellationToken stop = default) =>
+            RunAsync(new PageSite(siteFolder), port, host, log, handler: null, stop);
+
+        /// <summary>
+        /// Serves a site. <paramref name="handler"/> (from KScript.Http) sees each request first; when it returns
+        /// null, the request goes to the site's pages and files.
+        /// </summary>
+        public static async Task<int> RunAsync(PageSite site, int port, string host, TextWriter log, Func<HttpRequest, Task<PageResult>> handler, CancellationToken stop = default)
         {
-            var site = new PageSite(siteFolder);
 
             var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = site.Root });
             builder.Logging.ClearProviders();
@@ -215,7 +229,7 @@ namespace KScript.Pages
                 PageResult result;
                 try
                 {
-                    result = await HandleAsync(site, http.Request, types);
+                    result = (handler != null ? await handler(http.Request) : null) ?? await HandleAsync(site, http.Request, types);
                 }
                 catch (Exception ex)
                 {

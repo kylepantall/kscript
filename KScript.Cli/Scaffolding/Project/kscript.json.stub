@@ -3,12 +3,25 @@
   "name": "{{ kebab }}",
   "serve": {
     "root": ".",
-    "port": {{ port ?? 8080 }},
+    "port": {{ port }},
     "host": "localhost"
   },
+{{#if http}}
+  "http": {
+    "middleware": ["log"]
+  },
+{{/if}}
+{{#if desktop}}
+  "app": {
+    "main": "desktop.ks.xml",
+    "name": "{{ title }}",
+    "id": "app.kscript.{{ kebab }}",
+    "version": "1.0.0"
+  },
+{{/if}}
   "lint": {
     "include": ["**/*.html", "**/*.md", "**/*.ks.xml"],
-    "exclude": ["_templates", "node_modules"],
+    "exclude": ["_templates", "node_modules", "dist"],
     "rules": {},
     "warningsAsErrors": false
   },

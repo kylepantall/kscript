@@ -27,7 +27,7 @@ namespace KScript.Language.Analysis
             this.files = files ?? DiskFileSystem.Instance;
             this.catalog = catalog ?? LanguageCatalog.Default;
             directory = path != null ? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) : null;
-            result = new DocumentAnalysis(source, path, kind, MarkupParser.Parse(source, kind));
+            result = new DocumentAnalysis(source, path, kind, MarkupParser.Parse(source, kind, path));
         }
 
         private DocumentKind Kind => result.Kind;
@@ -67,6 +67,7 @@ namespace KScript.Language.Analysis
             AnalyzeFrontMatter(root);
             HoistFunctions(root);
             ApplyKnownTypes(root);
+            HoistTypes(root);
             CheckScriptRoot();
 
             WalkChildren(result.Markup.Children, root, markupMode: Kind != DocumentKind.Script);
@@ -81,7 +82,9 @@ namespace KScript.Language.Analysis
             // A leading / so relative paths such as _components/card.html match too.
             string normalized = "/" + path.Replace('\\', '/');
             return System.IO.Path.GetFileName(normalized).StartsWith("_", StringComparison.Ordinal)
-                || normalized.Contains("/_components/", StringComparison.Ordinal);
+                || normalized.Contains("/_components/", StringComparison.Ordinal)
+                // KScript.Http views get their variables from the controller: @view('people/show', person: $p).
+                || normalized.Contains("/views/", StringComparison.Ordinal);
         }
 
         private void DeclareBuiltIns(Scope root)
@@ -173,12 +176,21 @@ namespace KScript.Language.Analysis
                         Kind = SymbolKind.Function,
                         DeclarationSpan = span,
                         DeclaringElement = e,
-                        Description = e.GetAttributeValue("description"),
+                        Description = e.Documentation,
                     };
                     MarkupAttribute paramsAttr = e.GetAttribute("params");
                     if (paramsAttr?.Value != null)
                     {
                         fn.Parameters.AddRange(ParseParameters(paramsAttr.Value, report: false));
+                    }
+                    foreach ((string docName, string _) in fn.Doc?.Params ?? Array.Empty<(string, string)>())
+                    {
+                        if (!fn.Parameters.Any(p => p.Name == docName))
+                        {
+                            Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.DocParameter,
+                                $"The doc comment describes @param {docName}, but {name} has no parameter called {docName}."
+                                + (fn.Parameters.Count > 0 ? " Its parameters: " + string.Join(", ", fn.Parameters.Select(p => p.Name)) + "." : string.Empty));
+                        }
                     }
                     seen[name] = fn;
                     result.Symbols.Add(fn);
@@ -331,14 +343,14 @@ namespace KScript.Language.Analysis
             }
 
             SourceText other = new SourceText(text);
-            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path));
+            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
             Dictionary<string, (ExternalLocation, string)> constants = new Dictionary<string, (ExternalLocation, string)>(StringComparer.Ordinal);
             MarkupElement root = doc.RootElements.FirstOrDefault();
             if (root == null)
             {
                 return constants;
             }
-            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum"))
+            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum" || x.Name == "type"))
             {
                 MarkupAttribute nameAttr = let.GetAttribute("name");
                 if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
@@ -346,7 +358,7 @@ namespace KScript.Language.Analysis
                     continue;
                 }
                 TextSpan span = nameAttr.Value.SourceSpan;
-                constants[nameAttr.ValueText.Trim().TrimStart('$')] = (new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), let.GetAttributeValue("description"));
+                constants[nameAttr.ValueText.Trim().TrimStart('$')] = (new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), let.Documentation);
             }
             return constants;
         }
@@ -361,7 +373,7 @@ namespace KScript.Language.Analysis
             }
 
             SourceText other = new SourceText(text);
-            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path));
+            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
             Dictionary<string, (FunctionParameter[], ExternalLocation, string)> exports = new Dictionary<string, (FunctionParameter[], ExternalLocation, string)>(StringComparer.Ordinal);
             foreach (MarkupElement fn in doc.DescendantElements().Where(x => x.Name == "fn"))
             {
@@ -372,7 +384,7 @@ namespace KScript.Language.Analysis
                 }
                 FunctionParameter[] ps = fn.GetAttribute("params")?.Value is DecodedText p ? ParseParameters(p, report: false).ToArray() : Array.Empty<FunctionParameter>();
                 TextSpan span = nameAttr.Value.SourceSpan;
-                exports[nameAttr.ValueText.Trim()] = (ps, new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), fn.GetAttributeValue("description"));
+                exports[nameAttr.ValueText.Trim()] = (ps, new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), fn.Documentation);
             }
             return exports;
         }
@@ -475,6 +487,7 @@ namespace KScript.Language.Analysis
 
             CheckAttributes(e, info);
             CheckPlacement(e, info, previous);
+            CheckElse(e, previous, markupMode);
             RequirePackage(info.Package, e.NameSpan, $"<{e.Name}>");
             if (Kind != DocumentKind.Script && !info.Context.HasFlag(ElementContext.Page))
             {
@@ -503,6 +516,14 @@ namespace KScript.Language.Analysis
                 case "enum" when info.Package == "KScript.Core":
                     AnalyzeAttributes(e, info, scope);
                     AnalyzeEnum(e, scope);
+                    return;
+
+                case "type" when info.Package == "KScript.Core":
+                    AnalyzeType(e, info, scope, inner, markupMode);
+                    return;
+
+                case "field" when info.Package == "KScript.Core":
+                    AnalyzeField(e, info, scope);
                     return;
 
                 case "match":
@@ -854,8 +875,9 @@ namespace KScript.Language.Analysis
 
             if (info.MustBeInside != null && info.MustBeInside.Count > 0)
             {
-                bool ok = info.MustBeInside.Contains("fn")
-                    ? e.Ancestors().Any(a => info.MustBeInside.Contains(a.Name))
+                bool ok = info.MustBeInside.Contains("fn") || info.InsideAnyAncestor
+                    ? e.Ancestors().Any(a => info.MustBeInside.Contains(ElementInfo.BareName(a.Name))
+                        || (info.MustBeInside.Contains("fn") && catalog.GetElement(ElementInfo.BareName(a.Name))?.IsFunctionBody == true))
                     : e.Parent != null && info.MustBeInside.Contains(e.Parent.Name, StringComparer.OrdinalIgnoreCase);
                 if (!ok)
                 {
@@ -924,7 +946,7 @@ namespace KScript.Language.Analysis
                     AnalyzeExpressionRegion(attr.Value, RegionKind.ExpressionList, scope, e, attr);
                     break;
                 case AttributeKind.Template:
-                case AttributeKind.Text when attr.ValueText.Contains('{'):
+                case AttributeKind.Text when attr.ValueText.Contains('{') && !a.Literal:
                     AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: false);
                     break;
                 case AttributeKind.VariableReference:
@@ -938,7 +960,14 @@ namespace KScript.Language.Analysis
                     {
                         foreach ((string name, TextSpan span) in SplitNames(attr.Value))
                         {
-                            ReferenceFunction(name, span, scope);
+                            // Middleware lists (KScript.Http) also take built-ins and groups, with an argument: throttle:30.
+                            int colon = a.Options.Count > 0 ? name.IndexOf(':') : -1;
+                            string bare = colon > 0 ? name.Substring(0, colon).TrimEnd() : name;
+                            if (a.Options.Contains(bare) || (a.Options.Count > 0 && MiddlewareGroups().Contains(bare)))
+                            {
+                                continue;
+                            }
+                            ReferenceFunction(bare, new TextSpan(span.Start, bare.Length), scope);
                         }
                     }
                     break;
@@ -947,6 +976,9 @@ namespace KScript.Language.Analysis
                     break;
                 case AttributeKind.DeclareVariable:
                     CheckIdentifier(attr.Value);
+                    break;
+                case AttributeKind.TypeName:
+                    CheckTypeAttribute(attr);
                     break;
                 case AttributeKind.Statements:
                 {
@@ -1036,7 +1068,7 @@ namespace KScript.Language.Analysis
             string type = e.GetAttributeValue("type")?.Trim();
             if (type != null)
             {
-                shape = new TypeShape(type == "int" || type == "float" ? KType.Number : type);
+                shape = TypeNamed(type, e.Span.Start) ?? TypeShape.Unknown;
             }
 
             if (nameAttr.Value == null)
@@ -1051,6 +1083,10 @@ namespace KScript.Language.Analysis
                 if (declared != null && region?.Parse?.Root is LambdaNode lambda)
                 {
                     declared.Description = "fn(" + string.Join(", ", lambda.Parameters.Select(p => "$" + p.Name)) + ")";
+                }
+                if (declared != null && e.Documentation is string doc)
+                {
+                    declared.Description = declared.Description != null ? declared.Description + "\n\n" + doc : doc;
                 }
             }
             else
@@ -1164,7 +1200,11 @@ namespace KScript.Language.Analysis
                         continue;
                     }
 
-                    if (declare && assign.Operator == "=" && assign.Target is IdentifierNode || declare && assign.Operator == "=" && assign.Target is VariableNode)
+                    bool plain = assign.Operator == "=" && (assign.Target is IdentifierNode || assign.Target is VariableNode);
+                    // In a .kscript file, x = 3 in a <do> declares x when it isn't in scope yet.
+                    bool declareNew = !declare && plain && e.Name == "do" && attr == null && result.Markup.Syntax == SourceSyntax.Code
+                        && scope.Lookup(assign.Name, nameSpan.Start) == null;
+                    if (declare && plain || declareNew)
                     {
                         Symbol symbol = NewVariable(assign.Name, nameSpan, e, SymbolKind.Variable, shape);
                         scope.Declare(symbol, after);
@@ -1300,7 +1340,7 @@ namespace KScript.Language.Analysis
             {
                 foreach (FunctionParameter p in ParseParameters(paramsAttr.Value, report: true))
                 {
-                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, ParameterShape(p));
+                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, ParameterShape(p, e.Span.Start));
                     body.Declare(symbol, e.Span.Start);
                 }
             }
@@ -1350,6 +1390,13 @@ namespace KScript.Language.Analysis
             {
                 shape.Fields[f] = new FieldInfo(f, new TypeShape(f == "line" ? KType.Number : KType.String), null);
             }
+            TypeShape problem = new TypeShape(KType.Map);
+            foreach (string f in new[] { "path", "field", "message" })
+            {
+                problem.Fields[f] = new FieldInfo(f, new TypeShape(KType.String), null);
+            }
+            shape.Fields["problems"] = new FieldInfo("problems", new TypeShape(KType.List) { Element = problem }, null,
+                "For a Shape error (data that doesn't fit a <type>): each problem's JSON path, field and message.");
             return shape;
         }
 

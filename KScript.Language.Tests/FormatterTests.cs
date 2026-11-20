@@ -533,6 +533,23 @@ namespace KScript.Language.Tests
         private const string Tidy = "<kscript>\n  <echo>hi</echo>\n</kscript>\n";
 
         [Fact]
+        public void KscriptFilesAreLeftAlone()
+        {
+            const string code = "x = 1\nif $x > 0 {\necho \"hi\"\n}\n";
+            string path = Write("code.kscript", code);
+            Write("a.ks.xml", Tidy);
+
+            (int code1, string folder) = Run(dir, "--check");
+            Assert.Equal(0, code1);
+            Assert.DoesNotContain("code.kscript", folder);
+
+            (int code2, string named) = Run(path);
+            Assert.Equal(0, code2);
+            Assert.Contains("skipped (.kscript files are not reformatted yet)", named);
+            Assert.Equal(code, File.ReadAllText(path));
+        }
+
+        [Fact]
         public void CheckReportsWithoutChangingFiles()
         {
             string path = Write("a.ks.xml", Messy);

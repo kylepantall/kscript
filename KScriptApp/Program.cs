@@ -48,7 +48,9 @@ namespace KScript
             output.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
             output.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
             output.WriteLine("       kscript css [file-or-folder]... [--out folder] [--var name=value]   Compile .ks.css, .ks.scss and .ks.sass stylesheets.");
-            output.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]");
+            output.WriteLine("       kscript convert <file-or-folder>... [--to xml|kscript] [--stdout]   Write the .kscript version of an XML script, or the reverse.");
+            output.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]   Serve pages, and routes.ks.xml / api.ks.xml routes.");
+            output.WriteLine("       kscript routes [site folder]                      List the routes of a site.");
             output.WriteLine("       kscript app build [script] [--name \"My App\"] [--out folder]   Package a script as a desktop app.");
             output.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
             output.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
@@ -119,9 +121,14 @@ namespace KScript
 
             try
             {
-                return KScript.Pages.PageServer.RunAsync(folder ?? ".", port ?? 8080, host ?? "localhost", Out, Cancellation).GetAwaiter().GetResult();
+                return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
+            {
+                Error.WriteLine(ex.Message);
+                return 1;
+            }
+            catch (FileNotFoundException ex)
             {
                 Error.WriteLine(ex.Message);
                 return 1;
@@ -156,6 +163,31 @@ namespace KScript
                 rest.Add(a);
             }
             return rest.ToArray();
+        }
+
+        /// <summary>kscript routes [folder]: the route table of a site (the project's site root by default).</summary>
+        int Routes(string[] args)
+        {
+            string folder = args.FirstOrDefault(a => !a.StartsWith("-", StringComparison.Ordinal));
+            KScript.Projects.ProjectConfig project;
+            try
+            {
+                project = KScript.Projects.ProjectConfig.FindAndLoad(folder ?? ".");
+            }
+            catch (KScript.Projects.ProjectConfigException ex)
+            {
+                Error.WriteLine(ex.Message);
+                return 1;
+            }
+            string given = folder == null ? null : Path.GetFullPath(folder);
+            if (project != null && (given == null || string.Equals(given.TrimEnd(Path.DirectorySeparatorChar), project.Directory, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)))
+                folder = project.SiteRoot;
+            if (!Directory.Exists(folder ?? "."))
+            {
+                Error.WriteLine($"Site folder not found: {folder}");
+                return 1;
+            }
+            return KScript.Http.HttpServer.ListRoutes(folder ?? ".", project, Out, Error);
         }
 
         public int Run(string[] args)
@@ -239,6 +271,16 @@ namespace KScript
             if (args[0] == "css")
             {
                 return KScript.Style.CssCommand.Run(args.Skip(1).ToArray(), Out, Error);
+            }
+
+            if (args[0] == "routes")
+            {
+                return Routes(args.Skip(1).ToArray());
+            }
+
+            if (args[0] == "convert")
+            {
+                return KScript.Conversion.ConvertCommand.Run(args.Skip(1).ToArray(), Out, Error);
             }
 
             if (args[0] == "test")

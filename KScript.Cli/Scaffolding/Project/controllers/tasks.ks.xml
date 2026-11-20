@@ -1,0 +1,33 @@
+--- make
+when: http
+---
+<kscript>
+  <!--
+    The API's controller: each function answers a route in api.ks.xml. A map or list it returns is sent as JSON.
+    The rules come from lib/tasks.ks.xml, the same file the web page and the tests use.
+  -->
+  <import package="KScript.IO" />
+  <import package="KScript.Http" />
+  <import src="../lib/tasks.ks.xml" />
+
+  <const name="file" value="'data/tasks.json'" />
+
+  <fn name="load" description="The saved tasks, or the starter tasks before anything is saved.">
+    <return value="@exists($file) ? @read_json($file) : @starter_tasks()" />
+  </fn>
+
+  <fn name="index" description="GET /api/tasks">
+    <return value="@load()" />
+  </fn>
+
+  <fn name="store" params="json" description="POST /api/tasks with a JSON title">
+    <let name="tasks" value="@add_task(@load(), title: $json.title ?? '')" />
+    <do>@write_json($file, $tasks)</do>
+    <return value="@response($tasks->last(), status: 201)" />
+  </fn>
+
+  <fn name="destroy" params="id: int" description="DELETE /api/tasks/:id">
+    <do>@write_json($file, @remove_task(@load(), id: $id))</do>
+    <return value="null" />
+  </fn>
+</kscript>
