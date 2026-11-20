@@ -7,6 +7,7 @@ const { resolveServer, versionOf, supportsLsp, isOlderThan } = require('./src/se
 const { isSiteFolder } = require('./src/site');
 const { registerBlockDividers } = require('./src/blocks');
 const { watchedPath, watchBinary } = require('./src/watch');
+const { commentEnter } = require('./src/comments');
 
 const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-needed';
 
@@ -162,6 +163,7 @@ async function activate(context) {
       await startClient(context);
     }),
     vscode.commands.registerCommand('kscript.showOutput', () => output.show()),
+    vscode.commands.registerTextEditorCommand('kscript.onEnter', (editor) => commentEnter(vscode, editor)),
     vscode.commands.registerCommand('kscript.showSetup', () => vscode.env.openExternal(vscode.Uri.parse(INSTALL_URL))),
     vscode.commands.registerCommand('kscript.runTests', () => runTests()),
     vscode.commands.registerCommand('kscript.runTestsInFile', (uri) => {

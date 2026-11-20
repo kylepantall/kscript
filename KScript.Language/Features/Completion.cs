@@ -42,6 +42,12 @@ namespace KScript.Language.Features
                 return FrontMatterCompletions(analysis, offset);
             }
 
+            // Typing a word where a statement starts: offer keywords, variables, functions and commands without a trigger character.
+            if (cursor.Region == null && !cursor.InAttributeValue && !cursor.InEndTagName && StatementWordStart(analysis, offset) is int statementStart)
+            {
+                return StatementCompletions(analysis, statementStart, offset);
+            }
+
             if (cursor.InEndTagName)
             {
                 return new List<CompletionItem>
@@ -144,9 +150,102 @@ namespace KScript.Language.Features
             return i;
         }
 
+        private static readonly Dictionary<string, string> CodeStatementSnippets = new Dictionary<string, string>
+        {
+            ["if"] = "if ${1:condition} {\n\t$0\n}",
+            ["while"] = "while ${1:condition} {\n\t$0\n}",
+            ["for"] = "for ${1:item} in ${2:\\$list} {\n\t$0\n}",
+            ["fn"] = "fn ${1:name}($2) {\n\t$0\n}",
+            ["try"] = "try {\n\t$0\n} catch err {\n\t\n}",
+            ["match"] = "match ${1:\\$value} {\n\t$0\n}",
+            ["echo"] = "echo $0",
+            ["return"] = "return $0",
+        };
+
+        /// <summary>Elements a .kscript statement can't start with: they're written another way (x = 3, name: type, } else {).</summary>
+        private static readonly HashSet<string> NotCodeStatements = new HashSet<string> { "kscript", "do", "let", "set", "field" };
+
+        /// <summary>
+        /// The start of the word before the cursor when that word begins a statement: at the start of a line (or after '{' or ';')
+        /// in a .kscript file, or on its own line in the body of an XML script. Null anywhere else.
+        /// </summary>
+        private static int? StatementWordStart(DocumentAnalysis analysis, int offset)
+        {
+            string text = analysis.Source.Text;
+            int wordStart = WordStart(text, offset);
+            if (wordStart == offset || !Lexer.IsIdentStart(text[wordStart]) || analysis.Kind != DocumentKind.Script)
+            {
+                return null;
+            }
+            int p = wordStart;
+            while (p > 0 && (text[p - 1] == ' ' || text[p - 1] == '\t'))
+            {
+                p--;
+            }
+            char before = p == 0 ? '\n' : text[p - 1];
+            if (analysis.Markup.Syntax == SourceSyntax.Code)
+            {
+                bool inComment = analysis.Markup.DescendantNodes().OfType<MarkupComment>().Any(c => offset > c.Span.Start && offset <= c.Span.End);
+                return !inComment && (before is '\n' or '\r' or '{' or ';') ? wordStart : null;
+            }
+            return before is '\n' or '\r' or '>' ? wordStart : null;
+        }
+
+        private List<CompletionItem> StatementCompletions(DocumentAnalysis analysis, int wordStart, int offset)
+        {
+            TextSpan replace = TextSpan.FromBounds(wordStart, offset);
+            MarkupElement typed = analysis.Markup.DescendantElements().FirstOrDefault(e => e.NameSpan.Start == wordStart && e.NameSpan.Length > 0);
+            MarkupElement parent = typed != null ? typed.Parent : analysis.Markup.FindElementAt(offset);
+            MarkupElement previous = typed != null ? PreviousSibling(typed) : PreviousElementBefore(analysis.Source.Text, parent, wordStart);
+
+            if (analysis.Markup.Syntax != SourceSyntax.Code)
+            {
+                // XML: the word becomes an element, so the '<' comes with it.
+                return ElementCompletions(analysis, parent, replace, previous, snippets: true, openBracket: "<");
+            }
+
+            List<CompletionItem> items = new List<CompletionItem>();
+            foreach (ElementInfo e in Catalog.Elements)
+            {
+                if (!e.Context.HasFlag(ElementContext.Script) || NotCodeStatements.Contains(e.Name) || e.MustFollow?.Count > 0 || !FitsHere(e, parent, previous))
+                {
+                    continue;
+                }
+                CodeStatementSnippets.TryGetValue(e.Name, out string snippet);
+                items.Add(new CompletionItem
+                {
+                    Label = e.Name,
+                    Kind = CompletionKind.Keyword,
+                    Detail = e.Planned ? "KScript 2 (planned)" : "statement",
+                    Documentation = ElementMarkdown(e),
+                    InsertText = snippet,
+                    IsSnippet = snippet != null,
+                    ReplaceSpan = replace,
+                    SortText = "0" + e.Name,
+                });
+            }
+
+            // x = 3 assigns: offer the variables in scope by their bare names.
+            Scope scope = analysis.ScopeAt(offset);
+            items.AddRange(scope.VisibleAt(offset)
+                .Where(s => s.Kind is SymbolKind.Variable or SymbolKind.Parameter or SymbolKind.LoopVariable)
+                .GroupBy(s => s.Name).Select(g => g.First())
+                .Select(s => new CompletionItem
+                {
+                    Label = s.Name,
+                    Kind = s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : CompletionKind.Variable,
+                    Detail = s.Shape.Display(),
+                    Documentation = SymbolMarkdown(analysis, s),
+                    ReplaceSpan = replace,
+                    SortText = "1" + s.Name,
+                }));
+            items.AddRange(CommandCompletions(analysis, replace, withSigil: true));
+            return items;
+        }
+
         #region Markup
 
-        private List<CompletionItem> ElementCompletions(DocumentAnalysis analysis, MarkupElement parent, TextSpan replace, MarkupElement previous, bool snippets)
+        private List<CompletionItem> ElementCompletions(DocumentAnalysis analysis, MarkupElement parent, TextSpan replace, MarkupElement previous, bool snippets, string openBracket = "")
         {
             List<CompletionItem> items = new List<CompletionItem>();
             ElementContext context = analysis.Kind == DocumentKind.Script ? ElementContext.Script : ElementContext.Page;
@@ -171,9 +270,10 @@ namespace KScript.Language.Features
                     Kind = CompletionKind.Element,
                     Detail = e.Planned ? "KScript 2 (planned)" : "KScript element",
                     Documentation = ElementMarkdown(e),
-                    InsertText = snippets ? ElementSnippet(e) : null,
+                    InsertText = snippets ? openBracket + ElementSnippet(e) : null,
                     IsSnippet = snippets,
                     ReplaceSpan = replace,
+                    FilterText = openBracket.Length > 0 ? e.Name : null,
                     SortText = (fits ? "0" : "1") + e.Name,
                 });
             }
@@ -714,11 +814,11 @@ namespace KScript.Language.Features
                     Kind = s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : s.IsConst ? CompletionKind.Constant : CompletionKind.Variable,
                     Detail = s.Shape.Display(),
                     Documentation = SymbolMarkdown(analysis, s),
-                    ReplaceSpan = withSigil ? replace : replace,
-                    FilterText = (withSigil ? "$" : string.Empty) + s.Name,
+                    ReplaceSpan = replace,
+                    // The span replaced is the bare word (the $ isn't typed yet, or sits before it), so filter on the bare name.
+                    FilterText = s.Name,
                     SortText = "0" + s.Name,
                 })
-                .Concat(analysis.Kind == DocumentKind.Script ? Enumerable.Empty<CompletionItem>() : Enumerable.Empty<CompletionItem>())
                 .ToList();
         }
 
@@ -736,6 +836,7 @@ namespace KScript.Language.Features
                     InsertText = sigil + s.Name + (s.Parameters.Count == 0 ? "()" : "($1)"),
                     IsSnippet = true,
                     ReplaceSpan = replace,
+                    FilterText = s.Name,
                     SortText = "1" + s.Name,
                 }).ToList();
 
@@ -748,6 +849,7 @@ namespace KScript.Language.Features
                 InsertText = sigil + c.Name + (c.MaxArgs == 0 ? "()" : "($1)"),
                 IsSnippet = true,
                 ReplaceSpan = replace,
+                FilterText = c.Name,
                 SortText = "2" + c.Name,
             }));
             return items;
