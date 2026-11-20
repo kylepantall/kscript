@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 using KScript.Syntax;
@@ -11,12 +12,15 @@ namespace KScript.Runtime
     /// </summary>
     public sealed class TypeRef
     {
-        private TypeRef(string name, int listDepth, bool optional, RecordType inline)
+        private TypeRef(string name, int listDepth, bool optional, IKObject inline, TypeRef argBase = null, IReadOnlyDictionary<string, object> args = null, string argsText = null)
         {
             Name = name;
             ListDepth = listDepth;
             Optional = optional;
             Inline = inline;
+            ArgBase = argBase;
+            Args = args;
+            ArgsText = argsText;
         }
 
         /// <summary>The type's name, without <c>[]</c> or <c>?</c>.</summary>
@@ -28,22 +32,68 @@ namespace KScript.Runtime
         /// <summary>True when the type ends in <c>?</c>: null and missing values are allowed.</summary>
         public bool Optional { get; }
 
-        /// <summary>A type with no name of its own, such as an object inside a <c>sample</c> file.</summary>
-        internal RecordType Inline { get; }
+        /// <summary>
+        /// The type itself, when it is already known: an object inside a <c>sample</c> file, a field's own rules
+        /// (<c>&lt;field min="1"&gt;</c>), or a type given as a value.
+        /// </summary>
+        internal IKObject Inline { get; }
+
+        /// <summary>
+        /// For a type given arguments where it is used, such as <c>uuid(v: 4)</c> or <c>string[](max: 5)</c>: the
+        /// type before the brackets. Its items (at <see cref="ListDepth"/> 0) are that type with <see cref="Args"/> as rules.
+        /// </summary>
+        public TypeRef ArgBase { get; }
+
+        /// <summary>The arguments: plain values by name, such as v = 4.</summary>
+        public IReadOnlyDictionary<string, object> Args { get; }
+
+        private string ArgsText { get; }
 
         /// <summary>A built-in type such as string or int, rather than an &lt;enum&gt; or a &lt;type&gt;.</summary>
-        public bool IsBuiltIn => Inline == null && Values.DeclarableTypes.Contains(Name, StringComparer.OrdinalIgnoreCase);
+        public bool IsBuiltIn => Inline == null && Args == null && Values.DeclarableTypes.Contains(Name, StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Just a name: no <c>[]</c> and no <c>?</c>.</summary>
         public bool IsSimple => ListDepth == 0 && !Optional;
 
         internal static TypeRef Of(RecordType type, int listDepth = 0, bool optional = false) => new TypeRef(type.Name, listDepth, optional, type);
 
+        internal static TypeRef Of(RefinedType type, int listDepth = 0, bool optional = false) => new TypeRef(type.Name, listDepth, optional, type);
+
         internal static TypeRef Any(bool optional = false) => new TypeRef("any", 0, optional, null);
 
-        internal TypeRef WithOptional(bool optional) => optional == Optional ? this : new TypeRef(Name, ListDepth, optional, Inline);
+        internal TypeRef WithOptional(bool optional) => optional == Optional ? this : new TypeRef(Name, ListDepth, optional, Inline, ArgBase, Args, ArgsText);
 
-        internal TypeRef Item => new TypeRef(Name, ListDepth - 1, false, Inline);
+        internal TypeRef Item => new TypeRef(Name, ListDepth - 1, false, Inline, ArgBase, Args, ArgsText);
+
+        private TypeRef ListOf() => new TypeRef(Name, ListDepth + 1, false, Inline, ArgBase, Args, ArgsText);
+
+        private TypeRef WithArgs(IReadOnlyDictionary<string, object> args, string text) => new TypeRef(Name, 0, false, null, this, args, text.Trim());
+
+        private RefinedType refined;
+        private Scope refinedScope;
+
+        /// <summary>The type with its arguments as rules, on top of the project's defaults for a built-in type.</summary>
+        internal RefinedType Refined(Scope scope, Module module)
+        {
+            if (refined != null && refinedScope == scope) return refined;
+            TypeRules rules = TypeRules.FromOptions(Args, out string error) ?? throw new KScriptException($"{this}: {error}", "Type");
+            TypeRef baseType = ArgBase;
+            if (baseType.IsBuiltIn)
+            {
+                // The arguments replace the project's defaults for the type rather than adding to them.
+                rules = rules.Over(TypeDefaults.For(module, baseType.Name));
+                baseType = baseType.WithoutDefaults();
+            }
+            var type = new RefinedType(ToItemString(), baseType, rules, null, scope, module);
+            if (rules.ProblemFor(type.Root(), ToItemString()) is string problem) throw new KScriptException(problem, "Type");
+            refinedScope = scope;
+            return refined = type;
+        }
+
+        /// <summary>True for a built-in type that ignores the project's defaults (they were merged into its arguments).</summary>
+        internal bool NoDefaults { get; private init; }
+
+        internal TypeRef WithoutDefaults() => new TypeRef(Name, ListDepth, Optional, Inline, ArgBase, Args, ArgsText) { NoDefaults = true };
 
         /// <summary>Parses a type, or returns null when <paramref name="text"/> isn't one.</summary>
         public static TypeRef Parse(string text)
@@ -51,18 +101,86 @@ namespace KScript.Runtime
             string t = (text ?? string.Empty).Trim();
             bool optional = t.EndsWith('?');
             if (optional) t = t.Substring(0, t.Length - 1).TrimEnd();
-            int depth = 0;
-            while (t.EndsWith("[]", StringComparison.Ordinal))
+            // Peel [] and (args) off the end: string(min: 1)[] is a list of such strings, string[](max: 5) a short list.
+            var suffixes = new List<string>();
+            while (true)
             {
-                depth++;
-                t = t.Substring(0, t.Length - 2).TrimEnd();
+                if (t.EndsWith("[]", StringComparison.Ordinal))
+                {
+                    suffixes.Add("[]");
+                    t = t.Substring(0, t.Length - 2).TrimEnd();
+                    continue;
+                }
+                if (t.EndsWith(')'))
+                {
+                    int open = MatchingParen(t);
+                    if (open <= 0) return null;
+                    suffixes.Add(t.Substring(open));
+                    t = t.Substring(0, open).TrimEnd();
+                    continue;
+                }
+                break;
             }
             if (t.Length == 0 || !Lexer.IsIdentStart(t[0]) || !t.All(Lexer.IsIdentChar)) return null;
             if (Values.DeclarableTypes.Contains(t, StringComparer.OrdinalIgnoreCase)) t = t.ToLowerInvariant();
-            return new TypeRef(t, depth, optional, null);
+            var type = new TypeRef(t, 0, false, null);
+            for (int i = suffixes.Count - 1; i >= 0; i--)
+            {
+                if (suffixes[i] == "[]")
+                {
+                    type = type.ListOf();
+                    continue;
+                }
+                string inner = suffixes[i].Substring(1, suffixes[i].Length - 2);
+                IReadOnlyDictionary<string, object> args = ParseArgs(inner);
+                if (args == null) return null;
+                type = type.WithArgs(args, inner);
+            }
+            return optional ? type.WithOptional(true) : type;
         }
 
-        public override string ToString() => Name + string.Concat(Enumerable.Repeat("[]", ListDepth)) + (Optional ? "?" : string.Empty);
+        /// <summary>The ( that the ) ending <paramref name="t"/> closes, skipping brackets and quotes inside.</summary>
+        private static int MatchingParen(string t)
+        {
+            int depth = 0;
+            char quote = '\0';
+            for (int i = t.Length - 1; i >= 0; i--)
+            {
+                char c = t[i];
+                if (quote != '\0')
+                {
+                    if (c == quote) quote = '\0';
+                    continue;
+                }
+                if (c is '\'' or '"') quote = c;
+                else if (c is ')' or ']' or '}') depth++;
+                else if (c is '(' or '[' or '{')
+                {
+                    depth--;
+                    if (depth == 0) return c == '(' ? i : -1;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary><c>v: 4, domains: ['example.com']</c> as plain values by name, or null if they aren't plain.</summary>
+        internal static IReadOnlyDictionary<string, object> ParseArgs(string text)
+        {
+            ParseResult parsed = ExpressionParser.ParseExpression("{" + text + "}");
+            if (!parsed.Success || parsed.Root is not MapNode map) return null;
+            var args = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (MapEntryNode entry in map.Entries)
+            {
+                object value = TypeRules.PlainValue(entry.Value);
+                if (value is TypeRules.Unplain) return null;
+                args[entry.Key] = value;
+            }
+            return args;
+        }
+
+        private string ToItemString() => Args != null ? ArgBase + "(" + ArgsText + ")" : Name;
+
+        public override string ToString() => ToItemString() + string.Concat(Enumerable.Repeat("[]", ListDepth)) + (Optional ? "?" : string.Empty);
     }
 
     /// <summary>One field of a &lt;type&gt;.</summary>
@@ -102,6 +220,9 @@ namespace KScript.Runtime
         internal DecodedText ValueText { get; }
 
         internal bool HasDefault => DefaultNode != null || DefaultText != null;
+
+        internal FieldDefinition WithType(TypeRef type, bool optional) =>
+            new FieldDefinition(Name, type, From, Path, DefaultNode, DefaultText, ValueText, Description, optional);
 
         /// <summary>Parses a path such as <c>owner.login</c> or <c>items[0].name</c> into keys and indexes, or null.</summary>
         internal static List<object> ParsePath(string text)
@@ -181,6 +302,19 @@ namespace KScript.Runtime
 
         public FieldDefinition Field(string name) => fields.FirstOrDefault(f => f.Name == name);
 
+        /// <summary>The types this one joins: <c>type Admin with [User, Auditable]</c>.</summary>
+        public IReadOnlyList<RecordType> Bases => bases;
+
+        private readonly List<RecordType> bases = new List<RecordType>();
+
+        /// <summary>Rules on the whole record (<c>validate: $end > $start, '...'</c>), its bases' first.</summary>
+        internal List<Validator> Validators { get; } = new List<Validator>();
+
+        internal void AddBase(RecordType type) => bases.Add(type);
+
+        /// <summary>True if a record of this type can be used where <paramref name="other"/> is expected: it is that type, or joins it.</summary>
+        public bool IsA(RecordType other) => this == other || bases.Any(b => b.IsA(other));
+
         public string TypeName => "type";
 
         public string ToText() => Name;
@@ -206,6 +340,9 @@ namespace KScript.Runtime
                     return true;
                 case "check":
                     result = Shapes.Problems(call.Interpreter, Shapes.ParseIfText(call.Arg(0)), this);
+                    return true;
+                case "is":
+                    result = call.Arg(0) is Record r && r.Type.IsA(this);
                     return true;
                 case "schema":
                     result = Shapes.Schema(this);
@@ -236,6 +373,7 @@ namespace KScript.Runtime
         {
             ("from", "data", "Checks the data (a map, a list of maps, or JSON text) and returns it as this type. Fails with every problem it finds.", "any"),
             ("check", "data", "The problems that stop the data fitting this type, as { path, field, message } maps. Empty when it fits.", "list"),
+            ("is", "value", "yes if the value is a record of this type, or of a type that joins it with with [...].", "bool"),
             ("schema", "", "The type as a JSON Schema map.", "map"),
             ("fields", "", "The type's fields: name, type, optional, from, computed and description.", "list"),
             ("name", "", "The type's name.", "string"),
@@ -270,7 +408,17 @@ namespace KScript.Runtime
                 this[name] = value;
                 return;
             }
-            this[name] = Shapes.Convert(interpreter, value, field.Type.WithOptional(field.Optional), $"{Type.Name}.{name}", Type.Closure, Type.Module);
+            object converted = Shapes.Convert(interpreter, value, field.Type.WithOptional(field.Optional), $"{Type.Name}.{name}", Type.Closure, Type.Module);
+            bool had = TryGetValue(name, out object old);
+            this[name] = converted;
+            if (Type.Validators.Count == 0) return;
+            List<string> failures = Shapes.Failures(interpreter, this);
+            if (failures.Count == 0) return;
+            if (had) this[name] = old;
+            else Remove(name);
+            var error = new KScriptException($"{Type.Name}.{name} can't be set to that: the {Type.Name} {failures[0]}.", "Shape");
+            error.Fields["problems"] = failures.Select(f => (object)new Dictionary<string, object> { ["path"] = "$", ["field"] = null, ["message"] = f + "." }).ToList();
+            throw error;
         }
 
         private string Suggest(string name)
@@ -298,7 +446,7 @@ namespace KScript.Runtime
 
         internal static object Convert(Interpreter interpreter, object value, TypeRef type, string what, Scope scope, Module module)
         {
-            if (type.IsSimple && type.IsBuiltIn) return Values.ConvertTo(value, type.Name, what);
+            if (type.IsSimple && type.IsBuiltIn && TypeDefaults.For(module, type.Name) == null) return Values.ConvertTo(value, type.Name, what);
             var mapper = new ShapeMapper(interpreter, scope, module);
             object result = mapper.Convert(value, true, type, "$", null, 0);
             mapper.ThrowIfAny(what, type);
@@ -335,6 +483,14 @@ namespace KScript.Runtime
             return mapper.Problems.Select(p => (object)p.ToValue()).ToList();
         }
 
+        /// <summary>The problems that stop <paramref name="value"/> fitting <paramref name="type"/>, as maps.</summary>
+        internal static List<object> Problems(Interpreter interpreter, object value, TypeRef type, Scope scope, Module module)
+        {
+            var mapper = new ShapeMapper(interpreter, scope, module);
+            mapper.Convert(value, true, type, "$", null, 0);
+            return mapper.Problems.Select(p => (object)p.ToValue()).ToList();
+        }
+
         /// <summary>An <c>as:</c> argument: a &lt;type&gt; or &lt;enum&gt; value, or a type written as text.</summary>
         internal static TypeRef TypeArgument(object type, Scope scope, Module module, out Scope resolveIn, out Module resolveModule)
         {
@@ -348,6 +504,10 @@ namespace KScript.Runtime
                     return TypeRef.Of(record);
                 case EnumType e:
                     return TypeRef.Parse(e.Name);
+                case RefinedType refined:
+                    resolveIn = refined.Closure;
+                    resolveModule = refined.Module;
+                    return TypeRef.Of(refined);
                 case string text:
                     return TypeRef.Parse(text) ?? throw new KScriptException($"'{text}' isn't a type. Write a name such as string, int or Repo, with [] for a list and ? to allow null.", "Type");
                 default:
@@ -359,7 +519,7 @@ namespace KScript.Runtime
         internal static object Resolve(TypeRef type, Scope scope, Module module)
         {
             if (type.Inline != null) return type.Inline;
-            if (scope.TryGet(type.Name, out object found) && (found is RecordType || found is EnumType)) return found;
+            if (scope.TryGet(type.Name, out object found) && (found is RecordType || found is EnumType || found is RefinedType)) return found;
             IEnumerable<string> known = Values.DeclarableTypes.Concat(KnownTypes(scope));
             string close = Values.Closest(type.Name, known);
             throw new KScriptException($"Unknown type '{type.Name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
@@ -372,9 +532,22 @@ namespace KScript.Runtime
             {
                 foreach (KeyValuePair<string, object> v in s.OwnVariables)
                 {
-                    if (v.Value is RecordType || v.Value is EnumType) yield return v.Key;
+                    if (v.Value is RecordType || v.Value is EnumType || v.Value is RefinedType) yield return v.Key;
                 }
             }
+        }
+
+        /// <summary>The record-wide rules (<c>validate</c>) that <paramref name="record"/> breaks. Each field is a variable.</summary>
+        internal static List<string> Failures(Interpreter interpreter, Record record)
+        {
+            var failures = new List<string>();
+            foreach (Validator v in record.Type.Validators)
+            {
+                Scope s = record.Type.Closure.Child();
+                foreach (KeyValuePair<string, object> kv in record) s.Declare(kv.Key, kv.Value);
+                if (!Values.Truthy(interpreter.EvaluateText(v.Test, s, record.Type.Module))) failures.Add(v.Failure);
+            }
+            return failures;
         }
 
         /// <summary>JSON text becomes data; anything else is used as it is.</summary>
@@ -385,16 +558,27 @@ namespace KScript.Runtime
 
         #region Declaring
 
-        /// <summary>Builds the type a &lt;type&gt; element declares.</summary>
-        internal static RecordType Declare(ElementRun run)
+        /// <summary>
+        /// Builds the type a &lt;type&gt; element declares: a record type (fields, perhaps joining other record
+        /// types with <c>with</c>), or a refinement of one other type (<c>with="int" min="0"</c>).
+        /// </summary>
+        internal static IKObject Declare(ElementRun run)
         {
             string name = run.VariableName("name");
             if (Values.DeclarableTypes.Contains(name, StringComparer.OrdinalIgnoreCase))
                 throw run.Error($"'{name}' is a built-in type, so a <type> can't use it as its name.", "name", "Syntax");
+            List<string> with = TypeNames(run.Raw("with"));
+            if (with.Count == 1 && IsRefinable(with[0], run.Scope)) return DeclareRefined(run, name, with[0]);
+
+            string rule = TypeRules.Attributes.FirstOrDefault(run.Has);
+            if (rule != null)
+                throw run.Error($"{rule} only goes on a type made from one other type, such as <type name=\"Slug\" with=\"string\" {rule}=\"...\">, or on a field.", rule, "Syntax");
+
             string extraText = run.Raw("extra")?.Trim().ToLowerInvariant() ?? "drop";
             // The loader has already checked extra is one of drop, keep and error.
             ExtraKeys extra = extraText == "keep" ? ExtraKeys.Keep : extraText == "error" ? ExtraKeys.Error : ExtraKeys.Drop;
             var type = new RecordType(name, run.Raw("description"), extra, run.Scope, run.Module);
+            Dictionary<string, string> conflicts = JoinBases(type, with, run);
 
             string sample = run.Raw("sample");
             if (sample != null)
@@ -422,20 +606,148 @@ namespace KScript.Runtime
                     if (part.Trim().Length == 0) continue;
                     FieldDefinition field = ParseInlineField(part.Trim(), run);
                     if (!seen.Add(field.Name)) throw run.Error($"<type name=\"{name}\"> lists the field '{field.Name}' twice.", "fields", "Syntax");
-                    type.SetField(field);
+                    SetOwnField(type, field, run);
                 }
             }
 
+            var own = new TypeRules();
             foreach (MarkupElement e in run.ChildElements)
             {
-                if (e.Name != "field") throw run.Error($"<type> can only hold <field> elements, not <{e.Name}>.", null, "Syntax");
+                if (own.TryAddChild(e, run, allowNormalize: false)) continue;
+                if (e.Name != "field") throw run.Error($"<type> can only hold <field> and <validate> elements, not <{e.Name}>.", null, "Syntax");
                 FieldDefinition field = ParseFieldElement(e, run);
                 if (!seen.Add(field.Name)) throw run.Error($"<type name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
-                type.SetField(field);
+                SetOwnField(type, field, run);
             }
+            type.Validators.AddRange(own.Validators);
 
+            // A field two bases disagree on is fine once this type declares it itself.
+            string conflict = conflicts.Keys.FirstOrDefault(f => !seen.Contains(f));
+            if (conflict != null) throw run.Error(conflicts[conflict], "with", "Syntax");
             if (type.Fields.Count == 0) throw run.Error($"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.", null, "Syntax");
             return type;
+        }
+
+        /// <summary><c>User, Auditable</c> or <c>[User, Auditable]</c>.</summary>
+        internal static List<string> TypeNames(string text)
+        {
+            string t = (text ?? string.Empty).Trim();
+            if (t.StartsWith('[') && t.EndsWith(']')) t = t.Substring(1, t.Length - 2);
+            return Parameter.SplitTopLevel(t, ',').Select(n => n.Trim().Trim('\'', '"')).Where(n => n.Length > 0).ToList();
+        }
+
+        /// <summary>A built-in type, a list type, an &lt;enum&gt; or another refinement: a type that can have rules, rather than fields.</summary>
+        private static bool IsRefinable(string name, Scope scope)
+        {
+            TypeRef t = TypeRef.Parse(name);
+            if (t == null) return false;
+            if (t.IsBuiltIn || t.ListDepth > 0) return true;
+            return scope.TryGet(t.Name, out object found) && (found is RefinedType || found is EnumType);
+        }
+
+        private static RefinedType DeclareRefined(ElementRun run, string name, string baseName)
+        {
+            TypeRef baseType = TypeRef.Parse(baseName);
+            if (baseType.Optional) throw run.Error($"with=\"{baseName}\": a type's base can't allow null. Write {name}? where the type is used instead.", "with", "Syntax");
+            if (run.Has("fields") || run.Has("sample"))
+                throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it has rules (min, max, pattern, validate...) rather than fields.", run.Has("fields") ? "fields" : "sample", "Syntax");
+            if (!baseType.IsBuiltIn && baseType.ListDepth == 0 && run.Scope.TryGet(baseType.Name, out object found) && found is RefinedType inner) baseType = TypeRef.Of(inner);
+            TypeRules rules = TypeRules.Read(run.Element, run);
+            foreach (MarkupElement e in run.ChildElements)
+            {
+                if (!rules.TryAddChild(e, run, allowNormalize: true))
+                    throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it can only hold <validate> and <normalize>, not <{e.Name}>.", null, "Syntax");
+            }
+            var type = new RefinedType(name, baseType, rules, run.Raw("description"), run.Scope, run.Module);
+            if (rules.ProblemFor(type.Root(), $"<type name=\"{name}\">") is string problem) throw run.Error(problem, null, "Syntax");
+            return type;
+        }
+
+        /// <summary>
+        /// Copies the fields and rules of the types named in <c>with</c>, in order. Returns the fields two bases
+        /// give different types, with the message to fail with unless the new type declares them itself.
+        /// </summary>
+        private static Dictionary<string, string> JoinBases(RecordType type, List<string> with, ElementRun run)
+        {
+            var conflicts = new Dictionary<string, string>(StringComparer.Ordinal);
+            var origin = new Dictionary<string, RecordType>(StringComparer.Ordinal);
+            foreach (string baseName in with)
+            {
+                if (!run.Scope.TryGet(baseName, out object found) || found is not RecordType b)
+                {
+                    string why = found is RefinedType || IsRefinable(baseName, run.Scope)
+                        ? $"{baseName} isn't a type with fields, and a type made from one ({baseName}) can't join others. Use with=\"{baseName}\" on its own for rules on a {baseName}."
+                        : $"{baseName} isn't a type declared before this one.";
+                    throw run.Error($"<type name=\"{type.Name}\" with=\"...\">: {why}", "with", "Type");
+                }
+                if (b.IsA(type) || type.Bases.Contains(b)) throw run.Error($"<type name=\"{type.Name}\"> joins {b.Name} twice.", "with", "Syntax");
+                type.AddBase(b);
+                type.Validators.AddRange(b.Validators);
+                foreach (FieldDefinition f in b.Fields)
+                {
+                    FieldDefinition existing = type.Field(f.Name);
+                    if (existing == null)
+                    {
+                        type.SetField(f);
+                        origin[f.Name] = b;
+                    }
+                    else if (BaseName(existing.Type) != BaseName(f.Type) || existing.Type.ListDepth != f.Type.ListDepth)
+                    {
+                        conflicts[f.Name] = $"{type.Name} gets '{f.Name}' from {origin[f.Name].Name} ({existing.Type}) and {b.Name} ({f.Type}). Declare {f.Name} in {type.Name} to choose.";
+                    }
+                    else if (f.Type.Inline is RefinedType rules)
+                    {
+                        // Both bases have the field: the second one's rules apply on top of the first's.
+                        var both = new RefinedType(rules.Name, existing.Type.WithOptional(false), rules.Rules, null, rules.Closure, rules.Module);
+                        type.SetField(existing.WithType(TypeRef.Of(both, 0, existing.Type.Optional && f.Type.Optional), existing.Optional && f.Optional));
+                    }
+                }
+            }
+            return conflicts;
+        }
+
+        /// <summary>The name of the type under any field rules: string for <c>string(min: 1)</c>.</summary>
+        private static string BaseName(TypeRef t)
+        {
+            while (t.Inline is RefinedType r && r.Name == r.Base.WithOptional(false).ToString()) t = r.Base;
+            return t.WithOptional(false).ToString();
+        }
+
+        /// <summary>
+        /// Adds a field the type declares itself. One that replaces a base's field must keep that field's type or
+        /// narrow it (a refinement of it, or a type that joins it), so the record still fits where the base does.
+        /// </summary>
+        private static void SetOwnField(RecordType type, FieldDefinition field, ElementRun run)
+        {
+            FieldDefinition inherited = type.Field(field.Name);
+            if (inherited != null && type.Bases.Count > 0 && !Narrows(field.Type, inherited.Type, run.Scope))
+                throw run.Error($"{type.Name} declares '{field.Name}' as {field.Type}, but it joins a type where it is {inherited.Type}. Use {inherited.Type}, or a type made from it.", null, "Type");
+            type.SetField(field);
+        }
+
+        private static bool Narrows(TypeRef own, TypeRef inherited, Scope scope)
+        {
+            string target = BaseName(inherited);
+            if (own.ListDepth != inherited.ListDepth) return false;
+            for (int depth = 0; depth < 64; depth++)
+            {
+                if (BaseName(own) == target || own.WithOptional(false).ToString() == target) return true;
+                object resolved = own.Inline ?? (own.IsBuiltIn ? null : scope.TryGet(own.Name, out object f) ? f : null);
+                switch (resolved)
+                {
+                    case RefinedType r:
+                        own = r.Base;
+                        continue;
+                    case RecordType record:
+                        // A type declared later can't be checked yet; a known one must join the inherited type.
+                        return !(scope.TryGet(target, out object t) && t is RecordType wanted) || record.IsA(wanted);
+                    case null when !own.IsBuiltIn:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return false;
         }
 
         /// <summary><c>login: string</c>, <c>avatar_url?: string</c>, <c>tags: string[] = []</c> or just <c>name</c>.</summary>
@@ -483,6 +795,14 @@ namespace KScript.Runtime
             DecodedText defaultText = e.GetAttribute("default")?.Value;
             if (value != null && (from != null || defaultText != null))
                 throw run.Error($"The field '{name}' has a value, so it is worked out rather than read: it can't also have from or default.", null, "Syntax");
+            TypeRules rules = TypeRules.Read(e, run);
+            if (!rules.IsEmpty)
+            {
+                // title: string(min: 1) is a string with rules of its own: a refinement with no name.
+                var refined = new RefinedType(type.WithOptional(false).ToString(), type.WithOptional(false), rules, null, run.Scope, run.Module);
+                if (rules.ProblemFor(refined.Root(), $"the field '{name}'") is string problem) throw run.Error(problem, null, "Syntax");
+                type = TypeRef.Of(refined, 0, type.Optional);
+            }
             return new FieldDefinition(name, type, from, path, null, defaultText, value, e.GetAttributeValue("description"), optional || optionalAttribute);
         }
 
@@ -533,10 +853,17 @@ namespace KScript.Runtime
             return schema;
         }
 
-        private static Dictionary<string, object> SchemaOf(TypeRef t, RecordType owner, RecordType root, Dictionary<string, object> defs)
+        private static Dictionary<string, object> SchemaOf(TypeRef t, RecordType owner, RecordType root, Dictionary<string, object> defs) =>
+            SchemaOf(t, owner.Closure, owner.Module, root, defs);
+
+        private static Dictionary<string, object> SchemaOf(TypeRef t, Scope scope, Module module, RecordType root, Dictionary<string, object> defs)
         {
-            if (t.ListDepth > 0) return new Dictionary<string, object> { ["type"] = "array", ["items"] = SchemaOf(t.Item, owner, root, defs) };
-            if (t.Inline != null) return ObjectSchema(t.Inline, root, defs);
+            if (t.ListDepth > 0) return new Dictionary<string, object> { ["type"] = "array", ["items"] = SchemaOf(t.Item, scope, module, root, defs) };
+            switch (t.Inline)
+            {
+                case RecordType inline: return ObjectSchema(inline, root, defs);
+                case RefinedType refined: return RefinedSchema(refined, root, defs);
+            }
             switch (t.Name)
             {
                 case "string": return new Dictionary<string, object> { ["type"] = "string" };
@@ -545,6 +872,9 @@ namespace KScript.Runtime
                 case "number": return new Dictionary<string, object> { ["type"] = "number" };
                 case "bool": return new Dictionary<string, object> { ["type"] = "boolean" };
                 case "date": return new Dictionary<string, object> { ["type"] = "string", ["format"] = "date-time" };
+                case "email": return new Dictionary<string, object> { ["type"] = "string", ["format"] = "email" };
+                case "handle": return new Dictionary<string, object> { ["type"] = "string", ["pattern"] = "^@[A-Za-z0-9_][A-Za-z0-9_.-]{0,29}$" };
+                case "password": return new Dictionary<string, object> { ["type"] = "string", ["format"] = "password", ["writeOnly"] = true };
                 case "list": return new Dictionary<string, object> { ["type"] = "array" };
                 case "map": return new Dictionary<string, object> { ["type"] = "object" };
                 case "any":
@@ -553,13 +883,14 @@ namespace KScript.Runtime
             object resolved;
             try
             {
-                resolved = Resolve(t, owner.Closure, owner.Module);
+                resolved = Resolve(t, scope, module);
             }
             catch (KScriptException)
             {
                 return new Dictionary<string, object>();
             }
             if (resolved is EnumType e) return new Dictionary<string, object> { ["type"] = "string", ["enum"] = e.Names.Cast<object>().ToList() };
+            if (resolved is RefinedType r) return RefinedSchema(r, root, defs);
             var record = (RecordType)resolved;
             if (record == root) return new Dictionary<string, object> { ["$ref"] = "#" };
             if (!defs.ContainsKey(record.Name))
@@ -568,6 +899,29 @@ namespace KScript.Runtime
                 defs[record.Name] = ObjectSchema(record, root, defs);
             }
             return new Dictionary<string, object> { ["$ref"] = "#/$defs/" + record.Name };
+        }
+
+        /// <summary>The base type's schema, with the rules JSON Schema can say: min and max, pattern, and the plain lists of one_of and not.</summary>
+        private static Dictionary<string, object> RefinedSchema(RefinedType type, RecordType root, Dictionary<string, object> defs)
+        {
+            Dictionary<string, object> schema = SchemaOf(type.Base, type.Closure, type.Module, root, defs);
+            TypeRules rules = type.Rules;
+            string kind = schema.TryGetValue("type", out object k) ? k as string : null;
+            (string min, string max) = kind switch
+            {
+                "integer" or "number" => ("minimum", "maximum"),
+                "string" when schema.ContainsKey("format") && (string)schema["format"] == "date-time" => (null, null),
+                "string" => ("minLength", "maxLength"),
+                "array" => ("minItems", "maxItems"),
+                _ => (null, null),
+            };
+            if (min != null && rules.MinText != null && double.TryParse(rules.MinText, NumberStyles.Float, CultureInfo.InvariantCulture, out double lo)) schema[min] = lo;
+            if (max != null && rules.MaxText != null && double.TryParse(rules.MaxText, NumberStyles.Float, CultureInfo.InvariantCulture, out double hi)) schema[max] = hi;
+            if (rules.PatternText != null) schema["pattern"] = rules.PatternText;
+            if (rules.OneOf != null) schema["enum"] = rules.OneOf;
+            if (rules.Not != null) schema["not"] = new Dictionary<string, object> { ["enum"] = rules.Not };
+            if (type.Description != null) schema["description"] = type.Description;
+            return schema;
         }
 
         #endregion
@@ -637,12 +991,25 @@ namespace KScript.Runtime
                 for (int i = 0; i < list.Count; i++) result.Add(Convert(list[i], true, item, $"{path}[{i}]", field, depth + 1));
                 return result;
             }
+            if (type.Args != null) return MapRefined(value, type.Refined(scope, module), path, field, depth);
+            if (type.IsBuiltIn && !type.NoDefaults && TypeDefaults.For(module, type.Name) is TypeRules defaults)
+            {
+                // The project's defaults for the type (kscript.json "types") are rules on top of it.
+                TypeRef plain = TypeRef.Parse(type.Name).WithoutDefaults();
+                return MapRefined(value, new RefinedType(type.Name, plain, defaults, null, scope, module), path, field, depth);
+            }
             if (type.IsBuiltIn)
             {
                 // Data that should be text may be a number or a bool, but not a map or a list.
                 if (type.Name == "string" && (value is Dictionary<string, object> || value is List<object>))
                 {
                     Problem(path, field, $"needs a string, but got {Values.Describe(value)}.");
+                    return null;
+                }
+                if (SemanticTypes.IsSemantic(type.Name))
+                {
+                    if (SemanticTypes.TryConvert(type.Name, value, out object converted, out string reason)) return converted;
+                    Problem(path, field, SemanticTypes.Mismatch(type.Name, value, reason) + ".");
                     return null;
                 }
                 try
@@ -665,12 +1032,47 @@ namespace KScript.Runtime
                 Problem(path, field, $"must be a {e.Name} ({string.Join(", ", e.Names)}), but got {Values.Describe(value)}." + (close != null ? $" Did you mean {close}?" : string.Empty));
                 return null;
             }
+            if (resolved is RefinedType refined) return MapRefined(value, refined, path, field, depth);
             return MapRecord(value, (RecordType)resolved, path, depth);
+        }
+
+        /// <summary>
+        /// Converts to the base type (which checks the base's own rules), then normalises, then checks this type's
+        /// rules. A value that doesn't fit the base isn't checked any further, so it gets one problem, not several.
+        /// </summary>
+        private object MapRefined(object value, RefinedType type, string path, string field, int depth)
+        {
+            var inner = new ShapeMapper(interpreter, type.Closure, type.Module);
+            object result = inner.Convert(value, true, type.Base, path, field, depth + 1);
+            if (inner.Problems.Count == 0 && type.Rules.Normalize != null)
+            {
+                Scope s = type.Closure.Child();
+                s.Declare("value", result);
+                result = inner.Convert(interpreter.EvaluateText(type.Rules.Normalize, s, type.Module), true, type.Base, path, field, depth + 1);
+            }
+            if (inner.Problems.Count > 0)
+            {
+                Problems.AddRange(inner.Problems);
+                return null;
+            }
+            int before = Problems.Count;
+            foreach (string problem in type.Rules.Check(interpreter, result, type.Closure, type.Module, item => BaseItem(item, type, path, field, depth)))
+                Problem(path, field, problem + ".");
+            if (result is PasswordValue password && type.Rules.Options.TryGetValue("algorithm", out object algorithm)) result = password.WithAlgorithm(Values.ToStr(algorithm));
+            return Problems.Count == before ? result : null;
+        }
+
+        /// <summary>An item of one_of or not, converted to the base type so it compares like the value.</summary>
+        private object BaseItem(object item, RefinedType type, string path, string field, int depth)
+        {
+            var mapper = new ShapeMapper(interpreter, type.Closure, type.Module);
+            object converted = mapper.Convert(item, true, type.Base, path, field, depth + 1);
+            return mapper.Problems.Count == 0 ? converted : item;
         }
 
         private object MapRecord(object value, RecordType type, string path, int depth)
         {
-            if (value is Record existing && existing.Type == type) return existing;
+            if (value is Record existing && existing.Type.IsA(type)) return existing;
             if (value is not Dictionary<string, object> source)
             {
                 Problem(path, null, $"needs a {type.Name} (a map), but got {Values.Describe(value)}.");
@@ -708,6 +1110,11 @@ namespace KScript.Runtime
                 foreach (KeyValuePair<string, object> kv in record) s.Declare(kv.Key, kv.Value);
                 object computed = interpreter.EvaluateText(f.ValueText, s, type.Module);
                 record[f.Name] = mapper.Convert(computed, true, f.Type.WithOptional(true), path + Key(f.Name), f.Name, depth + 1);
+            }
+            // Rules on the whole record only run once its fields fit, so they can rely on them.
+            if (mapper.Problems.Count == 0 && !Problems.Any(p => p.Path.StartsWith(path, StringComparison.Ordinal)))
+            {
+                foreach (string failure in Shapes.Failures(interpreter, record)) Problem(path, null, failure + ".");
             }
             Problems.AddRange(mapper.Problems);
             return record;

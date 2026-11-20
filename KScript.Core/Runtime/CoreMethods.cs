@@ -43,6 +43,30 @@ namespace KScript.Runtime
             RegisterNumberMethods(p);
             RegisterDateMethods(p);
             RegisterStringMethods(p);
+            RegisterSemanticMethods(p);
+        }
+
+        private const string StrengthRules = "min?: int, max?: int, upper?: bool, lower?: bool, digit?: bool, symbol?: bool, common?: bool, not?: list, score?: int";
+
+        private static void RegisterSemanticMethods(PackageBuilder p)
+        {
+            p.Method(KType.Email, "local", "", "The part before the @, as it was written.", KType.String, (t, c) => ((EmailAddress)t).Local);
+            p.Method(KType.Email, "domain", "", "The part after the @, in lower case.", KType.String, (t, c) => ((EmailAddress)t).Domain);
+            p.Method(KType.Handle, "name", "", "The handle without its @.", KType.String, (t, c) => ((HandleName)t).Name);
+            p.Method(KType.Uuid, "version", "", "The UUID's version: 4 for random ones, 8 for custom ones (0 for the nil UUID).", KType.Number, (t, c) => (double)((UuidValue)t).Version);
+
+            string pw = KType.Password;
+            p.Method(pw, "hash", "algorithm?: string", "A hash to store instead of the password: argon2id (the default) or bcrypt, with a new random salt each time.", KType.String,
+                (t, c) => ((PasswordValue)t).Hash(c.Arg(0) is null ? ((PasswordValue)t).Algorithm : c.Str(0)));
+            p.Method(pw, "verify", "hash: string", "yes if this is the password the stored hash was made from. Takes the same time whether it matches or not.", KType.Bool,
+                (t, c) => ((PasswordValue)t).Verify(c.Str(0)));
+            p.Method(pw, "needs_rehash", "hash: string", "yes if the stored hash was made with weaker settings than ->hash() uses now, so it should be replaced after a successful login.", KType.Bool,
+                (t, c) => PasswordValue.NeedsRehash(c.Str(0)));
+            p.Method(pw, "strength", StrengthRules, "How hard the password is to guess: { score (0 to 4), label, ok, problems }. Rules: min length (8), max, upper, lower, digit, symbol, common (yes rejects well-known passwords), not (text it mustn't contain) and score (the lowest score that passes, 3).", KType.Map,
+                (t, c) => ((PasswordValue)t).Strength(c));
+            p.Method(pw, "strong", StrengthRules, "yes if the password passes ->strength() with these rules.", KType.Bool,
+                (t, c) => (bool)((PasswordValue)t).Strength(c)["ok"]);
+            p.Method(pw, "reveal", "", "The password's text. Only use it to pass the password on, such as to another service's login.", KType.String, (t, c) => ((PasswordValue)t).Secret);
         }
 
         private static void RegisterListMethods(PackageBuilder p)
@@ -297,7 +321,8 @@ namespace KScript.Runtime
             p.Method(s, "url_decode", "", "URL-escaped text decoded.", s, (t, c) => Uri.UnescapeDataString(S(t)));
             p.Method(s, "json", "as?: type", "Parses the text as JSON. With as: a <type>, the data is checked and turned into records.", KType.Any, (t, c) => Shapes.MapJson(c, Values.ParseJson(S(t)), 0));
             foreach (var m in RecordType.Methods)
-                p.Method(KType.Type, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((RecordType)t).TryCallMethod(c, m.Name, out object r) ? r : null);
+                p.Method(KType.Type, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((IKObject)t).TryCallMethod(c, m.Name, out object r)
+                    ? r : throw c.Error($"{((IKObject)t).ToText()} is made from another type, so it has no ->{m.Name}(). It has ->from(), ->check() and ->name().", "Name"));
             p.Method(s, "to_number", "default?", "The text as a number, or default when it isn't one.", KType.Number, (t, c) =>
                 Values.TryNumber(S(t), out double d) ? d : c.Has(0) ? c.Arg(0) : throw c.Error($"'{S(t)}' is not a number. Pass a default: ->to_number(0).", "Type"));
             p.Method(s, "to_int", "default?", "The text as a whole number, or default when it isn't one.", KType.Number, (t, c) =>

@@ -15,6 +15,13 @@ namespace KScript.Metadata
         // Values returned by particular commands.
         public const string File = "file";
         public const string Date = "date";
+
+        // Text with a meaning of its own: checked and normalised when it is converted.
+        public const string Email = "email";
+        public const string Password = "password";
+        public const string Handle = "handle";
+        public const string Uuid = "uuid";
+
         public const string Response = "response";
         public const string Chat = "chat";
         public const string Config = "config";
@@ -40,7 +47,7 @@ namespace KScript.Metadata
             }
 
             // Values are typed on use: a string that holds a number can use number methods, and anything prints as a string.
-            if (receiver == String && (actual == Number || actual == Bool || actual == File || actual == Date))
+            if (receiver == String && (actual == Number || actual == Bool || actual == File || actual == Date || actual == Email || actual == Handle || actual == Uuid))
             {
                 return true;
             }
