@@ -113,9 +113,9 @@ namespace KScript.Runtime
         public bool ContentIsSingleValue => Content != null && Interpreter.IsSingleValue(Content, Module, bareReferences: true);
 
         /// <summary>Runs the element text as assignment statements.</summary>
-        public void RunStatements(bool declare)
+        public void RunStatements(bool declare, bool declareNew = false)
         {
-            if (HasContent) Interpreter.ExecuteStatements(Content, Scope, Module, declare);
+            if (HasContent) Interpreter.ExecuteStatements(Content, Scope, Module, declare, declareNew);
         }
 
         public IEnumerable<MarkupElement> ChildElements => Element.ChildElements;

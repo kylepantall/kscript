@@ -1,0 +1,352 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "KScript (code)",
+  "scopeName": "source.kscript-code",
+  "comment": "The brace-and-newline .kscript format. XML scripts (.ks.xml, .ks) use kscript.tmLanguage.json.",
+  "patterns": [
+    {
+      "include": "#statement"
+    }
+  ],
+  "repository": {
+    "statement": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#fn"
+        },
+        {
+          "include": "#import"
+        },
+        {
+          "include": "#declaration"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#assignment"
+        },
+        {
+          "include": "#element"
+        },
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.documentation.kscript",
+          "begin": "///",
+          "end": "$",
+          "patterns": [
+            {
+              "match": "(@(?:param))\\s+([A-Za-z_][\\w-]*)",
+              "captures": {
+                "1": {
+                  "name": "storage.type.class.doc.kscript"
+                },
+                "2": {
+                  "name": "variable.parameter.kscript"
+                }
+              }
+            },
+            {
+              "match": "@(?:returns?|example|deprecated|see|param)\\b",
+              "name": "storage.type.class.doc.kscript"
+            },
+            {
+              "match": "`[^`]*`",
+              "name": "markup.inline.raw.kscript"
+            }
+          ]
+        },
+        {
+          "name": "comment.line.double-slash.kscript",
+          "begin": "//",
+          "end": "$"
+        },
+        {
+          "name": "comment.block.kscript",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "fn": {
+      "match": "\\b(fn)\\s+([A-Za-z_][\\w-]*)",
+      "captures": {
+        "1": {
+          "name": "storage.type.function.kscript"
+        },
+        "2": {
+          "name": "entity.name.function.kscript"
+        }
+      }
+    },
+    "import": {
+      "match": "\\b(import|from)\\b",
+      "name": "keyword.control.import.kscript"
+    },
+    "declaration": {
+      "patterns": [
+        {
+          "match": "\\b(const)\\s+([A-Za-z_][\\w-]*)",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.kscript"
+            },
+            "2": {
+              "name": "variable.other.constant.kscript"
+            }
+          }
+        },
+        {
+          "match": "\\b(echo)\\b",
+          "name": "support.function.builtin.kscript"
+        },
+        {
+          "match": "(?<![\\w$@.-])(throw)\\s+([A-Z][\\w.]*)(?=\\s*\\\")",
+          "captures": {
+            "1": {
+              "name": "keyword.control.flow.kscript"
+            },
+            "2": {
+              "name": "entity.name.type.kscript"
+            }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "(?<![\\w$@.-])(if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue)(?![\\w-])",
+          "name": "keyword.control.flow.kscript"
+        },
+        {
+          "match": "(?<![\\w$@.-])(as)(?![\\w-])",
+          "name": "keyword.control.import.kscript"
+        }
+      ]
+    },
+    "assignment": {
+      "match": "^\\s*([A-Za-z_][\\w-]*)(?=\\s*(?::\\s*[\\w.\\[\\]?]+\\s*)?(?:=(?![=>])|\\+=|-=|\\*=|/=|%=|\\?\\?=|\\+\\+|--))",
+      "captures": {
+        "1": {
+          "name": "variable.other.assignment.kscript"
+        }
+      }
+    },
+    "element": {
+      "patterns": [
+        {
+          "begin": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)\\s*(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.tag.kscript"
+            },
+            "2": {
+              "name": "punctuation.definition.attributes.begin.kscript"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.attributes.end.kscript"
+            }
+          },
+          "patterns": [
+            {
+              "match": "([A-Za-z_][\\w-]*)\\s*(:)",
+              "captures": {
+                "1": {
+                  "name": "entity.other.attribute-name.kscript"
+                },
+                "2": {
+                  "name": "punctuation.separator.key-value.kscript"
+                }
+              }
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "match": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)(?=\\s*(?:\\\"|\\{|$))",
+          "captures": {
+            "1": {
+              "name": "entity.name.tag.kscript"
+            }
+          }
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#text"
+        },
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#variable"
+        },
+        {
+          "include": "#command"
+        },
+        {
+          "include": "#method"
+        },
+        {
+          "include": "#constants"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#braces"
+        }
+      ]
+    },
+    "text": {
+      "name": "string.quoted.double.kscript",
+      "begin": "\\\"",
+      "end": "\\\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.kscript"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.kscript"
+        }
+      },
+      "patterns": [
+        {
+          "match": "\\\\[\\\"\\\\]",
+          "name": "constant.character.escape.kscript"
+        },
+        {
+          "include": "#interpolation"
+        },
+        {
+          "include": "#variable"
+        }
+      ]
+    },
+    "interpolation": {
+      "name": "meta.interpolation.kscript",
+      "contentName": "meta.embedded.expression.kscript",
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.interpolation.begin.kscript"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.interpolation.end.kscript"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#variable"
+        },
+        {
+          "include": "#command"
+        },
+        {
+          "include": "#method"
+        },
+        {
+          "include": "#constants"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#braces"
+        }
+      ]
+    },
+    "braces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#statement"
+        }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.single.kscript",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "match": "\\\\.",
+          "name": "constant.character.escape.kscript"
+        }
+      ]
+    },
+    "variable": {
+      "match": "\\$[A-Za-z_][\\w]*(?:\\.[A-Za-z_][\\w]*)*",
+      "name": "variable.other.kscript"
+    },
+    "command": {
+      "match": "@[A-Za-z_][\\w.-]*",
+      "name": "entity.name.function.kscript"
+    },
+    "method": {
+      "match": "(?<=->)\\s*([A-Za-z_][\\w]*)",
+      "captures": {
+        "1": {
+          "name": "support.function.kscript"
+        }
+      }
+    },
+    "constants": {
+      "patterns": [
+        {
+          "match": "(?<![\\w$.])(true|false|null|yes|no)(?![\\w-])",
+          "name": "constant.language.kscript"
+        },
+        {
+          "match": "(?<![\\w$])-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b",
+          "name": "constant.numeric.kscript"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "(?<![\\w$@.-])(and|or|not|is|in|gt|lt|ge|le|eq|ne)(?![\\w-])",
+          "name": "keyword.operator.word.kscript"
+        },
+        {
+          "match": "=>",
+          "name": "storage.type.function.arrow.kscript"
+        },
+        {
+          "match": "->|\\|>|\\?\\?=?|==|!=|<=|>=|\\+=|-=|\\*=|/=|%=|\\+\\+|--|[-+*/%<>=?!]",
+          "name": "keyword.operator.kscript"
+        }
+      ]
+    }
+  }
+}

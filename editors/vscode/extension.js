@@ -61,7 +61,11 @@ async function startClient(context) {
     debug: { command: server.command, args: server.args, transport: TransportKind.stdio },
   };
 
-  const documentSelector = [{ scheme: 'file', language: 'kscript' }, { scheme: 'untitled', language: 'kscript' }];
+  const documentSelector = [
+    { scheme: 'file', language: 'kscript' }, { scheme: 'untitled', language: 'kscript' },
+    // .kscript files only on disk: the server picks the parser from the file name, which an untitled file lacks.
+    { scheme: 'file', language: 'kscript-code' },
+  ];
   if (await pagesEnabled()) {
     // Pages served by `kscript serve`: HTML and Markdown with KScript elements inline.
     documentSelector.push({ scheme: 'file', language: 'html' }, { scheme: 'file', language: 'markdown' });

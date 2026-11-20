@@ -191,6 +191,9 @@ namespace KScript.Language.Analysis
 
         public string Description { get; internal set; }
 
+        /// <summary>The description read as a doc comment (summary, @param, @returns, @example, @deprecated), or null.</summary>
+        public DocComment Doc => DocComment.Parse(Description);
+
         /// <summary>For functions: their parameters, in order, and how many are required.</summary>
         public List<FunctionParameter> Parameters { get; } = new List<FunctionParameter>();
 

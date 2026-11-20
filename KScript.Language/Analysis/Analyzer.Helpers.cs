@@ -213,7 +213,9 @@ namespace KScript.Language.Analysis
                 .Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import).Select(s => s.Name);
             string suggestion = Suggestions.Closest(name, candidates);
             string message = isWrite
-                ? $"${name} is not defined. Declare it first with <let name=\"{name}\" ... />."
+                ? (result.Markup.Syntax == SourceSyntax.Code
+                    ? $"${name} is not defined, so it can't be updated. Give it a starting value first: {name} = ..."
+                    : $"${name} is not defined. Declare it first with <let name=\"{name}\" ... />.")
                 : $"${name} is not defined." + (suggestion != null ? $" Did you mean ${suggestion}?" : string.Empty);
             Report(span, DiagnosticSeverity.Error, isWrite ? DiagnosticCodes.SetUndeclared : DiagnosticCodes.UndefinedVariable, message,
                 suggestion != null ? new[] { new QuickFix($"Change to ${suggestion}", new TextChange(span, suggestion)) } : null);
@@ -235,12 +237,22 @@ namespace KScript.Language.Analysis
             ReferenceFunction(name, span, scope);
         }
 
+        /// <summary>A call to a function whose doc comment says @deprecated gets a warning with the reason.</summary>
+        private void ReportIfDeprecated(Symbol fn, TextSpan span)
+        {
+            if (fn.Doc?.Deprecated is string reason)
+            {
+                Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.Deprecated, $"@{fn.Name} is deprecated." + (reason.Length > 0 ? " " + reason : string.Empty));
+            }
+        }
+
         private Symbol ReferenceFunction(string name, TextSpan span, Scope scope)
         {
             Symbol fn = scope.Lookup(name, int.MaxValue);
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
                 result.References.Add(new SymbolReference(fn, span, false, false));
+                ReportIfDeprecated(fn, span);
                 return fn;
             }
 
