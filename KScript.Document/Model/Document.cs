@@ -372,13 +372,6 @@ namespace KScript.Documents
     {
     }
 
-    /// <summary>A placeholder in a header or footer: the page number, the page count.</summary>
-    public sealed class FieldInline : Inline
-    {
-        public FieldInline(string name) => Name = name;
-
-        public string Name { get; }
-    }
 
     /// <summary>A work cited: a book, an article, a web page.</summary>
     public sealed class Source

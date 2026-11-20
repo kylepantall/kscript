@@ -91,10 +91,9 @@ namespace KScript.Documents.Pdf
                     return Matrix(m, size, style);
                 case MathAccent ac:
                     return Accent(ac, size, style);
-                case MathSpace sp:
-                    return new MathBox { Width = sp.Em * size };
             }
-            return new MathBox();
+            // The only kind left is a space.
+            return new MathBox { Width = ((MathSpace)node).Em * size };
         }
 
         private static AtomKind KindOf(MathNode n) => n switch

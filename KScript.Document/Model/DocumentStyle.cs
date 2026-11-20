@@ -79,7 +79,6 @@ namespace KScript.Documents
 
         public double TextWidth => PageWidth - MarginLeft - MarginRight;
 
-        public DocumentStyle Clone() => (DocumentStyle)MemberwiseClone();
 
         /// <summary>Sets one style option by its attribute name, such as paper: a4 or margin: 2cm.</summary>
         public void Set(string name, string value)
@@ -154,6 +153,8 @@ namespace KScript.Documents
                 case "language":
                     Language = value;
                     break;
+                default:
+                    throw new KScriptException($"'{name}' isn't a document setting. Use {string.Join(", ", Options)}.", "Argument");
             }
         }
 

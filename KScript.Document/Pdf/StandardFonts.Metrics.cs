@@ -48,22 +48,5 @@ namespace KScript.Documents.Pdf
             (0x222B, 0xF2, 274), (0x2320, 0xF3, 686), (0xF8F5, 0xF4, 686), (0x2321, 0xF5, 686), (0xF8F6, 0xF6, 384), (0xF8F7, 0xF7, 384), (0xF8F8, 0xF8, 384), (0xF8F9, 0xF9, 384),
             (0xF8FA, 0xFA, 384), (0xF8FB, 0xFB, 384), (0xF8FC, 0xFC, 494), (0xF8FD, 0xFD, 494), (0xF8FE, 0xFE, 494),
         };
-
-        private static readonly Dictionary<string, (short Ascent, short Descent)> AscentDescent = new Dictionary<string, (short, short)>
-        {
-            ["Times-Roman"] = (683, -217),
-            ["Times-Bold"] = (676, -205),
-            ["Times-Italic"] = (683, -205),
-            ["Times-BoldItalic"] = (699, -205),
-            ["Helvetica"] = (718, -207),
-            ["Helvetica-Bold"] = (718, -207),
-            ["Helvetica-Oblique"] = (718, -207),
-            ["Helvetica-BoldOblique"] = (718, -207),
-            ["Courier"] = (629, -157),
-            ["Courier-Bold"] = (626, -142),
-            ["Courier-Oblique"] = (629, -157),
-            ["Courier-BoldOblique"] = (626, -142),
-            ["Symbol"] = (1010, -293),
-        };
     }
 }

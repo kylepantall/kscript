@@ -78,7 +78,15 @@ namespace KScript.Documents
             Located(run, () => doc.Style = Templates.Get(run.Template("template", "plain")), "template");
             foreach (string option in DocumentStyle.Options)
             {
-                if (run.Has(option)) Located(run, () => { doc.Style.Set(option, run.Template(option)); return true; }, option);
+                if (!run.Has(option)) continue;
+                try
+                {
+                    doc.Style.Set(option, run.Template(option));
+                }
+                catch (KScriptException e) when (e.Line == 0)
+                {
+                    throw run.Error($"{option}: {e.Message}", option, e.Type);
+                }
             }
             doc.Title = Blank(run.Template("title"));
             doc.Subtitle = Blank(run.Template("subtitle"));
@@ -223,7 +231,8 @@ namespace KScript.Documents
         internal static bool? Item(ElementRun run)
         {
             Builder b = Current(run);
-            ListBlock list = b.Lists.Count > 0 ? b.Lists.Peek() : throw run.Error("Item only works inside a List.", null, "Syntax");
+            // Item must be inside a List (the checker sees to that), so a list is open.
+            ListBlock list = b.Lists.Peek();
             var item = new ListItem();
             item.Blocks.AddRange(Paragraphs(run, run.Text()));
             list.Items.Add(item);
@@ -331,7 +340,7 @@ namespace KScript.Documents
         internal static bool? Row(ElementRun run)
         {
             Builder b = Current(run);
-            Table table = b.Table ?? throw run.Error("Tr only works inside a Table.", null, "Syntax");
+            Table table = b.Table;
             string text = run.Text();
             table.Rows.Add(Located(run, () => MarkdownBlocks.Row(text, run.Flag("header"), s => InlineParser.Parse(s))));
             return null;

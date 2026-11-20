@@ -32,11 +32,6 @@ namespace KScript.Documents.Maths
     {
         public List<MathNode> Items { get; } = new List<MathNode>();
 
-        public MathRow()
-        {
-        }
-
-        public MathRow(IEnumerable<MathNode> items) => Items.AddRange(items);
     }
 
     /// <summary>A letter, number, operator or symbol.</summary>
@@ -190,7 +185,6 @@ namespace KScript.Documents.Maths
         public string Character => Accent switch
         {
             "hat" or "widehat" => "^",
-            "bar" or "overline" or "underline" => "¯",
             "vec" => "→",
             "dot" => "˙",
             "ddot" => "¨",

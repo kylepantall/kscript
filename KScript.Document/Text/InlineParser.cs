@@ -113,17 +113,6 @@ namespace KScript.Documents.Text
                         pos += close.Length;
                         return items;
                     }
-                    if (close == "]" && At(pos) == '[')
-                    {
-                        // A nested [ ] inside a footnote or link text: kept as text.
-                        int depth = Bracket(pos);
-                        if (depth > pos)
-                        {
-                            literal.Append(text, pos, depth - pos + 1);
-                            pos = depth + 1;
-                            continue;
-                        }
-                    }
                     if (!Step(items)) literal.Append(text[pos++]);
                 }
                 if (close != null) return null;

@@ -24,8 +24,8 @@ namespace KScript.Documents.Export
 
         private readonly Document doc;
         private readonly Resolved resolved;
-        private readonly Part main = new Part("document");
-        private readonly Part notes = new Part("footnotes");
+        private readonly Part main = new Part();
+        private readonly Part notes = new Part();
         private readonly List<(string Name, byte[] Bytes)> media = new List<(string, byte[])>();
         private readonly List<string> numbering = new List<string>();
         private int bookmarks;
@@ -35,9 +35,6 @@ namespace KScript.Documents.Export
         /// <summary>A part of the package with its own relationships (hyperlinks, images).</summary>
         private sealed class Part
         {
-            public Part(string name) => Name = name;
-
-            public string Name { get; }
             public List<(string Id, string Type, string Target, bool External)> Rels { get; } = new List<(string, string, string, bool)>();
 
             public string Add(string type, string target, bool external)

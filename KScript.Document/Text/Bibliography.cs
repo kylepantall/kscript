@@ -13,6 +13,7 @@ namespace KScript.Documents.Text
             var sources = new List<Source>();
             int pos = 0;
             text ??= string.Empty;
+            var macros = new Dictionary<string, string>(Months, StringComparer.OrdinalIgnoreCase);
             while (true)
             {
                 int at = text.IndexOf('@', pos);
@@ -29,11 +30,19 @@ namespace KScript.Documents.Text
                 int end = Matching(text, open, text[open], close);
                 if (end < 0) throw new KScriptException($"The .bib entry @{type} that starts at character {at} isn't closed with {close}.", "Format");
                 pos = end + 1;
-                if (type == "comment" || type == "preamble" || type == "string") continue;
                 string body = text.Substring(open + 1, end - open - 1);
+                if (type == "string")
+                {
+                    // @string{jacm = "Journal of the ACM"}: later entries can write journal = jacm.
+                    var macro = new Source();
+                    ReadFields(body, macro, macros);
+                    foreach (var kv in macro.Fields) macros[kv.Key] = kv.Value;
+                    continue;
+                }
+                if (type == "comment" || type == "preamble") continue;
                 int comma = body.IndexOf(',');
                 var source = new Source { Type = type, Key = (comma < 0 ? body : body.Substring(0, comma)).Trim() };
-                if (comma >= 0) ReadFields(body.Substring(comma + 1), source);
+                if (comma >= 0) ReadFields(body.Substring(comma + 1), source, macros);
                 sources.Add(source);
             }
             return sources;
@@ -59,7 +68,27 @@ namespace KScript.Documents.Text
             return -1;
         }
 
-        private static void ReadFields(string body, Source source)
+        private static string ProtectBraced(string value)
+        {
+            var sb = new StringBuilder(value.Length);
+            int depth = 0;
+            foreach (char c in value)
+            {
+                if (c == '{') depth++;
+                else if (c == '}') depth--;
+                sb.Append(c == ' ' && depth > 0 ? '\u00A0' : c);
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>The month macros every BibTeX style knows: month = jan.</summary>
+        private static readonly Dictionary<string, string> Months = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["jan"] = "January", ["feb"] = "February", ["mar"] = "March", ["apr"] = "April", ["may"] = "May", ["jun"] = "June",
+            ["jul"] = "July", ["aug"] = "August", ["sep"] = "September", ["oct"] = "October", ["nov"] = "November", ["dec"] = "December",
+        };
+
+        private static void ReadFields(string body, Source source, Dictionary<string, string> macros)
         {
             int i = 0;
             while (i < body.Length)
@@ -81,9 +110,12 @@ namespace KScript.Documents.Text
                 {
                     int end = body.IndexOf(',', v);
                     if (end < 0) end = body.Length;
-                    value = body.Substring(v, end - v);
+                    value = body.Substring(v, end - v).Trim();
+                    if (macros.TryGetValue(value, out string expanded)) value = expanded;
                     i = end;
                 }
+                // {World Health Organization} in an author list is one name: its spaces become non-breaking ones.
+                if (name == "author" || name == "editor") value = ProtectBraced(value);
                 if (name.Length > 0) source.Fields[name] = Clean(value);
                 int next = body.IndexOf(',', i);
                 if (next < 0) break;
@@ -91,12 +123,13 @@ namespace KScript.Documents.Text
             }
         }
 
-        /// <summary>A BibTeX value as plain text: braces removed, \&amp; and -- turned into characters, spaces tidied.</summary>
+        /// <summary>TeX accent commands and the combining marks they put on the next letter: \"o is ö.</summary>
         private static readonly Dictionary<char, char> Accents = new Dictionary<char, char>
         {
             ['"'] = '\u0308', ['\''] = '\u0301', ['`'] = '\u0300', ['^'] = '\u0302', ['~'] = '\u0303', ['='] = '\u0304', ['.'] = '\u0307', ['c'] = '\u0327', ['v'] = '\u030C', ['u'] = '\u0306', ['H'] = '\u030B',
         };
 
+        /// <summary>A BibTeX value as plain text: braces removed, accents, quotes, \&amp; and -- turned into characters, spaces tidied.</summary>
         internal static string Clean(string value)
         {
             var sb = new StringBuilder();
@@ -136,7 +169,7 @@ namespace KScript.Documents.Text
                     while (i + 1 < value.Length && value[i + 1] == '-') i++;
                     continue;
                 }
-                sb.Append(char.IsWhiteSpace(c) ? ' ' : c);
+                sb.Append(char.IsWhiteSpace(c) && c != '\u00A0' ? ' ' : c);
             }
             return string.Join(" ", sb.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries));
         }
@@ -256,6 +289,8 @@ namespace KScript.Documents.Text
                 parts.Add(l);
             }
             if (source["note"] != null) parts.Add(new TextInline(" " + source["note"] + "."));
+            // An entry with nothing to show is listed by its key, so the citation still leads somewhere.
+            if (parts.Count == 0) parts.Add(new TextInline(source.Key + "."));
             return parts;
         }
 

@@ -21,7 +21,8 @@ namespace KScript.Documents.Maths
         {
             var parser = new MathParser(latex);
             MathRow row = parser.ParseRow(stopAtClose: false);
-            if (parser.pos < parser.text.Length) throw parser.Error($"'{parser.text[parser.pos]}' has nothing to close.");
+            // The row stops early only at a \right or \end with nothing open.
+            if (parser.pos < parser.text.Length) throw parser.Error(parser.LooksAt("\\right") ? "\\right has no \\left before it." : "\\end has no \\begin before it.");
             return Simplify(row);
         }
 

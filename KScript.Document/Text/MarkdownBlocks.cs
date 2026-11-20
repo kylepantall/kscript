@@ -112,7 +112,7 @@ namespace KScript.Documents.Text
                     continue;
                 }
 
-                if (trimmed.StartsWith("|", StringComparison.Ordinal) && i + 1 < lines.Length && Regex.IsMatch(lines[i + 1].Trim(), @"^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$"))
+                if (trimmed.StartsWith("|", StringComparison.Ordinal) && i + 1 < lines.Length && Regex.IsMatch(lines[i + 1].Trim(), @"^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$"))
                 {
                     var table = new Table();
                     table.Rows.Add(Row(trimmed, header: true, Inlines));
@@ -203,8 +203,9 @@ namespace KScript.Documents.Text
                 string line = lines[i];
                 if (line.Trim().Length == 0)
                 {
-                    // A blank line ends the list unless the next line carries it on.
-                    if (i + 1 < lines.Length && (Bullet.IsMatch(lines[i + 1]) || Ordered.IsMatch(lines[i + 1])) && Indent(lines[i + 1]) >= indent)
+                    // A blank line ends the list unless the next line carries it on with the same kind of item (or a nested one).
+                    if (i + 1 < lines.Length && (Indent(lines[i + 1]) > indent ? Bullet.IsMatch(lines[i + 1]) || Ordered.IsMatch(lines[i + 1])
+                        : Indent(lines[i + 1]) == indent && (list.Style == ListStyle.Bullet ? Bullet.IsMatch(lines[i + 1]) : Ordered.IsMatch(lines[i + 1]))))
                     {
                         i++;
                         continue;
@@ -230,6 +231,7 @@ namespace KScript.Documents.Text
                     }
                     break;
                 }
+                if ((list.Style == ListStyle.Bullet) != b.Success) break; // - after 1. (or the other way round) starts a new list
                 var item = new ListItem();
                 item.Blocks.Add(new Paragraph { Inlines = InlineParser.Parse(b.Success ? b.Groups[2].Value : o.Groups[3].Value, false, dollarMaths) });
                 list.Items.Add(item);

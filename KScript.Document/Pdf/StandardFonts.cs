@@ -31,11 +31,9 @@ namespace KScript.Documents.Pdf
 
         // Built on first use: the glyph table is in the other half of this partial class, whose fields may start later.
         private static Dictionary<int, (byte Code, short Width)> symbolMap;
-        private static Dictionary<int, short> symbolWidths;
 
         private static Dictionary<int, (byte Code, short Width)> SymbolMap => symbolMap ??= SymbolGlyphs.ToDictionary(g => g.Unicode, g => (g.Code, g.Width));
 
-        private static Dictionary<int, short> SymbolWidths => symbolWidths ??= SymbolGlyphs.GroupBy(g => (int)g.Code).ToDictionary(g => g.Key, g => g.First().Width);
 
         /// <summary>Characters neither font has, drawn as a near equivalent.</summary>
         private static readonly Dictionary<char, string> Substitutes = new Dictionary<char, string>
@@ -62,7 +60,6 @@ namespace KScript.Documents.Pdf
         /// <summary>The width of a WinAnsi code in a font, in 1/1000 em.</summary>
         public static double Width(string baseFont, int code)
         {
-            if (baseFont == Symbol) return SymbolWidths.TryGetValue(code, out short w) ? w : 0;
             short[] widths = WinAnsiWidths[baseFont];
             int i = code - 32;
             return i >= 0 && i < widths.Length ? widths[i] : 0;
@@ -130,12 +127,5 @@ namespace KScript.Documents.Pdf
         }
 
         public static double Measure(string text, Face face, double size) => Runs(text, face, size).Sum(r => r.Width);
-
-        /// <summary>How far the font reaches above and below the baseline, as a share of the size.</summary>
-        public static (double Ascent, double Descent) Extent(Face face)
-        {
-            var (a, d) = AscentDescent[face.BaseFont];
-            return (a / 1000.0, -d / 1000.0);
-        }
     }
 }

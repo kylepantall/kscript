@@ -78,8 +78,6 @@ namespace KScript.Documents.Pdf
             }
         }
 
-        public IReadOnlyList<Word> Words => words;
-
         private void End(double space)
         {
             if (current != null && current.Fragments.Count > 0)
@@ -297,8 +295,5 @@ namespace KScript.Documents.Pdf
                 if (i < line.Words.Count - 1) pos += w.SpaceAfter + gapExtra;
             }
         }
-
-        /// <summary>Plain text of inlines, for headings in bookmarks.</summary>
-        public static string Plain(IEnumerable<Inline> inlines) => InlineParser.Plain(inlines);
     }
 }

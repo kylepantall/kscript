@@ -59,19 +59,38 @@ namespace KScript.Documents.Maths
                     Group(s.Body, sb);
                     break;
                 case MathScripts sc:
-                    if (sc.Base is MathScripts || sc.Base is MathFrac) Group(sc.Base, sb);
+                {
+                    if (sc.Base is MathScripts || sc.Base is MathFrac || sc.Base is MathRow { Items.Count: 0 }) Group(sc.Base, sb);
                     else Write(sc.Base, sb);
+                    // Primes come straight after the base, as typed: f''_1^2.
+                    MathNode sup = sc.Sup;
+                    while (sup is MathAtom { Command: "\\prime" } || sup is MathRow { Items.Count: > 0 } r && r.Items[0] is MathAtom { Command: "\\prime" })
+                    {
+                        MathAtom prime = (MathAtom)(sup as MathRow)?.Items[0] ?? (MathAtom)sup;
+                        sb.Append('\'', prime.Text.Length);
+                        if (sup is MathRow rest && rest.Items.Count > 1)
+                        {
+                            var after = new MathRow();
+                            after.Items.AddRange(rest.Items.Skip(1));
+                            sup = after;
+                        }
+                        else
+                        {
+                            sup = null;
+                        }
+                    }
                     if (sc.Sub != null)
                     {
                         sb.Append('_');
                         Group(sc.Sub, sb);
                     }
-                    if (sc.Sup != null)
+                    if (sup != null)
                     {
                         sb.Append('^');
-                        Group(sc.Sup, sb);
+                        Group(sup, sb);
                     }
                     break;
+                }
                 case MathBigOp op:
                     if (op.Command == "operatorname") sb.Append("\\operatorname").Append(op.Limits ? "*" : string.Empty).Append('{').Append(op.Text).Append('}');
                     else sb.Append('\\').Append(op.Command);
