@@ -1,0 +1,11 @@
+--- make
+when: desktop
+---
+// {{ title }} as a desktop app. Open it with: kscript desktop{{ ext }}; package it with: kscript app build
+KScript.Window(title: "{{ title }}", width: 400, height: 300, theme: system) {
+  count = 0
+
+  Text(size: 24, weight: bold) "{{ title }}"
+  Text "Clicked {$count} times"
+  Button(variant: primary, on-click: "count += 1") "Click me"
+}

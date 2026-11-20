@@ -1,0 +1,10 @@
+--- make
+when: api
+---
+// Controllers are functions, so tests can call them directly.
+import "../controllers/hello{{ ext }}"
+
+test(name: "GET /api/hello says hello") {
+  expect(value: @show({}), equals: { message: 'Hello, world!' })
+  expect(value: @show({ name: 'Ellie' }).message, equals: 'Hello, Ellie!')
+}

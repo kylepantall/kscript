@@ -37,6 +37,27 @@ Scripts, tests, routes and the desktop app are written in the [.kscript format](
 
 `kscript make project my-tool --bare` makes just `kscript.json`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation: no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
 
+Add pieces to a bare project with options, in any mix:
+
+```sh
+kscript make project my-app --bare --web --api   # an empty website and JSON API
+kscript make project my-api --bare --api         # just the API: api.kscript, controllers/hello.kscript and its test
+kscript make project my-app --bare --desktop     # a script plus an empty KScript.Window desktop app
+```
+
+`--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `api.kscript` (a `KScript.Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.
+
+### The Makefile
+
+Every new project has a `Makefile`, so common commands are short: `make serve`, `make test`, `make check`, `make fmt`, `make compile`, and `make routes`, `make desktop` and `make app` when the project has an API or desktop app. Any other target is passed to `kscript make`, with `name=` as the name and `args=` for options:
+
+```sh
+make page name=contact                          # kscript make page contact
+make component name=Hero args="--props title"   # kscript make component Hero --props title
+```
+
+`make` comes with macOS (in the Xcode command line tools) and Linux. On Windows, install it (`winget install GnuWin32.Make`, `scoop install make` or `choco install make`) or run the `kscript` commands directly. Set `KSCRIPT=/path/to/kscript` to use another kscript.
+
 ### Changing what new projects get
 
 Every file `kscript make project` writes comes from a project template, and you can change it:

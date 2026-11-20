@@ -238,6 +238,10 @@ public class MakeProjectTests : IDisposable
             Assert.Contains(f, output);
         }
         Assert.False(File.Exists(Path.Combine(root, ProjectTemplate.ManifestName)), "the template's own settings are not copied");
+        string makefile = File.ReadAllText(Path.Combine(root, "Makefile"));
+        Assert.Contains("serve:\n\t$(KSCRIPT) serve", makefile);
+        Assert.Contains("desktop:\n\t$(KSCRIPT) desktop.kscript", makefile);
+        Assert.Contains("Makefile: ;\n%:\n\t$(KSCRIPT) make $@ $(name) $(args)", makefile);
         Assert.False(File.Exists(Path.Combine(root, "kscript.json.stub")));
         Assert.Contains("cd \"My Site\"", output);
         Assert.Contains("kscript serve           serve the site at http://localhost:3000", output);
@@ -399,7 +403,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "my-tool");
         var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
-        Assert.Equal(new[] { ".vscode/extensions.json", "kscript.json", "main.kscript", "tests/main.test.kscript" }, files);
+        Assert.Equal(new[] { ".vscode/extensions.json", "Makefile", "kscript.json", "main.kscript", "tests/main.test.kscript" }, files);
         Assert.Contains("kscript main.kscript    run the script", output);
 
         var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
@@ -421,6 +425,45 @@ public class MakeProjectTests : IDisposable
 
         Assert.Contains("not both", Make(parent.Root, "x", "--bare", "--template", "web").Err);
         Assert.Contains("no 'nope' project template", Make(parent.Root, "y", "--template", "nope").Err);
+    }
+
+    [Fact]
+    public void BareProjectsCanAddAnEmptyWebsiteApiOrDesktopApp()
+    {
+        using var parent = new TempSite();
+        var (code, output, err) = Make(parent.Root, "app", "--bare", "--web", "--api", "--no-desktop");
+        Assert.True(code == 0, err);
+        Assert.DoesNotContain("Note:", output);
+        string root = Path.Combine(parent.Root, "app");
+        var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
+        Assert.Equal(new[] { ".vscode/extensions.json", "Makefile", "_layout.html", "api.kscript", "controllers/hello.kscript", "index.html", "kscript.json", "main.kscript", "site.css", "tests/hello.test.kscript", "tests/main.test.kscript" }, files);
+        Assert.Contains("kscript serve           serve the site at http://localhost:8080", output);
+        Assert.Contains("kscript routes", output);
+
+        var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
+        Assert.Empty(config.Warnings);
+        Assert.Equal(8080, config.Serve.Port);
+        Assert.Null(config.App.Main);
+
+        var site = new PageSite(config.SiteRoot);
+        var home = PageRenderer.RenderFile(new PageContext(site.Root), site.Resolve("/").File);
+        Assert.Contains("<title>Home · App</title>", home.Body);
+
+        var o = new StringWriter { NewLine = "\n" };
+        Assert.True(KScript.Testing.TestCommand.Run(new[] { root }, o, new StringWriter(), color: false) == 0, o.ToString());
+        Assert.Contains("Tests: 3 passed, 3 total", o.ToString());
+
+        // An API on its own still gets serve settings; --desktop adds a window and the app section.
+        Assert.Equal(0, Make(parent.Root, "api-only", "--bare", "--api", "--desktop").Code);
+        var apiOnly = ProjectConfig.Load(Path.Combine(parent.Root, "api-only", "kscript.json"));
+        Assert.Empty(apiOnly.Warnings);
+        Assert.Equal("desktop.kscript", apiOnly.App.Main);
+        Assert.False(File.Exists(Path.Combine(parent.Root, "api-only", "index.html")));
+        Assert.True(File.Exists(Path.Combine(parent.Root, "api-only", "desktop.kscript")));
+        string makefile = File.ReadAllText(Path.Combine(parent.Root, "api-only", "Makefile"));
+        Assert.Contains("routes:\n\t$(KSCRIPT) routes", makefile);
+        Assert.Contains("app:\n\t$(KSCRIPT) app build", makefile);
+        Assert.Contains("%:\n\t$(KSCRIPT) make $@ $(name) $(args)", makefile);
     }
 
     [Fact]

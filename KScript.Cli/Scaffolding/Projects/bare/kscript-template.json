@@ -1,18 +1,38 @@
 // kscript make project --bare reads this file to learn about the template. It is not copied into new projects.
 // Every other file in this folder is copied, with {{ }} placeholders filled in (see docs/projects.md).
 {
-  "description": "A bare-bones project: kscript.json, one script and a test. No web pages, desktop app or API.",
+  "description": "A bare-bones project: kscript.json, one script and a test. Add --web, --api or --desktop for an empty website, API or desktop app.",
   "options": {
     "format": {
       "default": "kscript",
-      "description": "kscript writes the script and test as .kscript files; xml writes them as .ks.xml."
+      "description": "kscript writes scripts and tests as .kscript files; xml writes them as .ks.xml."
+    },
+    "web": {
+      "default": false,
+      "description": "Add an empty website: index.html, _layout.html and site.css, served by kscript serve."
+    },
+    "api": {
+      "default": false,
+      "description": "Add an empty JSON API: api.kscript (KScript.Http routes under /api), controllers/hello.kscript and a test for it."
+    },
+    "desktop": {
+      "default": false,
+      "description": "Add an empty desktop app: desktop.kscript (a KScript.Window) and the kscript.json app settings."
+    },
+    "port": {
+      "default": 8080,
+      "description": "The port kscript serve uses, with --web or --api"
     }
   },
   // Printed after the project is made, under "Next:". Lines that come out empty are left out.
   "next": [
     "kscript main{{ ext }}{{#if xml}} {{/if}}    run the script",
+    "{{#if web}}kscript serve           serve the site at http://localhost:{{ port }}{{/if}}",
+    "{{#if api}}{{#unless web}}kscript serve           serve the API at http://localhost:{{ port }}/api/hello{{/unless}}{{/if}}",
+    "{{#if api}}kscript routes          list the routes in api{{ ext }}{{/if}}",
+    "{{#if desktop}}kscript desktop{{ ext }}{{#if xml}} {{/if}} open the desktop app; kscript app build packages it{{/if}}",
     "kscript test            run the tests in tests/",
-    "kscript check           check every script",
+    "kscript check           check every {{#if web}}page and {{/if}}script",
     "kscript ide install     add the KScript extension to VS Code (the project also recommends it)"
   ]
 }
