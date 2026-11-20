@@ -18,7 +18,7 @@ namespace KScript.LanguageServer
     /// </summary>
     public sealed partial class KScriptLanguageServer
     {
-        public static readonly string[] TokenTypes = { "variable", "parameter", "function", "method", "property", "keyword", "operator", "string", "number", "namespace", "type" };
+        public static readonly string[] TokenTypes = { "variable", "parameter", "function", "method", "property", "keyword", "operator", "string", "number", "namespace", "type", "regexp" };
         public static readonly string[] TokenModifiers = { "declaration", "readonly", "defaultLibrary" };
 
         private readonly JsonRpcConnection connection;
@@ -176,6 +176,9 @@ namespace KScript.LanguageServer
                     return null;
                 }
                 case "textDocument/didSave":
+                    RefreshAll();
+                    RefreshOutputs(p?["textDocument"]?["uri"]?.GetValue<string>());
+                    return null;
                 case "workspace/didChangeWatchedFiles":
                     RefreshAll();
                     return null;
@@ -775,6 +778,25 @@ namespace KScript.LanguageServer
             CompletionKind.Module => 9,       // Module
             _ => 15,                          // Snippet
         };
+
+        /// <summary>
+        /// Autoload for coding agents: after a save, rewrites the project's AGENTS.md and .kscript/agents when the
+        /// project has them (kscript agents or kscript make project made them), so agents always read current docs.
+        /// </summary>
+        /// <summary>On save: rebuilds what the project makes from its code (the agent docs and other <see cref="KScript.Language.Outputs.ProjectOutputs"/>).</summary>
+        private void RefreshOutputs(string uri)
+        {
+            string path = uri == null ? null : Workspace.UriToPath(uri);
+            if (path == null || path.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            string root = KScript.Language.Agents.AgentDocs.FindRoot(path);
+            foreach (string line in KScript.Language.Outputs.ProjectOutputs.Describe(KScript.Language.Outputs.ProjectOutputs.Build(root)))
+            {
+                Log(line);
+            }
+        }
 
         private void Log(string message) =>
             connection.SendNotification("window/logMessage", new JsonObject { ["type"] = 1, ["message"] = message });

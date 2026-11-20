@@ -71,6 +71,7 @@ namespace KScript.Docs
             new Guide("install", "install.md", "Start here", "Install and editors"),
             new Guide("language", "language.md", "Language", "The language", "xml"),
             new Guide("code-format", "code-format.md", "Language", "The .kscript format", "kscript"),
+            new Guide("types", "types.md", "Language", "Types and validation", "kscript"),
             new Guide("web", "web.md", "Build", "Web pages"),
             new Guide("http", "http.md", "Build", "Routes and APIs"),
             new Guide("desktop", "desktop.md", "Build", "Desktop apps"),
@@ -82,6 +83,8 @@ namespace KScript.Docs
             new Guide("projects", "projects.md", "Tools", "Projects and kscript.json"),
             new Guide("formatting", "formatting.md", "Tools", "Formatting"),
             new Guide("standards", "standards.md", "Tools", "Lint standards"),
+            new Guide("mcp", "mcp.md", "Tools", "AI assistants (MCP)"),
+            new Guide("agents", "agents.md", "Tools", "Coding agents", "kscript"),
             new Guide("roadmap", "roadmap.md", "More", "Roadmap"),
         };
 

@@ -154,6 +154,10 @@ namespace KScript.Net
                 }
                 return null;
             });
+
+            p.AgentNotes(
+                ("@fetch", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test ->ok().",
+                    prefer: "@fetch($url)->check()->json(as: $Type) to fail fast and check the data's shape.")));
         }
 
         private static void CheckUrl(string url, Func<string, string, string, KScriptException> error)

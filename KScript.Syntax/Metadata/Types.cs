@@ -21,6 +21,7 @@ namespace KScript.Metadata
         public const string Password = "password";
         public const string Handle = "handle";
         public const string Uuid = "uuid";
+        public const string Regex = "regex";
 
         public const string Response = "response";
         public const string Chat = "chat";
@@ -38,7 +39,10 @@ namespace KScript.Metadata
         /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>
         public const string Type = "type";
 
-        public static readonly string[] Declarable = { "string", "int", "float", "bool", "list", "map", "fn" };
+        /// <summary>An error type: <c>NotFound</c> from <c>error NotFound { id: int }</c>, or a built-in such as Validation.</summary>
+        public const string ErrorType = "error_type";
+
+        public static readonly string[] Declarable = { "string", "int", "float", "bool", "list", "map", "fn", "email", "password", "handle", "uuid", "regex" };
 
         /// <summary>True if a method declared for <paramref name="receiver"/> can be called on a value of type <paramref name="actual"/>.</summary>
         public static bool Accepts(string receiver, string actual)
@@ -49,7 +53,7 @@ namespace KScript.Metadata
             }
 
             // Values are typed on use: a string that holds a number can use number methods, and anything prints as a string.
-            if (receiver == String && (actual == Number || actual == Bool || actual == File || actual == Date || actual == Email || actual == Handle || actual == Uuid))
+            if (receiver == String && (actual == Number || actual == Bool || actual == File || actual == Date || actual == Email || actual == Handle || actual == Uuid || actual == Regex))
             {
                 return true;
             }

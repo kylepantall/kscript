@@ -141,8 +141,8 @@ public class TypedJsonTests
     [InlineData("<echo>{ '{}'->json(as: 'Nope[') }</echo>", "'Nope[' isn't a type.")]
     [InlineData("<echo>{ '{}'->json(as: 3) }</echo>", "as: needs a type, such as Repo or 'Repo[]', but got a number (3).")]
     [InlineData("<echo>{ $Repo->from('[1, 2]') }</echo>", "$[0]: needs a Repo (a map), but got a number (1).")]
-    [InlineData("<let name=\"rs\" type=\"Repo[]\" value=\"3\" />", "$: needs a list of Repo, but got a number (3).")]
-    [InlineData("<let name=\"r\" type=\"Repo\" value=\"null\" />", "$: needs a Repo, but it is null.")]
+    [InlineData("<let name=\"rs\" type=\"Repo[]\" value=\"3\" />", "$rs doesn't fit Repo[]: needs a list of Repo, but got a number (3).")]
+    [InlineData("<let name=\"r\" type=\"Repo\" value=\"null\" />", "$r doesn't fit Repo: needs a Repo, but it is null.")]
     [InlineData("<let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><echo>{ $r.starz }</echo>", "Repo has no field 'starz'. Did you mean stars?")]
     [InlineData("<let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><echo>{ $r.zzzzzz }</echo>", "Repo has no field 'zzzzzz'. Its fields are: name, stars")]
     [InlineData("<let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><set>$r.starz = 3</set>", "Repo has no field 'starz'. Did you mean stars?")]
@@ -316,14 +316,14 @@ public class TypedJsonTests
     [InlineData("<type name=\"T\" fields=\"1a\" />", "'1a' can't be a field name")]
     [InlineData("<type name=\"T\"><field name=\" ? \" /></type>", "A field needs a name")]
     [InlineData("<type name=\"T\" fields=\"a: [x]\" />", "'[x]' isn't a type for the field 'a'")]
-    [InlineData("<type name=\"T\"><echo>x</echo></type>", "<type> can only hold <field> elements, not <echo>.")]
+    [InlineData("<type name=\"T\"><echo>x</echo></type>", "<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <echo>.")]
     [InlineData("<type name=\"T\"><field type=\"int\" /></type>", "<field> needs a name")]
     [InlineData("<type name=\"T\"><field name=\"a\" from=\"a..b\" /></type>", "from=\"a..b\" on the field 'a' isn't a path")]
     [InlineData("<type name=\"T\"><field name=\"a\" optional=\"maybe\" /></type>", "optional=\"maybe\" should be yes or no.")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" from=\"b\" /></type>", "it can't also have from or default")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" default=\"2\" /></type>", "it can't also have from or default")]
-    [InlineData("<field name=\"a\" />", "<field> must be inside <type>.")]
-    [InlineData("<type name=\"T\"><if test=\"yes\"><field name=\"a\" /></if></type>", "<type> can only hold <field> elements, not <if>.")]
+    [InlineData("<field name=\"a\" />", "<field> must be inside <type> or <error>.")]
+    [InlineData("<type name=\"T\"><if test=\"yes\"><field name=\"a\" /></if></type>", "<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <if>.")]
     public void DeclarationMistakesAreExplained(string body, string expected)
     {
         Assert.Contains(expected, Fails(body).Message);
@@ -371,7 +371,7 @@ public class TypedJsonTests
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><type name=\"User\" fields=\"login: string\" /></kscript>");
             string script = Path.Combine(dir, "t.ks.xml");
             File.WriteAllText(script, "<kscript><import src=\"lib.ks.xml\" names=\"Usr\" /></kscript>");
-            Assert.Contains("Did you mean User? Scripts export their top-level <fn> functions, <const> values, <enum>s and <type>s.", Assert.Throws<KScriptException>(() => RunScriptFile(script)).Message);
+            Assert.Contains("Did you mean User? Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s and <error>s.", Assert.Throws<KScriptException>(() => RunScriptFile(script)).Message);
         }
         finally
         {

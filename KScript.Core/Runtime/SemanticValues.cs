@@ -26,8 +26,9 @@ namespace KScript.Runtime
         public const string Password = "password";
         public const string Handle = "handle";
         public const string Uuid = "uuid";
+        public const string Regex = "regex";
 
-        public static readonly string[] Names = { Email, Password, Handle, Uuid };
+        public static readonly string[] Names = { Email, Password, Handle, Uuid, Regex };
 
         public static bool IsSemantic(string type) => Names.Contains(type);
 
@@ -51,6 +52,12 @@ namespace KScript.Runtime
                     if (value is not string hs) { reason = null; return false; }
                     if (!HandleName.TryParse(hs, out HandleName handle, out reason)) return false;
                     result = handle;
+                    return true;
+                case Regex:
+                    if (value is RegexValue) { result = value; reason = null; return true; }
+                    if (value is not string rs) { reason = null; return false; }
+                    if (!RegexValue.TryParse(rs, out RegexValue regex, out reason)) return false;
+                    result = regex;
                     return true;
                 case Uuid:
                     if (value is UuidValue) { result = value; reason = null; return true; }
@@ -342,7 +349,7 @@ namespace KScript.Runtime
                 {
                     return BCrypt.Net.BCrypt.Verify(secret, hash);
                 }
-                catch (BCrypt.Net.SaltParseException)
+                catch (Exception ex) when (ex is BCrypt.Net.SaltParseException || ex is FormatException)
                 {
                     // Falls through to the error below.
                 }
@@ -350,13 +357,16 @@ namespace KScript.Runtime
             throw new KScriptException("->verify() needs a hash made by ->hash() (it starts with $argon2id$ or $2b$), but got something else.", "Value");
         }
 
-        /// <summary>True if <paramref name="stored"/> was made with weaker settings than ->hash() uses now, so it should be made again at the next login.</summary>
-        public static bool NeedsRehash(string stored)
+        /// <summary>
+        /// True if <paramref name="stored"/> was made with weaker settings than ->hash() uses now, or with another
+        /// algorithm than <paramref name="algorithm"/>, so it should be made again at the next login.
+        /// </summary>
+        public static bool NeedsRehash(string stored, string algorithm = "argon2id")
         {
             string hash = (stored ?? string.Empty).Trim();
             if (TryParseArgon(hash, out int memory, out int passes, out int lanes, out _, out byte[] expected))
-                return memory < ArgonMemory || passes < ArgonPasses || lanes < ArgonLanes || expected.Length < HashBytes;
-            if (IsBcrypt(hash) && int.TryParse(hash.AsSpan(4, 2), out int cost)) return cost < BcryptCost;
+                return algorithm == "bcrypt" || memory < ArgonMemory || passes < ArgonPasses || lanes < ArgonLanes || expected.Length < HashBytes;
+            if (IsBcrypt(hash) && int.TryParse(hash.AsSpan(4, 2), out int cost)) return algorithm != "bcrypt" || cost < BcryptCost;
             throw new KScriptException("->needs_rehash() needs a hash made by ->hash() (it starts with $argon2id$ or $2b$), but got something else.", "Value");
         }
 
@@ -493,11 +503,13 @@ namespace KScript.Runtime
             if (password.Any(c => c < 128 && !char.IsLetterOrDigit(c))) pool += 33;
             if (password.Any(c => c >= 128 && !char.IsLetterOrDigit(c) || c >= 128 && char.IsLetter(c) && !char.IsUpper(c) && !char.IsLower(c))) pool += 100;
             double effective = 0;
+            int distinct = password.Distinct().Count();
             for (int i = 0; i < password.Length; i++)
             {
                 bool predictable = i > 0 && (password[i] == password[i - 1] || Math.Abs(password[i] - password[i - 1]) == 1);
                 effective += predictable ? 0.25 : 1;
             }
+            effective = Math.Min(effective, distinct * 2);
             double bits = effective * Math.Log2(Math.Max(pool, 1));
             return bits < 28 ? 0 : bits < 36 ? 1 : bits < 60 ? 2 : bits < 80 ? 3 : 4;
         }
@@ -589,6 +601,158 @@ namespace KScript.Runtime
         public string ToText() => Text;
 
         public override bool Equals(object obj) => obj is UuidValue u && u.Text == Text;
+
+        public override int GetHashCode() => Text.GetHashCode(StringComparison.Ordinal);
+
+        public override string ToString() => Text;
+    }
+
+    /// <summary>
+    /// A regular expression, written <c>/^[a-z]+$/i</c>. Text converts to one too: <c>'^[a-z]+$'</c>, or
+    /// <c>'/^[a-z]+$/i'</c> with flags. Flags: i (ignore case), m (^ and $ at each line), s (. matches new lines)
+    /// and x (spaces and # comments in the pattern are ignored).
+    /// </summary>
+    public sealed class RegexValue : ISemanticText
+    {
+        private RegexValue(string pattern, string flags, System.Text.RegularExpressions.Regex regex)
+        {
+            Pattern = pattern;
+            Flags = flags;
+            Regex = regex;
+        }
+
+        public string Pattern { get; }
+        public string Flags { get; }
+        public System.Text.RegularExpressions.Regex Regex { get; }
+
+        /// <summary>The literal: /pattern/flags.</summary>
+        public string Text => "/" + Pattern + "/" + Flags;
+        public string TypeName => SemanticTypes.Regex;
+
+        /// <summary>A literal <c>/pattern/flags</c>, or a bare pattern.</summary>
+        public static bool TryParse(string text, out RegexValue regex, out string reason)
+        {
+            regex = null;
+            string s = text ?? string.Empty;
+            string pattern = s;
+            string flags = string.Empty;
+            int last = s.LastIndexOf('/');
+            if (s.Length >= 2 && s[0] == '/' && last > 0 && s.Substring(last + 1).All(char.IsAsciiLetterLower))
+            {
+                pattern = s.Substring(1, last - 1);
+                flags = s.Substring(last + 1);
+            }
+            var options = System.Text.RegularExpressions.RegexOptions.CultureInvariant;
+            foreach (char f in flags)
+            {
+                switch (f)
+                {
+                    case 'i': options |= System.Text.RegularExpressions.RegexOptions.IgnoreCase; break;
+                    case 'm': options |= System.Text.RegularExpressions.RegexOptions.Multiline; break;
+                    case 's': options |= System.Text.RegularExpressions.RegexOptions.Singleline; break;
+                    case 'x': options |= System.Text.RegularExpressions.RegexOptions.IgnorePatternWhitespace; break;
+                    default:
+                        reason = $"'{f}' isn't a regex flag (use i, m, s and x)";
+                        return false;
+                }
+            }
+            if (flags.Distinct().Count() != flags.Length)
+            {
+                reason = "a flag is given twice";
+                return false;
+            }
+            try
+            {
+                regex = new RegexValue(pattern, flags, new System.Text.RegularExpressions.Regex(pattern, options, TimeSpan.FromSeconds(1)));
+                reason = null;
+                return true;
+            }
+            catch (ArgumentException ex)
+            {
+                reason = ex.Message.Replace($"Invalid pattern '{pattern}' at offset", "the pattern is invalid at character").TrimEnd('.');
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// The capturing groups in the order they open in the pattern. .NET numbers unnamed groups before named
+        /// ones, so captures would otherwise come out of order when the two are mixed.
+        /// </summary>
+        internal static List<string> GroupOrder(System.Text.RegularExpressions.Regex regex)
+        {
+            string pattern = regex.ToString();
+            bool explicitOnly = (regex.Options & System.Text.RegularExpressions.RegexOptions.ExplicitCapture) != 0;
+            var order = new List<string>();
+            int unnamed = 0;
+            bool inClass = false;
+            for (int i = 0; i < pattern.Length; i++)
+            {
+                char c = pattern[i];
+                if (c == '\\') { i++; continue; }
+                if (inClass) { inClass = c != ']'; continue; }
+                if (c == '[') { inClass = true; continue; }
+                if (c != '(') continue;
+                if (i + 1 < pattern.Length && pattern[i + 1] == '?')
+                {
+                    // (?<name>...) or (?'name'...) is a named group; (?<= and (?<! look behind.
+                    if (i + 2 < pattern.Length && (pattern[i + 2] == '<' || pattern[i + 2] == '\'') && i + 3 < pattern.Length && pattern[i + 3] != '=' && pattern[i + 3] != '!')
+                    {
+                        char close = pattern[i + 2] == '<' ? '>' : '\'';
+                        int end = pattern.IndexOf(close, i + 3);
+                        if (end > 0) order.Add(pattern.Substring(i + 3, end - i - 3));
+                    }
+                    continue;
+                }
+                if (!explicitOnly) order.Add((++unnamed).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            order.RemoveAll(k => regex.GroupNumberFromName(k) < 0);
+            // Anything the scan missed keeps .NET's order at the end.
+            foreach (int n in regex.GetGroupNumbers().Where(n => n > 0))
+            {
+                string key = regex.GroupNameFromNumber(n);
+                if (!order.Contains(key)) order.Add(key);
+            }
+            return order;
+        }
+
+        /// <summary>A match as a map: text, index, groups (by name) and captures (by number, 1 up).</summary>
+        public static Dictionary<string, object> MatchMap(System.Text.RegularExpressions.Regex regex, System.Text.RegularExpressions.Match m)
+        {
+            var groups = new Dictionary<string, object>(StringComparer.Ordinal);
+            var captures = new List<object>();
+            foreach (string name in regex.GetGroupNames().Where(n => !int.TryParse(n, out _)))
+            {
+                groups[name] = m.Groups[name].Success ? m.Groups[name].Value : null;
+            }
+            foreach (string key in GroupOrder(regex))
+            {
+                System.Text.RegularExpressions.Group g = m.Groups[key];
+                captures.Add(g.Success ? g.Value : null);
+            }
+            return new Dictionary<string, object>
+            {
+                ["text"] = m.Value,
+                ["index"] = (double)m.Index,
+                ["groups"] = groups,
+                ["captures"] = captures,
+            };
+        }
+
+        public bool TryGetMember(string name, out object value)
+        {
+            value = null;
+            return false;
+        }
+
+        public bool TryCallMethod(CallContext call, string name, out object result)
+        {
+            result = null;
+            return false;
+        }
+
+        public string ToText() => Text;
+
+        public override bool Equals(object obj) => obj is RegexValue r && r.Text == Text;
 
         public override int GetHashCode() => Text.GetHashCode(StringComparison.Ordinal);
 

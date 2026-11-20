@@ -14,16 +14,22 @@ namespace KScript.Runtime
     /// <summary>One parameter of a &lt;fn&gt;: <c>who</c>, <c>count: int = 1</c>.</summary>
     public sealed class Parameter
     {
-        public Parameter(string name, string type, ExprNode defaultValue)
+        public Parameter(string name, string type, ExprNode defaultValue, string defaultText = null)
         {
             Name = name;
             Type = type;
             Default = defaultValue;
+            DefaultText = defaultText;
         }
 
         public string Name { get; }
         public string Type { get; }
         public ExprNode Default { get; }
+
+        /// <summary>The default as written. A typed parameter's default can be raw text for its type (size: Size = 1920x1080), which needn't parse.</summary>
+        public string DefaultText { get; }
+
+        public bool HasDefault => Default != null || DefaultText != null;
 
         public override string ToString() => Name + (Type != null ? ": " + Type : string.Empty) + (Default != null ? " = …" : string.Empty);
 
@@ -39,16 +45,19 @@ namespace KScript.Runtime
                 string p = part.Trim();
                 if (p.Length == 0) continue;
                 ExprNode defaultValue = null;
+                string defaultText = null;
                 int eq = IndexOfTopLevel(p, '=');
                 if (eq >= 0)
                 {
+                    defaultText = p.Substring(eq + 1).Trim();
                     ParseResult parsed = ExpressionParser.ParseExpression(p.Substring(eq + 1));
-                    if (!parsed.Success)
+                    // A typed parameter's default that isn't an expression may be raw text for its type, checked when it is used.
+                    if (!parsed.Success && !p.Substring(0, eq).Contains(':'))
                     {
                         error = $"The default value of '{p.Substring(0, eq).Trim()}' isn't a valid expression: {parsed.Errors[0].Message}";
                         return result;
                     }
-                    defaultValue = parsed.Root;
+                    defaultValue = parsed.Success ? parsed.Root : null;
                     p = p.Substring(0, eq).Trim();
                 }
 
@@ -72,7 +81,7 @@ namespace KScript.Runtime
                     error = $"'{part.Trim()}' isn't a parameter name. Write names like who, count: int, or greeting = 'Hello'.";
                     return result;
                 }
-                result.Add(new Parameter(name, type, defaultValue));
+                result.Add(new Parameter(name, type, defaultValue, defaultText));
             }
             return result;
         }
@@ -171,6 +180,14 @@ namespace KScript.Runtime
         internal Scope Closure { get; }
         public Module Module { get; }
 
+        /// <summary>A default written as raw text for the parameter's type: who: handle = @guest, size: Size = medium.</summary>
+        private string RawDefault(Parameter p)
+        {
+            string kind = Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module);
+            if (kind == null || p.DefaultText == null) return null;
+            return p.Default == null || Interpreter.IsRawWord(p.Default, kind, Closure, Module) || Interpreter.LooksRaw(p.DefaultText, kind) ? p.DefaultText : null;
+        }
+
         public object Call(CallContext call)
         {
             Interpreter interpreter = call.Interpreter;
@@ -193,7 +210,7 @@ namespace KScript.Runtime
                     }
                     continue;
                 }
-                if (!t.IsSimple || t.IsBuiltIn) continue;
+                if (!t.IsSimple || t.IsBuiltIn || t.Args != null) continue;
                 object declared;
                 try
                 {
@@ -207,13 +224,16 @@ namespace KScript.Runtime
             }
             IReadOnlyList<object> args = ArgumentBinder.BindByName(call,
                 Parameters.Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null,
-                    TypeName: e?.Name ?? enumLists.GetValueOrDefault(p.Name)?.Name, ItemValues: enumLists.GetValueOrDefault(p.Name)?.Names)).ToList(), out HashSet<int> given);
+                    TypeName: e?.Name ?? enumLists.GetValueOrDefault(p.Name)?.Name, ItemValues: enumLists.GetValueOrDefault(p.Name)?.Names,
+                    RawText: p.Type == null || e != null ? null : Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module))).ToList(), out HashSet<int> given);
             for (int i = 0; i < Parameters.Count; i++)
             {
                 Parameter p = Parameters[i];
                 object value;
                 if (given.Contains(i)) value = args[i];
+                else if (p.HasDefault && p.Type != null && RawDefault(p) is string raw) value = raw;
                 else if (p.Default != null) value = interpreter.Evaluate(p.Default, scope, new EvalContext(Module, null));
+                else if (p.DefaultText != null) throw new KScriptException($"The default of '{p.Name}' in @{Name}() isn't a value or a {p.Type}: {p.DefaultText}.", "Syntax");
                 else throw new KScriptException($"@{Name}() needs a value for '{p.Name}'.", "Argument");
                 if (enums.TryGetValue(p.Name, out EnumType type)) value = type.Check(value, $"The '{p.Name}' argument of @{Name}()");
                 else if (p.Type != null) value = Shapes.Convert(interpreter, value, p.Type, $"The '{p.Name}' argument of @{Name}()", Closure, Module);

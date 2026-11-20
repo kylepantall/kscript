@@ -28,6 +28,12 @@ namespace KScript.Runtime
         /// <summary>The script <see cref="Offset"/> belongs to, when it isn't the one that reports the error.</summary>
         internal Module OffsetModule { get; set; }
 
+        /// <summary>The declared error type this error was made from (<c>NotFound(id: 42)</c>), or null for a built-in or ad hoc one.</summary>
+        public ErrorType Declared { get; set; }
+
+        /// <summary>The error that led to this one: <c>NotFound(id: 1, cause: $err)</c>.</summary>
+        public KScriptException Cause => InnerException as KScriptException;
+
         /// <summary>Extra fields from &lt;throw&gt;, available on the caught error value.</summary>
         public Dictionary<string, object> Fields { get; } = new Dictionary<string, object>();
 
@@ -36,16 +42,21 @@ namespace KScript.Runtime
         public string Location => File == null && Line == 0 ? null
             : $"{(File != null ? System.IO.Path.GetFileName(File) : "script")}{(Line > 0 ? $":{Line}" : string.Empty)}{(Column > 0 ? $":{Column}" : string.Empty)}";
 
-        /// <summary>The error as a map, which is what <c>&lt;catch as="err"&gt;</c> declares.</summary>
-        public Dictionary<string, object> ToValue()
+        /// <summary>
+        /// The error as a map, which is what <c>&lt;catch as="err"&gt;</c> declares: type, message, line, column, file,
+        /// status (from its type, for KScript.Http), cause, and its fields.
+        /// </summary>
+        public ErrorValue ToValue()
         {
-            var map = new Dictionary<string, object>
+            var map = new ErrorValue(this)
             {
                 ["type"] = Type,
                 ["message"] = Message,
                 ["line"] = Line > 0 ? (double)Line : null,
                 ["column"] = Column > 0 ? (double)Column : null,
                 ["file"] = File,
+                ["status"] = ErrorTypes.StatusOf(this) is int status ? (double)status : null,
+                ["cause"] = Cause?.ToValue(),
             };
             foreach (var kv in Fields) map[kv.Key] = kv.Value;
             return map;

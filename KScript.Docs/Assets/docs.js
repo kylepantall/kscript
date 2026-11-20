@@ -55,7 +55,10 @@
   });
 
   // ---------- Highlighting ----------
-  var EXPR = /('(?:[^'\\]|\\.)*')|(\$[A-Za-z_][\w]*)|(@[A-Za-z_][\w.]*)|(->\s*[A-Za-z_]\w*)|(\|>)|\b(\d+(?:\.\d+)?)\b|\b(fn|and|or|not|lt|le|gt|ge|eq|ne|in|step|match|yes|no|true|false|null)\b/g;
+  // Literals that need no quotes: /regex/flags, joan@example.com and 3f2a8c1e-... uuids.
+  var LITERALS = "((?<![\\w)\\]$])\\/(?![\\s\\/*])(?:\\\\.|\\[(?:\\\\.|[^\\]\\\\\\n])*\\]|[^\\/\\\\\\n\\[])+\\/[imsx]*(?!\\w))|((?<![\\w.%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?![\\w]|-(?!>)))|((?<![\\w-])[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?![\\w]))";
+  var TYPES = 'string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex';
+  var EXPR = new RegExp("('(?:[^'\\\\]|\\\\.)*')|" + LITERALS + "|(\\$[A-Za-z_][\\w]*)|(@[A-Za-z_][\\w.]*)|(->\\s*[A-Za-z_]\\w*)|(\\|>)|\\b(\\d+(?:\\.\\d+)?)\\b|\\b(fn|and|or|not|lt|le|gt|ge|eq|ne|in|step|match|yes|no|true|false|null)\\b", 'g');
 
   function hlExpr(s) {
     // A new RegExp each time: strings inside call hlTemplate, which calls hlExpr again.
@@ -63,12 +66,14 @@
     while ((m = re.exec(s))) {
       out += esc(s.slice(last, m.index));
       if (m[1]) out += span('str', hlTemplate(m[1]));
-      else if (m[2]) out += span('var', esc(m[2]));
-      else if (m[3]) out += span('cmd', esc(m[3]));
-      else if (m[4]) out += span('cmd', esc(m[4]));
-      else if (m[5]) out += span('kw', esc(m[5]));
-      else if (m[6]) out += span('num', m[6]);
-      else out += span('kw', m[7]);
+      else if (m[2]) out += span('re', esc(m[2]));
+      else if (m[3] || m[4]) out += span('str', esc(m[3] || m[4]));
+      else if (m[5]) out += span('var', esc(m[5]));
+      else if (m[6]) out += span('cmd', esc(m[6]));
+      else if (m[7]) out += span('cmd', esc(m[7]));
+      else if (m[8]) out += span('kw', esc(m[8]));
+      else if (m[9]) out += span('num', m[9]);
+      else out += span('kw', m[10]);
       last = m.index + m[0].length;
     }
     return out + esc(s.slice(last));
@@ -139,19 +144,34 @@
     return out;
   }
 
-  var KS = /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|('(?:[^'\\]|\\.)*')|(\$[A-Za-z_]\w*)|(@[A-Za-z_][\w.]*)|(->\s*[A-Za-z_]\w*)|\b(\d+(?:\.\d+)?)\b|\b(if|elif|else|for|in|at|while|match|case|when|default|fn|return|try|catch|finally|throw|import|from|as|const|echo|break|continue|exit|and|or|not|yes|no|true|false|null)\b|\b([A-Z][\w.]*|[a-z_][\w-]*)(?=\s*[({])/g;
+  var KS = new RegExp("(\\/\\/[^\\n]*)|(\"(?:[^\"\\\\]|\\\\.)*\")|('(?:[^'\\\\]|\\\\.)*')|" + LITERALS
+    + "|(\\$[A-Za-z_]\\w*)|(@[A-Za-z_][\\w.]*)|(->\\s*[A-Za-z_]\\w*)|\\b(\\d+(?:\\.\\d+)?)\\b"
+    + "|(:\\s*)(" + TYPES + "|[A-Z]\\w*)(?![\\w-])"
+    + "|^(\\s*)(min|max|pattern|one_of|not|validate|normalize|parse)(?=\\s*:\\s*(?![A-Za-z_][\\w.\\[\\]?]*\\s*(?:=|$)))"
+    + "|\\b(type|enum)(\\s+)([A-Za-z_]\\w*)(?:(\\s+with\\s*\\[)([^\\]\\n]*)(\\]))?"
+    + "|\\b(if|elif|else|for|in|at|while|match|case|when|default|fn|return|try|catch|finally|throw|import|from|as|const|echo|break|continue|exit|and|or|not|yes|no|true|false|null|type|enum|with)\\b"
+    + "|\\b([A-Z][\\w.]*|[a-z_][\\w-]*)(?=\\s*[({])", 'gm');
   function hlKscript(src) {
-    var re = new RegExp(KS.source, 'g'), out = '', last = 0, m;
+    var re = new RegExp(KS.source, 'gm'), out = '', last = 0, m;
     while ((m = re.exec(src))) {
       out += esc(src.slice(last, m.index));
       if (m[1]) out += span('com', esc(m[1]));
       else if (m[2]) out += span('str', '"' + hlTemplate(m[2].slice(1, -1)) + '"');
       else if (m[3]) out += span('str', esc(m[3]));
-      else if (m[4]) out += span('var', esc(m[4]));
-      else if (m[5] || m[6]) out += span('cmd', esc(m[5] || m[6]));
-      else if (m[7]) out += span('num', m[7]);
-      else if (m[8]) out += span('kw', m[8]);
-      else out += span('tag', esc(m[9]));
+      else if (m[4]) out += span('re', esc(m[4]));
+      else if (m[5] || m[6]) out += span('str', esc(m[5] || m[6]));
+      else if (m[7]) out += span('var', esc(m[7]));
+      else if (m[8] || m[9]) out += span('cmd', esc(m[8] || m[9]));
+      else if (m[10]) out += span('num', m[10]);
+      else if (m[12]) out += esc(m[11]) + span('type', esc(m[12]));
+      else if (m[14]) out += esc(m[13]) + span('kw', esc(m[14]));
+      else if (m[15]) {
+        // type Admin with [User, Auditable]: the name and the types it is built on.
+        out += span('kw', m[15]) + m[16] + span('type', esc(m[17]));
+        if (m[18]) out += m[18].replace('with', span('kw', 'with')) + esc(m[19]).replace(/[A-Za-z_]\w*/g, function (t) { return span('type', t); }) + m[20];
+      }
+      else if (m[21]) out += span('kw', m[21]);
+      else out += span('tag', esc(m[22]));
       last = m.index + m[0].length;
     }
     return out + esc(src.slice(last));

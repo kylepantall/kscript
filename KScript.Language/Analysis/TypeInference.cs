@@ -36,6 +36,9 @@ namespace KScript.Language.Analysis
                         LiteralKind.Number => KType.Number,
                         LiteralKind.String => KType.String,
                         LiteralKind.Bool => KType.Bool,
+                        LiteralKind.Regex => KType.Regex,
+                        LiteralKind.Email => KType.Email,
+                        LiteralKind.Uuid => KType.Uuid,
                         _ => KType.Null,
                     });
 
@@ -86,6 +89,13 @@ namespace KScript.Language.Analysis
                     TextSpan span = VariableNameSpan(v, region);
                     return result.RootScope.Innermost(span.Start).Lookup(v.Name, span.Start)?.Shape ?? TypeShape.Unknown;
                 }
+
+                case CallNode call when call.Callee is IdentifierNode errorName && ErrorTypeNamed(errorName, region) is TypeShape errorType:
+                    // NotFound(id: 42) makes an error of that type.
+                    return errorType.Instance ?? Analyzer.BaseErrorShape();
+
+                case IdentifierNode id when ErrorTypeNamed(id, region) is TypeShape errorType:
+                    return errorType;
 
                 case MemberNode member:
                 {
@@ -222,6 +232,19 @@ namespace KScript.Language.Analysis
             }
         }
 
+        /// <summary>The error type a bare name means here: a declared &lt;error&gt;, or a built-in such as Validation.</summary>
+        private TypeShape ErrorTypeNamed(IdentifierNode id, ExpressionRegion region)
+        {
+            int offset = region.Source.ToSource(id.Span.Start);
+            Symbol symbol = result.RootScope.Innermost(offset).Lookup(id.Name, offset);
+            if (symbol?.Shape.Type == KType.ErrorType)
+            {
+                return symbol.Shape;
+            }
+            return symbol == null && KScript.Runtime.ErrorTypes.BuiltIn.TryGetValue(id.Name, out KScript.Runtime.ErrorType b) && b.Name == id.Name
+                ? new TypeShape(KType.ErrorType) { Name = b.Name } : null;
+        }
+
         /// <summary>
         /// The result of a call with an <c>as:</c> argument (<c>->json(as: Repo)</c>): records of that type, or a list
         /// of them when the type says so or the data is known to be a list. Null when the call has no type to map to.
@@ -258,7 +281,7 @@ namespace KScript.Language.Analysis
         /// </summary>
         public TypeShape TypeNamed(string text, int offset)
         {
-            string t = (text ?? string.Empty).Trim();
+            string t = WithoutTypeArguments((text ?? string.Empty).Trim());
             if (t.EndsWith("?", StringComparison.Ordinal))
             {
                 t = t.Substring(0, t.Length - 1).TrimEnd();
@@ -278,6 +301,11 @@ namespace KScript.Language.Analysis
                 "map" => new TypeShape(KType.Map),
                 "fn" => new TypeShape(KType.Fn),
                 "date" => new TypeShape(KType.Date),
+                "email" => new TypeShape(KType.Email) { Declared = depth == 0 },
+                "password" => new TypeShape(KType.Password) { Declared = depth == 0 },
+                "handle" => new TypeShape(KType.Handle) { Declared = depth == 0 },
+                "uuid" => new TypeShape(KType.Uuid) { Declared = depth == 0 },
+                "regex" => new TypeShape(KType.Regex) { Declared = depth == 0 },
                 "any" => TypeShape.Unknown,
                 _ => null,
             };
@@ -295,6 +323,26 @@ namespace KScript.Language.Analysis
                 shape = new TypeShape(KType.List) { Element = shape };
             }
             return shape;
+        }
+
+        /// <summary>The type without the arguments given where it is used: <c>uuid(v: 4)</c> is uuid, <c>string[](max: 5)</c> is string[].</summary>
+        internal static string WithoutTypeArguments(string text)
+        {
+            int open = text.IndexOf('(');
+            if (open <= 0)
+            {
+                return text;
+            }
+            int depth = 0;
+            for (int i = open; i < text.Length; i++)
+            {
+                if (text[i] == '(') depth++;
+                else if (text[i] == ')' && --depth == 0)
+                {
+                    return (text.Substring(0, open) + text.Substring(i + 1)).Trim();
+                }
+            }
+            return text.Substring(0, open).Trim();
         }
 
         /// <summary>The user function (declared or imported) a call names, or null for a built-in command.</summary>

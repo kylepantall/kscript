@@ -133,7 +133,19 @@ namespace KScript.Syntax.Markup
                     continue;
                 }
 
-                if (fields)
+                if (fields && (Lookahead("fn ") || Lookahead("fn\t")))
+                {
+                    // A method of the type: fn width(unit: Unit) => ...
+                    int fnStart = pos;
+                    string fnDoc = TakeDoc();
+                    pos += 2;
+                    ParseFn(parent, fnStart, fnDoc);
+                }
+                else if (fields && RuleLineAhead() is string rule)
+                {
+                    ParseRule(parent, rule);
+                }
+                else if (fields)
                 {
                     ParseField(parent);
                 }
@@ -220,6 +232,7 @@ namespace KScript.Syntax.Markup
                 case "fn": ParseFn(parent, start, doc); return;
                 case "type" when StartsDeclaration(4): ParseType(parent, start, doc); return;
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
+                case "error" when StartsDeclaration(5): ParseError(parent, start, doc); return;
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
@@ -434,6 +447,11 @@ namespace KScript.Syntax.Markup
                 while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
                 int typeStart = q;
                 q = TypeEnd(q);
+                if (q < 0)
+                {
+                    // name: type(... with no closing ): parsed as an assignment, which reports the missing ).
+                    return true;
+                }
                 while (q < text.Length && (text[q] == ' ' || text[q] == '\t')) q++;
                 return q > typeStart && q < text.Length && text[q] == '=' && (q + 1 >= text.Length || (text[q + 1] != '=' && text[q + 1] != '>'));
             }
@@ -715,6 +733,40 @@ namespace KScript.Syntax.Markup
             {
                 ParseAttributeList(e);
             }
+            SkipSpaces();
+            if (TryWord("with"))
+            {
+                // type Admin with [User, Auditable] { }: with="User, Auditable".
+                SkipSpaces();
+                if (Peek(0) == '[')
+                {
+                    int open = pos;
+                    int close = ClosingBracket(open);
+                    if (close < 0)
+                    {
+                        Error(new TextSpan(open, 1), DiagnosticCodes.UnclosedElement, "This [ is missing its closing ].");
+                        close = text.IndexOf('\n', open) is int nl && nl >= 0 ? nl : text.Length;
+                    }
+                    int s = open + 1;
+                    int end = close;
+                    while (s < end && char.IsWhiteSpace(text[s])) s++;
+                    while (end > s && char.IsWhiteSpace(text[end - 1])) end--;
+                    AddRawAttribute(e, "with", TextSpan.FromBounds(s, end));
+                    pos = Math.Min(text.Length, close + 1);
+                }
+                else
+                {
+                    TextSpan single = ReadTypeSpan();
+                    if (single.Length == 0)
+                    {
+                        Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the types to build on after 'with', such as with [User, Auditable] or with [int].");
+                    }
+                    else
+                    {
+                        AddRawAttribute(e, "with", single);
+                    }
+                }
+            }
             if (doc != null)
             {
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
@@ -727,6 +779,53 @@ namespace KScript.Syntax.Markup
             else
             {
                 // type User(fields: "login: string, id: int") needs no block.
+                e.StartTagSpan = TextSpan.FromBounds(start, pos);
+            }
+            Finish(e, start);
+        }
+
+        /// <summary>
+        /// <c>error NotFound(status: 404, message: "No {$kind} {$id}") extends Validation { kind: string; id: int }</c>:
+        /// an &lt;error&gt;. The options, <c>extends</c> and the block of fields are all optional.
+        /// </summary>
+        private void ParseError(MarkupElement parent, int start, string doc)
+        {
+            MarkupElement e = Begin(parent, "error", start);
+            SkipSpaces();
+            AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
+            if (Peek(0) == '(')
+            {
+                ParseAttributeList(e);
+            }
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
+            }
+            int save = pos;
+            SkipSpaces();
+            if (TryWord("extends"))
+            {
+                SkipSpaces();
+                TextSpan parentName = ReadNameSpan(allowDash: false);
+                if (parentName.Length == 0)
+                {
+                    Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the error type it extends after 'extends', such as Validation.");
+                }
+                else
+                {
+                    AddRawAttribute(e, "extends", parentName);
+                }
+                save = pos;
+                SkipSpaces();
+            }
+            if (Peek(0) == '{')
+            {
+                ParseBlock(e, fields: true);
+            }
+            else
+            {
+                // error Timeout extends Network needs no block.
+                pos = save;
                 e.StartTagSpan = TextSpan.FromBounds(start, pos);
             }
             Finish(e, start);
@@ -854,6 +953,182 @@ namespace KScript.Syntax.Markup
             Finish(e, start);
         }
 
+        private static readonly string[] RuleWords = { "min", "max", "pattern", "one_of", "not", "validate", "normalize", "parse" };
+
+        /// <summary>
+        /// The rule a type's line starts with (<c>min: 0</c>, <c>pattern: /^[a-z]+$/</c>, <c>validate: $value > 0, 'too small'</c>),
+        /// or null for a field. A line such as <c>max: int</c> is still a field: the value after ':' is a type and nothing more.
+        /// </summary>
+        private string RuleLineAhead()
+        {
+            string word = RuleWords.FirstOrDefault(w => Lookahead(w) && pos + w.Length < text.Length && !Lexer.IsIdentChar(text[pos + w.Length]));
+            if (word == null)
+            {
+                return null;
+            }
+            int p = pos + word.Length;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            if (p >= text.Length || text[p] != ':')
+            {
+                return null;
+            }
+            p++;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            if (p >= text.Length || !Lexer.IsIdentStart(text[p]))
+            {
+                return word;
+            }
+            int end = TypeEnd(p);
+            if (end < 0)
+            {
+                return word;
+            }
+            int saved = pos;
+            pos = end;
+            bool field = AtStatementEnd() || PeekAfterSpaces('=') || LookaheadWordAfterSpaces("from");
+            pos = saved;
+            return field ? null : word;
+        }
+
+        private bool PeekAfterSpaces(char c)
+        {
+            int p = pos;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            return p < text.Length && text[p] == c;
+        }
+
+        private bool LookaheadWordAfterSpaces(string word)
+        {
+            int saved = pos;
+            SkipSpaces();
+            bool found = TryWord(word);
+            pos = saved;
+            return found;
+        }
+
+        /// <summary>
+        /// A rule line of a type. <c>min</c>, <c>max</c>, <c>pattern</c>, <c>one_of</c>, <c>not</c> and <c>parse</c> become
+        /// attributes of the &lt;type&gt;; <c>validate: test, 'message'</c> and <c>normalize: value</c> become child elements.
+        /// </summary>
+        private void ParseRule(MarkupElement type, string rule)
+        {
+            int start = pos;
+            TextSpan nameSpan = new TextSpan(pos, rule.Length);
+            pos += rule.Length;
+            SkipSpaces();
+            pos++; // ':'
+            SkipSpaces();
+            switch (rule)
+            {
+                case "validate":
+                {
+                    MarkupElement e = Begin(type, "validate", start, nameSpan);
+                    pos = nameSpan.End;
+                    SkipSpaces();
+                    pos++;
+                    AddExpressionAttribute(e, "test", Stop.Argument);
+                    if (Peek(0) == ',')
+                    {
+                        pos++;
+                        SkipSpaces();
+                        if (Peek(0) == '\'' || Peek(0) == '"')
+                        {
+                            // The message is text, as message="..." is in XML: its quotes go.
+                            int quoteStart = pos;
+                            SkipQuoted(Peek(0));
+                            TextSpan inner = TextSpan.FromBounds(quoteStart + 1, Math.Max(quoteStart + 1, pos - 1));
+                            AddAttribute(e, "message", DecodedText.Plain(text.Substring(inner.Start, inner.Length), inner.Start), inner, null, '\0');
+                        }
+                        else
+                        {
+                            AddExpressionAttribute(e, "message", Stop.Line);
+                        }
+                    }
+                    Finish(e, start);
+                    return;
+                }
+                case "normalize":
+                {
+                    MarkupElement e = Begin(type, "normalize", start, nameSpan);
+                    pos = nameSpan.End;
+                    SkipSpaces();
+                    pos++;
+                    AddExpressionAttribute(e, "value", Stop.Line);
+                    Finish(e, start);
+                    return;
+                }
+            }
+
+            TextSpan value;
+            if (pos >= text.Length || Peek(0) is '\n' or '\r' or '}' or ';')
+            {
+                value = new TextSpan(pos, 0);
+            }
+            else if (Peek(0) == '/' && rule == "pattern")
+            {
+                value = ReadRegexSpan();
+            }
+            else if ((Peek(0) == '\'' || Peek(0) == '"') && rule is "pattern" or "min" or "max")
+            {
+                // pattern: '^[a-z]+$' is the pattern itself, without its quotes.
+                int quoteStart = pos;
+                SkipQuoted(Peek(0));
+                value = TextSpan.FromBounds(quoteStart + 1, Math.Max(quoteStart + 1, pos - 1));
+            }
+            else
+            {
+                (int s, int end) = ReadExpression(Stop.Line);
+                value = TextSpan.FromBounds(s, end);
+            }
+            if (value.Length == 0)
+            {
+                Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, $"Write the value of {rule}, such as {rule}: {RuleExample(rule)}.");
+                return;
+            }
+            if (type.GetAttribute(rule) != null)
+            {
+                Error(nameSpan, DiagnosticCodes.MarkupSyntax, $"This type already has a {rule} rule.");
+                return;
+            }
+            AddAttribute(type, rule, DecodedText.Plain(text.Substring(value.Start, value.Length), value.Start), value, nameSpan, '\0');
+        }
+
+        private static string RuleExample(string rule) => rule switch
+        {
+            "min" => "0",
+            "max" => "100",
+            "pattern" => "/^[a-z]+$/",
+            "parse" => "$value->split('x')",
+            _ => "[a, b]",
+        };
+
+        /// <summary>A regex literal such as <c>/^H(?&lt;h&gt;\d+)$/i</c>: the slashes, escapes, a [class] and the flags.</summary>
+        private TextSpan ReadRegexSpan()
+        {
+            int start = pos++;
+            bool inClass = false;
+            while (pos < text.Length && text[pos] != '\n')
+            {
+                char c = text[pos];
+                if (c == '\\')
+                {
+                    pos += 2;
+                    continue;
+                }
+                if (c == '[') inClass = true;
+                else if (c == ']') inClass = false;
+                else if (c == '/' && !inClass)
+                {
+                    pos++;
+                    while (pos < text.Length && char.IsLetter(text[pos])) pos++;
+                    return TextSpan.FromBounds(start, pos);
+                }
+                pos++;
+            }
+            Error(new TextSpan(start, 1), DiagnosticCodes.MarkupSyntax, "This regular expression is missing its closing /.");
+            return TextSpan.FromBounds(start, pos);
+        }
+
         /// <summary><c>try { } catch err when test { } catch { } finally { }</c>: catch and finally go inside the try, as in XML.</summary>
         private void ParseTry(MarkupElement parent, int start)
         {
@@ -874,11 +1149,7 @@ namespace KScript.Syntax.Markup
                         ParseAttributeList(c);
                     }
                     SkipSpaces();
-                    if (Lexer.IsIdentStart(Peek(0)) && PeekName() != "when")
-                    {
-                        AddRawAttribute(c, "as", ReadNameSpan(allowDash: false));
-                        SkipSpaces();
-                    }
+                    ParseCatchHead(c);
                     if (TryWord("when"))
                     {
                         AddExpressionAttribute(c, "when", Stop.Header);
@@ -900,11 +1171,77 @@ namespace KScript.Syntax.Markup
             Finish(e, start);
         }
 
-        /// <summary><c>throw "message"</c> or <c>throw Validation "Age must be positive, got {$age}"</c>.</summary>
+        /// <summary>
+        /// What follows <c>catch</c>: error types (capitalised, joined by <c>|</c>) and then <c>as name</c>, or just a
+        /// lower-case name for the error. <c>catch NotFound | Conflict as e</c>, <c>catch IO</c>, <c>catch err</c>.
+        /// </summary>
+        private void ParseCatchHead(MarkupElement c)
+        {
+            if (!Lexer.IsIdentStart(Peek(0)) || PeekName() == "when")
+            {
+                return;
+            }
+            int first = pos;
+            string word = PeekName();
+            if (!char.IsUpper(word[0]))
+            {
+                AddRawAttribute(c, "as", ReadNameSpan(allowDash: false));
+                SkipSpaces();
+                return;
+            }
+            int last = pos;
+            while (true)
+            {
+                ReadName(allowDash: false);
+                last = pos;
+                int save = pos;
+                SkipSpaces();
+                if (Peek(0) is '|' or ',')
+                {
+                    pos++;
+                    SkipSpaces();
+                    if (Lexer.IsIdentStart(Peek(0)))
+                    {
+                        continue;
+                    }
+                    Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write another error type after |, such as catch NotFound | Conflict as e.");
+                    break;
+                }
+                pos = save;
+                break;
+            }
+            AddRawAttribute(c, "type", TextSpan.FromBounds(first, last));
+            SkipSpaces();
+            if (TryWord("as"))
+            {
+                SkipSpaces();
+                TextSpan name = ReadNameSpan(allowDash: false);
+                if (name.Length == 0)
+                {
+                    Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write a name for the error after 'as', such as catch NotFound as e.");
+                }
+                else
+                {
+                    AddRawAttribute(c, "as", name);
+                }
+                SkipSpaces();
+            }
+        }
+
+        /// <summary>
+        /// <c>throw "message"</c>, <c>throw Validation "Age must be positive, got {$age}"</c>, <c>throw NotFound(id: 42)</c>,
+        /// <c>throw $err</c> (a caught error, again) or a bare <c>throw</c>, which rethrows the error a catch is handling.
+        /// </summary>
         private void ParseThrow(MarkupElement parent, int start)
         {
             MarkupElement e = Begin(parent, "throw", start);
             SkipSpaces();
+            if (Peek(0) is '$' or '@' || (Lexer.IsIdentStart(Peek(0)) && LooksLikeCall()))
+            {
+                AddExpressionAttribute(e, "value", Stop.Line);
+                Finish(e, start);
+                return;
+            }
             if (Lexer.IsIdentStart(Peek(0)))
             {
                 AddRawAttribute(e, "type", ReadNameSpan());
@@ -923,6 +1260,17 @@ namespace KScript.Syntax.Markup
                 ReadExpression(Stop.Line);
             }
             Finish(e, start);
+        }
+
+        /// <summary>True at <c>Name(</c>: a call such as <c>NotFound(id: 42)</c> rather than a bare type name.</summary>
+        private bool LooksLikeCall()
+        {
+            int p = pos;
+            while (p < text.Length && Lexer.IsIdentChar(text[p]))
+            {
+                p++;
+            }
+            return p < text.Length && text[p] == '(';
         }
 
         /// <summary><c>return</c>, <c>return expr</c>, <c>exit</c>, <c>exit 1</c>.</summary>
@@ -1162,11 +1510,17 @@ namespace KScript.Syntax.Markup
                 {
                     break;
                 }
+                if (c == '/' && Peek(1) != '/' && Peek(1) != '*' && RegexCanStart(start) && SkipRegex())
+                {
+                    // A regex literal: its brackets and quotes are its own.
+                    continue;
+                }
                 if (c == '/' && Peek(1) == '*')
                 {
                     // At the end of a statement it is a comment of its own (kept after the statement); inside an
-                    // expression it stays there, and the expression lexer skips it. A new line inside doesn't end it.
-                    if (brackets.Count == 0 && TrailingCommentAt(pos))
+                    // expression, or after an operator that continues on the next line (x = 1 + /* tax */), it stays
+                    // there, and the expression lexer skips it. A new line inside doesn't end it.
+                    if (brackets.Count == 0 && TrailingCommentAt(pos) && !ContinuesAfter(start, pos))
                     {
                         break;
                     }
@@ -1234,6 +1588,60 @@ namespace KScript.Syntax.Markup
             return (start, end);
         }
 
+        /// <summary>True where a value can start, so a / begins a regex rather than dividing: after =, (, a comma, an operator or a keyword.</summary>
+        private bool RegexCanStart(int start)
+        {
+            int p = pos - 1;
+            while (p >= start && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p--;
+            }
+            if (p < start)
+            {
+                return true;
+            }
+            char before = text[p];
+            if (Lexer.IsIdentChar(before))
+            {
+                int w = p;
+                while (w >= start && Lexer.IsIdentChar(text[w]))
+                {
+                    w--;
+                }
+                string word = text.Substring(w + 1, p - w);
+                return word is "return" or "not" or "and" or "or" or "in" or "is" or "when" or "if" or "elif" or "while" or "match";
+            }
+            return before is '=' or '(' or ',' or ':' or '[' or '{' or '!' or '&' or '|' or '?' or ';' or '>' or '<' or '+' or '-' or '*' or '%';
+        }
+
+        /// <summary>Moves past a regex literal at pos (<c>/^[a-z]+$/i</c>). False, without moving, if it doesn't close on this line.</summary>
+        private bool SkipRegex()
+        {
+            int p = pos + 1;
+            bool inClass = false;
+            while (p < text.Length && text[p] != '\n')
+            {
+                char ch = text[p];
+                if (ch == '\\')
+                {
+                    p += 2;
+                    continue;
+                }
+                if (ch == '[') inClass = true;
+                else if (ch == ']') inClass = false;
+                else if (ch == '/' && !inClass)
+                {
+                    // The caller has ruled out // and /*, so the literal isn't empty.
+                    p++;
+                    while (p < text.Length && char.IsLetter(text[p])) p++;
+                    pos = p;
+                    return true;
+                }
+                p++;
+            }
+            return false;
+        }
+
         private bool ContinuesAfter(int start, int newline)
         {
             int end = newline;
@@ -1246,11 +1654,8 @@ namespace KScript.Syntax.Markup
                 return true;
             }
             string line = WithoutTrailingComments(text.Substring(start, end - start));
-            if (line.Length == 0)
-            {
-                return true;
-            }
-            if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal)))
+            if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal))
+                && !(line.EndsWith('/') && Lexer.Tokenize(line) is { Count: > 0 } tokens && tokens[^1].Kind == TokenKind.Regex))
             {
                 return true;
             }

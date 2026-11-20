@@ -17,6 +17,45 @@ namespace KScript.Runtime
             return Evaluate(parsed.Root, scope, new EvalContext(module, text));
         }
 
+        /// <summary>
+        /// Evaluates a value written for a declared type. Where the type is read from text (a handle, an enum or a type with a
+        /// pattern), a bare word such as <c>@kyle</c>, <c>red</c> or <c>H4cmW12in</c> is taken as the text itself, the way a
+        /// regex literal needs no quotes. Anything else is evaluated as usual.
+        /// </summary>
+        public object EvaluateTyped(DecodedText text, Scope scope, Module module, string type)
+        {
+            string kind = Shapes.RawTextKind(TypeRef.Parse(type), scope, module);
+            if (kind == null) return EvaluateText(text, scope, module);
+            ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
+            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(text.Value, kind)) return text.Value.Trim();
+            return EvaluateText(text, scope, module);
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex RawHandle = new System.Text.RegularExpressions.Regex(@"^@[\w.\-]+$");
+
+        /// <summary>Text that is plainly a handle (<c>@a--b</c>, which would otherwise read as @a - -b), for a handle type.</summary>
+        internal static bool LooksRaw(string text, string kind) => kind == "handle" && RawHandle.IsMatch(text.Trim());
+
+        /// <summary>True if <paramref name="node"/> is only bare words, numbers and the operators between them (<c>my-post</c>, <c>H4cmW12in</c>).</summary>
+        internal static bool IsRawWord(ExprNode node, string kind, Scope scope, Module module)
+        {
+            switch (node)
+            {
+                case IdentifierNode id:
+                    return !(module != null && module.Aliases.ContainsKey(id.Name));
+                case CommandCallNode { ArgumentList: null }:
+                    return kind == "handle";
+                case BinaryNode bin when bin.Operator == "-" || bin.Operator == "." || bin.Operator == "+":
+                    return IsRawWord(bin.Left, kind, scope, module) && IsRawPart(bin.Right, kind, scope, module)
+                        || IsRawPart(bin.Left, kind, scope, module) && IsRawWord(bin.Right, kind, scope, module);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsRawPart(ExprNode node, string kind, Scope scope, Module module) =>
+            node is LiteralNode { Kind: LiteralKind.Number } || IsRawWord(node, kind, scope, module);
+
         /// <summary>Evaluates comma separated expressions (<c>is="2, 3"</c>).</summary>
         public List<object> EvaluateList(DecodedText text, Scope scope, Module module)
         {
@@ -144,6 +183,7 @@ namespace KScript.Runtime
                         LiteralKind.Number => double.Parse(lit.Value, NumberStyles.Float, CultureInfo.InvariantCulture),
                         LiteralKind.String => lit.Value,
                         LiteralKind.Bool => lit.Value == "true",
+                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid => TypedLiteral(lit, ctx),
                         _ => null,
                     };
 
@@ -156,7 +196,9 @@ namespace KScript.Runtime
                 case IdentifierNode id:
                     if (ctx.Module != null && ctx.Module.Aliases.TryGetValue(id.Name, out ImportNamespace ns)) return ns;
                     // A <type> can be named without $: as: Repo.
-                    if (scope.TryGet(id.Name, out object declaredType) && declaredType is RecordType) return declaredType;
+                    if (scope.TryGet(id.Name, out object declaredType) && (declaredType is RecordType || declaredType is ErrorType)) return declaredType;
+                    // So is an error type: catch NotFound, $err->is(NotFound).
+                    if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType) return errorType;
                     throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
 
                 case ListNode list:
@@ -299,8 +341,18 @@ namespace KScript.Runtime
             return new BareList(list.Items.Select((item, n) => words[n] ?? Evaluate(item, scope, ctx)).ToList());
         }
 
-        private static BareWord BareWordOf(ExprNode node, Scope scope, EvalContext ctx, bool afterNamed)
+        private BareWord BareWordOf(ExprNode node, Scope scope, EvalContext ctx, bool afterNamed)
         {
+            // @kyle names a function when there is one; otherwise it can only be a handle, for a parameter that takes one.
+            if (node is CommandCallNode { ArgumentList: null } reference && !CanResolve(reference, scope, ctx))
+                return new BareWord("@" + reference.Name, false, afterNamed);
+            // small-box and v1.2 read as words for a parameter whose type is read from text.
+            if (node is BinaryNode && ctx.Origin != null && IsRawWord(node, "word", scope, ctx.Module)
+                && node.DescendantsAndSelf().OfType<IdentifierNode>().All(i => !scope.TryGet(i.Name, out _))
+                && node.Span.Start >= 0 && node.Span.Start + node.Span.Length <= ctx.Origin.Value.Length)
+            {
+                return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed);
+            }
             bool negated = false;
             if (node is UnaryNode { Operator: "not", Operand: IdentifierNode inner })
             {
@@ -308,11 +360,25 @@ namespace KScript.Runtime
                 negated = true;
             }
             if (node is IdentifierNode id && id.Name != "_" && !(ctx.Module != null && ctx.Module.Aliases.ContainsKey(id.Name))
-                && !(!negated && scope.TryGet(id.Name, out object value) && value is RecordType))
+                && !(!negated && scope.TryGet(id.Name, out object value) && (value is RecordType || value is ErrorType))
+                && !(!negated && ErrorTypes.FindExact(id.Name, null) != null))
             {
                 return new BareWord(id.Name, negated, afterNamed);
             }
             return null;
+        }
+
+        private bool CanResolve(CommandCallNode reference, Scope scope, EvalContext ctx)
+        {
+            try
+            {
+                ResolveCallable(reference.Name, scope, ctx, reference);
+                return true;
+            }
+            catch (KScriptException)
+            {
+                return false;
+            }
         }
 
         private object EvaluateRange(RangeNode range, Scope scope, EvalContext ctx)
@@ -354,9 +420,24 @@ namespace KScript.Runtime
                 }
             }
 
+            if (bin.Operator is "==" or "!=" or "===" or "!==")
+            {
+                // $user.handle == @kyle: next to a handle, an @name that isn't a function is a handle.
+                if (bin.Right is CommandCallNode { ArgumentList: null } r && !CanResolve(r, scope, ctx))
+                    return HandleCompare(bin, Evaluate(bin.Left, scope, ctx), r, ctx);
+                if (bin.Left is CommandCallNode { ArgumentList: null } l && !CanResolve(l, scope, ctx))
+                    return HandleCompare(bin, Evaluate(bin.Right, scope, ctx), l, ctx);
+            }
             object a = Evaluate(bin.Left, scope, ctx);
             object b = Evaluate(bin.Right, scope, ctx);
             return Binary(bin.Operator, a, b, bin, ctx);
+        }
+
+        private object HandleCompare(BinaryNode bin, object other, CommandCallNode word, EvalContext ctx)
+        {
+            if (!(other is HandleName)) throw Fail(word, ctx, $"Unknown command @{word.Name}(). An @name without a function is a handle only next to a handle, such as $user.handle == @{word.Name}.", "Name");
+            object handle = SemanticTypes.TryConvert(SemanticTypes.Handle, "@" + word.Name, out object h, out string reason) ? h : throw Fail(word, ctx, reason, "Type");
+            return Binary(bin.Operator, other, handle, bin, ctx);
         }
 
         private object Binary(string op, object a, object b, ExprNode node, EvalContext ctx)
@@ -680,6 +761,18 @@ namespace KScript.Runtime
                 {
                     // filter(...) after a pipe is a method of the value; slugify() is a function or command.
                     if (scope.TryGet(id.Name, out object stored) && stored is ICallable fn) return Call(fn, args, named, scope, ctx.Module);
+                    // NotFound(id: 42) makes an error, for throw.
+                    if (!piped && ErrorTypes.FindExact(id.Name, scope) is ErrorType error)
+                    {
+                        try
+                        {
+                            return error.Create(this, args, named).ToValue();
+                        }
+                        catch (KScriptException ex)
+                        {
+                            throw Fail(call, ctx, ex.Message, ex.Type);
+                        }
+                    }
                     if (piped && TryFindMethod(pipedValue, id.Name, ctx.Module, out MethodDefinition method))
                     {
                         return InvokeMethodDefinition(method, pipedValue, args.Skip(1).ToList(), named, scope, ctx);
@@ -736,6 +829,7 @@ namespace KScript.Runtime
             method = null;
             if (module == null) return false;
             string type = Values.TypeOf(target);
+            if (target is ErrorValue && module.Methods.TryGetValue("error:" + name, out method)) return true;
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
             // An email or a handle is text too, so string methods work on it.
@@ -752,9 +846,28 @@ namespace KScript.Runtime
             return method.Handler(target, call);
         }
 
+        /// <summary>A regex, email or UUID written without quotes. One that isn't valid fails at the literal.</summary>
+        private object TypedLiteral(LiteralNode lit, EvalContext ctx)
+        {
+            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, _ => SemanticTypes.Uuid };
+            if (SemanticTypes.TryConvert(type, lit.Value, out object value, out string reason)) return value;
+            throw Fail(lit, ctx, $"{lit.Value} isn't {(type == SemanticTypes.Email ? "an" : "a")} {type}: {reason}.", "Syntax");
+        }
+
         /// <summary>Calls <c>value->name(args)</c>.</summary>
         public object InvokeMethod(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
         {
+            // A <type>'s own methods: fn inside the type, with the record's fields (and $this) as variables.
+            if (target is Record record && record.Type.OwnMethods.TryGetValue(name, out MarkupElement methodElement))
+            {
+                Scope methodScope = record.Type.Closure.Child();
+                foreach (KeyValuePair<string, object> field in record) methodScope.Declare(field.Key, field.Value);
+                methodScope.Declare("this", record);
+                DeclareFunction(methodElement, methodScope, record.Type.Module);
+                methodScope.TryGet(name, out object fn);
+                return Call((ICallable)fn, args, named, scope, ctx.Module);
+            }
+
             // A package's methods for its own objects come first, so their arguments are bound by name (and flags) like commands'.
             bool defined = TryFindMethod(target, name, ctx.Module, out MethodDefinition method);
             if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);
@@ -769,6 +882,12 @@ namespace KScript.Runtime
 
             if (target == null)
                 throw Fail(node, ctx, $"Can't call ->{name}() on null. Use ?? to give a default, such as ($value ?? '')->{name}().", "Null");
+
+            if (target is Record typed && !(ctx.Module?.Methods.Values.Any(m => m.Name == name && m.Receiver == "map") ?? false))
+            {
+                string fields = typed.Type.OwnMethods.Count > 0 ? Suggest(name, typed.Type.OwnMethods.Keys).Replace("Did you mean ", "Did you mean ->").Replace("?", "()?") : string.Empty;
+                throw Fail(node, ctx, $"A {typed.Type.Name} has no method ->{name}().{fields} Methods are added with fn inside the type.", "Name");
+            }
 
             string type = Values.TypeOf(target);
             KScriptPackage owner = Packages.FindMethod(name, ctx.Module?.Packages).FirstOrDefault(p => p.Methods.Any(m => m.Name == name && (m.Receiver == type || m.Receiver == "any")));

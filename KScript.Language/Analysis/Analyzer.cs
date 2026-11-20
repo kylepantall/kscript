@@ -77,6 +77,7 @@ namespace KScript.Language.Analysis
             HoistFunctions(root);
             ApplyKnownTypes(root);
             HoistTypes(root);
+            HoistErrors(root);
             CheckScriptRoot();
 
             WalkChildren(result.Markup.Children, root, markupMode: Kind != DocumentKind.Script);
@@ -194,7 +195,7 @@ namespace KScript.Language.Analysis
             Dictionary<string, Symbol> seen = new Dictionary<string, Symbol>(StringComparer.Ordinal);
             foreach (MarkupElement e in result.Markup.DescendantElements())
             {
-                if (IsKScriptElementName(e, "fn"))
+                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && IsKScriptElementName(owner, "type")))
                 {
                     MarkupAttribute nameAttr = e.GetAttribute("name");
                     string name = nameAttr?.ValueText?.Trim();
@@ -390,12 +391,16 @@ namespace KScript.Language.Analysis
             {
                 return constants;
             }
-            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum" || x.Name == "type"))
+            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum" || x.Name == "type" || x.Name == "error"))
             {
                 MarkupAttribute nameAttr = let.GetAttribute("name");
                 if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
                 {
                     continue;
+                }
+                if (let.Name == "error")
+                {
+                    importedErrors.Add(nameAttr.ValueText.Trim());
                 }
                 TextSpan span = nameAttr.Value.SourceSpan;
                 constants[nameAttr.ValueText.Trim().TrimStart('$')] = (new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), let.Documentation);
@@ -564,6 +569,10 @@ namespace KScript.Language.Analysis
                     AnalyzeType(e, info, scope, inner, markupMode);
                     return;
 
+                case "error" when info.Package == "KScript.Core":
+                    AnalyzeError(e, info, scope, inner, markupMode);
+                    return;
+
                 case "field" when info.Package == "KScript.Core":
                     AnalyzeField(e, info, scope);
                     return;
@@ -591,7 +600,7 @@ namespace KScript.Language.Analysis
                     // <expect-error as="err"> declares the caught error after the element, shaped like <catch as>.
                     AnalyzeAttributes(e, info, scope, skip: "as");
                     WalkChildren(e.Children, inner, markupMode);
-                    DeclareFromAttribute(e, "as", scope, e.Span.End, SymbolKind.Variable, ErrorShape());
+                    DeclareFromAttribute(e, "as", scope, e.Span.End, SymbolKind.Variable, CaughtErrorShape(e, scope));
                     return;
 
                 case "for":
@@ -613,7 +622,14 @@ namespace KScript.Language.Analysis
                         outer = outer.Parent;
                     }
                     Scope catchScope = new Scope(outer, e.Span);
-                    DeclareFromAttribute(e, "as", catchScope, e.Span.Start, SymbolKind.Variable, ErrorShape());
+                    if (e.GetAttribute("as") == null)
+                    {
+                        // Without as, the error is $err.
+                        Symbol err = new Symbol { Name = "err", Kind = SymbolKind.BuiltIn, Shape = CaughtErrorShape(e, outer), Description = "The error this catch is handling.", DeclaringElement = e };
+                        result.Symbols.Add(err);
+                        catchScope.Declare(err, e.Span.Start);
+                    }
+                    DeclareFromAttribute(e, "as", catchScope, e.Span.Start, SymbolKind.Variable, CaughtErrorShape(e, outer));
                     AnalyzeAttributes(e, info, catchScope, skip: "as");
                     WalkChildren(e.Children, new Scope(catchScope, e.ContentSpan), markupMode);
                     return;
@@ -1044,6 +1060,9 @@ namespace KScript.Language.Analysis
                 case AttributeKind.TypeName:
                     CheckTypeAttribute(attr);
                     break;
+                case AttributeKind.ErrorType:
+                    CheckErrorTypeAttribute(e, attr, scope);
+                    break;
                 case AttributeKind.Statements:
                 {
                     Scope handlerScope = new Scope(scope, e.Span);
@@ -1099,9 +1118,17 @@ namespace KScript.Language.Analysis
             }
 
             ExpressionRegion region = null;
-            if (valueAttr?.Value != null)
+            string declaredType = e.GetAttributeValue("type")?.Trim();
+            if (valueAttr?.Value != null && CheckTypedValue(valueAttr.Value, declaredType, scope, e.Span.Start))
+            {
+                // Raw text for its type: @kyle for a handle, red for an enum.
+            }
+            else if (valueAttr?.Value != null)
             {
                 region = AnalyzeExpressionRegion(valueAttr.Value, RegionKind.Expression, scope, e, valueAttr);
+            }
+            else if (hasText && CheckTypedValue(text.Content, declaredType, scope, e.Span.Start))
+            {
             }
             else if (hasText)
             {
@@ -1452,11 +1479,7 @@ namespace KScript.Language.Analysis
 
         private static TypeShape ErrorShape()
         {
-            TypeShape shape = new TypeShape(KType.Error);
-            foreach (string f in new[] { "type", "message", "line" })
-            {
-                shape.Fields[f] = new FieldInfo(f, new TypeShape(f == "line" ? KType.Number : KType.String), null);
-            }
+            TypeShape shape = BaseErrorShape();
             TypeShape problem = new TypeShape(KType.Map);
             foreach (string f in new[] { "path", "field", "message" })
             {

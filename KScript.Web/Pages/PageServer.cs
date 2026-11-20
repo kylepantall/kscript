@@ -91,6 +91,9 @@ namespace KScript.Pages
             // Nor are the settings $config reads (config.json, config.staging.yaml), which may hold secrets.
             if (segments.Count > 0 && IsConfigFile(segments[^1]))
                 return NotFound();
+            // Nor are the notes for coding agents (AGENTS.md, CLAUDE.md), with or without .md.
+            if (segments.Count == 1 && new[] { "AGENTS", "AGENTS.md", "CLAUDE", "CLAUDE.md" }.Contains(segments[0], StringComparer.OrdinalIgnoreCase))
+                return NotFound();
 
             // /fr/about is the about page in French when locales/fr.json (or .yaml, or a locales/fr folder) exists.
             if (segments.Count > 0 && IsLocalePrefix(segments[0]))

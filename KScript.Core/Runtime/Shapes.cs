@@ -312,6 +312,21 @@ namespace KScript.Runtime
 
         internal void AddBase(RecordType type) => bases.Add(type);
 
+        /// <summary>
+        /// How text becomes a record: <c>pattern</c>'s named groups give the fields
+        /// (<c>/^(?&lt;w&gt;\d+)x(?&lt;h&gt;\d+)$/</c> turns 1920x1080 into { w: 1920, h: 1080 }), and <c>parse</c>, when
+        /// there is one, works the fields out instead (from $value, and $match when there is a pattern).
+        /// </summary>
+        internal RegexValue Pattern { get; set; }
+
+        internal DecodedText Parse { get; set; }
+
+        /// <summary>The type's own methods (<c>fn</c> inside the type), by name, with its bases' after its own.</summary>
+        internal Dictionary<string, MarkupElement> OwnMethods { get; } = new Dictionary<string, MarkupElement>(StringComparer.Ordinal);
+
+        /// <summary>True when text (a literal such as H4cmW12in) can become a record of this type.</summary>
+        internal bool ReadsText => Pattern != null || Parse != null;
+
         /// <summary>True if a record of this type can be used where <paramref name="other"/> is expected: it is that type, or joins it.</summary>
         public bool IsA(RecordType other) => this == other || bases.Any(b => b.IsA(other));
 
@@ -336,13 +351,13 @@ namespace KScript.Runtime
             switch (name)
             {
                 case "from":
-                    result = Shapes.MapAs(call.Interpreter, Shapes.ParseIfText(call.Arg(0)), this, $"The data");
+                    result = Shapes.MapAs(call.Interpreter, ReadsText ? call.Arg(0) : Shapes.ParseIfText(call.Arg(0)), this, $"The data");
                     return true;
                 case "check":
-                    result = Shapes.Problems(call.Interpreter, Shapes.ParseIfText(call.Arg(0)), this);
+                    result = Shapes.Problems(call.Interpreter, ReadsText ? call.Arg(0) : Shapes.ParseIfText(call.Arg(0)), this);
                     return true;
                 case "is":
-                    result = call.Arg(0) is Record r && r.Type.IsA(this);
+                    result = call.Arg(0) is Record r ? r.Type.IsA(this) : call.Arg(0) is RecordType t && t.IsA(this);
                     return true;
                 case "schema":
                     result = Shapes.Schema(this);
@@ -373,7 +388,7 @@ namespace KScript.Runtime
         {
             ("from", "data", "Checks the data (a map, a list of maps, or JSON text) and returns it as this type. Fails with every problem it finds.", "any"),
             ("check", "data", "The problems that stop the data fitting this type, as { path, field, message } maps. Empty when it fits.", "list"),
-            ("is", "value", "yes if the value is a record of this type, or of a type that joins it with with [...].", "bool"),
+            ("is", "value", "yes if the value is a record of this type, or of a type built on it with with [...]. Given a type, yes if that type is this one or is built on it.", "bool"),
             ("schema", "", "The type as a JSON Schema map.", "map"),
             ("fields", "", "The type's fields: name, type, optional, from, computed and description.", "list"),
             ("name", "", "The type's name.", "string"),
@@ -409,13 +424,13 @@ namespace KScript.Runtime
                 return;
             }
             object converted = Shapes.Convert(interpreter, value, field.Type.WithOptional(field.Optional), $"{Type.Name}.{name}", Type.Closure, Type.Module);
-            bool had = TryGetValue(name, out object old);
+            // Every field is set when a record is made, so there is always an old value to put back.
+            TryGetValue(name, out object old);
             this[name] = converted;
             if (Type.Validators.Count == 0) return;
             List<string> failures = Shapes.Failures(interpreter, this);
             if (failures.Count == 0) return;
-            if (had) this[name] = old;
-            else Remove(name);
+            this[name] = old;
             var error = new KScriptException($"{Type.Name}.{name} can't be set to that: the {Type.Name} {failures[0]}.", "Shape");
             error.Fields["problems"] = failures.Select(f => (object)new Dictionary<string, object> { ["path"] = "$", ["field"] = null, ["message"] = f + "." }).ToList();
             throw error;
@@ -515,6 +530,40 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>
+        /// What text written raw (unquoted) for <paramref name="type"/> means: "handle" for handle types (so <c>@kyle</c> is a handle),
+        /// "word" for types read from text (semantic and refined text types, enums, types with a pattern or parse), or null
+        /// when raw words keep their usual meaning (plain string, numbers, lists and records).
+        /// </summary>
+        internal static string RawTextKind(TypeRef type, Scope scope, Module module)
+        {
+            if (type == null || type.ListDepth > 0) return null;
+            if (type.ArgBase != null) return RawTextKind(type.ArgBase, scope, module) ?? (TextRoots.Contains(type.ArgBase.Name) ? "word" : null);
+            if (type.Inline == null && Values.DeclarableTypes.Contains(type.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                string name = type.Name.ToLowerInvariant();
+                return name == SemanticTypes.Handle ? "handle" : SemanticTypes.IsSemantic(name) ? "word" : null;
+            }
+            object resolved;
+            try { resolved = Resolve(type, scope, module); }
+            catch (KScriptException) { return null; }
+            switch (resolved)
+            {
+                case EnumType:
+                    return "word";
+                case RecordType r:
+                    return r.ReadsText ? "word" : null;
+                default:
+                    string root = ((RefinedType)resolved).Root();
+                    return root == SemanticTypes.Handle ? "handle" : TextRoots.Contains(root) ? "word" : null;
+            }
+        }
+
+        private static readonly HashSet<string> TextRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "string", SemanticTypes.Email, SemanticTypes.Handle, SemanticTypes.Uuid, SemanticTypes.Regex, SemanticTypes.Password,
+        };
+
         /// <summary>The &lt;type&gt; or &lt;enum&gt; a name (not a built-in type) refers to. Unknown names fail.</summary>
         internal static object Resolve(TypeRef type, Scope scope, Module module)
         {
@@ -554,7 +603,7 @@ namespace KScript.Runtime
         internal static object ParseIfText(object value) => value is string s ? Values.ParseJson(s) : value;
 
         /// <summary>The name a value's type has: a record's type name, or <see cref="Values.TypeOf"/>.</summary>
-        public static string TypeName(object value) => value is Record r ? r.Type.Name : Values.TypeOf(value);
+        public static string TypeName(object value) => value is Record r ? r.Type.Name : value is ErrorValue ? "error" : Values.TypeOf(value);
 
         #region Declaring
 
@@ -569,8 +618,18 @@ namespace KScript.Runtime
                 throw run.Error($"'{name}' is a built-in type, so a <type> can't use it as its name.", "name", "Syntax");
             List<string> with = TypeNames(run.Raw("with"));
             if (with.Count == 1 && IsRefinable(with[0], run.Scope)) return DeclareRefined(run, name, with[0]);
+            foreach (string b in with)
+            {
+                string baseName = TypeRef.Parse(b).Name;
+                if (!Values.DeclarableTypes.Contains(baseName, StringComparer.OrdinalIgnoreCase) && !run.Scope.TryGet(baseName, out _))
+                {
+                    string close = Values.Closest(baseName, Values.DeclarableTypes.Concat(KnownTypes(run.Scope)));
+                    throw run.Error($"Unknown type '{baseName}' in with." + (close != null ? $" Did you mean {close}?" : string.Empty)
+                        + " Build on a <type> declared before this one, or on a built-in type such as string, int or email.", "with", "Type");
+                }
+            }
 
-            string rule = TypeRules.Attributes.FirstOrDefault(run.Has);
+            string rule = TypeRules.Attributes.FirstOrDefault(a => a != "pattern" && run.Has(a));
             if (rule != null)
                 throw run.Error($"{rule} only goes on a type made from one other type, such as <type name=\"Slug\" with=\"string\" {rule}=\"...\">, or on a field.", rule, "Syntax");
 
@@ -579,6 +638,13 @@ namespace KScript.Runtime
             ExtraKeys extra = extraText == "keep" ? ExtraKeys.Keep : extraText == "error" ? ExtraKeys.Error : ExtraKeys.Drop;
             var type = new RecordType(name, run.Raw("description"), extra, run.Scope, run.Module);
             Dictionary<string, string> conflicts = JoinBases(type, with, run);
+            if (run.Has("pattern"))
+            {
+                if (!RegexValue.TryParse(PatternOf(run.Element), out RegexValue pattern, out string reason))
+                    throw run.Error($"pattern on <type name=\"{name}\"> isn't a regular expression: {reason}.", "pattern", "Syntax");
+                type.Pattern = pattern;
+            }
+            if (run.Element.GetAttribute("parse")?.Value is DecodedText parse) type.Parse = parse;
 
             string sample = run.Raw("sample");
             if (sample != null)
@@ -597,6 +663,23 @@ namespace KScript.Runtime
                 SampleTypes.Fill(type, data, sample, run);
             }
 
+            HashSet<string> seen = AddFields(run, type, rulesAndMethods: true);
+
+            // A field two bases disagree on is fine once this type declares it itself.
+            string conflict = conflicts.Keys.FirstOrDefault(f => !seen.Contains(f));
+            if (conflict != null) throw run.Error(conflicts[conflict], "with", "Syntax");
+            if (type.Fields.Count == 0) throw run.Error($"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.", null, "Syntax");
+            return type;
+        }
+
+        /// <summary>
+        /// Adds the fields of a &lt;type&gt; or &lt;error&gt;: its <c>fields</c> attribute, then its &lt;field&gt; elements.
+        /// A &lt;type&gt; (<paramref name="rulesAndMethods"/>) can also hold &lt;validate&gt; rules and &lt;fn&gt; methods.
+        /// Returns the names it declared, methods as "fn name".
+        /// </summary>
+        internal static HashSet<string> AddFields(ElementRun run, RecordType type, bool rulesAndMethods = false)
+        {
+            string name = type.Name;
             var seen = new HashSet<string>(StringComparer.Ordinal);
             string fieldsText = run.Raw("fields");
             if (!string.IsNullOrWhiteSpace(fieldsText))
@@ -605,7 +688,7 @@ namespace KScript.Runtime
                 {
                     if (part.Trim().Length == 0) continue;
                     FieldDefinition field = ParseInlineField(part.Trim(), run);
-                    if (!seen.Add(field.Name)) throw run.Error($"<type name=\"{name}\"> lists the field '{field.Name}' twice.", "fields", "Syntax");
+                    if (!seen.Add(field.Name)) throw run.Error($"<{run.Name} name=\"{name}\"> lists the field '{field.Name}' twice.", "fields", "Syntax");
                     SetOwnField(type, field, run);
                 }
             }
@@ -613,20 +696,30 @@ namespace KScript.Runtime
             var own = new TypeRules();
             foreach (MarkupElement e in run.ChildElements)
             {
-                if (own.TryAddChild(e, run, allowNormalize: false)) continue;
-                if (e.Name != "field") throw run.Error($"<type> can only hold <field> and <validate> elements, not <{e.Name}>.", null, "Syntax");
+                if (rulesAndMethods && own.TryAddChild(e, run, allowNormalize: false)) continue;
+                if (rulesAndMethods && e.Name == "fn")
+                {
+                    string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
+                    if (string.IsNullOrEmpty(method)) throw run.Error("A method needs a name: <fn name=\"area\" value=\"$width * $height\" />.", null, "Syntax");
+                    if (type.Field(method) != null && !type.Bases.Any(b => b.Field(method) != null)) throw run.Error($"{name} has a field and a method both called '{method}'.", null, "Syntax");
+                    type.OwnMethods[method] = e;
+                    seen.Add("fn " + method);
+                    continue;
+                }
+                if (e.Name != "field")
+                {
+                    throw run.Error(rulesAndMethods ? $"<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <{e.Name}>." : $"<{run.Name}> can only hold <field> elements, not <{e.Name}>.", null, "Syntax");
+                }
                 FieldDefinition field = ParseFieldElement(e, run);
-                if (!seen.Add(field.Name)) throw run.Error($"<type name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
+                if (!seen.Add(field.Name)) throw run.Error($"<{run.Name} name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
                 SetOwnField(type, field, run);
             }
             type.Validators.AddRange(own.Validators);
-
-            // A field two bases disagree on is fine once this type declares it itself.
-            string conflict = conflicts.Keys.FirstOrDefault(f => !seen.Contains(f));
-            if (conflict != null) throw run.Error(conflicts[conflict], "with", "Syntax");
-            if (type.Fields.Count == 0) throw run.Error($"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.", null, "Syntax");
-            return type;
+            return seen;
         }
+
+        /// <summary>The pattern attribute's text: a regex literal (/.../i) or a plain pattern.</summary>
+        private static string PatternOf(MarkupElement e) => e.GetAttributeValue("pattern");
 
         /// <summary><c>User, Auditable</c> or <c>[User, Auditable]</c>.</summary>
         internal static List<string> TypeNames(string text)
@@ -641,6 +734,7 @@ namespace KScript.Runtime
         {
             TypeRef t = TypeRef.Parse(name);
             if (t == null) return false;
+            if (t.Args != null) t = t.ArgBase;
             if (t.IsBuiltIn || t.ListDepth > 0) return true;
             return scope.TryGet(t.Name, out object found) && (found is RefinedType || found is EnumType);
         }
@@ -651,7 +745,7 @@ namespace KScript.Runtime
             if (baseType.Optional) throw run.Error($"with=\"{baseName}\": a type's base can't allow null. Write {name}? where the type is used instead.", "with", "Syntax");
             if (run.Has("fields") || run.Has("sample"))
                 throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it has rules (min, max, pattern, validate...) rather than fields.", run.Has("fields") ? "fields" : "sample", "Syntax");
-            if (!baseType.IsBuiltIn && baseType.ListDepth == 0 && run.Scope.TryGet(baseType.Name, out object found) && found is RefinedType inner) baseType = TypeRef.Of(inner);
+            if (!baseType.IsBuiltIn && baseType.Args == null && baseType.ListDepth == 0 && run.Scope.TryGet(baseType.Name, out object found) && found is RefinedType inner) baseType = TypeRef.Of(inner);
             TypeRules rules = TypeRules.Read(run.Element, run);
             foreach (MarkupElement e in run.ChildElements)
             {
@@ -671,6 +765,8 @@ namespace KScript.Runtime
         {
             var conflicts = new Dictionary<string, string>(StringComparer.Ordinal);
             var origin = new Dictionary<string, RecordType>(StringComparer.Ordinal);
+            var methodOrigin = new Dictionary<string, RecordType>(StringComparer.Ordinal);
+            RecordType patternOrigin = null;
             foreach (string baseName in with)
             {
                 if (!run.Scope.TryGet(baseName, out object found) || found is not RecordType b)
@@ -683,6 +779,17 @@ namespace KScript.Runtime
                 if (b.IsA(type) || type.Bases.Contains(b)) throw run.Error($"<type name=\"{type.Name}\"> joins {b.Name} twice.", "with", "Syntax");
                 type.AddBase(b);
                 type.Validators.AddRange(b.Validators);
+                foreach (KeyValuePair<string, MarkupElement> m in b.OwnMethods)
+                {
+                    if (type.OwnMethods.TryAdd(m.Key, m.Value)) methodOrigin[m.Key] = b;
+                    else if (type.OwnMethods[m.Key] != m.Value)
+                        conflicts["fn " + m.Key] = $"{type.Name} gets the method '{m.Key}' from {methodOrigin[m.Key].Name} and {b.Name}. Declare fn {m.Key} in {type.Name} to choose.";
+                }
+                if (b.Pattern != null && type.Pattern != null && type.Pattern != b.Pattern)
+                    throw run.Error($"{type.Name} joins two types read from text ({patternOrigin.Name} and {b.Name}), so it can't tell which pattern to use.", "with", "Syntax");
+                if (b.Pattern != null && type.Pattern == null) patternOrigin = b;
+                type.Pattern ??= b.Pattern;
+                type.Parse ??= b.Parse;
                 foreach (FieldDefinition f in b.Fields)
                 {
                     FieldDefinition existing = type.Field(f.Name);
@@ -695,8 +802,9 @@ namespace KScript.Runtime
                     {
                         conflicts[f.Name] = $"{type.Name} gets '{f.Name}' from {origin[f.Name].Name} ({existing.Type}) and {b.Name} ({f.Type}). Declare {f.Name} in {type.Name} to choose.";
                     }
-                    else if (f.Type.Inline is RefinedType rules)
+                    else if (f.Type.Inline is RefinedType || f.Type.Args != null && f.Type.ListDepth == 0)
                     {
+                        RefinedType rules = f.Type.Inline as RefinedType ?? f.Type.Refined(b.Closure, b.Module);
                         // Both bases have the field: the second one's rules apply on top of the first's.
                         var both = new RefinedType(rules.Name, existing.Type.WithOptional(false), rules.Rules, null, rules.Closure, rules.Module);
                         type.SetField(existing.WithType(TypeRef.Of(both, 0, existing.Type.Optional && f.Type.Optional), existing.Optional && f.Optional));
@@ -709,6 +817,7 @@ namespace KScript.Runtime
         /// <summary>The name of the type under any field rules: string for <c>string(min: 1)</c>.</summary>
         private static string BaseName(TypeRef t)
         {
+            if (t.Args != null) t = t.ArgBase.WithOptional(t.Optional);
             while (t.Inline is RefinedType r && r.Name == r.Base.WithOptional(false).ToString()) t = r.Base;
             return t.WithOptional(false).ToString();
         }
@@ -729,7 +838,8 @@ namespace KScript.Runtime
         {
             string target = BaseName(inherited);
             if (own.ListDepth != inherited.ListDepth) return false;
-            for (int depth = 0; depth < 64; depth++)
+            // Each step goes down to a base declared before, so this ends.
+            while (true)
             {
                 if (BaseName(own) == target || own.WithOptional(false).ToString() == target) return true;
                 object resolved = own.Inline ?? (own.IsBuiltIn ? null : scope.TryGet(own.Name, out object f) ? f : null);
@@ -747,7 +857,6 @@ namespace KScript.Runtime
                         return false;
                 }
             }
-            return false;
         }
 
         /// <summary><c>login: string</c>, <c>avatar_url?: string</c>, <c>tags: string[] = []</c> or just <c>name</c>.</summary>
@@ -828,18 +937,45 @@ namespace KScript.Runtime
         {
             var defs = new Dictionary<string, object>(StringComparer.Ordinal);
             var schema = new Dictionary<string, object> { ["$schema"] = "https://json-schema.org/draft/2020-12/schema" };
-            foreach (var kv in ObjectSchema(root, root, defs)) schema[kv.Key] = kv.Value;
+            foreach (var kv in ObjectSchema(root, root, defs, "#/$defs/")) schema[kv.Key] = kv.Value;
             if (defs.Count > 0) schema["$defs"] = defs;
             return schema;
         }
 
-        private static Dictionary<string, object> ObjectSchema(RecordType type, RecordType root, Dictionary<string, object> defs)
+        /// <summary>
+        /// A type as written where a type goes (<c>Person</c>, <c>Person[]</c>, <c>int</c>), as JSON Schema for an
+        /// OpenAPI document: named &lt;type&gt;s and &lt;enum&gt;s go in <paramref name="defs"/> and are referred to as
+        /// <c>{refBase}Name</c> (<c>#/components/schemas/Person</c>). Null when the type isn't one KScript knows.
+        /// </summary>
+        public static Dictionary<string, object> SchemaFor(string type, Scope scope, Module module, Dictionary<string, object> defs, string refBase)
+        {
+            TypeRef t = TypeRef.Parse(type);
+            if (t == null) return null;
+            return SchemaOf(t, scope, module, null, defs, refBase, named: true);
+        }
+
+        /// <summary>The named type (a &lt;type&gt; or &lt;enum&gt;) a type refers to, or null: <c>Person</c> for <c>Person[]?</c>.</summary>
+        public static object ResolveNamed(string type, Scope scope, Module module)
+        {
+            TypeRef t = TypeRef.Parse(type);
+            if (t == null || t.IsBuiltIn) return null;
+            try
+            {
+                return Resolve(t, scope, module);
+            }
+            catch (KScriptException)
+            {
+                return null;
+            }
+        }
+
+        private static Dictionary<string, object> ObjectSchema(RecordType type, RecordType root, Dictionary<string, object> defs, string refBase)
         {
             var properties = new Dictionary<string, object>(StringComparer.Ordinal);
             var required = new List<object>();
             foreach (FieldDefinition f in type.Fields)
             {
-                Dictionary<string, object> property = SchemaOf(f.Type, type, root, defs);
+                Dictionary<string, object> property = SchemaOf(f.Type, type.Closure, type.Module, root, defs, refBase, named: false);
                 if (f.Description != null) property["description"] = f.Description;
                 if (f.Computed) property["readOnly"] = true;
                 properties[f.Name] = property;
@@ -853,16 +989,14 @@ namespace KScript.Runtime
             return schema;
         }
 
-        private static Dictionary<string, object> SchemaOf(TypeRef t, RecordType owner, RecordType root, Dictionary<string, object> defs) =>
-            SchemaOf(t, owner.Closure, owner.Module, root, defs);
-
-        private static Dictionary<string, object> SchemaOf(TypeRef t, Scope scope, Module module, RecordType root, Dictionary<string, object> defs)
+        private static Dictionary<string, object> SchemaOf(TypeRef t, Scope scope, Module module, RecordType root, Dictionary<string, object> defs, string refBase, bool named)
         {
-            if (t.ListDepth > 0) return new Dictionary<string, object> { ["type"] = "array", ["items"] = SchemaOf(t.Item, scope, module, root, defs) };
+            if (t.ListDepth > 0) return new Dictionary<string, object> { ["type"] = "array", ["items"] = SchemaOf(t.Item, scope, module, root, defs, refBase, named) };
+            if (t.Args != null && t.Inline == null) return RefinedSchema(t.Refined(scope, module), root, defs, refBase);
             switch (t.Inline)
             {
-                case RecordType inline: return ObjectSchema(inline, root, defs);
-                case RefinedType refined: return RefinedSchema(refined, root, defs);
+                case RecordType inline: return ObjectSchema(inline, root, defs, refBase);
+                case RefinedType refined: return RefinedSchema(refined, root, defs, refBase);
             }
             switch (t.Name)
             {
@@ -875,6 +1009,8 @@ namespace KScript.Runtime
                 case "email": return new Dictionary<string, object> { ["type"] = "string", ["format"] = "email" };
                 case "handle": return new Dictionary<string, object> { ["type"] = "string", ["pattern"] = "^@[A-Za-z0-9_][A-Za-z0-9_.-]{0,29}$" };
                 case "password": return new Dictionary<string, object> { ["type"] = "string", ["format"] = "password", ["writeOnly"] = true };
+                case "uuid": return new Dictionary<string, object> { ["type"] = "string", ["format"] = "uuid" };
+                case "regex": return new Dictionary<string, object> { ["type"] = "string", ["format"] = "regex" };
                 case "list": return new Dictionary<string, object> { ["type"] = "array" };
                 case "map": return new Dictionary<string, object> { ["type"] = "object" };
                 case "any":
@@ -887,24 +1023,35 @@ namespace KScript.Runtime
             }
             catch (KScriptException)
             {
-                return new Dictionary<string, object>();
+                // Names other packages give meaning to, when they are there.
+                return t.Name.ToLowerInvariant() switch
+                {
+                    "url" or "uri" => new Dictionary<string, object> { ["type"] = "string", ["format"] = "uri" },
+                    _ => named ? null : new Dictionary<string, object>(),
+                };
             }
-            if (resolved is EnumType e) return new Dictionary<string, object> { ["type"] = "string", ["enum"] = e.Names.Cast<object>().ToList() };
-            if (resolved is RefinedType r) return RefinedSchema(r, root, defs);
+            if (resolved is EnumType e)
+            {
+                var values = new Dictionary<string, object> { ["type"] = "string", ["enum"] = e.Names.Cast<object>().ToList() };
+                if (refBase == "#/$defs/") return values;
+                defs.TryAdd(e.Name, values);
+                return new Dictionary<string, object> { ["$ref"] = refBase + e.Name };
+            }
+            if (resolved is RefinedType r) return RefinedSchema(r, root, defs, refBase);
             var record = (RecordType)resolved;
-            if (record == root) return new Dictionary<string, object> { ["$ref"] = "#" };
+            if (root != null && record == root) return new Dictionary<string, object> { ["$ref"] = "#" };
             if (!defs.ContainsKey(record.Name))
             {
                 defs[record.Name] = null;
-                defs[record.Name] = ObjectSchema(record, root, defs);
+                defs[record.Name] = ObjectSchema(record, root, defs, refBase);
             }
-            return new Dictionary<string, object> { ["$ref"] = "#/$defs/" + record.Name };
+            return new Dictionary<string, object> { ["$ref"] = refBase + record.Name };
         }
 
         /// <summary>The base type's schema, with the rules JSON Schema can say: min and max, pattern, and the plain lists of one_of and not.</summary>
-        private static Dictionary<string, object> RefinedSchema(RefinedType type, RecordType root, Dictionary<string, object> defs)
+        private static Dictionary<string, object> RefinedSchema(RefinedType type, RecordType root, Dictionary<string, object> defs, string refBase)
         {
-            Dictionary<string, object> schema = SchemaOf(type.Base, type.Closure, type.Module, root, defs);
+            Dictionary<string, object> schema = SchemaOf(type.Base, type.Closure, type.Module, root, defs, refBase, named: false);
             TypeRules rules = type.Rules;
             string kind = schema.TryGetValue("type", out object k) ? k as string : null;
             (string min, string max) = kind switch
@@ -956,6 +1103,14 @@ namespace KScript.Runtime
             Problems.Clear();
             Problems.AddRange(problems);
             var text = new StringBuilder();
+            if (Problems.Count == 1 && Problems[0].Path == "$")
+            {
+                // A value with one problem of its own (not in a field): say it on one line.
+                text.Append($"{what} doesn't fit {type}: {Problems[0].Message}");
+                var single = new KScriptException(text.ToString(), "Shape");
+                single.Fields["problems"] = Problems.Select(p => (object)p.ToValue()).ToList();
+                throw single;
+            }
             text.Append($"{what} doesn't fit {type} ({Problems.Count} problem{(Problems.Count == 1 ? string.Empty : "s")}):");
             foreach (ShapeProblem p in Problems.Take(Shapes.MaxProblems)) text.Append($"\n  {p.Path}: {p.Message}");
             if (Problems.Count > Shapes.MaxProblems) text.Append($"\n  ...and {Problems.Count - Shapes.MaxProblems} more.");
@@ -1073,6 +1228,11 @@ namespace KScript.Runtime
         private object MapRecord(object value, RecordType type, string path, int depth)
         {
             if (value is Record existing && existing.Type.IsA(type)) return existing;
+            if (type.ReadsText && (value is string || value is ISemanticText))
+            {
+                value = ReadText(Values.ToStr(value), type, path);
+                if (value == null) return null;
+            }
             if (value is not Dictionary<string, object> source)
             {
                 Problem(path, null, $"needs a {type.Name} (a map), but got {Values.Describe(value)}.");
@@ -1118,6 +1278,44 @@ namespace KScript.Runtime
             }
             Problems.AddRange(mapper.Problems);
             return record;
+        }
+
+        /// <summary>
+        /// Text such as H4cmW12in as a map of fields: the pattern's named groups, or what parse makes of it. Null, with
+        /// a problem, when the text doesn't match.
+        /// </summary>
+        private Dictionary<string, object> ReadText(string text, RecordType type, string path)
+        {
+            Dictionary<string, object> match = null;
+            if (type.Pattern != null)
+            {
+                System.Text.RegularExpressions.Match m;
+                try
+                {
+                    m = type.Pattern.Regex.Match(text);
+                }
+                catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+                {
+                    m = System.Text.RegularExpressions.Match.Empty;
+                }
+                if (!m.Success)
+                {
+                    Problem(path, null, $"needs text matching {type.Pattern.Text} to make a {type.Name}, but got {Values.Describe(text)}.");
+                    return null;
+                }
+                match = RegexValue.MatchMap(type.Pattern.Regex, m);
+                if (type.Parse == null)
+                {
+                    return ((Dictionary<string, object>)match["groups"]).Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value);
+                }
+            }
+            Scope s = type.Closure.Child();
+            s.Declare("value", text);
+            if (match != null) s.Declare("match", match);
+            object parsed = interpreter.EvaluateText(type.Parse, s, type.Module);
+            if (parsed is Dictionary<string, object> map) return map;
+            Problem(path, null, $"parse on {type.Name} must make a map of its fields, but made {Values.Describe(parsed)}.");
+            return null;
         }
 
         /// <summary>Follows a field's path into the data. <paramref name="at"/> is the path as written in problems.</summary>

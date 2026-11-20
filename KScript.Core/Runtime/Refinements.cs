@@ -48,7 +48,7 @@ namespace KScript.Runtime
 
         internal string MinText => Text("min");
         internal string MaxText => Text("max");
-        internal string PatternText => Text("pattern");
+        internal string PatternText => Options.TryGetValue("pattern", out object p) && p is RegexValue r ? r.Text : Text("pattern");
         internal List<object> OneOf => Options.TryGetValue("one_of", out object v) ? v as List<object> : null;
         internal List<object> Not => Options.TryGetValue("not", out object v) ? v as List<object> : null;
 
@@ -97,15 +97,15 @@ namespace KScript.Runtime
         private string Compile()
         {
             if (PatternText == null) return null;
-            try
+            // A regex value or literal (/^[a-z]+$/i) keeps its flags; plain text is the pattern itself.
+            if (Options["pattern"] is RegexValue value)
             {
-                pattern = new Regex(PatternText, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+                pattern = value.Regex;
                 return null;
             }
-            catch (ArgumentException ex)
-            {
-                return $"pattern '{PatternText}' isn't a regular expression: {ex.Message}";
-            }
+            if (!RegexValue.TryParse(PatternText, out RegexValue parsed, out string reason)) return $"pattern {PatternText} isn't a regular expression: {reason}.";
+            pattern = parsed.Regex;
+            return null;
         }
 
         /// <summary>These rules on top of <paramref name="defaults"/>: a rule given here replaces the default one.</summary>
@@ -176,7 +176,7 @@ namespace KScript.Runtime
             if (OneOf is List<object> oneOf)
             {
                 List<object> items = oneOf.Select(convert).ToList();
-                if (!items.Any(o => Values.StrictEquals(o, value))) yield return $"must be one of {string.Join(", ", items.Select(Values.ToStr))}";
+                if (!items.Any(o => Values.StrictEquals(o, value))) yield return $"must be one of {string.Join(", ", items.Select(o => o == null ? "null" : Values.ToStr(o)))}";
             }
             if (Not is List<object> reserved && reserved.Select(convert).Any(o => Values.StrictEquals(o, value))) yield return $"is reserved ('{Values.ToStr(value)}')";
             foreach (string problem in OptionProblems(value)) yield return problem;
@@ -221,7 +221,7 @@ namespace KScript.Runtime
             return parsed.Success ? PlainValue(parsed.Root) as List<object> : null;
         }
 
-        /// <summary>A literal as a value: numbers, text, bools, lists of them, and bare <c>@name</c> (as the text '@name').</summary>
+        /// <summary>A literal as a value: numbers, text, bools, lists of them, bare words, and bare <c>@name</c> (as the text '@name').</summary>
         internal static object PlainValue(ExprNode node)
         {
             switch (node)
@@ -232,10 +232,14 @@ namespace KScript.Runtime
                         LiteralKind.Number => double.Parse(l.Value, CultureInfo.InvariantCulture),
                         LiteralKind.Bool => l.Value == "true",
                         LiteralKind.Null => null,
+                        LiteralKind.Regex => RegexValue.TryParse(l.Value, out RegexValue regex, out _) ? regex : Unplain.Value,
                         _ => l.Value,
                     };
                 case CommandCallNode { ArgumentList: null } r:
                     return "@" + r.Name;
+                case IdentifierNode word:
+                    // A bare word is its text, as for an enum: one_of: [small, large], algorithm: bcrypt.
+                    return word.Name;
                 case UnaryNode { Operator: "-", Operand: LiteralNode { Kind: LiteralKind.Number } n }:
                     return -double.Parse(n.Value, CultureInfo.InvariantCulture);
                 case ListNode list:
@@ -401,22 +405,15 @@ namespace KScript.Runtime
         internal string Root()
         {
             RefinedType t = this;
-            for (int depth = 0; depth < 64; depth++)
+            while (true)
             {
                 if (t.Base.ListDepth > 0) return "list";
                 if (t.Base.Inline is RefinedType inner) { t = inner; continue; }
-                if (t.Base.IsBuiltIn) return t.Base.Name;
-                if (t.Closure.TryGet(t.Base.Name, out object found) && found is RefinedType next) { t = next; continue; }
-                return t.Base.Name;
+                // A base with arguments (uuid(v: 4), Age(max: 9)) comes down to the type before them.
+                TypeRef b = t.Base.Args != null ? t.Base.ArgBase : t.Base;
+                if (!b.IsBuiltIn && t.Closure.TryGet(b.Name, out object found) && found is RefinedType next) { t = next; continue; }
+                return b.Name;
             }
-            return "any";
         }
-
-        internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
-        {
-            ("from", "value", "Converts the value to this type and checks its rules. Fails with every problem it finds.", "any"),
-            ("check", "value", "The problems that stop the value fitting this type, as { path, field, message } maps. Empty when it fits.", "list"),
-            ("name", "", "The type's name.", "string"),
-        };
     }
 }
