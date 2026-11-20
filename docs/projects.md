@@ -74,6 +74,10 @@ kscript make project my-app --template ../starters/api   # any folder
     "port": 8080,         // --port and --host on the command line still win
     "host": "localhost"
   },
+  "http": {
+    "middleware": ["log"],                     // routes, middleware and their settings (see docs/http.md)
+    "groups": { "api": ["cors", "throttle"] }
+  },
   "lint": {
     "include": ["**/*.html", "**/*.md", "**/*.ks.xml"],   // what `kscript check` looks at
     "exclude": ["_templates", "node_modules", "drafts/**"], // never checked, on the command line or in the editor
@@ -108,6 +112,7 @@ kscript make project my-app --template ../starters/api   # any folder
 - `format` sets the style for `kscript fmt` and the editor's Format Document, and `format.rules` turns individual rules off. See [Formatting](formatting.md) for every setting and the ignore comments.
 - Inside a project, `kscript make page about` creates the page in the site root even when run from a subfolder.
 - `kscript serve` never serves `kscript.json`.
+- `http` configures route files, middleware, CORS, auth and rate limits for KScript.Http (see [Routes, controllers and middleware](http.md#settings-kscriptjson)).
 - `app` is read by `kscript app build`, which packages a desktop app (see [Desktop apps](desktop.md#packaging-an-app-kscript-app-build)).
 
 ## Generating files: kscript make

@@ -1,0 +1,10 @@
+{
+  "name": "http-app",
+  "serve": { "port": 8080 },
+  "http": {
+    "middleware": ["log"],
+    "groups": { "api": ["cors", "throttle"] },
+    "cors": { "origins": ["*"] },
+    "auth": { "token_env": "API_TOKEN" }
+  }
+}

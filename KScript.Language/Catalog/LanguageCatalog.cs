@@ -19,6 +19,9 @@ namespace KScript.Language.Catalog
         private static readonly Lazy<LanguageCatalog> DefaultInstance = new Lazy<LanguageCatalog>(() => new LanguageCatalog());
 
         private readonly Dictionary<string, ElementInfo> elements = new Dictionary<string, ElementInfo>(StringComparer.OrdinalIgnoreCase);
+
+        // Names as written, so KScript.Http's <Delete> and KScript.IO's <delete> are both known: an exact match wins.
+        private readonly Dictionary<string, ElementInfo> exactElements = new Dictionary<string, ElementInfo>(StringComparer.Ordinal);
         private readonly Dictionary<string, RetiredInfo> retiredElements = new Dictionary<string, RetiredInfo>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, RetiredInfo> retiredAttributes = new Dictionary<string, RetiredInfo>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, CallableInfo> commands = new Dictionary<string, CallableInfo>(StringComparer.OrdinalIgnoreCase);
@@ -56,7 +59,7 @@ namespace KScript.Language.Catalog
 
         #region Lookups
 
-        public IEnumerable<ElementInfo> Elements => elements.Values;
+        public IEnumerable<ElementInfo> Elements => exactElements.Values;
         public IEnumerable<CallableInfo> Commands => commands.Values;
         public IEnumerable<CallableInfo> Methods => methods;
         public IEnumerable<string> RetiredElementNames => retiredElements.Keys;
@@ -64,7 +67,8 @@ namespace KScript.Language.Catalog
         /// <summary>Every package a script can import, with its description (installed or not).</summary>
         public IReadOnlyDictionary<string, string> Packages => packages;
 
-        public ElementInfo GetElement(string name) => name != null && elements.TryGetValue(name, out ElementInfo e) ? e : null;
+        public ElementInfo GetElement(string name) =>
+            name == null ? null : exactElements.TryGetValue(name, out ElementInfo exact) ? exact : elements.TryGetValue(name, out ElementInfo e) ? e : null;
 
         public RetiredInfo GetRetiredElement(string name) => name != null && retiredElements.TryGetValue(name, out RetiredInfo r) ? r : null;
 
@@ -131,7 +135,7 @@ namespace KScript.Language.Catalog
 
             foreach (ElementDefinition e in package.Elements.Values)
             {
-                elements.TryAdd(e.Name, e.Info);
+                AddElement(e.Info);
             }
             foreach (CommandDefinition c in package.Commands.Values)
             {
@@ -203,7 +207,13 @@ namespace KScript.Language.Catalog
             AddPlannedMethod(KType.Element, "hide", "", "Hides the element.", KType.Element);
         }
 
-        private void AddPlannedElement(ElementInfo e) => elements.TryAdd(e.Name, e);
+        private void AddPlannedElement(ElementInfo e) => AddElement(e);
+
+        private void AddElement(ElementInfo e)
+        {
+            elements.TryAdd(e.Name, e);
+            exactElements.TryAdd(e.Name, e);
+        }
 
         private void AddPlannedCommand(string name, string parameters, string description, string returns)
         {

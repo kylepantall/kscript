@@ -1,0 +1,16 @@
+<!-- Web routes: pages that controllers render with data. kscript serve loads this file first. -->
+<KScript.Routes>
+  <import src="controllers/people.ks.xml" as="people" />
+  <import src="middleware/security.ks.xml" />
+
+  <Middleware use="secure_headers" />
+
+  <Get path="/" view="home" name="home" />
+  <Get path="/people" to="people.list" name="people.list" />
+  <Get path="/people/{id}" to="people.page" name="people.page" where="id: int" />
+  <Get path="/team" redirect="/people" status="301" />
+
+  <Get path="/ping">
+    <return value="'pong'" />
+  </Get>
+</KScript.Routes>

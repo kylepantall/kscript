@@ -205,11 +205,13 @@ Then save the first example above as `hello.ks.xml`, run `kscript hello.ks.xml`,
 - [Installing KScript](docs/install.md): installers, updating, manual downloads and editor setup
 - [The language](docs/language.md): values, expressions, control flow, functions, errors and every package
 - [Web pages and `<live>`](docs/web.md): `kscript serve`, layouts, components, routing and reactive blocks
+- [Routes, controllers and middleware](docs/http.md): KScript.Http route files, JSON APIs, views and middleware
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
 - [Desktop apps](docs/desktop.md): `<KScript.Window>`, its elements, and `kscript app build`
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI
+- [Roadmap](docs/roadmap.md): what's planned next, such as compiling KScript to TypeScript
 
 KScript is open source and contributions are welcome. Start with [Working on KScript](docs/contributing.md).
