@@ -163,7 +163,7 @@ namespace KScript.Runtime
                 ("type->schema", "<type name=\"User\" fields=\"login: string, id?: int\" />\n<echo>{ $User->schema() }</echo>"),
                 ("type->fields", "<type name=\"User\" fields=\"login: string, id: int\" />\n<echo>{ $User->fields()->map(fn($f) => $f.name) }</echo>"),
                 ("type->name", "<type name=\"User\" fields=\"login: string\" />\n<echo>{ $User->name() }</echo>"),
-                ("type->is", "<type name=\"User\" fields=\"login: string\" />\n<type name=\"Admin\" with=\"User\" fields=\"level: int\" />\n<echo>{ $Admin->is($User) } { $User->is($Admin) }</echo>"),
+                ("type->is", "<type name=\"User\" fields=\"login: string\" />\n<type name=\"Admin\" with=\"User\" fields=\"level: int\" />\n<let name=\"joan\" value=\"$Admin->from({ login: 'joan', level: 2 })\" />\n<echo>{ $User->is($joan) } { $User->is($Admin) } { $Admin->is($User) }</echo>"),
 
                 // Text with a meaning of its own
                 ("email->local", "Joan.Smith@Example.com->local()"),

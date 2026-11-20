@@ -387,6 +387,8 @@ namespace KScript.Runtime
                 switch (spec.Kind)
                 {
                     case AttributeKind.Expression:
+                        // A typed value may be raw text for its type (size="1920x1080"), read when it runs.
+                        if ((a.Name == "value" || a.Name == "default") && e.GetAttribute("type") != null) break;
                         GetParse(module, a.Value, ParseMode.Expression, check: true);
                         break;
                     case AttributeKind.ExpressionList:

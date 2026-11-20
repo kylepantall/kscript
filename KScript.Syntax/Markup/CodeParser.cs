@@ -1381,6 +1381,11 @@ namespace KScript.Syntax.Markup
                 {
                     break;
                 }
+                if (c == '/' && Peek(1) != '/' && Peek(1) != '*' && RegexCanStart(start) && SkipRegex())
+                {
+                    // A regex literal: its brackets and quotes are its own.
+                    continue;
+                }
                 if (c == '/' && Peek(1) == '*')
                 {
                     // At the end of a statement it is a comment of its own (kept after the statement); inside an
@@ -1453,6 +1458,63 @@ namespace KScript.Syntax.Markup
             return (start, end);
         }
 
+        /// <summary>True where a value can start, so a / begins a regex rather than dividing: after =, (, a comma, an operator or a keyword.</summary>
+        private bool RegexCanStart(int start)
+        {
+            int p = pos - 1;
+            while (p >= start && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p--;
+            }
+            if (p < start)
+            {
+                return true;
+            }
+            char before = text[p];
+            if (Lexer.IsIdentChar(before))
+            {
+                int w = p;
+                while (w >= start && Lexer.IsIdentChar(text[w]))
+                {
+                    w--;
+                }
+                string word = text.Substring(w + 1, p - w);
+                return word is "return" or "not" or "and" or "or" or "in" or "is" or "when" or "if" or "elif" or "while" or "match";
+            }
+            return before is '=' or '(' or ',' or ':' or '[' or '{' or '!' or '&' or '|' or '?' or ';' or '>' or '<' or '+' or '-' or '*' or '%';
+        }
+
+        /// <summary>Moves past a regex literal at pos (<c>/^[a-z]+$/i</c>). False, without moving, if it doesn't close on this line.</summary>
+        private bool SkipRegex()
+        {
+            int p = pos + 1;
+            bool inClass = false;
+            while (p < text.Length && text[p] != '\n')
+            {
+                char ch = text[p];
+                if (ch == '\\')
+                {
+                    p += 2;
+                    continue;
+                }
+                if (ch == '[') inClass = true;
+                else if (ch == ']') inClass = false;
+                else if (ch == '/' && !inClass)
+                {
+                    if (p == pos + 1)
+                    {
+                        return false;
+                    }
+                    p++;
+                    while (p < text.Length && char.IsLetter(text[p])) p++;
+                    pos = p;
+                    return true;
+                }
+                p++;
+            }
+            return false;
+        }
+
         private bool ContinuesAfter(int start, int newline)
         {
             int end = newline;
@@ -1469,7 +1531,8 @@ namespace KScript.Syntax.Markup
             {
                 return true;
             }
-            if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal)))
+            if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal))
+                && !(line.EndsWith('/') && Lexer.Tokenize(line) is { Count: > 0 } tokens && tokens[^1].Kind == TokenKind.Regex))
             {
                 return true;
             }

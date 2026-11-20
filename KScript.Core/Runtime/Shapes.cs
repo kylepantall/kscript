@@ -357,7 +357,7 @@ namespace KScript.Runtime
                     result = Shapes.Problems(call.Interpreter, Shapes.ParseIfText(call.Arg(0)), this);
                     return true;
                 case "is":
-                    result = call.Arg(0) is Record r && r.Type.IsA(this);
+                    result = call.Arg(0) is Record r ? r.Type.IsA(this) : call.Arg(0) is RecordType t && t.IsA(this);
                     return true;
                 case "schema":
                     result = Shapes.Schema(this);
@@ -388,7 +388,7 @@ namespace KScript.Runtime
         {
             ("from", "data", "Checks the data (a map, a list of maps, or JSON text) and returns it as this type. Fails with every problem it finds.", "any"),
             ("check", "data", "The problems that stop the data fitting this type, as { path, field, message } maps. Empty when it fits.", "list"),
-            ("is", "value", "yes if the value is a record of this type, or of a type that joins it with with [...].", "bool"),
+            ("is", "value", "yes if the value is a record of this type, or of a type built on it with with [...]. Given a type, yes if that type is this one or is built on it.", "bool"),
             ("schema", "", "The type as a JSON Schema map.", "map"),
             ("fields", "", "The type's fields: name, type, optional, from, computed and description.", "list"),
             ("name", "", "The type's name.", "string"),

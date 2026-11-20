@@ -171,6 +171,19 @@ namespace KScript.Runtime
         internal Scope Closure { get; }
         public Module Module { get; }
 
+        /// <summary>A default written as raw text for the parameter's type: who: handle = @guest, size: Size = medium.</summary>
+        private string RawDefault(Parameter p)
+        {
+            string kind = Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module);
+            if (kind == null || !Interpreter.IsRawWord(p.Default, kind, Closure, Module)) return null;
+            return p.Default switch
+            {
+                IdentifierNode id => id.Name,
+                CommandCallNode c => "@" + c.Name,
+                _ => null,
+            };
+        }
+
         public object Call(CallContext call)
         {
             Interpreter interpreter = call.Interpreter;
@@ -199,6 +212,7 @@ namespace KScript.Runtime
                 Parameter p = Parameters[i];
                 object value;
                 if (given.Contains(i)) value = args[i];
+                else if (p.Default != null && p.Type != null && RawDefault(p) is string raw) value = raw;
                 else if (p.Default != null) value = interpreter.Evaluate(p.Default, scope, new EvalContext(Module, null));
                 else throw new KScriptException($"@{Name}() needs a value for '{p.Name}'.", "Argument");
                 if (enums.TryGetValue(p.Name, out EnumType type)) value = type.Check(value, $"The '{p.Name}' argument of @{Name}()");

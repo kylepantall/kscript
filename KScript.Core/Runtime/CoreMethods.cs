@@ -57,16 +57,28 @@ namespace KScript.Runtime
 
             string rx = KType.Regex;
             static System.Text.RegularExpressions.Regex R(object t) => ((RegexValue)t).Regex;
-            p.Method(rx, "test", "text: string", "yes if the text matches somewhere (use ^ and $ to match all of it).", KType.Bool, (t, c) => R(t).IsMatch(c.Str(0)));
+            // A pattern that takes too long (catastrophic backtracking) stops with an error instead of hanging.
+            static object Safe(object t, Func<object> work)
+            {
+                try
+                {
+                    return work();
+                }
+                catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+                {
+                    throw new KScriptException($"The regular expression {Values.ToStr(t)} took longer than a second to match, so it was stopped. Simplify it, such as by removing nested repeats like (a+)+.", "Timeout");
+                }
+            }
+            p.Method(rx, "test", "text: string", "yes if the text matches somewhere (use ^ and $ to match all of it).", KType.Bool, (t, c) => Safe(t, () => R(t).IsMatch(c.Str(0))));
             p.Method(rx, "match", "text: string", "The first match: { text, index, groups, captures }, where groups holds named groups (?<name>...) and captures numbered ones. null if none.", KType.Map,
-                (t, c) => R(t).Match(c.Str(0)) is { Success: true } m ? RegexValue.MatchMap(R(t), m) : null);
+                (t, c) => Safe(t, () => R(t).Match(c.Str(0)) is { Success: true } m ? RegexValue.MatchMap(R(t), m) : null));
             p.Method(rx, "match_all", "text: string", "Every match, as { text, index, groups, captures } maps.", KType.List,
-                (t, c) => R(t).Matches(c.Str(0)).Select(m => (object)RegexValue.MatchMap(R(t), m)).ToList());
-            p.Method(rx, "replace", "text: string, with", "The text with every match replaced. with is text, where $1 and ${name} are groups, or fn($match) returning text.", KType.String, (t, c) =>
+                (t, c) => Safe(t, () => R(t).Matches(c.Str(0)).Select(m => (object)RegexValue.MatchMap(R(t), m)).ToList()));
+            p.Method(rx, "replace", "text: string, with", "The text with every match replaced. with is text, where $1 and ${name} are groups, or fn($match) returning text.", KType.String, (t, c) => Safe(t, () =>
                 c.Arg(1) is ICallable f
                     ? R(t).Replace(c.Str(0), m => Values.ToStr(c.Call(f, RegexValue.MatchMap(R(t), m))))
-                    : R(t).Replace(c.Str(0), c.Str(1)));
-            p.Method(rx, "split", "text: string", "The text split at every match.", KType.List, (t, c) => R(t).Split(c.Str(0)).Select(x => (object)x).ToList());
+                    : R(t).Replace(c.Str(0), c.Str(1))));
+            p.Method(rx, "split", "text: string", "The text split at every match.", KType.List, (t, c) => Safe(t, () => R(t).Split(c.Str(0)).Select(x => (object)x).ToList()));
             p.Method(rx, "pattern", "", "The pattern, without slashes or flags.", KType.String, (t, c) => ((RegexValue)t).Pattern);
             p.Method(rx, "flags", "", "The flags, such as i.", KType.String, (t, c) => ((RegexValue)t).Flags);
 

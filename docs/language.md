@@ -187,7 +187,7 @@ A parameter typed with an enum only takes its values (`'large'` or bare `large`)
 
 ## Typed data
 
-`type` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught.
+`type` declares the shape of some data, such as an API response. Data that passes through it is checked and turned into a record: a map that knows its type, so the editor completes its fields and a typo like `$repo.stras` is caught. Fields can also be `email`, `password`, `handle`, `uuid` or `regex`, and types can add rules to other types or join them. See [Types and validation](types.md).
 
 ```kscript
 enum Visibility { public, private, internal }
@@ -212,7 +212,7 @@ A short type fits on one line: `fields` takes `name: type` pairs like `fn` param
 
 | Attribute | What it does |
 | --- | --- |
-| `type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Defaults to `any`. |
+| `type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`, `email`, `password`, `handle`, `uuid`, `regex`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Rules can follow in brackets: `string(min: 1)`. Defaults to `any`. |
 | `from` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. |
 | `default` | The value when the data has none. The field is then optional. |
 | `optional` | `yes` lets the value be missing or null. So does ending the name or the type with `?`. |
