@@ -84,10 +84,10 @@ namespace KScript.Syntax.Markup
 
             ParseBody(root, braced: false);
 
-            // A file that is a single package element, such as KScript.Window { ... }, uses it as the root,
-            // as an XML script would.
+            // A file that is a single package element, such as KScript.Window { ... }, or an explicit kscript { ... },
+            // uses it as the root, as an XML script would.
             List<MarkupElement> top = root.ChildElements.ToList();
-            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && top[0].Name.StartsWith("KScript.", StringComparison.Ordinal))
+            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && (top[0].Name.StartsWith("KScript.", StringComparison.Ordinal) || top[0].Name == "kscript"))
             {
                 foreach (MarkupNode node in root.Children.Where(n => !(n is MarkupText)))
                 {

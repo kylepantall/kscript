@@ -1,6 +1,8 @@
 using System.Globalization;
 
 using KScript.Runtime;
+using KScript.Syntax;
+using KScript.Syntax.Markup;
 
 namespace KScript.Tests;
 
@@ -199,6 +201,37 @@ public class CodeFormatTests
         {
             Directory.Delete(dir, true);
         }
+    }
+
+    [Fact]
+    public void AnExplicitKscriptBlockIsTheRootAndCanImport()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "kscript-root-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(dir, "lib"));
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "lib", "s.kscript"), "fn shout(x) => $x->upper()");
+            string main = Path.Combine(dir, "main.kscript");
+            File.WriteAllText(main, "// comment\nkscript {\n  import \"lib/s.kscript\"\n  import KScript.Math\n\n  echo \"{ @shout('hi') }\"\n}\n");
+            Assert.Equal("HI\n", RunFile(main));
+
+            MarkupElement root = Assert.Single(CodeParser.Parse(File.ReadAllText(main)).RootElements);
+            Assert.Equal("kscript", root.Name);
+            Assert.Equal(new[] { "import", "import", "echo" }, root.ChildElements.Select(e => e.Name));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void ImportsInsideABlockSayWhereTheyGo()
+    {
+        var error = Assert.Throws<KScriptException>(() => Run("if true {\n  import KScript.Math\n}"));
+        Assert.Equal("import goes at the top level of the file, not inside a block, before anything that uses it.", error.Message);
+        Assert.Equal(2, error.Line);
+        Assert.DoesNotContain("<", error.Message);
     }
 
     [Fact]

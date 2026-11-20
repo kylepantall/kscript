@@ -158,7 +158,10 @@ namespace KScript.Runtime
             // <import> only works at the top of a script, where it is resolved before anything runs.
             foreach (MarkupElement misplaced in module.Document.DescendantElements().Where(e => e.Name == "import" && e.Parent != module.Root))
             {
-                throw Located(new KScriptException("<import> must be a direct child of <kscript>, before anything that uses it.", "Import"), module, misplaced.Span.Start);
+                string message = module.Document.Syntax == SourceSyntax.Code
+                    ? "import goes at the top level of the file, not inside a block, before anything that uses it."
+                    : "<import> must be a direct child of <kscript>, before anything that uses it.";
+                throw Located(new KScriptException(message, "Import"), module, misplaced.Span.Start);
             }
         }
 

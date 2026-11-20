@@ -99,8 +99,9 @@ Row(gap: 8, wrap) {
 - In `name(...)` a value runs to the next `,` or `)` outside brackets; quote it to include a comma. A bare name such
   as `wrap` means `wrap="yes"`.
 - Expressions are kept as written, so raw `<` and `>` work (`lt` and `gt` still do).
-- The file is the body of an implied `<kscript>`. A file whose only statement is a `KScript.*` element (such as
-  `KScript.Window(...) { }`) uses that element as the root.
+- The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. A file whose only
+  statement is `kscript { }` or a `KScript.*` element (such as `KScript.Window(...) { }`) uses that element as the
+  root. `import` goes at that top level, not inside another block.
 - `//` and `/* */` are comments.
 
 ## Doc comments
