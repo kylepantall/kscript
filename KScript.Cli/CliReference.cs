@@ -46,7 +46,7 @@ namespace KScript
                 },
                 "kscript agents\nkscript agents --check", "agents"),
             new CliCommand("watch", "kscript watch [folder] [--once] [--check]",
-                "Rebuild everything the project makes from its code (the agent docs, and more as packages add to it) each time a file changes, until Ctrl+C. kscript serve and the editor (on save) do the same.",
+                "Rebuild everything the project makes from its code (the agent docs, the OpenAPI file http.openapi.file names, and more as packages add to it) each time a file changes, until Ctrl+C. kscript serve and the editor (on save) do the same.",
                 new[]
                 {
                     O("--once", "Build once and stop."),
@@ -133,7 +133,7 @@ namespace KScript
                     O("--runtime file", "A kscript release binary or archive for the target, instead of downloading one."),
                 },
                 "kscript compile hello.ks.xml\nkscript compile --target all", "compile"),
-            new CliCommand("make", "kscript make project <folder> [--bare] [--port 8080]\nkscript make <type> <name> [--key value]\nkscript make --list",
+            new CliCommand("make", "kscript make project <folder> [--bare] [--port 8080]\nkscript make <type> <name> [--key value]\nkscript make auth [--api]\nkscript make --list",
                 "Start a new project, or generate a file: a route (added to the routes file), controller, request, middleware, view, page, component, stylesheet, type, enum, window, config, test and more. kscript make --list shows them all, with their options.",
                 new[]
                 {

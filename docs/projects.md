@@ -187,9 +187,11 @@ kscript make type Repo --fields "name: string, stars: int from stargazers_count"
 kscript make enum Size --values small,medium,large    # types/size.kscript
 kscript make module pricing --fns subtotal,total      # lib/pricing.kscript
 kscript make window settings                          # settings.kscript, a desktop window
+kscript make document annual-report                   # documents/annual-report.kscript, a PDF and Word document
 kscript make config staging                           # config/config.staging.yaml
 kscript make test checkout                            # tests/checkout.test.kscript
 kscript make error PaymentFailed --status 402 --fields "order: int"   # errors/payment-failed.kscript
+kscript make auth --api                               # sign up, sign in, resets and API tokens (see Sign-in)
 kscript make                                          # list every type
 ```
 
@@ -217,6 +219,7 @@ my-app/
   types/           make type, make enum
   errors/          make error
   jobs/            make job
+  documents/       make document
   config/          make config
   locales/         make locale
   data/            JSON that stores and caches write

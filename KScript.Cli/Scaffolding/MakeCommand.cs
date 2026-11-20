@@ -130,6 +130,20 @@ namespace KScript.Scaffolding
                     return 0;
                 }
 
+                if (string.Equals(type, "auth", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (positional.Count > 1) { error.WriteLine($"kscript make auth takes no name (unexpected '{positional[1]}'). Options: --api, --format, --force, --dry-run."); return 1; }
+                    AuthResult made = AuthMaker.Make(root, options, force, dryRun);
+                    foreach (var (action, path) in made.Files)
+                    {
+                        string where = fromProject && root != "." ? Path.GetRelativePath(Directory.GetCurrentDirectory(), Path.Combine(Path.GetFullPath(root), path)).Replace('\\', '/') : path;
+                        output.WriteLine($"{(dryRun ? "Would: " + action.ToLowerInvariant() : action)} {where}");
+                    }
+                    output.WriteLine("Next:");
+                    foreach (string line in made.Next) output.WriteLine("  " + line);
+                    return 0;
+                }
+
                 if (positional.Count < 2)
                 {
                     var t = Scaffolder.FindTemplate(root, type);
@@ -346,6 +360,7 @@ namespace KScript.Scaffolding
             output.WriteLine("       kscript make templates [type…]   copy the built-in templates to _templates/ to customise them");
             output.WriteLine("       kscript make templates project   copy the project template to customise new projects (--global for all)");
             output.WriteLine("       kscript make project <folder>    start a new web app, with a desktop app unless --no-desktop");
+            output.WriteLine("       kscript make auth                sign-in pages, routes and a controller (KScript.Auth); --api adds token routes");
             output.WriteLine("       kscript make project <folder> --bare   start a bare project: kscript.json, one script and a test");
             output.WriteLine();
             var all = Scaffolder.ListTemplates(root);

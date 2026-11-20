@@ -80,8 +80,14 @@ namespace KScript.Metadata
         /// <summary>True for loops, which make <c>&lt;break/&gt;</c> and <c>&lt;continue/&gt;</c> valid inside.</summary>
         public bool IsLoop { get; init; }
 
+        /// <summary>For text content: which parts are used as written, such as LaTeX maths whose braces aren't <c>{ }</c> values.</summary>
+        public TextLiterals LiteralText { get; init; }
+
         /// <summary>True if attributes other than the listed ones are allowed (they become variables, as in <c>&lt;layout&gt;</c>).</summary>
         public bool AllowsExtraAttributes { get; init; }
+
+        /// <summary>The type of the variable its declare-variable attribute (to:, into:) makes, when not text.</summary>
+        public string DeclaresType { get; init; }
 
         /// <summary>True if the element is in the KScript 2 design but no package implements it yet.</summary>
         public bool Planned => Package == null;

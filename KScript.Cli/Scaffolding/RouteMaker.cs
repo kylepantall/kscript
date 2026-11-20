@@ -209,7 +209,7 @@ namespace KScript.Scaffolding
             return name + ext;
         }
 
-        private static string NewRoutesFile(bool api, bool xml)
+        internal static string NewRoutesFile(bool api, bool xml)
         {
             string comment = api
                 ? "API routes, served by kscript serve under /api with JSON errors (see the Routes and APIs guide). kscript routes lists them."
@@ -251,7 +251,7 @@ namespace KScript.Scaffolding
         private static string Normalise(string line) => Regex.Replace(line.Trim(), @"\s+", " ");
 
         /// <summary>The import and route lines as XML elements, converted the way --format xml converts a script.</summary>
-        private static List<string> ToXmlLines(List<string> lines)
+        internal static List<string> ToXmlLines(List<string> lines)
         {
             string code = "KScript.Routes {\n" + string.Join("\n", lines.Select(l => "  " + l)) + "\n}\n";
             var (_, xml) = ScriptFormat.Apply("route.kscript", "routes.kscript", code, ScriptFormat.Xml);
@@ -266,7 +266,7 @@ namespace KScript.Scaffolding
         /// Adds the imports after the route file's last import (or at the top of the routes block) and the route at the
         /// end of the block, indented like the block's other lines.
         /// </summary>
-        private static string Insert(string text, List<string> imports, List<string> routes, bool xml, string file)
+        internal static string Insert(string text, List<string> imports, List<string> routes, bool xml, string file)
         {
             var lines = text.Split('\n').ToList();
             int open = lines.FindIndex(l => xml ? l.TrimStart().StartsWith("<KScript.Routes", StringComparison.Ordinal) : Regex.IsMatch(l, @"^\s*KScript\.Routes\b.*\{\s*(//.*)?$"));

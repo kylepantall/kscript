@@ -242,6 +242,21 @@ public class ScaffolderTests
     }
 
     [Fact]
+    public void DocumentBuildsPdfAndWord()
+    {
+        using var site = new TempSite();
+        Assert.Equal(0, Make(site.Root, "document", "annual_report").Code);
+        string script = Read(site, "documents/annual-report.kscript");
+        Assert.Contains("template: paper,\n  title: \"Annual Report\"", script);
+        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(new StringWriter(), "")).RunFile(Path.Combine(site.Root, "documents", "annual-report.kscript"));
+        Assert.StartsWith("%PDF-", File.ReadAllText(Path.Combine(site.Root, "documents", "annual-report.pdf")));
+        Assert.True(File.Exists(Path.Combine(site.Root, "documents", "annual-report.docx")));
+
+        Assert.Equal(0, Make(site.Root, "document", "annual_report", "--format", "xml", "--template", "report").Code);
+        Assert.Contains("<KScript.Document template=\"report\"", Read(site, "documents/annual-report.ks.xml"));
+    }
+
+    [Fact]
     public void ErrorTypesAreMadeInLibErrors()
     {
         using var site = new TempSite(("kscript.json", "{}"));
@@ -324,7 +339,7 @@ public class ScaffolderTests
         using var site = new TempSite();
         var (code, output, _) = Make(site.Root, "templates");
         Assert.Equal(0, code);
-        foreach (var f in new[] { "component.html", "page.html", "markdown.md", "layout.html", "script.kscript", "test.kscript" })
+        foreach (var f in new[] { "component.html", "page.html", "markdown.md", "layout.html", "script.kscript", "test.kscript", "document.kscript" })
         {
             Assert.Contains($"Created _templates/{f}", output);
             Assert.True(File.Exists(Path.Combine(site.Root, "_templates", f)));
@@ -341,6 +356,7 @@ public class ScaffolderTests
     [Theory]
     [InlineData(new[] { "widget", "Foo" }, "There is no 'widget' template")]
     [InlineData(new[] { "component" }, "Give the component a name")]
+    [InlineData(new[] { "document" }, "kscript make document annual-report")]
     [InlineData(new[] { "page", "../outside" }, "is not a valid name")]
     [InlineData(new[] { "page", "about", "us" }, "Did you mean: kscript make page \"about us\"")]
     public void MistakesAreExplained(string[] args, string message)

@@ -69,7 +69,7 @@
             ]
           }
         },
-        "middleware": { "type": "array", "items": { "type": "string" }, "description": "Middleware run for every route, such as [\"log\"]. Built-ins: log, cors, auth, throttle, etag, cache_control, cache_response (throttle:30, auth:OTHER_TOKEN, cache_control:300, cache_response:5m)." },
+        "middleware": { "type": "array", "items": { "type": "string" }, "description": "Middleware run for every route, such as [\"log\"]. Built-ins: log, cors, auth, guest, csrf, throttle, etag, cache_control, cache_response (throttle:30, auth:session, auth:token, auth:OTHER_TOKEN, cache_control:300, cache_response:5m)." },
         "groups": {
           "type": "object",
           "description": "Names for lists of middleware, used like a middleware name: { \"admin\": [\"auth\", \"log\"] }.",
@@ -92,9 +92,22 @@
         "auth": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Settings for the auth middleware.",
+          "description": "Sign-in with KScript.Auth, and the auth middleware. Times are seconds, or text such as \"15m\", \"2h\" or \"30d\".",
           "properties": {
-            "token_env": { "type": "string", "default": "API_TOKEN", "description": "The environment variable holding the bearer token." }
+            "token_env": { "type": "string", "default": "API_TOKEN", "description": "The environment variable holding the shared bearer token the auth middleware also accepts." },
+            "login": { "type": "string", "default": "/login", "description": "Where the auth middleware sends people who aren't signed in." },
+            "home": { "type": "string", "default": "/", "description": "Where the guest middleware sends people who are signed in, and @intended()'s default." },
+            "sessions": { "enum": ["file", "memory"], "default": "file", "description": "Where sessions are kept: file (the app's state folder, so they last across restarts) or memory." },
+            "folder": { "type": "string", "description": "A folder, relative to the site, for users, sessions and tokens. By default they go in the app's data and state folders." },
+            "lifetime": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "2h", "description": "How long a session lasts after the last request." },
+            "remember": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "30d", "description": "How long a \"remember me\" sign-in lasts." },
+            "cookie": { "type": "string", "default": "ks_session", "description": "The session cookie's name." },
+            "secure": { "type": "boolean", "description": "Forces the cookie's Secure flag on or off. By default it is set for https requests." },
+            "same_site": { "enum": ["Lax", "Strict", "None"], "default": "Lax", "description": "The cookie's SameSite." },
+            "csrf": { "type": "boolean", "default": true, "description": "False turns off the CSRF check that web routes get when their file imports KScript.Auth." },
+            "attempts": { "type": "integer", "minimum": 1, "default": 5, "description": "Failed sign-ins allowed per email and address before @attempt() makes them wait." },
+            "lockout": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "1m", "description": "How long failed sign-ins are counted over, and how long @attempt() then waits." },
+            "reset_lifetime": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "1h", "description": "How long a password reset token works." }
           }
         },
         "throttle": {
@@ -119,7 +132,8 @@
                 "title": { "type": "string", "description": "info.title. Defaults to the project's name." },
                 "version": { "type": "string", "description": "info.version. Defaults to app.version, then 1.0.0." },
                 "description": { "type": "string", "description": "info.description." },
-                "routes": { "enum": ["auto", "api", "all"], "default": "auto", "description": "Which routes: api (from api.* files), all, or auto (the API routes if there are any, otherwise all)." }
+                "routes": { "enum": ["auto", "api", "all"], "default": "auto", "description": "Which routes: api (from api.* files), all, or auto (the API routes if there are any, otherwise all)." },
+                "file": { "type": "string", "description": "A file, relative to kscript.json, to keep the document in (openapi.json, or openapi.yaml for YAML). kscript watch, kscript serve and the editor (on save) rewrite it as the routes change." }
               }
             }
           ]
@@ -172,6 +186,7 @@
         "storage": { "type": "string", "default": "lib", "description": "JSON file stores (kscript make storage)." },
         "jobs": { "type": "string", "default": "jobs", "description": "Jobs (kscript make job)." },
         "windows": { "type": "string", "default": ".", "description": "Desktop windows (kscript make window)." },
+        "documents": { "type": "string", "default": "documents", "description": "Document scripts that write PDF and Word files (kscript make document)." },
         "config": { "type": "string", "default": "config", "description": "Settings files (kscript make config), unless config.root is set." },
         "locales": { "type": "string", "default": "locales", "description": "Translations (kscript make locale)." },
         "logging": { "type": "string", "default": "lib", "description": "Log providers (kscript make logger)." },
