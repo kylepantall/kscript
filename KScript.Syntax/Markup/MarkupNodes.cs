@@ -96,7 +96,10 @@ namespace KScript.Syntax.Markup
         public string Text { get; internal set; } = string.Empty;
 
         /// <summary>A doc comment, &lt;!--- ... --&gt;: documents the element after it, like /// in a .kscript file.</summary>
-        public bool IsDoc => Text.StartsWith("-", StringComparison.Ordinal) && !Text.StartsWith("--", StringComparison.Ordinal);
+        public bool IsDoc => !Plain && Text.StartsWith("-", StringComparison.Ordinal) && !Text.StartsWith("--", StringComparison.Ordinal);
+
+        /// <summary>A // or /* */ comment from a .kscript file: never a doc comment, even when it starts with '-'.</summary>
+        internal bool Plain { get; init; }
 
         /// <summary>The doc comment's text with the leading '-' and the common indentation removed, or null.</summary>
         public string DocText

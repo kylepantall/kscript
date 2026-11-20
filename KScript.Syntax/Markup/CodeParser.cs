@@ -1300,7 +1300,7 @@ namespace KScript.Syntax.Markup
 
         private void AddComment(int start, string body)
         {
-            commentTarget?.Children.Add(new MarkupComment { Text = body, Span = TextSpan.FromBounds(start, pos), Parent = commentTarget });
+            commentTarget?.Children.Add(new MarkupComment { Text = body, Plain = true, Span = TextSpan.FromBounds(start, pos), Parent = commentTarget });
         }
 
         /// <summary>Skips trivia to look at the next word (else, catch, ...) without keeping comments or doc lines.</summary>
