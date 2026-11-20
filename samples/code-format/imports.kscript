@@ -1,0 +1,6 @@
+import "lib/strings.kscript" as str
+import slugify from "lib/strings.kscript"
+
+let title = 'Hello World'
+echo "{ $title |> str.slugify() }"
+echo @slugify($title)

@@ -1,0 +1,6 @@
+/// Lower-cases text and joins words with dashes.
+fn slugify(text) {
+  return $text->lower()->replace(' ', '-')
+}
+
+fn titlecase(text) => $text->upper()

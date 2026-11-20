@@ -47,7 +47,7 @@ namespace KScript.Runtime
         public Module LoadText(string text, string path = null)
         {
             var source = new SourceText(text);
-            MarkupDocument document = MarkupParser.Parse(source, DocumentKind.Script);
+            MarkupDocument document = MarkupParser.Parse(source, DocumentKind.Script, path);
             var module = new Module(this, path, source, document);
             if (module.Path != null) loading.Add(module.Path);
             try

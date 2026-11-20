@@ -27,7 +27,7 @@ namespace KScript.Language.Analysis
             this.files = files ?? DiskFileSystem.Instance;
             this.catalog = catalog ?? LanguageCatalog.Default;
             directory = path != null ? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) : null;
-            result = new DocumentAnalysis(source, path, kind, MarkupParser.Parse(source, kind));
+            result = new DocumentAnalysis(source, path, kind, MarkupParser.Parse(source, kind, path));
         }
 
         private DocumentKind Kind => result.Kind;
@@ -329,7 +329,7 @@ namespace KScript.Language.Analysis
             }
 
             SourceText other = new SourceText(text);
-            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path));
+            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
             Dictionary<string, (ExternalLocation, string)> constants = new Dictionary<string, (ExternalLocation, string)>(StringComparer.Ordinal);
             MarkupElement root = doc.RootElements.FirstOrDefault();
             if (root == null)
@@ -359,7 +359,7 @@ namespace KScript.Language.Analysis
             }
 
             SourceText other = new SourceText(text);
-            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path));
+            MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
             Dictionary<string, (FunctionParameter[], ExternalLocation, string)> exports = new Dictionary<string, (FunctionParameter[], ExternalLocation, string)>(StringComparer.Ordinal);
             foreach (MarkupElement fn in doc.DescendantElements().Where(x => x.Name == "fn"))
             {

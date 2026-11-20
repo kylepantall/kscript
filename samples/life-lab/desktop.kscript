@@ -1,0 +1,74 @@
+// Life Lab as a desktop app, in the .kscript format: kscript desktop.kscript opens it in a window.
+// The rules come from lib/life.ks.xml, the same script the terminal and browser versions use.
+KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, background: "#0f172a") {
+  import "lib/life.ks.xml"
+
+  let cols = 40
+  let rows = 24
+  let world = @pattern_world('glider_gun', $cols, $rows)
+  let playing = false
+  let speed = 150
+  let pattern = 'glider_gun'
+  let soup = 30
+  let wrap = true
+  let pattern_choices = $patterns->keys()->map(fn($k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
+
+  fn tick() {
+    set world = @advance($world, 1)
+    set playing = @population($world.grid) > 0
+  }
+
+  Timer(every: $speed, when: $playing, on-tick: @tick())
+
+  Column(gap: 4) {
+    Text(size: 26, weight: bold, color: "#e2e8f0") "Life Lab"
+    Text(color: "#94a3b8") "Conway's Game of Life, written in KScript. Click cells to draw, then press Play."
+  }
+
+  Row(gap: 8, wrap) {
+    Button(variant: primary, width: 80, on-click: "playing = not $playing") "{ $playing ? 'Pause' : 'Play' }"
+    Button(on-click: "world = @advance($world, 1); playing = false") "Step"
+    Button(on-click: "world = @advance($world, 10)") "+10"
+    Button(on-click: "world = @advance($world, 50)") "+50"
+    Spacer(size: 8)
+    Text(color: "#94a3b8") "Speed"
+    Select(bind: speed, options: { Slow: 400, Normal: 150, Fast: 40 })
+    Text(color: "#94a3b8") "Pattern"
+    Select(bind: pattern, options: $pattern_choices,
+           on-change: "world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false")
+  }
+
+  Row(gap: 8, wrap) {
+    Button(on-click: "world = @new_world(@random_grid($cols, $rows, $soup), $world.wrap, 'random soup'); playing = false") "Random soup"
+    Slider(bind: soup, min: 5, max: 80, step: 5, width: 140, tooltip: "How full the soup is")
+    Text(color: "#94a3b8", width: 40) "{$soup}%"
+    CheckBox(bind: wrap, on-change: "world = $world->merge({ wrap: $event.value })") "Wrap edges"
+    Button(on-click: "world = @new_world(@blank($cols, $rows), $world.wrap); playing = false") "Clear"
+  }
+
+  Text(color: "#cbd5e1", wrap) "{ $patterns->has($world.pattern) ? $patterns[$world.pattern].about : 'Your own pattern.' }"
+
+  Box(background: "#1e293b", padding: 6, radius: 6) {
+    Grid(columns: $cols, gap: 1) {
+      for row at y in $world.grid {
+        for c at x in $row {
+          Box(width: 16, height: 16, radius: 2,
+              background: "{ $c == $alive_cell ? '#4ade80' : '#0b1220' }",
+              on-click: "world = @flip($world, $x + ',' + $y)")
+        }
+      }
+    }
+  }
+
+  Row(gap: 24, wrap) {
+    let s = @summary($world)
+    for stat in [['Generation', $s.generation], ['Alive', $s.population + ' (' + $s.density + '%)'], ['Born', $s.births], ['Died', $s.deaths], ['Status', $s.status]] {
+      Column(gap: 2) {
+        Text(size: 11, color: "#64748b") "{ $stat[0]->upper() }"
+        Text(size: 16, weight: bold, color: "#e2e8f0") "{ $stat[1] }"
+      }
+    }
+  }
+
+  Text(size: 12, color: "#64748b") "Also runs in a terminal (kscript life.ks.xml) and a browser (kscript serve). Same rules, one script: lib/life.ks.xml."
+}

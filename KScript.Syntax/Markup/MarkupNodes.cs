@@ -15,6 +15,13 @@ namespace KScript.Syntax.Markup
         Markdown,
     }
 
+    /// <summary>How a script is written: as XML (<c>.ks.xml</c>), or in the brace-and-newline format (<c>.kscript</c>).</summary>
+    public enum SourceSyntax
+    {
+        Xml,
+        Code,
+    }
+
     /// <summary>
     /// Text with XML/HTML entities decoded, and a map from each decoded character back to its offset in the document,
     /// so positions inside an attribute or a text node can be reported exactly.
@@ -177,6 +184,10 @@ namespace KScript.Syntax.Markup
     {
         public SourceText Source { get; internal set; }
         public DocumentKind Kind { get; internal set; }
+
+        /// <summary>Xml for markup files; Code for <c>.kscript</c> files, which <see cref="CodeParser"/> turns into the same tree.</summary>
+        public SourceSyntax Syntax { get; internal set; }
+
         public List<MarkupNode> Children { get; } = new List<MarkupNode>();
         public FrontMatter FrontMatter { get; internal set; }
         public List<Diagnostic> Diagnostics { get; } = new List<Diagnostic>();

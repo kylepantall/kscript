@@ -7,7 +7,7 @@ namespace KScript.Language.Tests
     {
         public static IEnumerable<object[]> Samples() =>
             Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory, "samples"), "*.*", SearchOption.AllDirectories)
-                .Where(f => f.EndsWith(".xml") || f.EndsWith(".html") || f.EndsWith(".md"))
+                .Where(f => f.EndsWith(".xml") || f.EndsWith(".kscript") || f.EndsWith(".html") || f.EndsWith(".md"))
                 .Select(f => new object[] { Path.GetRelativePath(Path.Combine(AppContext.BaseDirectory, "samples"), f) });
 
         [Theory]

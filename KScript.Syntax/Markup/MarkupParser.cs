@@ -55,6 +55,14 @@ namespace KScript.Syntax.Markup
 
         public static MarkupDocument Parse(string text, DocumentKind kind) => Parse(new SourceText(text), kind);
 
+        /// <summary>Parses a file, choosing the syntax from its path: <c>.kscript</c> scripts use the brace-and-newline format.</summary>
+        public static MarkupDocument Parse(SourceText source, DocumentKind kind, string path) =>
+            kind == DocumentKind.Script && IsCodePath(path) ? CodeParser.Parse(source) : Parse(source, kind);
+
+        /// <summary>True for <c>.kscript</c> files, which are written in the brace-and-newline format rather than XML.</summary>
+        public static bool IsCodePath(string path) =>
+            path != null && path.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase);
+
         public static MarkupDocument Parse(SourceText source, DocumentKind kind)
         {
             MarkupParser parser = new MarkupParser(source, kind);
