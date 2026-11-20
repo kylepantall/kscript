@@ -41,9 +41,6 @@ namespace KScript.Metadata
             return t.StartsWith("[", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal);
         }
 
-        /// <summary>The names written as an array literal: <c>[log, cors]</c>.</summary>
-        public static string ToArray(string text) => "[" + string.Join(", ", Names(text)) + "]";
-
         private static bool IsSeparator(char c) => char.IsWhiteSpace(c) || c == ',' || c == '[' || c == ']';
     }
 }

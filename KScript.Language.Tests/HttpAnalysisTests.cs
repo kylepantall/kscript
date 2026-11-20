@@ -96,6 +96,8 @@ namespace KScript.Language.Tests
             // XML attributes are always text, and one name needs no list.
             Assert.DoesNotContain(Analyze("<fn name=\"stamp\" params=\"request, next\" value=\"$next($request)\" /><Middleware use=\"stamp, cors\" />").Diagnostics, x => x.Code == DiagnosticCodes.PreferArrayList);
             Assert.DoesNotContain(Analyzer.Analyze("KScript.Routes {\n  Middleware(use: \"cors\")\n}\n", Path.Combine(Site, "routes.kscript"), Files).Diagnostics, x => x.Code == DiagnosticCodes.PreferArrayList);
+            // Text that isn't a list of names stays a string.
+            Assert.DoesNotContain(Analyzer.Analyze("KScript.Routes {\n  Middleware(use: \"cors, rate(10)\")\n}\n", Path.Combine(Site, "routes.kscript"), Files).Diagnostics, x => x.Code == DiagnosticCodes.PreferArrayList);
         }
 
         [Fact]
