@@ -29,10 +29,6 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            if (e.Ancestors().Any(a => a.Name == "live"))
-            {
-                return;
-            }
             List<MarkupElement> earlier = ChainBefore(e);
             if (earlier == null)
             {

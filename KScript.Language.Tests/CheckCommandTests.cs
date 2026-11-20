@@ -220,6 +220,22 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void PrintConfigWithoutAStandardOrAFile()
+        {
+            Write("kscript.json", "{ \"standard\": [], \"lnit\": {} }");
+            var output = new StringWriter();
+            Assert.Equal(0, CheckCommand.PrintConfig(dir, output));
+            string text = output.ToString();
+            Assert.Contains("(none: \"standard\": [] in kscript.json)", text);
+            Assert.Contains("(none: every rule at its built-in severity", text);
+            Assert.Contains("warning: unknown setting 'lnit'", text);
+
+            output = new StringWriter();
+            Assert.Equal(2, CheckCommand.PrintConfig(Path.Combine(dir, "missing"), output));
+            Assert.Contains("file not found", output.ToString());
+        }
+
+        [Fact]
         public void ProjectWarningsAndBadJsonAreReported()
         {
             Write("kscript.json", "{ \"lnit\": {} }");

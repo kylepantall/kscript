@@ -389,6 +389,9 @@ public class MakeProjectTests : IDisposable
             var (code, output, err) = MakeCommandRun("templates", "project");
             Assert.True(code == 0, err);
             Assert.Contains("Copied the project template", output);
+            var twice = MakeCommandRun("templates", "project");
+            Assert.Equal(0, twice.Item1);
+            Assert.Contains("already has the project template", twice.Item2);
         }
         finally
         {
@@ -459,6 +462,38 @@ public class MakeProjectTests : IDisposable
         Assert.Contains("Next:", out2);
 
         Assert.Contains("no template folder", Make(other.Root, "x", "--template", Path.Combine(other.Root, "nope")).Err);
+    }
+
+    [Fact]
+    public void TemplateFoldersAreChecked()
+    {
+        using var t = new TempSite(
+            ("ok/kscript-template.json", "{ \"options\": { \"flag\": true, \"off\": false, \"none\": null, \"word\": \"x\", \"count\": 3 } }"),
+            ("ok/README.md", "# {{ title }}\n"),
+            ("bad-json/kscript-template.json", "{ nope"),
+            ("bad-json/README.md", "x"),
+            ("outside/a.md", "--- make\nto: ../escape.md\n---\nx"),
+            ("twice/a.md", "--- make\nto: same.md\n---\na"),
+            ("twice/b.md", "--- make\nto: same.md\n---\nb"));
+
+        ProjectTemplate ok = ProjectTemplate.Find(Path.Combine(t.Root, "new"), Path.Combine(t.Root, "ok"));
+        Assert.Equal(new[] { "true", "false", null, "x", "3" }, ok.Options.Select(o => o.Default));
+        Assert.Equal(0, Make(t.Root, "made", "--template", Path.Combine(t.Root, "ok")).Code);
+
+        Assert.Contains("kscript-template.json", Make(t.Root, "a", "--template", Path.Combine(t.Root, "bad-json")).Err);
+        Assert.Contains("is not a path inside the project", Make(t.Root, "b", "--template", Path.Combine(t.Root, "outside")).Err);
+        Assert.Contains("makes same.md twice", Make(t.Root, "c", "--template", Path.Combine(t.Root, "twice")).Err);
+    }
+
+    [Fact]
+    public void AProjectInsideAnotherUsesTheBuiltInTemplateWhenTheOuterHasNone()
+    {
+        using var outer = new TempSite((ProjectConfig.FileName, "{ \"name\": \"outer\" }"));
+        Assert.Equal(0, Make(outer.Root, "inner").Code);
+        Assert.True(File.Exists(Path.Combine(outer.Root, "inner", "tasks.html")));
+
+        using var broken = new TempSite((ProjectConfig.FileName, "{ nope"));
+        Assert.Equal(0, Make(broken.Root, "inner").Code);
     }
 
     [Fact]

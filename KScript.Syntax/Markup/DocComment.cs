@@ -175,8 +175,5 @@ namespace KScript.Syntax.Markup
             }
             return sb.ToString();
         }
-
-        /// <summary>The first sentence or line of the summary, for one-line uses such as an LLM tool description.</summary>
-        public string Brief => Summary.Split('\n')[0];
     }
 }
