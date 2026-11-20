@@ -21,13 +21,19 @@ namespace KScript.Compile
         public string Repository { get; set; } = Environment.GetEnvironmentVariable("KSCRIPT_REPO") ?? SelfUpdater.DefaultRepository;
         /// <summary>The release runtime id of this computer, such as osx-arm64.</summary>
         public string HostRuntime { get; set; } = SelfUpdater.RuntimeId();
-        /// <summary>The running kscript when it is a release (single-file) build, else null.</summary>
-        public string CurrentBinary { get; set; } = SelfUpdater.InstalledBinaryPath(SelfUpdater.AssemblyLocation(), Environment.ProcessPath);
+        /// <summary>
+        /// The running kscript when it is a single-file build, else null. A Native AOT kscript (the release build) has
+        /// no .NET bundle to build programs from, so it downloads the matching runtime, as it does for other platforms.
+        /// </summary>
+        public string CurrentBinary { get; set; } = CurrentBundle(System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported);
         /// <summary>Where kscript keeps the runtimes it downloads for other platforms.</summary>
         public string RuntimeCache { get; set; } = DefaultCache();
         public HttpMessageHandler Handler { get; set; } = new HttpClientHandler();
         /// <summary>Seals a Mac app with Apple's codesign, which only exists on a Mac. Returns an error or null.</summary>
         public Func<string, string> Codesign { get; set; } = OperatingSystem.IsMacOS() ? RunCodesign : null;
+
+        internal static string CurrentBundle(bool managed) =>
+            managed ? SelfUpdater.InstalledBinaryPath(SelfUpdater.AssemblyLocation(), Environment.ProcessPath) : null;
 
         internal static string DefaultCache() =>
             OperatingSystem.IsWindows()
@@ -460,7 +466,10 @@ namespace KScript.Compile
         #endregion
     }
 
-    /// <summary>Finds the release kscript for a target: this one, one given with --runtime, a cached one, or a download.</summary>
+    /// <summary>
+    /// Finds the kscript runtime for a target: this kscript when it is a single-file build, one given with --runtime, a
+    /// cached one, or the release's kscript-runtime-&lt;rid&gt; archive (the single-file build that programs are made from).
+    /// </summary>
     internal sealed class RuntimeStore
     {
         private readonly CompileEnvironment env;
@@ -493,7 +502,7 @@ namespace KScript.Compile
             if (!SelfUpdater.TryParseVersion(version, out Version parsed) || parsed == new Version(0, 0, 0) || version.Contains("-dev", StringComparison.Ordinal))
                 throw new CompileException($"This kscript is a development build ({version}), so there's no release to get the {target.Name} kscript from. Use a release kscript, or pass --runtime with a kscript built for {target.Name}.");
 
-            string asset = SelfUpdater.AssetName(target.Runtime);
+            string asset = SelfUpdater.RuntimeAssetName(target.Runtime);
             string url = $"https://github.com/{env.Repository}/releases/download/v{version}/{asset}";
             log.WriteLine($"Downloading kscript {version} for {target.Name} (once; kept in {env.RuntimeCache})");
             using var client = new HttpClient(env.Handler, disposeHandler: false);

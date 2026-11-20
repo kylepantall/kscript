@@ -90,6 +90,9 @@ namespace KScript.Updates
 
         public static string AssetName(string rid) => rid.StartsWith("win-", StringComparison.Ordinal) ? $"kscript-{rid}.zip" : $"kscript-{rid}.tar.gz";
 
+        /// <summary>The release archive holding the single-file kscript that kscript compile builds programs from.</summary>
+        public static string RuntimeAssetName(string rid) => AssetName(rid).Replace("kscript-", "kscript-runtime-", StringComparison.Ordinal);
+
         /// <summary>Parses "v1.2.3", "1.2", "1.2.3-beta.1" (the prerelease part is ignored).</summary>
         public static bool TryParseVersion(string text, out Version version)
         {
