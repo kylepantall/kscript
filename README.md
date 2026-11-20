@@ -226,7 +226,7 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path` `@known_folder('downloads')`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
 | `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
-| `KScript.Web` | The elements of `kscript serve` pages (below). Pages don't need imports. |
+| `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
 | `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](#testing-scripts-kscript-test)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).
@@ -270,7 +270,6 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 | `<layout src="_layout.html" title="…">` and `<slot />` | Wrap the page in a layout; extra attributes become variables. |
 | `<my-card user="{$u}">`, `<hero>` | A component: `_components/my-card.html`, with `<slot />` for its children. Any element that isn't an HTML or KScript element can be a component. Components only see their own attributes. |
 | `<include src="_part.html">` | Insert another template here. |
-| `<import src="lib/tools.ks.xml" names="a, b">` | Use the top-level `<fn>` functions and `<let const="yes">` values of a KScript script, run by the same interpreter as `kscript tools.ks.xml`: `{ @a(1) }`. The path is relative to the site folder; without `names`, everything the script exports. |
 | `<markdown>` | Render Markdown, with `{ }` values escaped. |
 | `<respond status json type header-x>` / `<redirect to>` | Send a different response, e.g. JSON or a 404. |
 
@@ -279,7 +278,9 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **Markdown pages**: `.md` files can start with `---` front matter (`title: About`, `layout: _layout.html`); its keys become variables.
 - **Routing**: `/people` serves `people.html`, `people.md` or `people/index.html`; `/people/42` can match `people/[id].html` (`$request.params.id`). Files and folders starting with `_` or `.` and KScript sources (`.xml`) are never served. `_404.html` is used for missing pages.
 - **`$request`**: `method`, `path`, `query`, `form`, `headers`, `cookies`, `params` and `body`.
-- **Commands**: `@read_json`, `@read_text`, `@read_markdown` (gives `html`, `title` and `meta`), `@files`, `@exists`, `@json`, `@markdown`, `@now`, `@today`, `@date`, `@range`, `@random`, `@guid`. File access is limited to the site folder.
+- **Same language as scripts**: pages run on the KScript 2 interpreter, so every KScript.Core command and method works in them. Pages also get KScript.IO, KScript.Markdown and KScript.Web without importing them: `@read_json`, `@read_text`, `@read_markdown` (gives `html`, `title` and `meta`), `@files`, `@exists`, `@markdown`. Other packages are imported at the top of the page, as in a script: `<import package="KScript.Math" as="math" />` and then `{ @math.sqrt(2) }`.
+- **Sharing code with scripts**: `<import src="lib/text.ks.xml" />` at the top of a page gives it that script's top-level `<fn>` functions and `<let const="yes">` values. `as="text"` (then `@text.shout(...)`) and `names="shout"` work as they do in scripts.
+- **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
 - **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
 
 See `Example Sites/team` for a complete site with a layout, a component, a Markdown page, a dynamic route and a JSON endpoint.
@@ -454,5 +455,5 @@ See [docs/testing.md](docs/testing.md) for every element, check and setting.
 
 ## Roadmap
 
-KScript 2 is landing in steps: pages running on the same interpreter as scripts, desktop windows (`KScript.UI`), and language models (`KScript.AI`).
+KScript 2 is landing in steps. Scripts and `kscript serve` pages already share one interpreter; desktop windows (`KScript.UI`) and language models (`KScript.AI`) come next.
 

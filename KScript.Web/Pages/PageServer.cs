@@ -240,7 +240,7 @@ namespace KScript.Pages
                         page.Status = 404;
                         return page;
                     }
-                    return new PageResult { Status = 404, Body = $"<!doctype html><title>Not found</title><h1>Not found</h1><p>{PageValues.HtmlEscape(request.Path.Value)}</p>" };
+                    return new PageResult { Status = 404, Body = $"<!doctype html><title>Not found</title><h1>Not found</h1><p>{KScript.Runtime.Values.HtmlEscape(request.Path.Value)}</p>" };
                 }
             }
         }
@@ -325,7 +325,7 @@ namespace KScript.Pages
                 Status = 500,
                 Body = "<!doctype html><meta charset=\"utf-8\"><title>KScript error</title>" +
                        "<style>body{font:15px/1.5 system-ui,sans-serif;margin:40px;color:#222}pre{background:#f6f4f1;padding:16px;border-radius:8px;white-space:pre-wrap}</style>" +
-                       $"<h1>KScript error</h1><pre>{PageValues.HtmlEscape(location + ex.Message + detail)}</pre>",
+                       $"<h1>KScript error</h1><pre>{KScript.Runtime.Values.HtmlEscape(location + ex.Message + detail)}</pre>",
             };
         }
     }

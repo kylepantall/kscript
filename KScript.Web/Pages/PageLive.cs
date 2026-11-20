@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 
-using Newtonsoft.Json.Linq;
+using KScript.Runtime;
 
 namespace KScript.Pages
 {
@@ -50,7 +50,7 @@ namespace KScript.Pages
 
         public static string Sign(Dictionary<string, object> values)
         {
-            string json = PageValues.ToJsonString(values);
+            string json = Values.ToJson(values);
             string payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
             using var hmac = new HMACSHA256(_key);
             string sig = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(payload)));
@@ -70,7 +70,13 @@ namespace KScript.Pages
             catch (FormatException) { throw new LiveExpiredException(); }
             if (!CryptographicOperations.FixedTimeEquals(expected, actual)) throw new LiveExpiredException();
             string json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
-            return PageValues.FromJson(JToken.Parse(json)) as Dictionary<string, object> ?? new Dictionary<string, object>();
+            return ParseJson(json) as Dictionary<string, object> ?? new Dictionary<string, object>();
+        }
+
+        private static object ParseJson(string json)
+        {
+            try { return Values.ParseJson(json); }
+            catch (KScriptException) { throw new PageException("Invalid live request."); }
         }
 
         /// <summary>Numbers the on-* handlers inside a live block in document order (once per parse).</summary>
@@ -108,14 +114,14 @@ namespace KScript.Pages
         /// <summary>Reads the JSON body the runtime posts to /_ks/live.</summary>
         public static (string Page, LiveEvent Event) ParseRequest(string json)
         {
-            var body = PageValues.FromJson(JToken.Parse(json)) as Dictionary<string, object>
+            var body = ParseJson(json) as Dictionary<string, object>
                 ?? throw new PageException("Invalid live request.");
-            string Get(string k) => body.TryGetValue(k, out var v) ? PageValues.ToStr(v) : null;
+            string Get(string k) => body.TryGetValue(k, out var v) ? Values.ToStr(v) : null;
 
             var ev = new LiveEvent
             {
                 BlockId = Get("block") ?? throw new PageException("Live request has no block id."),
-                Handler = body.TryGetValue("handler", out var h) && h != null && PageValues.TryNumber(h, out double hn) ? (int)hn : -1,
+                Handler = body.TryGetValue("handler", out var h) && h != null && Values.TryNumber(h, out double hn) ? (int)hn : -1,
                 State = Verify(Get("state")),
                 Args = Verify(Get("args")),
                 Binds = body.TryGetValue("binds", out var b) && b is Dictionary<string, object> bm ? bm : new Dictionary<string, object>(),

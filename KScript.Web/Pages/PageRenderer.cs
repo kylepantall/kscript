@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
+using KScript.Runtime;
+
 namespace KScript.Pages
 {
     /// <summary>What a page produced: usually HTML, or a response set by &lt;respond&gt; / &lt;redirect&gt;.</summary>
@@ -44,21 +46,13 @@ namespace KScript.Pages
         /// <summary>Set when re-rendering a &lt;live&gt; block for a browser event.</summary>
         public LiveEvent Live { get; set; }
 
-        private PageScripts scripts;
-
-        /// <summary>The scripts pages import with &lt;import src&gt;, run by the KScript interpreter.</summary>
-        internal PageScripts Scripts => scripts ??= new PageScripts(this);
-
         internal int LiveCounter;
-        internal long Steps;
-        internal int CallDepth;
         internal int IncludeDepth;
 
-        internal void Step()
-        {
-            if (++Steps > MaxSteps)
-                throw new PageException($"The page took more than {MaxSteps:N0} steps. Is there an endless loop?");
-        }
+        private PageRuntime runtime;
+
+        /// <summary>The KScript interpreter for this request, made when the page first needs it.</summary>
+        internal PageRuntime Runtime => runtime ??= new PageRuntime(this);
 
         /// <summary>Resolves a path inside the site folder. Paths that would leave it are refused.</summary>
         public string ResolveSitePath(string path, string where = null)
@@ -112,13 +106,25 @@ namespace KScript.Pages
             public bool SwallowNewline;
 
             /// <summary>Inside a &lt;live&gt; block: the block's scope, where its state lives.</summary>
-            public PageScope LiveScope;
+            public Scope LiveScope;
+
+            /// <summary>The file's packages and imported scripts.</summary>
+            public Module Module;
+
+            /// <summary>The file's top-level &lt;import&gt; elements, which run before the rest of it renders.</summary>
+            public HashSet<PageElement> Imports;
+
+            /// <summary>A state for nested content of the same file (a &lt;live&gt; or &lt;markdown&gt; body).</summary>
+            public RenderState With(bool? markdown = null, Scope liveScope = null) => new RenderState
+            {
+                Ctx = Ctx, File = File, Markdown = markdown ?? Markdown, Slot = Slot, LiveScope = liveScope ?? LiveScope, Module = Module, Imports = Imports,
+            };
         }
 
         /// <summary>Renders a page file (relative to the site folder): .html or .md.</summary>
         public static PageResult RenderFile(PageContext ctx, string relativePath, Dictionary<string, object> parameters = null)
         {
-            var scope = NewPageScope(ctx, parameters);
+            var scope = NewScope(ctx, parameters);
             try
             {
                 string html = RenderFileInScope(ctx, relativePath, scope, slot: null);
@@ -135,12 +141,12 @@ namespace KScript.Pages
         public static PageResult RenderString(string template, PageContext ctx = null, bool markdown = false, string fileName = "page.html")
         {
             ctx ??= new PageContext(Directory.GetCurrentDirectory());
-            var scope = NewPageScope(ctx, null);
+            var scope = NewScope(ctx, null);
             try
             {
                 string html = markdown
                     ? RenderMarkdownSource(template, fileName, ctx, scope, null)
-                    : RenderSource(template, 1, new RenderState { Ctx = ctx, File = fileName }, scope);
+                    : RenderSource(template, 1, NewState(ctx, fileName, null, false), scope);
                 return new PageResult { Body = AddLiveRuntime(html.TrimStart()) };
             }
             catch (PageResponseSignal signal)
@@ -158,16 +164,16 @@ namespace KScript.Pages
             return body >= 0 ? html.Insert(body, tag + "\n") : html + "\n" + tag;
         }
 
-        private static PageScope NewPageScope(PageContext ctx, Dictionary<string, object> parameters)
+        private static Scope NewScope(PageContext ctx, Dictionary<string, object> parameters)
         {
-            var globals = new PageScope();
+            var globals = new Scope();
             var request = ctx.Request;
             if (parameters != null) request["params"] = parameters.ToDictionary(kv => kv.Key, kv => kv.Value);
             globals.Declare("request", request);
             return globals.Child();
         }
 
-        private static string RenderFileInScope(PageContext ctx, string relativePath, PageScope scope, string slot)
+        private static string RenderFileInScope(PageContext ctx, string relativePath, Scope scope, string slot)
         {
             if (++ctx.IncludeDepth > 32) throw new PageException($"Layouts, components or includes are nested more than 32 deep (at {relativePath}). Does one include itself?");
             try
@@ -176,7 +182,7 @@ namespace KScript.Pages
                 string name = relativePath.Replace('\\', '/').TrimStart('/');
                 if (name.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
                     return RenderMarkdownSource(text, name, ctx, scope, slot);
-                return RenderSource(text, 1, new RenderState { Ctx = ctx, File = name, Slot = slot }, scope);
+                return RenderSource(text, 1, NewState(ctx, name, slot, false), scope);
             }
             finally
             {
@@ -184,22 +190,30 @@ namespace KScript.Pages
             }
         }
 
-        private static string RenderMarkdownSource(string text, string name, PageContext ctx, PageScope scope, string slot)
+        private static string RenderMarkdownSource(string text, string name, PageContext ctx, Scope scope, string slot)
         {
             var (meta, body, bodyLine) = PageMarkdown.SplitFrontMatter(text);
             var pageScope = scope.Child();
             foreach (var kv in meta) pageScope.Declare(kv.Key, kv.Value);
             pageScope.Declare("page", meta);
 
-            string markdown = RenderSource(body, bodyLine, new RenderState { Ctx = ctx, File = name, Markdown = true, Slot = slot }, pageScope);
+            string markdown = RenderSource(body, bodyLine, NewState(ctx, name, slot, true), pageScope);
             string html = PageMarkdown.ToHtml(markdown);
 
             if (meta.TryGetValue("layout", out var layout) && layout != null)
-                return RenderFileInScope(ctx, PageValues.ToStr(layout), pageScope, html);
+                return RenderFileInScope(ctx, Values.ToStr(layout), pageScope, html);
             return html;
         }
 
-        private static string RenderSource(string text, int firstLine, RenderState state, PageScope scope)
+        private static RenderState NewState(PageContext ctx, string file, string slot, bool markdown)
+        {
+            string full;
+            try { full = ctx.ResolveSitePath(file); }
+            catch (PageException) { full = Path.Combine(ctx.SiteRoot, file); }
+            return new RenderState { Ctx = ctx, File = file, Slot = slot, Markdown = markdown, Module = ctx.Runtime.ModuleFor(file, full) };
+        }
+
+        private static string RenderSource(string text, int firstLine, RenderState state, Scope scope)
         {
             List<PageNode> nodes;
             try
@@ -211,12 +225,28 @@ namespace KScript.Pages
                 ex.Location ??= state.File;
                 throw;
             }
+            // <import> elements at the top of the file run first, so everything in the file can use them.
+            state.Imports = new HashSet<PageElement>(ReferenceEqualityComparer.Instance);
+            foreach (var import in nodes.OfType<PageElement>().Where(e => e.Name == "import"))
+            {
+                state.Imports.Add(import);
+                try
+                {
+                    state.Ctx.Runtime.Import(state.Module, import, scope, state.Ctx, state.File);
+                }
+                catch (PageException ex)
+                {
+                    ex.Location ??= $"{state.File}:{import.Line}";
+                    throw;
+                }
+            }
+
             var sb = new StringBuilder();
             RenderNodes(nodes, scope, sb, state);
             return sb.ToString();
         }
 
-        private static void RenderNodes(List<PageNode> nodes, PageScope scope, StringBuilder sb, RenderState state)
+        private static void RenderNodes(List<PageNode> nodes, Scope scope, StringBuilder sb, RenderState state)
         {
             // State of the current if / elif / else (or for / else) chain: null when there is no chain.
             bool? chainMatched = null;
@@ -237,7 +267,7 @@ namespace KScript.Pages
                         if (text.Raw) sb.Append(t);
                         else
                         {
-                            sb.Append(Interpolate(t, scope, state.Ctx, state.Markdown ? EscapeMode.Markdown : EscapeMode.Html));
+                            sb.Append(Interpolate(t, scope, state, state.Markdown ? EscapeMode.Markdown : EscapeMode.Html));
                             if (text.Text.Trim().Length > 0) chainMatched = null;
                         }
                         continue;
@@ -283,18 +313,22 @@ namespace KScript.Pages
                     ex.Location ??= $"{state.File}:{node.Line}";
                     throw;
                 }
+                catch (KScriptException ex)
+                {
+                    throw new PageException(ex.Message, ex) { Location = $"{state.File}:{node.Line}" };
+                }
             }
         }
 
-        private static bool Test(PageElement el, PageScope scope, RenderState state)
+        private static bool Test(PageElement el, Scope scope, RenderState state)
         {
             string test = el.Attr("test") ?? throw new PageException($"<{el.Name}> needs a test attribute, e.g. <{el.Name} test=\"$count gt 0\">.");
-            return PageValues.Truthy(Eval(test, scope, state));
+            return Values.Truthy(Eval(test, scope, state));
         }
 
-        private static object Eval(string expr, PageScope scope, RenderState state) => PageEvaluator.Evaluate(expr, scope, state.Ctx);
+        private static object Eval(string expr, Scope scope, RenderState state) => state.Ctx.Runtime.Evaluate(expr, scope, state.Module);
 
-        private static void RenderElement(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
+        private static void RenderElement(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
             switch (el.Name)
             {
@@ -304,7 +338,7 @@ namespace KScript.Pages
                     return;
 
                 case "do":
-                    RunStatements(InnerText(el), scope, state, declare: false);
+                    state.Ctx.Runtime.Execute(InnerText(el), scope, state.Module, declare: false);
                     return;
 
                 case "while":
@@ -326,18 +360,13 @@ namespace KScript.Pages
                 case "default":
                     throw new PageException($"<{el.Name}> must be inside <match>.");
 
+                case "import":
+                    if (state.Imports != null && state.Imports.Contains(el)) return;
+                    throw new PageException("<import> must be at the top level of the page, not inside another element.");
+
                 case "live":
                     RenderLive(el, scope, sb, state);
                     return;
-
-                case "import":
-                {
-                    if (el.Attr("package") != null)
-                        throw new PageException("Pages can't import packages. Put the code that needs KScript.Math, KScript.IO and so on in a script and import that: <import src=\"lib/tools.ks.xml\" />.");
-                    string src = el.Attr("src") ?? throw new PageException("<import> in a page needs src, a script relative to the site folder: <import src=\"lib/life.ks.xml\" />.");
-                    state.Ctx.Scripts.Import(src, el.Attr("names"), el.Attr("as"), scope);
-                    return;
-                }
 
                 case "state":
                     // Handled by the enclosing <live>.
@@ -352,7 +381,7 @@ namespace KScript.Pages
                     RenderNodes(el.Children, inner, body, state);
                     var layoutScope = scope.Child();
                     foreach (var a in el.Attributes.Where(a => a.Name != "src")) layoutScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
-                    AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state.Ctx, EscapeMode.None), layoutScope, body.ToString()), state);
+                    AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), layoutScope, body.ToString()), state);
                     return;
                 }
 
@@ -366,14 +395,14 @@ namespace KScript.Pages
                     string src = el.Attr("src") ?? throw new PageException("<include> needs a src attribute.");
                     var incScope = scope.Child();
                     foreach (var a in el.Attributes.Where(a => a.Name != "src")) incScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
-                    AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state.Ctx, EscapeMode.None), incScope, null), state);
+                    AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), incScope, null), state);
                     return;
                 }
 
                 case "markdown":
                 {
                     var md = new StringBuilder();
-                    RenderNodes(el.Children, scope.Child(), md, new RenderState { Ctx = state.Ctx, File = state.File, Markdown = true, Slot = state.Slot, LiveScope = state.LiveScope });
+                    RenderNodes(el.Children, scope.Child(), md, state.With(markdown: true));
                     sb.Append(PageMarkdown.ToHtml(PageMarkdown.Dedent(md.ToString())));
                     return;
                 }
@@ -381,21 +410,21 @@ namespace KScript.Pages
                 case "respond":
                 {
                     var result = new PageResult();
-                    if (el.Attr("status") is string status) result.Status = (int)PageValues.ToNumber(Eval(status, scope, state), "<respond status>");
+                    if (el.Attr("status") is string status) result.Status = (int)Values.ToNumber(Eval(status, scope, state), "<respond status>");
                     if (el.Attr("json") is string json)
                     {
                         result.ContentType = "application/json; charset=utf-8";
-                        result.Body = PageValues.ToJsonString(Eval(json, scope, state), indented: true);
+                        result.Body = Values.ToJson(Eval(json, scope, state), indented: true);
                     }
                     else
                     {
                         var body = new StringBuilder();
                         RenderNodes(el.Children, scope.Child(), body, state);
                         result.Body = body.ToString().Trim();
-                        if (el.Attr("type") is string type) result.ContentType = Interpolate(type, scope, state.Ctx, EscapeMode.None);
+                        if (el.Attr("type") is string type) result.ContentType = Interpolate(type, scope, state, EscapeMode.None);
                     }
                     foreach (var a in el.Attributes.Where(a => a.Name.StartsWith("header-", StringComparison.Ordinal)))
-                        result.Headers[a.Name.Substring(7)] = Interpolate(a.Value ?? string.Empty, scope, state.Ctx, EscapeMode.None);
+                        result.Headers[a.Name.Substring(7)] = Interpolate(a.Value ?? string.Empty, scope, state, EscapeMode.None);
                     throw new PageResponseSignal(result);
                 }
 
@@ -403,8 +432,8 @@ namespace KScript.Pages
                 {
                     string to = el.Attr("to") ?? throw new PageException("<redirect> needs a to attribute, e.g. <redirect to=\"/thanks\" />.");
                     var result = new PageResult { Status = 302, Body = string.Empty };
-                    if (el.Attr("status") is string status) result.Status = (int)PageValues.ToNumber(Eval(status, scope, state), "<redirect status>");
-                    result.Headers["Location"] = Interpolate(to, scope, state.Ctx, EscapeMode.None);
+                    if (el.Attr("status") is string status) result.Status = (int)Values.ToNumber(Eval(status, scope, state), "<redirect status>");
+                    result.Headers["Location"] = Interpolate(to, scope, state, EscapeMode.None);
                     throw new PageResponseSignal(result);
                 }
             }
@@ -445,7 +474,7 @@ namespace KScript.Pages
 
         private static string VarName(string attributeName) => attributeName.Replace('-', '_');
 
-        private static bool TryComponent(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
+        private static bool TryComponent(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
             string path = $"_components/{el.Name}.html";
             if (!state.Ctx.SiteFileExists(path))
@@ -466,7 +495,7 @@ namespace KScript.Pages
             return true;
         }
 
-        private static void RenderHtmlElement(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
+        private static void RenderHtmlElement(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
             sb.Append('<').Append(el.SourceName ?? el.Name);
             bool hasHandler = false;
@@ -483,8 +512,8 @@ namespace KScript.Pages
                 if (a.Name == "every" && el.HasAttr("on-tick"))
                 {
                     // <span on-tick="..." every="200">: how often, in milliseconds, the tick handler runs.
-                    double ms = PageValues.ToNumber(TryWholeExpression(a.Value ?? string.Empty, out string everyExpr, out _) ? Eval(everyExpr, scope, state) : a.Value, "every");
-                    sb.Append(" data-ks-every=\"").Append(PageValues.FormatNumber(Math.Max(16, ms))).Append('"');
+                    double ms = Values.ToNumber(TryWholeExpression(a.Value ?? string.Empty, out string everyExpr, out _) ? Eval(everyExpr, scope, state) : a.Value, "every");
+                    sb.Append(" data-ks-every=\"").Append(Values.ToStr(Math.Max(16, Math.Round(ms)))).Append('"');
                     continue;
                 }
                 if (a.Name == "bind")
@@ -492,16 +521,16 @@ namespace KScript.Pages
                     if (state.LiveScope == null) throw new PageException("bind only works inside a <live> block.");
                     string name = (a.Value ?? string.Empty).Trim().TrimStart('$');
                     if (!scope.TryGet(name, out var bound)) throw new PageException($"bind=\"{name}\": ${name} is not defined. Declare it with <state name=\"{name}\" value=\"''\" />.");
-                    sb.Append(" data-ks-bind=\"").Append(PageValues.HtmlEscape(name)).Append('"');
+                    sb.Append(" data-ks-bind=\"").Append(Values.HtmlEscape(name)).Append('"');
                     if (el.Name == "input" && string.Equals(el.Attr("type"), "checkbox", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (PageValues.Truthy(bound)) sb.Append(" checked");
+                        if (Values.Truthy(bound)) sb.Append(" checked");
                     }
                     else if (el.Name != "textarea" && el.Name != "select")
                     {
-                        sb.Append(" value=\"").Append(PageValues.HtmlEscape(PageValues.ToStr(bound))).Append('"');
+                        sb.Append(" value=\"").Append(Values.HtmlEscape(Values.ToStr(bound))).Append('"');
                     }
-                    if (!el.HasAttr("name")) sb.Append(" name=\"").Append(PageValues.HtmlEscape(name)).Append('"');
+                    if (!el.HasAttr("name")) sb.Append(" name=\"").Append(Values.HtmlEscape(name)).Append('"');
                     continue;
                 }
                 if (a.Value == null) { sb.Append(' ').Append(a.SourceName ?? a.Name); continue; }
@@ -511,26 +540,26 @@ namespace KScript.Pages
                     object v = Eval(expr, scope, state);
                     if (v == null || v is bool b && !b) continue;
                     if (v is bool) { sb.Append(' ').Append(a.SourceName ?? a.Name); continue; }
-                    string s = PageValues.ToStr(v);
-                    sb.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(raw ? s.Replace("\"", "&quot;") : PageValues.HtmlEscape(s)).Append('"');
+                    string s = Values.ToStr(v);
+                    sb.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(raw ? s.Replace("\"", "&quot;") : Values.HtmlEscape(s)).Append('"');
                     continue;
                 }
 
-                string value = Interpolate(a.Value, scope, state.Ctx, EscapeMode.Html);
+                string value = Interpolate(a.Value, scope, state, EscapeMode.Html);
                 sb.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(value.Replace("\"", "&quot;")).Append('"');
             }
 
             if (hasHandler)
             {
                 var locals = LocalVariables(scope, state.LiveScope);
-                if (locals.Count > 0) sb.Append(" data-ks-args=\"").Append(PageValues.HtmlEscape(PageLive.Sign(locals))).Append('"');
+                if (locals.Count > 0) sb.Append(" data-ks-args=\"").Append(Values.HtmlEscape(PageLive.Sign(locals))).Append('"');
             }
 
             if (el.Void) { sb.Append('>'); return; }
             sb.Append('>');
             if (el.Name == "textarea" && el.Attr("bind") is string tb && scope.TryGet(tb.Trim().TrimStart('$'), out var tv))
             {
-                sb.Append(PageValues.HtmlEscape(PageValues.ToStr(tv))).Append("</textarea>");
+                sb.Append(Values.HtmlEscape(Values.ToStr(tv))).Append("</textarea>");
                 return;
             }
             RenderNodes(el.Children, scope.Child(), sb, state);
@@ -538,11 +567,11 @@ namespace KScript.Pages
         }
 
         /// <summary>Attribute values for layouts, includes and components: a whole <c>{expr}</c> passes the value itself.</summary>
-        private static object AttributeValue(PageAttribute a, PageScope scope, RenderState state)
+        private static object AttributeValue(PageAttribute a, Scope scope, RenderState state)
         {
             if (a.Value == null) return true;
             if (TryWholeExpression(a.Value, out string expr, out _)) return Eval(expr, scope, state);
-            return Interpolate(a.Value, scope, state.Ctx, EscapeMode.None);
+            return Interpolate(a.Value, scope, state, EscapeMode.None);
         }
 
         /// <summary>True when the text is exactly one <c>{ expression }</c> (or <c>{! expression }</c>).</summary>
@@ -559,7 +588,7 @@ namespace KScript.Pages
             return expr.Trim().Length > 0;
         }
 
-        private static bool RenderFor(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
+        private static bool RenderFor(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
             string each = el.Attr("each") ?? throw new PageException("<for> needs each and in attributes, e.g. <for each=\"p\" in=\"$people\">.");
             string inExpr = el.Attr("in") ?? throw new PageException("<for> needs an in attribute, e.g. <for each=\"p\" in=\"$people\">.");
@@ -574,7 +603,7 @@ namespace KScript.Pages
                 Dictionary<string, object> map => map.Select(kv => (names.Length > 1 ? kv.Value : new Dictionary<string, object> { ["key"] = kv.Key, ["value"] = kv.Value }, (object)kv.Key)),
                 double n => Enumerable.Range(0, Math.Max(0, (int)n)).Select(x => ((object)(double)x, (object)null)),
                 string s => s.Select(ch => ((object)ch.ToString(), (object)null)),
-                _ => throw new PageException($"<for> can't loop over {PageValues.Describe(source)}."),
+                _ => throw new PageException($"<for> can't loop over {Values.Describe(source)}."),
             };
 
             int index = 0;
@@ -602,7 +631,7 @@ namespace KScript.Pages
         /// A &lt;live&gt; block is re-rendered on the server when its handlers run in the browser.
         /// Its &lt;state&gt; travels with the page, signed, so the server keeps nothing between requests.
         /// </summary>
-        private static void RenderLive(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
+        private static void RenderLive(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
             if (state.LiveScope != null) throw new PageException("<live> blocks can't be nested.");
             var ctx = state.Ctx;
@@ -631,7 +660,7 @@ namespace KScript.Pages
                 foreach (var kv in ctx.Live.Binds)
                 {
                     if (!stateNames.Contains(kv.Key)) continue;
-                    liveScope.Assign(kv.Key, kv.Value is string sv && liveScope.TryGet(kv.Key, out var old) && old is double && PageValues.TryNumber(sv, out double num) ? num : kv.Value);
+                    liveScope.Assign(kv.Key, kv.Value is string sv && liveScope.TryGet(kv.Key, out var old) && old is double && Values.TryNumber(sv, out double num) ? num : kv.Value);
                 }
 
                 if (ctx.Live.Handler >= 0)
@@ -640,32 +669,32 @@ namespace KScript.Pages
                     var handlerScope = liveScope.Child();
                     foreach (var kv in ctx.Live.Args) handlerScope.Declare(kv.Key, kv.Value);
                     handlerScope.Declare("event", ctx.Live.Event);
-                    RunStatements(handlers[ctx.Live.Handler].Value ?? string.Empty, handlerScope, state, declare: false);
+                    ctx.Runtime.Execute(handlers[ctx.Live.Handler].Value ?? string.Empty, handlerScope, state.Module, declare: false);
                 }
             }
 
             var body = new StringBuilder();
-            var inner = new RenderState { Ctx = ctx, File = state.File, Markdown = state.Markdown, Slot = state.Slot, LiveScope = liveScope };
+            var inner = state.With(liveScope: liveScope);
             RenderNodes(el.Children, liveScope, body, inner);
 
             var values = new Dictionary<string, object>();
             foreach (var name in stateNames)
             {
                 liveScope.TryGet(name, out var v);
-                if (v is PageLambda || v is KScript.Runtime.ICallable) throw new PageException($"State ${name} holds a function, which can't be sent to the browser.");
+                if (v is ICallable) throw new PageException($"State ${name} holds a lambda, which can't be sent to the browser.");
                 values[name] = v;
             }
 
             string tag = el.Attr("as") ?? "div";
             var html = new StringBuilder();
-            html.Append('<').Append(tag).Append(" data-ks-live=\"").Append(PageValues.HtmlEscape(id)).Append('"');
-            html.Append(" data-ks-state=\"").Append(PageValues.HtmlEscape(PageLive.Sign(values))).Append('"');
+            html.Append('<').Append(tag).Append(" data-ks-live=\"").Append(Values.HtmlEscape(id)).Append('"');
+            html.Append(" data-ks-state=\"").Append(Values.HtmlEscape(PageLive.Sign(values))).Append('"');
             foreach (var a in el.Attributes.Where(a => a.Name != "id" && a.Name != "as"))
             {
                 if (a.Value == null) html.Append(' ').Append(a.SourceName ?? a.Name);
-                else html.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(Interpolate(a.Value, scope, ctx, EscapeMode.Html).Replace("\"", "&quot;")).Append('"');
+                else html.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(Interpolate(a.Value, scope, state, EscapeMode.Html).Replace("\"", "&quot;")).Append('"');
             }
-            html.Append(" id=\"").Append(PageValues.HtmlEscape(id)).Append("\">");
+            html.Append(" id=\"").Append(Values.HtmlEscape(id)).Append("\">");
             html.Append(body).Append("</").Append(tag).Append('>');
 
             if (target)
@@ -677,21 +706,21 @@ namespace KScript.Pages
         }
 
         /// <summary>Variables declared between a handler's element and its live block, e.g. the loop item.</summary>
-        private static Dictionary<string, object> LocalVariables(PageScope scope, PageScope liveScope)
+        private static Dictionary<string, object> LocalVariables(Scope scope, Scope liveScope)
         {
             var locals = new Dictionary<string, object>();
             for (var s = scope; s != null && s != liveScope; s = s.Parent)
             {
                 foreach (var kv in s.OwnVariables)
                 {
-                    if (kv.Value is PageLambda || kv.Value is KScript.Runtime.ICallable || locals.ContainsKey(kv.Key)) continue;
+                    if (kv.Value is ICallable || locals.ContainsKey(kv.Key)) continue;
                     locals[kv.Key] = kv.Value;
                 }
             }
             return locals;
         }
 
-        private static void RenderMatch(PageElement el, PageScope scope, StringBuilder sb, RenderState state)
+        private static void RenderMatch(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
             string valueExpr = el.Attr("value") ?? throw new PageException("<match> needs a value attribute.");
             object value = Eval(valueExpr, scope, state);
@@ -706,10 +735,10 @@ namespace KScript.Pages
                 {
                     if (c.Attr("is") is string isExpr)
                     {
-                        var options = Eval("[" + isExpr + "]", matchScope, state) as List<object>;
-                        hit = options.Any(o => PageValues.LooseEquals(o, value));
+                        var options = state.Ctx.Runtime.EvaluateList(isExpr, matchScope, state.Module);
+                        hit = options.Any(o => Values.LooseEquals(o, value));
                     }
-                    else if (c.Attr("when") is string when) hit = PageValues.Truthy(Eval(when, matchScope, state));
+                    else if (c.Attr("when") is string when) hit = Values.Truthy(Eval(when, matchScope, state));
                     else throw new PageException("<case> needs an is or when attribute.");
                 }
                 else throw new PageException($"Only <case> and <default> can go inside <match>, not <{c.Name}>.");
@@ -725,14 +754,14 @@ namespace KScript.Pages
         private static string InnerText(PageElement el) =>
             string.Concat(el.Children.Select(c => c is PageText t ? t.Text : throw new PageException($"<{el.Name}> can only contain text, not <{((PageElement)c).Name}>.")));
 
-        private static void Assign(PageElement el, PageScope scope, RenderState state, bool declare)
+        private static void Assign(PageElement el, Scope scope, RenderState state, bool declare)
         {
             string name = el.Attr("name");
             if (name == null)
             {
                 string statements = InnerText(el);
                 if (statements.Trim().Length == 0) throw new PageException($"<{el.Name}> needs a name and value, e.g. <{el.Name} name=\"count\" value=\"0\" />, or a statement like <{el.Name}>count = 0</{el.Name}>.");
-                RunStatements(statements, scope, state, declare);
+                state.Ctx.Runtime.Execute(statements, scope, state.Module, declare);
                 return;
             }
 
@@ -749,113 +778,26 @@ namespace KScript.Pages
             if (op != null && op != "=")
             {
                 if (!scope.TryGet(name, out var current)) throw new PageException($"${name} is not defined, so op=\"{op}\" can't update it.");
-                value = Combine(current, op, value);
+                value = state.Ctx.Runtime.Combine(current, op, value, state.Module);
             }
 
             if (declare) scope.Declare(name, value);
             else scope.Assign(name, value);
         }
 
-        private static readonly Regex Statement = new Regex(@"^\s*\$?([A-Za-z_]\w*)\s*(\+=|-=|\*=|/=|\?\?=|=)(?!=)\s*(.+?)\s*$", RegexOptions.Singleline);
-
-        /// <summary>Runs <c>x = 3; $total += $price</c> style statements.</summary>
-        private static void RunStatements(string text, PageScope scope, RenderState state, bool declare)
-        {
-            foreach (string stmt in SplitStatements(text))
-            {
-                var m = Statement.Match(stmt);
-                if (!m.Success) throw new PageException($"Expected an assignment like 'x = 3' or '$x += 1', but got: {stmt.Trim()}");
-                string name = m.Groups[1].Value, op = m.Groups[2].Value;
-                object value = Eval(m.Groups[3].Value, scope, state);
-                if (op != "=")
-                {
-                    if (!scope.TryGet(name, out var current)) throw new PageException($"${name} is not defined, so '{op}' can't update it.");
-                    value = Combine(current, op, value);
-                }
-                if (declare) scope.Declare(name, value);
-                else scope.Assign(name, value);
-            }
-        }
-
-        private static object Combine(object current, string op, object value)
-        {
-            switch (op)
-            {
-                case "??=": return current ?? value;
-                case "+=":
-                    if (current is double a && value is double b) return a + b;
-                    if (current is List<object> list) return value is List<object> more ? list.Concat(more).ToList() : list.Append(value).ToList();
-                    if (current is string || value is string) return PageValues.ToStr(current) + PageValues.ToStr(value);
-                    return PageValues.ToNumber(current, "+=") + PageValues.ToNumber(value, "+=");
-                case "-=": return PageValues.ToNumber(current, "-=") - PageValues.ToNumber(value, "-=");
-                case "*=": return PageValues.ToNumber(current, "*=") * PageValues.ToNumber(value, "*=");
-                case "/=":
-                    double d = PageValues.ToNumber(value, "/=");
-                    if (d == 0) throw new PageException("Division by zero in '/='.");
-                    return PageValues.ToNumber(current, "/=") / d;
-            }
-            throw new PageException($"Unknown assignment operator '{op}'.");
-        }
-
-        private static IEnumerable<string> SplitStatements(string text)
-        {
-            int depth = 0, start = 0;
-            char quote = '\0';
-            for (int i = 0; i < text.Length; i++)
-            {
-                char c = text[i];
-                if (quote != '\0') { if (c == '\\') i++; else if (c == quote) quote = '\0'; continue; }
-                if (c == '\'' || c == '"') quote = c;
-                else if (c == '(' || c == '[' || c == '{') depth++;
-                else if (c == ')' || c == ']' || c == '}') depth--;
-                else if ((c == ';' || c == '\n') && depth == 0)
-                {
-                    string part = text.Substring(start, i - start);
-                    if (part.Trim().Length > 0) yield return part;
-                    start = i + 1;
-                }
-            }
-            string last = text.Substring(start);
-            if (last.Trim().Length > 0) yield return last;
-        }
-
         internal enum EscapeMode { Html, Markdown, None }
 
         /// <summary>Replaces <c>{ expr }</c> in text. <c>{{</c> and <c>}}</c> are literal braces; <c>{! expr }</c> is not escaped.</summary>
-        internal static string Interpolate(string text, PageScope scope, PageContext ctx, EscapeMode mode)
+        private static string Interpolate(string text, Scope scope, RenderState state, EscapeMode mode)
         {
             if (text.IndexOf('{') < 0 && text.IndexOf('}') < 0) return text;
-            var sb = new StringBuilder(text.Length);
-            int i = 0;
-            while (i < text.Length)
+            Func<string, string> escape = mode switch
             {
-                char c = text[i];
-                if (c == '{' && i + 1 < text.Length && text[i + 1] == '{') { sb.Append('{'); i += 2; continue; }
-                if (c == '}' && i + 1 < text.Length && text[i + 1] == '}') { sb.Append('}'); i += 2; continue; }
-                if (c == '{')
-                {
-                    int end = FindClose(text, i + 1);
-                    if (end < 0) throw new PageException($"Missing '}}' to close '{{' in: {Snippet(text, i)}. Write {{{{ for a literal brace.");
-                    string expr = text.Substring(i + 1, end - i - 1);
-                    bool raw = expr.StartsWith("!", StringComparison.Ordinal) && !expr.StartsWith("!=", StringComparison.Ordinal);
-                    if (raw) expr = expr.Substring(1);
-                    if (expr.Trim().Length == 0) throw new PageException($"Empty {{ }} in: {Snippet(text, i)}. Write {{{{ }}}} for literal braces.");
-                    string value = PageValues.ToStr(PageEvaluator.Evaluate(expr, scope, ctx));
-                    sb.Append(raw || mode == EscapeMode.None ? value : mode == EscapeMode.Markdown ? PageValues.MarkdownEscape(value) : PageValues.HtmlEscape(value));
-                    i = end + 1;
-                    continue;
-                }
-                sb.Append(c);
-                i++;
-            }
-            return sb.ToString();
-        }
-
-        private static string Snippet(string text, int at)
-        {
-            int start = Math.Max(0, at - 10);
-            string s = text.Substring(start, Math.Min(50, text.Length - start)).Replace('\n', ' ').Trim();
-            return s;
+                EscapeMode.Html => Values.HtmlEscape,
+                EscapeMode.Markdown => PageMarkdown.Escape,
+                _ => null,
+            };
+            return state.Ctx.Runtime.Interpolate(text, scope, state.Module, escape);
         }
 
         /// <summary>Finds the '}' that closes a '{' opened just before <paramref name="from"/>, skipping strings and nested braces.</summary>
