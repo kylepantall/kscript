@@ -40,6 +40,33 @@ namespace KScript.Projects
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
     }
 
+    /// <summary>The <c>test</c> section: used by <c>kscript test</c>.</summary>
+    public sealed class TestSettings
+    {
+        /// <summary>The test files <c>kscript test</c> runs when given a folder. Globs relative to kscript.json.</summary>
+        public List<string> Include { get; set; } = new List<string>(DefaultInclude);
+
+        /// <summary>Files and folders that are never run as tests.</summary>
+        public List<string> Exclude { get; set; } = new List<string>(DefaultExclude);
+
+        /// <summary>How long one test may run, in seconds, before it fails. 0 means no limit.</summary>
+        public double Timeout { get; set; } = DefaultTimeout;
+
+        /// <summary>Packages imported by every test file, on top of the project's packages.</summary>
+        public List<string> Packages { get; set; } = new List<string>();
+
+        public const double DefaultTimeout = 10;
+        public static readonly string[] DefaultInclude = { "**/*.test.ks.xml", "**/*.test.xml" };
+        public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
+
+        /// <summary>True for a file named like a test: <c>name.test.ks.xml</c> or <c>name.test.xml</c>.</summary>
+        public static bool IsTestFileName(string path)
+        {
+            string name = Path.GetFileName(path ?? string.Empty);
+            return name.EndsWith(".test.ks.xml", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".test.xml", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     /// <summary>
     /// A KScript project's settings, read from <c>kscript.json</c> in the project folder. <c>kscript serve</c>,
     /// <c>kscript check</c>, <c>kscript make</c> and the language server look for it in the folder they work on and
@@ -71,6 +98,7 @@ namespace KScript.Projects
         public string Name { get; set; }
         public ServeSettings Serve { get; } = new ServeSettings();
         public LintSettings Lint { get; } = new LintSettings();
+        public TestSettings Test { get; } = new TestSettings();
 
         /// <summary>
         /// Packages every script in the project imports without an &lt;import&gt;, such as KScript.Terminal.
@@ -156,6 +184,9 @@ namespace KScript.Projects
                         case "lint":
                             ReadLint(prop.Value, config);
                             break;
+                        case "test":
+                            ReadTest(prop.Value, config);
+                            break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
                             foreach (string package in config.Packages)
@@ -165,7 +196,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve or lint).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, packages, serve, lint or test).");
                             break;
                     }
                 }
@@ -233,6 +264,52 @@ namespace KScript.Projects
                         break;
                 }
             }
+        }
+
+        private static void ReadTest(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "test", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                switch (p.Name)
+                {
+                    case "include":
+                        config.Test.Include = Strings(p.Value, "test.include", config) ?? config.Test.Include;
+                        break;
+                    case "exclude":
+                        config.Test.Exclude = Strings(p.Value, "test.exclude", config) ?? config.Test.Exclude;
+                        break;
+                    case "timeout":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetDouble(out double seconds) && seconds >= 0) config.Test.Timeout = seconds;
+                        else config.Warnings.Add("test.timeout should be a number of seconds (0 for no limit).");
+                        break;
+                    case "packages":
+                        config.Test.Packages = Strings(p.Value, "test.packages", config) ?? config.Test.Packages;
+                        foreach (string package in config.Test.Packages)
+                        {
+                            if (!KScript.Runtime.PackageRegistry.Default.IsKnown(package))
+                                config.Warnings.Add($"test.packages: there is no package '{package}'.");
+                        }
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'test.{p.Name}' (expected include, exclude, timeout or packages).");
+                        break;
+                }
+            }
+        }
+
+        /// <summary>True when the file matches test.include and not test.exclude.</summary>
+        public bool IsTestIncluded(string path)
+        {
+            string rel = Relative(path);
+            return rel != null && Test.Include.Any(g => GlobMatches(g, rel)) && !Test.Exclude.Any(g => GlobMatches(g, rel));
+        }
+
+        /// <summary>True when the file or folder is under the project folder and matches test.exclude.</summary>
+        public bool IsTestExcluded(string path)
+        {
+            string rel = Relative(path);
+            return rel != null && Test.Exclude.Any(g => GlobMatches(g, rel));
         }
 
         private static bool Object(JsonElement e, string name, ProjectConfig config)

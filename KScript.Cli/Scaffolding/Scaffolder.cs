@@ -115,6 +115,14 @@ namespace KScript.Scaffolding
             else if (values["kebab"].Length == 0)
                 throw new StubException($"'{request.Name}' has no letters or digits to make a file name from.");
 
+            // base: project makes `to` relative to the project folder (where kscript.json is) instead of the site root,
+            // for files that aren't part of the site, such as tests.
+            if (header.TryGetValue("base", out var baseDir) && string.Equals(baseDir.Trim(), "project", StringComparison.OrdinalIgnoreCase)
+                && KScript.Projects.ProjectConfig.FindAndLoad(root) is KScript.Projects.ProjectConfig project)
+            {
+                root = project.Directory;
+            }
+
             string to = request.To != null ? request.To : header.TryGetValue("to", out var t)
                 ? StubTemplate.Render(t, values).Trim()
                 : values["dir"] + values["kebab"] + Path.GetExtension(template.FileName);

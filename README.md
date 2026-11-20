@@ -97,6 +97,7 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 | `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
 | `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/` | Packages: each registers its elements, commands and methods, with their documentation. |
 | `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
+| `KScript.Test/` | The KScript.Test package and `kscript test`: finding test files, running them, and the console and JUnit reports. |
 | `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` starter in `Scaffolding/Project/`), `kscript migrate` (`Migration/`), `kscript ide` and `kscript update`. |
 | `KScriptApp/` | The `kscript` command line app. |
 | `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
@@ -110,7 +111,7 @@ Other editors with LSP support work too: `kscript ide config neovim` (or `helix`
 
 `KScript.Tests` covers the interpreter, every package, `kscript serve` pages, `kscript make`, `kscript.json` and the sample scripts; `KScript.Language.Tests` covers the analyzer, the editor features and the language server. Run them with `dotnet test KScript.sln`.
 
-Every push to `master` and every pull request runs [the CI workflow](.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `Example Scripts/Find Oldest Person.xml`, and checks the sample scripts with `kscript check`, on three platforms:
+Every push to `master` and every pull request runs [the CI workflow](.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `Example Scripts/Find Oldest Person.xml`, checks the sample scripts with `kscript check` and runs their KScript tests with `kscript test`, on three platforms:
 
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
@@ -225,6 +226,7 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 | `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages don't need imports. |
+| `KScript.Test` | `<test>`, `<describe>`, `<before-each>`, `<after-each>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](#testing-scripts-kscript-test)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. An element written with the `KScript.` prefix, such as `<KScript.input>`, imports the package that has it without an `<import>`. A project can import packages for every script in `kscript.json` (below).
 
@@ -317,9 +319,10 @@ kscript make project my-site --port 3000
 cd my-site
 kscript serve      # http://localhost:3000, from kscript.json
 kscript check      # checks every page and script in the project
+kscript test       # runs the tests in tests/
 ```
 
-It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_components/site-nav.html`, `site.css`, `scripts/hello.ks.xml` and `.vscode/extensions.json`, which asks VS Code to install the KScript extension. `kscript make project .` sets up the current folder; existing files are never replaced without `--force`.
+It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_components/site-nav.html`, `site.css`, `lib/greeting.ks.xml` (a function), `scripts/hello.ks.xml` (a script that uses it), `tests/greeting.test.ks.xml` (tests for both, run with `kscript test`) and `.vscode/extensions.json`, which asks VS Code to install the KScript extension. `kscript make project .` sets up the current folder; existing files are never replaced without `--force`.
 
 ### Project settings: kscript.json
 
@@ -339,6 +342,12 @@ It creates `kscript.json`, `index.html`, `about.md`, `_layout.html`, `_component
     "exclude": ["_templates", "node_modules", "drafts/**"], // never checked, on the command line or in the editor
     "rules": { "KS3003": "off", "KS4*": "error" },          // off, hint, info, warning or error, by code or prefix
     "warningsAsErrors": false                               // same as kscript check --warnaserror
+  },
+  "test": {
+    "include": ["tests/**/*.test.ks.xml"],  // what `kscript test` runs (default: **/*.test.ks.xml and **/*.test.xml)
+    "exclude": ["tests/slow"],
+    "timeout": 10,                          // seconds per test, 0 for no limit
+    "packages": ["KScript.Terminal"]        // imported by test files only
   }
 }
 ```
@@ -360,6 +369,7 @@ kscript make page "people/[id]"                       # people/[id].html, with $
 kscript make markdown blog/first-post                 # blog/first-post.md with front matter
 kscript make layout main --css /site.css              # _layouts/main.html
 kscript make script tidy-downloads                    # tidy-downloads.xml
+kscript make test checkout                            # tests/checkout.test.ks.xml, in the project folder
 kscript make                                          # list every template
 ```
 
@@ -384,11 +394,54 @@ hint: Use it in a page: <{{ kebab }}-card />
 </article>
 ```
 
-- The `--- make` header is optional: `to` is where the file goes (default: the name with the template's extension), `hint` is printed afterwards, `description` shows in `kscript make`.
+- The `--- make` header is optional: `to` is where the file goes (default: the name with the template's extension), `hint` is printed afterwards, `description` shows in `kscript make`. `base: project` makes `to` relative to the project folder (where `kscript.json` is) rather than the site root, as the `test` template does.
 - `{{ name }}` is the name as typed; `{{ kebab }}`, `{{ snake }}`, `{{ pascal }}`, `{{ camel }}` and `{{ title }}` are its other spellings; `{{ dir }}` is its folder (`blog/` for `blog/first-post`), `{{ path }}` is folder and kebab name, `{{ url }}` its page URL, and `{{ params }}` lists `[id]` segments.
 - `{{ value | kebab }}` applies a filter (`kebab snake pascal camel title var lower upper trim`; `var` turns `sub-title` into the `sub_title` a component sees), and `{{ value ?? fallback }}` gives a default.
 - `{{#if value}} … {{else}} … {{/if}}`, `{{#unless value}}`, and `{{#each value}} … {{ item }} … {{/each}}` over a comma-separated list (`{{ index }}`, `{{ first }}` and `{{ last }}` are set). A block tag on its own line leaves no blank line behind.
 - Single braces are left alone, so KScript's `{$value}` is written as is.
+
+## Testing scripts: kscript test
+
+Tests are scripts named `name.test.ks.xml`, usually in a `tests/` folder. `kscript test` runs every one in the project, prints each result, and exits with 1 if any test failed, so it can gate CI.
+
+```xml
+<!-- tests/greeting.test.ks.xml -->
+<kscript>
+  <import src="../lib/greeting.ks.xml" />
+
+  <describe name="greeting">
+    <test name="says hello">
+      <expect value="@greeting('Joan')" equals="'Hello, Joan!'" />
+    </test>
+
+    <test name="tidies '{$name}'" each="name" in="['  joan ', 'JOAN']">
+      <expect value="@greeting($name)" equals="'Hello, Joan!'" />
+    </test>
+  </describe>
+
+  <test name="hello.ks.xml greets the name it is given">
+    <let name="run" value="@run_script('../scripts/hello.ks.xml', { args: ['ellie'] })" />
+    <expect value="$run.output" equals="'Hello, Ellie!'" />
+    <assert test="$run.code eq 0" />
+  </test>
+</kscript>
+```
+
+```sh
+kscript test                            # every test in the project
+kscript test tests/cart                 # a folder, or name one or more files
+kscript test --filter "greeting › says" # tests whose full name contains the text
+kscript test --junit test-results.xml   # a JUnit XML report for CI
+kscript make test checkout              # start tests/checkout.test.ks.xml
+```
+
+- A file's top-level code (imports, variables, functions, `<describe>`) runs once; then each `<test>` runs on its own, so one failing test doesn't stop the others. `<before-each>` and `<after-each>` run around every test in their file or `<describe>`.
+- `<expect value="…">` takes one check: `equals`, `not-equals`, `same` (`===`), `contains`, `not-contains`, `matches`, `type` or `count`. `<assert test="$total eq 30" />` shows the value of each side when it fails.
+- `<expect-error type contains as>` expects its body to stop with an error, `<capture to input>` collects what its body prints (and answers its prompts), and `@run_script(path, { args, input })` runs a whole script and returns `{ output, code, error }`.
+- `skip="reason"` and `only="yes"` go on a `<test>` or `<describe>`, and `timeout="30"` on a test (10 seconds by default).
+- Test files get KScript.Test without an `<import>`, in the runner and in the editor. In VS Code, **KScript: Run Tests** runs them.
+
+See [docs/testing.md](docs/testing.md) for every element, check and setting.
 
 ## Writing portable scripts
 

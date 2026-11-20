@@ -117,12 +117,59 @@
         "command": "kscript.showOutput",
         "title": "Show Language Server Output",
         "category": "KScript"
+      },
+      {
+        "command": "kscript.runTests",
+        "title": "Run Tests",
+        "category": "KScript"
+      },
+      {
+        "command": "kscript.runTestsInFile",
+        "title": "Run Tests in This File",
+        "category": "KScript",
+        "icon": "$(beaker)"
       }
     ],
     "jsonValidation": [
       {
         "fileMatch": "kscript.json",
         "url": "./schemas/kscript.schema.json"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "kscript.runTestsInFile",
+          "when": "resourceFilename =~ /\\.test\\.(ks\\.)?xml$/",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kscript.runTestsInFile",
+          "when": "resourceFilename =~ /\\.test\\.(ks\\.)?xml$/"
+        }
+      ]
+    },
+    "taskDefinitions": [
+      {
+        "type": "kscript",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "enum": [
+              "test"
+            ],
+            "description": "The kscript command to run."
+          },
+          "file": {
+            "type": "string",
+            "description": "A test file to run, instead of every test in the folder."
+          }
+        }
       }
     ]
   },

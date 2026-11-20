@@ -39,11 +39,64 @@ namespace KScript.Runtime
         public Dictionary<string, object> Items { get; } = new Dictionary<string, object>();
 
         /// <summary>Writes a line of output, as &lt;echo&gt; does.</summary>
-        public virtual void WriteLine(string text) => Out.WriteLine(text);
+        public virtual void WriteLine(string text)
+        {
+            if (CurrentCapture is TextWriter capture) capture.WriteLine(text);
+            else Out.WriteLine(text);
+        }
 
-        public virtual void Write(string text) => Out.Write(text);
+        public virtual void Write(string text)
+        {
+            if (CurrentCapture is TextWriter capture) capture.Write(text);
+            else Out.Write(text);
+        }
 
         /// <summary>Reads a line of input, or null at the end of input.</summary>
-        public virtual string ReadLine() => In.ReadLine();
+        public virtual string ReadLine()
+        {
+            lock (captures)
+            {
+                if (inputs.Count > 0) return inputs[inputs.Count - 1].ReadLine();
+            }
+            return In.ReadLine();
+        }
+
+        private readonly List<TextWriter> captures = new List<TextWriter>();
+        private readonly List<TextReader> inputs = new List<TextReader>();
+
+        private TextWriter CurrentCapture
+        {
+            get { lock (captures) return captures.Count > 0 ? captures[captures.Count - 1] : null; }
+        }
+
+        /// <summary>
+        /// Sends what <see cref="Write"/> and <see cref="WriteLine"/> print to <paramref name="output"/> until the
+        /// result is disposed, for example while a test runs or inside &lt;capture&gt;. Captures nest.
+        /// </summary>
+        public IDisposable CaptureOutput(TextWriter output)
+        {
+            lock (captures) captures.Add(output);
+            return new Undo(() => { lock (captures) captures.Remove(output); });
+        }
+
+        /// <summary>Makes <see cref="ReadLine"/> read from <paramref name="input"/> until the result is disposed.</summary>
+        public IDisposable ProvideInput(TextReader input)
+        {
+            lock (captures) inputs.Add(input);
+            return new Undo(() => { lock (captures) inputs.Remove(input); });
+        }
+
+        private sealed class Undo : IDisposable
+        {
+            private Action action;
+
+            public Undo(Action action) => this.action = action;
+
+            public void Dispose()
+            {
+                action?.Invoke();
+                action = null;
+            }
+        }
     }
 }

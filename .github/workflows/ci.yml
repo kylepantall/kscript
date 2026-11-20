@@ -54,6 +54,9 @@ jobs:
       - name: Check KScript 2 samples
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 "Example Scripts" --warnaserror
 
+      - name: Run KScript tests
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2
+
   vscode:
     name: VS Code extension
     runs-on: ubuntu-latest

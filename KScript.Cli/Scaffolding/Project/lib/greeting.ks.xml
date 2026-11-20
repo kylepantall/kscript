@@ -1,0 +1,6 @@
+<kscript>
+  <!-- Functions here can be imported by scripts and tests: <import src="../lib/greeting.ks.xml" /> -->
+  <fn name="greeting" params="name" description="A friendly hello for someone.">
+    <return value="'Hello, ' + $name->trim()->title() + '!'" />
+  </fn>
+</kscript>

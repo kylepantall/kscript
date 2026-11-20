@@ -15,6 +15,7 @@ namespace KScript
             Console.WriteLine("       kscript check [file-or-folder]... [--warnaserror]   Check scripts and pages without running them (no path: the current project).");
             Console.WriteLine("       kscript migrate <file-or-folder>... [--dry-run]      Rewrite KScript 1 scripts as KScript 2.");
             Console.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
+            Console.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml tests.");
             Console.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost]");
             Console.WriteLine("       kscript update [--check] [--force] [--version <tag>]   Update to the latest release.");
             Console.WriteLine("       kscript ide [install|uninstall|config] [editor]       Set up VS Code, Cursor, VSCodium or another editor.");
@@ -154,6 +155,11 @@ namespace KScript
                 return Serve(args.Skip(1).ToArray());
             }
 
+            if (args[0] == "test")
+            {
+                return RunTests(args.Skip(1).ToArray());
+            }
+
             // kscript make component Hero, or Artisan-style kscript make:component Hero
             if (args[0] == "make" || args[0].StartsWith("make:", StringComparison.Ordinal))
             {
@@ -175,7 +181,26 @@ namespace KScript
                 return 2;
             }
 
+            // kscript greet.test.ks.xml runs the file's tests.
+            if (KScript.Projects.TestSettings.IsTestFileName(path))
+            {
+                return RunTests(new[] { path }.Concat(args.Skip(1)).ToArray());
+            }
+
             return RunScript(path, args.Skip(1).ToArray());
+        }
+
+        /// <summary>kscript test: Ctrl+C stops the run after the current test.</summary>
+        static int RunTests(string[] args)
+        {
+            using var cancel = new System.Threading.CancellationTokenSource();
+            Console.CancelKeyPress += (_, e) =>
+            {
+                if (cancel.IsCancellationRequested) return;
+                e.Cancel = true;
+                cancel.Cancel();
+            };
+            return KScript.Testing.TestCommand.Run(args, Console.Out, Console.Error, cancel.Token);
         }
 
         /// <summary>
