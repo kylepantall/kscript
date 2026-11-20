@@ -134,6 +134,12 @@ namespace KScript.Syntax.Markup
 
         public MarkupElement Owner { get; internal set; }
 
+        /// <summary>
+        /// True for the expression of a shorthand start tag such as <c>&lt;if $ready&gt;</c>, which has no name or
+        /// quotes in the source (<see cref="NameSpan"/> is empty).
+        /// </summary>
+        public bool IsShorthand { get; internal set; }
+
         public string ValueText => Value?.Value;
     }
 
