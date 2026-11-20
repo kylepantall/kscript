@@ -1,0 +1,6 @@
+--- make
+description: A KScript script, run with kscript <file>
+to: {{ dir }}{{ kebab }}{{ ext }}
+hint: Run it: kscript {{ dir }}{{ kebab }}{{ ext }}
+---
+echo "Hello from {{ title }}!"

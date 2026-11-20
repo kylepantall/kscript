@@ -20,10 +20,13 @@ To update later:
 kscript update                    # install the latest release if it's newer
 kscript update --check            # only report whether there is one
 kscript update --version v0.2.0   # install a specific release
+kscript update --no-ide           # leave the editor extension alone
 kscript --version
 ```
 
 `kscript update` replaces the binary in place. On Windows the running `kscript.exe` is renamed to `kscript.exe.old` and deleted the next time kscript starts. It uses `GITHUB_TOKEN` if set, to avoid GitHub's rate limit.
+
+It also brings the [editor extension](#editor-support) up to the same release in every editor that already has it (VS Code, Insiders, Cursor, VSCodium, Windsurf), and tells you which ones it updated. Editors without the extension are left alone. This happens even when the binary is already current, so an extension that fell behind gets caught up. `--check` reports stale extensions too, and `--force` reinstalls them. Reload the editor window afterwards.
 
 You can also download a build by hand from the [Releases page](https://github.com/kylepantall/kscript/releases): `linux-x64`, `linux-arm64`, `osx-arm64` (Apple Silicon), `osx-x64` and `win-x64`. Each is a single `kscript` file that includes the .NET runtime:
 

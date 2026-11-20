@@ -8,7 +8,7 @@
 kscript make project my-app --port 3000
 cd my-app
 kscript serve            # http://localhost:3000, from kscript.json
-kscript desktop.ks.xml   # the desktop app, in a window
+kscript desktop.kscript  # the desktop app, in a window
 kscript app build        # package it: dist/My App.app on a Mac, dist/My App/ elsewhere
 kscript test             # runs the tests in tests/
 kscript check            # checks every page and script in the project
@@ -22,13 +22,16 @@ What it makes:
 | `kscript.json` | Settings for `serve`, `check`, `test` and, with the desktop app, the `app` section `kscript app build` reads. |
 | `index.html`, `about.md`, `_layout.html`, `_components/site-nav.html`, `site.css` | The site: two pages, the layout they share and a navigation component. |
 | `tasks.html` | A to-do list in a [`<live>`](web.md#reactive-pages-with-live-no-javascript) block, with no JavaScript. |
-| `lib/tasks.ks.xml` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app and the tests. |
-| `desktop.ks.xml` | The same to-do list as a [`<KScript.Window>`](desktop.md) desktop app. |
-| `lib/greeting.ks.xml`, `scripts/hello.ks.xml` | A function and a command-line script that uses it. |
-| `tests/tasks.test.ks.xml`, `tests/greeting.test.ks.xml` | Tests for the rules and the script, run with `kscript test`. |
+| `lib/tasks.kscript` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app, the API and the tests. |
+| `desktop.kscript` | The same to-do list as a [`<KScript.Window>`](desktop.md) desktop app. |
+| `api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). |
+| `lib/greeting.kscript`, `scripts/hello.kscript` | A function and a command-line script that uses it. |
+| `tests/tasks.test.kscript`, `tests/greeting.test.kscript` | Tests for the rules and the script, run with `kscript test`. |
 | `.vscode/extensions.json`, `.gitignore` | Asks VS Code to install the KScript extension; keeps built apps (`dist/`) out of git. |
 
-`--no-desktop` leaves out `desktop.ks.xml` and the `app` section, for a web site only. `kscript make project .` sets up the current folder; existing files are never replaced without `--force`. `kscript make project --help` lists the template's options.
+Scripts, tests, routes and the desktop app are written in the [.kscript format](code-format.md). `--format xml` writes them as XML (`.ks.xml`) instead, and records `"make": { "format": "xml" }` in `kscript.json` so that later `kscript make script` and `kscript make test` follow suit. Pages stay HTML either way.
+
+`--no-desktop` leaves out `desktop.kscript` and the `app` section, for a web site only. `--no-http` leaves out the API. `kscript make project .` sets up the current folder; existing files are never replaced without `--force`. `kscript make project --help` lists the template's options.
 
 ### Changing what new projects get
 
@@ -43,6 +46,7 @@ kscript make project my-app --template ../starters/api   # any folder
 
 `kscript make project` uses the first template it finds: the `--template` folder, then `_templates/project` in the project the new one is made inside (handy for a folder of several apps), then `~/.kscript/templates/project` (or `$KSCRIPT_TEMPLATES/project`), then the built-in one. Edit, add or delete files in the template folder to change what new projects get.
 
+- Write scripts as `.kscript` files and refer to other scripts with `{{ ext }}` (`import "lib/tasks{{ ext }}"`). With `--format xml`, each `.kscript` file is converted to XML and named `.ks.xml`, and `{{ ext }}` is `.ks.xml`; `{{#if xml}}` tells the formats apart. A `.ks.xml` file in the template is copied as it is.
 - Each file is a template with the same `{{ }}` placeholders as [`kscript make` templates](#your-own-templates): `{{ title }}` is the project name as a title (`My App`), `{{ kebab }}` is `my-app`, and every option is a value (`{{ port }}`, `{{#if desktop}} … {{/if}}`).
 - A file can start with a `--- make` header. `when: desktop` copies it only when the option is on, `unless: desktop` only when it is off, and `to: docs/{{ kebab }}.md` writes it somewhere else.
 - A name ending in `.stub` loses the ending: the template keeps `kscript.json.stub` so that editors and `kscript check` don't read it as a real project.
@@ -86,7 +90,7 @@ kscript make project my-app --template ../starters/api   # any folder
     "warningsAsErrors": false                               // same as kscript check --warnaserror
   },
   "test": {
-    "include": ["tests/**/*.test.ks.xml"],  // what `kscript test` runs (default: **/*.test.ks.xml, **/*.test.xml and **/*.test.kscript)
+    "include": ["tests/**/*.test.kscript"],  // what `kscript test` runs (default: **/*.test.kscript, **/*.test.ks.xml and **/*.test.xml)
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
     "packages": ["KScript.Terminal"]        // imported by test files only
@@ -134,12 +138,14 @@ kscript make page about --title "About us"            # about.html, wrapped in _
 kscript make page "people/[id]"                       # people/[id].html, with $id read from the URL
 kscript make markdown blog/first-post                 # blog/first-post.md with front matter
 kscript make layout main --css /site.css              # _layouts/main.html
-kscript make script tidy-downloads                    # tidy-downloads.xml
-kscript make test checkout                            # tests/checkout.test.ks.xml, in the project folder
+kscript make script tidy-downloads                    # tidy-downloads.kscript (tidy-downloads.ks.xml with --format xml)
+kscript make test checkout                            # tests/checkout.test.kscript, in the project folder
 kscript make                                          # list every template
 ```
 
 `kscript make:component Hero` works too. Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
+
+Scripts and tests are written as `.kscript` files. `--format xml` writes `.ks.xml` instead, and `"make": { "format": "xml" }` in `kscript.json` makes that the project's default.
 
 <a id="your-own-templates"></a>**Your own templates.** Templates live in the project's `_templates/` folder, which `kscript serve` never serves. `kscript make templates` copies the built-in ones there to edit. A file there replaces the built-in template of the same name (`_templates/component.html`), and any other file adds a type: `_templates/card.html` gives `kscript make card Profile`.
 

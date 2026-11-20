@@ -1,9 +1,12 @@
-# The .kscript format (experimental)
+# The .kscript format
 
 `.kscript` files are KScript written with braces and new lines instead of XML tags. The language, the runtime and
 every package are the same: the parser (`KScript.Syntax/Markup/CodeParser.cs`) builds the exact element tree the
 XML parser builds, so `kscript`, `kscript check` and the language server treat both alike. The file extension picks
 the parser; `.ks.xml` scripts are unchanged, and the two kinds can import each other.
+
+`kscript make project`, `kscript make script` and `kscript make test` write `.kscript` files; pass `--format xml`, or set
+`"make": { "format": "xml" }` in `kscript.json`, to get `.ks.xml` instead.
 
 ```
 import KScript.IO

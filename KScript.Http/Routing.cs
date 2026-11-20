@@ -77,9 +77,6 @@ namespace KScript.Http
 
         public List<string> Parameters { get; } = new List<string>();
 
-        /// <summary>True when the path has no parameters.</summary>
-        public bool IsStatic => Parameters.Count == 0;
-
         public static string Normalise(string path)
         {
             path = (path ?? "/").Trim().Replace('\\', '/');
@@ -288,8 +285,6 @@ namespace KScript.Http
         private readonly Dictionary<string, Route> named = new Dictionary<string, Route>(StringComparer.Ordinal);
 
         public IReadOnlyList<Route> Routes => routes;
-
-        public IReadOnlyDictionary<string, Route> Named => named;
 
         public void Add(Route route)
         {

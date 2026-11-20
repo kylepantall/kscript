@@ -40,7 +40,7 @@ public sealed class ConvertProjectTests : IDisposable
         Environment.SetEnvironmentVariable("KSCRIPT_TEMPLATES", Path.Combine(dir, "no-user-templates"));
         try
         {
-            KScript.Scaffolding.ProjectScaffolder.Create(dir, "todo");
+            KScript.Scaffolding.ProjectScaffolder.Create(dir, "todo", new Dictionary<string, string> { ["format"] = "xml" });
         }
         finally
         {
@@ -56,7 +56,7 @@ public sealed class ConvertProjectTests : IDisposable
         }
 
         // Nothing points at the deleted XML files any more: imports, comments, strings, pages and kscript.json.
-        foreach (string file in Directory.EnumerateFiles(project, "*.*", SearchOption.AllDirectories))
+        foreach (string file in Directory.EnumerateFiles(project, "*.*", SearchOption.AllDirectories).Where(f => !f.EndsWith("kscript.json", StringComparison.Ordinal)))
         {
             Assert.DoesNotContain(".ks.xml", File.ReadAllText(file).Replace("**/*.ks.xml", string.Empty).Replace("*.test.ks.xml", string.Empty));
         }

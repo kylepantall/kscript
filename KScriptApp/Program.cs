@@ -47,7 +47,7 @@ namespace KScript
             output.WriteLine("       kscript check --print-config [file-or-folder]      Show the lint and format settings that apply, and which standard set each.");
             output.WriteLine("       kscript fmt [file-or-folder]... [--check]          Tidy scripts and pages (--check: only report, for CI).");
             output.WriteLine("       kscript lsp                                       Start the language server (LSP over stdio).");
-            output.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.ks.xml and *.test.kscript tests.");
+            output.WriteLine("       kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]   Run *.test.kscript and *.test.ks.xml tests.");
             output.WriteLine("       kscript css [file-or-folder]... [--out folder] [--var name=value]   Compile .ks.css, .ks.scss and .ks.sass stylesheets.");
             output.WriteLine("       kscript convert <file-or-folder>... [--to xml|kscript] [--stdout]   Write the .kscript version of an XML script, or the reverse.");
             output.WriteLine("       kscript serve [site folder] [--port 8080] [--host localhost] [--env name]   Serve pages, and routes.ks.xml / api.ks.xml routes.");

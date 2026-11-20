@@ -169,6 +169,35 @@ public class StandardsTests
     }
 
     [Fact]
+    public void StandardsThatCannotBeReadAreErrors()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "proj-unreadable");
+        string file = Path.Combine(dir, ProjectConfig.FileName);
+        string team = Path.Combine(dir, "team.json");
+        var locked = Assert.Throws<ProjectConfigException>(() => ProjectConfig.Parse("""{ "standard": "team.json" }""", file, p => p == team, p => throw new UnauthorizedAccessException("locked")));
+        Assert.Contains("can't read the standard", locked.Message);
+
+        var list = Assert.Throws<ProjectConfigException>(() => ProjectConfig.Parse("""{ "standard": "team.json" }""", file, p => p == team, p => "[]"));
+        Assert.Contains("a standard should hold an object", list.Message);
+
+        Assert.Contains("not a valid path", Assert.Throws<ProjectConfigException>(() => Parse("{ \"standard\": \"a\\u0000b\" }")).Message);
+        Assert.Contains("can't find the standard '~/no-such-standard'", Assert.Throws<ProjectConfigException>(() => Parse("""{ "standard": "~/no-such-standard" }""")).Message);
+        Assert.Contains("can't find the standard '~'", Assert.Throws<ProjectConfigException>(() => Parse("""{ "standard": "~" }""")).Message);
+    }
+
+    [Fact]
+    public void AppliedStandardsSayWhereTheyCameFrom()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "proj-applied");
+        string team = Path.Combine(dir, "team.json");
+        var c = ProjectConfig.Parse("""{ "standard": "team.json" }""", Path.Combine(dir, ProjectConfig.FileName), p => p == team, p => "{}");
+        Assert.True(Parse("{}").AppliedStandards.Single().IsBuiltIn);
+        Assert.Null(Parse("{}").AppliedStandards.Single().Path);
+        Assert.Equal(team, c.AppliedStandards.Single().Path);
+        Assert.False(c.AppliedStandards.Single().IsBuiltIn);
+    }
+
+    [Fact]
     public void TheBuiltInStandardsAreValidStandards()
     {
         foreach (string name in Standards.BuiltIn.Keys)

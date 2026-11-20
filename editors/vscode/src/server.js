@@ -111,4 +111,22 @@ function supportsLsp(version) {
   return Number(m[1]) > 0 || Number(m[2]) >= 1;
 }
 
-module.exports = { installLocations, findOnPath, expand, resolveServer, versionOf, supportsLsp };
+/**
+ * True when the kscript CLI is an older release than the extension, so the extension may ask for features the server lacks.
+ * Development builds (0.0.0-dev) and versions that can't be read never count as older.
+ */
+function isOlderThan(cliVersion, extensionVersion) {
+  const parse = (v) => {
+    const m = /^v?(\d+)\.(\d+)\.(\d+)/.exec(v || '');
+    return m && !v.replace(/^v/, '').startsWith('0.0.0') ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  };
+  const cli = parse(cliVersion);
+  const ext = parse(extensionVersion);
+  if (!cli || !ext) return false;
+  for (let i = 0; i < 3; i++) {
+    if (cli[i] !== ext[i]) return cli[i] < ext[i];
+  }
+  return false;
+}
+
+module.exports = { installLocations, findOnPath, expand, resolveServer, versionOf, supportsLsp, isOlderThan };
