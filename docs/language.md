@@ -509,7 +509,7 @@ Using something from a package that isn't imported stops with `<input> is part o
 
 ## Language models: KScript.AI
 
-`KScript.AI` lets a script ask Claude. The API key comes from the `ANTHROPIC_API_KEY` environment variable (or a profile saved by `ant auth login`), never from the script. Scripts use `claude-opus-5-5` unless they ask for another model, or `KSCRIPT_AI_MODEL` names one.
+`KScript.AI` lets a script ask Claude. The API key comes from the `ANTHROPIC_API_KEY` environment variable (or a token in `ANTHROPIC_AUTH_TOKEN`, or the profile `ant auth login` saved, when the `ant` command is installed), never from the script. `ANTHROPIC_BASE_URL` sends requests to another host, such as a proxy. Scripts use `claude-opus-5-5` unless they ask for another model, or `KSCRIPT_AI_MODEL` names one.
 
 ```kscript
 import KScript.AI

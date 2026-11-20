@@ -24,7 +24,7 @@ kscript hello.kscript
 - **Mistakes show up before anything runs.** Unknown elements, bad attributes, missing imports and syntax errors are reported before the first line runs, so a typo near the end can't leave a job half done. The errors say what to write instead.
 - **An editor that understands your code.** The VS Code extension knows the type of every value, so `$person.` offers that person's fields and `$name->` offers string methods, including what your own functions return.
 - **Batteries included, loaded only when used.** Files, HTTP, maths, Markdown, terminal prompts and web pages come as packages. A script imports the ones it needs, and a terminal script never loads the web server.
-- **One binary, every OS.** Install a single file that has the .NET runtime built in. The same script behaves the same on all three platforms, down to how numbers are printed.
+- **One binary, every OS.** Install a native program that needs no .NET and starts in milliseconds. The same script behaves the same on all three platforms, down to how numbers are printed.
 - **Everything else you need is built in.** `kscript make` scaffolds projects and files, `kscript test` runs your tests, `kscript check` lints for CI, `kscript fmt` tidies your files, and `kscript serve` runs your site.
 
 ## Scripts that read like what they do

@@ -40,9 +40,9 @@ When a program starts for the first time, the .NET host unpacks its scripts and 
 
 `--target` takes one or more of these, separated by commas, or `all`. `mac`, `linux` and `windows` mean `mac-arm64`, `linux-x64` and `win-x64`. Without `--target`, the program is built for the computer you're on. Each target gets its own folder under `dist/` (or `--out`).
 
-To build for another platform, `kscript compile` needs that platform's `kscript`. It downloads it once from the release that matches your `kscript --version`, keeps it in `~/.kscript/runtimes` (`%LOCALAPPDATA%\kscript\runtimes` on Windows), and reuses it after that. Building for the computer you're on uses the `kscript` you're running, so it needs no download. To work offline, or with your own build, pass `--runtime` with a `kscript` binary or a release archive (`kscript-win-x64.zip`) for the one target you're building.
+Programs are built from a runtime: the single-file build of `kscript` for the target platform, published with each release as `kscript-runtime-<platform>`. `kscript compile` downloads it once from the release that matches your `kscript --version`, keeps it in `~/.kscript/runtimes` (`%LOCALAPPDATA%\kscript\runtimes` on Windows), and reuses it after that, so only the first build for each platform needs the network. To work offline, or with your own build, pass `--runtime` with a runtime binary or archive (`kscript-runtime-win-x64.zip`) for the one target you're building.
 
-Programs need a release `kscript` (0.4.0 or later). A `kscript` built from the repository with `dotnet build` isn't a single file, so it can only build programs with `--runtime`.
+A `kscript` built from the repository with `dotnet build` can only build programs with `--runtime`.
 
 ## Names, icons and versions
 

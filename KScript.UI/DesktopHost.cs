@@ -58,8 +58,7 @@ namespace KScript.UI
         /// <summary>Opens the window and blocks until it is closed.</summary>
         internal static void Show(UISession session)
         {
-            Start();
-            var view = new WindowView(session);
+            WindowView view = Open(session, () => Start());
             UIElements.CloseRequested = () => view.Window.Close();
             try
             {
@@ -70,6 +69,34 @@ namespace KScript.UI
                 UIElements.CloseRequested = null;
                 view.StopTimers();
             }
+        }
+
+        /// <summary>Starts Avalonia and builds the window, explaining a missing native library rather than crashing.</summary>
+        internal static WindowView Open(UISession session, Action start)
+        {
+            try
+            {
+                start();
+                return new WindowView(session);
+            }
+            catch (Exception ex) when (MissingLibrary(ex))
+            {
+                throw new KScriptException(MissingLibraryMessage, "UI");
+            }
+        }
+
+        internal const string MissingLibraryMessage =
+            "Windows need the UI libraries that ship beside kscript (libSkiaSharp and libHarfBuzzSharp), and they aren't there. " +
+            "Run `kscript update --force`, or reinstall with install.sh or install.ps1.";
+
+        /// <summary>True when a native library didn't load: kscript was copied without the files beside it.</summary>
+        internal static bool MissingLibrary(Exception ex)
+        {
+            for (; ex != null; ex = ex.InnerException)
+            {
+                if (ex is DllNotFoundException) return true;
+            }
+            return false;
         }
 
         private static void RunUntilClosed(Window window)

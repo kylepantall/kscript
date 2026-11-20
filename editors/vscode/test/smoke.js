@@ -1,5 +1,5 @@
 // End-to-end check with the same JSON-RPC library VS Code's client uses: start `kscript lsp`, open a script,
-// and check diagnostics, completion, hover and definition. Usage: node test/smoke.js <path to KScript.dll>
+// and check diagnostics, completion, hover and definition. Usage: node test/smoke.js <path to KScript.dll or a kscript binary>
 'use strict';
 
 const assert = require('assert');
@@ -8,7 +8,10 @@ const path = require('path');
 const rpc = require('vscode-jsonrpc/node');
 
 const dll = process.argv[2] || path.resolve(__dirname, '../../../KScriptApp/bin/Debug/net8.0/KScript.dll');
-const server = cp.spawn('dotnet', [dll, 'lsp'], { stdio: ['pipe', 'pipe', 'inherit'] });
+// A .dll runs with dotnet; anything else is a kscript binary (single-file or Native AOT) and runs as it is.
+const server = dll.endsWith('.dll')
+  ? cp.spawn('dotnet', [dll, 'lsp'], { stdio: ['pipe', 'pipe', 'inherit'] })
+  : cp.spawn(dll, ['lsp'], { stdio: ['pipe', 'pipe', 'inherit'] });
 const connection = rpc.createMessageConnection(new rpc.StreamMessageReader(server.stdout), new rpc.StreamMessageWriter(server.stdin));
 
 const uri = 'file:///tmp/kscript-smoke/hello.ks.xml';

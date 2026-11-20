@@ -379,7 +379,7 @@ namespace KScript.LanguageServer
                 JsonArray diagnostics = new JsonArray();
                 foreach (Diagnostic d in doc.Analysis.Diagnostics)
                 {
-                    diagnostics.Add(DiagnosticJson(doc.Analysis.Source, d));
+                    diagnostics.Add((JsonNode)DiagnosticJson(doc.Analysis.Source, d));
                 }
                 connection.SendNotification("textDocument/publishDiagnostics", new JsonObject
                 {
@@ -421,7 +421,7 @@ namespace KScript.LanguageServer
                 {
                     json["additionalTextEdits"] = new JsonArray(item.AdditionalEdits.Select(e => (JsonNode)new JsonObject { ["range"] = Range(a.Source, e.Span), ["newText"] = e.NewText }).ToArray());
                 }
-                items.Add(json);
+                items.Add((JsonNode)json);
             }
             return new JsonObject { ["isIncomplete"] = false, ["items"] = items };
         }
@@ -453,11 +453,11 @@ namespace KScript.LanguageServer
                 {
                     JsonObject pj = new JsonObject { ["label"] = label };
                     if (doc != null) pj["documentation"] = doc;
-                    ps.Add(pj);
+                    ps.Add((JsonNode)pj);
                 }
                 JsonObject sj = new JsonObject { ["label"] = s.Label, ["parameters"] = ps };
                 if (s.Documentation != null) sj["documentation"] = new JsonObject { ["kind"] = "markdown", ["value"] = s.Documentation };
-                signatures.Add(sj);
+                signatures.Add((JsonNode)sj);
             }
             return new JsonObject { ["signatures"] = signatures, ["activeSignature"] = help.ActiveSignature, ["activeParameter"] = help.ActiveParameter };
         }
@@ -472,7 +472,7 @@ namespace KScript.LanguageServer
             JsonArray locations = new JsonArray();
             foreach (SourceLocation location in service.GetDefinition(a, Offset(a.Source, p["position"])))
             {
-                locations.Add(Location(doc, a, location));
+                locations.Add((JsonNode)Location(doc, a, location));
             }
             return locations;
         }
@@ -488,7 +488,7 @@ namespace KScript.LanguageServer
             JsonArray locations = new JsonArray();
             foreach (SymbolReference r in service.GetReferences(a, Offset(a.Source, p["position"]), includeDeclaration))
             {
-                locations.Add(new JsonObject { ["uri"] = doc.Uri, ["range"] = Range(a.Source, r.Span) });
+                locations.Add((JsonNode)new JsonObject { ["uri"] = doc.Uri, ["range"] = Range(a.Source, r.Span) });
             }
             return locations;
         }
@@ -503,7 +503,7 @@ namespace KScript.LanguageServer
             JsonArray highlights = new JsonArray();
             foreach (SymbolReference r in service.GetReferences(a, Offset(a.Source, p["position"]), includeDeclaration: true))
             {
-                highlights.Add(new JsonObject { ["range"] = Range(a.Source, r.Span), ["kind"] = r.IsWrite ? 3 : 2 });
+                highlights.Add((JsonNode)new JsonObject { ["range"] = Range(a.Source, r.Span), ["kind"] = r.IsWrite ? 3 : 2 });
             }
             return highlights;
         }
@@ -542,7 +542,7 @@ namespace KScript.LanguageServer
             {
                 JsonObject json = new JsonObject { ["startLine"] = r.StartLine, ["endLine"] = r.EndLine };
                 if (r.IsComment) json["kind"] = "comment";
-                ranges.Add(json);
+                ranges.Add((JsonNode)json);
             }
             return ranges;
         }
@@ -556,7 +556,7 @@ namespace KScript.LanguageServer
             {
                 foreach (CodeBlock b in service.GetBlocks(a))
                 {
-                    blocks.Add(new JsonObject { ["range"] = Range(a.Source, b.Span), ["label"] = b.Label });
+                    blocks.Add((JsonNode)new JsonObject { ["range"] = Range(a.Source, b.Span), ["label"] = b.Label });
                 }
             }
             return new JsonObject { ["blocks"] = blocks };
@@ -585,7 +585,7 @@ namespace KScript.LanguageServer
                     ["paddingLeft"] = false,
                 };
                 if (hint.Tooltip != null) json["tooltip"] = new JsonObject { ["kind"] = "markdown", ["value"] = hint.Tooltip };
-                hints.Add(json);
+                hints.Add((JsonNode)json);
             }
             return hints;
         }
@@ -612,7 +612,7 @@ namespace KScript.LanguageServer
                         ["children"] = Convert(item.Children),
                     };
                     if (item.Detail != null) json["detail"] = item.Detail;
-                    array.Add(json);
+                    array.Add((JsonNode)json);
                 }
                 return array;
             }
@@ -643,11 +643,11 @@ namespace KScript.LanguageServer
                     string piece = a.Source.Text.Substring(start, length).TrimEnd('\r', '\n');
                     if (piece.Length > 0)
                     {
-                        data.Add(pos.Line - lastLine);
-                        data.Add(pos.Line == lastLine ? pos.Character - lastChar : pos.Character);
-                        data.Add(piece.Length);
-                        data.Add((int)token.Type);
-                        data.Add((int)token.Modifiers);
+                        data.Add((JsonNode)(pos.Line - lastLine));
+                        data.Add((JsonNode)(pos.Line == lastLine ? pos.Character - lastChar : pos.Character));
+                        data.Add((JsonNode)piece.Length);
+                        data.Add((JsonNode)(int)token.Type);
+                        data.Add((JsonNode)(int)token.Modifiers);
                         lastLine = pos.Line;
                         lastChar = pos.Character;
                     }
@@ -686,7 +686,7 @@ namespace KScript.LanguageServer
             JsonArray actions = new JsonArray();
             foreach ((Diagnostic d, QuickFix fix) in service.GetQuickFixes(a, span))
             {
-                actions.Add(new JsonObject
+                actions.Add((JsonNode)new JsonObject
                 {
                     ["title"] = fix.Title,
                     ["kind"] = "quickfix",
@@ -708,7 +708,7 @@ namespace KScript.LanguageServer
             JsonArray links = new JsonArray();
             foreach (DocumentLink link in a.Links)
             {
-                links.Add(new JsonObject { ["range"] = Range(a.Source, link.Span), ["target"] = Workspace.PathToUri(link.TargetPath), ["tooltip"] = "Open " + link.Kind });
+                links.Add((JsonNode)new JsonObject { ["range"] = Range(a.Source, link.Span), ["target"] = Workspace.PathToUri(link.TargetPath), ["tooltip"] = "Open " + link.Kind });
             }
             return links;
         }
@@ -733,7 +733,7 @@ namespace KScript.LanguageServer
             JsonArray edits = new JsonArray();
             foreach (TextChange c in changes)
             {
-                edits.Add(new JsonObject { ["range"] = Range(source, c.Span), ["newText"] = c.NewText });
+                edits.Add((JsonNode)new JsonObject { ["range"] = Range(source, c.Span), ["newText"] = c.NewText });
             }
             return edits;
         }

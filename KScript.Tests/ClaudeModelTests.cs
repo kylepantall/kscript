@@ -1,7 +1,7 @@
 using System.Globalization;
+using System.Net;
+using System.Text;
 using System.Text.Json;
-
-using Anthropic;
 
 using KScript.AI;
 using KScript.Runtime;
@@ -28,7 +28,7 @@ public sealed class ClaudeModelTests : IDisposable
 
     public void Dispose() => server.Dispose();
 
-    private ClaudeModel Model() => new ClaudeModel(() => new AnthropicClient { ApiKey = "test-key", BaseUrl = server.Url, MaxRetries = 0 });
+    private ClaudeModel Model(string source = "ANTHROPIC_API_KEY") => new ClaudeModel(() => new ClaudeConnection { ApiKey = source == "ANTHROPIC_API_KEY" ? "test-key" : null, AuthToken = source == "ANTHROPIC_API_KEY" ? null : "token", Source = source, BaseUrl = server.Url, MaxRetries = 0 });
 
     private ClaudeModelTests Answer(params string[] blocks) => Stopped("end_turn", null, blocks);
 
@@ -68,7 +68,8 @@ public sealed class ClaudeModelTests : IDisposable
         Assert.Equal("POST", method);
         Assert.StartsWith("/v1/messages", path);
         Assert.Contains("server-side-fallback-2026-07-01", headers["anthropic-beta"]);
-        Assert.True(headers.ContainsKey("x-api-key") || headers.ContainsKey("Authorization"));
+        Assert.Equal("test-key", headers["x-api-key"]);
+        Assert.Equal(ClaudeModel.ApiVersion, headers["anthropic-version"]);
         JsonElement sent = Sent(0);
         Assert.Equal("claude-opus-5-5", sent.GetProperty("model").GetString());
         Assert.Equal(50, sent.GetProperty("max_tokens").GetInt32());
@@ -145,29 +146,145 @@ public sealed class ClaudeModelTests : IDisposable
         Assert.Contains("Claude returned an error", bad.Message);
 
         answers.Enqueue((401, Error("authentication_error", "invalid x-api-key")));
-        Assert.Contains("needs an API key", Fails("<echo>{ @llm('x') }</echo>").Message);
+        Assert.Contains("didn't accept the key in ANTHROPIC_API_KEY", Fails("<echo>{ @llm('x') }</echo>").Message);
 
-        string saved = Environment.GetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN");
-        Environment.SetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", "set-for-test");
-        try
-        {
-            answers.Enqueue((401, Error("authentication_error", "invalid x-api-key")));
-            Assert.Contains("didn't accept the API key", Fails("<echo>{ @llm('x') }</echo>").Message);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", saved);
-        }
+        answers.Enqueue((401, Error("authentication_error", "expired")));
+        Assert.Contains("Run `ant auth login` again", Fails("<echo>{ @llm('x') }</echo>", Model(ClaudeConnection.AntSource)).Message);
+
+        answers.Enqueue((500, "not json"));
+        Assert.Contains("Claude returned an error: HTTP 500", Fails("<echo>{ @llm('x') }</echo>").Message);
+        answers.Enqueue((500, "{ \"error\": \"text\" }"));
+        Assert.Contains("HTTP 500", Fails("<echo>{ @llm('x') }</echo>").Message);
+
+        answers.Enqueue((200, "not json"));
+        Assert.Contains("wasn't JSON", Fails("<echo>{ @llm('x') }</echo>").Message);
+    }
+
+    [Fact]
+    public void Tokens_go_as_bearer_with_the_oauth_beta()
+    {
+        Answer(Text("Hi."));
+        Assert.Equal("Hi.\n", Run("<echo>{ @llm('x') }</echo>", Model("ANTHROPIC_AUTH_TOKEN")));
+        var headers = server.Requests[0].Headers;
+        Assert.Equal("Bearer token", headers["Authorization"]);
+        Assert.Contains(ClaudeModel.OAuthBeta, headers["anthropic-beta"]);
+        Assert.False(headers.ContainsKey("x-api-key"));
     }
 
     [Fact]
     public void Unreachable_and_keyless_clients_say_what_to_do()
     {
-        var offline = new ClaudeModel(() => new AnthropicClient { ApiKey = "k", BaseUrl = $"http://127.0.0.1:{TestServer.FreePort()}", MaxRetries = 0 });
+        var offline = new ClaudeModel(() => new ClaudeConnection { ApiKey = "k", BaseUrl = $"http://127.0.0.1:{TestServer.FreePort()}", MaxRetries = 1 }) { Backoff = (_, _) => TimeSpan.Zero };
         Assert.Contains("Couldn't reach Claude", Fails("<echo>{ @llm('x') }</echo>", offline).Message);
-        var keyless = new ClaudeModel(() => throw new InvalidOperationException("No API key or credentials were found."));
+        var keyless = new ClaudeModel(() => ClaudeConnection.FromEnvironment(_ => null, () => null));
         Assert.Contains("needs an API key", Fails("<echo>{ @llm('x') }</echo>", keyless).Message);
-        var broken = new ClaudeModel(() => throw new InvalidOperationException("Something else."));
-        Assert.DoesNotContain("API key", Fails("<echo>{ @llm('x') }</echo>", broken).Message);
+        var slow = new ClaudeModel(() => new ClaudeConnection { ApiKey = "k", Handler = new StubHandler(_ => throw new TaskCanceledException()) });
+        Assert.Contains("timed out", Fails("<echo>{ @llm('x') }</echo>", slow).Message);
+    }
+
+    [Fact]
+    public void The_environment_picks_the_credential_like_the_sdks()
+    {
+        var env = new Dictionary<string, string> { ["ANTHROPIC_API_KEY"] = "key", ["ANTHROPIC_AUTH_TOKEN"] = "token", ["ANTHROPIC_BASE_URL"] = " http://localhost:1 " };
+        ClaudeConnection c = ClaudeConnection.FromEnvironment(n => env.GetValueOrDefault(n), () => "ant");
+        Assert.Equal(("key", null, "ANTHROPIC_API_KEY", "http://localhost:1"), (c.ApiKey, c.AuthToken, c.Source, c.BaseUrl));
+
+        env.Remove("ANTHROPIC_API_KEY");
+        c = ClaudeConnection.FromEnvironment(n => env.GetValueOrDefault(n), () => "ant");
+        Assert.Equal(("token", "ANTHROPIC_AUTH_TOKEN"), (c.AuthToken, c.Source));
+
+        env.Clear();
+        c = ClaudeConnection.FromEnvironment(n => env.GetValueOrDefault(n), () => "ant");
+        Assert.Equal(("ant", ClaudeConnection.AntSource, ClaudeConnection.DefaultBaseUrl), (c.AuthToken, c.Source, c.BaseUrl));
+
+        // ant itself: missing, failing, and a program that prints something and exits 0.
+        Assert.Null(ClaudeConnection.RunAnt("kscript-no-such-program-" + Guid.NewGuid().ToString("N"), "auth print-credentials --access-token"));
+        Assert.Null(ClaudeConnection.RunAnt("dotnet", "no-such-command-here"));
+        Assert.NotNull(ClaudeConnection.RunAnt("dotnet", "--version"));
+        _ = ClaudeConnection.AntToken();
+    }
+
+    [Fact]
+    public void The_default_connection_reads_the_environment()
+    {
+        string savedKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+        string savedUrl = Environment.GetEnvironmentVariable("ANTHROPIC_BASE_URL");
+        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", "k");
+        Environment.SetEnvironmentVariable("ANTHROPIC_BASE_URL", $"http://127.0.0.1:{TestServer.FreePort()}");
+        try
+        {
+            var model = new ClaudeModel { Backoff = (_, _) => TimeSpan.Zero };
+            Assert.Contains("Couldn't reach Claude", Fails("<echo>{ @llm('x') }</echo>", model).Message);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", savedKey);
+            Environment.SetEnvironmentVariable("ANTHROPIC_BASE_URL", savedUrl);
+        }
+    }
+
+    [Fact]
+    public void Overloads_and_rate_limits_are_retried_unless_the_api_says_not_to()
+    {
+        var replies = new Queue<HttpResponseMessage>();
+        HttpResponseMessage Reply(int status, string body, string shouldRetry = null)
+        {
+            var r = new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+            if (shouldRetry != null) r.Headers.Add("x-should-retry", shouldRetry);
+            return r;
+        }
+        string ok = "{ \"content\": [{ \"type\": \"text\", \"text\": \"done\" }], \"stop_reason\": \"end_turn\" }";
+        var waits = new List<int>();
+        var model = new ClaudeModel(() => new ClaudeConnection { ApiKey = "k", MaxRetries = 2, Handler = new StubHandler(_ => replies.Dequeue()) })
+        {
+            Backoff = (attempt, _) => { waits.Add(attempt); return TimeSpan.Zero; },
+        };
+
+        replies.Enqueue(Reply(529, Error("overloaded_error", "Overloaded.")));
+        replies.Enqueue(Reply(409, "{}"));
+        replies.Enqueue(Reply(200, ok));
+        Assert.Equal("done\n", Run("<echo>{ @llm('x') }</echo>", model));
+        Assert.Equal(new[] { 0, 1 }, waits);
+
+        replies.Enqueue(Reply(500, Error("api_error", "No."), shouldRetry: "false"));
+        Assert.Contains("Claude returned an error: No.", Fails("<echo>{ @llm('x') }</echo>", model).Message);
+
+        replies.Enqueue(Reply(400, Error("invalid_request_error", "Bad."), shouldRetry: "true"));
+        replies.Enqueue(Reply(408, "{}"));
+        replies.Enqueue(Reply(429, Error("rate_limit_error", "Slow.")));
+        Assert.Contains("rate limit", Fails("<echo>{ @llm('x') }</echo>", model).Message);
+    }
+
+    [Fact]
+    public void Backoff_follows_retry_after_up_to_a_minute()
+    {
+        var model = new ClaudeModel();
+        Assert.Equal(TimeSpan.FromSeconds(3), model.Backoff(0, TimeSpan.FromSeconds(3)));
+        Assert.Equal(TimeSpan.FromSeconds(1), model.Backoff(1, TimeSpan.FromMinutes(5)));
+        Assert.Equal(TimeSpan.FromSeconds(0.5), model.Backoff(0, null));
+    }
+
+    [Fact]
+    public void Requests_and_replies_keep_odd_blocks_safe()
+    {
+        var request = new AiRequest { Model = "m" };
+        request.Messages.Add(new AiMessage("assistant", new[] { new AiBlock { Kind = AiBlockKind.ToolUse, Id = "t", Name = "n" } }));
+        JsonElement sent = JsonDocument.Parse(ClaudeModel.RequestBody(request)).RootElement;
+        Assert.Equal(JsonValueKind.Object, sent.GetProperty("messages")[0].GetProperty("content")[0].GetProperty("input").ValueKind);
+
+        AiReply reply = ClaudeModel.Reply("{ \"stop_reason\": \"end_turn\" }");
+        Assert.Empty(reply.Blocks);
+        Assert.Null(reply.RefusalExplanation);
+        reply = ClaudeModel.Reply("{ \"content\": [{ \"type\": \"text\" }, 5], \"stop_reason\": 1 }");
+        Assert.Equal("", reply.Blocks[0].Text);
+        Assert.Equal(AiBlockKind.Other, reply.Blocks[1].Kind);
+        Assert.Null(reply.StopReason);
+    }
+
+    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> answer) : HttpMessageHandler
+    {
+        protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken) => answer(request);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(answer(request));
     }
 }

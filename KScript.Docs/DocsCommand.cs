@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using KScript.Pages;
 
@@ -303,10 +304,10 @@ namespace KScript.Docs
         {
             string path = request.Path.Value ?? "/";
             if (!path.StartsWith("/api/", StringComparison.Ordinal)) return null;
-            if (path != "/api/run" && path != "/api/convert") return Json(404, new { error = "There is no such API." });
-            if (!HttpMethods.IsPost(request.Method)) return Json(405, new { error = "POST only." });
+            if (path != "/api/run" && path != "/api/convert") return Json(404, new JsonObject { ["error"] = "There is no such API." });
+            if (!HttpMethods.IsPost(request.Method)) return Json(405, new JsonObject { ["error"] = "POST only." });
             if (!IsLocal(request, port) || request.Headers[RunHeader].ToString() != "1")
-                return Json(403, new { error = "Examples can only be run from the docs pages." });
+                return Json(403, new JsonObject { ["error"] = "Examples can only be run from the docs pages." });
 
             JsonElement body;
             try
@@ -314,36 +315,36 @@ namespace KScript.Docs
                 using var reader = new StreamReader(request.Body, Encoding.UTF8);
                 char[] buffer = new char[Playground.MaxCode * 2 + 1024];
                 int read = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
-                if (read == buffer.Length) return Json(413, new { error = "The example is too long to run here." });
+                if (read == buffer.Length) return Json(413, new JsonObject { ["error"] = "The example is too long to run here." });
                 body = JsonDocument.Parse(new string(buffer, 0, read)).RootElement;
             }
             catch (JsonException)
             {
-                return Json(400, new { error = "Send JSON: { \"code\": \"...\" }." });
+                return Json(400, new JsonObject { ["error"] = "Send JSON: { \"code\": \"...\" }." });
             }
 
             string code = Field(body, "code");
-            if (code == null) return Json(400, new { error = "Send JSON: { \"code\": \"...\" }." });
+            if (code == null) return Json(400, new JsonObject { ["error"] = "Send JSON: { \"code\": \"...\" }." });
 
             if (path == "/api/convert")
             {
                 string to = Field(body, "to") == "kscript" ? "kscript" : "xml";
                 string converted = Playground.Convert(code, to);
                 return converted == null
-                    ? Json(422, new { error = $"This code can't be converted to {(to == "kscript" ? ".kscript" : "XML")} until it parses. Run it to see the problem." })
-                    : Json(200, new { code = converted });
+                    ? Json(422, new JsonObject { ["error"] = $"This code can't be converted to {(to == "kscript" ? ".kscript" : "XML")} until it parses. Run it to see the problem." })
+                    : Json(200, new JsonObject { ["code"] = converted });
             }
 
             PlaygroundResult result = await Task.Run(() => Playground.Run(code, Field(body, "format"), Field(body, "input")));
-            return Json(200, new { output = result.Output, error = result.Error, exitCode = result.ExitCode, ms = result.Milliseconds, truncated = result.Truncated });
+            return Json(200, new JsonObject { ["output"] = result.Output, ["error"] = result.Error, ["exitCode"] = result.ExitCode, ["ms"] = result.Milliseconds, ["truncated"] = result.Truncated });
         }
 
         private static string Field(JsonElement body, string name) =>
             body.ValueKind == JsonValueKind.Object && body.TryGetProperty(name, out JsonElement v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
-        private static PageResult Json(int status, object value)
+        private static PageResult Json(int status, JsonObject value)
         {
-            var result = new PageResult { Status = status, ContentType = "application/json; charset=utf-8", Body = JsonSerializer.Serialize(value) };
+            var result = new PageResult { Status = status, ContentType = "application/json; charset=utf-8", Body = value.ToJsonString() };
             result.Headers["Cache-Control"] = "no-store";
             return result;
         }

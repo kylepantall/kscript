@@ -28,19 +28,18 @@ kscript --version
 
 It also brings the [editor extension](#editor-support) up to the same release in every editor that already has it (VS Code, Insiders, Cursor, VSCodium, Windsurf), and tells you which ones it updated. Editors without the extension are left alone. This happens even when the binary is already current, so an extension that fell behind gets caught up. `--check` reports stale extensions too, and `--force` reinstalls them. Reload the editor window afterwards.
 
-You can also download a build by hand from the [Releases page](https://github.com/kylepantall/kscript/releases): `linux-x64`, `linux-arm64`, `osx-arm64` (Apple Silicon), `osx-x64` and `win-x64`. Each is a single `kscript` file that includes the .NET runtime:
+You can also download a build by hand from the [Releases page](https://github.com/kylepantall/kscript/releases): `linux-x64`, `linux-arm64`, `osx-arm64` (Apple Silicon), `osx-x64` and `win-x64`. Each `kscript-<platform>` archive holds `kscript`, a native program that needs no .NET, and the two libraries desktop windows draw with (`libSkiaSharp` and `libHarfBuzzSharp`). Keep the three files in the same folder; everything except windows works without the libraries. The `kscript-runtime-<platform>` archives are what [`kscript compile`](compile.md) builds programs from, and you don't need them to run kscript.
 
 ```sh
-tar -xzf kscript-osx-arm64.tar.gz
-xattr -d com.apple.quarantine kscript   # macOS only: the binary isn't notarized
-./kscript serve "Example Sites/team"
+mkdir kscript && tar -xzf kscript-osx-arm64.tar.gz -C kscript
+xattr -dr com.apple.quarantine kscript   # macOS only: the files aren't notarized
+./kscript/kscript serve "Example Sites/team"
 ```
 
-To build one yourself from source:
+To build one yourself from source (Native AOT needs `clang` and `zlib1g-dev` on Linux, Xcode on macOS, or Visual Studio's C++ tools on Windows):
 
 ```sh
-dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out
+dotnet publish KScriptApp -c Release -r osx-arm64 -p:PublishAot=true -o out
 ```
 
 Run `kscript docs` to open the documentation in your browser. It is built into `kscript`, so it works offline and matches the version you have. `kscript docs replace` opens it with a search for "replace".

@@ -708,6 +708,16 @@ public sealed class CompileTests : IDisposable
     }
 
     [Fact]
+    public void A_native_kscript_downloads_the_runtime_for_its_own_platform_too()
+    {
+        // Native AOT has no .NET bundle inside, so the running kscript isn't used to build programs.
+        Assert.Null(CompileEnvironment.CurrentBundle(managed: false));
+        Assert.Equal(KScript.Updates.SelfUpdater.InstalledBinaryPath(KScript.Updates.SelfUpdater.AssemblyLocation(), Environment.ProcessPath), CompileEnvironment.CurrentBundle(managed: true));
+        Assert.Equal("kscript-runtime-linux-x64.tar.gz", KScript.Updates.SelfUpdater.RuntimeAssetName("linux-x64"));
+        Assert.Equal("kscript-runtime-win-x64.zip", KScript.Updates.SelfUpdater.RuntimeAssetName("win-x64"));
+    }
+
+    [Fact]
     public void Runtimes_for_other_computers_are_downloaded_once_and_cached()
     {
         string script = Write("tool/hello.ks.xml", "<kscript />");
@@ -724,8 +734,8 @@ public sealed class CompileTests : IDisposable
         Assert.Contains("Downloading kscript 0.4.0 for linux-arm64", output);
         Assert.Equal(new[]
         {
-            "https://github.com/example/kscript/releases/download/v0.4.0/kscript-linux-arm64.tar.gz",
-            "https://github.com/example/kscript/releases/download/v0.4.0/kscript-win-x64.zip",
+            "https://github.com/example/kscript/releases/download/v0.4.0/kscript-runtime-linux-arm64.tar.gz",
+            "https://github.com/example/kscript/releases/download/v0.4.0/kscript-runtime-win-x64.zip",
         }, releases.Urls);
         Assert.True(File.Exists(Path.Combine(dir, "cache", "0.4.0", "win-x64", "kscript.exe")));
         Assert.True(File.Exists(Path.Combine(dir, "tool", "dist", "win-x64", "hello.exe")));

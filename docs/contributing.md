@@ -53,6 +53,15 @@ Every push to `master` and every pull request runs [the CI workflow](../.github/
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
 
+### Native AOT
+
+A CI job also publishes kscript with Native AOT on Linux (`-p:PublishAot=true`) and runs scripts, `kscript serve`, `kscript docs`, `kscript mcp` and the language server with it. Releases still ship the single-file build; the job keeps the AOT build working so it stays an option. It fails on any new trim or AOT warning, so:
+
+- Write JSON with `JsonNode`/`JsonObject` or a source-generated `JsonSerializerContext` (see `OpenApiJsonContext`), not `JsonSerializer.Serialize(object)`. Add to a `JsonArray` with `array.Add((JsonNode)value)`: the generic `Add<T>` isn't AOT-safe.
+- A new built-in package needs a `DynamicDependency` on `PackageRegistry.Get` as well as its line in `PackageRegistry.BuiltIn`; `NativeAotTests` checks the two lists match.
+
+To try it locally: `dotnet publish KScriptApp/KScriptApp.csproj -c Release -r linux-x64 -p:PublishAot=true -o aot` (needs `clang` and `zlib1g-dev`). `KScript.AI` calls the Messages API directly rather than through the Anthropic SDK, because the SDK serialises with reflection.
+
 ## Changing a command, method or element
 
 The reference in `kscript docs`, editor completion and hover, and `kscript check` all read the same catalog: what each package registers in its `Register` method. Change a command's parameters there and every one of them changes with it.

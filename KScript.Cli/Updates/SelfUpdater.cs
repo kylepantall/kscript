@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Formats.Tar;
 using System.IO;
 using System.IO.Compression;
@@ -28,7 +30,7 @@ namespace KScript.Updates
         public string RuntimeId { get; set; } = SelfUpdater.RuntimeId();
         public string Token { get; set; } = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
         /// <summary>The installed binary to replace, or null when running from a .NET build.</summary>
-        public string TargetPath { get; set; } = SelfUpdater.InstalledBinaryPath(typeof(SelfUpdater).Assembly.Location, Environment.ProcessPath);
+        public string TargetPath { get; set; } = SelfUpdater.InstalledBinaryPath(SelfUpdater.AssemblyLocation(), Environment.ProcessPath);
         public bool Windows { get; set; } = OperatingSystem.IsWindows();
         public HttpMessageHandler Handler { get; set; } = new HttpClientHandler();
         /// <summary>Runs a binary with --version: its output, or null when it doesn't start.</summary>
@@ -88,6 +90,9 @@ namespace KScript.Updates
         }
 
         public static string AssetName(string rid) => rid.StartsWith("win-", StringComparison.Ordinal) ? $"kscript-{rid}.zip" : $"kscript-{rid}.tar.gz";
+
+        /// <summary>The release archive holding the single-file kscript that kscript compile builds programs from.</summary>
+        public static string RuntimeAssetName(string rid) => AssetName(rid).Replace("kscript-", "kscript-runtime-", StringComparison.Ordinal);
 
         /// <summary>Parses "v1.2.3", "1.2", "1.2.3-beta.1" (the prerelease part is ignored).</summary>
         public static bool TryParseVersion(string text, out Version version)
@@ -256,18 +261,16 @@ namespace KScript.Updates
             output.WriteLine($"Downloading kscript {latestTag} ({assetName})...");
             string dir = Path.GetDirectoryName(target);
             string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}" + (env.Windows ? ".exe" : ""));
+            await using var archive = new MemoryStream();
 
             try
             {
-                await using (var archive = new MemoryStream())
+                await using (var download = await http.GetStreamAsync(downloadUrl))
                 {
-                    await using (var download = await http.GetStreamAsync(downloadUrl))
-                    {
-                        await download.CopyToAsync(archive);
-                    }
-                    archive.Position = 0;
-                    ExtractBinary(archive, assetName, staged);
+                    await download.CopyToAsync(archive);
                 }
+                archive.Position = 0;
+                ExtractBinary(archive, assetName, staged);
 
                 if (!env.Windows && !OperatingSystem.IsWindows())
                 {
@@ -283,6 +286,17 @@ namespace KScript.Updates
                 }
 
                 ReplaceBinary(staged, target, env.Windows);
+
+                // The native libraries the desktop UI needs ship beside kscript (Native AOT can't embed them).
+                archive.Position = 0;
+                try
+                {
+                    ExtractCompanions(archive, assetName, dir);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    error.WriteLine($"kscript was updated, but its UI libraries couldn't be replaced ({ex.Message}). Close any running kscript apps and run: kscript update --force");
+                }
             }
             finally
             {
@@ -292,6 +306,10 @@ namespace KScript.Updates
             output.WriteLine($"Updated kscript {current} -> {latestTag.TrimStart('v')} ({target})");
             return ide ? await IdeCommand.UpdateInstalledAsync(latestTag, force, checkOnly: false, output, error, env.IdeHost) : 0;
         }
+
+        /// <summary>Where kscript's own assembly is on disk: empty in a single-file or Native AOT build, which is how those are told apart.</summary>
+        [UnconditionalSuppressMessage("SingleFile", "IL3000", Justification = "An empty location is the signal: it means kscript is one binary.")]
+        internal static string AssemblyLocation() => typeof(SelfUpdater).Assembly.Location;
 
         /// <summary>The path of the running single-file binary, or null when running as a framework-dependent dll.</summary>
         internal static string InstalledBinaryPath(string assemblyLocation, string path)
@@ -314,6 +332,51 @@ namespace KScript.Updates
             }
 
             return path;
+        }
+
+        /// <summary>
+        /// Writes the other files of a release archive (the desktop UI's native libraries) into <paramref name="dir"/>,
+        /// each staged and then moved into place. Returns their names; older releases have none.
+        /// </summary>
+        internal static List<string> ExtractCompanions(Stream archive, string assetName, string dir)
+        {
+            var written = new List<string>();
+            void Write(string name, Action<string> extract)
+            {
+                name = Path.GetFileName(name);
+                if (name.Length == 0 || name == "kscript" || string.Equals(name, "kscript.exe", StringComparison.OrdinalIgnoreCase)) return;
+                string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}-{name}");
+                try
+                {
+                    extract(staged);
+                    File.Move(staged, Path.Combine(dir, name), overwrite: true);
+                    written.Add(name);
+                }
+                finally
+                {
+                    TryDelete(staged);
+                }
+            }
+
+            if (assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                using var zip = new ZipArchive(archive, ZipArchiveMode.Read, leaveOpen: true);
+                foreach (ZipArchiveEntry entry in zip.Entries) Write(entry.FullName, path => entry.ExtractToFile(path, overwrite: true));
+                return written;
+            }
+
+            using var gzip = new GZipStream(archive, CompressionMode.Decompress, leaveOpen: true);
+            using var tar = new TarReader(gzip);
+            TarEntry e;
+            while ((e = tar.GetNextEntry()) != null)
+            {
+                if (e.EntryType is TarEntryType.RegularFile or TarEntryType.V7RegularFile)
+                {
+                    TarEntry current = e;
+                    Write(current.Name, path => current.ExtractToFile(path, overwrite: true));
+                }
+            }
+            return written;
         }
 
         internal static void ExtractBinary(Stream archive, string assetName, string destination)
