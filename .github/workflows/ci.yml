@@ -60,6 +60,16 @@ jobs:
       - name: Run KScript tests
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab
 
+      - name: Check a new project (kscript make project)
+        shell: bash
+        run: |
+          k="dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
+          cd "$RUNNER_TEMP"
+          $k make project new-app
+          $k check new-app --warnaserror
+          $k fmt --check new-app
+          $k test new-app
+
   vscode:
     name: VS Code extension
     runs-on: ubuntu-latest

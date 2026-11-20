@@ -472,11 +472,11 @@ public class TestFrameworkTests
             Assert.Equal(0, MakeCommand.Run(new[] { "project", "demo", "--dir", parent }, o, new StringWriter()));
             string project = Path.Combine(parent, "demo");
             List<string> files = TestRunner.Discover(new[] { project });
-            Assert.Equal(new[] { "greeting.test.ks.xml" }, files.Select(Path.GetFileName));
-            TestFileResult r = TestRunner.RunFile(files[0], new TestRunSettings());
-            Assert.Null(r.Error);
-            Assert.Equal(5, r.Tests.Count);
-            Assert.All(r.Tests, t => Assert.True(t.Outcome == TestOutcome.Passed, t.FullName + ": " + t.Message));
+            Assert.Equal(new[] { "greeting.test.ks.xml", "tasks.test.ks.xml" }, files.Select(Path.GetFileName).OrderBy(f => f, StringComparer.Ordinal));
+            var results = files.Select(f => TestRunner.RunFile(f, new TestRunSettings())).ToList();
+            Assert.All(results, r => Assert.Null(r.Error));
+            Assert.Equal(14, results.Sum(r => r.Tests.Count));
+            Assert.All(results.SelectMany(r => r.Tests), t => Assert.True(t.Outcome == TestOutcome.Passed, t.FullName + ": " + t.Message));
         }
         finally
         {
