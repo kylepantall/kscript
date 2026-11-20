@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using KScript.Ide;
 using KScript.Updates;
 
 namespace KScript.Tests;
@@ -25,6 +26,31 @@ public sealed class SelfUpdaterRunTests : IDisposable
         {
             Requests.Add(request);
             return Task.FromResult(Routes.TryGetValue(request.RequestUri!.ToString(), out var answer) ? answer() : new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
+    /// <summary>One editor (VS Code) whose KScript extension is <see cref="Version"/>, or none when Version is null.</summary>
+    private sealed class FakeEditors : IIdeHost
+    {
+        public string Version { get; set; }
+        public List<string[]> Runs { get; } = new();
+        public string DownloadedTag { get; private set; }
+        public bool IsWindows => false;
+        public bool IsMacOS => false;
+        public string GetEnvironmentVariable(string name) => name == "PATH" && Version != null ? "/ide" : null;
+        public bool FileExists(string path) => path == Path.Combine("/ide", "code");
+
+        public (int ExitCode, string Output) Run(string fileName, IEnumerable<string> arguments)
+        {
+            string[] args = arguments.ToArray();
+            Runs.Add(args);
+            return (0, args[0] == "--list-extensions" ? $"kylepantall.kscript@{Version}\n" : "ok");
+        }
+
+        public Task<(string Path, string Tag)> DownloadExtensionAsync(string tag, TextWriter error)
+        {
+            DownloadedTag = tag;
+            return Task.FromResult((Path.GetTempFileName(), tag));
         }
     }
 
@@ -76,6 +102,7 @@ public sealed class SelfUpdaterRunTests : IDisposable
             Windows = false,
             Handler = github,
             RunVersion = _ => "kscript 0.2.0",
+            IdeHost = new FakeEditors(),
         });
     }
 
@@ -129,10 +156,58 @@ public sealed class SelfUpdaterRunTests : IDisposable
     }
 
     [Fact]
+    public void Updates_the_editor_extension_with_the_binary()
+    {
+        var (_, env) = Setup();
+        var editors = new FakeEditors { Version = "0.1.0" };
+        env.IdeHost = editors;
+        var (code, output, error) = Update(env);
+        Assert.True(code == 0, error);
+        Assert.Contains("Updated kscript 0.1.0 -> 0.2.0", output);
+        Assert.Contains("Updated the KScript extension in Visual Studio Code: 0.1.0 -> 0.2.0", output);
+        Assert.Equal("v0.2.0", editors.DownloadedTag);
+    }
+
+    [Fact]
+    public void Updates_a_stale_extension_when_the_binary_is_current()
+    {
+        var (_, env) = Setup();
+        env.CurrentVersion = "0.2.0";
+        var editors = new FakeEditors { Version = "0.1.0" };
+        env.IdeHost = editors;
+
+        Assert.Contains("Visual Studio Code is 0.1.0; kscript update will install 0.2.0", Update(env, "--check").Out);
+        Assert.Null(editors.DownloadedTag);
+
+        var (code, output, _) = Update(env);
+        Assert.Equal(0, code);
+        Assert.Contains("kscript 0.2.0 is up to date.", output);
+        Assert.Contains("Updated the KScript extension in Visual Studio Code: 0.1.0 -> 0.2.0", output);
+        Assert.Equal("old binary", File.ReadAllText(env.TargetPath));
+    }
+
+    [Fact]
+    public void No_ide_leaves_the_editors_alone()
+    {
+        var (_, env) = Setup();
+        var editors = new FakeEditors { Version = "0.1.0" };
+        env.IdeHost = editors;
+        Assert.Equal(0, Update(env, "--no-ide").Code);
+        Assert.Equal(0, Update(env, "--check", "--no-ide").Code);
+        env.CurrentVersion = "0.2.0";
+        Assert.DoesNotContain("extension", Update(env, "--no-ide").Out);
+        Assert.Empty(editors.Runs);
+
+        // The default editors are the real machine's, with the same GitHub settings.
+        Assert.IsType<SystemIdeHost>(new UpdateEnvironment().IdeHost);
+    }
+
+    [Fact]
     public void Usage()
     {
         var (_, env) = Setup();
         Assert.Contains("Usage: kscript update", Update(env, "--help").Out);
+        Assert.Contains("--no-ide", Update(env, "--help").Out);
         Assert.Contains("--version needs a release tag", Update(env, "--version").Err);
     }
 

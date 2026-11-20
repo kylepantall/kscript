@@ -174,6 +174,109 @@ namespace KScript.Tests
             Assert.Contains("not compatible", error);
         }
 
+        private static (int Code, string Out, string Err) UpdateInstalled(FakeHost host, string tag = "v0.3.0", bool force = false, bool checkOnly = false)
+        {
+            StringWriter output = new StringWriter();
+            StringWriter error = new StringWriter();
+            int code = IdeCommand.UpdateInstalledAsync(tag, force, checkOnly, output, error, host).GetAwaiter().GetResult();
+            return (code, output.ToString(), error.ToString());
+        }
+
+        /// <summary>VS Code has 0.2.0, Cursor has 0.3.0, VSCodium doesn't have the extension.</summary>
+        private static FakeHost ThreeEditors()
+        {
+            FakeHost host = LinuxWith("/usr/bin/code", "/usr/bin/cursor", "/usr/bin/codium");
+            host.OnRun = (file, args) => args[0] != "--list-extensions" ? (0, "ok") : file switch
+            {
+                "/usr/bin/code" => (0, "ms-python.python@2024.1.0\nKylePantall.KScript@0.2.0\n"),
+                "/usr/bin/cursor" => (0, "kylepantall.kscript@0.3.0\n"),
+                _ => (0, "ms-python.python@2024.1.0\n"),
+            };
+            return host;
+        }
+
+        [Fact]
+        public void UpdatesTheExtensionOnlyWhereItIsInstalledAndStale()
+        {
+            FakeHost host = ThreeEditors();
+            (int code, string output, string error) = UpdateInstalled(host);
+            Assert.True(code == 0, error);
+            Assert.Equal("v0.3.0", host.DownloadedTag);
+            (string file, string[] args) = Assert.Single(host.Runs, r => r.Args[0] == "--install-extension");
+            Assert.Equal("/usr/bin/code", file);
+            Assert.Equal("--force", args[2]);
+            Assert.False(File.Exists(args[1]), "the downloaded .vsix is cleaned up");
+            Assert.Contains("Updated the KScript extension in Visual Studio Code: 0.2.0 -> 0.3.0", output);
+            Assert.Contains("The KScript extension in Cursor is up to date (0.3.0).", output);
+            Assert.DoesNotContain("VSCodium", output);
+            Assert.Contains("Reload the editor window", output);
+        }
+
+        [Fact]
+        public void ChecksWithoutInstalling()
+        {
+            FakeHost host = ThreeEditors();
+            (int code, string output, _) = UpdateInstalled(host, checkOnly: true);
+            Assert.Equal(0, code);
+            Assert.Contains("The KScript extension in Visual Studio Code is 0.2.0; kscript update will install 0.3.0.", output);
+            Assert.Equal("unset", host.DownloadedTag);
+            Assert.DoesNotContain(host.Runs, r => r.Args[0] == "--install-extension");
+        }
+
+        [Fact]
+        public void ForceReinstallsAnExtensionThatIsAlreadyCurrent()
+        {
+            FakeHost host = ThreeEditors();
+            (_, string output, _) = UpdateInstalled(host, force: true);
+            Assert.Contains("Reinstalled the KScript extension 0.3.0 in Cursor.", output);
+            Assert.Contains("Updated the KScript extension in Visual Studio Code", output);
+            Assert.Equal(2, host.Runs.Count(r => r.Args[0] == "--install-extension"));
+        }
+
+        [Fact]
+        public void NothingToUpdateIsQuiet()
+        {
+            FakeHost none = LinuxWith();
+            Assert.Equal((0, "", ""), UpdateInstalled(none));
+
+            FakeHost current = LinuxWith("/usr/bin/cursor");
+            current.OnRun = (f, a) => (0, "kylepantall.kscript@0.3.0");
+            (int code, string output, _) = UpdateInstalled(current);
+            Assert.Equal(0, code);
+            Assert.Equal("unset", current.DownloadedTag);
+            Assert.DoesNotContain("Reload", output);
+        }
+
+        [Fact]
+        public void ReportsExtensionUpdateFailures()
+        {
+            // An editor that can't list its extensions is an error, but the others are still checked.
+            FakeHost broken = ThreeEditors();
+            Func<string, string[], (int, string)> inner = broken.OnRun;
+            broken.OnRun = (file, args) => file == "/usr/bin/cursor" ? (2, "crashed ") : inner(file, args);
+            (int code, string output, string error) = UpdateInstalled(broken);
+            Assert.Equal(1, code);
+            Assert.Contains("Cursor couldn't list its extensions (exit code 2): crashed", error);
+            Assert.Contains("Updated the KScript extension in Visual Studio Code", output);
+
+            FakeHost onlyBroken = LinuxWith("/usr/bin/cursor");
+            onlyBroken.OnRun = (f, a) => (2, "crashed");
+            Assert.Equal(1, UpdateInstalled(onlyBroken).Code);
+
+            FakeHost failsInstall = ThreeEditors();
+            inner = failsInstall.OnRun;
+            failsInstall.OnRun = (file, args) => args[0] == "--install-extension" ? (1, "not compatible") : inner(file, args);
+            (code, output, error) = UpdateInstalled(failsInstall);
+            Assert.Equal(1, code);
+            Assert.Contains("Visual Studio Code couldn't update the extension (exit code 1): not compatible", error);
+            Assert.DoesNotContain("Reload", output);
+
+            FakeHost noDownload = ThreeEditors();
+            noDownload.DownloadFails = true;
+            Assert.Equal(1, UpdateInstalled(noDownload).Code);
+            Assert.DoesNotContain(noDownload.Runs, r => r.Args[0] == "--install-extension");
+        }
+
         [Fact]
         public void UninstallsByExtensionId()
         {

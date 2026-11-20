@@ -25,7 +25,7 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/kylepantall/kscript/master/install.ps1 | iex
 ```
 
-The extension finds `kscript` where the installers put it (`~/.kscript/bin`, or `%LOCALAPPDATA%\Programs\kscript` on Windows), then on your `PATH`. Keep it up to date with `kscript update`, then run **KScript: Restart Language Server**.
+The extension finds `kscript` where the installers put it (`~/.kscript/bin`, or `%LOCALAPPDATA%\Programs\kscript` on Windows), then on your `PATH`. Keep it up to date with `kscript update` (which updates this extension too), then run **KScript: Restart Language Server**.
 
 You can also install this extension from the command line with `kscript ide install`.
 
