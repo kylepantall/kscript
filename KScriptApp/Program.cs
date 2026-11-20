@@ -140,7 +140,7 @@ namespace KScript
                 else if (string.Equals(environment, "production", StringComparison.OrdinalIgnoreCase))
                     Error.WriteLine("Docs: not served in the production environment.");
                 else if (Directory.Exists(folder ?? "."))
-                    docs = KScript.Docs.DocsCommand.ServeProjectAsync(folder ?? ".", project, docsPort, port ?? 8080, Out, Error, stopDocs.Token);
+                    docs = ServeDocs(folder ?? ".", project, docsPort, port ?? 8080, stopDocs.Token);
             }
 
             try
@@ -168,6 +168,14 @@ namespace KScript
                 docs.GetAwaiter().GetResult();
             }
         }
+
+        /// <summary>
+        /// Starts the docs for kscript serve --with-docs. A method of its own, so serving a compiled site (whose program
+        /// leaves KScript.Docs out) never loads that assembly.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        System.Threading.Tasks.Task ServeDocs(string folder, KScript.Projects.ProjectConfig project, int? docsPort, int sitePort, System.Threading.CancellationToken stop) =>
+            KScript.Docs.DocsCommand.ServeProjectAsync(folder, project, docsPort, sitePort, Out, Error, stop);
 
         /// <summary>The environment from --env, also set as KSCRIPT_ENV so pages and child scripts see it.</summary>
         string EnvironmentName;
