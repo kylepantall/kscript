@@ -494,6 +494,7 @@ namespace KScript.Language.Features
                     return a.Options.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
                 case AttributeKind.TypeName:
+                case AttributeKind.TypeNames:
                     return a.Options.Concat(TypeNames(analysis)).Distinct().Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
                 case AttributeKind.Bool:

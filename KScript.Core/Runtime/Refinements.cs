@@ -221,7 +221,7 @@ namespace KScript.Runtime
             return parsed.Success ? PlainValue(parsed.Root) as List<object> : null;
         }
 
-        /// <summary>A literal as a value: numbers, text, bools, lists of them, and bare <c>@name</c> (as the text '@name').</summary>
+        /// <summary>A literal as a value: numbers, text, bools, lists of them, bare words, and bare <c>@name</c> (as the text '@name').</summary>
         internal static object PlainValue(ExprNode node)
         {
             switch (node)
@@ -237,6 +237,9 @@ namespace KScript.Runtime
                     };
                 case CommandCallNode { ArgumentList: null } r:
                     return "@" + r.Name;
+                case IdentifierNode word:
+                    // A bare word is its text, as for an enum: one_of: [small, large], algorithm: bcrypt.
+                    return word.Name;
                 case UnaryNode { Operator: "-", Operand: LiteralNode { Kind: LiteralKind.Number } n }:
                     return -double.Parse(n.Value, CultureInfo.InvariantCulture);
                 case ListNode list:

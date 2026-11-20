@@ -107,6 +107,36 @@ test('comments and doc comments', async () => {
   assert.match(scopeOf(more, 'after'), /string\.quoted\.double\.kscript/);
 });
 
+test('types: with lists, annotations, rules and typed literals', async () => {
+  const tokens = tokenize(await load(), [
+    'type Username with [handle, Auditable] {',
+    '  max: 16',
+    '  pattern: /^@[a-z_]+$/i',
+    '  validate: not $value->name()->starts_with(\'_\'), "No leading _"',
+    '  level: int',
+    '}',
+    'id: uuid(v: 4) = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f',
+    'e: email = joan@example.com',
+    'half = 10 / 2 / 5',
+  ].join('\n'));
+  assert.match(scopeOf(tokens, 'type'), /storage\.type\.kscript/);
+  assert.match(scopeOf(tokens, 'Username'), /entity\.name\.type\.kscript/);
+  assert.match(scopeOf(tokens, 'with'), /storage\.modifier\.kscript/);
+  assert.match(scopeOf(tokens, 'handle'), /support\.type\.builtin\.kscript/);
+  assert.match(scopeOf(tokens, 'Auditable'), /entity\.name\.type\.kscript/);
+  assert.match(scopeOf(tokens, 'max'), /keyword\.other\.rule\.kscript/);
+  assert.match(scopeOf(tokens, 'validate'), /keyword\.other\.rule\.kscript/);
+  assert.match(scopeOf(tokens, '/^@[a-z_]+$/i'), /string\.regexp\.kscript/);
+  assert.match(scopeOf(tokens, 'int'), /support\.type\.builtin\.kscript/);
+  assert.doesNotMatch(scopeOf(tokens, 'level'), /keyword\.other\.rule/);
+  assert.match(scopeOf(tokens, 'id'), /variable\.other\.assignment\.kscript/);
+  assert.match(scopeOf(tokens, 'uuid'), /support\.type\.builtin\.kscript/);
+  assert.match(scopeOf(tokens, '3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f'), /constant\.other\.uuid\.kscript/);
+  assert.match(scopeOf(tokens, 'email'), /support\.type\.builtin\.kscript/);
+  assert.match(scopeOf(tokens, 'joan@example.com'), /string\.unquoted\.email\.kscript/);
+  assert.ok(!tokens.some((t) => /string\.regexp/.test(t.scopes) && t.text.includes('2')), 'division is not a regex');
+});
+
 test('every sample tokenizes without leaving a string or block open', async () => {
   const grammar = await load();
   const root = path.resolve(__dirname, '../../../../samples');
