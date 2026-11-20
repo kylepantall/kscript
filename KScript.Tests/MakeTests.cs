@@ -242,6 +242,25 @@ public class ScaffolderTests
     }
 
     [Fact]
+    public void ErrorTypesAreMadeInLibErrors()
+    {
+        using var site = new TempSite(("kscript.json", "{}"));
+        Assert.Equal(0, Make(site.Root, "error", "payment_failed", "--status", "402", "--extends", "validation", "--fields", "order: int, reason?: string", "--message", "Order {$order} could not be paid").Code);
+        Assert.Equal("/// Payment Failed.\nerror PaymentFailed(status: 402, message: \"Order {$order} could not be paid\") extends Validation {\n  order: int\n  reason?: string\n}\n",
+            Read(site, "lib/errors/payment-failed.kscript"));
+        Assert.Equal(0, Make(site.Root, "error", "Gone").Code);
+        Assert.Equal("/// Gone.\nerror Gone(message: \"Gone\")\n", Read(site, "lib/errors/gone.kscript"));
+
+        site.Write("main.kscript", "import \"lib/errors/payment-failed.kscript\"\ntry {\n  throw PaymentFailed(order: 7)\n} catch Validation as e {\n  echo \"{ $e.message } { $e.status }\"\n}\n");
+        var output = new StringWriter();
+        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(output, "")).RunFile(Path.Combine(site.Root, "main.kscript"));
+        Assert.Contains("Order 7 could not be paid 402", output.ToString());
+
+        Assert.Equal(0, Make(site.Root, "error", "Gone", "--format", "xml").Code);
+        Assert.Contains("<error name=\"Gone\" message=\"Gone\" description=\"Gone.\" />", Read(site, "lib/errors/gone.ks.xml"));
+    }
+
+    [Fact]
     public void ExistingFilesNeedForce()
     {
         using var site = new TempSite(("_components/hero.html", "mine"));

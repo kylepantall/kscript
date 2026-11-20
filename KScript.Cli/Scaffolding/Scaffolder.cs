@@ -261,6 +261,7 @@ namespace KScript.Scaffolding
             "layout" => "main",
             "script" => "tidy-downloads",
             "test" => "checkout",
+            "error" => "PaymentFailed",
             _ => "Example",
         };
 

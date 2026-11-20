@@ -1,0 +1,48 @@
+// Error types: declare them, throw them with their fields, and catch them by type.
+
+/// An order that can't be found.
+error OrderNotFound(message: "No order {$id}") extends NotFound {
+  id: int
+}
+
+/// Not enough of something in stock.
+error OutOfStock(status: 409, message: "Only {$left} {$item} left, {$wanted} wanted") {
+  item: string
+  left: int
+  wanted: int
+}
+
+stock = { tea: 2, coffee: 10 }
+orders = [{ id: 1, item: 'tea', qty: 5 }, { id: 2, item: 'coffee', qty: 1 }]
+
+fn place(id: int) {
+  order = $orders->find(fn($o) => $o.id == $id)
+  if $order == null {
+    throw OrderNotFound(id: $id)
+  }
+  left = $stock[$order.item]
+  if $left < $order.qty {
+    throw OutOfStock(item: $order.item, left: $left, wanted: $order.qty)
+  }
+  return 'Order ' + $id + ': ' + $order.qty + ' ' + $order.item
+}
+
+for id in [1, 2, 3] {
+  try {
+    echo @place($id)
+  } catch OutOfStock as e {
+    echo "{ $e.message } ({ $e.status })"
+  } catch NotFound as e {
+    echo "{ $e.message } ({ $e.type }, { $e.status })"
+  }
+}
+
+try {
+  try {
+    @place(3)
+  } catch err {
+    throw Validation(message: "Couldn't place the order", cause: $err)
+  }
+} catch Validation as e {
+  echo "{ $e.message }: { $e.cause.message }"
+}

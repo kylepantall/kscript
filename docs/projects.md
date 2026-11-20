@@ -168,6 +168,8 @@ kscript make markdown blog/first-post                 # blog/first-post.md with 
 kscript make layout main --css /site.css              # _layouts/main.html
 kscript make script tidy-downloads                    # tidy-downloads.kscript (tidy-downloads.ks.xml with --format xml)
 kscript make test checkout                            # tests/checkout.test.kscript, in the project folder
+kscript make error PaymentFailed --status 402 --extends Validation --fields "order: int, reason?: string"
+                                                      # lib/errors/payment-failed.kscript: an error type
 kscript make                                          # list every template
 ```
 

@@ -40,10 +40,6 @@ namespace KScript.Language.Analysis
         /// </summary>
         private void HoistErrors(Scope root)
         {
-            if (catalog.GetElement("error")?.Package != "KScript.Core")
-            {
-                return;
-            }
             foreach (MarkupElement e in result.Markup.DescendantElements().Where(e => IsKScriptElementName(e, "error")))
             {
                 MarkupAttribute nameAttr = e.GetAttribute("name");
@@ -248,6 +244,13 @@ namespace KScript.Language.Analysis
             }
             foreach ((string name, TextSpan span) in ErrorTypeNames(attr.Value))
             {
+                if (ErrorTypes.BuiltIn.TryGetValue(name, out ErrorType b) && b.Name != name && scope.Lookup(name, span.Start) == null)
+                {
+                    // The runtime matches built-in names without case, but the editor asks for one spelling.
+                    Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownErrorType, $"Write the error type as {b.Name}.",
+                        new[] { new QuickFix($"Change to {b.Name}", new TextChange(span, b.Name)) });
+                    continue;
+                }
                 if (ReferenceErrorType(name, span, scope))
                 {
                     continue;
@@ -278,7 +281,7 @@ namespace KScript.Language.Analysis
             scope.VisibleAt(offset).Where(s => s.Shape.Type == KType.ErrorType).Select(s => s.Name).Concat(importedErrors).Concat(ErrorTypes.BuiltIn.Values.Select(t => t.Name)).Distinct();
 
         /// <summary>The fields every error has, and those of a Shape error.</summary>
-        internal static TypeShape BaseErrorShape()
+        internal static TypeShape BaseErrorShape(int depth = 0)
         {
             TypeShape shape = new TypeShape(KType.Error);
             foreach (string f in BaseErrorFields)
@@ -286,7 +289,8 @@ namespace KScript.Language.Analysis
                 TypeShape fieldShape = f switch
                 {
                     "line" or "column" or "status" => new TypeShape(KType.Number),
-                    "cause" => new TypeShape(KType.Error),
+                    // A cause is an error too; past a few levels it's left open rather than built forever.
+                    "cause" => depth < 3 ? BaseErrorShape(depth + 1) : TypeShape.Unknown,
                     _ => new TypeShape(KType.String),
                 };
                 shape.Fields[f] = new FieldInfo(f, fieldShape, null, f switch
@@ -319,11 +323,6 @@ namespace KScript.Language.Analysis
                     {
                         shape.Fields.TryAdd(f.Key, f.Value);
                     }
-                }
-                else if (importedErrors.Contains(name))
-                {
-                    // An imported error's fields aren't known here, so don't warn about them.
-                    return new TypeShape(KType.Error) { Name = name };
                 }
             }
             return shape;

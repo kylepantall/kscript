@@ -1,0 +1,12 @@
+--- make
+description: An error type in lib/errors/, thrown with throw Name(...) and caught with catch Name as e
+base: project
+to: lib/errors/{{ dir }}{{ kebab }}{{ ext }}
+hint: Import it with import "lib/errors/{{ dir }}{{ kebab }}{{ ext }}", then throw {{ pascal }}(...) and catch {{ pascal }} as e
+---
+/// {{ title }}.
+error {{ pascal }}({{#if status}}status: {{ status }}, {{/if}}message: "{{#if message}}{{ message }}{{else}}{{ title }}{{/if}}"){{#if extends}} extends {{ extends | pascal }}{{/if}}{{#if fields}} {
+{{#each fields}}
+  {{ item | trim }}
+{{/each}}
+}{{/if}}

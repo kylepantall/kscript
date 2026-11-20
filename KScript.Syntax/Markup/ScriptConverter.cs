@@ -610,7 +610,7 @@ namespace KScript.Syntax.Markup
                     case "continue" when e.Attributes.Count == 0 && !e.Children.Any():
                         Line(indent, e.Name);
                         return;
-                    case "throw" when Only("value") && !e.Children.Any():
+                    case "throw" when Only("value") && Attr("value") != null && !e.Children.Any():
                         Line(indent, "throw " + Reindent(Attr("value").Trim(), Pad(indent)));
                         return;
                     case "throw" when e.Attributes.Count == 0 && !e.Children.Any(c => !(c is MarkupText t && t.IsWhitespace)):

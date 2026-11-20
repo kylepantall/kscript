@@ -585,6 +585,13 @@ namespace KScript.Language.Analysis
                 {
                     // $err is visible in the when="..." test as well as the body.
                     Scope catchScope = new Scope(scope, e.Span);
+                    if (e.GetAttribute("as") == null)
+                    {
+                        // Without as, the error is $err.
+                        Symbol err = new Symbol { Name = "err", Kind = SymbolKind.BuiltIn, Shape = CaughtErrorShape(e, scope), Description = "The error this catch is handling.", DeclaringElement = e };
+                        result.Symbols.Add(err);
+                        catchScope.Declare(err, e.Span.Start);
+                    }
                     DeclareFromAttribute(e, "as", catchScope, e.Span.Start, SymbolKind.Variable, CaughtErrorShape(e, scope));
                     AnalyzeAttributes(e, info, catchScope, skip: "as");
                     WalkChildren(e.Children, new Scope(catchScope, e.ContentSpan), markupMode);

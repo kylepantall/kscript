@@ -115,13 +115,20 @@ Expected $order.total eq 30 to be true.
 
 ### Errors
 
-`expect-error { }` fails unless its body stops with an error. `type` checks the error type, `contains` checks the message, and `as` keeps the error (`type`, `message`, `line`, `file`) for more checks:
+`expect-error { }` fails unless its body stops with an error. `type` checks the error type (an error type that extends it counts too), `contains` checks the message, and `as` keeps the error (`type`, `message`, `line`, `file`, `status`, `cause` and its fields) for more checks:
 
 ```kscript
 expect-error(type: Validation, contains: positive, as: err) {
   @set_age(-1)
 }
 expect(value: $err.line, type: number)
+```
+
+For one expression, `throws` is shorter: it passes when working out the value stops with an error of that type.
+
+```kscript
+expect(value: @find_person(99), throws: PersonNotFound)
+expect(value: @json('nope'), throws: Format) // Json extends Format
 ```
 
 A failed check inside the body is still reported as a failure, not taken as the expected error.

@@ -21,6 +21,7 @@ public class ScaffoldingCoverageTests
     [InlineData("markdown", "blog/first-post")]
     [InlineData("layout", "main")]
     [InlineData("script", "tidy-downloads")]
+    [InlineData("error", "PaymentFailed")]
     [InlineData("card", "Example")]
     public void A_missing_name_gets_an_example(string type, string example)
     {

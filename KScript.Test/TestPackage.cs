@@ -409,7 +409,7 @@ namespace KScript.Testing
                 caught = ex;
             }
 
-            string wanted = string.IsNullOrEmpty(type) ? "an error" : $"a {type} error";
+            string wanted = string.IsNullOrEmpty(type) ? "an error" : $"{Article(type)} {type} error";
             if (caught == null) throw Failure(run, $"Expected {wanted}, but the body ran without one.");
             if (!string.IsNullOrEmpty(type) && !ErrorTypes.Matches(caught, type))
                 throw Failure(run, $"Expected {wanted}, but got {caught.Type}: {caught.Message}");
@@ -431,11 +431,13 @@ namespace KScript.Testing
             }
             catch (KScriptException ex) when (ex.Type != AssertionType || string.Equals(type, AssertionType, StringComparison.OrdinalIgnoreCase))
             {
-                if (!ErrorTypes.Matches(ex, type)) throw Failure(run, $"Expected {subject} to throw a {type} error, but it threw {ex.Type}: {ex.Message}", "throws");
+                if (!ErrorTypes.Matches(ex, type)) throw Failure(run, $"Expected {subject} to throw {Article(type)} {type} error, but it threw {ex.Type}: {ex.Message}", "throws");
                 return null;
             }
-            throw Failure(run, $"Expected {subject} to throw a {type} error, but it was {Show(actual)}.", "value");
+            throw Failure(run, $"Expected {subject} to throw {Article(type)} {type} error, but it was {Show(actual)}.", "value");
         }
+
+        private static string Article(string word) => "AEIOU".Contains(char.ToUpperInvariant(word[0])) ? "an" : "a";
 
         private static bool? Capture(ElementRun run)
         {

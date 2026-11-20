@@ -283,7 +283,7 @@ The editor completes the methods for each type and shows what they do. `@json(te
 ```kscript
 try {
   data = @read_json($path)
-} catch err when $err.type eq 'FileNotFound' {
+} catch FileNotFound {
   echo "No file at {$path}, using defaults."
 } catch err {
   echo "Failed: {$err.message} (line {$err.line})"
@@ -293,7 +293,56 @@ try {
 throw Validation "Age must be positive, got {$age}"
 ```
 
+`catch` takes the error types it handles, joined by `|`, and `as` names the error: `catch FileNotFound | Permission as e`. A catch with only a lower-case name (`catch err`) handles every error. `when` adds a test: `catch Network as e when $e.status eq 503`. Catches are tried in order and the first that fits runs. Error type names start with a capital letter, which is how `catch` tells them from the variable's name.
+
 Unknown elements, attributes and syntax errors are reported before a script starts, so a typo near the end doesn't leave a job half done.
+
+### Error types
+
+Declare your own error types with `error`. Fields work as in a [`type`](#typed-data), the message can use them, and `extends` says what kind of error it is:
+
+```kscript try
+/// No person has that id.
+error PersonNotFound(message: "No person with id {$id}") extends NotFound {
+  id: int
+}
+error OutOfStock(status: 409, message: "{$item} is out of stock") {
+  item: string
+  left: int = 0
+}
+
+fn find_person(id: int) {
+  throw PersonNotFound(id: $id)
+}
+
+try {
+  @find_person(42)
+} catch NotFound as e {
+  echo "{ $e.message } ({ $e.type }, status { $e.status })"
+}
+```
+
+- **Throwing.** `throw PersonNotFound(id: 42)` makes the error and throws it. Its arguments are its fields, by name, plus `message:` (instead of the type's message) and `cause:` (the error that led to this one). A field without a default must be given, and the editor flags missing and unknown fields. `throw Validation "Too short"` still works for a type with no fields, and `throw Validation(field: 'name', message: 'Too short')` adds fields to a built-in one.
+- **Catching.** `catch NotFound` catches `PersonNotFound` too, because it extends `NotFound`. In the catch, `$e.id` reads a field, and the editor completes the fields of the types the catch names. Every error has `type`, `message`, `line`, `column`, `file`, `status` and `cause`. `$e->is(NotFound)` checks the type in code, and `$e->chain()` lists it: `['PersonNotFound', 'NotFound', 'Error']`.
+- **Rethrowing and wrapping.** A bare `throw` inside a catch rethrows the error it is handling, unchanged. `throw $e` does the same with a saved error. To add context, wrap it: `throw ConfigBroken(path: $path, cause: $e)`, then `$err.cause.message` reads the original.
+- **Making one without throwing.** `$OutOfStock->new(item: 'tea')` gives the error as a value, to return or throw later.
+- **Status.** `status` is the HTTP status a [KScript.Http route](http.md#errors-and-status-codes) answers with when nothing catches the error. A type inherits it, and its fields and message, from the type it extends.
+- **Exports.** Top-level error types are exported, like functions and types, so `import "lib/errors.kscript"` brings them in. `kscript make error PaymentFailed --status 402 --extends Validation --fields "order: int"` writes one to `lib/errors/`.
+
+The built-in error types, which KScript itself raises, form a tree that `catch` follows:
+
+| Type | Extends | Raised for |
+| --- | --- | --- |
+| `Error` | | Every error. `catch Error` catches everything. |
+| `Syntax`, `Name`, `Null`, `Argument`, `Value`, `Const` | `Error` | Mistakes in a script: bad syntax, an unknown name, null where a value is needed, wrong arguments, a bad value, changing a const. |
+| `Type` | `Error` | A value of the wrong type. `Shape` extends it, for data that doesn't fit a `type` (`$e.problems` lists each problem). |
+| `Format` | `Error` | Text in the wrong format. `Json` and `Yaml` extend it. |
+| `IO` | `Error` | Files. `FileNotFound`, `Permission` and `Access` extend it. |
+| `Network` | `Error` | Requests. `Timeout` extends it, and `$e.status` is the response's status. |
+| `Import`, `Config`, `Input`, `Limit`, `Context`, `Platform`, `Cancelled`, `Retired`, `Http`, `AI`, `Assertion` | `Error` | Imports, settings, input, limits such as recursion, the wrong place, the OS, a stopped script, KScript 1 features, KScript.Http apps, language models, failed test checks. |
+| `Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409) | `Error` | For your own code to throw or extend. The number is the HTTP status. |
+
+A name in `catch` or `throw` that is neither declared nor built in still works (as a kind of `Error`), but the editor warns about it (KS5011), since it is usually a typo.
 
 ## Settings: $config
 

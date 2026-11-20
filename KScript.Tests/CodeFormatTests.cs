@@ -22,6 +22,7 @@ public class CodeFormatTests
     [InlineData("tour")]
     [InlineData("oldest")]
     [InlineData("repos")]
+    [InlineData("errors")]
     public void SamplesPrintTheSameAsTheirXmlVersions(string name)
     {
         string xml = RunFile(ScriptRunner.RepoFile("samples", "kscript2", name + ".ks.xml"));
