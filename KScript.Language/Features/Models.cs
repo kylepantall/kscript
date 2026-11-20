@@ -19,6 +19,7 @@ namespace KScript.Language.Features
         File,
         Snippet,
         Folder,
+        Module,
     }
 
     public sealed class CompletionItem
@@ -41,6 +42,9 @@ namespace KScript.Language.Features
         public string SortText { get; init; }
         public string FilterText { get; init; }
         public bool Deprecated { get; init; }
+
+        /// <summary>Edits made with the insert, such as the import a package's command needs.</summary>
+        public IReadOnlyList<TextChange> AdditionalEdits { get; init; }
 
         public override string ToString() => $"{Kind} {Label}";
     }
@@ -65,6 +69,12 @@ namespace KScript.Language.Features
 
         /// <summary>Per parameter: its name, the enum values it takes (or null), and whether it is a yes/no flag.</summary>
         internal IReadOnlyList<(string Name, IReadOnlyList<string> Values, bool Flag)> Details { get; init; }
+
+        /// <summary>The parameters that are deprecated, by name.</summary>
+        internal IReadOnlyCollection<string> DeprecatedParameters { get; init; } = Array.Empty<string>();
+
+        /// <summary>Per parameter: the enum values its items take when it is a list of an enum (<c>sizes: Size[]</c>), or null.</summary>
+        internal IReadOnlyList<IReadOnlyList<string>> ItemValues { get; init; }
     }
 
     public sealed class SignatureHelpResult

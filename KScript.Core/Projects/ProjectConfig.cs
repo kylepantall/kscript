@@ -227,7 +227,7 @@ namespace KScript.Projects
         public int ThrottleLimit { get; set; } = 60;
         public double ThrottleSeconds { get; set; } = 60;
 
-        public static readonly string[] DefaultRouteNames = { "routes", "api" };
+        public static readonly string[] DefaultRouteNames = { "routes", "api", "routes/web", "routes/api" };
     }
 
     public sealed class ProjectConfig
@@ -268,6 +268,44 @@ namespace KScript.Projects
         public AppSettings App { get; } = new AppSettings();
         public MakeSettings Make { get; } = new MakeSettings();
         public HttpSettings Http { get; } = new HttpSettings();
+
+        /// <summary>
+        /// The recommended folder for each kind of file, which <c>kscript make</c> writes to. kscript.json's "paths"
+        /// section moves any of them, relative to the site folder: <c>"paths": { "controllers": "app/controllers" }</c>.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> DefaultPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["routes"] = "routes",
+            ["controllers"] = "controllers",
+            ["middleware"] = "middleware",
+            ["requests"] = "requests",
+            ["views"] = "views",
+            ["components"] = "_components",
+            ["layouts"] = "_layouts",
+            ["partials"] = "_partials",
+            ["styles"] = "styles",
+            ["lib"] = "lib",
+            ["types"] = "types",
+            ["storage"] = "lib",
+            ["jobs"] = "jobs",
+            ["windows"] = ".",
+            ["documents"] = "documents",
+            ["config"] = "config",
+            ["locales"] = "locales",
+            ["logging"] = "lib",
+            ["data"] = "data",
+            ["scripts"] = "scripts",
+            ["tests"] = "tests",
+        };
+
+        /// <summary>The folders kscript.json's "paths" section sets, by name (see <see cref="DefaultPaths"/>).</summary>
+        public Dictionary<string, string> Paths { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The folder for a kind of file: kscript.json's "paths" setting, or the recommended one.</summary>
+        public string PathFor(string name) =>
+            Paths.TryGetValue(name, out var path) ? path
+            : string.Equals(name, "views", StringComparison.OrdinalIgnoreCase) ? Http.Views
+            : DefaultPaths.TryGetValue(name, out var folder) ? folder : name;
 
         /// <summary>
         /// Packages every script in the project imports without an &lt;import&gt;, such as KScript.Terminal.
@@ -415,6 +453,9 @@ namespace KScript.Projects
                         case "http":
                             ReadHttp(prop.Value, config);
                             break;
+                        case "paths":
+                            ReadPaths(prop.Value, config);
+                            break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
                             foreach (string package in config.Packages)
@@ -424,7 +465,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, serve, http, lint, test, config, format, make or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, serve, http, lint, test, config, format, make or app).");
                             break;
                     }
                 }
@@ -590,6 +631,34 @@ namespace KScript.Projects
             Set("lint.rules." + key);
         }
 
+        private static void ReadPaths(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "paths", config)) return;
+            foreach (var p in e.EnumerateObject())
+            {
+                if (!DefaultPaths.ContainsKey(p.Name))
+                {
+                    config.Warnings.Add($"paths: unknown folder '{p.Name}' (expected {string.Join(", ", DefaultPaths.Keys)}).");
+                    continue;
+                }
+                string folder = String(p.Value, "paths." + p.Name, config);
+                if (folder == null) continue;
+                folder = folder.Replace('\\', '/').Trim().TrimEnd('/');
+                if (folder.Length == 0) folder = ".";
+                if (Path.IsPathRooted(folder) || folder.Split('/').Contains(".."))
+                {
+                    config.Warnings.Add($"paths.{p.Name} should be a folder inside the project, such as \"{DefaultPaths[p.Name]}\", not \"{folder}\".");
+                    continue;
+                }
+                config.Paths[p.Name] = folder;
+            }
+            // @view() looks in paths.views unless http.views says otherwise.
+            if (config.Paths.TryGetValue("views", out var views) && !config.httpViewsSet) config.Http.Views = views;
+        }
+
+        /// <summary>True once http.views is read, so paths.views doesn't replace it.</summary>
+        private bool httpViewsSet;
+
         private static void ReadMake(JsonElement e, ProjectConfig config)
         {
             if (!Object(e, "make", config)) return;
@@ -683,6 +752,7 @@ namespace KScript.Projects
                         break;
                     case "views":
                         http.Views = String(p.Value, "http.views", config) ?? http.Views;
+                        config.httpViewsSet = true;
                         break;
                     case "api_prefix":
                         http.ApiPrefix = String(p.Value, "http.api_prefix", config) ?? http.ApiPrefix;

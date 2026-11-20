@@ -51,6 +51,30 @@ Every push to `master` and every pull request runs [the CI workflow](../.github/
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
 
+## Changing a command, method or element
+
+The reference in `kscript docs`, editor completion and hover, and `kscript check` all read the same catalog: what each package registers in its `Register` method. Change a command's parameters there and every one of them changes with it.
+
+To retire something, deprecate it first, so scripts keep working while they move off it:
+
+```csharp
+p.Deprecate("@read_file", "Reading text has a clearer name", "@read_text");   // a command
+p.Deprecate("@fetch(retries)", "Requests are retried for you");                // one of its parameters
+p.Deprecate("string->shout", "", "->upper");                                   // a method
+p.Deprecate("<beep>", "", "<sound>");                                          // an element
+p.Deprecate("<sound tone>", "Renamed", "pitch");                               // one of its attributes
+```
+
+The first text says why and the second is what to use instead, as written in a script. Then:
+
+- `kscript check` and the editor warn (KS4008) where the script uses it, with a quick fix when the replacement is a plain rename.
+- Completion shows it struck through and lists it last, and hover says it is deprecated.
+- The reference strikes it through, labels it **deprecated** and shows why and what to use instead.
+
+`Deprecate` throws if the key names nothing, so removing a parameter later can't leave a stale deprecation behind.
+
+The guides in `docs/` and the README are written by hand, so a test keeps them honest: `DocsTests.Every_example_in_the_guides_and_readme_matches_the_code` checks every `kscript` and `xml` example with the analyzer. It fails if an example uses an element, attribute, command, method or parameter that no longer exists, passes the wrong number of arguments, or uses something deprecated.
+
 ## Syntax highlighting on GitHub
 
 GitHub highlights code with [Linguist](https://github.com/github-linguist/linguist), which only knows the languages that have been added to it. A repository can't bring its own grammar, so until KScript is in Linguist:

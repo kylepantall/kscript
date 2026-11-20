@@ -133,6 +133,34 @@
         "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
       }
     },
+    "paths": {
+      "type": "object",
+      "description": "Where kscript make puts each kind of file, relative to the site folder. Leave a folder out to use the recommended one.",
+      "additionalProperties": false,
+      "properties": {
+        "routes": { "type": "string", "default": "routes", "description": "Route files: web.kscript (served at /) and api.kscript (under /api)." },
+        "controllers": { "type": "string", "default": "controllers", "description": "Controllers (kscript make controller, kscript make route)." },
+        "middleware": { "type": "string", "default": "middleware", "description": "Middleware (kscript make middleware)." },
+        "requests": { "type": "string", "default": "requests", "description": "Typed request bodies (kscript make request)." },
+        "views": { "type": "string", "default": "views", "description": "Views that controllers render with @view() (kscript make view). Also where @view() looks, unless http.views is set." },
+        "components": { "type": "string", "default": "_components", "description": "Page components (kscript make component)." },
+        "layouts": { "type": "string", "default": "_layouts", "description": "Page layouts (kscript make layout)." },
+        "partials": { "type": "string", "default": "_partials", "description": "HTML that pages <include> (kscript make partial)." },
+        "styles": { "type": "string", "default": "styles", "description": ".ks.css stylesheets (kscript make css)." },
+        "lib": { "type": "string", "default": "lib", "description": "Shared functions and constants (kscript make module, kscript make const, kscript make cache)." },
+        "types": { "type": "string", "default": "types", "description": "Types and enums (kscript make type, kscript make enum)." },
+        "storage": { "type": "string", "default": "lib", "description": "JSON file stores (kscript make storage)." },
+        "jobs": { "type": "string", "default": "jobs", "description": "Jobs (kscript make job)." },
+        "windows": { "type": "string", "default": ".", "description": "Desktop windows (kscript make window)." },
+        "documents": { "type": "string", "default": "documents", "description": "Document scripts that write PDF and Word files (kscript make document)." },
+        "config": { "type": "string", "default": "config", "description": "Settings files (kscript make config), unless config.root is set." },
+        "locales": { "type": "string", "default": "locales", "description": "Translations (kscript make locale)." },
+        "logging": { "type": "string", "default": "lib", "description": "Log providers (kscript make logger)." },
+        "data": { "type": "string", "default": "data", "description": "JSON data that stores and caches write." },
+        "scripts": { "type": "string", "default": "scripts", "description": "Scripts (kscript make script)." },
+        "tests": { "type": "string", "default": "tests", "description": "Tests (kscript make test)." }
+      }
+    },
     "make": {
       "type": "object",
       "description": "Settings for kscript make.",

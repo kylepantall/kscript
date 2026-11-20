@@ -15,9 +15,20 @@ namespace KScript.Scaffolding
         public string FilePath { get; init; }
         public bool BuiltIn => FilePath == null;
         public bool OverridesBuiltIn { get; init; }
+        /// <summary>Where the command directory lists it, such as "Routes and APIs" (the header's <c>category:</c>).</summary>
+        public string Category { get; init; }
+        /// <summary>What follows <c>kscript make &lt;type&gt;</c>, such as <c>&lt;name&gt; [--resource]</c> (the header's <c>usage:</c>).</summary>
+        public string Usage { get; init; }
+        /// <summary>The options the template reads, from header lines such as <c>--resource: what it does</c>.</summary>
+        public IReadOnlyList<StubOption> Options { get; init; } = Array.Empty<StubOption>();
+        /// <summary>Example commands, from the header's <c>example:</c> lines.</summary>
+        public IReadOnlyList<string> Examples { get; init; } = Array.Empty<string>();
         internal string FileName { get; init; }
         internal string Source { get; init; }
     }
+
+    /// <summary>An option a template reads: <c>--fields</c> and what it does.</summary>
+    public sealed record StubOption(string Name, string Description);
 
     public sealed class MakeRequest
     {
@@ -29,6 +40,8 @@ namespace KScript.Scaffolding
         public Dictionary<string, string> Options { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public bool Force { get; set; }
         public bool DryRun { get; set; }
+        /// <summary>Only render the template (for templates that add to another file, such as route): nothing is written.</summary>
+        internal bool Rendering { get; set; }
         /// <summary>Where to write the file, relative to the project folder, instead of the template's <c>to:</c>.</summary>
         public string To { get; set; }
     }
@@ -65,6 +78,19 @@ namespace KScript.Scaffolding
         {
             ["md"] = "markdown",
             ["c"] = "component",
+            ["stylesheet"] = "css",
+            ["style"] = "css",
+            ["mw"] = "middleware",
+            ["log-provider"] = "logger",
+            ["store"] = "storage",
+            ["lib"] = "module",
+            ["constants"] = "const",
+            ["fn"] = "module",
+            ["function"] = "module",
+            ["functions"] = "module",
+            ["struct"] = "type",
+            ["record"] = "type",
+            ["shape"] = "type",
         };
 
         /// <summary>Every template available in a project, built-in ones first.</summary>
@@ -109,6 +135,9 @@ namespace KScript.Scaffolding
 
             var values = Values(template, rawName, request.Options, KScript.Projects.ProjectConfig.FindAndLoad(root));
             var (header, body) = SplitHeader(template.Source, template.FileName);
+            if (header.ContainsKey("adds-to") && !request.Rendering)
+                throw new StubException($"kscript make {template.Type} adds to a file rather than making one; run it as kscript make {template.Type} {Example(template.Type)}.");
+            ApplyDefaults(header, values);
 
             if (string.Equals(template.Type, "component", StringComparison.OrdinalIgnoreCase))
                 CheckComponentName(values["kebab"], request.Name);
@@ -126,9 +155,13 @@ namespace KScript.Scaffolding
             string to = request.To != null ? request.To : header.TryGetValue("to", out var t)
                 ? StubTemplate.Render(t, values).Trim()
                 : values["dir"] + values["kebab"] + Path.GetExtension(template.FileName);
-            to = to.Replace('\\', '/').TrimStart('/');
+            to = System.Text.RegularExpressions.Regex.Replace(to.Replace('\\', '/').TrimStart('/'), @"(^|/)(\./)+", "$1");
 
+            // {{ up }} leads from the new file's folder back to the project's: ../ for controllers/people.kscript.
+            values["up"] = string.Concat(Enumerable.Repeat("../", to.Count(ch => ch == '/')));
             string content = StubTemplate.Render(body, values);
+            // A template whose sections end with a blank line leaves one at the end; files end with one newline.
+            if (content.EndsWith("\n\n", StringComparison.Ordinal)) content = content.TrimEnd('\n') + "\n";
             (to, content) = ScriptFormat.Apply(template.FileName, to, content, values["format"]);
 
             string full = Path.GetFullPath(Path.Combine(root, to));
@@ -137,18 +170,36 @@ namespace KScript.Scaffolding
                 throw new StubException($"The {template.Type} template would write outside the project folder ({to}).");
 
             bool exists = File.Exists(full);
-            if (exists && !request.Force)
+            if (exists && !request.Force && !request.Rendering)
                 throw new StubException($"{to} already exists. Use --force to replace it.");
 
             string hint = header.TryGetValue("hint", out var h) ? StubTemplate.Render(h, values).Trim() : null;
 
-            if (!request.DryRun)
+            if (!request.DryRun && !request.Rendering)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(full)!);
                 File.WriteAllText(full, content);
             }
 
             return new MakeResult { RelativePath = to, FullPath = full, Content = content, Hint = hint, Template = template, Overwrote = exists };
+        }
+
+        /// <summary>
+        /// The header's <c>defaults: actions=index, fields=name: string</c> fills in options that weren't given
+        /// (separated by ;). <c>--resource</c> without <c>--actions</c> means the five resource actions.
+        /// </summary>
+        private static void ApplyDefaults(Dictionary<string, string> header, Dictionary<string, string> values)
+        {
+            if (StubTemplate.IsSet(values.GetValueOrDefault("resource")) && !values.ContainsKey("actions"))
+                values["actions"] = "index, show, store, update, destroy";
+            if (!header.TryGetValue("defaults", out var defaults)) return;
+            foreach (string pair in defaults.Split(';'))
+            {
+                int eq = pair.IndexOf('=');
+                if (eq <= 0) continue;
+                string key = pair.Substring(0, eq).Trim();
+                if (!values.ContainsKey(key)) values[key] = pair.Substring(eq + 1).Trim();
+            }
         }
 
         public const string DefaultLayout = "_layout.html";
@@ -191,7 +242,7 @@ namespace KScript.Scaffolding
             foreach (var b in builtIns)
             {
                 // A project template of the same type with another extension still counts as the same type.
-                var existing = Directory.EnumerateFiles(folder).FirstOrDefault(f => string.Equals(Path.GetFileNameWithoutExtension(f), b.Type, StringComparison.OrdinalIgnoreCase));
+                var existing = Directory.EnumerateFiles(folder).FirstOrDefault(f => string.Equals(TypeOf(f), b.Type, StringComparison.OrdinalIgnoreCase));
                 if (existing != null && !force) continue;
                 if (existing != null && !string.Equals(Path.GetFileName(existing), b.FileName, StringComparison.OrdinalIgnoreCase)) File.Delete(existing);
                 File.WriteAllText(Path.Combine(folder, b.FileName), b.Source);
@@ -202,7 +253,7 @@ namespace KScript.Scaffolding
 
         // ---- values ----------------------------------------------------------------------------------------------
 
-        private static Dictionary<string, string> Values(StubInfo template, string rawName, Dictionary<string, string> options, KScript.Projects.ProjectConfig project)
+        internal static Dictionary<string, string> Values(StubInfo template, string rawName, Dictionary<string, string> options, KScript.Projects.ProjectConfig project)
         {
             var segments = rawName.Split('/');
             string name = segments[^1];
@@ -239,7 +290,32 @@ namespace KScript.Scaffolding
                 values[kv.Key.Replace('-', '_')] = kv.Value;
 
             ScriptFormat.AddValues(values, ScriptFormat.Resolve(options, project));
+            // {{ paths.controllers }} and the rest: the recommended folders, or kscript.json's "paths" (see ProjectConfig.DefaultPaths).
+            foreach (string folder in KScript.Projects.ProjectConfig.DefaultPaths.Keys)
+                values["paths." + folder] = Folder(project?.PathFor(folder) ?? KScript.Projects.ProjectConfig.DefaultPaths[folder]);
+            values["paths.config"] = ConfigFolder(project);
+            if (!values.ContainsKey("views")) values["views"] = values["paths.views"];
             return values;
+        }
+
+        private static string Folder(string path)
+        {
+            string folder = path.Replace('\\', '/').Trim().Trim('/');
+            return folder.Length == 0 ? "." : folder;
+        }
+
+        /// <summary>
+        /// Where settings files go: config.root if kscript.json sets it (that's where $config reads them), else
+        /// paths.config if set, else config/ when the folder is there, else the project folder, where $config looks
+        /// by default.
+        /// </summary>
+        private static string ConfigFolder(KScript.Projects.ProjectConfig project)
+        {
+            if (project == null) return ".";
+            if (project.Config.Root != null)
+                return Folder(Path.GetRelativePath(project.SiteRoot, Path.GetFullPath(Path.Combine(project.Directory, project.Config.Root))));
+            if (project.Paths.TryGetValue("config", out var set)) return Folder(set);
+            return System.IO.Directory.Exists(Path.Combine(project.SiteRoot, "config")) ? "config" : ".";
         }
 
         private static void CheckComponentName(string kebab, string given)
@@ -261,11 +337,54 @@ namespace KScript.Scaffolding
             "layout" => "main",
             "script" => "tidy-downloads",
             "test" => "checkout",
+            "route" => "users",
+            "controller" => "people",
+            "request" => "NewPerson",
+            "middleware" => "secure-headers",
+            "view" => "people/show",
+            "partial" => "footer",
+            "css" => "site",
+            "module" => "pricing",
+            "type" => "Repo",
+            "enum" => "Size",
+            "const" => "limits",
+            "storage" => "people",
+            "cache" => "api-cache",
+            "job" => "send-reminders",
+            "window" => "settings",
+            "config" => "staging",
+            "env" => "base",
+            "locale" => "fr",
+            "logger" => "alerts",
             "document" => "annual-report",
             _ => "Example",
         };
 
         // ---- template files --------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// The generator for each kind of declaration a script can export (Interpreter.Declarations): a test fails
+        /// if the language gains one without a generator here.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> DeclarationGenerators = new Dictionary<string, string>
+        {
+            ["fn"] = "module",
+            ["const"] = "const",
+            ["enum"] = "enum",
+            ["type"] = "type",
+        };
+
+        /// <summary>The command directory's sections, in order, and the built-in types in each.</summary>
+        public static readonly IReadOnlyList<(string Name, string[] Types)> Categories = new[]
+        {
+            ("Routes and APIs", new[] { "route", "controller", "request", "middleware", "view" }),
+            ("Pages and styles", new[] { "page", "markdown", "layout", "component", "partial", "css" }),
+            ("Scripts and data", new[] { "script", "module", "type", "enum", "const", "storage", "cache", "job" }),
+            ("Desktop apps", new[] { "window" }),
+            ("Documents", new[] { "document" }),
+            ("Settings", new[] { "config", "env", "locale", "logger" }),
+            ("Tests", new[] { "test" }),
+        };
 
         private static List<StubInfo> builtInCache;
 
@@ -274,7 +393,7 @@ namespace KScript.Scaffolding
             if (builtInCache != null) return builtInCache;
             var asm = typeof(Scaffolder).Assembly;
             const string prefix = "KScript.Scaffolding.Templates.";
-            string[] order = { "component", "page", "markdown", "layout", "script" };
+            string[] order = Categories.SelectMany(c => c.Types).ToArray();
 
             var list = asm.GetManifestResourceNames()
                 .Where(n => n.StartsWith(prefix, StringComparison.Ordinal))
@@ -284,7 +403,7 @@ namespace KScript.Scaffolding
                     using var stream = asm.GetManifestResourceStream(n)!;
                     using var reader = new StreamReader(stream);
                     string source = reader.ReadToEnd().Replace("\r\n", "\n");
-                    return Info(Path.GetFileNameWithoutExtension(file), file, source, null);
+                    return Info(TypeOf(file), file, source, null);
                 })
                 .OrderBy(t => Array.IndexOf(order, t.Type) is int i && i >= 0 ? i : int.MaxValue)
                 .ThenBy(t => t.Type, StringComparer.Ordinal)
@@ -301,11 +420,19 @@ namespace KScript.Scaffolding
                 .Where(f => !Path.GetFileName(f).StartsWith('.'))
                 .ToList();
 
-            var duplicates = files.GroupBy(f => Path.GetFileNameWithoutExtension(f), StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
+            var duplicates = files.GroupBy(f => TypeOf(f), StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
             if (duplicates != null)
                 throw new StubException($"{TemplatesFolder} has more than one '{duplicates.Key}' template ({string.Join(", ", duplicates.Select(Path.GetFileName))}). Keep one.");
 
-            return files.Select(f => Info(Path.GetFileNameWithoutExtension(f), Path.GetFileName(f), File.ReadAllText(f).Replace("\r\n", "\n"), f)).ToList();
+            return files.Select(f => Info(TypeOf(f), Path.GetFileName(f), File.ReadAllText(f).Replace("\r\n", "\n"), f)).ToList();
+        }
+
+        /// <summary>A template's type is its file name up to the first dot: css.ks.css makes css.</summary>
+        internal static string TypeOf(string file)
+        {
+            string name = Path.GetFileName(file);
+            int dot = name.IndexOf('.');
+            return dot > 0 ? name.Substring(0, dot) : name;
         }
 
         private static StubInfo Info(string type, string fileName, string source, string path)
@@ -318,6 +445,10 @@ namespace KScript.Scaffolding
                 Source = source,
                 FilePath = path,
                 Description = header.TryGetValue("description", out var d) ? d : null,
+                Category = header.TryGetValue("category", out var c) ? c : null,
+                Usage = header.TryGetValue("usage", out var u) ? u : null,
+                Options = header.Where(kv => kv.Key.StartsWith("--", StringComparison.Ordinal)).Select(kv => new StubOption(kv.Key, kv.Value)).ToList(),
+                Examples = header.TryGetValue("example", out var e) ? e.Split('\n') : Array.Empty<string>(),
             };
         }
 
@@ -343,7 +474,9 @@ namespace KScript.Scaffolding
 
                 int colon = line.IndexOf(':');
                 if (colon <= 0) throw new StubException($"{fileName}: header lines look like 'to: path', but found '{line.Trim()}'.");
-                header[line.Substring(0, colon).Trim()] = line.Substring(colon + 1).Trim();
+                string key = line.Substring(0, colon).Trim(), value = line.Substring(colon + 1).Trim();
+                // A template can give several examples, one per line.
+                header[key] = string.Equals(key, "example", StringComparison.OrdinalIgnoreCase) && header.TryGetValue(key, out var before) ? before + "\n" + value : value;
             }
             throw new StubException($"{fileName}: the '--- make' header is never closed with a '---' line.");
         }

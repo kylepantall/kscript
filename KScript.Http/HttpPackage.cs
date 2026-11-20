@@ -66,7 +66,7 @@ namespace KScript.Http
             }
 
             var routeAttrs = RouteAttributes().ToList();
-            routeAttrs.Insert(1, new A("methods", K.Text, "The HTTP methods, comma separated: get, post.", true));
+            routeAttrs.Insert(1, new A("methods", K.Text, "The HTTP methods: [get, post].", true) { NameList = true });
             p.Element(new ElementInfo("Route", "A route for several HTTP methods at once.", ContentKind.Statements, routeAttrs.ToArray())
             {
                 Context = ElementContext.Script,
@@ -76,7 +76,7 @@ namespace KScript.Http
                 Example = "<KScript.Routes>\n  <Route methods=\"get, post\" path=\"/contact\" to=\"contact.handle\" />\n</KScript.Routes>",
             }, run =>
             {
-                var methods = run.RequiredRaw("methods").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                var methods = NameList.Names(run.RequiredRaw("methods"))
                     .Select(m => m.ToUpperInvariant()).ToList();
                 foreach (string m in methods)
                 {
@@ -111,7 +111,7 @@ namespace KScript.Http
             });
 
             p.Element(new ElementInfo("Middleware", "Middleware for the routes that follow it in this file or group.", ContentKind.Empty,
-                new A("use", K.FunctionReferences, "Built-ins (log, cors, auth, throttle:30) or <fn>s taking ($request, $next), comma separated.", true, BuiltInMiddleware))
+                new A("use", K.FunctionReferences, "Built-ins (log, cors, auth, throttle:30) or <fn>s taking ($request, $next): [log, cors, my_check].", true, BuiltInMiddleware))
             {
                 Context = ElementContext.Script,
                 MustBeInside = new[] { "Routes", "Group" },
@@ -126,8 +126,8 @@ namespace KScript.Http
             p.Element(new ElementInfo("Resource", "The usual routes of a JSON resource, answered by the functions a controller script exports: index (GET path), store (POST path), show (GET path/{id}), update (PUT and PATCH path/{id}) and destroy (DELETE path/{id}). Functions the controller doesn't have get no route.", ContentKind.Empty,
                 new A("path", K.Text, "The resource's path, such as /people.", true) { Literal = true },
                 new A("to", K.Text, "The controller: the name a script is imported as (<import src=\"...\" as=\"people\" />).", true),
-                new A("only", K.Text, "Only these actions, comma separated: index, show."),
-                new A("except", K.Text, "All actions but these, comma separated."),
+                new A("only", K.Text, "Only these actions: [index, show].") { NameList = true },
+                new A("except", K.Text, "All actions but these: [destroy].") { NameList = true },
                 new A("name", K.Text, "The route name prefix (people gives people.index, people.show...). The default is the controller's name."),
                 new A("param", K.Text, "The name of the path parameter, id by default."),
                 Middleware("Middleware for these routes, comma separated."))
@@ -322,7 +322,7 @@ namespace KScript.Http
         }
 
         private static HashSet<string> Names(string list) =>
-            new HashSet<string>((list ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.Ordinal);
+            new HashSet<string>(NameList.Names(list), StringComparer.Ordinal);
 
         /// <summary>
         /// Finds a controller or middleware function: a <c>&lt;fn&gt;</c> in scope (<c>show</c>), a function of a
@@ -361,13 +361,13 @@ namespace KScript.Http
         private static ICallable Command(Interpreter interpreter, CommandDefinition cmd) =>
             new NativeFunction(cmd.Name, call => interpreter.InvokeCommand(cmd, call));
 
-        /// <summary>Reads a middleware list: <c>log, cors, auth:ADMIN_TOKEN, throttle:30, my_check</c>.</summary>
+        /// <summary>Reads a middleware list: <c>[log, cors, auth:ADMIN_TOKEN, throttle:30, my_check]</c> (or the same without brackets).</summary>
         internal static List<MiddlewareRef> ResolveMiddleware(ElementRun run, string list)
         {
             var result = new List<MiddlewareRef>();
             if (string.IsNullOrWhiteSpace(list)) return result;
             RequestContext ctx = Context(run);
-            foreach (string raw in list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            foreach (string raw in NameList.Names(list))
             {
                 int colon = raw.IndexOf(':');
                 string name = colon > 0 ? raw[..colon].Trim() : raw;

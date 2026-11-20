@@ -1,10 +1,16 @@
 --- make
-description: A document (paper, report, letter...) saved as PDF and Word
-to: {{ dir }}{{ kebab }}{{ ext }}
-hint: Build it: kscript {{ dir }}{{ kebab }}{{ ext }} (writes {{ kebab }}.pdf and {{ kebab }}.docx). See the Documents guide for templates, tables and citations.
+description: A document script in documents/ that writes a PDF and a Word file (KScript.Document)
+category: Documents
+usage: <name> [--template paper|report|plain] [--format kscript|xml]
+--template: The look: paper, report or plain (default paper)
+--format: kscript or xml (default the project's make.format)
+example: kscript make document annual-report --template report
+example: kscript make document papers/gliders
+to: {{ paths.documents }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Build it: kscript {{ paths.documents }}/{{ dir }}{{ kebab }}{{ ext }} (writes {{ kebab }}.pdf and {{ kebab }}.docx next to it). See the Documents guide for tables, figures and citations.
 ---
-// template: plain, paper, report, letter or invoice. Add .tex, .md or .html to to: for those formats too.
-KScript.Document(template: paper, title: "{{ title }}", author: "Your Name", to: "{{ kebab }}.pdf, {{ kebab }}.docx") {
+// Add .tex, .md or .html to to: for those formats too.
+KScript.Document(template: {{ template ?? paper }}, title: "{{ title }}", author: "Your Name", to: "{{ kebab }}.pdf, {{ kebab }}.docx") {
   Abstract "One paragraph on what this document is about."
 
   Section(title: Introduction, id: intro) {

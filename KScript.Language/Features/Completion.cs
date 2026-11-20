@@ -42,10 +42,10 @@ namespace KScript.Language.Features
                 return FrontMatterCompletions(analysis, offset);
             }
 
-            // Typing a word where a statement starts: offer keywords, variables, functions and commands without a trigger character.
-            if (cursor.Region == null && !cursor.InAttributeValue && !cursor.InEndTagName && StatementWordStart(analysis, offset) is int statementStart)
+            // Positions the markup and expression parsers don't see: imports, statement starts, KScript.X, and empty expressions.
+            if (ContextCompletions(analysis, cursor) is List<CompletionItem> context)
             {
-                return StatementCompletions(analysis, statementStart, offset);
+                return context;
             }
 
             if (cursor.InEndTagName)
@@ -150,99 +150,6 @@ namespace KScript.Language.Features
             return i;
         }
 
-        private static readonly Dictionary<string, string> CodeStatementSnippets = new Dictionary<string, string>
-        {
-            ["if"] = "if ${1:condition} {\n\t$0\n}",
-            ["while"] = "while ${1:condition} {\n\t$0\n}",
-            ["for"] = "for ${1:item} in ${2:\\$list} {\n\t$0\n}",
-            ["fn"] = "fn ${1:name}($2) {\n\t$0\n}",
-            ["try"] = "try {\n\t$0\n} catch err {\n\t\n}",
-            ["match"] = "match ${1:\\$value} {\n\t$0\n}",
-            ["echo"] = "echo $0",
-            ["return"] = "return $0",
-        };
-
-        /// <summary>Elements a .kscript statement can't start with: they're written another way (x = 3, name: type, } else {).</summary>
-        private static readonly HashSet<string> NotCodeStatements = new HashSet<string> { "kscript", "do", "let", "set", "field" };
-
-        /// <summary>
-        /// The start of the word before the cursor when that word begins a statement: at the start of a line (or after '{' or ';')
-        /// in a .kscript file, or on its own line in the body of an XML script. Null anywhere else.
-        /// </summary>
-        private static int? StatementWordStart(DocumentAnalysis analysis, int offset)
-        {
-            string text = analysis.Source.Text;
-            int wordStart = WordStart(text, offset);
-            if (wordStart == offset || !Lexer.IsIdentStart(text[wordStart]) || analysis.Kind != DocumentKind.Script)
-            {
-                return null;
-            }
-            int p = wordStart;
-            while (p > 0 && (text[p - 1] == ' ' || text[p - 1] == '\t'))
-            {
-                p--;
-            }
-            char before = p == 0 ? '\n' : text[p - 1];
-            if (analysis.Markup.Syntax == SourceSyntax.Code)
-            {
-                bool inComment = analysis.Markup.DescendantNodes().OfType<MarkupComment>().Any(c => offset > c.Span.Start && offset <= c.Span.End);
-                return !inComment && (before is '\n' or '\r' or '{' or ';') ? wordStart : null;
-            }
-            return before is '\n' or '\r' or '>' ? wordStart : null;
-        }
-
-        private List<CompletionItem> StatementCompletions(DocumentAnalysis analysis, int wordStart, int offset)
-        {
-            TextSpan replace = TextSpan.FromBounds(wordStart, offset);
-            MarkupElement typed = analysis.Markup.DescendantElements().FirstOrDefault(e => e.NameSpan.Start == wordStart && e.NameSpan.Length > 0);
-            MarkupElement parent = typed != null ? typed.Parent : analysis.Markup.FindElementAt(offset);
-            MarkupElement previous = typed != null ? PreviousSibling(typed) : PreviousElementBefore(analysis.Source.Text, parent, wordStart);
-
-            if (analysis.Markup.Syntax != SourceSyntax.Code)
-            {
-                // XML: the word becomes an element, so the '<' comes with it.
-                return ElementCompletions(analysis, parent, replace, previous, snippets: true, openBracket: "<");
-            }
-
-            List<CompletionItem> items = new List<CompletionItem>();
-            foreach (ElementInfo e in Catalog.Elements)
-            {
-                if (!e.Context.HasFlag(ElementContext.Script) || NotCodeStatements.Contains(e.Name) || e.MustFollow?.Count > 0 || !FitsHere(e, parent, previous))
-                {
-                    continue;
-                }
-                CodeStatementSnippets.TryGetValue(e.Name, out string snippet);
-                items.Add(new CompletionItem
-                {
-                    Label = e.Name,
-                    Kind = CompletionKind.Keyword,
-                    Detail = e.Planned ? "KScript 2 (planned)" : "statement",
-                    Documentation = ElementMarkdown(e),
-                    InsertText = snippet,
-                    IsSnippet = snippet != null,
-                    ReplaceSpan = replace,
-                    SortText = "0" + e.Name,
-                });
-            }
-
-            // x = 3 assigns: offer the variables in scope by their bare names.
-            Scope scope = analysis.ScopeAt(offset);
-            items.AddRange(scope.VisibleAt(offset)
-                .Where(s => s.Kind is SymbolKind.Variable or SymbolKind.Parameter or SymbolKind.LoopVariable)
-                .GroupBy(s => s.Name).Select(g => g.First())
-                .Select(s => new CompletionItem
-                {
-                    Label = s.Name,
-                    Kind = s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : CompletionKind.Variable,
-                    Detail = s.Shape.Display(),
-                    Documentation = SymbolMarkdown(analysis, s),
-                    ReplaceSpan = replace,
-                    SortText = "1" + s.Name,
-                }));
-            items.AddRange(CommandCompletions(analysis, replace, withSigil: true));
-            return items;
-        }
-
         #region Markup
 
         private List<CompletionItem> ElementCompletions(DocumentAnalysis analysis, MarkupElement parent, TextSpan replace, MarkupElement previous, bool snippets, string openBracket = "")
@@ -252,7 +159,7 @@ namespace KScript.Language.Features
 
             foreach (ElementInfo e in Catalog.Elements)
             {
-                if (!e.Context.HasFlag(context) || (context == ElementContext.Page && e.HtmlWins))
+                if (!e.Context.HasFlag(context) || e.Planned || (context == ElementContext.Page && e.HtmlWins))
                 {
                     continue;
                 }
@@ -262,19 +169,19 @@ namespace KScript.Language.Features
                 {
                     continue;
                 }
-                bool fits = true;
-
                 items.Add(new CompletionItem
                 {
                     Label = e.Name,
                     Kind = CompletionKind.Element,
-                    Detail = e.Planned ? "KScript 2 (planned)" : "KScript element",
-                    Documentation = ElementMarkdown(e),
+                    Detail = PackageDetail(analysis, e.Package, e.Deprecated != null ? "KScript element (deprecated)" : "KScript element"),
+                    Documentation = ElementMarkdown(e, analysis.Markup.Syntax == SourceSyntax.Code),
+                    Deprecated = e.Deprecated != null,
+                    AdditionalEdits = ImportEdits(analysis, e.Package),
                     InsertText = snippets ? openBracket + ElementSnippet(e) : null,
                     IsSnippet = snippets,
                     ReplaceSpan = replace,
                     FilterText = openBracket.Length > 0 ? e.Name : null,
-                    SortText = (fits ? "0" : "1") + e.Name,
+                    SortText = (e.Deprecated != null ? "9" : "0") + e.Name,
                 });
             }
 
@@ -308,6 +215,10 @@ namespace KScript.Language.Features
 
         private bool FitsHere(ElementInfo e, MarkupElement parent, MarkupElement previous)
         {
+            if (parent?.Name == "match" && e.MustBeInside?.Contains("match") != true)
+            {
+                return false;
+            }
             if (e.MustBeInside != null && e.MustBeInside.Count > 0)
             {
                 bool inside = e.MustBeInside.Contains("fn") || e.InsideAnyAncestor
@@ -452,22 +363,31 @@ namespace KScript.Language.Features
                 return items;
             }
 
+            // In a .kscript file, statements with their own syntax (fn f(a), if x {) take no named arguments, and the rest
+            // write them as name: value.
+            bool code = analysis.Markup.Syntax == SourceSyntax.Code;
+            if (code && CodeStatementSnippets.ContainsKey(e.Name))
+            {
+                return items;
+            }
             foreach (AttributeInfo a in info.Attributes)
             {
                 if (e.Attributes.Any(x => x.Name == a.Name && !(x.NameSpan.Start == start)))
                 {
                     continue;
                 }
+                bool quoted = a.Kind is AttributeKind.Template or AttributeKind.Path or AttributeKind.Text;
                 items.Add(new CompletionItem
                 {
                     Label = a.Name,
                     Kind = CompletionKind.Attribute,
-                    Detail = (a.Required ? "required " : string.Empty) + KindLabel(a.Kind),
-                    Documentation = a.Description + OptionsLine(a),
-                    InsertText = a.Name + "=\"$1\"",
+                    Detail = (a.Required ? "required " : string.Empty) + KindLabel(a.Kind) + (a.Deprecated != null ? " (deprecated)" : string.Empty),
+                    Documentation = DeprecationLine(a.Deprecated, a.Name) + a.Description + OptionsLine(a),
+                    Deprecated = a.Deprecated != null,
+                    InsertText = !code ? a.Name + "=\"$1\"" : quoted ? a.Name + ": \"$1\"" : a.Name + ": $1",
                     IsSnippet = true,
                     ReplaceSpan = TextSpan.FromBounds(start, offset),
-                    SortText = (a.Required ? "0" : "1") + a.Name,
+                    SortText = (a.Deprecated != null ? "9" : a.Required ? "0" : "1") + a.Name,
                 });
             }
             return items;
@@ -518,6 +438,9 @@ namespace KScript.Language.Features
                 case AttributeKind.VariableReference:
                     return VariableCompletions(analysis, cursor.Offset, replace, withSigil: false);
 
+                case AttributeKind.Parameters:
+                    return ParameterValueCompletions(analysis, before, cursor.Offset, replace);
+
                 case AttributeKind.Path:
                     return PathCompletions(analysis, value, cursor.Offset, scriptsOnly: cursor.TagElement.Name == "import");
 
@@ -531,6 +454,13 @@ namespace KScript.Language.Features
                     return new List<CompletionItem>();
             }
         }
+
+        /// <summary>Built-in type names, then the document's own types and enums.</summary>
+        private List<CompletionItem> TypeCompletions(DocumentAnalysis analysis, TextSpan replace) =>
+            (Catalog.GetElement("field")?.GetAttribute("type")?.Options ?? Array.Empty<string>()).Select(t => (t, "0"))
+                .Concat(TypeNames(analysis).Select(t => (t, "1")))
+                .Select(t => new CompletionItem { Label = t.Item1, Kind = CompletionKind.Value, Detail = "type", ReplaceSpan = replace, SortText = t.Item2 + t.Item1 })
+                .ToList();
 
         /// <summary>The &lt;type&gt;s and &lt;enum&gt;s a document declares or imports.</summary>
         internal static IReadOnlyList<string> TypeNames(DocumentAnalysis analysis) =>
@@ -745,6 +675,11 @@ namespace KScript.Language.Features
                 {
                     return BareMemberCompletions(analysis, region, wordStart - 1, replace, method: false);
                 }
+                if (allowBare && wordStart == index)
+                {
+                    // Asked for in the text itself (Ctrl+Space): the $variables and @commands it can show.
+                    return ExpressionStartCompletions(analysis, offset, replace, template: false).Where(i => i.Kind != CompletionKind.Keyword).ToList();
+                }
                 return new List<CompletionItem>();
             }
 
@@ -778,6 +713,7 @@ namespace KScript.Language.Features
             List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false);
             start.InsertRange(0, ParameterNameCompletions(analysis, region, wordStart, replace));
             start.InsertRange(0, NamedValueCompletions(analysis, region, wordStart, replace));
+            start.InsertRange(0, ListItemCompletions(analysis, region, wordStart, replace));
             return start;
         }
 
@@ -840,17 +776,19 @@ namespace KScript.Language.Features
                     SortText = "1" + s.Name,
                 }).ToList();
 
-            items.AddRange(Catalog.Commands.Select(c => new CompletionItem
+            items.AddRange(Catalog.Commands.Where(c => !c.Planned).Select(c => new CompletionItem
             {
                 Label = sigil + c.Name,
                 Kind = CompletionKind.Command,
-                Detail = c.Labels.FirstOrDefault(),
+                Detail = PackageDetail(analysis, c.Package, c.Labels.FirstOrDefault()),
+                AdditionalEdits = ImportEdits(analysis, c.Package),
                 Documentation = CallableMarkdown(c),
+                Deprecated = c.Deprecated != null,
                 InsertText = sigil + c.Name + (c.MaxArgs == 0 ? "()" : "($1)"),
                 IsSnippet = true,
                 ReplaceSpan = replace,
                 FilterText = c.Name,
-                SortText = "2" + c.Name,
+                SortText = (c.Deprecated != null ? "9" : "2") + c.Name,
             }));
             return items;
         }
@@ -909,10 +847,11 @@ namespace KScript.Language.Features
                     Detail = m.Labels.First() + ": " + MethodResult(m, receiver).Display()
                              + (m.ReceiverType != KType.Any && m.ReceiverType != receiver.Type ? "  (" + m.ReceiverType + ")" : string.Empty),
                     Documentation = CallableMarkdown(m, receiver.Type != KType.Any ? receiver : null),
+                    Deprecated = m.Deprecated != null,
                     InsertText = m.Name + (m.MaxArgs == 0 ? "()" : "($1)"),
                     IsSnippet = true,
                     ReplaceSpan = replace,
-                    SortText = (receiver.Type == KType.Any || m.ReceiverType == receiver.Type ? "0" : m.ReceiverType == KType.Any ? "1" : "2") + m.Name,
+                    SortText = (m.Deprecated != null ? "9" : receiver.Type == KType.Any || m.ReceiverType == receiver.Type ? "0" : m.ReceiverType == KType.Any ? "1" : "2") + m.Name,
                 }).ToList();
 
         /// <summary>What a method returns on this receiver: list methods such as filter keep the item type.</summary>
@@ -963,16 +902,17 @@ namespace KScript.Language.Features
                     return import.Shape.Fields.Values.Select(f => new CompletionItem
                     {
                         Label = f.Name,
-                        Kind = CompletionKind.Function,
+                        Kind = f.Shape.Type == KType.Fn ? CompletionKind.Function : CompletionKind.Constant,
                         Documentation = f.Description,
-                        InsertText = f.Name + "($1)",
-                        IsSnippet = true,
+                        InsertText = f.Shape.Type == KType.Fn ? f.Name + "($1)" : null,
+                        IsSnippet = f.Shape.Type == KType.Fn,
                         ReplaceSpan = replace,
                     }).ToList();
                 }
             }
 
-            if (target == null)
+            // An import is lib.name, not $lib.name.
+            if (target == null || (target is VariableNode v && analysis.ScopeAt(region.Source.ToSource(v.Span.Start)).Lookup(v.Name, int.MaxValue)?.Kind == SymbolKind.Import))
             {
                 return new List<CompletionItem>();
             }

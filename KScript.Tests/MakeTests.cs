@@ -216,7 +216,7 @@ public class ScaffolderTests
         Assert.Equal(0, Make(site.Root, "layout", "Main", "--css", "/site.css,/print.css", "--lang", "en-GB").Code);
         string layout = Read(site, "_layouts/main.html");
         Assert.Contains("<html lang=\"en-GB\">", layout);
-        Assert.Contains("<link rel=\"stylesheet\" href=\"/site.css\">\n  <link rel=\"stylesheet\" href=\"/print.css\">", layout);
+        Assert.Contains("<link rel=\"stylesheet\" href=\"/site.css\">\n    <link rel=\"stylesheet\" href=\"/print.css\">", layout);
 
         site.Write("index.html", "<layout src=\"_layouts/main.html\" title=\"Home\"><p>hi</p></layout>");
         string html = site.Render("index.html").Body;
@@ -230,13 +230,13 @@ public class ScaffolderTests
         using var site = new TempSite();
         // Scripts are .kscript by default, and XML with --format xml.
         Assert.Equal(0, Make(site.Root, "script", "tidy_downloads").Code);
-        Assert.Equal("echo \"Hello from Tidy Downloads!\"\n", Read(site, "tidy-downloads.kscript"));
+        Assert.Equal("echo \"Hello from Tidy Downloads!\"\n", Read(site, "scripts/tidy-downloads.kscript"));
         var output = new StringWriter();
-        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(output, "")).RunFile(Path.Combine(site.Root, "tidy-downloads.kscript"));
+        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(output, "")).RunFile(Path.Combine(site.Root, "scripts", "tidy-downloads.kscript"));
         Assert.Contains("Hello from Tidy Downloads!", output.ToString());
 
         Assert.Equal(0, Make(site.Root, "script", "tidy_downloads", "--format", "xml").Code);
-        string xml = Read(site, "tidy-downloads.ks.xml");
+        string xml = Read(site, "scripts/tidy-downloads.ks.xml");
         Assert.StartsWith("<kscript>", xml);
         Assert.Contains("Hello from Tidy Downloads!", ScriptRunner.Run(xml));
     }
@@ -246,14 +246,14 @@ public class ScaffolderTests
     {
         using var site = new TempSite();
         Assert.Equal(0, Make(site.Root, "document", "annual_report").Code);
-        string script = Read(site, "annual-report.kscript");
-        Assert.Contains("title: \"Annual Report\"", script);
-        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(new StringWriter(), "")).RunFile(Path.Combine(site.Root, "annual-report.kscript"));
-        Assert.StartsWith("%PDF-", File.ReadAllText(Path.Combine(site.Root, "annual-report.pdf")));
-        Assert.True(File.Exists(Path.Combine(site.Root, "annual-report.docx")));
+        string script = Read(site, "documents/annual-report.kscript");
+        Assert.Contains("template: paper, title: \"Annual Report\"", script);
+        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(new StringWriter(), "")).RunFile(Path.Combine(site.Root, "documents", "annual-report.kscript"));
+        Assert.StartsWith("%PDF-", File.ReadAllText(Path.Combine(site.Root, "documents", "annual-report.pdf")));
+        Assert.True(File.Exists(Path.Combine(site.Root, "documents", "annual-report.docx")));
 
-        Assert.Equal(0, Make(site.Root, "document", "annual_report", "--format", "xml").Code);
-        Assert.Contains("<KScript.Document", Read(site, "annual-report.ks.xml"));
+        Assert.Equal(0, Make(site.Root, "document", "annual_report", "--format", "xml", "--template", "report").Code);
+        Assert.Contains("<KScript.Document template=\"report\"", Read(site, "documents/annual-report.ks.xml"));
     }
 
     [Fact]

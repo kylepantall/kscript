@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using System.Text.RegularExpressions;
 
 using KScript.Language.Catalog;
@@ -62,7 +63,7 @@ namespace KScript.Language.Analysis
         }
 
         private static HashSet<string> ActionNames(string list) =>
-            new HashSet<string>((list ?? string.Empty).Split(',').Select(a => a.Trim()).Where(a => a.Length > 0), StringComparer.Ordinal);
+            new HashSet<string>(NameList.Names(list), StringComparer.Ordinal);
 
         private void CheckUnused(bool projectWide)
         {

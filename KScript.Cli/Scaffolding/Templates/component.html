@@ -1,6 +1,11 @@
 --- make
 description: A reusable piece of a page, used as <name /> (saved in _components/)
-to: _components/{{ kebab }}.html
+category: Pages and styles
+usage: <Name> [--props title,image]
+--props: Attributes it takes, comma separated; each becomes a variable inside it
+example: kscript make component Hero --props title,subtitle
+example: kscript make component SiteNav
+to: {{ paths.components }}/{{ kebab }}.html
 hint: Use it in a page: <{{ kebab }}{{#each props}} {{ item }}="…"{{/each}} />
 ---
 <section class="{{ kebab }}">
