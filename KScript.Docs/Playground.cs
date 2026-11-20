@@ -137,8 +137,7 @@ namespace KScript.Docs
             }
 
             result.Milliseconds = watch.ElapsedMilliseconds;
-            // The docs page shows output the same on every OS, so Windows line endings become \n.
-            result.Output = Ansi.Replace(output.ToString(), string.Empty).Replace("\r\n", "\n");
+            result.Output = Ansi.Replace(output.ToString(), string.Empty);
             result.Truncated = output.Truncated;
             return result;
         }
@@ -194,7 +193,13 @@ namespace KScript.Docs
             private readonly StringBuilder text = new StringBuilder();
             private readonly int max;
 
-            public LimitedWriter(int max) => this.max = max;
+            // The docs page shows output the same on every OS: line ends are written as \n, and the limit counts
+            // what the reader sees.
+            public LimitedWriter(int max)
+            {
+                this.max = max;
+                NewLine = "\n";
+            }
 
             public bool Truncated { get; private set; }
 
@@ -209,6 +214,7 @@ namespace KScript.Docs
             public override void Write(string value)
             {
                 if (value == null) return;
+                value = value.Replace("\r\n", "\n");
                 int room = max - text.Length;
                 if (value.Length <= room) text.Append(value);
                 else
