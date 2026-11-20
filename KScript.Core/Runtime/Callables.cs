@@ -135,9 +135,10 @@ namespace KScript.Runtime
         public object Call(CallContext call)
         {
             Scope scope = Closure.Child();
+            IReadOnlyList<object> args = call.Named.Count == 0 ? call.Args : ArgumentBinder.BindByName(call, Parameters, out _, lenient: true);
             for (int i = 0; i < Node.Parameters.Count; i++)
             {
-                scope.Declare(Node.Parameters[i].Name, i < call.Args.Count ? call.Args[i] : null);
+                scope.Declare(Node.Parameters[i].Name, i < args.Count ? args[i] : null);
             }
             return call.Interpreter.Evaluate(Node.Body, scope, Context);
         }
@@ -173,21 +174,12 @@ namespace KScript.Runtime
         {
             Interpreter interpreter = call.Interpreter;
             Scope scope = Closure.Child();
-            var named = call.Named ?? new Dictionary<string, object>();
-            foreach (string key in named.Keys)
-            {
-                if (!Parameters.Any(p => p.Name == key))
-                    throw new KScriptException($"@{Name}() has no parameter named '{key}'. Its parameters are: {string.Join(", ", Parameters.Select(p => p.Name))}.", "Argument");
-            }
-            if (call.Args.Count > Parameters.Count)
-                throw new KScriptException($"@{Name}() takes {Parameters.Count} argument{(Parameters.Count == 1 ? string.Empty : "s")} but was given {call.Args.Count}.", "Argument");
-
+            IReadOnlyList<object> args = ArgumentBinder.BindByName(call, Parameters.Select(p => p.Name).ToList(), out HashSet<int> given);
             for (int i = 0; i < Parameters.Count; i++)
             {
                 Parameter p = Parameters[i];
                 object value;
-                if (i < call.Args.Count) value = call.Args[i];
-                else if (named.TryGetValue(p.Name, out object n)) value = n;
+                if (given.Contains(i)) value = args[i];
                 else if (p.Default != null) value = interpreter.Evaluate(p.Default, scope, new EvalContext(Module, null));
                 else throw new KScriptException($"@{Name}() needs a value for '{p.Name}'.", "Argument");
                 if (p.Type != null) value = Values.ConvertTo(value, p.Type, $"The '{p.Name}' argument of @{Name}()");
@@ -240,8 +232,9 @@ namespace KScript.Runtime
         private static readonly IReadOnlyDictionary<string, object> NoNamed = new Dictionary<string, object>();
 
         public CallContext(Interpreter interpreter, string name, IReadOnlyList<object> args, IReadOnlyDictionary<string, object> named = null,
-            Scope scope = null, Module module = null, bool isMethod = false)
+            Scope scope = null, Module module = null, bool isMethod = false, IReadOnlyCollection<int> skipped = null)
         {
+            Skipped = skipped ?? Array.Empty<int>();
             Interpreter = interpreter;
             Name = name;
             Args = args ?? Array.Empty<object>();
@@ -263,6 +256,16 @@ namespace KScript.Runtime
         public Module Module { get; }
 
         public bool IsMethod { get; }
+
+        /// <summary>
+        /// Optional positions left empty because a later parameter was given by name (<c>@cmd('a', third: 3)</c>
+        /// skips the second). They read as null, and <see cref="Has(int)"/> is false for them, so fallbacks apply.
+        /// </summary>
+        public IReadOnlyCollection<int> Skipped { get; }
+
+        /// <summary>The parameter names of the signature the arguments were bound to, when known (for error messages).</summary>
+        public IReadOnlyList<string> ParameterNames { get; init; }
+
         public int Count => Args.Count;
         public KScriptHost Host => Interpreter.Host;
 
@@ -272,11 +275,11 @@ namespace KScript.Runtime
         public object Arg(int i) => i < Args.Count ? Args[i] : null;
 
         /// <summary>A positional argument, or the named argument of that name.</summary>
-        public object Arg(int i, string name) => i < Args.Count ? Args[i] : Named.TryGetValue(name, out object v) ? v : null;
+        public object Arg(int i, string name) => Has(i) ? Args[i] : Named.TryGetValue(name, out object v) ? v : null;
 
-        public bool Has(int i) => i < Args.Count;
+        public bool Has(int i) => i < Args.Count && !Skipped.Contains(i);
 
-        public bool Has(int i, string name) => i < Args.Count || Named.ContainsKey(name);
+        public bool Has(int i, string name) => Has(i) || Named.ContainsKey(name);
 
         public string Str(int i) => Values.ToStr(Arg(i));
 
@@ -301,6 +304,8 @@ namespace KScript.Runtime
         public object Need(int i)
         {
             if (i >= Args.Count) throw Error($"{Display} needs at least {i + 1} argument{(i == 0 ? string.Empty : "s")}.", "Argument");
+            if (Skipped.Contains(i))
+                throw Error($"{Display} needs a value for {(ParameterNames != null && i < ParameterNames.Count ? $"'{ParameterNames[i]}'" : $"argument {i + 1}")}.", "Argument");
             return Args[i];
         }
 
