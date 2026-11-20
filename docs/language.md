@@ -46,6 +46,31 @@ Variables belong to the block they are declared in. `{{` and `}}` are literal br
 </match>
 ```
 
+### Early returns instead of else
+
+Inside a function or a loop, end a branch early instead of writing `<else>`: `<return>` in a function,
+`<continue />` or `<break />` in a loop. The main path then stays at the left edge and each special case is dealt with
+first.
+
+```xml
+<fn name="grade" params="score">
+  <if test="$score ge 90">
+    <return value="'A'" />
+  </if>
+  <if test="$score ge 75">
+    <return value="'B'" />
+  </if>
+  <return value="'C'" />
+</fn>
+```
+
+`kscript check` and the editor warn about `<else>` and `<elif>` with KS6001 there, and at the top of a script when
+every branch before already ends with `<return>`, `<break>`, `<continue>`, `<throw>` or `<exit>`. The quick fix
+removes the `<else>` (or turns `<elif>` into a separate `<if>`) and, when the chain is the last statement of the
+function or loop, adds the `<return />` or `<continue />` for you. Pages, `<live>` blocks and `<for>`…`<else>` (for an
+empty list) are not flagged, since there is nothing to return from. To turn the rule off for a project, set
+`"lint": { "rules": { "KS6001": "off" } }` in `kscript.json`.
+
 ## Functions
 
 ```xml

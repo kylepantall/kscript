@@ -483,6 +483,7 @@ namespace KScript.Language.Analysis
 
             CheckAttributes(e, info);
             CheckPlacement(e, info, previous);
+            CheckElse(e, previous, markupMode);
             RequirePackage(info.Package, e.NameSpan, $"<{e.Name}>");
             if (Kind != DocumentKind.Script && !info.Context.HasFlag(ElementContext.Page))
             {
