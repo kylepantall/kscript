@@ -17,10 +17,10 @@ A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a rou
 
 | File | Routes |
 | --- | --- |
-| `routes.kscript` or `routes.ks.xml` | Web routes, mounted at `/`. |
-| `api.kscript` or `api.ks.xml` | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
+| `routes/web.kscript`, or `routes.kscript` at the top (or `.ks.xml`) | Web routes, mounted at `/`. |
+| `routes/api.kscript`, or `api.kscript` at the top (or `.ks.xml`) | API routes, mounted under `/api`. Errors and missing routes are answered with JSON. |
 
-`http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)).
+`http.routes` in `kscript.json` can list other files instead (see [Settings](#settings-kscriptjson)). `kscript make route users` adds a route and makes its controller (see [Generating files](projects.md#generating-files-kscript-make)): `kscript make route "people/{id}" --api`, `kscript make route people --resource`, and `kscript make controller`, `request`, `middleware` and `view` for the rest.
 
 ```kscript
 // routes.kscript
@@ -227,7 +227,7 @@ Group(middleware: auth) {
 ```jsonc
 {
   "http": {
-    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes.* and api.*
+    "routes": ["routes.kscript", { "file": "api/v1.kscript", "prefix": "/api/v1", "api": true }],  // default: routes/web.*, routes/api.*, routes.* and api.*
     "middleware": ["log"],                      // for every route
     "groups": { "api": ["cors", "throttle"] },  // names for lists of middleware
     "views": "views",                           // where @view() looks first; never served

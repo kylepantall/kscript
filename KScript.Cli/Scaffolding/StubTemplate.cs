@@ -10,6 +10,7 @@ namespace KScript.Scaffolding
     /// <list type="bullet">
     /// <item><c>{{ name }}</c> inserts a value, <c>{{ name | kebab }}</c> transforms it, <c>{{ name ?? text }}</c> gives a fallback.</item>
     /// <item><c>{{#if name}} … {{else}} … {{/if}}</c> keeps a section when the value is set (not empty and not "false").</item>
+    /// <item><c>{{#if name is text}}</c>, <c>{{#if name in a, b}}</c> and <c>{{#if list has text}}</c> compare values (ignoring case).</item>
     /// <item><c>{{#each name}} … {{ item }} … {{/each}}</c> repeats a section for each comma-separated value.</item>
     /// </list>
     /// Single braces are left alone, so KScript's own <c>{$value}</c> interpolation can be written as is.
@@ -205,7 +206,7 @@ namespace KScript.Scaffolding
                         }
                     case BlockNode b:
                         {
-                            bool truthy = IsSet(Lookup(b.Name, values));
+                            bool truthy = Test(b.Name, values);
                             if (b.Kind == "unless") truthy = !truthy;
                             RenderNodes(truthy ? b.Body : b.Else, values, sb);
                             break;
@@ -236,6 +237,21 @@ namespace KScript.Scaffolding
                 value = fn(value);
             }
             return value;
+        }
+
+        /// <summary>
+        /// The condition of an #if or #unless: <c>name</c> is set; <c>name is text</c> equals it (ignoring case);
+        /// <c>name in a, b, c</c> is one of a comma-separated list; <c>name has text</c> is a comma-separated list holding it.
+        /// </summary>
+        private static bool Test(string condition, Dictionary<string, string> values)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(condition, @"^(\S+)\s+(is|in|has)\s+(.*)$");
+            if (!match.Success) return IsSet(Lookup(condition, values));
+            string value = Lookup(match.Groups[1].Value, values) ?? "";
+            if (match.Groups[2].Value == "has")
+                return List(value).Any(item => string.Equals(item, match.Groups[3].Value.Trim(), StringComparison.OrdinalIgnoreCase));
+            var wanted = match.Groups[2].Value == "is" ? new List<string> { match.Groups[3].Value.Trim() } : List(match.Groups[3].Value);
+            return wanted.Any(w => string.Equals(w, value.Trim(), StringComparison.OrdinalIgnoreCase));
         }
 
         private static string Lookup(string name, Dictionary<string, string> values) =>

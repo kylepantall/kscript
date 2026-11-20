@@ -1,0 +1,18 @@
+--- make
+description: A job in jobs/: a script that does one task and logs what it did, for a scheduler or by hand
+category: Scripts and data
+usage: <name> [--every "15 minutes"]
+--every: How often it should run, noted in the file for cron or Task Scheduler
+example: kscript make job send-reminders --every "1 day"
+example: kscript make job cleanup/old-uploads
+to: {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Run it: kscript {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}{{#if every}} (schedule it every {{ every }} with cron or Task Scheduler){{/if}}
+---
+// {{ title }}: run it with kscript {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}{{#if every}}, every {{ every }}{{/if}}.
+// It logs to the terminal; set logging providers in config.yaml to keep a file (kscript make logger).
+log "{{ title }} started"
+
+// Do the work here.
+done = 0
+
+log(fields: { done: $done }) "{{ title }} finished"

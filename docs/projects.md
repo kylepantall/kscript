@@ -24,7 +24,8 @@ What it makes:
 | `tasks.html` | A to-do list in a [`<live>`](web.md#reactive-pages-with-live-no-javascript) block, with no JavaScript. |
 | `lib/tasks.kscript` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app, the API and the tests. |
 | `desktop.kscript` | The same to-do list as a [`<KScript.Window>`](desktop.md) desktop app. |
-| `api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). |
+| `routes/api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). |
+| `config/config.yaml` | Settings every script and page reads as `$config` (`config.root` in `kscript.json` points there). |
 | `lib/greeting.kscript`, `scripts/hello.kscript` | A function and a command-line script that uses it. |
 | `tests/tasks.test.kscript`, `tests/greeting.test.kscript` | Tests for the rules and the script, run with `kscript test`. |
 | `.vscode/extensions.json`, `.gitignore` | Asks VS Code to install the KScript extension; keeps built apps (`dist/`) out of git. |
@@ -35,17 +36,17 @@ Scripts, tests, routes and the desktop app are written in the [.kscript format](
 
 ### A bare project: --bare
 
-`kscript make project my-tool --bare` makes just `kscript.json`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation: no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
+`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.yaml`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation: no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
 
 Add pieces to a bare project with options, in any mix:
 
 ```sh
 kscript make project my-app --bare --web --api   # an empty website and JSON API
-kscript make project my-api --bare --api         # just the API: api.kscript, controllers/hello.kscript and its test
+kscript make project my-api --bare --api         # just the API: routes/api.kscript, controllers/hello.kscript and its test
 kscript make project my-app --bare --desktop     # a script plus an empty KScript.Window desktop app
 ```
 
-`--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `api.kscript` (a `KScript.Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.
+`--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `routes/api.kscript` (a `KScript.Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.
 
 ### The Makefile
 
@@ -156,18 +157,71 @@ kscript make project my-app --template ../starters/api   # any folder
 
 ## Generating files: kscript make
 
-`kscript make` creates components, pages and scripts from templates, so a new file starts out right:
+`kscript make <type> <name>` creates a file where the project keeps that kind of file, makes any folder it needs, and writes scripts in the project's format. [kscript make commands](/cli/make) lists every type with its options and examples, and so does `kscript make --list`; `kscript make <type> --help` shows one.
 
 ```sh
+kscript make route users                              # adds Get(path: "/users", to: users.index) to routes/web.kscript,
+                                                      # and makes controllers/users.kscript with index()
+kscript make route "users/{id}" --where "id: int"     # Get(…, to: users.show), and adds show(id) to the controller
+kscript make route users --method post --api          # Post(…, to: users.store) in routes/api.kscript, served under /api
+kscript make route people --resource --api            # Resource(path: "/people", to: people), with all five functions
+kscript make route about --view about                 # Get(path: "/about", view: "about"), and views/about.html
+kscript make controller people --resource             # controllers/people.kscript: index, show, store, update, destroy
+kscript make request NewPerson --fields "name: string, age?: int"   # requests/new-person.kscript, a typed body
+kscript make middleware secure-headers                # middleware/secure-headers.kscript
+kscript make view people/show --vars person           # views/people/show.html, for @view('people/show', person: $p)
 kscript make component Hero --props title,sub-title   # _components/hero.html, used as <hero title="…" sub-title="…" />
 kscript make page about --title "About us"            # about.html, wrapped in _layout.html (created if missing)
 kscript make page "people/[id]"                       # people/[id].html, with $id read from the URL
-kscript make markdown blog/first-post                 # blog/first-post.md with front matter
-kscript make layout main --css /site.css              # _layouts/main.html
-kscript make script tidy-downloads                    # tidy-downloads.kscript (tidy-downloads.ks.xml with --format xml)
-kscript make test checkout                            # tests/checkout.test.kscript, in the project folder
-kscript make                                          # list every template
+kscript make css theme --primary "#3355ff"            # styles/theme.ks.css, served as /styles/theme.css
+kscript make type Repo --fields "name: string, stars: int from stargazers_count"   # types/repo.kscript
+kscript make enum Size --values small,medium,large    # types/size.kscript
+kscript make module pricing --fns subtotal,total      # lib/pricing.kscript
+kscript make window settings                          # settings.kscript, a desktop window
+kscript make config staging                           # config/config.staging.yaml
+kscript make test checkout                            # tests/checkout.test.kscript
+kscript make                                          # list every type
 ```
+
+A route goes in `routes/web.kscript`, or `routes/api.kscript` with `--api`. A project that already keeps `routes.kscript` or `api.kscript` at the top, or lists its route files in `http.routes`, gets the route there instead. The route file imports the controller, and the route is refused if the file already has one for the same method and path. `struct` and `record` are other names for `type`, and `fn` and `function` for `module`: there is a generator for every kind of thing a script can declare (functions, constants, enums and types).
+
+### Where files go: the recommended layout
+
+`kscript make` puts each kind of file in its own folder, and makes the folder the first time it is needed, so a project only has the folders it uses:
+
+```text
+my-app/
+  kscript.json     settings, including "paths"
+  Makefile
+  .env             secrets (make env); never served
+  routes/          web.kscript (served at /) and api.kscript (served at /api)
+  controllers/     make controller, make route
+  middleware/      make middleware
+  requests/        make request
+  views/           make view
+  _components/     make component (folders starting with _ are never served)
+  _layouts/        make layout (the default _layout.html stays at the top)
+  _partials/       make partial
+  styles/          make css
+  lib/             make module, const, cache, storage and logger
+  types/           make type, make enum
+  jobs/            make job
+  config/          make config
+  locales/         make locale
+  data/            JSON that stores and caches write
+  scripts/         make script
+  tests/           make test
+```
+
+Pages stay where they are, because a page's path is its URL. Desktop windows (`make window`) go at the top, next to `desktop.kscript`. Move any folder with `paths` in `kscript.json`:
+
+```jsonc
+{
+  "paths": { "controllers": "app/controllers", "styles": "assets/css", "views": "app/views" }
+}
+```
+
+The names are `routes`, `controllers`, `middleware`, `requests`, `views`, `components`, `layouts`, `partials`, `styles`, `lib`, `types`, `storage`, `jobs`, `windows`, `config`, `locales`, `logging`, `data`, `scripts` and `tests`. `paths.views` is also where `@view()` looks, unless `http.views` says otherwise. `kscript serve` finds `routes/web.kscript` and `routes/api.kscript` by itself; a route file anywhere else needs listing in `http.routes`. Settings files go where `config.root` points, because that's where `$config` reads them. Without `config.root`, they go at the top of the project, unless it already has a `config/` folder. Pages only find components in `_components/`.
 
 `kscript make:component Hero` works too. Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
 
@@ -192,8 +246,8 @@ hint: Use it in a page: <{{ kebab }}-card />
 </article>
 ```
 
-- The `--- make` header is optional: `to` is where the file goes (default: the name with the template's extension), `hint` is printed afterwards, `description` shows in `kscript make`. `base: project` makes `to` relative to the project folder (where `kscript.json` is) rather than the site root, as the `test` template does.
-- `{{ name }}` is the name as typed; `{{ kebab }}`, `{{ snake }}`, `{{ pascal }}`, `{{ camel }}` and `{{ title }}` are its other spellings; `{{ dir }}` is its folder (`blog/` for `blog/first-post`), `{{ path }}` is folder and kebab name, `{{ url }}` its page URL, and `{{ params }}` lists `[id]` segments.
+- The `--- make` header is optional: `to` is where the file goes (default: the name with the template's extension), `hint` is printed afterwards, `description` shows in `kscript make`. `category`, `usage`, `example:` lines (as many as you like) and `--option: what it does` lines fill in its entry in `kscript make --list`, and `defaults: actions=index` gives options a default. `base: project` makes `to` relative to the project folder (where `kscript.json` is) rather than the site root, as the `test` template does.
+- `{{ name }}` is the name as typed; `{{ kebab }}`, `{{ snake }}`, `{{ pascal }}`, `{{ camel }}` and `{{ title }}` are its other spellings; `{{ dir }}` is its folder (`blog/` for `blog/first-post`), `{{ path }}` is folder and kebab name, `{{ url }}` its page URL, and `{{ params }}` lists `[id]` segments. `{{ paths.controllers }}` and the other `paths` are the project's folders, `{{ up }}` leads from the new file back to the project folder (`../` for `lib/x.kscript`), and `{{ ext }}` is `.kscript` or `.ks.xml`.
 - `{{ value | kebab }}` applies a filter (`kebab snake pascal camel title var lower upper trim`; `var` turns `sub-title` into the `sub_title` a component sees), and `{{ value ?? fallback }}` gives a default.
-- `{{#if value}} … {{else}} … {{/if}}`, `{{#unless value}}`, and `{{#each value}} … {{ item }} … {{/each}}` over a comma-separated list (`{{ index }}`, `{{ first }}` and `{{ last }}` are set). A block tag on its own line leaves no blank line behind.
+- `{{#if value}} … {{else}} … {{/if}}`, `{{#unless value}}`, `{{#if value is text}}`, `{{#if value in a, b}}`, `{{#if list has text}}`, and `{{#each value}} … {{ item }} … {{/each}}` over a comma-separated list (`{{ index }}`, `{{ first }}` and `{{ last }}` are set). A block tag on its own line leaves no blank line behind.
 - Single braces are left alone, so KScript's `{$value}` is written as is.

@@ -1,10 +1,15 @@
 --- make
 description: A test file in tests/, run with kscript test
+category: Tests
+usage: <name> [--format kscript|xml]
+--format: kscript or xml (default the project's make.format)
+example: kscript make test checkout
+example: kscript make test api/people
 base: project
-to: tests/{{ dir }}{{ kebab }}.test{{ ext }}
-hint: Run it: kscript test tests/{{ dir }}{{ kebab }}.test{{ ext }}
+to: {{ paths.tests }}/{{ dir }}{{ kebab }}.test{{ ext }}
+hint: Run it: kscript test {{ paths.tests }}/{{ dir }}{{ kebab }}.test{{ ext }}
 ---
-// Bring in what you're testing, e.g. import "../lib/{{ kebab }}{{ ext }}"
+// Bring in what you're testing, e.g. import "../{{ paths.lib }}/{{ kebab }}{{ ext }}"
 
 describe(name: "{{ title }}") {
   test(name: "adds numbers") {

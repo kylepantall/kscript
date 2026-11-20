@@ -1,21 +1,27 @@
 --- make
 description: A page layout; pages use it with <layout src="…" title="…">
-to: _layouts/{{ kebab }}.html
-hint: Use it in a page: <layout src="_layouts/{{ kebab }}.html" title="…"> … </layout>
+category: Pages and styles
+usage: <name> [--css a.css,b.css] [--lang en]
+--css: Stylesheets to link, comma separated
+--lang: The page language (default en)
+example: kscript make layout blog --css /site.css
+example: kscript make layout docs --lang fr
+to: {{ paths.layouts }}/{{ kebab }}.html
+hint: Use it in a page: <layout src="{{ paths.layouts }}/{{ kebab }}.html" title="…"> … </layout>
 ---
 <!doctype html>
 <html lang="{{ lang ?? en }}">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{$title}</title>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{$title}</title>
 {{#each css}}
-  <link rel="stylesheet" href="{{ item }}">
+    <link rel="stylesheet" href="{{ item }}">
 {{/each}}
-</head>
-<body>
-  <main>
-    <slot />
-  </main>
-</body>
+  </head>
+  <body>
+    <main>
+      <slot />
+    </main>
+  </body>
 </html>

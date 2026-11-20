@@ -1,0 +1,25 @@
+--- make
+description: Middleware in middleware/: a function that runs around routes, and can stop a request or change its response
+category: Routes and APIs
+usage: <name> [--header X-Name] [--before]
+--before: Write a check that can turn a request away before the controller runs
+--header: Add this header to every response (default X-Handled-By)
+example: kscript make middleware secure-headers --header X-Frame-Options
+example: kscript make middleware admin-only --before
+to: {{ paths.middleware }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Use it in a route file: import {{ paths.middleware }}/{{ dir }}{{ kebab }}{{ ext }} (the path is relative to the route file, so "../{{ paths.middleware }}/…" from routes/), then Middleware(use: {{ snake }}), Group(middleware: {{ snake }}) or Get(…, middleware: {{ snake }})
+---
+import KScript.Http
+
+/// {{ title }}: runs before the route's controller, and gets its response back from $next.
+fn {{ snake }}(request, next) {
+{{#if before}}
+  if ($request.headers['x-api-key'] ?? '') == '' {
+    return @response({ error: 'Send an X-Api-Key header.' }, status: 401)
+  }
+  return $next($request)
+{{else}}
+  response = $next($request)
+  return $response->with_header('{{ header ?? X-Handled-By }}', '{{ kebab }}')
+{{/if}}
+}

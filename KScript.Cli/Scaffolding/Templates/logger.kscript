@@ -1,0 +1,18 @@
+--- make
+description: A log provider in lib/: a function that gets every log entry at or above a level
+category: Settings
+usage: <name> [--level warn]
+--level: The lowest level it gets: trace, debug, info, warn (the default), error or fatal
+example: kscript make logger alerts --level error
+example: kscript make logger audit --level info
+to: {{ paths.logging }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Turn it on in a script that imports it: log-provider(fn: {{ snake }}, level: {{ level ?? warn }}), or in config.yaml under logging.providers as - fn: {{ snake }}
+---
+// {{ title }}: a log provider. Each entry is a map with time, level, category, message and fields.
+import KScript.IO
+
+/// Gets each entry at {{ level ?? warn }} or above.
+fn {{ snake }}(entry) {
+  // Paths are relative to this script: {{ up }}logs is the project's logs folder.
+  @append_text('{{ up }}logs/{{ kebab }}.log', $entry.time + ' ' + $entry.level + ' ' + $entry.message + $os.newline)
+}

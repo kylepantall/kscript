@@ -81,6 +81,22 @@ jobs:
           $k check bare-app --warnaserror
           $k fmt --check bare-app
           $k test bare-app
+          # The generators: routes add themselves to routes/, and everything they make checks and formats cleanly.
+          cd bare-app
+          $k make route users
+          $k make route "users/{id}" --where "id: int"
+          $k make route users --method post
+          $k make route people --resource --api
+          $k make route about --view about
+          $k make request NewPerson --fields "name: string, age?: int"
+          $k make middleware secure-headers
+          $k make type Repo --fields "name: string, stars: int"
+          $k make enum Size --values small,medium,large
+          $k make css theme
+          $k check .
+          $k fmt --check .
+          $k routes .
+          $k test .
 
   compile:
     name: kscript compile (${{ matrix.name }})

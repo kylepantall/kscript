@@ -119,6 +119,7 @@ namespace KScript.Docs
             }
             site.AddReference();
             site.AddCli();
+            site.AddMakeCommands();
             site.AddPlayground();
             site.AddNotFound();
             return site;

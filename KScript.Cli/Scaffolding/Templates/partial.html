@@ -1,0 +1,12 @@
+--- make
+description: A piece of HTML in _partials/ that pages insert with <include src="…">
+category: Pages and styles
+usage: <name>
+example: kscript make partial footer
+example: kscript make partial blog/sidebar
+to: {{ paths.partials }}/{{ dir }}{{ kebab }}.html
+hint: Insert it in a page: <include src="{{ paths.partials }}/{{ dir }}{{ kebab }}.html" />
+---
+<div class="{{ kebab }}">
+  <p>{{ title }}</p>
+</div>
