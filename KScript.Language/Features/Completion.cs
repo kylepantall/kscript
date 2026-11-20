@@ -548,7 +548,9 @@ namespace KScript.Language.Features
                 return MethodCompletions(analysis, region, p - 2, replace, pipe: true);
             }
 
-            return ExpressionStartCompletions(analysis, offset, replace, template: false);
+            List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false);
+            start.InsertRange(0, ParameterNameCompletions(analysis, region, wordStart, replace));
+            return start;
         }
 
         private List<CompletionItem> ExpressionStartCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool template)

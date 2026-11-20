@@ -61,6 +61,19 @@ Variables belong to the block they are declared in. `{{` and `}}` are literal br
 
 Functions can be called before they are declared, recurse, and be passed around: `@square` is the function itself. Lambdas are values too: `<let name="by_age" value="fn($a, $b) => $a.age - $b.age" />`.
 
+### Named arguments
+
+Any call can name its arguments, in any order: built-in commands, methods, your own `<fn>` functions and lambdas.
+
+```xml
+<echo>{ @known_folder(name: 'downloads') }</echo>
+<echo>{ @greet(greeting: 'Hi', who: 'Kyle') }</echo>
+<echo>{ @range(1, step: 2, end: 10) }</echo>
+<echo>{ 'abc'->pad_left(char: '*', width: 6) }</echo>
+```
+
+Positional arguments come first and fill parameters in order; each `name: value` then fills the parameter of that name, so you can skip optional ones in between. Naming a parameter that doesn't exist, or giving one twice, is an error with a "did you mean" hint. The parameter names are the ones signature help and hover show; the editor also completes them after `(` or `,`.
+
 ## Values and methods
 
 Values are strings, numbers, bools, lists, maps, dates, functions and null, plus values packages add (files, HTTP responses). Every value has methods, called with `->` and chained:
@@ -119,5 +132,6 @@ Using something from a package that isn't imported stops with `<input> is part o
 ## Writing portable scripts
 
 - Build paths with `@join_path($dir, 'file.txt')` (KScript.IO) rather than hard-coding `\` or `/`.
+- Find the user's folders with `@known_folder(name: 'downloads')` (KScript.IO): `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. It follows each system's own settings, such as Windows' Downloads location and Linux's `user-dirs.dirs`.
 - `$os.name` is `windows`, `linux` or `macos`, and `$os.home`, `$os.temp` and `$os.separator` are there too; `$env.HOME` reads an environment variable.
 - Numbers are always parsed and printed with `.` as the decimal separator, whatever the machine's language.

@@ -74,6 +74,7 @@ namespace KScript.Language.Tests
         [InlineData("@read_text($path) |> @json()", "(|> @read_text($path) @json())")]
         // Named arguments
         [InlineData("@chat(system: 'You are a tutor.')", "@chat(system:'You are a tutor.')")]
+        [InlineData("@range(1, step: 2)", "@range(1 step:2)")]
         // Match
         [InlineData("match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }", "(match $choice 1=>'settings' 2=>'exit' _=>'?')")]
         public void ParsesWithExpectedShape(string source, string expected)

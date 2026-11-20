@@ -45,7 +45,7 @@ namespace KScript.Language.Analysis
                     AnalyzeExpr(m.Target, region, scope, ExprContext.Value);
                     TypeShape receiver = Infer(m.Target, region);
                     AnalyzeArguments(m.Arguments, region, scope, LambdaParameterShapes(m.Name, receiver));
-                    CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false);
+                    CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false, m.Arguments, region);
                     return;
                 }
 
@@ -168,7 +168,8 @@ namespace KScript.Language.Analysis
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
                 result.References.Add(new SymbolReference(fn, nameSpan, false, false));
-                if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn)))
+                if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn))
+                    && !CheckNamedArguments($"@{fn.Name}()", c.Arguments, piped, SlotsOf(fn), region, full))
                 {
                     CheckFunctionArgumentCount(fn, count, full);
                 }
@@ -186,6 +187,10 @@ namespace KScript.Language.Analysis
             if (command != null)
             {
                 RequirePackage(command.Package, full, $"@{command.Name}()");
+                if (count >= 0 && CheckNamedArguments($"@{command.Name}()", c.Arguments, piped, SlotsOf(new[] { command }), region, full))
+                {
+                    return;
+                }
                 if (count >= 0 && command.Signatures.Count > 0 && !command.Signatures.Any(s => count >= s.MinArgs && count <= s.MaxArgs))
                 {
                     Report(full, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
@@ -247,10 +252,13 @@ namespace KScript.Language.Analysis
                         if (fn != null && fn.Kind == SymbolKind.Function)
                         {
                             result.References.Add(new SymbolReference(fn, span, false, false));
-                            CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
+                            if (!CheckNamedArguments($"@{fn.Name}()", call.Arguments, 1, SlotsOf(fn), region, region.Source.ToSource(call.Span)))
+                            {
+                                CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
+                            }
                             return;
                         }
-                        CheckMethod(id.Name, span, left ?? TypeShape.Unknown, call.Arguments.Count, pipe: true);
+                        CheckMethod(id.Name, span, left ?? TypeShape.Unknown, call.Arguments.Count, pipe: true, call.Arguments, region);
                         return;
                     }
 
@@ -363,7 +371,7 @@ namespace KScript.Language.Analysis
             AnalyzeExpr(lambda.Body, region, inner, ExprContext.Value);
         }
 
-        private void CheckMethod(string name, TextSpan nameSpan, TypeShape receiver, int count, bool pipe)
+        private void CheckMethod(string name, TextSpan nameSpan, TypeShape receiver, int count, bool pipe, IReadOnlyList<ArgumentNode> args = null, ExpressionRegion region = null)
         {
             if (string.IsNullOrEmpty(name) || name == "call")
             {
@@ -397,6 +405,10 @@ namespace KScript.Language.Analysis
                 return;
             }
 
+            if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(applicable), region, nameSpan))
+            {
+                return;
+            }
             if (count >= 0 && !applicable.Any(m => count >= m.MinArgs && count <= m.MaxArgs))
             {
                 Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
