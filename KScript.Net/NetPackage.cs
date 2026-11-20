@@ -114,6 +114,8 @@ namespace KScript.Net
             foreach (var m in ResponseValue.Methods)
                 p.Method(KType.Response, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((ResponseValue)t).TryCallMethod(c, m.Name, out object r) ? r : null);
 
+            p.LogProvider("http", "Sends log entries to a web service as a JSON array (url, headers, batch).", c => new HttpLogProvider(c, Client.Value));
+
             p.Command("fetch", "url, options?",
                 "Makes an HTTP request and returns the response. options is a map: method, headers, body (a map is sent as JSON), timeout (seconds, default 100).",
                 KType.Response, Fetch,
@@ -201,6 +203,62 @@ namespace KScript.Net
             {
                 throw new KScriptException($"Couldn't reach {url}: {ex.Message}", "Network");
             }
+        }
+    }
+
+    /// <summary>
+    /// A log provider that POSTs entries to a URL as a JSON array, <c>batch</c> at a time (default 20) and the rest
+    /// when the script ends. Each entry is an object of time, level, message, category, script, line and the fields.
+    /// </summary>
+    public sealed class HttpLogProvider : ILogProvider
+    {
+        private readonly HttpClient client;
+        private readonly Uri url;
+        private readonly Dictionary<string, string> headers = new Dictionary<string, string>();
+        private readonly int batch;
+        private readonly List<string> pending = new List<string>();
+
+        public HttpLogProvider(LogProviderContext c, HttpClient client)
+        {
+            this.client = client;
+            string address = c.Need("url");
+            if (!Uri.TryCreate(address, UriKind.Absolute, out url) || (url.Scheme != "http" && url.Scheme != "https"))
+                throw new KScriptException($"{c.Where}: url should be an http or https address, but is '{address}'.", "Config");
+            if (c.Get("headers") is object h)
+            {
+                if (h is not Dictionary<string, object> map) throw new KScriptException($"{c.Where}: headers should be a map, such as {{ Authorization: 'Bearer ...' }}.", "Config");
+                foreach (var kv in map) headers[kv.Key] = Values.ToStr(kv.Value);
+            }
+            double size = c.Get("batch") is object b ? Values.ToNumber(b, $"{c.Where} batch") : 20;
+            if (size < 1) throw new KScriptException($"{c.Where}: batch should be 1 or more.", "Config");
+            batch = (int)size;
+        }
+
+        public void Write(LogEntry entry)
+        {
+            bool full;
+            lock (pending)
+            {
+                pending.Add(entry.ToJson());
+                full = pending.Count >= batch;
+            }
+            if (full) Flush();
+        }
+
+        public void Flush()
+        {
+            string body;
+            lock (pending)
+            {
+                if (pending.Count == 0) return;
+                body = "[" + string.Join(",", pending) + "]";
+                pending.Clear();
+            }
+            using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
+            foreach (var kv in headers) request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
+            using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using HttpResponseMessage response = client.Send(request, cancel.Token);
+            if (!response.IsSuccessStatusCode) throw new KScriptException($"{url} answered {(int)response.StatusCode} {response.ReasonPhrase}.", "Http");
         }
     }
 }

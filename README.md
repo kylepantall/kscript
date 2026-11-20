@@ -248,6 +248,51 @@ features: [search, cart]
 
 Pages served by `kscript serve` read settings from the site folder. They never change environment variables, and `kscript serve` never serves `config.*` files or any `.yaml`, `.yml` or `.env` file. Keep secrets in `.env` or in YAML, because a JSON file named after an environment (such as `staging.json`) is served like any other file.
 
+### Logging: $log
+
+Every script has a logger. Entries at `info` and above go to the terminal (stderr) until you set up somewhere else for them:
+
+```xml
+<log>Import started</log>
+<log level="warn" category="payments" fields="{ order: $order.id }">Card declined for {$customer.name}</log>
+<do>$log->info('Saved', { id: $id, size: $bytes })</do>
+
+<let name="db" value="$log->named('db')->with({ host: $config.database.host })" />
+<do>$db->debug('Connected')</do>                       <!-- category db, with a host field -->
+<if test="$log->enabled('debug')"><do>$log->debug(@to_json($everything))</do></if>
+
+<try>
+  <do>@read_json('missing.json')</do>
+  <catch as="err"><do>$log->error('Could not read the file', $err)</do></catch>   <!-- error, error_type and error_line fields -->
+</try>
+```
+
+Levels are `trace`, `debug`, `info`, `warn`, `error` and `fatal`. **Providers** decide where entries go, and are usually set in config:
+
+```yaml
+# config.yaml
+logging:
+  level: info                 # the lowest level written (default info)
+  levels:
+    db: debug                 # per category; db also covers db.queries
+  providers:
+    - type: console           # stderr, coloured at a terminal; stream: stdout, format: json, time: HH:mm:ss.fff
+      level: warn
+    - type: file              # text, or json lines; roll: daily writes app-2026-11-20.log
+      path: logs/app.log
+      format: json
+    - fn: notify              # a <fn> in the script, called with each entry
+      level: error
+    - type: http              # from KScript.Net: POSTs entries as JSON, batch at a time
+      url: https://logs.example.com/ingest
+      headers: { Authorization: "Bearer ${LOG_TOKEN}" }
+      batch: 20
+```
+
+`<log-provider>` adds one from a script, with the same options as attributes (`replace="yes"` removes the ones already set up, including the default console one). A `memory` provider keeps entries for `$log->entries()`, which is handy in tests. Entries that a provider holds back, such as an http batch, are sent when the script ends or on `$log->flush()`. A provider that fails is reported once on stderr, and the others carry on.
+
+Packages add provider types with `p.LogProvider("type", description, create)`, and programs that run KScript can add their own with `host.Logs.AddProvider(provider, level)`, where a provider implements `ILogProvider`.
+
 ## Packages
 
 KScript.Core (everything above) is always there. Everything else comes from a package, imported at the top of the script, so a script only loads what it uses: a terminal script never loads the web server.

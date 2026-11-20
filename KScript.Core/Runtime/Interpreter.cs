@@ -599,6 +599,10 @@ namespace KScript.Runtime
             {
                 throw new KScriptException("<return> must be inside <fn>.", "Syntax");
             }
+            finally
+            {
+                Host.FlushLogs();
+            }
         }
 
         /// <summary>Loads and runs a script file.</summary>

@@ -109,6 +109,7 @@ namespace KScript.Runtime
         private readonly Dictionary<string, VariableDefinition> variables = new Dictionary<string, VariableDefinition>(StringComparer.Ordinal);
         private readonly Dictionary<string, EchoFormatter> echoFormats = new Dictionary<string, EchoFormatter>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> requires = new List<string>();
+        private readonly Dictionary<string, LogProviderType> logProviders = new Dictionary<string, LogProviderType>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>The full name, such as KScript.Terminal.</summary>
         public abstract string Name { get; }
@@ -126,6 +127,9 @@ namespace KScript.Runtime
         public IReadOnlyList<MethodDefinition> Methods { get { EnsureRegistered(); return methods; } }
         public IReadOnlyDictionary<string, VariableDefinition> Variables { get { EnsureRegistered(); return variables; } }
         public IReadOnlyDictionary<string, EchoFormatter> EchoFormats { get { EnsureRegistered(); return echoFormats; } }
+
+        /// <summary>Kinds of log provider this package adds, by type name: logging.providers[].type and &lt;log-provider type&gt;.</summary>
+        public IReadOnlyDictionary<string, LogProviderType> LogProviders { get { EnsureRegistered(); return logProviders; } }
 
         /// <summary>Packages that are imported along with this one.</summary>
         public IReadOnlyList<string> Requires { get { EnsureRegistered(); return requires; } }
@@ -191,6 +195,13 @@ namespace KScript.Runtime
             }
 
             public void EchoFormat(string name, EchoFormatter formatter) => package.echoFormats[name] = formatter;
+
+            /// <summary>
+            /// Adds a kind of log provider, such as http. Scripts that import the package can name it in
+            /// logging.providers (type: http) or &lt;log-provider type="http"&gt;; <paramref name="create"/> gets the options.
+            /// </summary>
+            public void LogProvider(string type, string description, Func<LogProviderContext, ILogProvider> create) =>
+                package.logProviders[type] = new LogProviderType(type, description, create, package.Name);
 
             /// <summary>Another package that is always imported with this one.</summary>
             public void Requires(string packageName) => package.requires.Add(packageName);

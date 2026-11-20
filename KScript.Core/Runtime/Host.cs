@@ -93,6 +93,20 @@ namespace KScript.Runtime
         /// <summary>Where <c>$config</c> reads settings from (kscript --env, kscript.json's config section). Null for the defaults.</summary>
         public ConfigOptions Config { get; set; }
 
+        /// <summary>The run's logging: providers and levels, set up from $config.logging on first use.</summary>
+        public LogHub Logs
+        {
+            get
+            {
+                lock (Items) return logs ??= new LogHub(this);
+            }
+        }
+
+        private LogHub logs;
+
+        /// <summary>Writes out log entries that providers hold back. The interpreter calls it when a run ends.</summary>
+        public void FlushLogs() => logs?.Flush();
+
         /// <summary>State that packages keep for the length of a run, by key.</summary>
         public Dictionary<string, object> Items { get; } = new Dictionary<string, object>();
 

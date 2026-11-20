@@ -43,8 +43,8 @@ namespace KScript.Runtime
             {
                 ["type"] = Type,
                 ["message"] = Message,
-                ["line"] = Line > 0 ? Line : null,
-                ["column"] = Column > 0 ? Column : null,
+                ["line"] = Line > 0 ? (double)Line : null,
+                ["column"] = Column > 0 ? (double)Column : null,
                 ["file"] = File,
             };
             foreach (var kv in Fields) map[kv.Key] = kv.Value;
