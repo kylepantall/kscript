@@ -34,7 +34,7 @@ namespace KScript.Runtime
                 new A("category", K.Template, "Where it comes from, such as db or payments."),
                 new A("fields", K.Expression, "A map of extra values, such as { order: $order.id, total: $total }."))
             {
-                Example = "<log level=\"warn\" category=\"payments\" fields=\"{ order: $id }\">Card declined for {$customer.name}</log>",
+                Example = "<let name=\"id\" value=\"42\" />\n<let name=\"customer\" value=\"{ name: 'Joan' }\" />\n<log level=\"warn\" category=\"payments\" fields=\"{ order: $id }\">Card declined for {$customer.name}</log>",
             }, run =>
             {
                 string message = run.Has("message") ? run.Template("message") : run.Text();

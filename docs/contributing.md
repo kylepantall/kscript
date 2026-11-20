@@ -32,6 +32,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | `KScript.UI/` | Desktop windows: the KScript.UI package, the redraw model (`UISession`) and the Avalonia host that shows it on macOS, Windows and Linux. |
 | `KScript.Test/` | The KScript.Test package and `kscript test`: finding test files, running them, and the console and JUnit reports. |
 | `KScript.Cli/` | `kscript make` (`Scaffolding/`, built-in templates in `Scaffolding/Templates/`, the `kscript make project` templates in `Scaffolding/Projects/web/` and `Scaffolding/Projects/bare/`, each described by its `kscript-template.json`), `kscript ide`, `kscript update` and `kscript compile` (`Compile/`: the single-file bundle reader and writer, package trimming, Windows resources, Mac signing and icons). |
+| `KScript.Docs/` | `kscript docs`: the docs website, built from `docs/*.md` and the language catalog, with the sandbox (`Playground`) that runs its examples. The examples of commands and methods live with them, in each package's `p.Examples(...)`. |
 | `KScriptApp/` | The `kscript` command line app. |
 | `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
 | `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |

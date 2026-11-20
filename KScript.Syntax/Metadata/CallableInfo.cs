@@ -103,7 +103,7 @@ namespace KScript.Metadata
         public IReadOnlyList<Signature> Signatures { get; }
 
         /// <summary>A short usage example, shown in hover.</summary>
-        public string Example { get; init; }
+        public string Example { get; set; }
 
         /// <summary>For methods: the type the method is for.</summary>
         public string ReceiverType { get; init; } = KType.Any;

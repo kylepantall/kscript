@@ -95,12 +95,21 @@ namespace KScript.Markdown
         protected override void Register(PackageBuilder p)
         {
             p.Command("markdown", "text", "Renders Markdown: $doc.html, $doc.title, $doc.meta (front matter) and $doc.text.", KType.Map,
-                c => MarkdownText.Document(c.Str(0)), "<let name=\"post\" value=\"@read_text('hello.md') |> @markdown()\" />");
+                c => MarkdownText.Document(c.Str(0)), "<let name=\"post\" value=\"@markdown('# Hello *world*')\" />\n<echo>{ $post.title }: { $post.html }</echo>");
             p.Command("read_markdown", "path", "Reads a Markdown file: $doc.html, $doc.title, $doc.meta (front matter) and $doc.text. Relative paths are from the script's folder.", KType.Map,
                 c => MarkdownText.Document(File.ReadAllText(c.Host.ResolvePath(c.Str(0), c.Module?.Directory ?? c.Host.WorkingDirectory))),
                 "<let name=\"post\" value=\"@read_markdown('posts/hello.md')\" />");
             p.Method(KType.String, "markdown", "", "The text rendered from Markdown to HTML.", KType.String, (t, c) => MarkdownText.ToHtml((string)t));
             p.Method(KType.String, "markdown_escape", "", "The text escaped so Markdown shows it as written.", KType.String, (t, c) => MarkdownText.Escape((string)t));
+            RegisterExamples(p);
+        }
+
+        /// <summary>Usage examples, shown in hover and run by kscript docs.</summary>
+        private static void RegisterExamples(PackageBuilder p)
+        {
+            p.Examples(
+                ("string->markdown", "'Some **bold** text'->markdown()"),
+                ("string->markdown_escape", "'2 * 3 = 6'->markdown_escape()"));
         }
     }
 }

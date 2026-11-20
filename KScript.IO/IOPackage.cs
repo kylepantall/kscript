@@ -128,7 +128,7 @@ namespace KScript.IO
             p.Command("file", "path", "A file value for a path, with methods like ->name(), ->extension() and ->size().", KType.File, c => new FileValue(PathOf(c.Need(0), c)),
                 "<let name=\"report\" value=\"@file('out/report.pdf')\" />");
             p.Command("read_text", "path", "The text of a file. Relative paths are from the script's folder.", KType.String, c => File.ReadAllText(PathOf(c.Need(0), c)),
-                "<let name=\"config\" value=\"@read_text('config.json') |> @json()\" />");
+                "<do>@write_text('config.json', '{ \"port\": 8080 }')</do>\n<let name=\"config\" value=\"@read_text('config.json') |> @json()\" />\n<echo>$config.port</echo>");
             p.Command("read_lines", "path", "The lines of a file.", KType.List, c => File.ReadAllLines(PathOf(c.Need(0), c)).Cast<object>().ToList());
             p.Command("read_json", "path, as?: type", "A JSON file read into maps and lists. With as: a <type>, the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))), 1));
             p.Command("read_yaml", "path", "A YAML file read into maps and lists.", KType.Any, c =>
@@ -193,7 +193,7 @@ namespace KScript.IO
                 new A("overwrite", K.Bool, "yes replaces a file that is already there."))
             {
                 Context = ElementContext.Script,
-                Example = "<move from=\"$file\" to=\"@join_path($new_dir, $file->name())\" />",
+                Example = "<do>@write_text('report.txt', 'Q3')</do>\n<mkdir path=\"'archive'\" />\n<let name=\"file\" value=\"@file('report.txt')\" />\n<move from=\"$file\" to=\"@join_path('archive', $file->name())\" />\n<echo>{ @exists('archive/report.txt') }</echo>",
             }, run => Transfer(run, move: true));
 
             p.Element(new ElementInfo("copy", "Copies a file or folder.", ContentKind.Empty,
@@ -227,6 +227,46 @@ namespace KScript.IO
                 Directory.CreateDirectory(PathOf(run, "path"));
                 return null;
             });
+            RegisterExamples(p);
+        }
+
+        /// <summary>Usage examples, shown in hover and run by kscript docs.</summary>
+        private static void RegisterExamples(PackageBuilder p)
+        {
+            p.Examples(
+                ("@read_lines", "<do>@write_text('todo.txt', 'milk' + @char_of(10) + 'eggs')</do>\n<echo>{ @read_lines('todo.txt') }</echo>"),
+                ("@read_json", "<do>@write_json('people.json', [{ name: 'Joan', age: 82 }])</do>\n<echo>{ @read_json('people.json')->first().name }</echo>"),
+                ("@read_yaml", "<do>@write_text('app.yaml', 'name: Shop' + @char_of(10) + 'port: 8080')</do>\n<echo>{ @read_yaml('app.yaml').port }</echo>"),
+                ("@read_env", "<do>@write_text('.env', 'PORT=8080' + @char_of(10) + 'URL=http://localhost:${PORT}')</do>\n<echo>{ @read_env('.env').URL }</echo>"),
+                ("@write_text", "<do>@write_text('hello.txt', 'Hello!')</do>\n<echo>{ @read_text('hello.txt') }</echo>"),
+                ("@append_text", "<do>@write_text('log.txt', 'one;'); @append_text('log.txt', 'two;')</do>\n<echo>{ @read_text('log.txt') }</echo>"),
+                ("@write_json", "<do>@write_json('settings.json', { theme: 'dark', size: 14 })</do>\n<echo>{ @read_text('settings.json') }</echo>"),
+                ("@write_yaml", "<do>@write_yaml('settings.yaml', { theme: 'dark', size: 14 })</do>\n<echo>{ @read_text('settings.yaml') }</echo>"),
+                ("@exists", "<do>@write_text('a.txt', 'a')</do>\n<echo>{ @exists('a.txt') } { @exists('b.txt') }</echo>"),
+                ("@is_file", "<do>@write_text('a.txt', 'a')</do>\n<echo>{ @is_file('a.txt') } { @is_file('.') }</echo>"),
+                ("@is_folder", "<mkdir path=\"'photos'\" />\n<echo>{ @is_folder('photos') }</echo>"),
+                ("@folders", "<mkdir path=\"'2025'\" />\n<mkdir path=\"'2026'\" />\n<echo>{ @folders('.')->map(fn($f) => $f->name())->sort() }</echo>"),
+                ("@join_path", "@join_path('reports', '2026', 'november.pdf')"),
+                ("@full_path", "@full_path('notes.txt')->ends_with('notes.txt')"),
+                ("@cwd", "@cwd()->length() gt 0"),
+                ("@home", "@home()->length() gt 0"),
+                ("@temp_folder", "@temp_folder()->length() gt 0"),
+                ("@known_folder", "@known_folder(downloads)->length() gt 0"),
+                ("file->path", "@file('notes.txt')->path()->ends_with('notes.txt')"),
+                ("file->name", "@file('reports/q3.pdf')->name()"),
+                ("file->stem", "@file('reports/q3.pdf')->stem()"),
+                ("file->extension", "@file('reports/q3.pdf')->extension()"),
+                ("file->directory", "@file('reports/q3.pdf')->directory()->name()"),
+                ("file->exists", "@file('missing.txt')->exists()"),
+                ("file->is_file", "<do>@write_text('a.txt', 'a')</do>\n<echo>{ @file('a.txt')->is_file() }</echo>"),
+                ("file->is_folder", "<mkdir path=\"'photos'\" />\n<echo>{ @file('photos')->is_folder() }</echo>"),
+                ("file->size", "<do>@write_text('a.txt', 'hello')</do>\n<echo>{ @file('a.txt')->size() } bytes</echo>"),
+                ("file->modified", "<do>@write_text('a.txt', 'hello')</do>\n<echo>{ @file('a.txt')->modified()->year() ge 2026 }</echo>"),
+                ("file->created", "<do>@write_text('a.txt', 'hello')</do>\n<echo>{ @file('a.txt')->created()->year() ge 2000 }</echo>"),
+                ("file->read_text", "<do>@write_text('a.txt', 'hello')</do>\n<echo>{ @file('a.txt')->read_text() }</echo>"),
+                ("file->read_lines", "<do>@write_text('a.txt', 'one' + @char_of(10) + 'two')</do>\n<echo>{ @file('a.txt')->read_lines() }</echo>"),
+                ("file->join", "@file('reports')->join('2026', 'q3.pdf')->name()"),
+                ("file->relative_to", "@file('reports/2026/q3.pdf')->relative_to('reports')"));
         }
 
         private static object Write(CallContext c, string text, bool append)

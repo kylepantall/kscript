@@ -8,7 +8,7 @@ the parser; `.ks.xml` scripts are unchanged, and the two kinds can import each o
 `kscript make project`, `kscript make script` and `kscript make test` write `.kscript` files; pass `--format xml`, or set
 `"make": { "format": "xml" }` in `kscript.json`, to get `.ks.xml` instead.
 
-```
+```kscript try
 import KScript.IO
 
 /// Lower-cases text and joins words with dashes.
