@@ -189,9 +189,11 @@ namespace KScript.Conversion
                 }
             }
 
-            // Pages in a converted folder import the scripts too (<import src="lib/tasks.ks.xml" />).
-            foreach (string page in roots.SelectMany(r => Directory.EnumerateFiles(r, "*.*", SearchOption.AllDirectories))
-                         .Where(f => f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            // Pages in a converted folder import the scripts too (<import src="lib/tasks.ks.xml" />), and a project's
+            // Makefile runs them (kscript desktop.ks.xml).
+            foreach (string page in roots.SelectMany(r => Directory.EnumerateFiles(r, "*", SearchOption.AllDirectories))
+                         .Where(f => f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+                                     || string.Equals(Path.GetFileName(f), "Makefile", StringComparison.Ordinal))
                          .Where(f => !f.Split(Path.DirectorySeparatorChar).Any(part => part is "node_modules" or ".git" or "_templates"))
                          .Distinct(PathComparer).OrderBy(f => f, StringComparer.Ordinal))
             {
