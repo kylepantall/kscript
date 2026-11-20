@@ -1,0 +1,44 @@
+// Tests for the app's rules, which the web page{{#if desktop}}, the desktop app{{/if}}{{#if http}} and the API{{/if}} share. Run with: kscript test
+import "../lib/tasks{{ ext }}"
+
+describe(name: "tasks") {
+  test(name: "adding gives each task the next id") {
+    tasks = @add_task(@add_task([], title: 'Write'), title: 'Test')
+    expect(value: $tasks->map(fn($t) => $t.id), equals: [1, 2])
+    expect(value: $tasks[1], equals: { id: 2, title: 'Test', done: false })
+  }
+
+  test(name: "a blank title adds nothing", each: title, in: ['', '   ']) {
+    expect(value: @add_task([], title: $title), count: 0)
+  }
+
+  test(name: "titles are trimmed") {
+    expect(value: @add_task([], title: '  Ship it  ')[0].title, equals: 'Ship it')
+  }
+
+  test(name: "toggling ticks one task and leaves the others") {
+    tasks = @toggle_task(@starter_tasks(), id: 1)
+    expect(value: $tasks->map(fn($t) => $t.done), equals: [true, false])
+    expect(value: @toggle_task($tasks, id: 1)[0].done, equals: false)
+  }
+
+  test(name: "removing and clearing") {
+    tasks = @toggle_task(@starter_tasks(), id: 2)
+    expect(value: @remove_task($tasks, id: 1)->map(fn($t) => $t.id), equals: [2])
+    expect(value: @clear_done($tasks)->map(fn($t) => $t.id), equals: [1])
+  }
+
+  counts = [
+    { done: 0, text: '2 tasks left' },
+    { done: 1, text: '1 task left' },
+    { done: 2, text: '0 tasks left' },
+  ]
+
+  test(name: "'{$case.text}' when {$case.done} of 2 are done", each: case, in: $counts) {
+    tasks = @starter_tasks()
+    for id in [1, 2]->take($case.done) {
+      tasks = @toggle_task($tasks, id: $id)
+    }
+    expect(value: @tasks_left($tasks), equals: $case.text)
+  }
+}

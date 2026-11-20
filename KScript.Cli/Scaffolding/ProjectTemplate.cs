@@ -196,9 +196,11 @@ namespace KScript.Scaffolding
                 to = to.Replace('\\', '/').TrimStart('/');
                 if (to.Length == 0 || to.Split('/').Any(s => s == ".." || s.Length == 0) || Path.IsPathRooted(to))
                     throw new StubException($"{path}: '{to}' is not a path inside the project.");
+                string content = StubTemplate.Render(body, values);
+                (to, content) = ScriptFormat.Apply(path, to, content, Lookup(values, "format"));
                 if (result.ContainsKey(to))
                     throw new StubException($"The project template makes {to} twice. Give one of them a 'when:' so only one is copied.");
-                result[to] = StubTemplate.Render(body, values);
+                result[to] = content;
             }
             return result;
         }

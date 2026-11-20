@@ -146,7 +146,7 @@ namespace KScript.Conversion
 
         private static bool IsXmlScript(string path) =>
             (path.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".ks", StringComparison.OrdinalIgnoreCase))
-            && !path.EndsWith(".test.ks.xml", StringComparison.OrdinalIgnoreCase);
+            && !KScript.Projects.TestSettings.IsTestFileName(path);
 
         private static void PrintUsage(TextWriter writer)
         {

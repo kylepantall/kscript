@@ -1,0 +1,4 @@
+// A command-line script. Run it with: kscript scripts/hello{{ ext }} Ellie
+import "../lib/greeting{{ ext }}"
+
+echo "{ @greeting($args[0] ?? '{{ title }}') }"

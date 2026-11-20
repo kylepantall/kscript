@@ -1,0 +1,4 @@
+// Functions here can be imported by scripts and tests: import "../lib/greeting{{ ext }}"
+
+/// A friendly hello for someone.
+fn greeting(name) => 'Hello, ' + $name->trim()->title() + '!'

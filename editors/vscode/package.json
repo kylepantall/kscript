@@ -168,14 +168,14 @@
       "editor/title/run": [
         {
           "command": "kscript.runTestsInFile",
-          "when": "resourceFilename =~ /\\.test\\.(ks\\.)?xml$/",
+          "when": "resourceFilename =~ /\\.test\\.((ks\\.)?xml|kscript)$/",
           "group": "navigation"
         }
       ],
       "commandPalette": [
         {
           "command": "kscript.runTestsInFile",
-          "when": "resourceFilename =~ /\\.test\\.(ks\\.)?xml$/"
+          "when": "resourceFilename =~ /\\.test\\.((ks\\.)?xml|kscript)$/"
         }
       ]
     },
