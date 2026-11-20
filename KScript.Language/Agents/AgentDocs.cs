@@ -212,7 +212,7 @@ namespace KScript.Language.Agents
                 return null;
             }
             // Route files kscript convert just replaced are still on disk, so name their new versions instead.
-            string text = table.ToString().TrimEnd();
+            string text = table.ToString().Replace("\r\n", "\n").TrimEnd();
             foreach (string old in skip ?? new HashSet<string>())
             {
                 string name = Path.GetRelativePath(site, old).Replace('\\', '/');
@@ -703,7 +703,8 @@ namespace KScript.Language.Agents
             {
                 files[$"{Folder}/packages/{package}.md"] = Package(package, catalog, project.Format);
             }
-            return files;
+            // Always \n, so --check agrees with what was written whatever the platform's newline is.
+            return files.ToDictionary(f => f.Key, f => f.Value.Replace("\r\n", "\n"), StringComparer.Ordinal);
         }
 
         /// <summary>
