@@ -318,6 +318,29 @@ namespace KScript.Language.Tests
             Assert.Equal(2, Diagnostics().Count);
             Assert.NotEmpty(Diagnostics(template));
         }
+
+        [Fact]
+        public void FormatsDocuments()
+        {
+            JsonObject caps = Initialize()["result"]["capabilities"].AsObject();
+            Assert.True(caps["documentFormattingProvider"].GetValue<bool>());
+
+            string text = "<kscript>\n<if test=\"yes\">\n<echo>hi</echo>\n</if>\n</kscript>";
+            Open(text);
+            JsonObject request = Doc().Also(o => o["options"] = new JsonObject { ["tabSize"] = 4, ["insertSpaces"] = true });
+            JsonArray edits = Request("textDocument/formatting", request)["result"].AsArray();
+            JsonObject edit = Assert.Single(edits).AsObject();
+            Syntax.Text.SourceText source = new Syntax.Text.SourceText(text);
+            int start = source.GetOffset(edit["range"]["start"]["line"].GetValue<int>(), edit["range"]["start"]["character"].GetValue<int>());
+            int end = source.GetOffset(edit["range"]["end"]["line"].GetValue<int>(), edit["range"]["end"]["character"].GetValue<int>());
+            string formatted = text.Substring(0, start) + edit["newText"].GetValue<string>() + text.Substring(end);
+            Assert.Equal("<kscript>\n    <if test=\"yes\">\n        <echo>hi</echo>\n    </if>\n</kscript>\n", formatted);
+
+            // A document with markup errors is left alone.
+            const string broken = "file:///work/broken.ks.xml";
+            Open("<kscript>\n<if test=\"yes\">\n</kscript>", broken);
+            Assert.Empty(Request("textDocument/formatting", Doc(broken))["result"].AsArray());
+        }
     }
 
     internal static class JsonExtensions

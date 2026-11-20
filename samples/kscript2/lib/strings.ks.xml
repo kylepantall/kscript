@@ -1,6 +1,6 @@
 <kscript>
   <fn name="slugify" params="text" description="Lower-cases text and joins words with dashes.">
-    <return value="$text->lower()->replace(' ', '-')" />
+    <return value="$text->lower()->replace(old: ' ', new: '-')" />
   </fn>
   <fn name="titlecase" params="text" value="$text->upper()" />
 </kscript>

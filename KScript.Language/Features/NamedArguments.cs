@@ -35,6 +35,7 @@ namespace KScript.Language.Features
                         Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
                         Documentation = c.Description,
                         Parameters = s.Parameters.Select(p => (p.Label, p.Description)).ToList(),
+                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : null, p.IsFlag)).ToList(),
                     });
                 }
             }
@@ -47,6 +48,9 @@ namespace KScript.Language.Features
                     Label = fn.TypedSignature,
                     Documentation = doc != null ? doc.ToMarkdown(includeParams: false) : fn.Description,
                     Parameters = fn.Parameters.Select(p => (p.Label, doc?.ParamText(p.Name))).ToList(),
+                    Details = fn.Parameters.Select(p => (p.Name,
+                        p.Type != null ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type && x.EnumValues != null)?.EnumValues : null,
+                        p.Type == KType.Bool)).ToList(),
                 });
             }
 
@@ -144,6 +148,55 @@ namespace KScript.Language.Features
 
             var items = new List<CompletionItem>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
+
+            // Bare values of the enum parameter this argument lands on: @known_folder(‸) offers downloads, home...
+            bool afterNamed = others.Any(a => a.Name != null && a.Span.End <= wordStart);
+            foreach (SignatureInfo signature in signatures.Where(sig => sig.Details != null && !afterNamed && positional < sig.Details.Count))
+            {
+                (string name, IReadOnlyList<string> values, _) = signature.Details[positional];
+                foreach (string value in values ?? Array.Empty<string>())
+                {
+                    if (seen.Add("=" + value))
+                    {
+                        items.Add(new CompletionItem
+                        {
+                            Label = value,
+                            Kind = CompletionKind.Value,
+                            Detail = name,
+                            Documentation = $"A value of `{name}` in `{signature.Label}`.",
+                            ReplaceSpan = replace,
+                            SortText = "000" + value,
+                        });
+                    }
+                }
+            }
+
+            // Yes/no parameters can be written as flags: recursive, not recursive.
+            foreach (SignatureInfo signature in signatures.Where(sig => sig.Details != null))
+            {
+                for (int i = 0; i < signature.Details.Count; i++)
+                {
+                    (string name, _, bool flag) = signature.Details[i];
+                    if (!flag || i < positional || named.Contains(name) || others.Any(a => LanguageService.FlagName(a) == name) || !seen.Add("!" + name))
+                    {
+                        continue;
+                    }
+                    foreach (string label in new[] { name, "not " + name })
+                    {
+                        items.Add(new CompletionItem
+                        {
+                            Label = label,
+                            Kind = CompletionKind.Keyword,
+                            Detail = "flag",
+                            Documentation = $"Sets `{name}` to {(label.StartsWith("not ", StringComparison.Ordinal) ? "no" : "yes")} in `{signature.Label}`.",
+                            ReplaceSpan = replace,
+                            FilterText = label,
+                            SortText = "01" + label,
+                        });
+                    }
+                }
+            }
+
             foreach (SignatureInfo signature in signatures)
             {
                 for (int i = 0; i < signature.Parameters.Count; i++)
@@ -170,6 +223,59 @@ namespace KScript.Language.Features
             return items;
         }
 
+        /// <summary>The flag a bare-word argument sets (<c>recursive</c> or <c>not recursive</c>), or null.</summary>
+        internal static string FlagName(ArgumentNode a) => a.Name == null ? Analysis.Analyzer.BareWord(a)?.Word : null;
+
+        /// <summary>Right after <c>name:</c> in a call, the enum values that parameter takes.</summary>
+        private List<CompletionItem> NamedValueCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)
+        {
+            string text = region.Source.Value;
+            int p = wordStart;
+            while (p > 0 && char.IsWhiteSpace(text[p - 1]))
+            {
+                p--;
+            }
+            if (p == 0 || text[p - 1] != ':')
+            {
+                return new List<CompletionItem>();
+            }
+            int end = p - 1, start = end;
+            while (start > 0 && Lexer.IsIdentChar(text[start - 1]))
+            {
+                start--;
+            }
+            string name = text.Substring(start, end - start);
+            (ExprNode node, ArgumentList args) = InnermostCall(region, wordStart);
+            if (node == null || name.Length == 0)
+            {
+                return new List<CompletionItem>();
+            }
+            var items = new List<CompletionItem>();
+            foreach (SignatureInfo signature in SignaturesFor(analysis, region, node, out _).Where(sig => sig.Details != null))
+            {
+                foreach ((string param, IReadOnlyList<string> values, _) in signature.Details.Where(d => d.Name == name))
+                {
+                    foreach (string value in values ?? Array.Empty<string>())
+                    {
+                        if (items.Any(i => i.Label == value))
+                        {
+                            continue;
+                        }
+                        items.Add(new CompletionItem
+                        {
+                            Label = value,
+                            Kind = CompletionKind.Value,
+                            Detail = param,
+                            Documentation = $"A value of `{param}` in `{signature.Label}`.",
+                            ReplaceSpan = replace,
+                            SortText = "000" + value,
+                        });
+                    }
+                }
+            }
+            return items;
+        }
+
         /// <summary>Hover on <c>name</c> in <c>name: value</c>: the parameter it fills.</summary>
         private HoverResult ArgumentNameHover(DocumentAnalysis analysis, ExpressionRegion region, int index)
         {
@@ -179,6 +285,24 @@ namespace KScript.Language.Features
                 ArgumentNode arg = args?.Arguments.FirstOrDefault(a => a.Name != null && a.NameSpan.Start <= index && index <= a.NameSpan.End);
                 if (arg == null)
                 {
+                    // A bare word: an enum value or a flag.
+                    ArgumentNode bare = args?.Arguments.FirstOrDefault(a => Analysis.Analyzer.BareWord(a) is var (_, _, n) && n.Span.Start <= index && index <= n.Span.End);
+                    if (bare != null && Analysis.Analyzer.BareWord(bare) is var (word, negated, node))
+                    {
+                        foreach (SignatureInfo signature in SignaturesFor(analysis, region, call, out _).Where(sig => sig.Details != null))
+                        {
+                            var flag = signature.Details.FirstOrDefault(d => d.Flag && d.Name == word);
+                            if (bare.Name == null && flag.Name != null)
+                            {
+                                return new HoverResult($"**{(negated ? "not " : string.Empty)}{word}**: flag, sets `{word}` to {(negated ? "no" : "yes")} in `{signature.Label}`.", region.Source.ToSource(node.Span));
+                            }
+                            var owner = signature.Details.FirstOrDefault(d => d.Values != null && d.Values.Contains(word, StringComparer.OrdinalIgnoreCase));
+                            if (owner.Name != null)
+                            {
+                                return new HoverResult($"**{word}**: a value of `{owner.Name}` ({string.Join(", ", owner.Values)}) in `{signature.Label}`.", region.Source.ToSource(node.Span));
+                            }
+                        }
+                    }
                     continue;
                 }
                 foreach (SignatureInfo signature in SignaturesFor(analysis, region, call, out _))

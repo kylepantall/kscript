@@ -386,10 +386,10 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            if (report && type != null && !KType.Declarable.Contains(type))
+            if (report && type != null && !KType.Declarable.Contains(type) && !DeclaredEnums().Contains(type))
             {
                 Report(value.ToSource(new TextSpan(start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length), type.Length)),
-                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", KType.Declarable)}.");
+                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", KType.Declarable)}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
             }
 
             if (report && def != null)
@@ -525,5 +525,12 @@ namespace KScript.Language.Analysis
         }
 
         #endregion
+    
+        private HashSet<string> declaredEnums;
+
+        /// <summary>The names of the &lt;enum&gt; types declared anywhere in this document.</summary>
+        private HashSet<string> DeclaredEnums() => declaredEnums ??= new HashSet<string>(
+            result.Markup.DescendantElements().Where(x => x.Name == "enum").Select(x => x.GetAttributeValue("name")?.Trim().TrimStart('$')).Where(n => !string.IsNullOrEmpty(n)),
+            StringComparer.Ordinal);
     }
 }

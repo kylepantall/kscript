@@ -16,7 +16,7 @@
   <set>x += 1</set>
   <do>$x = 3; $total += $price * $qty</do>
   <let name="config" const="yes">{ debug: false, retries: 3 }</let>
-  <echo>Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for braces.</echo>
+  <echo>Hello, $name! Total: { ($price * $qty)->round(digits: 2) }. Use {{ and }} for braces.</echo>
 
   <!-- Lists, maps, lambdas and pipes -->
   <let name="colours" value="['red', 'green', 'blue']" />
@@ -30,14 +30,24 @@
       |> join(', ')" />
   <let name="by_age" value="fn($a, $b) => $a.age - $b.age" />
   <let name="sorted" value="$people->sort($by_age)" />
-  <echo>{ $names |> @to_lower() |> @greet('Hi') }</echo>
+  <echo>{ $names |> @to_lower() |> @greet(greeting: 'Hi') }</echo>
 
   <!-- Loops -->
-  <for each="i" in="0..10"><echo>$i</echo></for>
-  <for each="i" in="0..100 step 5"><echo>$i</echo></for>
-  <for each="item" index="k" in="$colours"><echo>$k: $item</echo></for>
-  <for each="key, value" in="$config"><echo>$key = $value</echo></for>
-  <while test="$n lt 3"><set name="n" value="$n + 1" /></while>
+  <for each="i" in="0..10">
+    <echo>$i</echo>
+  </for>
+  <for each="i" in="0..100 step 5">
+    <echo>$i</echo>
+  </for>
+  <for each="item" index="k" in="$colours">
+    <echo>$k: $item</echo>
+  </for>
+  <for each="key, value" in="$config">
+    <echo>$key = $value</echo>
+  </for>
+  <while test="$n lt 3">
+    <set name="n" value="$n + 1" />
+  </while>
 
   <!-- Branches -->
   <let name="score" value="80" />
@@ -52,10 +62,18 @@
   </else>
   <let name="choice" value="2" />
   <match value="$choice">
-    <case is="1"><call fn="greet" args="'settings'" /></case>
-    <case is="2, 3"><echo>Coming soon</echo></case>
-    <case when="$choice gt 9"><echo>Out of range</echo></case>
-    <default><echo>Unknown option</echo></default>
+    <case is="1">
+      <call fn="greet" args="'settings'" />
+    </case>
+    <case is="2, 3">
+      <echo>Coming soon</echo>
+    </case>
+    <case when="$choice gt 9">
+      <echo>Out of range</echo>
+    </case>
+    <default>
+      <echo>Unknown option</echo>
+    </default>
   </match>
   <let name="label" value="match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }" />
 
@@ -65,7 +83,7 @@
   </fn>
   <fn name="double" params="x: int" value="$x * 2" />
   <echo>@greet('World')</echo>
-  <echo>{ 'Kyle' |> @greet('Hi') } { @double(4) }</echo>
+  <echo>{ 'Kyle' |> @greet(greeting: 'Hi') } { @double(4) }</echo>
 
   <!-- Errors -->
   <let name="path" value="'data.json'" />
@@ -77,7 +95,9 @@
     <catch as="err">
       <echo>Failed: {$err.message} (line {$err.line})</echo>
     </catch>
-    <finally><echo>done</echo></finally>
+    <finally>
+      <echo>done</echo>
+    </finally>
   </try>
   <let name="age" value="-1" />
   <try>

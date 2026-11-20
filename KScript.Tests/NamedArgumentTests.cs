@@ -73,7 +73,6 @@ public class NamedArgumentTests
     [InlineData("@greet(greting: 'Hi', who: 'K')", "no parameter named 'greting'. Did you mean greeting?")]
     [InlineData("@greet('K', who: 'J')", "given 'who' twice")]
     [InlineData("@greet(greeting: 'Hi')", "needs a value for 'who'")]
-    [InlineData("@greet(who: 'K', 'Hi')", "Positional arguments must come before named ones")]
     public void FunctionMistakesAreExplained(string call, string expected)
     {
         KScriptException ex = Fails(Greet + $"<echo>{{ {call} }}</echo>");

@@ -143,7 +143,7 @@ A failed check inside the body is still reported as a failure, not taken as the 
 
 ```xml
 <test name="hello.ks.xml greets the name it is given">
-  <let name="run" value="@run_script('../scripts/hello.ks.xml', { args: ['Ellie'] })" />
+  <let name="run" value="@run_script('../scripts/hello.ks.xml', options: { args: ['Ellie'] })" />
   <expect value="$run.code" equals="0" />
   <expect value="$run.output" equals="'Hello, Ellie!'" />
 </test>

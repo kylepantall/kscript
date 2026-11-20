@@ -38,6 +38,7 @@ namespace KScript.Language.Analysis
 
                 case CommandCallNode c:
                     AnalyzeCommand(c, region, scope, piped: 0);
+                    FlushBare(c.Arguments, region, scope);
                     return;
 
                 case MethodCallNode m:
@@ -46,11 +47,13 @@ namespace KScript.Language.Analysis
                     TypeShape receiver = Infer(m.Target, region);
                     AnalyzeArguments(m.Arguments, region, scope, LambdaParameterShapes(m.Name, receiver));
                     CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false, m.Arguments, region);
+                    FlushBare(m.Arguments, region, scope);
                     return;
                 }
 
                 case CallNode call:
                     AnalyzeCall(call, region, scope, piped: false, left: null);
+                    FlushBare(call.Arguments, region, scope);
                     return;
 
                 case MemberNode member:
@@ -119,6 +122,11 @@ namespace KScript.Language.Analysis
         {
             foreach (ArgumentNode arg in args)
             {
+                if (BareWord(arg) is var (word, _, node) && scope.Lookup(word, region.Source.ToSource(node.Span.Start))?.Kind != SymbolKind.Import)
+                {
+                    pendingBare.Add(arg);
+                    continue;
+                }
                 if (lambdaParameters != null && arg.Value is LambdaNode lambda)
                 {
                     AnalyzeLambda(lambda, region, scope, lambdaParameters);
@@ -170,7 +178,7 @@ namespace KScript.Language.Analysis
                 result.References.Add(new SymbolReference(fn, nameSpan, false, false));
                 ReportIfDeprecated(fn, nameSpan);
                 if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn))
-                    && !CheckNamedArguments($"@{fn.Name}()", c.Arguments, piped, SlotsOf(fn), region, full))
+                    && !CheckNamedArguments($"@{fn.Name}()", c.Arguments, piped, SlotsOf(fn, scope), region, full))
                 {
                     CheckFunctionArgumentCount(fn, count, full);
                 }
@@ -254,7 +262,7 @@ namespace KScript.Language.Analysis
                         {
                             result.References.Add(new SymbolReference(fn, span, false, false));
                             ReportIfDeprecated(fn, span);
-                            if (!CheckNamedArguments($"@{fn.Name}()", call.Arguments, 1, SlotsOf(fn), region, region.Source.ToSource(call.Span)))
+                            if (!CheckNamedArguments($"@{fn.Name}()", call.Arguments, 1, SlotsOf(fn, scope), region, region.Source.ToSource(call.Span)))
                             {
                                 CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
                             }
@@ -319,10 +327,12 @@ namespace KScript.Language.Analysis
             {
                 case CallNode call:
                     AnalyzeCall(call, region, scope, piped: true, left: Infer(pipe.Left, region));
+                    FlushBare(call.Arguments, region, scope);
                     return;
 
                 case CommandCallNode command:
                     AnalyzeCommand(command, region, scope, piped: 1);
+                    FlushBare(command.Arguments, region, scope);
                     return;
 
                 case LambdaNode lambda:

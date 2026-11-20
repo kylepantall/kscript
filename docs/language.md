@@ -70,9 +70,35 @@ Any call can name its arguments, in any order: built-in commands, methods, your 
 <echo>{ @greet(greeting: 'Hi', who: 'Kyle') }</echo>
 <echo>{ @range(1, step: 2, end: 10) }</echo>
 <echo>{ 'abc'->pad_left(char: '*', width: 6) }</echo>
+<echo>{ @join_path(base: $folder, ['archive', $name]) }</echo>
 ```
 
-Positional arguments come first and fill parameters in order; each `name: value` then fills the parameter of that name, so you can skip optional ones in between. Naming a parameter that doesn't exist, or giving one twice, is an error with a "did you mean" hint. The parameter names are the ones signature help and hover show; the editor also completes them after `(` or `,`.
+Positional arguments fill parameters in order, and each `name: value` fills the parameter of that name, so you can skip optional ones in between. A positional argument written after named ones fills the first parameter still empty, which is how `@join_path(base: $folder, [...])` reads. Naming a parameter that doesn't exist, or giving one twice, is an error with a "did you mean" hint. The editor completes parameter names after `(` or `,`.
+
+### Flags
+
+A yes/no parameter can be written as a bare word: `recursive` sets it to yes and `not recursive` to no, so calls read like a sentence.
+
+```xml
+<let name="all" value="@files($folder, pattern: '*.txt', recursive)" />
+<echo>{ $data->to_json(not indented) }</echo>
+<fn name="save" params="path, overwrite: bool = false">…</fn>
+<do>@save('out.txt', overwrite)</do>
+```
+
+### Enums and consts
+
+`<enum>` declares a set of named values, and `<const>` a value that can't change.
+
+```xml
+<enum name="Size" values="small, medium, large" />
+<const name="max_items" value="10" />
+<fn name="pack" params="size: Size, gift: bool = false" value="'Packing ' + $size" />
+
+<echo>{ @pack(large) } { @pack(size: small, gift) } { $Size.medium }</echo>
+```
+
+A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
 
 ## Values and methods
 
@@ -82,7 +108,7 @@ Values are strings, numbers, bools, lists, maps, dates, functions and null, plus
 <echo>{ $name->trim()->upper() }</echo>
 <echo>{ $people->filter(fn($p) => $p.age ge 18)->map(fn($p) => $p.name)->join(', ') }</echo>
 <echo>{ $people |> sort_by(fn($p) => $p.name) |> first() }</echo>
-<echo>{ @now()->add_days(7)->format('d MMMM yyyy') }</echo>
+<echo>{ @now()->add_days(7)->format(pattern: 'd MMMM yyyy') }</echo>
 ```
 
 The editor completes the methods for each type and shows what they do. `@json(text)` and `$value->to_json()` convert to and from JSON.
@@ -119,10 +145,10 @@ KScript.Core (everything above) is always there. Everything else comes from a pa
 
 | Package | What it adds |
 | --- | --- |
-| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `<echo format="markdown">` |
-| `KScript.Math` | `@sqrt` `@pow` `@round(x, digits)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low, high)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
-| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path` `@known_folder('downloads')`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
-| `KScript.Net` | `@fetch(url, { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
+| `KScript.Terminal` | `<input to type default secret>`, `<picker>` (a file or folder path), `<menu options>`, `<confirm>`, `<pause>`, `<clear>`, `@color(text, colour: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `<echo format="markdown">` |
+| `KScript.Math` | `@sqrt` `@pow` `@round(x, digits: 2)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
+| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
+| `KScript.Net` | `@fetch(url, options: { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `<download url to>`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
 | `KScript.UI` | Desktop windows: a script whose root is `<KScript.Window>` opens one. `<Column>` `<Row>` `<Grid>` `<Text>` `<Button>` `<TextBox>` `<CheckBox>` `<Select>` `<Slider>` `<Box>` `<Spacer>` `<Timer>`, `@close_window()`. See [Desktop apps](desktop.md). |
@@ -132,7 +158,7 @@ Using something from a package that isn't imported stops with `<input> is part o
 
 ## Writing portable scripts
 
-- Build paths with `@join_path($dir, 'file.txt')` (KScript.IO) rather than hard-coding `\` or `/`.
-- Find the user's folders with `@known_folder(name: 'downloads')` (KScript.IO): `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. It follows each system's own settings, such as Windows' Downloads location and Linux's `user-dirs.dirs`.
+- Build paths with `@join_path(base: $dir, ['reports', 'file.txt'])` (KScript.IO) rather than hard-coding `\` or `/`.
+- Find the user's folders with `@known_folder(downloads)` (KScript.IO): `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. It follows each system's own settings, such as Windows' Downloads location and Linux's `user-dirs.dirs`.
 - `$os.name` is `windows`, `linux` or `macos`, and `$os.home`, `$os.temp` and `$os.separator` are there too; `$env.HOME` reads an environment variable.
 - Numbers are always parsed and printed with `.` as the decimal separator, whatever the machine's language.

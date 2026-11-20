@@ -186,6 +186,9 @@ namespace KScript.Language.Analysis
 
         public int RequiredParameterCount => Parameters.Count(p => !p.HasDefault);
 
+        /// <summary>For &lt;enum&gt; types: their values, in order. A parameter typed with the enum takes them bare.</summary>
+        public List<string> EnumValues { get; internal set; }
+
         /// <summary>For imports: the file they come from (absolute, when the document has a path).</summary>
         public string SourcePath { get; internal set; }
 

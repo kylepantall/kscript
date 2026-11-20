@@ -43,7 +43,7 @@ namespace KScript.Language.Tests
         [InlineData(People + "<for each=\"p\" in=\"$people\"><p>{$p.‸}</p></for>")]
         [InlineData(People + "<p>{$people->filter(fn($p) => $p.‸)}</p>")]
         [InlineData(People + "<p>{$people |> max_by(fn($p) => $p.‸)}</p>")]
-        [InlineData(People + "<p>{$people->reduce(fn($total, $p) => $total + $p.‸, 0)}</p>")]
+        [InlineData(People + "<p>{$people->reduce(fn($total, $p) => $total + $p.‸, initial: 0)}</p>")]
         public void JsonFileFieldsComplete(string page)
         {
             List<string> labels = Labels(page);

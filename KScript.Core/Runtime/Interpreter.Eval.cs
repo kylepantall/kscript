@@ -276,12 +276,28 @@ namespace KScript.Runtime
             Dictionary<string, object> named = null;
             foreach (ArgumentNode a in arguments)
             {
-                object value = Evaluate(a.Value, scope, ctx);
+                // A bare word (downloads, recursive, not recursive) means something only to the parameter it lands on.
+                object value = BareWordOf(a.Value, scope, ctx, afterNamed: named != null && a.Name == null) ?? Evaluate(a.Value, scope, ctx);
                 if (a.Name != null) (named ??= new Dictionary<string, object>(StringComparer.Ordinal))[a.Name] = value;
-                else if (named != null) throw Fail(a, ctx, "Positional arguments must come before named ones (name: value).", "Syntax");
+                else if (named != null && !(value is BareWord)) args.Add(new LatePositional(value));
                 else args.Add(value);
             }
             return (args, named);
+        }
+
+        private static BareWord BareWordOf(ExprNode node, Scope scope, EvalContext ctx, bool afterNamed)
+        {
+            bool negated = false;
+            if (node is UnaryNode { Operator: "not", Operand: IdentifierNode inner })
+            {
+                node = inner;
+                negated = true;
+            }
+            if (node is IdentifierNode id && id.Name != "_" && !(ctx.Module != null && ctx.Module.Aliases.ContainsKey(id.Name)))
+            {
+                return new BareWord(id.Name, negated, afterNamed);
+            }
+            return null;
         }
 
         private object EvaluateRange(RangeNode range, Scope scope, EvalContext ctx)
@@ -634,7 +650,7 @@ namespace KScript.Runtime
                         return InvokeMethodDefinition(method, pipedValue, args.Skip(1).ToList(), named, scope, ctx);
                     }
                     if (piped && pipedValue is IKObject obj
-                        && obj.TryCallMethod(new CallContext(this, id.Name, args.Skip(1).ToList(), named, scope, ctx.Module, isMethod: true), id.Name, out object objResult))
+                        && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, id.Name, args.Skip(1).ToList(), named, scope, ctx.Module, isMethod: true)), id.Name, out object objResult))
                     {
                         return objResult;
                     }
@@ -701,7 +717,7 @@ namespace KScript.Runtime
         /// <summary>Calls <c>value->name(args)</c>.</summary>
         public object InvokeMethod(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
         {
-            if (target is IKObject obj && obj.TryCallMethod(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true), name, out object result))
+            if (target is IKObject obj && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), name, out object result))
             {
                 return result;
             }
