@@ -16,7 +16,7 @@
   <set>x += 1</set>
   <do>$x = 3; $total += $price * $qty</do>
   <let name="config" const="yes">{ debug: false, retries: 3 }</let>
-  <echo>Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for braces.</echo>
+  <echo>Hello, $name! Total: { ($price * $qty)->round(digits: 2) }. Use {{ and }} for braces.</echo>
 
   <!-- Lists, maps, lambdas and pipes -->
   <let name="colours" value="['red', 'green', 'blue']" />
@@ -30,7 +30,7 @@
       |> join(', ')" />
   <let name="by_age" value="fn($a, $b) => $a.age - $b.age" />
   <let name="sorted" value="$people->sort($by_age)" />
-  <echo>{ $names |> @to_lower() |> @greet('Hi') }</echo>
+  <echo>{ $names |> @to_lower() |> @greet(greeting: 'Hi') }</echo>
 
   <!-- Loops -->
   <for each="i" in="0..10">
@@ -83,7 +83,7 @@
   </fn>
   <fn name="double" params="x: int" value="$x * 2" />
   <echo>@greet('World')</echo>
-  <echo>{ 'Kyle' |> @greet('Hi') } { @double(4) }</echo>
+  <echo>{ 'Kyle' |> @greet(greeting: 'Hi') } { @double(4) }</echo>
 
   <!-- Errors -->
   <let name="path" value="'data.json'" />

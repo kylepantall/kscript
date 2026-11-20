@@ -10,4 +10,4 @@ layout: _layout.html
 - **{$p.name}**, {$p.role}
 </for>
 
-Written by { $title }. Last updated { @now()->format('d MMMM yyyy') }.
+Written by { $title }. Last updated { @now()->format(pattern: 'd MMMM yyyy') }.

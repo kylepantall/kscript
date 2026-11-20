@@ -121,7 +121,7 @@ public class CoreTests
     public void FunctionsWithDefaultsAndReturn()
     {
         const string fn = "<fn name=\"greet\" params=\"who, greeting = 'Hello'\"><return value=\"$greeting + ', ' + $who + '!'\" /></fn>";
-        Assert.Equal("Hello, World!\nHi, Kyle!\n", RunBody(fn + "<echo>@greet('World')</echo><echo>{ @greet('Kyle', 'Hi') }</echo>"));
+        Assert.Equal("Hello, World!\nHi, Kyle!\n", RunBody(fn + "<echo>@greet('World')</echo><echo>{ @greet('Kyle', greeting: 'Hi') }</echo>"));
     }
 
     [Fact]

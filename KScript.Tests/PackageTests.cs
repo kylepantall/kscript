@@ -125,7 +125,7 @@ public class PackageTests
     [Fact]
     public void ColoursArePlainWhenNotATerminal()
     {
-        Assert.Equal("ok\n", RunBody("<echo>{ @color('ok', 'green') }</echo>", "", "KScript.Terminal"));
+        Assert.Equal("ok\n", RunBody("<echo>{ @color('ok', colour: 'green') }</echo>", "", "KScript.Terminal"));
         Assert.Equal("false\n", RunBody("<echo>{ @is_terminal() }</echo>", "", "KScript.Terminal"));
     }
 
@@ -149,14 +149,14 @@ public class PackageTests
 
     [Theory]
     [InlineData("@sqrt(16)", "4")]
-    [InlineData("@pow(2, 8)", "256")]
-    [InlineData("@round(2.345, 2)", "2.35")]
-    [InlineData("@clamp(15, 0, 10)", "10")]
+    [InlineData("@pow(2, exponent: 8)", "256")]
+    [InlineData("@round(2.345, digits: 2)", "2.35")]
+    [InlineData("@clamp(15, low: 0, high: 10)", "10")]
     [InlineData("@median(3, 1, 2, 10)", "2.5")]
     [InlineData("@average([2, 4])", "3")]
-    [InlineData("@gcd(12, 18)", "6")]
+    [InlineData("@gcd(a: 12, b: 18)", "6")]
     [InlineData("@factorial(5)", "120")]
-    [InlineData("$pi->round(4)", "3.1416")]
+    [InlineData("$pi->round(digits: 4)", "3.1416")]
     [InlineData("[1, 2, 3]->median()", "2")]
     public void MathCommands(string expression, string expected)
     {
@@ -166,8 +166,8 @@ public class PackageTests
     [Fact]
     public void RandomIsRepeatableWithASeed()
     {
-        string a = RunBody("<do>@random_seed(7)</do><echo>{ @random(1, 100) } { @random(1, 100) }</echo>", "", "KScript.Math");
-        string b = RunBody("<do>@random_seed(7)</do><echo>{ @random(1, 100) } { @random(1, 100) }</echo>", "", "KScript.Math");
+        string a = RunBody("<do>@random_seed(7)</do><echo>{ @random(low: 1, high: 100) } { @random(low: 1, high: 100) }</echo>", "", "KScript.Math");
+        string b = RunBody("<do>@random_seed(7)</do><echo>{ @random(low: 1, high: 100) } { @random(low: 1, high: 100) }</echo>", "", "KScript.Math");
         Assert.Equal(a, b);
     }
 
@@ -187,9 +187,9 @@ public class PackageTests
                   <import package="KScript.IO" />
                   <write to="'out/a.txt'">hello</write>
                   <write to="'out/a.txt'" append="yes">again</write>
-                  <do>@write_json('out/data.json', { n: 1 })</do>
+                  <do>@write_json('out/data.json', value: { n: 1 })</do>
                   <echo>{ @read_lines('out/a.txt')->count() } { @read_json('out/data.json').n }</echo>
-                  <for each="f" in="@files('out', '*.txt')">
+                  <for each="f" in="@files('out', pattern: '*.txt')">
                     <echo>{ $f->name() } { $f->extension() } { $f->size() gt 0 }</echo>
                   </for>
                   <mkdir path="'moved'" />

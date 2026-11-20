@@ -23,7 +23,7 @@
 
       <div class="lab">
         <live id="lab">
-          <state name="world" value="@pattern_world('glider_gun', $cols, $rows)" />
+          <state name="world" value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
           <state name="playing" value="false" />
           <state name="speed" value="'150'" />
           <state name="pattern" value="'glider_gun'" />
@@ -33,16 +33,16 @@
           <if test="$playing">
             <span
               hidden
-              on-tick="world = @advance($world, 1); playing = @population($world.grid) gt 0"
+              on-tick="world = @advance($world, generations: 1); playing = @population($world.grid) gt 0"
               every="{$speed}"></span>
           </if>
 
           <section class="controls">
             <div class="group">
               <button class="primary" on-click="playing = not $playing">{ $playing ? 'Pause' : 'Play' }</button>
-              <button on-click="world = @advance($world, 1); playing = false">Step</button>
-              <button on-click="world = @advance($world, 10)">+10</button>
-              <button on-click="world = @advance($world, 50)">+50</button>
+              <button on-click="world = @advance($world, generations: 1); playing = false">Step</button>
+              <button on-click="world = @advance($world, generations: 10)">+10</button>
+              <button on-click="world = @advance($world, generations: 50)">+50</button>
             </div>
             <label>Speed
               <select bind="speed">
@@ -52,19 +52,19 @@
               </select>
             </label>
             <label>Pattern
-              <select bind="pattern" on-change="world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false">
+              <select bind="pattern" on-change="world = @pattern_world($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false">
                 <for each="name" in="$patterns->keys()">
-                  <option value="{$name}" selected="{$name eq $pattern}">{ $name->replace('_', ' ')->capitalize() }</option>
+                  <option value="{$name}" selected="{$name eq $pattern}">{ $name->replace(old: '_', new: ' ')->capitalize() }</option>
                 </for>
               </select>
             </label>
             <div class="group">
-              <button on-click="world = @new_world(@random_grid($cols, $rows, $soup->to_number(30)), $world.wrap, 'random soup'); playing = false">Random soup</button>
+              <button on-click="world = @new_world(@random_grid(width: $cols, height: $rows, density: $soup->to_number(default: 30)), wrap: $world.wrap, pattern: 'random soup'); playing = false">Random soup</button>
               <input type="range" min="5" max="80" step="5" bind="soup" aria-label="How full the soup is">
               <span class="muted">{$soup}%</span>
             </div>
             <label class="check"><input type="checkbox" checked="{$world.wrap}" on-change="world = $world->merge({ wrap: $event.checked })"> Wrap edges</label>
-            <button on-click="world = @new_world(@blank($cols, $rows), $world.wrap); playing = false">Clear</button>
+            <button on-click="world = @new_world(@blank(width: $cols, height: $rows), wrap: $world.wrap); playing = false">Clear</button>
           </section>
 
           <p class="about">
@@ -73,7 +73,7 @@
           </p>
 
           <!-- One handler for the whole board: the clicked cell's value is "column,row". -->
-          <div class="board" style="--cols: {$cols}" on-click="world = @flip($world, $event.value)">
+          <div class="board" style="--cols: {$cols}" on-click="world = @flip($world, where: $event.value)">
             <for each="row" index="y" in="$world.grid">
               <for each="c" index="x" in="$row">
                 <button class="{ $c eq 'O' ? 'cell on' : 'cell' }" value="{$x},{$y}"></button>
@@ -100,7 +100,7 @@
             </div>
             <div>
               <dt>Status</dt>
-              <dd class="status { $s.status->lower()->replace(' ', '-')->replace(',', '') }">{$s.status}</dd>
+              <dd class="status { $s.status->lower()->replace(old: ' ', new: '-')->replace(old: ',', new: '') }">{$s.status}</dd>
             </div>
             <div>
               <dt>Board</dt>

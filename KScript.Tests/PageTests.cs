@@ -93,11 +93,11 @@ public class PageExpressionTests
     public void Strings_and_numbers_have_methods()
     {
         Assert.Equal("Hi there", Eval("'  hi there '->trim()->capitalize()"));
-        Assert.Equal(3.14, Eval("3.14159->round(2)"));
+        Assert.Equal(3.14, Eval("3.14159->round(digits: 2)"));
         Assert.Equal(42d, Eval("'42'->to_number()"));
-        Assert.Equal(0d, Eval("'abc'->to_number(0)"));
+        Assert.Equal(0d, Eval("'abc'->to_number(default: 0)"));
         Assert.Equal("a|b", Eval("'a,b'->split(',')->join('|')"));
-        Assert.Equal("1,234.50", Eval("1234.5->format('N2')"));
+        Assert.Equal("1,234.50", Eval("1234.5->format(pattern: 'N2')"));
     }
 
     [Theory]
@@ -568,7 +568,7 @@ public class PageRuntimeTests
     [Fact]
     public void Pages_cannot_write_files_or_import_scripts_outside_the_site()
     {
-        using var site = new TempSite(("write.html", "{ @write_text('x.txt', 'hi') }"), ("import.html", "<import src=\"../lib.ks.xml\" />"), ("file.html", "{ @file('.')->join('..', 'x')->read_text() }"));
+        using var site = new TempSite(("write.html", "{ @write_text('x.txt', text: 'hi') }"), ("import.html", "<import src=\"../lib.ks.xml\" />"), ("file.html", "{ @file('.')->join('..', 'x')->read_text() }"));
         Assert.Contains("read-only", Assert.Throws<PageException>(() => site.Render("write.html")).Message);
         Assert.False(File.Exists(Path.Combine(site.Root, "x.txt")));
         Assert.Contains("outside the site folder", Assert.Throws<PageException>(() => site.Render("import.html")).Message);
@@ -578,7 +578,7 @@ public class PageRuntimeTests
     [Fact]
     public void Files_are_read_from_the_site_folder()
     {
-        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', '*.md')->map(fn($f) => $f->name())->join(', ') } { @exists('posts/a.md') }"));
+        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', pattern: '*.md')->map(fn($f) => $f->name())->join(', ') } { @exists('posts/a.md') }"));
         Assert.Equal("a.md, b.md true", site.Render("posts/index.html").Body);
     }
 

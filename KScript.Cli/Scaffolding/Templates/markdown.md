@@ -10,4 +10,4 @@ layout: {{ layout ?? _layout.html }}
 
 # {{ title }}
 
-Write your page here. KScript works too: today is { @today()->format('d MMMM yyyy') }.
+Write your page here. KScript works too: today is { @today()->format(pattern: 'd MMMM yyyy') }.
