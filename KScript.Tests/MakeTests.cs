@@ -337,6 +337,7 @@ public class ScaffolderTests
     [Theory]
     [InlineData(new[] { "widget", "Foo" }, "There is no 'widget' template")]
     [InlineData(new[] { "component" }, "Give the component a name")]
+    [InlineData(new[] { "document" }, "kscript make document annual-report")]
     [InlineData(new[] { "page", "../outside" }, "is not a valid name")]
     [InlineData(new[] { "page", "about", "us" }, "Did you mean: kscript make page \"about us\"")]
     public void MistakesAreExplained(string[] args, string message)
