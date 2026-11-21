@@ -10,14 +10,16 @@ namespace KScript
 {
     class Program
     {
+        internal static void ReportUnhandled(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject is Exception ex) ErrorReport.Write(Console.Error, ex);
+        }
+
         static int Main(string[] args)
         {
             WorkingFolder.Remember();
             // An error on a thread of its own (a timer, a background task) ends the process: say why the KScript way.
-            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-            {
-                if (e.ExceptionObject is Exception ex) ErrorReport.Write(Console.Error, ex);
-            };
+            AppDomain.CurrentDomain.UnhandledException += ReportUnhandled;
             // A program built by kscript compile runs its own script and nothing else. This check comes first, and
             // Run is never reached, because a compiled program leaves out the assemblies Run uses (the command line,
             // the language server and the packages the script doesn't import).

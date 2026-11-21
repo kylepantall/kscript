@@ -161,6 +161,31 @@ public class ErrorReportTests
         }
     }
 
+    [Fact]
+    public void Compiled_programs_and_crashed_threads_report_KScript_errors()
+    {
+        var e = new StringWriter();
+        Assert.Equal(70, new CommandLine { Out = new StringWriter(), Error = e }.RunCompiledSafely(Path.Combine(Path.GetTempPath(), "no-such-manifest-" + Guid.NewGuid().ToString("N")), Array.Empty<string>()));
+        Assert.StartsWith("   ERROR  ", e.ToString());
+
+        TextWriter before = Console.Error;
+        var console = new StringWriter();
+        Console.SetError(console);
+        string noColour = Environment.GetEnvironmentVariable("NO_COLOR");
+        Environment.SetEnvironmentVariable("NO_COLOR", "1");
+        try
+        {
+            Program.ReportUnhandled(null, new UnhandledExceptionEventArgs(new InvalidOperationException("boom"), true));
+            Program.ReportUnhandled(null, new UnhandledExceptionEventArgs("not an exception", true));
+        }
+        finally
+        {
+            Console.SetError(before);
+            Environment.SetEnvironmentVariable("NO_COLOR", noColour);
+        }
+        Assert.Equal("   ERROR  Error: boom\n", console.ToString().Replace("\r\n", "\n"));
+    }
+
     /// <summary>Runs <paramref name="test"/> in a folder that it may delete. Linux and macOS only: Windows can't delete a process's folder.</summary>
     private static void InDeletableFolder(Action<string> test)
     {
@@ -192,6 +217,19 @@ public class ErrorReportTests
             Assert.Equal("FileNotFound", error.Type);
             Assert.Contains($"({dir}) no longer exists", error.Message);
             Assert.Throws<KScriptException>(WorkingFolder.Check);
+
+            // Started in a folder that is already gone: the shell's PWD is what kscript remembers.
+            string pwd = Environment.GetEnvironmentVariable("PWD");
+            try
+            {
+                Environment.SetEnvironmentVariable("PWD", "/nowhere/at/all");
+                WorkingFolder.Remember();
+                Assert.Contains("(/nowhere/at/all)", Assert.Throws<KScriptException>(() => WorkingFolder.Current).Message);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("PWD", pwd);
+            }
 
             // .NET's own exception for it says what happened too.
             Exception raw = Assert.ThrowsAny<IOException>(() => Directory.GetCurrentDirectory());

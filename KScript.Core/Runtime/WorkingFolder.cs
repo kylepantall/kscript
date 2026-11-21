@@ -52,14 +52,8 @@ namespace KScript.Runtime
             string path = remembered;
             if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
             {
-                try
-                {
-                    Directory.SetCurrentDirectory(path);
-                    return path;
-                }
-                catch (Exception again) when (IsMissingFolder(again))
-                {
-                }
+                Directory.SetCurrentDirectory(path);
+                return path;
             }
             throw Missing(path, ex);
         }
