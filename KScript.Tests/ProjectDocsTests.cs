@@ -238,14 +238,21 @@ public sealed class ProjectDocsTests : IDisposable
         int sitePort = TestServer.FreePort();
         int docsPort = TestServer.FreePort();
         using var stop = new CancellationTokenSource();
+        // The server writes from its own thread: write through a synchronized writer and read under its lock,
+        // or reading the StringBuilder while it grows can throw.
         var output = new StringWriter();
-        var server = Task.Run(() => new CommandLine { Out = output, Error = TextWriter.Null, Cancellation = stop.Token }
+        TextWriter shared = TextWriter.Synchronized(output);
+        string Printed()
+        {
+            lock (shared) return output.ToString();
+        }
+        var server = Task.Run(() => new CommandLine { Out = shared, Error = TextWriter.Null, Cancellation = stop.Token }
             .Run(new[] { "serve", dir, "--port", sitePort.ToString(), "--docs-port", docsPort.ToString() }));
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://localhost:{docsPort}") };
         var deadline = DateTime.UtcNow.AddSeconds(60);
-        while (!output.ToString().Contains("Docs for shop") && DateTime.UtcNow < deadline && !server.IsCompleted) Thread.Sleep(50);
-        Assert.Contains($"Docs for shop: http://localhost:{docsPort}/project", output.ToString());
+        while (!Printed().Contains("Docs for shop") && DateTime.UtcNow < deadline && !server.IsCompleted) Thread.Sleep(50);
+        Assert.Contains($"Docs for shop: http://localhost:{docsPort}/project", Printed());
         string page = http.GetStringAsync("/project").Result;
         Assert.Contains("data-default-format=\"xml\"", page);
         Assert.Contains("fn-slugify", page);

@@ -139,23 +139,32 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void Package_items_add_the_import_they_need()
+        public void Package_items_are_offered_only_once_imported()
         {
-            // A command from a package the script doesn't import adds the import line, in the file's own format.
-            CompletionItem write = Assert.Single(Complete("x = 1\ny = @‸", Code), i => i.Label == "read_text");
-            Assert.Equal("import KScript.IO\n", Assert.Single(write.AdditionalEdits).NewText);
-            Assert.Contains("adds import KScript.IO", write.Detail, StringComparison.Ordinal);
-            Assert.Null(Assert.Single(Complete("import KScript.IO\ny = @‸", Code), i => i.Label == "read_text").AdditionalEdits);
+            // A command, statement or element from a package the script doesn't import isn't offered: it wouldn't work.
+            Assert.DoesNotContain(Complete("x = 1\ny = @‸", Code), i => i.Label == "read_text");
+            CompletionItem read = Assert.Single(Complete("import KScript.IO\ny = @‸", Code), i => i.Label == "read_text");
+            Assert.Null(read.AdditionalEdits);
+            Assert.Contains("now", Complete("x = 1\ny = @‸", Code).Select(i => i.Label));
 
-            CompletionItem input = Assert.Single(Complete("import KScript.IO\n‸", Code), i => i.Label == "input");
-            Assert.Equal("\nimport KScript.Terminal", Assert.Single(input.AdditionalEdits).NewText);
+            Assert.DoesNotContain(Complete("import KScript.IO\n‸", Code), i => i.Label == "input");
+            Assert.Contains(Complete("import KScript.Terminal\n‸", Code), i => i.Label == "input");
+            Assert.DoesNotContain(Complete("<kscript>\n  <echo>hi</echo>\n  <‸\n</kscript>", Xml), i => i.Label == "picker");
+            Assert.Contains(Complete("<kscript>\n  <import package=\"KScript.Terminal\" />\n  <‸\n</kscript>", Xml), i => i.Label == "picker");
+            Assert.DoesNotContain(Complete("KScript.Routes {\n  Get(path: \"/x\") {\n    return @‸\n  }\n}", Code), i => i.Label == "read_text");
 
-            CompletionItem picker = Assert.Single(Complete("<kscript>\n  <echo>hi</echo>\n  <‸\n</kscript>", Xml), i => i.Label == "picker");
-            Assert.Equal("\n  <import package=\"KScript.Terminal\" />", Assert.Single(picker.AdditionalEdits).NewText);
+            // Inside a function too: KScript.Document's Section and Paragraph need the import.
+            List<string> inFn = Complete("fn report() {\n  ‸\n}", Code).Select(i => i.Label).ToList();
+            Assert.DoesNotContain("Section", inFn);
+            Assert.DoesNotContain("Document", inFn);
+            Assert.Contains("echo", inFn);
+            List<string> imported = Complete("import KScript.Document\n\nfn report() {\n  ‸\n}", Code).Select(i => i.Label).ToList();
+            Assert.Contains("Section", imported);
+            Assert.Contains("Document", imported);
 
-            // Inside a KScript.Routes { } root, the import goes at the top of the block.
-            CompletionItem routed = Assert.Single(Complete("KScript.Routes {\n  Get(path: \"/x\") {\n    return @‸\n  }\n}", Code), i => i.Label == "read_text");
-            Assert.Equal("\n  import KScript.IO", Assert.Single(routed.AdditionalEdits).NewText);
+            // Methods too: ->markdown_escape() is KScript.Markdown's.
+            Assert.DoesNotContain("markdown_escape", Complete("echo 'a'->‸", Code).Select(i => i.Label));
+            Assert.Contains("markdown_escape", Complete("import KScript.Markdown\necho 'a'->‸", Code).Select(i => i.Label));
 
             // A package that is already imported is listed last when importing.
             List<CompletionItem> packages = Complete("import KScript.IO\nimport ‸", Code);
@@ -205,7 +214,7 @@ namespace KScript.Language.Tests
             Assert.StartsWith("**after-each**", code.Documentation, StringComparison.Ordinal);
             Assert.Contains("in its file or `describe`, even", code.Documentation, StringComparison.Ordinal);
             Assert.Contains("```kscript\nafter-each {\n  cart = []\n}\n```", code.Documentation, StringComparison.Ordinal);
-            Assert.Contains("| Argument |", Assert.Single(Complete("‸", Code), i => i.Label == "write").Documentation, StringComparison.Ordinal);
+            Assert.Contains("| Argument |", Assert.Single(Complete("import KScript.IO\n‸", Code), i => i.Label == "write").Documentation, StringComparison.Ordinal);
 
             CompletionItem xml = Assert.Single(Complete("<kscript>\n<import package=\"KScript.Test\" />\n<‸\n</kscript>", Xml), i => i.Label == "after-each");
             Assert.StartsWith("**<after-each>**", xml.Documentation, StringComparison.Ordinal);

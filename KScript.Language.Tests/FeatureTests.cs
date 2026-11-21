@@ -95,7 +95,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void CompletesCommandsAndScriptFunctions()
         {
-            List<CompletionItem> items = Complete(Script("<fn name=\"greet\" params=\"who\" value=\"$who\" /><echo>@‸</echo>"));
+            List<CompletionItem> items = Complete(Script("<import package=\"KScript.IO\" /><fn name=\"greet\" params=\"who\" value=\"$who\" /><echo>@‸</echo>"));
             Assert.Contains(items, i => i.Label == "join_path" && i.Kind == CompletionKind.Command);
             Assert.Contains(items, i => i.Label == "greet" && i.Kind == CompletionKind.Function);
             Assert.DoesNotContain(items, i => i.Label == "more_less");

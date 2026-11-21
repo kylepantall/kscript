@@ -188,15 +188,12 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void CompletionAddsTheImportAPackageNeeds()
+        public void CompletionOffersOnlyImportedPackagesAndTheDiagnosticAddsTheImport()
         {
             Initialize();
             Open("<kscript>\n<echo>{ @ }</echo>\n</kscript>");
             JsonArray items = Request("textDocument/completion", At(1, 9))["result"]["items"].AsArray();
-            JsonNode readText = items.Single(i => i["label"].GetValue<string>() == "read_text");
-            JsonNode edit = Assert.Single(readText["additionalTextEdits"].AsArray());
-            Assert.Equal("\n<import package=\"KScript.IO\" />", edit["newText"].GetValue<string>());
-            Assert.Equal(0, edit["range"]["start"]["line"].GetValue<int>());
+            Assert.DoesNotContain(items, i => i["label"].GetValue<string>() == "read_text");
             Assert.Null(items.Single(i => i["label"].GetValue<string>() == "now")["additionalTextEdits"]);
         }
 
