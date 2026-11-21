@@ -174,7 +174,7 @@ namespace KScript.Language.Formatting
                     case State.Code:
                         s.States[i] = State.Code;
                         s.InExpression[i] = expressionDepth > 0;
-                        if (c == '/' && Peek(text, i + 1) == '/')
+                        if (c == '/' && Peek(text, i + 1) == '/' && !KScript.Syntax.Lexer.AfterUrlScheme(text, i))
                         {
                             state = State.LineComment;
                             s.States[i] = State.LineComment;
@@ -294,7 +294,7 @@ namespace KScript.Language.Formatting
                     }
                     continue;
                 }
-                if (c == '/' && Peek(text, i + 1) == '/') return false;
+                if (c == '/' && Peek(text, i + 1) == '/' && !KScript.Syntax.Lexer.AfterUrlScheme(text, i)) return false;
                 if (c == '(' || c == '[' || c == '{') depth++;
                 else if (c == ')' || c == ']' || c == '}') depth--;
                 else if (depth == 0 && IsAssignment(text, i, out int length))

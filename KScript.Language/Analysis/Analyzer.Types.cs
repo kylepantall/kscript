@@ -21,6 +21,13 @@ namespace KScript.Language.Analysis
         [ThreadStatic]
         private static HashSet<string> analysingImports;
 
+        /// <summary>
+        /// The exports worked out while one import is being analysed, shared by the nested analyses it starts, so a file
+        /// that many others reach (a project's native types, which every file sees) is analysed once, not once per path.
+        /// </summary>
+        [ThreadStatic]
+        private static Dictionary<string, Dictionary<string, (SymbolKind Kind, TypeShape Shape)>> nestedImportCache;
+
         /// <summary>The exports of imported files, by path, shared by the passes of one analysis.</summary>
         private Dictionary<string, Dictionary<string, (SymbolKind Kind, TypeShape Shape)>> importCache =
             new Dictionary<string, Dictionary<string, (SymbolKind, TypeShape)>>(StringComparer.Ordinal);
@@ -101,6 +108,16 @@ namespace KScript.Language.Analysis
             }
 
             analysingImports ??= new HashSet<string>(StringComparer.Ordinal);
+            bool outermost = analysingImports.Count == 0;
+            if (outermost)
+            {
+                nestedImportCache = new Dictionary<string, Dictionary<string, (SymbolKind, TypeShape)>>(StringComparer.Ordinal);
+            }
+            else if (nestedImportCache != null && nestedImportCache.TryGetValue(path, out var shared))
+            {
+                importCache[path] = shared;
+                return shared;
+            }
             if (!analysingImports.Add(path))
             {
                 return null;
@@ -123,11 +140,19 @@ namespace KScript.Language.Analysis
                     }
                 }
                 importCache[path] = exports;
+                if (nestedImportCache != null)
+                {
+                    nestedImportCache[path] = exports;
+                }
                 return exports;
             }
             finally
             {
                 analysingImports.Remove(path);
+                if (outermost)
+                {
+                    nestedImportCache = null;
+                }
             }
         }
 

@@ -339,7 +339,8 @@ namespace KScript.Language.Features
             }
             if (DocsCommand != null && !c.Planned)
             {
-                string search = System.Text.Json.JsonSerializer.Serialize(new[] { c.Name });
+                // The command's arguments as a JSON list, written by hand so nothing is serialised by reflection.
+                string search = new System.Text.Json.Nodes.JsonArray(System.Text.Json.Nodes.JsonValue.Create(c.Name)).ToJsonString();
                 sb.Append("\n\n[Open docs](command:").Append(DocsCommand).Append('?').Append(Uri.EscapeDataString(search)).Append(')');
             }
             return sb.ToString();

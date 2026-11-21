@@ -50,7 +50,7 @@ namespace KScript.Runtime
         private string ArgsText { get; }
 
         /// <summary>A built-in type such as string or int, rather than an &lt;enum&gt; or a &lt;type&gt;.</summary>
-        public bool IsBuiltIn => Inline == null && Args == null && Values.DeclarableTypes.Contains(Name, StringComparer.OrdinalIgnoreCase);
+        public bool IsBuiltIn => Inline == null && Args == null && Values.IsDeclarable(Name);
 
         /// <summary>Just a name: no <c>[]</c> and no <c>?</c>.</summary>
         public bool IsSimple => ListDepth == 0 && !Optional;
@@ -122,7 +122,7 @@ namespace KScript.Runtime
                 break;
             }
             if (t.Length == 0 || !Lexer.IsIdentStart(t[0]) || !t.All(Lexer.IsIdentChar)) return null;
-            if (Values.DeclarableTypes.Contains(t, StringComparer.OrdinalIgnoreCase)) t = t.ToLowerInvariant();
+            if (Values.IsDeclarable(t) && !KScript.Metadata.NativeTypes.IsNative(t)) t = t.ToLowerInvariant();
             var type = new TypeRef(t, 0, false, null);
             for (int i = suffixes.Count - 1; i >= 0; i--)
             {
@@ -557,11 +557,11 @@ namespace KScript.Runtime
         internal static string RawTextKind(TypeRef type, Scope scope, Module module)
         {
             if (type == null || type.ListDepth > 0) return null;
-            if (type.ArgBase != null) return RawTextKind(type.ArgBase, scope, module) ?? (TextRoots.Contains(type.ArgBase.Name) ? "word" : null);
-            if (type.Inline == null && Values.DeclarableTypes.Contains(type.Name, StringComparer.OrdinalIgnoreCase))
+            if (type.ArgBase != null) return RawTextKind(type.ArgBase, scope, module) ?? (TextRoots.Contains(type.ArgBase.Name) || KScript.Metadata.NativeTypes.IsNative(type.ArgBase.Name) ? "word" : null);
+            if (type.Inline == null && Values.IsDeclarable(type.Name))
             {
-                string name = type.Name.ToLowerInvariant();
-                return name == SemanticTypes.Handle ? "handle" : SemanticTypes.IsSemantic(name) ? "word" : null;
+                string name = KScript.Metadata.NativeTypes.IsNative(type.Name) ? type.Name : type.Name.ToLowerInvariant();
+                return KScript.Metadata.NativeTypes.Get(name)?.RawKind;
             }
             object resolved;
             try { resolved = Resolve(type, scope, module); }
@@ -574,7 +574,7 @@ namespace KScript.Runtime
                     return r.ReadsText ? "word" : null;
                 default:
                     string root = ((RefinedType)resolved).Root();
-                    return root == SemanticTypes.Handle ? "handle" : TextRoots.Contains(root) ? "word" : null;
+                    return KScript.Metadata.NativeTypes.Get(root)?.RawKind ?? (TextRoots.Contains(root) ? "word" : null);
             }
         }
 
@@ -633,14 +633,14 @@ namespace KScript.Runtime
         internal static IKObject Declare(ElementRun run)
         {
             string name = run.VariableName("name");
-            if (Values.DeclarableTypes.Contains(name, StringComparer.OrdinalIgnoreCase))
+            if (Values.IsDeclarable(name))
                 throw run.Error($"'{name}' is a built-in type, so a <type> can't use it as its name.", "name", "Syntax");
             List<string> with = TypeNames(run.Raw("with"));
             if (with.Count == 1 && IsRefinable(with[0], run.Scope)) return DeclareRefined(run, name, with[0]);
             foreach (string b in with)
             {
                 string baseName = TypeRef.Parse(b).Name;
-                if (!Values.DeclarableTypes.Contains(baseName, StringComparer.OrdinalIgnoreCase) && !run.Scope.TryGet(baseName, out _))
+                if (!Values.IsDeclarable(baseName) && !run.Scope.TryGet(baseName, out _))
                 {
                     string close = Values.Closest(baseName, Values.DeclarableTypes.Concat(KnownTypes(run.Scope)));
                     throw run.Error($"Unknown type '{baseName}' in with." + (close != null ? $" Did you mean {close}?" : string.Empty)
@@ -1034,6 +1034,15 @@ namespace KScript.Runtime
                 case "map": return new Dictionary<string, object> { ["type"] = "object" };
                 case "any":
                 case "fn": return new Dictionary<string, object>();
+                case "port": return new Dictionary<string, object> { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = 65535 };
+            }
+            if (KScript.Metadata.NativeTypes.Get(t.Name) is KScript.Metadata.NativeTypeInfo native)
+            {
+                var schema = new Dictionary<string, object> { ["type"] = "string" };
+                if (native.JsonFormat != null) schema["format"] = native.JsonFormat;
+                if (native.Secret) schema["writeOnly"] = true;
+                schema["example"] = native.Example.Trim('\'');
+                return schema;
             }
             object resolved;
             try

@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Language.Catalog;
 using KScript.Syntax;
 using KScript.Syntax.Text;
@@ -39,6 +40,7 @@ namespace KScript.Language.Analysis
                         LiteralKind.Regex => KType.Regex,
                         LiteralKind.Email => KType.Email,
                         LiteralKind.Uuid => KType.Uuid,
+                        LiteralKind.Url => "url",
                         _ => KType.Null,
                     });
 
@@ -329,6 +331,11 @@ namespace KScript.Language.Analysis
                 "any" => TypeShape.Unknown,
                 _ => null,
             };
+            if (shape == null && NativeTypes.Get(t) is NativeTypeInfo native)
+            {
+                // port is a number; the other native types are text with a meaning of their own.
+                shape = new TypeShape(native.Name == "port" ? KType.Number : native.Name) { Declared = depth == 0 };
+            }
             if (shape == null && t.Length > 0)
             {
                 Symbol symbol = result.RootScope.Innermost(offset).Lookup(t, offset);

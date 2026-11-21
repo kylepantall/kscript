@@ -503,6 +503,21 @@ namespace KScript.Projects
         /// <summary>The folder the project reads extensions from when kscript.json doesn't say.</summary>
         public const string DefaultExtensionsFolder = "extensions";
 
+        /// <summary>
+        /// Where the project's own native types are: folders or globs, relative to kscript.json, like
+        /// <see cref="Extensions"/>. The types, enums and records they declare work in every script in the project
+        /// without an import. Null (the setting left out) means the <c>natives</c> folder, where kscript make native writes.
+        /// </summary>
+        public List<string> Natives { get; set; }
+
+        /// <summary>The folder the project reads native types from when kscript.json doesn't say.</summary>
+        public const string DefaultNativesFolder = "natives";
+
+        /// <summary>The project's native type files, full paths in a stable order (see <see cref="Natives"/>).</summary>
+        public List<string> NativeFiles(Func<string, bool> directoryExists = null, Func<string, bool> fileExists = null,
+            Func<string, IEnumerable<string>> listFiles = null, Func<string, IEnumerable<string>> listDirectories = null) =>
+            FilesIn(Natives ?? new List<string> { DefaultNativesFolder }, directoryExists, fileExists, listFiles, listDirectories);
+
         private static readonly string[] ScriptSuffixes = { ".kscript", ".ks.xml", ".ks" };
         private static readonly string[] SkippedFolders = { "node_modules", ".git", "_templates", "bin", "obj" };
 
@@ -518,7 +533,11 @@ namespace KScript.Projects
         /// <see cref="Extensions"/>, and every project file a glob there matches.
         /// </summary>
         public List<string> ExtensionFiles(Func<string, bool> directoryExists = null, Func<string, bool> fileExists = null,
-            Func<string, IEnumerable<string>> listFiles = null, Func<string, IEnumerable<string>> listDirectories = null)
+            Func<string, IEnumerable<string>> listFiles = null, Func<string, IEnumerable<string>> listDirectories = null) =>
+            FilesIn(Extensions ?? new List<string> { DefaultExtensionsFolder }, directoryExists, fileExists, listFiles, listDirectories);
+
+        private List<string> FilesIn(List<string> entries, Func<string, bool> directoryExists, Func<string, bool> fileExists,
+            Func<string, IEnumerable<string>> listFiles, Func<string, IEnumerable<string>> listDirectories)
         {
             directoryExists ??= System.IO.Directory.Exists;
             fileExists ??= File.Exists;
@@ -551,7 +570,7 @@ namespace KScript.Projects
                 return files.Select(Path.GetFullPath).OrderBy(f => f, StringComparer.Ordinal);
             }
 
-            foreach (string entry in Extensions ?? new List<string> { DefaultExtensionsFolder })
+            foreach (string entry in entries)
             {
                 string clean = entry.Trim().Replace('\\', '/').TrimEnd('/');
                 if (clean.StartsWith("./", StringComparison.Ordinal)) clean = clean.Substring(2);
@@ -591,7 +610,7 @@ namespace KScript.Projects
             foreach (JsonProperty type in e.EnumerateObject())
             {
                 string name = type.Name.Trim().ToLowerInvariant();
-                if (!KScript.Runtime.Values.DeclarableTypes.Contains(name) || name is "any" or "fn")
+                if (!KScript.Runtime.Values.IsDeclarable(name) || name is "any" or "fn")
                 {
                     config.Warnings.Add($"types: '{type.Name}' isn't a built-in type. Defaults can be set for: {string.Join(", ", KScript.Runtime.Values.DeclarableTypes.Where(t => t is not ("any" or "fn")))}.");
                     continue;
@@ -764,6 +783,9 @@ namespace KScript.Projects
                             break;
                         case "extensions":
                             config.Extensions = Strings(prop.Value, "extensions", config) ?? config.Extensions;
+                            break;
+                        case "natives":
+                            config.Natives = Strings(prop.Value, "natives", config) ?? config.Natives;
                             break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;

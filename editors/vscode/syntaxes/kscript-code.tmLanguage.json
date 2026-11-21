@@ -78,7 +78,7 @@
         },
         {
           "name": "comment.line.double-slash.kscript",
-          "begin": "//",
+          "begin": "(?<!https:|http:|wss:|ws:|ftp:)//",
           "end": "$"
         },
         {
@@ -425,7 +425,7 @@
     "typeName": {
       "patterns": [
         {
-          "match": "(?<![\\w$@.-])(string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex)(?![\\w-])",
+          "match": "(?<![\\w$@.-])(string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex|url|domain|ip|cidr|mac|port|slug|semver|mime|hex|base64|jwt|json|phone|country|currency|locale|timezone|duration|cron|color|iban|card)(?![\\w-])",
           "name": "support.type.builtin.kscript"
         },
         {
@@ -435,7 +435,7 @@
       ]
     },
     "typeAnnotation": {
-      "match": "(?<=[\\w?])\\s*(:)\\s*(?!(?:not|true|false|null|yes|no)\\b)((?:string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex)(?![\\w-])|[A-Z]\\w*)(?=\\s*(?:\\(|\\[\\]|\\?|=|,|\\)|$|from\\b|=>|;|\\}|//))",
+      "match": "(?<=[\\w?])\\s*(:)\\s*(?!(?:not|true|false|null|yes|no)\\b)((?:string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex|url|domain|ip|cidr|mac|port|slug|semver|mime|hex|base64|jwt|json|phone|country|currency|locale|timezone|duration|cron|color|iban|card)(?![\\w-])|[A-Z]\\w*)(?=\\s*(?:\\(|\\[\\]|\\?|=|,|\\)|$|from\\b|=>|;|\\}|//))",
       "captures": {
         "1": {
           "name": "punctuation.separator.type.kscript"
@@ -465,6 +465,10 @@
         {
           "match": "(?<![\\w)\\]$'\"])/(?![\\s/*])(?:\\\\.|\\[(?:\\\\.|[^\\]\\\\\\n])*\\]|[^/\\\\\\n\\[])+/[imsx]*(?!\\w)",
           "name": "string.regexp.kscript"
+        },
+        {
+          "match": "(?<![\\w$@.])(?i:https?|wss?|ftp)://[^\\s'\",()\\[\\]{};<>`]+?(?=[.!?:]*(?:[\\s'\",()\\[\\]{};<>`]|->|$))",
+          "name": "string.unquoted.url.kscript"
         },
         {
           "match": "(?<![\\w.%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?![\\w]|-(?!>))",

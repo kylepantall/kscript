@@ -371,6 +371,7 @@ public sealed class MakeGeneratorTests : IDisposable
             new[] { "native", "Tier", "--one-of", "gold,silver" },
             new[] { "native", "Level", "--base", "int", "--one-of", "1,2,3" },
             new[] { "native", "Note" },
+            new[] { "native", "CompanySite", "--base", "url", "--validate", "$value->host()->ends_with('example.com'), 'Use a company site'" },
         })
         {
             var (code, _, err) = Make(app, args);
@@ -384,37 +385,46 @@ public sealed class MakeGeneratorTests : IDisposable
               // TODO: Add the rules a value must follow: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
             }
 
-            """.Replace("\r\n", "\n"), Read(app, "types/percent.kscript"));
-        Assert.Contains("  not: [@admin, @root]\n", Read(app, "types/username.kscript"));
-        Assert.Contains("  one_of: ['gold', 'silver']\n", Read(app, "types/tier.kscript"));
-        Assert.Contains("  one_of: [1, 2, 3]\n", Read(app, "types/level.kscript"));
-        Assert.Contains("type Note with [string] {\n", Read(app, "types/note.kscript"));
+            """.Replace("\r\n", "\n"), Read(app, "natives/percent.kscript"));
+        Assert.Contains("  not: [@admin, @root]\n", Read(app, "natives/username.kscript"));
+        Assert.Contains("  one_of: ['gold', 'silver']\n", Read(app, "natives/tier.kscript"));
+        Assert.Contains("  one_of: [1, 2, 3]\n", Read(app, "natives/level.kscript"));
+        Assert.Contains("type Note with [string] {\n", Read(app, "natives/note.kscript"));
 
         File.WriteAllText(Path.Combine(app, "try.kscript"), """
-            import "types/sku.kscript"
-            import "types/percent.kscript"
-            import "types/username.kscript"
-            import "types/tier.kscript"
-            import "types/level.kscript"
             sku: Sku = abc-1234
+            site: CompanySite = https://docs.example.com/start
             who: Username = @Joan
             tier: Tier = gold
             fn off(p: Percent, l: Level) => $p * $l
-            echo "$sku $who $tier { @off(15, 2) }"
+            echo "$sku $who $tier { @off(15, 2) } { $site->path() }"
             try {
               bad: Sku = zzz-0001
+            } catch err {
+              echo $err.message
+            }
+            try {
+              other: CompanySite = https://elsewhere.org
+              echo $other
             } catch err {
               echo $err.message
             }
             """);
         AssertNoErrors(app);
         string tryFile = Path.Combine(app, "try.kscript");
-        Assert.Equal("ABC-1234 @joan gold 30\n$bad doesn't fit Sku: ZZZ is kept for tests.\n", ScriptRunner.Run(File.ReadAllText(tryFile), path: tryFile));
+        Assert.Equal("ABC-1234 @joan gold 30 /start\n$bad doesn't fit Sku: ZZZ is kept for tests.\n$other doesn't fit CompanySite: Use a company site.\n", ScriptRunner.Run(File.ReadAllText(tryFile), path: tryFile));
 
         File.AppendAllText(tryFile, "\nlate: Username = @root\necho $late\n");
         var check = new StringWriter();
         KScript.LanguageServer.CheckCommand.Run(new[] { app }, check);
         Assert.True(Regex.IsMatch(check.ToString(), @"try.kscript\(\d+,\d+\): error KS5012: '@root' doesn't fit Username: it is reserved \('@root'\)\."), check.ToString());
+
+        // kscript.json's "natives" moves them.
+        string moved = Project(name: "moved");
+        string json = Path.Combine(moved, "kscript.json");
+        File.WriteAllText(json, "{ \"natives\": [\"src/kinds\"]," + File.ReadAllText(json).TrimStart().Substring(1));
+        Assert.Equal(0, Make(moved, "native", "Sku").Item1);
+        Assert.True(File.Exists(Path.Combine(moved, "src", "kinds", "sku.kscript")));
     }
 
     [Fact]

@@ -599,14 +599,14 @@ namespace KScript.LanguageServer
             {
                 foreach (CodeLens lens in service.GetCodeLenses(a))
                 {
-                    JsonArray arguments = new JsonArray { doc.Uri };
+                    JsonArray arguments = new JsonArray(JsonValue.Create(doc.Uri));
                     if (lens.Target is TextSpan target)
                     {
                         arguments.Add(Range(a.Source, target)["start"].DeepClone());
                     }
                     foreach (string argument in lens.Arguments)
                     {
-                        arguments.Add(argument);
+                        arguments.Add((JsonNode)JsonValue.Create(argument));
                     }
                     lenses.Add((JsonNode)new JsonObject
                     {
