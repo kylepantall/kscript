@@ -70,8 +70,10 @@ namespace KScript.Metadata
                 return true;
             }
 
-            // Values are typed on use: a string that holds a number can use number methods, and anything prints as a string.
-            if (receiver == String && (actual == Number || actual == Bool || actual == File || actual == Date || actual == Email || actual == Handle || actual == Uuid || actual == Regex))
+            // Values are typed on use: a string that holds a number can use number methods. Text with a meaning of its own
+            // (an email, a handle, a uuid, a regex) is still text, so it keeps some string methods (see StringMethodsOf).
+            // A number, bool, date or file isn't text and has no string methods, as at run time: use ->to_string() first.
+            if (receiver == String && (actual == Email || actual == Handle || actual == Uuid || actual == Regex))
             {
                 return true;
             }
