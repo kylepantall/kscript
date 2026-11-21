@@ -910,8 +910,12 @@ namespace KScript.Runtime
             IEnumerable<string> known = ctx.Module?.Methods.Values.Where(m => m.Receiver == type || m.Receiver == "any").Select(m => m.Name) ?? Enumerable.Empty<string>();
             string noun = type switch { "list" => "Lists", "map" => "Maps", "string" => "Text values", "number" => "Numbers", "date" => "Dates", "bool" => "Bools", "fn" => "Functions", _ => $"Values of type {type}" };
             string hint = target is Dictionary<string, object> ? $" To read a key, write .{name} or ['{name}']."
-                : target is ISemanticText && (ctx.Module?.Methods.ContainsKey("string:" + name) ?? false) ? $" Use ->to_string()->{name}() to work on its text."
-                : string.Empty;
+                : !(ctx.Module?.Methods.ContainsKey("string:" + name) ?? false) ? string.Empty
+                : target is ISemanticText ? $" Use ->to_string()->{name}() to work on its text."
+                : !(target is DateTime or double or bool || type == KType.File) ? string.Empty
+                // ->json() reads JSON text; a date or number is written as JSON with ->to_json().
+                : string.Equals(name, "json", StringComparison.OrdinalIgnoreCase) ? " To write it as JSON text, use ->to_json()."
+                : $" Use ->to_string()->{name}() to work on its text.";
             throw Fail(node, ctx, $"{noun} have no method ->{name}()." + Suggest(name, known).Replace("Did you mean ", "Did you mean ->").Replace("?", "()?") + hint, "Name");
         }
 
