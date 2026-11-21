@@ -43,7 +43,7 @@ namespace KScript.Documents
                 new A("author", K.Template, "The author, or several separated by ; (Author elements can add affiliations and emails)."),
                 new A("date", K.Template, "The date shown under the title, such as { @now()->format('d MMMM yyyy') }."),
                 new A("keywords", K.Template, "Keywords, separated by commas: shown under the abstract and saved in the file's properties."),
-                new A("to", K.Template, "Where to save it, by extension: paper.pdf, paper.tex, paper.docx, paper.md or paper.html. Separate several with commas."),
+                new A("to", K.Template, "Where to save it, by extension: paper.pdf, paper.tex, paper.docx, paper.md or paper.html. Save several with a list: [paper.pdf, paper.docx].") { NameList = true },
                 new A("into", K.DeclareVariable, "A variable that receives the document, for ->save(), ->pages() or ->markdown() later."),
                 new A("paper", K.Template, "Paper size: a4 (the default), a3, a5, b5, letter, legal, or a size such as 15cm x 20cm."),
                 new A("landscape", K.Bool, "yes turns the paper sideways."),

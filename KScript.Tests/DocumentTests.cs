@@ -394,6 +394,29 @@ KScript.Document(paper: legal, to: ""legal.pdf"") {
         Assert.True(File.Exists(PathOf("legal.pdf")));
     }
 
+    [Fact]
+    public void To_takes_a_list_of_files()
+    {
+        Run(@"
+import KScript.Document
+name = 'list'
+KScript.Document(title: ""Bare"", to: [bare.pdf, bare.md]) {
+  Paragraph ""Bare names.""
+}
+KScript.Document(title: ""Quoted"", to: [""quoted.tex"", 'quoted.html']) {
+  Paragraph ""Quoted names.""
+}
+KScript.Document(title: ""Values"", to: [""{ $name }.docx""]) {
+  Paragraph ""A filled-in name.""
+}
+");
+        foreach (string file in new[] { "bare.pdf", "bare.md", "quoted.tex", "quoted.html", "list.docx" })
+            Assert.True(File.Exists(PathOf(file)), file);
+        Assert.Equal(new[] { "a.pdf", "b.docx", "c.tex" }, DocumentElements.OutputPaths("[a.pdf, \"b.docx\", 'c.tex']"));
+        Assert.Equal(new[] { "a.pdf", "b.docx" }, DocumentElements.OutputPaths("a.pdf, b.docx"));
+        Assert.Empty(DocumentElements.OutputPaths("[\"\", ]"));
+    }
+
     [Theory]
     [InlineData("KScript.Document(title: \"x\") {\n}", "needs to:")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  KScript.Document(to: \"b.pdf\") {\n  }\n}", "can't be inside another")]

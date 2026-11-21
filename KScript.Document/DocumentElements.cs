@@ -2,6 +2,7 @@ using System.Globalization;
 
 using KScript.Documents.Maths;
 using KScript.Documents.Text;
+using KScript.Metadata;
 using KScript.Runtime;
 
 namespace KScript.Documents
@@ -115,11 +116,25 @@ namespace KScript.Documents
             var value = new DocumentValue(doc);
             if (!string.IsNullOrWhiteSpace(to))
             {
-                foreach (string path in to.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                foreach (string path in OutputPaths(to))
                     Located(run, () => { value.Save(run.Host, path, run.Module.Directory); return true; }, "to");
             }
             if (into != null) run.Scope.Declare(into, value);
             return null;
+        }
+
+        /// <summary>
+        /// The files to: names. A list, <c>[paper.pdf, "paper.docx"]</c>, or comma separated text, <c>"paper.pdf, paper.docx"</c>.
+        /// Quotes around an entry are dropped.
+        /// </summary>
+        internal static List<string> OutputPaths(string to) =>
+            NameList.Names(to).Select(Unquote).Where(p => p.Length > 0).ToList();
+
+        private static string Unquote(string s)
+        {
+            s = s.Trim();
+            if (s.Length >= 2 && (s[0] == '"' || s[0] == '\'') && s[s.Length - 1] == s[0]) s = s.Substring(1, s.Length - 2).Trim();
+            return s;
         }
 
         private static string Blank(string s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
