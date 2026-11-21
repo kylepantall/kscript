@@ -390,6 +390,16 @@ namespace KScript.Language.Features
                 .SelectMany(d => d.Fixes.Select(f => (d, f)))
                 .ToList();
 
+        /// <summary>
+        /// Code actions on the span that fix no problem but write code for you, such as "Override fn hi() from User" on
+        /// a joined type or "Add fn failed(err)" on a job.
+        /// </summary>
+        public List<QuickFix> GetCodeActions(DocumentAnalysis analysis, TextSpan span) =>
+            analysis.Actions
+                .Where(a => a.Span.Start <= span.End && span.Start <= a.Span.End)
+                .Select(a => a.Fix)
+                .ToList();
+
         #endregion
     }
 }

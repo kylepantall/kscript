@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Help writing types and jobs, like C#'s "implement missing members" and "generate overrides": a job without `fn handle()` gets an **Add fn handle()** quick fix, and the lightbulb on a job offers **Add fn failed(err)**. On a joined type (`type Admin with [User]`) it offers **Override fn greet(who: string) from User** for each method a base gives it. A method two bases both give is an error with a **Declare fn label in C** fix, as at run time. Each fix writes a stub in the file's own format.
 - Errors a learner can act on. A word from another language is answered with what KScript writes, and a quick fix makes the change: `print`, `println`, `console.log` and `puts` become `echo`; `function`, `def` and `func` become `fn`; `var` is dropped; `x++` becomes `x += 1`; `foreach`, `switch` and `raise` name `for`, `match` and `throw`; `@len($list)` points to `$list->length()`. In a `.kscript` file, messages no longer talk about `<elements>` or XML.
 - A line left unfinished (`total = 5 +`) is reported on that line, not on the correct line after it, and a missing quote ends with its line, so the rest of the file is still checked.
 - A warning when text used as a value holds a variable, as in `greeting = "Hello $name"`: only the text after `echo` is a template, so this would keep `$name` as written. The quick fix joins the parts: `'Hello ' + $name`.
