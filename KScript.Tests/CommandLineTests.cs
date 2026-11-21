@@ -108,6 +108,19 @@ public sealed class CommandLineTests : IDisposable
     }
 
     [Fact]
+    public void The_default_writers_follow_the_console_after_its_encoding_is_set()
+    {
+        // Setting Console.OutputEncoding (Run does) replaces Console.Out and Console.Error. The command line must
+        // write to the new writers, or CliStyle doesn't see the console and a terminal gets no colour.
+        var cli = new CommandLine();
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Assert.Same(Console.Out, cli.Out);
+        Assert.Same(Console.Error, cli.Error);
+        var given = new StringWriter();
+        Assert.Same(given, new CommandLine { Out = given }.Out);
+    }
+
+    [Fact]
     public void Ansi_flags_force_colours_on_or_off()
     {
         try
