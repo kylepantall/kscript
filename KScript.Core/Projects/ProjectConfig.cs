@@ -166,7 +166,7 @@ namespace KScript.Projects
         public static readonly string[] RuleNames =
         {
             "indent", "statementPerLine", "tidyTags", "wrapAttributes", "trimTrailingWhitespace", "collapseBlankLines", "finalNewline",
-            "spacing", "braceStyle",
+            "spacing", "braceStyle", "wrapStrings",
         };
     }
 

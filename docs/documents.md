@@ -136,7 +136,7 @@ KScript.Document(template: report, title: "Annual Report", author: "The team", t
 
 ## Maths
 
-`Math` is an equation on its own line. Its text is LaTeX, kept exactly as written, so braces and backslashes need no escaping. Equations are numbered, and `id:` lets the text refer to the number with `[#id]`:
+`Math` is an equation on its own line. Its text is LaTeX, kept exactly as written, so braces and backslashes need no escaping. A long equation can go in a ```` ```latex ```` block over several lines, and a long `Paragraph` can end its lines with `\` (see [Long strings and blocks of text](code-format.md#long-strings-and-blocks-of-text)). Equations are numbered, and `id:` lets the text refer to the number with `[#id]`:
 
 ```kscript
 KScript.Document(title: "Maths", to: "maths.pdf") {

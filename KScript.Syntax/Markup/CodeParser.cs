@@ -479,10 +479,10 @@ namespace KScript.Syntax.Markup
                 Finish(e, start);
                 return;
             }
-            if (Peek(0) == '"')
+            if (AtText())
             {
                 int save = pos;
-                (DecodedText content, TextSpan span) = ReadString();
+                (DecodedText content, TextSpan span) = ReadText();
                 int after = pos;
                 bool alone = AtStatementEnd();
                 pos = after;
@@ -1247,9 +1247,9 @@ namespace KScript.Syntax.Markup
                 AddRawAttribute(e, "type", ReadNameSpan());
                 SkipSpaces();
             }
-            if (Peek(0) == '"')
+            if (AtText())
             {
-                (DecodedText message, TextSpan span) = ReadString();
+                (DecodedText message, TextSpan span) = ReadText();
                 e.StartTagSpan = TextSpan.FromBounds(start, span.Start);
                 AddText(e, message, span);
                 e.ContentSpan = span;
@@ -1311,9 +1311,9 @@ namespace KScript.Syntax.Markup
             e.StartTagSpan = TextSpan.FromBounds(start, pos);
             SkipSpaces();
             int contentStart = pos;
-            if (Peek(0) == '"')
+            if (AtText())
             {
-                (DecodedText content, TextSpan span) = ReadString();
+                (DecodedText content, TextSpan span) = ReadText();
                 AddText(e, content, span);
                 contentStart = span.Start;
                 e.ContentSpan = span;
@@ -1504,6 +1504,12 @@ namespace KScript.Syntax.Markup
                 if (c == '\'' || c == '"')
                 {
                     SkipQuoted(c);
+                    continue;
+                }
+                if (c == '`' && StringBlock.Read(text, pos) is StringBlock block)
+                {
+                    // A ``` block: its lines are its own; the expression lexer reads it as a string.
+                    pos = block.End;
                     continue;
                 }
                 if (c == '/' && Peek(1) == '/' && brackets.Count == 0)
@@ -1719,9 +1725,30 @@ namespace KScript.Syntax.Markup
             pos++;
         }
 
+        /// <summary>At "text" or a ``` block without a type (a typed block is a value, not text).</summary>
+        private bool AtText() =>
+            Peek(0) == '"' || (StringBlock.StartsAt(text, pos) && StringBlock.Read(text, pos) is { TypeName: null });
+
+        /// <summary>Reads "text" or a ``` block as the text of an element.</summary>
+        private (DecodedText Value, TextSpan Span) ReadText()
+        {
+            if (Peek(0) == '"')
+            {
+                return ReadString();
+            }
+            StringBlock block = StringBlock.Read(text, pos);
+            if (block.Error != null)
+            {
+                Error(block.ErrorSpan, DiagnosticCodes.MarkupSyntax, block.Error);
+            }
+            pos = block.End;
+            return (new DecodedText(block.Value, block.Map), TextSpan.FromBounds(block.Start, block.End));
+        }
+
         /// <summary>
-        /// Reads "text" as the text of an element or attribute. \" and \\ are escapes; everything else, including
-        /// { } and new lines, is kept as written.
+        /// Reads "text" as the text of an element or attribute. \" and \\ are escapes, and a \ at the end of a line
+        /// joins it to the next (without the break or the next line's indentation); everything else, including { } and
+        /// new lines, is kept as written.
         /// </summary>
         private (DecodedText Value, TextSpan Span) ReadString()
         {
@@ -1735,6 +1762,12 @@ namespace KScript.Syntax.Markup
                     map.Add(pos);
                     value.Append(text[pos + 1]);
                     pos += 2;
+                    continue;
+                }
+                if (LineJoins.At(text, pos, text.Length, out int after))
+                {
+                    // A backslash at the end of a line: the text carries on after the next line's indentation.
+                    pos = after;
                     continue;
                 }
                 map.Add(pos);

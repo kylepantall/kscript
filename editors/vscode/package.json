@@ -68,7 +68,18 @@
       {
         "language": "kscript-code",
         "scopeName": "source.kscript-code",
-        "path": "./syntaxes/kscript-code.tmLanguage.json"
+        "path": "./syntaxes/kscript-code.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.sql": "sql",
+          "meta.embedded.block.html": "html",
+          "meta.embedded.block.json": "json",
+          "meta.embedded.block.css": "css",
+          "meta.embedded.block.javascript": "javascript",
+          "meta.embedded.block.markdown": "markdown",
+          "meta.embedded.block.latex": "latex",
+          "meta.embedded.block.yaml": "yaml",
+          "meta.embedded.block.xml": "xml"
+        }
       },
       {
         "scopeName": "kscript.pages.injection",

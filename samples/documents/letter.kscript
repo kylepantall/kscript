@@ -12,9 +12,11 @@ KScript.Document(template: letter, to: "letter.pdf, letter.docx") {
     closing: "Yours sincerely,",
     signature: "Alan Turing\nDirector, Life Lab"
   ) {
-    Paragraph "We would be delighted if you would give the opening talk at our patterns day on 14 March 2027. Your paper on gliders has been read by everyone in the lab, and we would love to hear where the work is going next."
+    Paragraph "We would be delighted if you would give the opening talk at our patterns day on 14 March 2027. Your \
+      paper on gliders has been read by everyone in the lab, and we would love to hear where the work is going next."
 
-    Paragraph "The talk would be 40 minutes, with time for questions afterwards. We will of course cover your travel and a night's stay."
+    Paragraph "The talk would be 40 minutes, with time for questions afterwards. We will of course cover your travel \
+      and a night's stay."
 
     Paragraph "Please let me know by the end of January whether you can come."
   }

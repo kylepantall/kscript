@@ -21,20 +21,28 @@ KScript.Document(
   Author(affiliation: "Department of Computing, Example University", email: "ada@example.org") "Ada Lovelace"
   Author(affiliation: "Institute of Patterns") "Alan Turing"
 
-  Abstract "We describe the glider, the smallest pattern in Conway's Game of Life that travels. It returns to its own shape every \( p = 4 \) generations, moved one cell diagonally, so its speed is \( c/4 \). We compare it with other small patterns and give the rule as a formula."
+  Abstract "We describe the glider, the smallest pattern in Conway's Game of Life that travels. It returns to its own \
+    shape every \( p = 4 \) generations, moved one cell diagonally, so its speed is \( c/4 \). We compare it with \
+    other small patterns and give the rule as a formula."
 
   Section(title: Introduction, id: intro) {
-    Paragraph "The Game of Life [@gardner1970] is a cellular automaton on a square grid. Each cell is alive or dead, and the next generation depends only on the eight neighbours of each cell.^[The grid is usually taken to be infinite.] Despite the simple rule, Life can compute anything a computer can [@berlekamp1982; @wolfram1984]."
+    Paragraph "The Game of Life [@gardner1970] is a cellular automaton on a square grid. Each cell is alive or dead, \
+      and the next generation depends only on the eight neighbours of each cell.^[The grid is usually taken to be \
+      infinite.] Despite the simple rule, Life can compute anything a computer can [@berlekamp1982; @wolfram1984]."
 
-    Paragraph "Section [#rule] gives the rule, Figure [#fig-glider] shows a glider over four generations and Table [#tab-patterns] lists some well-known patterns."
+    Paragraph "Section [#rule] gives the rule, Figure [#fig-glider] shows a glider over four generations and Table \
+      [#tab-patterns] lists some well-known patterns."
   }
 
   Section(title: The rule, id: rule) {
-    Paragraph "Let \( N_t(x) \) be the number of live neighbours of cell \( x \) at time \( t \). A cell is alive at time \( t + 1 \) when"
+    Paragraph "Let \( N_t(x) \) be the number of live neighbours of cell \( x \) at time \( t \). A cell is alive at \
+      time \( t + 1 \) when"
 
-    Math(id: eq-rule) "s_{t+1}(x) = \begin{cases} 1 & \text{if } N_t(x) = 3, \\\\ 1 & \text{if } s_t(x) = 1 \text{ and } N_t(x) = 2, \\\\ 0 & \text{otherwise.} \end{cases}"
+    Math(id: eq-rule) "s_{t+1}(x) = \begin{cases} 1 & \text{if } N_t(x) = 3, \\\\ 1 & \text{if } s_t(x) = \
+      1 \text{ and } N_t(x) = 2, \\\\ 0 & \text{otherwise.} \end{cases}"
 
-    Paragraph "Equation [#eq-rule] is applied to every cell at once. The neighbour count is a sum over the Moore neighbourhood \( \mathcal{M}(x) = \{ y \in \mathbb{Z}^2 : 0 < \lVert y - x \rVert_\infty \le 1 \} \):"
+    Paragraph "Equation [#eq-rule] is applied to every cell at once. The neighbour count is a sum over the Moore \
+      neighbourhood \( \mathcal{M}(x) = \{ y \in \mathbb{Z}^2 : 0 < \lVert y - x \rVert_\infty \le 1 \} \):"
 
     Math(id: eq-count) "N_t(x) = \sum_{y \in \mathcal{M}(x)} s_t(y)"
   }
@@ -51,7 +59,8 @@ KScript.Document(
 
     Math(id: eq-speed) "v = \frac{\max(|\Delta x|, |\Delta y|)}{p} \, c"
 
-    Paragraph "where \( c \) is one cell per generation, the fastest any signal can travel. For the glider, \( \Delta x = \Delta y = 1 \) and \( p = 4 \), so \( v = c/4 \)."
+    Paragraph "where \( c \) is one cell per generation, the fastest any signal can travel. For the glider, \( \Delta \
+      x = \Delta y = 1 \) and \( p = 4 \), so \( v = c/4 \)."
 
     Table(
       caption: "Some small patterns and their periods.",
@@ -62,7 +71,8 @@ KScript.Document(
     )
 
     Section(title: Population) {
-      Paragraph "The population of a glider is always 5. Across all phases the mean density in its \( 3 \times 3 \) bounding box is \( \tfrac{5}{9} \approx 0.56 \)."
+      Paragraph "The population of a glider is always 5. Across all phases the mean density in its \( 3 \times 3 \) \
+        bounding box is \( \tfrac{5}{9} \approx 0.56 \)."
     }
   }
 

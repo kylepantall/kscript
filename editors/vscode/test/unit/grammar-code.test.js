@@ -17,7 +17,10 @@ function load() {
     await oniguruma.loadWASM(wasm);
     const registry = new textmate.Registry({
       onigLib: Promise.resolve({ createOnigScanner: (p) => new oniguruma.OnigScanner(p), createOnigString: (s) => new oniguruma.OnigString(s) }),
-      loadGrammar: async (scope) => (scope === 'source.kscript-code' ? textmate.parseRawGrammar(fs.readFileSync(grammarPath, 'utf8'), grammarPath) : null),
+      // Languages embedded in ``` blocks (source.sql, text.tex.latex, ...) come from VS Code itself: stand-ins here.
+      loadGrammar: async (scope) => (scope === 'source.kscript-code'
+        ? textmate.parseRawGrammar(fs.readFileSync(grammarPath, 'utf8'), grammarPath)
+        : textmate.parseRawGrammar(JSON.stringify({ scopeName: scope, patterns: [] }), scope + '.json')),
     });
     return registry.loadGrammar('source.kscript-code');
   })();
@@ -149,4 +152,40 @@ test('every sample tokenizes without leaving a string or block open', async () =
     for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) stack = grammar.tokenizeLine(line, stack).ruleStack;
     assert.strictEqual(stack.depth, 1, `${path.basename(file)} ends inside a rule`);
   }
+});
+
+test('a backslash at the end of a line joins a string to the next line', async () => {
+  const tokens = tokenize(await load(), "echo \"Hello, \\\n    $name\"\nx = 'abc \\\n  def'\ny = 1");
+  assert.match(scopeOf(tokens, '\\'), /string\.quoted\.double\.kscript constant\.character\.escape\.line-continuation\.kscript/);
+  assert.match(scopeOf(tokens, '$name'), /string\.quoted\.double\.kscript variable\.other\.kscript/);
+  assert.match(scopeOf(tokens, '\\', 1), /string\.quoted\.single\.kscript constant\.character\.escape\.line-continuation\.kscript/);
+  assert.match(scopeOf(tokens, 'def'), /string\.quoted\.single\.kscript/);
+  assert.match(scopeOf(tokens, 'y'), /variable\.other\.assignment\.kscript/);
+});
+
+test('``` blocks: text, a language or a <Type>, closed by a fence of their own', async () => {
+  const tokens = tokenize(await load(), [
+    'echo ```',
+    '  Hi $name',
+    '  ```',
+    'query = ```sql',
+    '  SELECT 1',
+    '  ```',
+    'repo = ```<Repo>',
+    '  { "a": 1 }',
+    '  ```',
+    'Math(id: x) ````latex',
+    '  ```',
+    '  \\frac{1}{2}',
+    '  ````',
+    'z = 2',
+  ].join('\n'));
+  assert.match(scopeOf(tokens, '$name'), /string\.unquoted\.block\.kscript variable\.other\.kscript/);
+  assert.match(scopeOf(tokens, 'sql'), /meta\.block\.fenced\.kscript entity\.name\.tag\.language\.kscript/);
+  assert.match(scopeOf(tokens, 'SELECT 1'), /meta\.embedded\.block\.sql/);
+  assert.match(scopeOf(tokens, '<Repo>'), /entity\.name\.type\.kscript/);
+  assert.match(scopeOf(tokens, '\\frac{1}{2}'), /meta\.embedded\.block\.latex/);
+  // Three backticks don't close a block opened with four.
+  assert.match(scopeOf(tokens, '```', 6), /meta\.embedded\.block\.latex/);
+  assert.match(scopeOf(tokens, 'z'), /variable\.other\.assignment\.kscript/);
 });

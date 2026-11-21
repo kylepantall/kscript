@@ -104,9 +104,9 @@ namespace KScript.Language.Formatting
                 text = Space(text);
             }
             text = Layout(text, options);
-            if (full && options.WrapAttributes)
+            if (full && (options.WrapAttributes || options.WrapStrings))
             {
-                for (int i = 0; i < 6; i++)
+                for (int i = 0; i < 24; i++)
                 {
                     string wrapped = Wrap(text, options);
                     if (wrapped == text) break;
@@ -137,6 +137,8 @@ namespace KScript.Language.Formatting
             public bool[] InExpression;  // for a code char: some enclosing bracket is ( [ or a map's {
             public List<int> LineStarts = new List<int>();
             public bool[] Verbatim;      // characters inside kscript-fmt: off regions and ignored statements
+            public bool[] Joined;        // a '\n' in a string after a \ that joins the line to the next
+            public List<StringBlock> Blocks = new List<StringBlock>(); // ``` blocks, in order
 
             public bool IsCode(int i) => i >= 0 && i < Text.Length && States[i] == State.Code;
 
@@ -153,6 +155,7 @@ namespace KScript.Language.Formatting
                 IsBlock = new bool[text.Length],
                 InExpression = new bool[text.Length],
                 Verbatim = new bool[text.Length],
+                Joined = new bool[text.Length],
             };
             s.LineStarts.Add(0);
             for (int i = 0; i < text.Length; i++)
@@ -188,6 +191,13 @@ namespace KScript.Language.Formatting
                             state = c == '\'' ? State.Single : State.Double;
                             s.States[i] = state;
                         }
+                        else if (c == '`' && StringBlock.Read(text, i) is StringBlock fence)
+                        {
+                            // A ``` block reads as one string, fences included.
+                            for (int j = i; j < fence.End; j++) s.States[j] = State.Double;
+                            s.Blocks.Add(fence);
+                            i = fence.End - 1;
+                        }
                         else if (c == '(' || c == '[' || c == '{')
                         {
                             bool block = c == '{' && expressionDepth == 0 && OpensBlock(s, text, i);
@@ -210,6 +220,7 @@ namespace KScript.Language.Formatting
                         s.States[i] = state;
                         if (c == '\\' && i + 1 < text.Length)
                         {
+                            if (text[i + 1] == '\n') s.Joined[i + 1] = true;
                             s.States[++i] = state;
                         }
                         else if (c == (state == State.Single ? '\'' : '"'))
@@ -687,6 +698,9 @@ namespace KScript.Language.Formatting
             bool previousOpened = false;
             int commentDelta = 0;
             int lastCodeLine = -1;
+            int lastColumns = 0;
+            StringBlock block = null; // the ``` block whose lines are being copied, moved by blockDelta columns
+            int blockDelta = 0;
 
             for (int line = 0; line < s.LineStarts.Count; line++)
             {
@@ -696,16 +710,29 @@ namespace KScript.Language.Formatting
                 bool startsInString = start < text.Length && start > 0 && (s.States[start - 1] == State.Single || s.States[start - 1] == State.Double) && (s.States[start] == State.Single || s.States[start] == State.Double);
                 bool startsInComment = start > 0 && start < text.Length && s.States[start - 1] == State.BlockComment && s.States[start] == State.BlockComment && !IsCommentOpen(s, start);
                 bool verbatim = start < text.Length && s.Verbatim[start];
+                // After a \ that joins two lines of a string, the next line's indentation isn't part of the string.
+                bool joined = startsInString && !verbatim && s.Joined[start - 1] && options.Indent;
+                if (block != null && start >= block.End) block = null;
 
                 // Closers at the start of the line.
                 int first = start;
                 while (first < end && (text[first] == ' ' || text[first] == '\t')) first++;
                 bool blank = first >= end;
 
-                if (verbatim || startsInString)
+                if (joined)
                 {
                     FlushBlanks(sb, ref blankRun, options);
-                    sb.Append(raw).Append('\n');
+                    string content = raw.TrimStart(' ', '\t');
+                    bool endsInString = end > start && (s.States[end - 1] == State.Single || s.States[end - 1] == State.Double) && !ClosesString(s, end - 1);
+                    if (options.TrimTrailingWhitespace && !endsInString) content = content.TrimEnd();
+                    sb.Append(Indent(lastColumns + options.IndentSize, options)).Append(content).Append('\n');
+                    wroteLine = true;
+                    previousOpened = false;
+                }
+                else if (verbatim || startsInString)
+                {
+                    FlushBlanks(sb, ref blankRun, options);
+                    sb.Append(block != null && !verbatim && start > block.Start ? Shift(raw, blockDelta, options) : raw).Append('\n');
                     wroteLine = true;
                     previousOpened = false;
                 }
@@ -753,6 +780,10 @@ namespace KScript.Language.Formatting
                     if (options.TrimTrailingWhitespace && !endsInString) content = content.TrimEnd();
                     sb.Append(Indent(columns, options)).Append(content).Append('\n');
                     wroteLine = true;
+                    if (!startsInComment) lastColumns = columns;
+                    // A ``` block opened on this line moves with it: the closing fence sets the block's indentation.
+                    block = s.Blocks.FirstOrDefault(b => b.Start >= start && b.Start < end && b.End > end);
+                    blockDelta = block != null ? BlockDelta(text, block, columns - Columns(raw, options)) : 0;
 
                     if (!startsInComment || HasCode(s, start, end)) lastCodeLine = HasCode(s, start, end) ? line : lastCodeLine;
                     previousOpened = LastCodeChar(s, start, end) is int last && (text[last] == '{' || text[last] == '(' || text[last] == '[');
@@ -792,6 +823,35 @@ namespace KScript.Language.Formatting
                 if (text[i] == '\n') newlines++;
             }
             return result + new string('\n', Math.Min(newlines, options.CollapseBlankLines ? options.MaxBlankLines + 1 : newlines));
+        }
+
+        /// <summary>
+        /// How far a ``` block's lines can move with its first line: by <paramref name="delta"/> columns when its
+        /// lines are indented with spaces deeply enough, else not at all.
+        /// </summary>
+        private static int BlockDelta(string text, StringBlock block, int delta)
+        {
+            if (delta == 0 || block.Error != null || block.ContentEnd >= text.Length) return 0;
+            int fence = block.ContentEnd;
+            while (fence < text.Length && text[fence] == ' ') fence++;
+            if (text[fence] != '`' || (delta < 0 && fence - block.ContentEnd < -delta)) return 0;
+            for (int i = block.ContentStart; i < block.ContentEnd;)
+            {
+                int lineEnd = text.IndexOf('\n', i);
+                if (lineEnd < 0 || lineEnd > block.ContentEnd) lineEnd = block.ContentEnd;
+                int spaces = 0;
+                while (i + spaces < lineEnd && text[i + spaces] == ' ') spaces++;
+                bool blank = string.IsNullOrWhiteSpace(text.Substring(i, lineEnd - i));
+                if (!blank && (text[i + spaces] == '\t' || (delta < 0 && spaces < -delta))) return 0;
+                i = lineEnd + 1;
+            }
+            return delta;
+        }
+
+        private static string Shift(string line, int delta, FormatOptions options)
+        {
+            if (delta == 0 || string.IsNullOrWhiteSpace(line)) return delta == 0 ? line : string.Empty;
+            return delta > 0 ? new string(' ', delta) + line : line.Substring(-delta);
         }
 
         private static bool ClosesString(Scan s, int i) => i + 1 >= s.Text.Length || s.States[i + 1] == State.Code || s.States[i + 1] == State.LineComment || s.States[i + 1] == State.BlockComment;
@@ -911,9 +971,11 @@ namespace KScript.Language.Formatting
                 {
                     continue;
                 }
-                if (start > 0 && s.States[start - 1] != State.Code && s.States[start - 1] != State.LineComment) continue;
+                bool joined = start > 0 && s.Joined[start - 1];
+                if (start > 0 && s.States[start - 1] != State.Code && s.States[start - 1] != State.LineComment && !joined) continue;
 
-                for (int i = start; i < end; i++)
+                bool wrapped = false;
+                for (int i = start; i < end && options.WrapAttributes; i++)
                 {
                     char c = text[i];
                     if (!Editable(s, i) || !(c == '(' || c == '[' || (c == '{' && !s.IsBlock[i]))) continue;
@@ -932,11 +994,73 @@ namespace KScript.Language.Formatting
                     int before = close - 1;
                     while (before > i && (text[before] == ' ' || text[before] == '\t')) before--;
                     edits.Replace(before + 1, close - before - 1, "\n");
+                    wrapped = true;
                     break;
+                }
+                if (!wrapped && options.WrapStrings)
+                {
+                    WrapString(s, start, end, options, edits);
                 }
             }
             return edits.Apply(text);
         }
+
+        /// <summary>
+        /// A string that runs past the print width is broken at the last space that fits, with a \ at the end of the
+        /// line: the break and the next line's indentation aren't part of the string. Text inside { } in "text" is
+        /// never split, and the rest of the line moves down with the string.
+        /// </summary>
+        private static void WrapString(Scan s, int start, int end, FormatOptions options, Edits edits)
+        {
+            string text = s.Text;
+            int leadingChars = LeadingWidth(text, start, end);
+            int leadingColumns = Columns(text.Substring(start, end - start), options);
+            int Column(int i) => leadingColumns + (i - start) - leadingChars;
+
+            int braces = 0;
+            int best = -1;
+            bool inBrackets = false;
+            if (start > 0 && s.Joined[start - 1])
+            {
+                int q = start - 1;
+                while (q > 0 && !IsQuote(s, q)) q--;
+                inBrackets = s.InExpression[q];
+            }
+            for (int i = start + leadingChars; i < end; i++)
+            {
+                State state = s.States[i];
+                if (state != State.Single && state != State.Double)
+                {
+                    braces = 0;
+                    continue;
+                }
+                // Only a string that is a statement's text or value: one inside ( [ { is left for the list to wrap.
+                if (IsQuote(s, i)) inBrackets = s.InExpression[i];
+                if (s.Verbatim[i] || inBrackets || IsInBlock(s, i)) continue;
+                char c = text[i];
+                if (c == '\\' && i + 1 < end)
+                {
+                    i++;
+                    continue;
+                }
+                if (state == State.Double && c == '{') braces++;
+                else if (state == State.Double && c == '}' && braces > 0) braces--;
+                // Break after a space that is inside the string, followed by more of the string (not its closing quote).
+                if (c != ' ' || braces > 0 || i + 1 >= end || text[i + 1] == ' ' || text[i + 1] == '\\' || s.States[i + 1] != state || ClosesString(s, i + 1) || IsQuote(s, i)) continue;
+                if (i == start + leadingChars || s.States[i - 1] != state || IsQuote(s, i - 1)) continue;
+                // Only a break that makes the line fit: if the string starts past the width, wrapping it won't help.
+                if (Column(i + 1) + 1 > options.PrintWidth) break;
+                best = i;
+            }
+            if (best < 0) return;
+            int indent = (start > 0 && s.Joined[start - 1] ? leadingColumns : leadingColumns + options.IndentSize);
+            if (Column(best + 1) <= indent + 1) return; // breaking here wouldn't make the line any shorter
+            edits.Replace(best + 1, 0, "\\\n" + Indent(indent, options));
+        }
+
+        private static bool IsQuote(Scan s, int i) => (s.Text[i] == '"' || s.Text[i] == '\'') && (i == 0 || s.States[i - 1] == State.Code || s.States[i - 1] == State.LineComment || s.States[i - 1] == State.BlockComment);
+
+        private static bool IsInBlock(Scan s, int i) => s.Blocks.Any(b => i >= b.Start && i < b.End);
 
         private static int LeadingWidth(string text, int start, int end)
         {

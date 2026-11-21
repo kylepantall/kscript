@@ -76,5 +76,6 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
     }
   }
 
-  Text(size: 12, color: "#64748b") "Also runs in a terminal (kscript life.ks.xml) and a browser (kscript serve). Same rules, one script: lib/life.ks.xml."
+  Text(size: 12, color: "#64748b") "Also runs in a terminal (kscript life.ks.xml) and a browser (kscript serve). Same \
+    rules, one script: lib/life.ks.xml."
 }

@@ -467,7 +467,7 @@ namespace KScript.Syntax
 
                 case TokenKind.String:
                     Advance();
-                    return new LiteralNode { Kind = LiteralKind.String, Value = t.Text, Span = t.Span };
+                    return TypedBlock(t, new LiteralNode { Kind = LiteralKind.String, Value = t.Text, Span = t.Span });
 
                 case TokenKind.Regex:
                     Advance();
@@ -736,6 +736,31 @@ namespace KScript.Syntax
             return buffer[index + k];
         }
 
+        /// <summary>
+        /// A ``` block tagged with a type parses its text: <c>```&lt;json&gt;</c> is <c>'...'-&gt;json()</c> and
+        /// <c>```&lt;Repo&gt;</c> is <c>'...'-&gt;json(as: $Repo)</c>. Any other block is the string itself.
+        /// </summary>
+        private static ExprNode TypedBlock(Token t, LiteralNode literal)
+        {
+            string tag = t.Tag;
+            if (tag == null || tag.Length < 3 || tag[0] != '<' || tag[tag.Length - 1] != '>')
+            {
+                return literal;
+            }
+            string type = tag.Substring(1, tag.Length - 2).Trim();
+            if (type is "text" or "string")
+            {
+                return literal;
+            }
+            TextSpan at = new TextSpan(t.Span.Start, 0);
+            ArgumentList args = new ArgumentList { Span = at, Closed = true };
+            if (type != "json")
+            {
+                args.Arguments.Add(new ArgumentNode { Name = "as", NameSpan = at, Value = new VariableNode { Name = type, Span = at }, Span = at });
+            }
+            return new MethodCallNode { Target = literal, Name = "json", NameSpan = at, ArgumentList = args, Span = t.Span };
+        }
+
         private Token Advance()
         {
             Token t = Peek();
@@ -746,7 +771,7 @@ namespace KScript.Syntax
             }
             if (t.Error != null)
             {
-                Error(t.Span, t.Error, t.Kind == TokenKind.Error && t.Text.StartsWith("~") ? DiagnosticCodes.RetiredSigil : DiagnosticCodes.ExpressionSyntax);
+                Error(t.ErrorSpan, t.Error, t.Kind == TokenKind.Error && t.Text.StartsWith("~") ? DiagnosticCodes.RetiredSigil : DiagnosticCodes.ExpressionSyntax);
             }
             return t;
         }

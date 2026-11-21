@@ -306,7 +306,8 @@
             "collapseBlankLines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to maxBlankLines." },
             "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." },
             "spacing": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: one space after commas and colons, around assignments and =>, and before a block's '{'. Off: spacing inside lines is kept." },
-            "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." }
+            "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." },
+            "wrapStrings": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: break a string that runs past printWidth at a space, with a \\ at the end of the line (the break isn't part of the string). Off: long strings stay on one line." }
           }
         },
         "indent": {

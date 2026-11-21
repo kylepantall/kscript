@@ -332,6 +332,116 @@ namespace KScript.Language.Tests
 
         // ---- every .kscript file in the repository ----------------------------------------------------------------
 
+        [Fact]
+        public void WrapsALongStringWithABackslashAtTheEndOfTheLine()
+        {
+            string input = Lines(
+                "if true {",
+                "  echo \"Hello { $name }, this line of text is long enough that it runs past the print width, so it wraps.\"",
+                "}");
+            Assert.Equal(Lines(
+                "if true {",
+                "  echo \"Hello { $name }, this line of text is long enough that it \\",
+                "    runs past the print width, so it wraps.\"",
+                "}"), Fmt(input, new FormatOptions { PrintWidth = 70 }));
+        }
+
+        [Fact]
+        public void WrapsALongStringOverAsManyLinesAsItNeeds()
+        {
+            string words = string.Join(" ", Enumerable.Range(1, 40).Select(i => "word" + i));
+            string result = Fmt(Lines("x = '" + words + "' |> upper()"), new FormatOptions { PrintWidth = 60 });
+            string[] lines = result.TrimEnd('\n').Split('\n');
+            Assert.True(lines.Length > 4);
+            Assert.All(lines, l => Assert.True(l.Length <= 60, l));
+            Assert.All(lines.Take(lines.Length - 1), l => Assert.EndsWith(" \\", l));
+            Assert.All(lines.Skip(1), l => Assert.StartsWith("  word", l));
+            Assert.EndsWith("' |> upper()", lines[^1]);
+        }
+
+        [Fact]
+        public void LeavesStringsInsideBracketsAndStringsThatCannotFit()
+        {
+            FormatOptions narrow = new FormatOptions { PrintWidth = 40 };
+            // Inside a call, the list wraps, not the string.
+            string call = Lines("@f('a fairly long string that does not fit in forty columns')");
+            Assert.Equal(call, Fmt(call, narrow));
+            // A string that starts past the width can't be helped by a break.
+            string late = Lines("Button(on-click: \"world = @new_world(1, 2, 3); playing = false\") \"Random soup\"");
+            Assert.Equal(late, Fmt(late, narrow));
+            // Text in { } is never split.
+            string braces = Lines("echo \"{ $a + $b + $c + $d + $e + $f + $g + $h + $i + $j }\"");
+            Assert.Equal(braces, Fmt(braces, narrow));
+        }
+
+        [Fact]
+        public void WrapStringsCanBeTurnedOff()
+        {
+            string input = Lines("echo \"Hello, this line of text is long enough that it runs past the print width.\"");
+            Assert.Equal(input, Fmt(input, new FormatOptions { PrintWidth = 40, WrapStrings = false }));
+        }
+
+        [Fact]
+        public void ReindentsTheLinesAfterABackslash()
+        {
+            Assert.Equal(Lines(
+                "if true {",
+                "  echo \"one \\",
+                "    two \\",
+                "    three\"",
+                "}"), Fmt(Lines(
+                "if true {",
+                "echo \"one \\",
+                "           two \\",
+                "three\"",
+                "}")));
+            // Without a backslash, the new line is part of the text, so the line is kept as it is.
+            string kept = Lines("if true {", "  echo \"one", "           two\"", "}");
+            Assert.Equal(kept, Fmt(kept));
+        }
+
+        [Fact]
+        public void ABlockMovesWithItsStatementAndKeepsItsInsideIndentation()
+        {
+            Assert.Equal(Lines(
+                "if true {",
+                "  q = ```sql",
+                "    SELECT *",
+                "      FROM t",
+                "",
+                "    WHERE a = '{ b }'",
+                "    ```",
+                "  echo $q",
+                "}"), Fmt(Lines(
+                "if true {",
+                "q = ```sql",
+                "  SELECT *",
+                "    FROM t",
+                "",
+                "  WHERE a = '{ b }'",
+                "  ```",
+                "echo $q",
+                "}")));
+            // Lines that can't move the whole way (tabs) leave the block as it is.
+            string tabs = Lines("if true {", "q = ```", "\tA", "```", "}");
+            Assert.Equal(Lines("if true {", "  q = ```", "\tA", "```", "}"), Fmt(tabs));
+        }
+
+        [Fact]
+        public void TheInsideOfABlockIsNeverTouched()
+        {
+            string input = Lines(
+                "Math(id: eq) ```latex",
+                "  \\ln\\frac{k_2}{k_1}   =   \\frac{E}{R}   ",
+                "      \\left(x\\right)",
+                "  ```",
+                "echo ```",
+                "  a;b {   c   } // not a comment",
+                "  ```");
+            Assert.Equal(input.Replace("   \n", "\n"), Fmt(input).Replace("   \n", "\n"));
+            Assert.Contains("\\frac{E}{R}   \n", Fmt(input));
+        }
+
         public static IEnumerable<object[]> RepositoryFiles()
         {
             string root = FormatterTests.RepoRoot();
