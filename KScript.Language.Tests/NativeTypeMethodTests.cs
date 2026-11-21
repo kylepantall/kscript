@@ -45,7 +45,8 @@ namespace KScript.Language.Tests
 
             Assert.Contains(own, methods);
             Assert.Contains("to_string", methods);
-            foreach (string kept in KType.StringMethodsOf[type])
+            // Kept methods from packages (->markdown_escape() is KScript.Markdown's) are only offered once imported.
+            foreach (string kept in KType.StringMethodsOf[type].Where(n => LanguageCatalog.Default.GetMethods(n, KType.String).Any(m => m.Package is null or "KScript.Core")))
             {
                 Assert.Contains(kept, methods);
             }

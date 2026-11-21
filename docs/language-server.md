@@ -67,6 +67,9 @@ package wins.
 A script imports KScript.Core, the packages in the nearest `kscript.json`, the ones named in `<import package>`, and
 the owner of any `<KScript.X>` element. Pages need no imports.
 
+Completion only offers what the file can use: built-ins and items from the packages it imports, at the top level, inside
+functions and after `->`. Using an item from a package that isn't imported is KS3009, with a quick fix that adds the import.
+
 The `kscript serve` page engine (`KScript.Web/Pages`) runs pages, including `<live>`, `<state>`, `on-*` handlers and
 `bind`. `PageEngineContractTests` read the engine's source and fail when one of its methods, commands or elements is
 missing from the catalog. The tests also check that `Example Sites/team` analyzes without errors.

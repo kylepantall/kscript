@@ -284,7 +284,8 @@ namespace KScript.Language.Features
             foreach (ElementInfo e in Catalog.Elements)
             {
                 bool follows = e.MustFollow?.Count > 0;
-                if (!e.Context.HasFlag(ElementContext.Script) || e.Planned || NotCodeStatements.Contains(e.Name) || follows != followOn || !FitsHere(e, parent, previous))
+                if (!e.Context.HasFlag(ElementContext.Script) || e.Planned || NotCodeStatements.Contains(e.Name) || follows != followOn || !FitsHere(e, parent, previous)
+                    || NeedsImport(analysis, e.Package))
                 {
                     continue;
                 }
@@ -293,14 +294,13 @@ namespace KScript.Language.Features
                 {
                     Label = e.Name,
                     Kind = CompletionKind.Keyword,
-                    Detail = PackageDetail(analysis, e.Package, e.Deprecated != null ? "statement (deprecated)" : "statement"),
+                    Detail = e.Deprecated != null ? "statement (deprecated)" : "statement",
                     Documentation = ElementMarkdown(e, analysis.Markup.Syntax == SourceSyntax.Code),
                     Deprecated = e.Deprecated != null,
                     InsertText = snippet,
                     IsSnippet = snippet != null,
                     ReplaceSpan = replace,
                     SortText = (e.Deprecated != null ? "9" : "0") + e.Name,
-                    AdditionalEdits = ImportEdits(analysis, e.Package),
                 });
             }
             return items;
@@ -410,15 +410,11 @@ namespace KScript.Language.Features
             return afterKeyword || afterOperator ? ExpressionStartCompletions(analysis, offset, replace, template: false) : null;
         }
 
-        /// <summary>"KScript.IO · adds the import" for an item from a package the script doesn't import yet.</summary>
-        private static string PackageDetail(DocumentAnalysis analysis, string package, string otherwise) =>
-            NeedsImport(analysis, package) ? $"{package} (adds import {package})" : otherwise;
-
+        /// <summary>
+        /// True for an item from a package this script doesn't import: completion leaves it out, since it wouldn't
+        /// work here. Using it anyway is reported (KS MissingImport) with a quick fix that adds the import.
+        /// </summary>
         private static bool NeedsImport(DocumentAnalysis analysis, string package) =>
             package != null && analysis.Kind == DocumentKind.Script && !analysis.ImportedPackages.Contains(package);
-
-        /// <summary>The edit that imports <paramref name="package"/> when the script doesn't already.</summary>
-        private static IReadOnlyList<TextChange> ImportEdits(DocumentAnalysis analysis, string package) =>
-            NeedsImport(analysis, package) && Analyzer.ImportChange(analysis, package) is TextChange change ? new[] { change } : null;
     }
 }

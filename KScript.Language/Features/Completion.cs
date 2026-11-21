@@ -192,7 +192,8 @@ namespace KScript.Language.Features
 
             foreach (ElementInfo e in Catalog.Elements)
             {
-                if (!e.Context.HasFlag(context) || e.Planned || (context == ElementContext.Page && e.HtmlWins))
+                // Only what this file can use: built-ins and the packages it imports.
+                if (!e.Context.HasFlag(context) || e.Planned || (context == ElementContext.Page && e.HtmlWins) || NeedsImport(analysis, e.Package))
                 {
                     continue;
                 }
@@ -206,10 +207,9 @@ namespace KScript.Language.Features
                 {
                     Label = e.Name,
                     Kind = CompletionKind.Element,
-                    Detail = PackageDetail(analysis, e.Package, e.Deprecated != null ? "KScript element (deprecated)" : "KScript element"),
+                    Detail = e.Deprecated != null ? "KScript element (deprecated)" : "KScript element",
                     Documentation = ElementMarkdown(e, analysis.Markup.Syntax == SourceSyntax.Code),
                     Deprecated = e.Deprecated != null,
-                    AdditionalEdits = ImportEdits(analysis, e.Package),
                     InsertText = snippets ? openBracket + ElementSnippet(e) : null,
                     IsSnippet = snippets,
                     ReplaceSpan = replace,
@@ -869,12 +869,11 @@ namespace KScript.Language.Features
                     SortText = "1" + s.Name,
                 }).ToList();
 
-            items.AddRange(Catalog.Commands.Where(c => !c.Planned).Select(c => new CompletionItem
+            items.AddRange(Catalog.Commands.Where(c => !c.Planned && !NeedsImport(analysis, c.Package)).Select(c => new CompletionItem
             {
                 Label = sigil + c.Name,
                 Kind = CompletionKind.Command,
-                Detail = PackageDetail(analysis, c.Package, c.Labels.FirstOrDefault()),
-                AdditionalEdits = ImportEdits(analysis, c.Package),
+                Detail = c.Labels.FirstOrDefault(),
                 Documentation = CallableMarkdown(c),
                 Deprecated = c.Deprecated != null,
                 InsertText = sigil + c.Name + (c.MaxArgs == 0 ? "()" : "($1)"),
@@ -949,12 +948,12 @@ namespace KScript.Language.Features
                 ReplaceSpan = replace,
                 SortText = "0" + m.Name,
             }).ToList();
-            items.AddRange(BuiltInMethodItems(receiver, replace).Where(i => !names.Contains(i.Label)));
+            items.AddRange(BuiltInMethodItems(analysis, receiver, replace).Where(i => !names.Contains(i.Label)));
             return items;
         }
 
-        private List<CompletionItem> BuiltInMethodItems(TypeShape receiver, TextSpan replace) =>
-            Catalog.MethodsFor(receiver.Type)
+        private List<CompletionItem> BuiltInMethodItems(DocumentAnalysis analysis, TypeShape receiver, TextSpan replace) =>
+            Catalog.MethodsFor(receiver.Type).Where(m => !NeedsImport(analysis, m.Package))
                 .Select(m => new CompletionItem
                 {
                     Label = m.Name,
