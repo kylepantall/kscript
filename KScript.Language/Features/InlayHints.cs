@@ -77,8 +77,56 @@ namespace KScript.Language.Features
                 Add(s.DeclarationSpan.End, ": " + s.Shape.Brief(), $"```kscript\n${s.Name}: {s.Shape.Pretty()}\n```");
             }
 
+            AddParameterNames(analysis, Add);
             return hints.OrderBy(h => h.Offset).ToList();
         }
+
+        /// <summary>
+        /// The parameter's name before an argument whose meaning isn't plain from the code: a number, text, yes/no,
+        /// list or map written straight into a call that takes several arguments, as in
+        /// <c>->pad_left(width: 10, char: '.')</c>. Variables, named arguments and one-argument calls get none.
+        /// </summary>
+        private void AddParameterNames(DocumentAnalysis analysis, Action<int, string, string> add)
+        {
+            foreach (ExpressionRegion region in analysis.Regions)
+            {
+                foreach (ExprNode node in region.Nodes.SelectMany(n => n.DescendantsAndSelf()))
+                {
+                    ArgumentList list = ArgumentsOf(node);
+                    if (list == null || list.Arguments.Count < 2 || !list.Arguments.Any(a => a.Name == null && IsPlainValue(a.Value)))
+                    {
+                        continue;
+                    }
+                    List<SignatureInfo> signatures = SignaturesFor(analysis, region, node, out int piped).ToList();
+                    SignatureInfo signature = signatures.FirstOrDefault(s => s.Parameters.Count >= list.Arguments.Count + piped);
+                    if (signature == null || signatures.Count(s => s.Parameters.Count >= list.Arguments.Count + piped) > 1)
+                    {
+                        continue; // No signature fits, or several do and the names would be a guess.
+                    }
+                    for (int i = 0; i < list.Arguments.Count; i++)
+                    {
+                        ArgumentNode a = list.Arguments[i];
+                        if (a.Name != null)
+                        {
+                            break; // After a named argument, positions no longer say which parameter is meant.
+                        }
+                        (string Label, string Documentation) parameter = signature.Parameters[i + piped];
+                        if (!IsPlainValue(a.Value) || parameter.Label.Contains("...", StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+                        string name = ParameterName(parameter.Label);
+                        if (name.Length > 0)
+                        {
+                            add(region.Source.ToSource(a.Span.Start), name + ": ", parameter.Documentation);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static bool IsPlainValue(ExprNode node) =>
+            node is LiteralNode { Template: null } || node is UnaryNode { Operand: LiteralNode } || node is ListNode || node is MapNode;
 
         /// <summary>True when the declaration already says the type: a literal value, a type="..." or a typed parameter.</summary>
         private static bool IsObvious(DocumentAnalysis analysis, Symbol s)

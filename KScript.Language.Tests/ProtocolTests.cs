@@ -553,6 +553,56 @@ namespace KScript.Language.Tests
             JsonArray items = Request("textDocument/completion", At(1, 14, uri))["result"]["items"].AsArray();
             Assert.Contains(items, i => i["label"].GetValue<string>().TrimStart('$') == "name");
         }
+
+        [Fact]
+        public void AFunctionGetsALensThatShowsItsUses()
+        {
+            Request("initialize", new JsonObject
+            {
+                ["processId"] = null, ["rootUri"] = null, ["capabilities"] = new JsonObject(),
+                ["initializationOptions"] = new JsonObject { ["codeLens"] = true, ["docsCommand"] = "kscript.openDocs" },
+            });
+            Notify("initialized", new JsonObject());
+
+            const string uri = "file:///work/sums.kscript";
+            OpenAs("kscript-code", "// Doubles a number\nfn double(n) => $n * 2\necho @double(n: 2)\n", uri);
+            JsonArray lenses = Request("textDocument/codeLens", Doc(uri))["result"].AsArray();
+            JsonObject uses = Assert.Single(lenses, l => l["command"]["command"].GetValue<string>() == "kscript.showReferences").AsObject();
+            Assert.Equal("1 use", uses["command"]["title"].GetValue<string>());
+            Assert.Equal(1, uses["range"]["start"]["line"].GetValue<int>());
+            // The URI, then where the name is, so the editor can list the uses.
+            JsonArray arguments = uses["command"]["arguments"].AsArray();
+            Assert.Equal(uri, arguments[0].GetValue<string>());
+            Assert.Equal(1, arguments[1]["line"].GetValue<int>());
+            Assert.Equal(3, arguments[1]["character"].GetValue<int>());
+
+            // The editor said it opens the docs, so hovers end with a link that does.
+            string hover = Request("textDocument/hover", At(2, 7, uri))["result"]?["contents"]?["value"]?.GetValue<string>();
+            Assert.DoesNotContain("Open docs", hover ?? string.Empty);
+            OpenAs("kscript-code", "name = 'Joan'\necho $name->upper()\n", "file:///work/name.kscript");
+            hover = Request("textDocument/hover", At(1, 13, "file:///work/name.kscript"))["result"]["contents"]["value"].GetValue<string>();
+            Assert.Contains("[Open docs](command:kscript.openDocs?", hover);
+        }
+
+        [Fact]
+        public void OpenScriptsAreSearchedForSymbols()
+        {
+            Assert.True(Initialize()["result"]["capabilities"]["workspaceSymbolProvider"].GetValue<bool>());
+            OpenAs("kscript-code", "const LIMIT = 3\nfn slugify(text) => $text->lower()\nfn slug_of(text) => @slugify(text: $text)\ncount = 1\n", "file:///work/strings.kscript");
+            OpenAs("html", "<p>{ 1 + 1 }</p>", "file:///work/page.html");
+
+            JsonArray found = Request("workspace/symbol", new JsonObject { ["query"] = "slug" })["result"].AsArray();
+            Assert.Equal(new[] { "slugify", "slug_of" }, found.Select(f => f["name"].GetValue<string>()));
+            Assert.Equal(12, found[0]["kind"].GetValue<int>());
+            Assert.Equal("strings.kscript", found[0]["containerName"].GetValue<string>());
+            Assert.EndsWith("/work/strings.kscript", found[0]["location"]["uri"].GetValue<string>());
+            Assert.Equal(1, found[0]["location"]["range"]["start"]["line"].GetValue<int>());
+
+            // Any case, with or without the @, and nothing typed lists every function and constant (not variables).
+            Assert.Single(Request("workspace/symbol", new JsonObject { ["query"] = "@SLUGIFY" })["result"].AsArray());
+            Assert.Equal(new[] { "slugify", "slug_of", "$LIMIT" }, Request("workspace/symbol", new JsonObject { ["query"] = "" })["result"].AsArray().Select(f => f["name"].GetValue<string>()));
+            Assert.Empty(Request("workspace/symbol", new JsonObject { ["query"] = "nothing-like-this" })["result"].AsArray());
+        }
     }
 
     internal static class JsonExtensions

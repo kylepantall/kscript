@@ -24,7 +24,7 @@ namespace KScript.Language.Tests
             Assert.Equal(CompletionKind.Keyword, echo.Kind);
             Assert.Equal("echo $0", echo.InsertText);
             Assert.True(echo.IsSnippet);
-            Assert.Equal("0echo", echo.SortText);
+            Assert.Equal("0100echo", echo.SortText);
             Assert.Equal(1, echo.ReplaceSpan.Length);
 
             Assert.Contains(items, i => i.Label == "if" && i.InsertText.StartsWith("if ${1:condition} {", StringComparison.Ordinal));

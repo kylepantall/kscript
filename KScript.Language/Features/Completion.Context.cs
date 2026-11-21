@@ -300,7 +300,7 @@ namespace KScript.Language.Features
                     InsertText = snippet,
                     IsSnippet = snippet != null,
                     ReplaceSpan = replace,
-                    SortText = (e.Deprecated != null ? "9" : "0") + e.Name,
+                    SortText = e.Deprecated != null ? "9" + e.Name : "0" + Ranking.Statement(e.Name, KScript.Projects.TestSettings.IsTestFileName(analysis.Path)),
                 });
             }
             return items;

@@ -54,6 +54,18 @@ puts "Run" above a script's first statement and "Run test" above each test. The 
 them when the editor sends `initializationOptions: { "codeLens": true }` to say it has those commands. A new, unsaved
 `.kscript` document (language id `kscript-code`) is parsed as code even though it has no file name yet.
 
+The same lenses put "3 uses" above each function something calls, or "used in other files" when only another file of
+the project does. That lens calls `kscript.showReferences` with the URI and the position of the function's name.
+`workspace/symbol` finds the functions and constants of every script in the folders the editor opened
+(`workspaceFolders` or `rootUri`), by any part of the name.
+
+Suggestions are ordered by `sortText`: the statements and methods used most come first (`Ranking` in
+KScript.Language/Features holds the lists, and a test checks every name in them exists), then the rest by name, and a
+script's own variables come before built-in ones, nearest first. Inlay hints name the parameter beside a number, text,
+list or map written straight into a call with several arguments. Hovers on commands and methods show the catalog's
+example in the file's own format, and end with an "Open docs" link when the editor sends
+`initializationOptions: { "docsCommand": "<command>" }`: the link runs that command with the name as its argument.
+
 An editor that runs a script can set `KSCRIPT_ERROR_PATHS=full`, and the error a script stops with then names its file
 with the whole path (`ERROR  /work/app/hello.kscript:3:5: ...`) so the editor can link to the line.
 

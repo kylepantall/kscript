@@ -90,7 +90,9 @@ async function startClient(context) {
     documentSelector,
     outputChannel: output,
     // The server only offers the Run and Run test lenses to an editor that says it can run them.
-    initializationOptions: { codeLens: config().get('codeLens.enabled', true) },
+    // docsCommand lets a hover end with an "Open docs" link, which only this command may run.
+    initializationOptions: { codeLens: config().get('codeLens.enabled', true), docsCommand: 'kscript.openDocs' },
+    markdown: { isTrusted: { enabledCommands: ['kscript.openDocs'] } },
     synchronize: { fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{xml,ks,kscript,html,md,json}') },
   });
   client.onDidChangeState((e) => {

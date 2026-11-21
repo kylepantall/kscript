@@ -123,7 +123,7 @@ namespace KScript.Language.Features
                     TextSpan span = region.Source.ToSource(c.NameSpan);
                     if (command != null)
                     {
-                        return new HoverResult(CallableMarkdown(command), span);
+                        return new HoverResult(CallableMarkdown(command) + HoverExtras(command, analysis), span);
                     }
                     RetiredInfo retired = Catalog.GetRetiredCommand(c.Name);
                     return retired != null ? new HoverResult($"**@{c.Name}** was removed in KScript 2.\n\n{retired.Replacement}", span) : null;
@@ -192,7 +192,7 @@ namespace KScript.Language.Features
                 return new HoverResult(SymbolMarkdown(analysis, extension), region.Source.ToSource(nameSpan));
             }
             CallableInfo method = Catalog.GetMethods(name, receiver.Type).FirstOrDefault();
-            return method != null ? new HoverResult(CallableMarkdown(method, receiver), region.Source.ToSource(nameSpan)) : null;
+            return method != null ? new HoverResult(CallableMarkdown(method, receiver) + HoverExtras(method, analysis), region.Source.ToSource(nameSpan)) : null;
         }
 
         #region Markdown
@@ -313,6 +313,34 @@ namespace KScript.Language.Features
             else if (c.Package != null && c.Package != "KScript.Core")
             {
                 sb.Append("\n\nFrom ").Append(c.Package).Append('.');
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// What a hover adds below a command's or method's description: its example, written the way this file is
+        /// written, and a link that opens its page in the docs (when the editor can run the link: <see cref="DocsCommand"/>).
+        /// </summary>
+        internal string HoverExtras(CallableInfo c, DocumentAnalysis analysis)
+        {
+            StringBuilder sb = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(c.Example))
+            {
+                bool code = analysis.Markup.Syntax == SourceSyntax.Code;
+                string example = c.Example.Trim();
+                bool markup = example.StartsWith('<');
+                string shown = markup ? (code ? ExampleAsCode(example) : example)
+                    : code ? "echo " + example
+                    : "<echo>{ " + example.Replace("&", "&amp;").Replace("<", "&lt;") + " }</echo>";
+                if (shown != null)
+                {
+                    sb.Append("\n\n**Example**\n```").Append(code ? "kscript" : "xml").Append('\n').Append(shown).Append("\n```");
+                }
+            }
+            if (DocsCommand != null && !c.Planned)
+            {
+                string search = System.Text.Json.JsonSerializer.Serialize(new[] { c.Name });
+                sb.Append("\n\n[Open docs](command:").Append(DocsCommand).Append('?').Append(Uri.EscapeDataString(search)).Append(')');
             }
             return sb.ToString();
         }

@@ -5,7 +5,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { RUN_ENV, untitledPath, isTestFile } = require('./run');
+const { RUN_ENV, untitledPath, isTestFile, docsArgs } = require('./run');
 
 const KSCRIPT_LANGUAGES = ['kscript', 'kscript-code'];
 
@@ -153,7 +153,17 @@ function registerCommands(vscode, context, server) {
     vscode.commands.registerCommand('kscript.serve', inProject('serve', 'serve the site', ['serve'], { background: true })),
     vscode.commands.registerCommand('kscript.check', inProject('check', 'check the project', ['check'], { matcher: '$kscript-check' })),
     vscode.commands.registerCommand('kscript.formatProject', inProject('fmt', 'format the project', ['fmt'])),
-    vscode.commands.registerCommand('kscript.openDocs', inProject('docs', 'open the docs', ['docs'], { background: true, needsFolder: false })),
+    // "Open docs" in a hover passes the name it is about, and the docs open on what they have for it.
+    vscode.commands.registerCommand('kscript.openDocs', (word) =>
+      inProject('docs', 'open the docs', docsArgs(word), { background: true, needsFolder: false })()),
+    // "3 uses" above a function: the list every use is shown in, as Find All References does.
+    vscode.commands.registerCommand('kscript.showReferences', async (target, position) => {
+      if (!target || !position) return;
+      const uri = vscode.Uri.parse(target);
+      const at = new vscode.Position(position.line, position.character);
+      const found = await vscode.commands.executeCommand('vscode.executeReferenceProvider', uri, at);
+      await vscode.commands.executeCommand('editor.action.showReferences', uri, at, found || []);
+    }),
     vscode.commands.registerCommand('kscript.newProject', newProject),
   );
 

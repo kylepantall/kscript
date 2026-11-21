@@ -51,6 +51,9 @@ namespace KScript.Language.Features
         public string Command { get; }
 
         public IReadOnlyList<string> Arguments { get; }
+
+        /// <summary>For a lens about a name ("3 uses"): where the name is, sent as a position after the URI.</summary>
+        public TextSpan? Target { get; init; }
     }
 
     public sealed partial class LanguageService
@@ -58,6 +61,7 @@ namespace KScript.Language.Features
         public const string RunCommand = "kscript.run";
         public const string RunTestCommand = "kscript.runTest";
         public const string RunTestsInFileCommand = "kscript.runTestsInFile";
+        public const string ShowUsesCommand = "kscript.showReferences";
 
         /// <summary>The tests of a test file, in document order, with describe groups as parents. Empty for other files.</summary>
         public List<TestItem> GetTests(DocumentAnalysis analysis)
@@ -120,6 +124,7 @@ namespace KScript.Language.Features
                     lenses.Add(new CodeLens(new TextSpan(tests[0].Span.Start, 0), "▶ Run all tests in this file", RunTestsInFileCommand));
                     AddTestLenses(tests, lenses);
                 }
+                AddUseLenses(analysis, lenses);
                 return lenses;
             }
 
@@ -128,7 +133,29 @@ namespace KScript.Language.Features
             {
                 lenses.Add(new CodeLens(new TextSpan(first.Span.Start, 0), "▶ Run", RunCommand));
             }
+            AddUseLenses(analysis, lenses);
             return lenses;
+        }
+
+        /// <summary>
+        /// "3 uses" above each function of the file that something calls: the calls in this file, and whether another
+        /// file of the project uses it too. A function nothing uses gets no lens; the unused warning covers it.
+        /// </summary>
+        private void AddUseLenses(DocumentAnalysis analysis, List<CodeLens> lenses)
+        {
+            ProjectUses project = null;
+            foreach (Symbol fn in analysis.Symbols.Where(s => s.Kind == SymbolKind.Function && s.SourcePath == null && s.DeclaringElement != null))
+            {
+                int uses = analysis.ReferencesTo(fn).Count(r => !r.IsDeclaration);
+                // Other files are only read for a function this file never calls, as the unused check does.
+                bool elsewhere = uses == 0
+                    && (project ??= ProjectUsage.Find(analysis.Path, analysis.Source.Text, Files, Catalog)).Names.Contains(fn.Name);
+                string title = uses == 1 ? "1 use" : uses > 1 ? uses + " uses" : elsewhere ? "used in other files" : null;
+                if (title != null)
+                {
+                    lenses.Add(new CodeLens(new TextSpan(fn.DeclaringElement.Span.Start, 0), title, ShowUsesCommand) { Target = fn.DeclarationSpan });
+                }
+            }
         }
 
         private static void AddTestLenses(List<TestItem> tests, List<CodeLens> lenses)

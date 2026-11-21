@@ -130,4 +130,11 @@ function loadError(results) {
   return failed ? failed.message : null;
 }
 
-module.exports = { stripAnsi, RUN_ENV, parseRunError, untitledPath, isTestFile, parseJUnit, filterFor, namePattern, outcomeOf, loadError };
+/** The arguments of kscript docs: the words to search for, when a hover's "Open docs" link names something. */
+function docsArgs(word) {
+  const text = typeof word === 'string' ? word.trim() : '';
+  // A name is all the link sends; anything that could read as an option is left out.
+  return text && /^(->)?[\w.:-]+$/.test(text) && !/^-(?!>)/.test(text) ? ['docs', text] : ['docs'];
+}
+
+module.exports = { docsArgs, stripAnsi, RUN_ENV, parseRunError, untitledPath, isTestFile, parseJUnit, filterFor, namePattern, outcomeOf, loadError };

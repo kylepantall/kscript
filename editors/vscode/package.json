@@ -156,7 +156,7 @@
         "kscript.codeLens.enabled": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show **Run** above a script and **Run test** above each test."
+          "markdownDescription": "Show **Run** above a script, **Run test** above each test and how many times each function is used."
         }
       }
     },
@@ -222,6 +222,11 @@
         "command": "kscript.openDocs",
         "title": "Open Docs",
         "category": "KScript"
+      },
+      {
+        "command": "kscript.showReferences",
+        "title": "Show Uses",
+        "category": "KScript"
       }
     ],
     "jsonValidation": [
@@ -269,6 +274,10 @@
         },
         {
           "command": "kscript.runTest",
+          "when": "false"
+        },
+        {
+          "command": "kscript.showReferences",
           "when": "false"
         },
         {

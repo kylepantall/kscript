@@ -9,6 +9,8 @@ Language support for [KScript](https://github.com/kylepantall/kscript): scripts 
 - Outline, semantic highlighting and syntax highlighting, including `{ expressions }` in pages
 - Run a script with the **Run** button, `F5` or the **▶ Run** line above its first statement, with the error it stops on marked on its line
 - Tests in the Testing view and a **▶ Run test** line above each one
+- Suggestions with the everyday statements and methods first, parameter names shown beside plain values, and hovers with an example and an **Open docs** link
+- How many times each function is used, shown above it, and **Go to Symbol in Workspace** (`Ctrl+T`) across every script
 - Format Document and format on save, using the same formatter as `kscript fmt` (XML scripts and pages; `.kscript` files are left as they are)
 
 ## Requirements
@@ -38,7 +40,7 @@ You can also install this extension from the command line with `kscript ide inst
 | `kscript.server.path` | empty | The `kscript` executable to use, if it isn't installed in the usual place. `~` and `${env:NAME}` are expanded. |
 | `kscript.server.args` | `["lsp"]` | Arguments that start the language server. |
 | `kscript.pages.enabled` | `auto` | Check `.html` and `.md` pages: `auto` in folders that look like a `kscript serve` site (`_components/`, `_layout.html`, `_layouts/` or `kscript.json`), `always`, or `never`. |
-| `kscript.codeLens.enabled` | `true` | Show **Run** above a script and **Run test** above each test. |
+| `kscript.codeLens.enabled` | `true` | Show **Run** above a script, **Run test** above each test and how many times each function is used. |
 | `kscript.trace.server` | `off` | Log the messages between VS Code and the language server (`messages` or `verbose`). |
 
 ## Project settings

@@ -66,7 +66,10 @@ const diagnostics = new Promise((resolve) => {
   assert.ok(folds.some((f) => f.startLine === 0), 'the script folds');
 
   const lenses = await connection.sendRequest('textDocument/codeLens', { textDocument: { uri } });
-  assert.deepStrictEqual(lenses.map((l) => [l.command.title, l.command.command, l.command.arguments[0], l.range.start.line]), [['▶ Run', 'kscript.run', uri, 1]], 'a Run lens on the first statement');
+  assert.deepStrictEqual(lenses.map((l) => [l.command.title, l.command.command, l.command.arguments[0], l.range.start.line]), [['▶ Run', 'kscript.run', uri, 1], ['1 use', 'kscript.showReferences', uri, 5]], 'a Run lens on the first statement and a count of uses on the function');
+
+  const symbols = await connection.sendRequest('workspace/symbol', { query: 'doub' });
+  assert.deepStrictEqual(symbols.map((f) => f.name), ['double'], 'a function is found by part of its name');
 
   // A new, unsaved .kscript file is checked as code, and a test file lists its tests.
   const untitled = 'untitled:Untitled-1';

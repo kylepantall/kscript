@@ -135,6 +135,8 @@ namespace KScript.LanguageServer
             {
                 case "initialize":
                     initialized = true;
+                    service.DocsCommand = p?["initializationOptions"]?["docsCommand"]?.GetValue<string>();
+                    RememberFolders(p);
                     return Initialize(p?["initializationOptions"]?["codeLens"]?.GetValue<bool>() == true);
                 case "initialized":
                 case "$/cancelRequest":
@@ -198,6 +200,7 @@ namespace KScript.LanguageServer
                 case "kscript/blocks": return Blocks(p);
                 case "kscript/tests": return Tests(p);
                 case "textDocument/codeLens": return CodeLenses(p);
+                case "workspace/symbol": return WorkspaceSymbols(p);
                 case "textDocument/codeAction": return CodeActions(p);
                 case "textDocument/documentLink": return DocumentLinks(p);
                 case "textDocument/formatting": return Formatting(p);
@@ -239,7 +242,12 @@ namespace KScript.LanguageServer
                 ["documentHighlightProvider"] = true,
                 ["renameProvider"] = new JsonObject { ["prepareProvider"] = true },
                 ["documentSymbolProvider"] = true,
+<<<<<<< HEAD
                 ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix", "refactor.rewrite") },
+=======
+                ["workspaceSymbolProvider"] = true,
+                ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix") },
+>>>>>>> 7aef25b (Rank everyday suggestions first, name plain arguments, and show examples and use counts)
                 ["documentLinkProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["inlayHintProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["foldingRangeProvider"] = true,
@@ -596,6 +604,10 @@ namespace KScript.LanguageServer
                 foreach (CodeLens lens in service.GetCodeLenses(a))
                 {
                     JsonArray arguments = new JsonArray { doc.Uri };
+                    if (lens.Target is TextSpan target)
+                    {
+                        arguments.Add(Range(a.Source, target)["start"].DeepClone());
+                    }
                     foreach (string argument in lens.Arguments)
                     {
                         arguments.Add(argument);
@@ -699,6 +711,84 @@ namespace KScript.LanguageServer
             }
 
             return Convert(service.GetOutline(a));
+        }
+
+        // The folders open in the editor, searched by workspace/symbol.
+        private readonly List<string> folders = new List<string>();
+
+        // By path: the text a closed file's symbols were read from, and the symbols.
+        private readonly Dictionary<string, (string Text, List<(OutlineItem Item, JsonObject Range)> Symbols)> symbolCache =
+            new Dictionary<string, (string, List<(OutlineItem, JsonObject)>)>(StringComparer.Ordinal);
+
+        private void RememberFolders(JsonNode p)
+        {
+            folders.Clear();
+            IEnumerable<string> uris = p?["workspaceFolders"] is JsonArray list
+                ? list.Select(f => f?["uri"]?.GetValue<string>())
+                : new[] { p?["rootUri"]?.GetValue<string>() };
+            folders.AddRange(uris.Select(Workspace.UriToPath).Where(f => f != null).Distinct(StringComparer.Ordinal));
+        }
+
+        /// <summary>
+        /// workspace/symbol: the functions and constants of every script in the open folders whose name contains the
+        /// words typed, so "Go to Symbol in Workspace" finds a function without knowing its file.
+        /// </summary>
+        private JsonNode WorkspaceSymbols(JsonNode p)
+        {
+            string query = p?["query"]?.GetValue<string>()?.Trim().TrimStart('@', '$') ?? string.Empty;
+            JsonArray found = new JsonArray();
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            IEnumerable<string> paths = folders.SelectMany(f => ProjectUsage.FilesUnder(f, workspace))
+                .Concat(workspace.Documents.Where(d => d.Path != null).Select(d => d.Path));
+            foreach (string path in paths)
+            {
+                string full = Path.GetFullPath(path);
+                if (!seen.Add(full) || KScript.Syntax.Markup.MarkupParser.KindFromPath(full) != KScript.Syntax.Markup.DocumentKind.Script)
+                {
+                    continue;
+                }
+                string text = workspace.ReadText(full);
+                if (text == null || text.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+                foreach ((OutlineItem item, JsonObject range) in SymbolsOf(full, text))
+                {
+                    if (item.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+                    found.Add((JsonNode)new JsonObject
+                    {
+                        ["name"] = item.Name,
+                        ["kind"] = OutlineKindToLsp(item.Kind),
+                        ["containerName"] = Path.GetFileName(full),
+                        ["location"] = new JsonObject { ["uri"] = Workspace.PathToUri(full), ["range"] = range.DeepClone() },
+                    });
+                    if (found.Count >= MaxWorkspaceSymbols)
+                    {
+                        return found;
+                    }
+                }
+            }
+            return found;
+        }
+
+        internal const int MaxWorkspaceSymbols = 200;
+
+        private List<(OutlineItem Item, JsonObject Range)> SymbolsOf(string path, string text)
+        {
+            if (symbolCache.TryGetValue(path, out var cached) && cached.Text == text)
+            {
+                return cached.Symbols;
+            }
+            DocumentAnalysis a = Analyzer.AnalyzeFile(text, path, workspace, service.Catalog);
+            List<(OutlineItem, JsonObject)> symbols = service.GetOutline(a)
+                .Where(i => i.Kind == OutlineKind.Function || i.Kind == OutlineKind.Constant)
+                .Select(i => (i, Range(a.Source, i.SelectionSpan)))
+                .ToList();
+            symbolCache[path] = (text, symbols);
+            return symbols;
         }
 
         private JsonNode SemanticTokens(JsonNode p)

@@ -86,3 +86,14 @@ test('reports a file that could not load', () => {
   assert.strictEqual(loadError(parseJUnit(xml)), 'a.test.kscript:1:1: Syntax: oops');
   assert.strictEqual(loadError(parseJUnit(report)), null);
 });
+
+test('Open docs searches for the name a hover is about, and nothing else', () => {
+  const { docsArgs } = require('../../src/run');
+  assert.deepStrictEqual(docsArgs('upper'), ['docs', 'upper']);
+  assert.deepStrictEqual(docsArgs(' ->pad_left '), ['docs', '->pad_left']);
+  assert.deepStrictEqual(docsArgs(), ['docs']);
+  assert.deepStrictEqual(docsArgs({ fsPath: '/x' }), ['docs']);
+  // Nothing that could be read as an option or a second argument.
+  assert.deepStrictEqual(docsArgs('--port'), ['docs']);
+  assert.deepStrictEqual(docsArgs('a b'), ['docs']);
+});
