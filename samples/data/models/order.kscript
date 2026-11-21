@@ -1,0 +1,14 @@
+import KScript.Data
+
+enum OrderStatus { open, paid, shipped, cancelled }
+
+/// An order for one product.
+model Order {
+  timestamps: yes
+  soft_deletes: yes
+  index: [product_id, [status, created_at]]
+  product_id: int
+  customer: email
+  quantity: int(min: 1)
+  status: OrderStatus = 'open'
+}

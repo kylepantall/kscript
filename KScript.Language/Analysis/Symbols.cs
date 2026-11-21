@@ -50,6 +50,12 @@ namespace KScript.Language.Analysis
         /// <summary>True for records of a &lt;type&gt; without extra="keep": reading a field it doesn't list is a mistake.</summary>
         public bool Closed { get; init; }
 
+        /// <summary>
+        /// A more exact kind whose methods come first: "model" for a KScript.Data model (<c>$User->where()</c>), "record"
+        /// for its records (<c>$user->save()</c>), and for queries on a model. Null for everything else.
+        /// </summary>
+        public string Kind { get; init; }
+
         /// <summary>For a &lt;type&gt; value (<c>$Repo</c>): the shape of the records it makes.</summary>
         public TypeShape Instance { get; init; }
 
@@ -76,7 +82,7 @@ namespace KScript.Language.Analysis
         {
             if (Name != null)
             {
-                return Type == KType.Type ? "type " + Name : Name;
+                return Type == KType.Type ? (Kind == KType.Model ? "model " : "type ") + Name : Type == KType.Query ? "query of " + Name : Name;
             }
             if (Type == KType.List)
             {

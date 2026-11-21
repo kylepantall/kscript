@@ -143,8 +143,10 @@ namespace KScript.Runtime
                     break;
                 case Dictionary<string, object> map:
                     w.WriteStartObject();
+                    HashSet<string> hidden = (map as Record)?.Type.Hidden;
                     foreach (var kv in map)
                     {
+                        if (hidden != null && hidden.Contains(kv.Key)) continue;
                         w.WritePropertyName(kv.Key);
                         WriteJson(w, kv.Value, depth + 1);
                     }
@@ -379,6 +381,10 @@ namespace KScript.Runtime
                     d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + (char.ToLowerInvariant(a[i - 1]) == char.ToLowerInvariant(b[j - 1]) ? 0 : 1));
             return d[a.Length, b.Length];
         }
+
+        /// <summary>Words as a list for a sentence: "a", "a or b", "a, b or c".</summary>
+        public static string OrList(IReadOnlyList<string> words) =>
+            words.Count <= 1 ? string.Concat(words) : string.Join(", ", words.Take(words.Count - 1)) + " or " + words[words.Count - 1];
 
         /// <summary>The closest of <paramref name="candidates"/> to <paramref name="name"/>, if it is close enough to suggest.</summary>
         public static string Closest(string name, IEnumerable<string> candidates)

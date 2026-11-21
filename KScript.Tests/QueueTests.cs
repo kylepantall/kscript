@@ -714,7 +714,7 @@ public sealed class QueueTests : StorageFixture
 
     [Fact]
     public void ImportingAJobThatIsntThereSaysWhatScriptsExport() =>
-        Assert.Contains("<error>s and <job>s", Assert.Throws<KScriptException>(() => Run("<import src=\"jobs/welcome.kscript\" names=\"Nope\" />", setup: h => h.WorkingDirectory = Project)).Message);
+        Assert.Contains("<error>s, <model>s and <job>s", Assert.Throws<KScriptException>(() => Run("<import src=\"jobs/welcome.kscript\" names=\"Nope\" />", setup: h => h.WorkingDirectory = Project)).Message);
 
     [Fact]
     public void ABrokenKscriptJsonMeansTheDefaults()

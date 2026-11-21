@@ -831,6 +831,8 @@ namespace KScript.Runtime
             if (module == null) return false;
             string type = Values.TypeOf(target);
             if (target is ErrorValue && module.Methods.TryGetValue("error:" + name, out method)) return true;
+            // A package's records (a model's) have its methods as well as maps'.
+            if (target is Record record && record.Type.RecordKind != null && module.Methods.TryGetValue(record.Type.RecordKind + ":" + name, out method)) return true;
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
             // An email, handle, uuid or regex is text too, so the string methods that make sense for it work on it.

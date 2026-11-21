@@ -40,6 +40,13 @@ namespace KScript.Metadata
         public const string Users = "users";
         public const string Document = "document";
 
+        // KScript.Data: a model (<c>$User</c>), one of its records, a query, and a database connection.
+        public const string Model = "model";
+        public const string Record = "record";
+        public const string Query = "query";
+        public const string Database = "database";
+        public const string PasswordHash = "password_hash";
+
         // KScript.Queue: a job (SendWelcome(...)), its type, a chain of jobs, a queue and a fake queue for tests.
         public const string Job = "job";
         public const string JobType = "job_type";

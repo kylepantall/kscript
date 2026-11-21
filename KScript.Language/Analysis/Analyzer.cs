@@ -203,7 +203,7 @@ namespace KScript.Language.Analysis
             Dictionary<string, Symbol> seen = new Dictionary<string, Symbol>(StringComparer.Ordinal);
             foreach (MarkupElement e in result.Markup.DescendantElements())
             {
-                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && (IsKScriptElementName(owner, "type") || IsKScriptElementName(owner, "job"))))
+                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && (IsTypeElement(owner) || IsKScriptElementName(owner, "job"))))
                 {
                     MarkupAttribute nameAttr = e.GetAttribute("name");
                     string name = nameAttr?.ValueText?.Trim();
@@ -399,7 +399,7 @@ namespace KScript.Language.Analysis
             {
                 return constants;
             }
-            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum" || x.Name == "type" || x.Name == "error" || x.Name == "job"))
+            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum" || x.Name == "type" || x.Name == "model" || x.Name == "error" || x.Name == "job"))
             {
                 MarkupAttribute nameAttr = let.GetAttribute("name");
                 if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
@@ -574,6 +574,7 @@ namespace KScript.Language.Analysis
                     return;
 
                 case "type" when info.Package == "KScript.Core":
+                case "model" when info.Package == "KScript.Data":
                     AnalyzeType(e, info, scope, inner, markupMode);
                     return;
 
@@ -968,7 +969,7 @@ namespace KScript.Language.Analysis
                 if (!ok)
                 {
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
-                        $"<{e.Name}> must be inside {string.Join(" or ", info.MustBeInside.Select(n => "<" + n + ">"))}.");
+                        $"<{e.Name}> must be inside {KScript.Runtime.Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.");
                 }
             }
 

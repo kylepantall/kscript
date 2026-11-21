@@ -302,6 +302,9 @@ namespace KScript.Runtime
 
         public FieldDefinition Field(string name) => fields.FirstOrDefault(f => f.Name == name);
 
+        /// <summary>Adds a field at a place in the list, such as a model's key first.</summary>
+        internal void InsertField(int index, FieldDefinition field) => fields.Insert(index, field);
+
         /// <summary>The types this one joins: <c>type Admin with [User, Auditable]</c>.</summary>
         public IReadOnlyList<RecordType> Bases => bases;
 
@@ -330,7 +333,20 @@ namespace KScript.Runtime
         /// <summary>True if a record of this type can be used where <paramref name="other"/> is expected: it is that type, or joins it.</summary>
         public bool IsA(RecordType other) => this == other || bases.Any(b => b.IsA(other));
 
-        public string TypeName => "type";
+        /// <summary>"type", or the kind of type a package declares with it, such as "model": package methods for that kind work on it.</summary>
+        public string TypeName => Kind ?? "type";
+
+        /// <summary>The kind of type a package made this for (<c>model</c> for KScript.Data), or null for a plain &lt;type&gt;.</summary>
+        internal string Kind { get; set; }
+
+        /// <summary>The receiver that package methods for this type's records are registered for (<c>record</c>), or null for none.</summary>
+        internal string RecordKind { get; set; }
+
+        /// <summary>What the package that made the type keeps with it, such as a model's table.</summary>
+        internal object Tag { get; set; }
+
+        /// <summary>Fields left out when a record is turned into JSON, such as a password hash.</summary>
+        internal HashSet<string> Hidden { get; set; }
 
         public string ToText() => Name;
 
@@ -402,6 +418,9 @@ namespace KScript.Runtime
     public sealed class Record : Dictionary<string, object>
     {
         internal Record(RecordType type) : base(StringComparer.Ordinal) => Type = type;
+
+        /// <summary>What a package keeps with one record, such as the values a model record was loaded with.</summary>
+        internal object Tag { get; set; }
 
         public RecordType Type { get; }
 

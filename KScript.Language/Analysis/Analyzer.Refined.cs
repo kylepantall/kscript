@@ -38,7 +38,7 @@ namespace KScript.Language.Analysis
             name == null ? null : TypeElementIn(result.Markup, name) ?? ImportedTypeElement(name);
 
         private MarkupElement TypeElementIn(MarkupDocument doc, string name) =>
-            doc.DescendantElements().FirstOrDefault(e => IsKScriptElementName(e, "type") && e.GetAttributeValue("name")?.Trim().TrimStart('$') == name);
+            doc.DescendantElements().FirstOrDefault(e => IsTypeElement(e) && e.GetAttributeValue("name")?.Trim().TrimStart('$') == name);
 
         /// <summary>The parsed files this one imports, by path, for the types declared in them.</summary>
         private Dictionary<string, MarkupDocument> importedMarkup;
@@ -85,6 +85,14 @@ namespace KScript.Language.Analysis
                 result.References.Add(new SymbolReference(symbol, span, false, false));
             }
         }
+
+        /// <summary>A &lt;type&gt;, or a KScript.Data &lt;model&gt; (a type whose records are kept in a table).</summary>
+        private bool IsTypeElement(MarkupElement e) =>
+            (IsKScriptElementName(e, "type") && catalog.GetElement("type")?.Package == "KScript.Core")
+            || IsModelElement(e);
+
+        private bool IsModelElement(MarkupElement e) =>
+            IsKScriptElementName(e, "model") && catalog.GetElement("model")?.Package == "KScript.Data";
 
         private static bool IsBuiltInTypeName(string name) =>
             BuiltInTypes.Contains(name, StringComparer.OrdinalIgnoreCase) || SemanticTypeNames.Contains(name, StringComparer.OrdinalIgnoreCase);

@@ -1,0 +1,12 @@
+import KScript.Data
+
+/// Something the shop sells.
+model Product {
+  timestamps: yes
+  unique: [sku]
+  sku: string(max: 20)
+  name: string(max: 120)
+  price: number(min: 0)
+  stock: int = 0
+  tags: string[] = []
+}

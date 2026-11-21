@@ -111,6 +111,19 @@ namespace KScript.Language.Analysis
             }
         }
 
+        /// <summary>
+        /// For calls that read bare words themselves, such as column names in KScript.Data (<c>->pluck(email)</c>,
+        /// <c>->where(role: admin)</c>): the words are values, so they aren't reported as unknown names.
+        /// </summary>
+        private void KeepBareWords(IEnumerable<ArgumentNode> args)
+        {
+            foreach (ArgumentNode a in args)
+            {
+                pendingBare.Remove(a);
+                pendingBareItems.Remove(a);
+            }
+        }
+
         private void FlushBare(IEnumerable<ArgumentNode> args, ExpressionRegion region, Scope scope)
         {
             foreach (ArgumentNode a in args)

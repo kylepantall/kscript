@@ -91,7 +91,7 @@ namespace KScript.Runtime
             foreach (Signature signature in Ordered(info, call))
             {
                 List<Slot> slots = signature.Parameters.Select(Slot.From).ToList();
-                if (TryResolve(call, slots, lenient: true, out object[] args, out HashSet<int> skipped, out Dictionary<string, object> rest, out KScriptException error))
+                if (TryResolve(call, slots, lenient: true, out object[] args, out HashSet<int> skipped, out Dictionary<string, object> rest, out KScriptException error, info.KeepsBareWords))
                 {
                     return new CallContext(call.Interpreter, call.Name, args, rest, call.Scope, call.Module, call.IsMethod, skipped)
                     {
@@ -143,7 +143,7 @@ namespace KScript.Runtime
         }
 
         private static bool TryResolve(CallContext call, List<Slot> slots, bool lenient, out object[] args, out HashSet<int> skipped,
-            out Dictionary<string, object> rest, out KScriptException error)
+            out Dictionary<string, object> rest, out KScriptException error, bool keepBare = false)
         {
             args = null;
             skipped = new HashSet<int>();
@@ -176,6 +176,11 @@ namespace KScript.Runtime
                 {
                     positional.Add(value);
                 }
+                else if (keepBare && !bare.Negated && slot != null && !slot.IsEnum)
+                {
+                    // A column name or word the method reads itself: ->pluck(email), @db(users).
+                    positional.Add(bare);
+                }
                 else if (Index(bare.Name) >= 0)
                 {
                     named.Add(new KeyValuePair<string, object>(bare.Name, !bare.Negated));
@@ -195,6 +200,11 @@ namespace KScript.Runtime
                 {
                     int index = Index(pair.Key);
                     string resolved = index >= 0 && !bare.Negated ? EnumValue(slots[index], bare.Name) : null;
+                    if (resolved == null && keepBare && (index < 0 ? variadic : slots[index].Values == null || slots[index].Values.Count == 0))
+                    {
+                        named.Add(new KeyValuePair<string, object>(pair.Key, bare));
+                        continue;
+                    }
                     if (resolved == null)
                     {
                         error = NotAValue(call, bare, index >= 0 ? slots[index] : null, slots);
@@ -284,6 +294,12 @@ namespace KScript.Runtime
             {
                 if (!(bound[i] is BareList list)) continue;
                 Slot slot = i < slots.Count ? slots[i] : slots.LastOrDefault(s => s.Variadic);
+                if (keepBare && slot?.IsEnumList != true)
+                {
+                    // The call reads the words itself: [id, name] are columns.
+                    bound[i] = list.Items.ToList();
+                    continue;
+                }
                 var items = new List<object>(list.Items.Count);
                 foreach (object item in list.Items)
                 {
@@ -308,6 +324,11 @@ namespace KScript.Runtime
             }
             foreach (string key in rest.Where(r => r.Value is BareList).Select(r => r.Key).ToList())
             {
+                if (keepBare)
+                {
+                    rest[key] = ((BareList)rest[key]).Items.ToList();
+                    continue;
+                }
                 error = NotAValue(call, ((BareList)rest[key]).FirstWord, null);
                 return false;
             }

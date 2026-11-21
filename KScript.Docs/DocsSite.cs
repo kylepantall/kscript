@@ -80,6 +80,7 @@ namespace KScript.Docs
             new Guide("stylesheets", "stylesheets.md", "Build", "Stylesheets"),
             new Guide("storage", "storage.md", "Build", "App folders: KScript.Storage", "kscript"),
             new Guide("cache", "cache.md", "Build", "Caching: KScript.Cache", "kscript"),
+            new Guide("data", "data.md", "Build", "Databases: KScript.Data", "kscript"),
             new Guide("auth", "auth.md", "Build", "Sign-in: KScript.Auth", "kscript"),
             new Guide("queues", "queues.md", "Build", "Queues and jobs: KScript.Queue", "kscript"),
             new Guide("documents", "documents.md", "Build", "Documents: KScript.Document", "kscript"),

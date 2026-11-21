@@ -307,7 +307,7 @@ namespace KScript.Runtime
 
             if (info.MustBeInside != null && info.MustBeInside.Count > 0 && !e.Ancestors().Any(a => info.MustBeInside.Contains(BareName(a.Name))
                     || (info.MustBeInside.Contains("fn") && module.Elements.TryGetValue(BareName(a.Name), out ElementDefinition outer) && outer.Info.IsFunctionBody)))
-                throw Located(new KScriptException($"<{info.Name}> must be inside <{string.Join("> or <", info.MustBeInside)}>.", "Syntax"), module, e.NameSpan.Start);
+                throw Located(new KScriptException($"<{info.Name}> must be inside {Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.", "Syntax"), module, e.NameSpan.Start);
 
             if (def.OwnsContent) return;
 
@@ -677,7 +677,7 @@ namespace KScript.Runtime
         /// The kinds of thing a script declares by name at its top level, which scripts that import it see:
         /// functions, constants, enums and types. kscript make has a generator for each one.
         /// </summary>
-        public static readonly IReadOnlyList<string> Declarations = new[] { "fn", "const", "enum", "type", "error", "job" };
+        public static readonly IReadOnlyList<string> Declarations = new[] { "fn", "const", "enum", "type", "error", "model", "job" };
 
         private void CollectExports(Module module)
         {
@@ -708,7 +708,7 @@ namespace KScript.Runtime
                 {
                     string close = Values.Closest(name, imported.Exports.Keys);
                     throw new KScriptException($"{imported.DisplayName} doesn't export '{name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                        + " Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s and <job>s.", "Import");
+                        + " Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s, <model>s and <job>s.", "Import");
                 }
                 scope.Declare(name, value);
             }
@@ -764,6 +764,7 @@ namespace KScript.Runtime
 
         private bool IsTypeDeclaration(Module module, MarkupElement e) =>
             ((e.Name == "type" || e.Name == "error") && module.DefinitionOf(e)?.Package is CorePackage)
+            || module.DefinitionOf(e)?.Hoisted == true
             || (e.Name == "job" && module.DefinitionOf(e)?.Package?.Name == "KScript.Queue");
 
         /// <summary>Runs one element. <paramref name="chain"/> is the result of the element before it, for &lt;elif&gt; and &lt;else&gt;.</summary>

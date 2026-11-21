@@ -455,6 +455,7 @@ namespace KScript.Projects
             ["styles"] = "styles",
             ["lib"] = "lib",
             ["types"] = "types",
+            ["models"] = "models",
             ["errors"] = "errors",
             ["storage"] = "lib",
             ["jobs"] = "jobs",

@@ -120,6 +120,12 @@ namespace KScript.Metadata
         /// <summary>The type of the result, when known.</summary>
         public string ReturnType { get; init; } = KType.Any;
 
+        /// <summary>
+        /// True when names the signature doesn't list, and words without quotes, mean something to the call itself, as
+        /// columns and values do in <c>$User->where(role: admin)</c>: they reach it as they are instead of being an error.
+        /// </summary>
+        public bool KeepsBareWords { get; set; }
+
         /// <summary>True if the callable is in the KScript 2 design but no package implements it yet.</summary>
         public bool Planned => Package == null && Kind != CallableKind.Function;
 
