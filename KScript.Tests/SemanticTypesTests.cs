@@ -270,7 +270,8 @@ public class SemanticTypesTests
     public void TheTypesGuideListsTheStringMethodsEachTypeKeeps()
     {
         string guide = File.ReadAllText(ScriptRunner.RepoFile("docs", "types.md"));
-        foreach ((string type, HashSet<string> kept) in KScript.Metadata.KType.StringMethodsOf)
+        // Types a package adds (a test package may have added one) are documented by the package.
+        foreach ((string type, HashSet<string> kept) in KScript.Metadata.KType.StringMethodsOf.Where(t => KScript.Metadata.NativeTypes.Get(t.Key).Package == null))
         {
             string row = guide.Split('\n').Single(l => l.StartsWith($"| `{type}` | `contains`", StringComparison.Ordinal));
             Assert.Equal(kept.OrderBy(n => n), row.Split('|')[2].Split(',').Select(n => n.Trim().Trim('`')).OrderBy(n => n));

@@ -103,10 +103,10 @@ namespace KScript.Language.Agents
         /// <summary>The longest example kept, in characters.</summary>
         public const int ExampleLimit = 100;
 
-        /// <summary>Budgets in characters (about four to a token): AGENTS.md's section, index.md and each package file.</summary>
+        /// <summary>Budgets in characters (about four to a token): AGENTS.md's section, index.md and each package file. KScript.Core is the biggest package file, with the methods of every native type.</summary>
         public static int AgentsBudget = 7000;
         public static int IndexBudget = 16000;
-        public static int PackageBudget = 28000;
+        public static int PackageBudget = 44000;
 
         private static readonly HashSet<string> SkippedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "bin", "obj", "node_modules", "dist", "_templates" };
 

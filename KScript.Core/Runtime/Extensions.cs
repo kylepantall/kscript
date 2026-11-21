@@ -32,6 +32,15 @@ namespace KScript.Runtime
     internal sealed class ProjectExtensionSet
     {
         public List<Module> Modules { get; } = new List<Module>();
+
+        /// <summary>The project's native type files (the natives folder, or kscript.json's "natives").</summary>
+        public List<Module> Natives { get; } = new List<Module>();
+
+        /// <summary>
+        /// The types and enums the native type files declare, filled in as they run. Every script in the project
+        /// sees them through its globals' parent scope, so a script's own type of the same name wins.
+        /// </summary>
+        public Scope NativeScope { get; } = new Scope();
     }
 
     /// <summary>
@@ -42,7 +51,8 @@ namespace KScript.Runtime
     internal static class Extensions
     {
         /// <summary>The built-in types an extend block can name. Packages' own types (file, response, ...) work too.</summary>
-        public static readonly string[] BuiltInTypes = { "string", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "regex" };
+        public static IEnumerable<string> BuiltInTypes =>
+            new[] { "string", "number", "bool", "list", "map", "fn", "date" }.Concat(KScript.Metadata.NativeTypes.Names);
 
         /// <summary>The receiver an extend block's type means: int and float are numbers.</summary>
         public static string Receiver(string type) => type switch
@@ -208,18 +218,34 @@ namespace KScript.Runtime
             if (projectExtensions.TryGetValue(file, out ProjectExtensionSet set)) return set;
 
             set = projectExtensions[file] = new ProjectExtensionSet();
-            List<string> files;
+            List<string> files, natives;
             try
             {
-                files = ProjectConfig.Load(file).ExtensionFiles();
+                ProjectConfig config = ProjectConfig.Load(file);
+                files = config.ExtensionFiles();
+                natives = config.NativeFiles();
             }
             catch (ProjectConfigException)
             {
                 return set; // the project's own commands report a broken kscript.json
             }
+            foreach (string path in natives)
+            {
+                set.Natives.Add(modulesByPath.TryGetValue(path, out Module loaded) ? loaded : Load(path));
+            }
             foreach (string path in files)
             {
                 set.Modules.Add(modulesByPath.TryGetValue(path, out Module loaded) ? loaded : Load(path));
+            }
+
+            // Native types first, so extensions (and later natives) can use them.
+            foreach (Module m in set.Natives.ToList())
+            {
+                RunModule(m);
+                foreach (KeyValuePair<string, object> export in m.Exports)
+                {
+                    if (export.Value is RefinedType || export.Value is RecordType || export.Value is EnumType) set.NativeScope.Declare(export.Key, export.Value);
+                }
             }
             foreach (Module m in set.Modules.ToList())
             {

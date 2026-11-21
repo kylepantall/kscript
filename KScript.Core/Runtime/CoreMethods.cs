@@ -57,6 +57,7 @@ namespace KScript.Runtime
             RegisterDateMethods(p);
             RegisterStringMethods(p);
             RegisterSemanticMethods(p);
+            RegisterNativeMethods(p);
         }
 
         private const string StrengthRules = "min?: int, max?: int, upper?: bool, lower?: bool, digit?: bool, symbol?: bool, common?: bool, not?: list, score?: int";

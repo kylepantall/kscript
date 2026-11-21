@@ -39,6 +39,12 @@
       "items": { "type": "string" },
       "default": ["extensions"]
     },
+    "natives": {
+      "type": "array",
+      "description": "Where the project's native types are: folders (everything inside, subfolders too) or globs, relative to kscript.json. The types and enums they declare (type Sku with [string] { ... }) work in every script in the project without an import. kscript make native writes to the first folder. Default: [\"natives\"].",
+      "items": { "type": "string" },
+      "default": ["natives"]
+    },
     "serve": {
       "type": "object",
       "description": "Defaults for kscript serve. Options on the command line win.",

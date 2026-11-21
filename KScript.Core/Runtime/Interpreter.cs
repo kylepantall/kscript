@@ -180,8 +180,8 @@ namespace KScript.Runtime
         {
             var source = new SourceText(string.Empty);
             var module = new Module(this, path, source, MarkupParser.Parse(source, DocumentKind.Page)) { HasRun = true };
-            module.Globals = new Scope();
             module.ProjectExtensions = ProjectExtensionsFor(module);
+            module.Globals = new Scope(module.ProjectExtensions?.NativeScope);
             AddPackage(module, Packages.Core, null);
             foreach (string name in Options.DefaultPackages.Concat(packages ?? Enumerable.Empty<string>()))
             {
@@ -652,12 +652,12 @@ namespace KScript.Runtime
             module.Running = true;
             try
             {
-                module.Globals = new Scope();
+                module.ProjectExtensions = ProjectExtensionsFor(module);
+                module.Globals = new Scope(module.ProjectExtensions?.NativeScope);
                 foreach (VariableDefinition v in module.Variables.Values)
                 {
                     module.Globals.Declare(v.Name, v.Value(this, module));
                 }
-                module.ProjectExtensions = ProjectExtensionsFor(module);
 
                 if (module.IsPackageRoot)
                 {

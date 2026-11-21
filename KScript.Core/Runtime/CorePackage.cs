@@ -51,7 +51,7 @@ namespace KScript.Runtime
                 ContentKind.Expression,
                 new A("name", K.DeclareVariable, "The variable to declare."),
                 new A("value", K.Expression, "The initial value. Can be written as the element's text instead."),
-                new A("type", K.TypeName, "Convert the value to this type, or fail early: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes),
+                new A("type", K.TypeName, "Convert the value to this type, or fail early: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes.ToArray()),
                 new A("const", K.Bool, "yes makes a later <set> an error."))
             {
                 Example = "<let name=\"count\" value=\"0\" />\n<let name=\"people\">[{ name: 'Joan', age: 82 }]</let>\n<let>x = 3</let>",
@@ -61,7 +61,7 @@ namespace KScript.Runtime
                 ContentKind.Expression,
                 new A("name", K.DeclareVariable, "The constant to declare.", true),
                 new A("value", K.Expression, "Its value. Can be written as the element's text instead."),
-                new A("type", K.TypeName, "Convert the value to this type, or fail early: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes),
+                new A("type", K.TypeName, "Convert the value to this type, or fail early: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes.ToArray()),
                 new A("description", K.Text, "What the constant is for, shown on hover."))
             {
                 Example = "<const name=\"max_size\" value=\"10 * 1024\" />",
@@ -101,7 +101,7 @@ namespace KScript.Runtime
                 new A("fields", K.Fields, "A short type's fields on one line, like fn params: `login: string, id: int, avatar_url?: string`. Bigger types list their fields one per line instead (<field> elements)."),
                 new A("sample", K.Path, "A JSON file holding an example of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
                 new A("extra", K.Enum, "Keys in the data that the type doesn't list: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
-                new A("with", K.TypeNames, "Other types this one is made from. Types with fields are joined: `with=\"User, Auditable\"` has all their fields and rules, and fits wherever they do. One built-in type, such as `with=\"int\"` or `with=\"handle\"`, makes a type with rules instead of fields: min, max, pattern, one_of, not, <validate> and <normalize>.", false, Values.DeclarableTypes),
+                new A("with", K.TypeNames, "Other types this one is made from. Types with fields are joined: `with=\"User, Auditable\"` has all their fields and rules, and fits wherever they do. One built-in type, such as `with=\"int\"` or `with=\"handle\"`, makes a type with rules instead of fields: min, max, pattern, one_of, not, <validate> and <normalize>.", false, Values.DeclarableTypes.ToArray()),
                 new A("min", K.Text, "The smallest value allowed: a number for numbers, a date for dates, the length for text (a handle's name without its @), the count for lists. Needs with=\"...\" naming one built-in type."),
                 new A("max", K.Text, "The largest value allowed: a number for numbers, a date for dates, the length for text, the count for lists. Needs with=\"...\" naming one built-in type."),
                 new A("pattern", K.Text, "A regular expression the value's text must match: `^[a-z0-9-]+$`. On a type with fields, its named groups fill the fields of the same name, so the type can be made from text."),
@@ -137,7 +137,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("field", "One field of a <type>, <error>, <model> or <job>: in a .kscript file, one line of the block, `stars: int from stargazers_count`.", ContentKind.Empty,
                 new A("name", K.Text, "The field's name. End it with ? to make it optional.", true),
-                new A("type", K.TypeName, "The field's type: a built-in such as string or int, an <enum>, another <type>, T[] for a list, T? to allow null. Defaults to any.", false, Values.DeclarableTypes),
+                new A("type", K.TypeName, "The field's type: a built-in such as string or int, an <enum>, another <type>, T[] for a list, T? to allow null. Defaults to any.", false, Values.DeclarableTypes.ToArray()),
                 new A("from", K.Text, "Where to read the value, when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`."),
                 new A("default", K.Expression, "The value when the data has none (makes the field optional)."),
                 new A("optional", K.Bool, "yes lets the value be missing or null."),
@@ -172,7 +172,7 @@ namespace KScript.Runtime
                 new A("name", K.VariableReference, "The variable to change."),
                 new A("value", K.Expression, "The new value. Can be written as the element's text instead."),
                 new A("op", K.Enum, "Update instead of replace: op=\"+=\" value=\"1\".", false, "=", "+=", "-=", "*=", "/=", "??="),
-                new A("type", K.TypeName, "Convert the value to this type, or fail: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes))
+                new A("type", K.TypeName, "Convert the value to this type, or fail: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes.ToArray()))
             {
                 Example = "<let name=\"total\" value=\"0\" />\n<let name=\"count\" value=\"0\" />\n<set name=\"total\" value=\"$total + 2.50 * 3\" />\n<set>count += 1</set>\n<echo>$count item, $total</echo>",
             }, run => Assign(run, declare: false));

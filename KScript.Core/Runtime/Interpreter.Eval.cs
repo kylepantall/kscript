@@ -37,7 +37,7 @@ namespace KScript.Runtime
         /// <summary>Text that is plainly a handle (<c>@a--b</c>, which would otherwise read as @a - -b), for a handle type.</summary>
         internal static bool LooksRaw(string text, string kind) => kind == "handle" && RawHandle.IsMatch(text.Trim());
 
-        /// <summary>True if <paramref name="node"/> is only bare words, numbers and the operators between them (<c>my-post</c>, <c>H4cmW12in</c>).</summary>
+        /// <summary>True if <paramref name="node"/> is only bare words, numbers and the operators between them (<c>my-post</c>, <c>H4cmW12in</c>, <c>Europe/London</c>).</summary>
         internal static bool IsRawWord(ExprNode node, string kind, Scope scope, Module module)
         {
             switch (node)
@@ -46,7 +46,10 @@ namespace KScript.Runtime
                     return !(module != null && module.Aliases.ContainsKey(id.Name));
                 case CommandCallNode { ArgumentList: null }:
                     return kind == "handle";
-                case BinaryNode bin when bin.Operator == "-" || bin.Operator == "." || bin.Operator == "+":
+                case MemberNode { NullSafe: false } member when kind == "word":
+                    // example.com, api.example.co.uk
+                    return IsRawPart(member.Target, kind, scope, module);
+                case BinaryNode bin when bin.Operator == "-" || bin.Operator == "." || bin.Operator == "+" || bin.Operator == "/":
                     return IsRawWord(bin.Left, kind, scope, module) && IsRawPart(bin.Right, kind, scope, module)
                         || IsRawPart(bin.Left, kind, scope, module) && IsRawWord(bin.Right, kind, scope, module);
                 default:
@@ -184,7 +187,7 @@ namespace KScript.Runtime
                         LiteralKind.Number => double.Parse(lit.Value, NumberStyles.Float, CultureInfo.InvariantCulture),
                         LiteralKind.String => lit.Value,
                         LiteralKind.Bool => lit.Value == "true",
-                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid => TypedLiteral(lit, ctx),
+                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url => TypedLiteral(lit, ctx),
                         _ => null,
                     };
 
@@ -856,9 +859,9 @@ namespace KScript.Runtime
         /// <summary>A regex, email or UUID written without quotes. One that isn't valid fails at the literal.</summary>
         private object TypedLiteral(LiteralNode lit, EvalContext ctx)
         {
-            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, _ => SemanticTypes.Uuid };
+            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, LiteralKind.Url => "url", _ => SemanticTypes.Uuid };
             if (SemanticTypes.TryConvert(type, lit.Value, out object value, out string reason)) return value;
-            throw Fail(lit, ctx, $"{lit.Value} isn't {(type == SemanticTypes.Email ? "an" : "a")} {type}: {reason}.", "Syntax");
+            throw Fail(lit, ctx, $"{lit.Value} isn't {KScript.Metadata.NativeTypes.Get(type).WithArticle}: {reason}.", "Syntax");
         }
 
         /// <summary>Calls <c>value->name(args)</c>.</summary>
