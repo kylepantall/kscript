@@ -69,6 +69,7 @@ if [ "$os" = osx ]; then
 fi
 # The desktop UI's native libraries ship beside kscript. Rename everything into place so a running kscript isn't disturbed.
 for file in "$tmp/pkg"/*; do
+  [ -d "$file" ] && continue
   [ "$file" = "$tmp/pkg/kscript" ] || mv -f "$file" "$BIN_DIR/"
 done
 mv -f "$tmp/pkg/kscript" "$BIN_DIR/kscript"

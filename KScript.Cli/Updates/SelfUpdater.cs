@@ -335,6 +335,17 @@ namespace KScript.Updates
         }
 
         /// <summary>
+        /// The file name of an archive entry at the top of the archive (<c>kscript</c>, <c>./libSkiaSharp.dylib</c>),
+        /// or null for a folder or anything inside one.
+        /// </summary>
+        internal static string TopLevelName(string entryName)
+        {
+            string name = entryName.Replace('\\', '/');
+            while (name.StartsWith("./", StringComparison.Ordinal)) name = name.Substring(2);
+            return name.Length == 0 || name.Contains('/') ? null : name;
+        }
+
+        /// <summary>
         /// Writes the other files of a release archive (the desktop UI's native libraries) into <paramref name="dir"/>,
         /// each staged and then moved into place. Returns their names; older releases have none.
         /// </summary>
@@ -343,8 +354,12 @@ namespace KScript.Updates
             var written = new List<string>();
             void Write(string name, Action<string> extract)
             {
-                name = Path.GetFileName(name);
-                if (name.Length == 0 || name == "kscript" || string.Equals(name, "kscript.exe", StringComparison.OrdinalIgnoreCase)) return;
+                // Only files at the top of the archive sit beside kscript. Anything in a folder (such as a macOS
+                // KScript.dsym bundle, whose DWARF/KScript would land on kscript on a case-insensitive disk) is skipped,
+                // and so is any name that differs from kscript only in case.
+                name = TopLevelName(name);
+                if (name == null || string.Equals(name, "kscript", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(name, "kscript.exe", StringComparison.OrdinalIgnoreCase)) return;
                 string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}-{name}");
                 try
                 {
@@ -384,7 +399,7 @@ namespace KScript.Updates
             if (assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             {
                 using var zip = new ZipArchive(archive, ZipArchiveMode.Read, leaveOpen: true);
-                var entry = zip.Entries.FirstOrDefault(e => string.Equals(e.Name, "kscript.exe", StringComparison.OrdinalIgnoreCase))
+                var entry = zip.Entries.FirstOrDefault(e => string.Equals(TopLevelName(e.FullName), "kscript.exe", StringComparison.OrdinalIgnoreCase))
                     ?? throw new InvalidDataException($"{assetName} has no kscript.exe inside.");
                 entry.ExtractToFile(destination, overwrite: true);
                 return;
@@ -395,7 +410,7 @@ namespace KScript.Updates
             TarEntry e;
             while ((e = tar.GetNextEntry()) != null)
             {
-                if ((e.EntryType is TarEntryType.RegularFile or TarEntryType.V7RegularFile) && Path.GetFileName(e.Name) == "kscript")
+                if ((e.EntryType is TarEntryType.RegularFile or TarEntryType.V7RegularFile) && TopLevelName(e.Name) == "kscript")
                 {
                     e.ExtractToFile(destination, overwrite: true);
                     return;
