@@ -89,12 +89,13 @@ namespace KScript.LanguageServer
             }
 
             int changed = 0, failed = 0, formatted = 0;
+            var cli = new KScript.Output.CliOutput(output);
             foreach (string file in files)
             {
                 string shown = file.StartsWith("./", StringComparison.Ordinal) || file.StartsWith(".\\", StringComparison.Ordinal) ? file.Substring(2) : file;
                 if (MarkupKind(file) == Syntax.Markup.DocumentKind.Markdown)
                 {
-                    output.WriteLine($"{shown}: skipped (Markdown pages are not reformatted)");
+                    cli.TwoColumn(shown, cli.Style.Gray("Markdown pages are not reformatted") + " " + cli.Style.Apply("SKIPPED", "1;33"));
                     continue;
                 }
 
@@ -111,7 +112,7 @@ namespace KScript.LanguageServer
 
                 if (config != null && !config.Format.Enabled)
                 {
-                    output.WriteLine($"{shown}: skipped (format.enabled is false in {config.FilePath})");
+                    cli.TwoColumn(shown, cli.Style.Gray($"format.enabled is false in {config.FilePath}") + " " + cli.Style.Apply("SKIPPED", "1;33"));
                     continue;
                 }
 
@@ -137,29 +138,29 @@ namespace KScript.LanguageServer
                 changed++;
                 if (check)
                 {
-                    output.WriteLine($"{shown}: not formatted");
+                    cli.TwoColumn(shown, cli.Style.Apply("NOT FORMATTED", "1;31"));
                 }
                 else
                 {
                     File.WriteAllText(file, result.Text, new UTF8Encoding(bom));
-                    output.WriteLine($"{shown}: formatted");
+                    cli.TwoColumn(shown, cli.Style.Apply("FORMATTED", "1;32"));
                 }
             }
 
             string files1 = formatted == 1 ? "file" : "files";
+            if (changed + failed > 0) cli.NewLine();
             if (check)
             {
-                output.WriteLine(changed == 0
-                    ? $"{formatted} {files1} checked: all formatted."
-                    : $"{formatted} {files1} checked: {changed} need formatting. Run kscript fmt to fix {(changed == 1 ? "it" : "them")}.");
+                if (changed == 0) cli.Success($"{formatted} {files1} checked: all formatted.");
+                else cli.Error($"{formatted} {files1} checked: {changed} need formatting. Run kscript fmt to fix {(changed == 1 ? "it" : "them")}.");
             }
             else
             {
-                output.WriteLine($"{formatted} {files1} checked: {changed} formatted.");
+                cli.Success($"{formatted} {files1} checked: {changed} formatted.");
             }
             if (failed > 0)
             {
-                output.WriteLine($"{failed} file{(failed == 1 ? " has" : "s have")} errors and {(failed == 1 ? "was" : "were")} left alone; kscript check shows the details.");
+                cli.Error($"{failed} file{(failed == 1 ? " has" : "s have")} errors and {(failed == 1 ? "was" : "were")} left alone; kscript check shows the details.");
             }
             return failed > 0 || (check && changed > 0) ? 1 : 0;
         }

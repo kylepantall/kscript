@@ -1,5 +1,6 @@
 using System.Globalization;
 
+using KScript.Output;
 using KScript.Projects;
 using KScript.Runtime;
 
@@ -82,12 +83,17 @@ namespace KScript.Queueing
             {
                 QueueSettings.Connection connection = context.Connection(options.Connection);
                 if (connection.Driver == "memory")
-                    error.WriteLine("The memory connection only holds jobs dispatched in this process, so this worker won't see jobs from other runs. Use kscript serve --with-worker, or a file connection.");
+                    new CliOutput(error).Warn("The memory connection only holds jobs dispatched in this process, so this worker won't see jobs from other runs. Use kscript serve --with-worker, or a file connection.");
                 if (!options.Once && !options.StopWhenEmpty)
-                    output.WriteLine($"Worker: {connection.Name} ({connection.Driver}), queues {worker.QueuesText}. Ctrl+C stops it after the running jobs finish.");
+                {
+                    var cli = new CliOutput(output);
+                    cli.NewLine();
+                    cli.Info($"Processing jobs from the [{connection.Name}] connection ({connection.Driver}), queues [{worker.QueuesText}].\nCtrl+C stops it after the running jobs finish.");
+                    cli.NewLine();
+                }
                 int failures = worker.Run(stop);
                 if (options.Once || options.StopWhenEmpty)
-                    output.WriteLine($"Ran {worker.Processed} job{(worker.Processed == 1 ? string.Empty : "s")}" + (failures > 0 ? $", {failures} failed." : "."));
+                    new CliOutput(output).Label(failures > 0 ? "WARN" : "DONE", failures > 0 ? CliOutput.WarnCode : CliOutput.DoneCode, $"Ran {worker.Processed} job{(worker.Processed == 1 ? string.Empty : "s")}" + (failures > 0 ? $", {failures} failed." : "."));
                 return failures > 0 && (options.Once || options.StopWhenEmpty) ? 1 : 0;
             }
             catch (KScriptException ex)
@@ -177,9 +183,15 @@ namespace KScript.Queueing
                         }, indented: true));
                         return 0;
                     }
-                    output.WriteLine($"Connection {driver.Name} ({driver.Kind}){(driver is FileQueueDriver f ? ": " + f.Folder : string.Empty)}");
-                    Table(output, new[] { "Queue", "Waiting", "Delayed", "Running", "Failed" },
-                        rows.Select(r => new[] { r.Queue, N(r.Waiting), N(r.Delayed), N(r.Running), N(r.Failed) }));
+                    var cli = new CliOutput(output);
+                    cli.NewLine();
+                    cli.TwoColumn(cli.Style.Bold("Connection"), $"{driver.Name} ({driver.Kind})");
+                    if (driver is FileQueueDriver f) cli.TwoColumn(cli.Style.Bold("Folder"), f.Folder);
+                    cli.NewLine();
+                    string Count(int n, Func<string, string> colour) => n == 0 ? cli.Style.Gray("0") : colour(N(n));
+                    cli.Table(new[] { "Queue", "Waiting", "Delayed", "Running", "Failed" },
+                        rows.Select(r => new[] { r.Queue, Count(r.Waiting, cli.Style.Green), Count(r.Delayed, cli.Style.Yellow), Count(r.Running, cli.Style.Cyan), Count(r.Failed, cli.Style.Red) }),
+                        new[] { CliAlign.Left, CliAlign.Right, CliAlign.Right, CliAlign.Right, CliAlign.Right });
                     return 0;
                 }
                 case "list":
@@ -192,10 +204,10 @@ namespace KScript.Queueing
                     }
                     if (jobs.Count == 0)
                     {
-                        output.WriteLine(target == null ? "No jobs are waiting." : $"No jobs are waiting on {target}.");
+                        new CliOutput(output).Info(target == null ? "No jobs are waiting." : $"No jobs are waiting on [{target}].");
                         return 0;
                     }
-                    Table(output, new[] { "Id", "Job", "Queue", "Runs", "Fields" },
+                    new CliOutput(output).Table(new[] { "Id", "Job", "Queue", "Runs", "Fields" },
                         jobs.Select(j => new[] { j.Id, j.Job, j.Queue, j.AvailableAt <= QueueRuntime.Clock() ? "now" : When(j.AvailableAt), Fields(j) }));
                     return 0;
                 }
@@ -209,12 +221,14 @@ namespace KScript.Queueing
                     }
                     if (jobs.Count == 0)
                     {
-                        output.WriteLine("No failed jobs.");
+                        new CliOutput(output).Success("No failed jobs.");
                         return 0;
                     }
-                    Table(output, new[] { "Id", "Job", "Queue", "Failed", "Tries", "Error" },
-                        jobs.Select(j => new[] { j.Id, j.Job, j.Queue, When(j.FailedAt ?? j.AvailableAt), j.Attempts + "/" + j.Tries, Error(j) }));
-                    output.WriteLine("kscript queue retry <id> (or --all) runs one again; kscript queue forget <id> deletes it.");
+                    var failedOut = new CliOutput(output);
+                    failedOut.Table(new[] { "Id", "Job", "Queue", "Failed", "Tries", "Error" },
+                        jobs.Select(j => new[] { j.Id, j.Job, j.Queue, When(j.FailedAt ?? j.AvailableAt), j.Attempts + "/" + j.Tries, failedOut.Style.Red(Error(j)) }));
+                    failedOut.NewLine();
+                    failedOut.Info("kscript queue retry <id> (or --all) runs one again; kscript queue forget <id> deletes it.");
                     return 0;
                 }
                 case "retry":
@@ -225,13 +239,13 @@ namespace KScript.Queueing
                     List<string> ids = all ? driver.Failed().Select(j => j.Id).ToList() : new List<string> { target };
                     int done = ids.Count(id => retry ? driver.Retry(id) : driver.Forget(id));
                     if (!all && done == 0) return Fail(error, $"There is no failed job '{target}'. kscript queue failed lists them.");
-                    output.WriteLine(retry ? $"{done} failed job{(done == 1 ? " is" : "s are")} back on {(done == 1 ? "its queue" : "their queues")}." : $"{done} failed job{(done == 1 ? string.Empty : "s")} deleted.");
+                    new CliOutput(output).Success(retry ? $"{done} failed job{(done == 1 ? " is" : "s are")} back on {(done == 1 ? "its queue" : "their queues")}." : $"{done} failed job{(done == 1 ? string.Empty : "s")} deleted.");
                     return 0;
                 }
                 case "clear":
                 {
                     int removed = driver.Clear(target);
-                    output.WriteLine($"Removed {removed} waiting job{(removed == 1 ? string.Empty : "s")}" + (target != null ? $" from {target}." : "."));
+                    new CliOutput(output).Success($"Removed {removed} waiting job{(removed == 1 ? string.Empty : "s")}" + (target != null ? $" from {target}." : "."));
                     return 0;
                 }
                 default:
@@ -284,18 +298,9 @@ namespace KScript.Queueing
             return text.Length > 80 ? text.Substring(0, 77) + "..." : text;
         }
 
-        private static void Table(TextWriter output, string[] headers, IEnumerable<string[]> rows)
-        {
-            List<string[]> all = rows.ToList();
-            int[] widths = headers.Select((h, i) => Math.Max(h.Length, all.Count == 0 ? 0 : all.Max(r => r[i].Length))).ToArray();
-            string Row(string[] cells) => string.Join("  ", cells.Select((c, i) => i == cells.Length - 1 ? c : c.PadRight(widths[i]))).TrimEnd();
-            output.WriteLine(Row(headers));
-            foreach (string[] row in all) output.WriteLine(Row(row));
-        }
-
         private static int Fail(TextWriter error, string message)
         {
-            error.WriteLine(message);
+            new CliOutput(error).Error(message);
             return 1;
         }
     }

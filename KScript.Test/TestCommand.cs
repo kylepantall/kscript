@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Xml.Linq;
+using KScript.Output;
 
 using KScript.Projects;
 
@@ -108,39 +109,33 @@ namespace KScript.Testing
 
             var missing = new List<string>();
             List<string> files = TestRunner.Discover(paths, missing);
-            foreach (string m in missing) error.WriteLine($"There is no file or folder at '{m}'.");
+            foreach (string m in missing) new CliOutput(error).Error($"There is no file or folder at '{m}'.");
             if (missing.Count > 0) return 1;
             if (files.Count == 0)
             {
-                error.WriteLine($"No test files found in {string.Join(", ", paths)}. Test files are named like greet.test.kscript (or greet.test.ks.xml); create one with kscript make test greet.");
+                new CliOutput(error).Error($"No test files found in {string.Join(", ", paths)}. Test files are named like greet.test.kscript (or greet.test.ks.xml); create one with kscript make test greet.");
                 return 1;
             }
 
-            var style = new Style(color ?? UseColor());
+            var cli = new CliOutput(output, color);
+            var style = cli.Style;
             var clock = Stopwatch.StartNew();
             var results = new List<TestFileResult>();
             foreach (string file in files)
             {
-                bool headed = false;
                 string display = Path.GetRelativePath(settings.BaseDirectory, file).Replace('\\', '/');
-                void Head()
-                {
-                    if (headed) return;
-                    headed = true;
-                    output.WriteLine(style.Bold(display.StartsWith("..", StringComparison.Ordinal) ? file : display));
-                }
+                if (display.StartsWith("..", StringComparison.Ordinal)) display = file;
 
+                // A file's results are collected, then shown under a PASS or FAIL label, as Pest and artisan test do.
+                var lines = new StringWriter { NewLine = output.NewLine };
                 TestFileResult result;
                 try
                 {
-                    result = TestRunner.RunFile(file, settings, r =>
-                    {
-                        Head();
-                        PrintResult(output, style, r);
-                    });
+                    result = TestRunner.RunFile(file, settings, r => PrintResult(lines, style, r));
                 }
                 catch (OperationCanceledException)
                 {
+                    output.Write(lines.ToString());
                     error.WriteLine("Stopped.");
                     return 130;
                 }
@@ -148,17 +143,20 @@ namespace KScript.Testing
 
                 if (result.Error != null)
                 {
-                    Head();
-                    output.WriteLine($"  {style.Red("✗")} {style.Red("Could not run the file:")} {Indent(result.Error, 4).TrimStart()}");
-                    if (!string.IsNullOrEmpty(result.Output)) output.WriteLine(style.Dim($"    Output:\n{Indent(result.Output, 6)}"));
+                    lines.WriteLine($"  {style.Red("✗")} {style.Red("Could not run the file:")} {Indent(result.Error, 4).TrimStart()}");
+                    if (!string.IsNullOrEmpty(result.Output)) lines.WriteLine(style.Dim($"    Output:\n{Indent(result.Output, 6)}"));
                 }
                 else if (result.Tests.Count == 0)
                 {
                     // With --filter, files without a match are left out of the output.
                     if (!string.IsNullOrEmpty(settings.Filter)) continue;
-                    Head();
-                    output.WriteLine(style.Dim("  (no tests in this file)"));
+                    lines.WriteLine(style.Dim("  (no tests in this file)"));
                 }
+
+                if (result.Failed || result.Error != null) cli.Label("FAIL", CliOutput.ErrorCode, display);
+                else if (result.Tests.Count > 0 && result.Tests.All(t => t.Outcome == TestOutcome.Skipped)) cli.Label("SKIP", CliOutput.WarnCode, display);
+                else cli.Label("PASS", CliOutput.DoneCode, display);
+                output.Write(lines.ToString());
                 output.WriteLine();
             }
             clock.Stop();
@@ -170,21 +168,21 @@ namespace KScript.Testing
             int brokenFiles = results.Count(r => r.Error != null);
 
             var parts = new List<string>();
-            if (failed > 0) parts.Add(style.Red($"{failed} failed"));
-            if (passed > 0) parts.Add(style.Green($"{passed} passed"));
-            if (skipped > 0) parts.Add(style.Yellow($"{skipped} skipped"));
+            if (failed > 0) parts.Add(style.Apply($"{failed} failed", "1;31"));
+            if (passed > 0) parts.Add(style.Apply($"{passed} passed", "1;32"));
+            if (skipped > 0) parts.Add(style.Apply($"{skipped} skipped", "1;33"));
             parts.Add($"{all.Count} total");
-            output.WriteLine($"Tests: {string.Join(", ", parts)}");
+            output.WriteLine($"  {style.Gray("Tests:")}    {string.Join(", ", parts)}");
             int failedFiles = results.Count(r => r.Failed);
-            output.WriteLine($"Files: {(failedFiles > 0 ? style.Red($"{failedFiles} failed") + ", " : string.Empty)}{results.Count} total{(brokenFiles > 0 ? $" ({brokenFiles} could not run)" : string.Empty)}");
-            output.WriteLine($"Time:  {clock.Elapsed.TotalSeconds.ToString("0.00", CultureInfo.InvariantCulture)}s");
+            output.WriteLine($"  {style.Gray("Files:")}    {(failedFiles > 0 ? style.Apply($"{failedFiles} failed", "1;31") + ", " : string.Empty)}{results.Count} total{(brokenFiles > 0 ? $" ({brokenFiles} could not run)" : string.Empty)}");
+            output.WriteLine($"  {style.Gray("Duration:")} {clock.Elapsed.TotalSeconds.ToString("0.00", CultureInfo.InvariantCulture)}s");
 
             if (junit != null)
             {
                 try
                 {
                     WriteJUnit(junit, results, clock.Elapsed);
-                    output.WriteLine($"Wrote {junit}");
+                    cli.Info($"Wrote the JUnit report to [{junit}].");
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
@@ -195,13 +193,13 @@ namespace KScript.Testing
 
             if (all.Count == 0 && brokenFiles == 0)
             {
-                error.WriteLine(string.IsNullOrEmpty(settings.Filter) ? "No tests found." : $"No tests match '{settings.Filter}'.");
+                new CliOutput(error).Warn(string.IsNullOrEmpty(settings.Filter) ? "No tests found." : $"No tests match '{settings.Filter}'.");
                 return 1;
             }
             return failed == 0 && brokenFiles == 0 ? 0 : 1;
         }
 
-        private static void PrintResult(TextWriter output, Style style, TestResult r)
+        private static void PrintResult(TextWriter output, CliStyle style, TestResult r)
         {
             string time = style.Dim($" ({FormatDuration(r.Duration)})");
             switch (r.Outcome)
@@ -232,13 +230,9 @@ namespace KScript.Testing
 
         private static int Fail(TextWriter error, string message)
         {
-            error.WriteLine(message);
+            new KScript.Output.CliOutput(error).Error(message);
             return 1;
         }
-
-        private static bool UseColor() =>
-            Environment.GetEnvironmentVariable("FORCE_COLOR") != null
-            || (!Console.IsOutputRedirected && Environment.GetEnvironmentVariable("NO_COLOR") == null);
 
         /// <summary>Writes the results as JUnit XML, which most CI systems (GitHub Actions, GitLab, Jenkins, Azure) can show.</summary>
         public static void WriteJUnit(string path, IReadOnlyList<TestFileResult> results, TimeSpan total)
@@ -300,20 +294,5 @@ namespace KScript.Testing
         }
 
         private static string FirstLine(string text) => (text ?? string.Empty).Replace("\r\n", "\n").Split('\n')[0];
-
-        private sealed class Style
-        {
-            private readonly bool on;
-
-            public Style(bool on) => this.on = on;
-
-            private string Wrap(string code, string text) => on ? $"\u001b[{code}m{text}\u001b[0m" : text;
-
-            public string Bold(string t) => Wrap("1", t);
-            public string Dim(string t) => Wrap("2", t);
-            public string Red(string t) => Wrap("31", t);
-            public string Green(string t) => Wrap("32", t);
-            public string Yellow(string t) => Wrap("33", t);
-        }
     }
 }

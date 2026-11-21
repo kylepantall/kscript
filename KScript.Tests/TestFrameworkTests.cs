@@ -376,7 +376,7 @@ public class TestFrameworkTests
         Assert.Equal(0, code);
         Assert.Contains("  ✓ math › adds (", output);
         Assert.Contains("  ○ later (skipped)", output);
-        Assert.Contains("Tests: 1 passed, 1 skipped, 2 total", output);
+        Assert.Contains("Tests:    1 passed, 1 skipped, 2 total", output);
 
         (code, output, _) = Command(site.Root);
         Assert.Equal(1, code);
@@ -384,8 +384,8 @@ public class TestFrameworkTests
         Assert.Contains("      Expected 1 to equal 2, but it was 1.\n      at ", output);
         Assert.Contains("bad.test.ks.xml:1:", output);
         Assert.Contains("      Output:\n        log line", output);
-        Assert.Contains("Tests: 1 failed, 1 passed, 1 skipped, 3 total", output);
-        Assert.Contains("Files: 1 failed, 2 total", output);
+        Assert.Contains("Tests:    1 failed, 1 passed, 1 skipped, 3 total", output);
+        Assert.Contains("Files:    1 failed, 2 total", output);
 
         (code, _, string err) = Command(site.Root, "--filter", "nothing like this");
         Assert.Equal(1, code);

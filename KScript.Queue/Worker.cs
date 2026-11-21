@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 
+using KScript.Output;
 using KScript.Runtime;
 
 namespace KScript.Queueing
@@ -152,29 +153,29 @@ namespace KScript.Queueing
         /// <summary>Runs one reserved job and records what happened in its driver.</summary>
         internal AttemptResult Process(IQueueDriver driver, QueuedJob job)
         {
-            Line($"{job.Job} #{Short(job.Id)} on {job.Queue}: running (attempt {job.Attempts} of {job.Tries})");
+            Event(job, "RUNNING", "1;33", job.Tries > 1 ? $"attempt {job.Attempts} of {job.Tries}" : null, null);
             AttemptResult result = JobRunner.Attempt(context, job, options.Host);
             Interlocked.Increment(ref processed);
-            string took = $"{result.Elapsed.TotalMilliseconds:0} ms";
+            string took = $"{result.Elapsed.TotalMilliseconds:0}ms";
             switch (result.Outcome)
             {
                 case JobOutcome.Done:
                     driver.Complete(job);
                     if (job.UniqueKey != null) driver.Unlock(job.UniqueKey);
                     DispatchChain(driver, job);
-                    Line($"{job.Job} #{Short(job.Id)}: done ({took})");
+                    Event(job, "DONE", "1;32", took, null);
                     break;
                 case JobOutcome.Released:
                     job.Attempts = Math.Max(0, job.Attempts - 1);
                     job.AvailableAt = result.RetryAt ?? QueueRuntime.Clock();
                     driver.Release(job);
-                    Line($"{job.Job} #{Short(job.Id)}: released, back in {Durations.Describe(Math.Max(0, (job.AvailableAt - QueueRuntime.Clock()).TotalSeconds))} ({took})");
+                    Event(job, "RELEASED", "1;33", took, $"released, back in {Durations.Describe(Math.Max(0, (job.AvailableAt - QueueRuntime.Clock()).TotalSeconds))}");
                     break;
                 case JobOutcome.Retrying:
                     job.LastError = ErrorInfo(result.Error);
                     job.AvailableAt = result.RetryAt ?? QueueRuntime.Clock();
                     driver.Release(job);
-                    Line($"{job.Job} #{Short(job.Id)}: {result.Error.Type}: {result.Error.Message} (retrying in {Durations.Describe(Math.Max(0, (job.AvailableAt - QueueRuntime.Clock()).TotalSeconds))}, {took})");
+                    Event(job, "RETRY", "1;33", took, $"{result.Error.Type}: {result.Error.Message} (retrying in {Durations.Describe(Math.Max(0, (job.AvailableAt - QueueRuntime.Clock()).TotalSeconds))})");
                     break;
                 default:
                     Interlocked.Increment(ref failures);
@@ -182,7 +183,7 @@ namespace KScript.Queueing
                     job.FailedAt = QueueRuntime.Clock();
                     driver.Fail(job);
                     if (job.UniqueKey != null) driver.Unlock(job.UniqueKey);
-                    Line($"{job.Job} #{Short(job.Id)}: failed: {result.Error.Type}: {result.Error.Message} ({took})");
+                    Event(job, "FAIL", "1;31", took, $"failed: {result.Error.Type}: {result.Error.Message}");
                     break;
             }
             return result;
@@ -209,10 +210,33 @@ namespace KScript.Queueing
 
         private readonly object logGate = new object();
 
+        private CliOutput cli;
+
+        private CliOutput Cli => cli ??= new CliOutput(log);
+
+        private static string Time() => QueueRuntime.Clock().ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
         private void Line(string text)
         {
             if (log == null) return;
-            lock (logGate) log.WriteLine(QueueRuntime.Clock().ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " " + text);
+            lock (logGate) log.WriteLine($"  {Cli.Style.Gray(Time())} {text}");
+        }
+
+        /// <summary>
+        /// One line per step of a job, as artisan queue:work shows them: "  11:02:03 SendWelcome #1a2b3c4d ..... 12ms DONE",
+        /// with what went wrong on the line below. Whole lines, so workers running jobs side by side don't mix them.
+        /// </summary>
+        private void Event(QueuedJob job, string status, string code, string note, string detail)
+        {
+            if (log == null) return;
+            CliStyle style = Cli.Style;
+            string left = $"{style.Gray(Time())} {job.Job} {style.Gray("#" + Short(job.Id))}{(job.Queue != "default" ? style.Gray(" on " + job.Queue) : string.Empty)}";
+            string right = (note != null ? style.Gray(note) + " " : string.Empty) + style.Apply(status, code);
+            lock (logGate)
+            {
+                Cli.TwoColumn(left, right);
+                if (detail != null) Cli.Line($"           {(status == "FAIL" ? style.Red(detail) : style.Gray(detail))}");
+            }
         }
     }
 

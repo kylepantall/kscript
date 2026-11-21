@@ -25,8 +25,12 @@ namespace KScript.Http
                 try
                 {
                     RouteTable table = app.Table();
-                    log?.WriteLine($"Routes: {table.Routes.Count} from {string.Join(", ", app.Files.Select(f => Path.GetFileName(f.Path)))} (kscript routes lists them).");
-                    if (app.Settings.OpenApi.Enabled) log?.WriteLine("API docs: /_api, made from the routes (/_openapi.json and /_openapi.yaml for tools).");
+                    if (log != null)
+                    {
+                        var cli = new KScript.Output.CliOutput(log);
+                        cli.Info($"Routes: {table.Routes.Count} from {string.Join(", ", app.Files.Select(f => Path.GetFileName(f.Path)))} (kscript routes lists them).");
+                        if (app.Settings.OpenApi.Enabled) cli.Info("API docs: [/_api], made from the routes (/_openapi.json and /_openapi.yaml for tools).");
+                    }
                 }
                 catch (KScriptException ex)
                 {
@@ -91,8 +95,11 @@ namespace KScript.Http
             }
         }
 
-        /// <summary>kscript routes [folder]: prints every route, its name, what answers it and its middleware.</summary>
-        public static int ListRoutes(string siteFolder, ProjectConfig project, TextWriter output, TextWriter error)
+        /// <summary>
+        /// kscript routes [folder]: prints every route, its name and what answers it (-v adds middleware and files).
+        /// <paramref name="plain"/> prints the plain table coding agents' docs use instead.
+        /// </summary>
+        public static int ListRoutes(string siteFolder, ProjectConfig project, TextWriter output, TextWriter error, bool verbose = false, bool plain = false)
         {
             HttpApp app;
             try
@@ -106,12 +113,18 @@ namespace KScript.Http
             }
             if (!app.HasRoutes)
             {
-                error.WriteLine($"There are no route files in {app.SiteRoot}. Add routes.ks.xml (or routes.kscript, api.ks.xml) starting with <KScript.Routes>.");
+                new KScript.Output.CliOutput(error).Error($"There are no route files in [{app.SiteRoot}]. Add routes.ks.xml (or routes.kscript, api.ks.xml) starting with <KScript.Routes>.");
                 return 1;
             }
             try
             {
-                output.Write(HttpApp.Describe(app.LoadRoutes(), app.SiteRoot));
+                if (plain)
+                {
+                    output.Write(HttpApp.Describe(app.LoadRoutes(), app.SiteRoot));
+                    return 0;
+                }
+                var cli = new KScript.Output.CliOutput(output);
+                output.Write(HttpApp.Print(app.LoadRoutes(), app.SiteRoot, cli, verbose).Replace("\n", output.NewLine));
                 return 0;
             }
             catch (KScriptException ex)

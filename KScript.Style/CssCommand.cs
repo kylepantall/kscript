@@ -80,7 +80,7 @@ namespace KScript.Style
 
         private static int Fail(TextWriter error, string message)
         {
-            error.WriteLine(message);
+            new KScript.Output.CliOutput(error).Error(message);
             return 1;
         }
 

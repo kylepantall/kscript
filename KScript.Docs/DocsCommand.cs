@@ -93,8 +93,11 @@ namespace KScript.Docs
                     before: request => HandleApiAsync(request, chosen),
                     started: url =>
                     {
-                        output.WriteLine($"KScript docs: {url}{query}");
-                        output.WriteLine("Press Ctrl+C to stop.");
+                        var cli = new KScript.Output.CliOutput(output);
+                        cli.NewLine();
+                        cli.Info($"KScript docs: {url}{query}");
+                        cli.NewLine();
+                        cli.Comment("  Press Ctrl+C to stop.");
                         if (openBrowser) (open ?? OpenBrowser)(url + query);
                     }).GetAwaiter().GetResult();
             }

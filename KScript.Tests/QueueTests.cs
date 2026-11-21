@@ -202,7 +202,7 @@ public sealed class QueueTests : StorageFixture
 
         string log = Work();
         Assert.Contains("Welcome #", log);
-        Assert.Contains(": done (", log);
+        Assert.Matches(@" \.+ \d+ms DONE", log);
         Assert.Equal("Welcome there <ann@example.com> #2 attempt 1 of 3 on mail\nWelcome Bo <bo@example.com> #3 attempt 1 of 3 on mail\n", JobOutput());
         Assert.Empty(driver.Waiting(null));
         Assert.Empty(driver.Running());
@@ -700,7 +700,7 @@ public sealed class QueueTests : StorageFixture
         IQueueDriver driver = Driver();
         driver.Reserve(new[] { "mail" }, now);
         driver.Fail(driver.Reserve(new[] { "mail" }, now));
-        Assert.Contains("mail     0        0        1        1", Cli("status").Out);
+        Assert.Matches(@"│ mail +│ +0 │ +0 │ +1 │ +1 │", Cli("status").Out);
     }
 
     [Fact]
@@ -736,16 +736,16 @@ public sealed class QueueTests : StorageFixture
         statusDriver.Release(busy);
         var status = Cli("status", "--project", Project);
         Assert.Equal(0, status.Code);
-        Assert.Contains("Connection file (file): ", status.Out);
-        Assert.Contains("mail     1        1        0        0", status.Out);
+        Assert.Matches(@"Connection \.+ file \(file\)", status.Out);
+        Assert.Matches(@"│ mail +│ +1 │ +1 │ +0 │ +0 │", status.Out);
         Assert.Contains("\"waiting\": 1", Cli("status", "--format", "json").Out);
         var list = Cli("list", "mail");
         Assert.Contains("now", list.Out);
         Assert.Contains("in 5m", list.Out);
         Assert.Contains("\"user_id\":13", list.Out);
         Assert.Contains("\"job\": \"Welcome\"", Cli("list", "--format", "json").Out);
-        Assert.Equal("No jobs are waiting on other.\n", Cli("list", "other").Out);
-        Assert.Equal("No failed jobs.\n", Cli("failed").Out);
+        Assert.Equal("   INFO  No jobs are waiting on [other].\n", Cli("list", "other").Out);
+        Assert.Equal("   DONE  No failed jobs.\n", Cli("failed").Out);
 
         var worker = Cli("worker", "--queue", "mail", "--stop-when-empty");
         Assert.Equal(0, worker.Code);
@@ -762,7 +762,7 @@ public sealed class QueueTests : StorageFixture
         Assert.Contains("3/3", failed.Out);
         Assert.Contains("\"failed_at\"", Cli("failed", "--format", "json").Out);
         string id = Driver().Failed()[0].Id;
-        Assert.Equal("1 failed job is back on its queue.\n", Cli("retry", id).Out);
+        Assert.Equal("   DONE  1 failed job is back on its queue.\n", Cli("retry", id).Out);
         Assert.Contains("There is no failed job", Cli("retry", id).Error);
         Assert.Contains("needs a failed job's id", Cli("forget").Error);
         Later(400);
@@ -771,12 +771,12 @@ public sealed class QueueTests : StorageFixture
         Cli("worker", "--queue", "mail", "--stop-when-empty", "--max-jobs", "5", "--max-time", "1h", "--concurrency", "2", "--sleep", "1s");
         Later(60);
         Cli("worker", "--queue", "mail", "--stop-when-empty");
-        Assert.Equal("1 failed job deleted.\n", Cli("forget", "--all").Out);
-        Assert.Equal("0 failed jobs are back on their queues.\n", Cli("retry", "--all").Out);
+        Assert.Equal("   DONE  1 failed job deleted.\n", Cli("forget", "--all").Out);
+        Assert.Equal("   DONE  0 failed jobs are back on their queues.\n", Cli("retry", "--all").Out);
         Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 2, email: 'b@example.com')");
-        Assert.Equal("Removed 1 waiting job from mail.\n", Cli("clear", "mail").Out);
-        Assert.Equal("Removed 0 waiting jobs.\n", Cli("clear").Out);
-        Assert.Equal("No jobs are waiting.\n", Cli("list").Out);
+        Assert.Equal("   DONE  Removed 1 waiting job from mail.\n", Cli("clear", "mail").Out);
+        Assert.Equal("   DONE  Removed 0 waiting jobs.\n", Cli("clear").Out);
+        Assert.Equal("   INFO  No jobs are waiting.\n", Cli("list").Out);
     }
 
     [Theory]
@@ -820,14 +820,14 @@ public sealed class QueueTests : StorageFixture
         {
             var said = new StringWriter(CultureInfo.InvariantCulture);
             QueueCommand.RunWorker(new[] { "--sleep", "0.01" }, said, new StringWriter(), quick.Token, Project);
-            Assert.Contains("queues every queue, default first.", said.ToString());
+            Assert.Contains("queues [every queue, default first]", said.ToString());
         }
         UseProject("{ \"name\": \"" + app + "\", \"queue\": { \"default\": \"memory\", \"queues\": [\"high\", \"default\"], \"worker\": { \"concurrency\": 2, \"sleep\": \"1s\" } } }");
         var output = new StringWriter(CultureInfo.InvariantCulture);
         var error = new StringWriter(CultureInfo.InvariantCulture);
         using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
         Assert.Equal(0, QueueCommand.RunWorker(new[] { "--project", Project }, output, error, stop.Token));
-        Assert.Contains("Worker: memory (memory), queues high, default.", output.ToString());
+        Assert.Contains("Processing jobs from the [memory] connection (memory), queues [high, default].", output.ToString());
         Assert.Contains("only holds jobs dispatched in this process", error.ToString());
 
         FileOf("kscript.json", "{ \"queue\": 5 }");

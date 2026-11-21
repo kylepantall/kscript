@@ -489,7 +489,7 @@ import slugify from "lib/strings.kscript"
 
 | Package | What it adds |
 | --- | --- |
-| `KScript.Terminal` | `input(to, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, colour: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)` |
+| `KScript.Terminal` | `input(to, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, colour: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, headers, align)` (see [Terminal output](#terminal-output)) |
 | `KScript.Math` | `@sqrt` `@pow` `@round(x, digits: 2)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
 | `KScript.Net` | `@api(url, options: { method, headers, body, timeout })` returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `download(url, to)`, `@url_encode`, `@query_string` |
@@ -506,6 +506,40 @@ import slugify from "lib/strings.kscript"
 | `KScript.Test` | `test`, `describe`, `before-each`, `after-each`, `expect`, `assert`, `expect-error`, `capture`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](testing.md)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. A statement written with the `KScript.` prefix, such as `KScript.input`, imports the package that has it without an `import`. A project can import packages for every script in `kscript.json` (below).
+
+### Terminal output
+
+KScript.Terminal prints the same way the `kscript` commands do, so a script's output looks like the rest of the tool. Colours are only used at a terminal: piped output, files and tests get the same text without them, and `NO_COLOR`, `FORCE_COLOR`, `--ansi` and `--no-ansi` work as they do for `kscript` itself.
+
+```kscript
+import KScript.Terminal
+
+people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 9 }]
+heading "Report"
+detail(name: People) "{ $people->length() }"
+task(name: "Adding up") {
+  total = 1 + 2
+}
+table(rows: $people)
+info "Wrote [report.txt]."
+alert(type: error) "The file [data.csv] is empty."
+```
+
+```text
+Report
+  People .................................................... 2
+  Adding up .......................................... 2ms DONE
+  ┌──────┬─────┐
+  │ name │ age │
+  ├──────┼─────┤
+  │ Joan │  82 │
+  │ Sam  │   9 │
+  └──────┴─────┘
+   INFO  Wrote [report.txt].
+   ERROR  The file [data.csv] is empty.
+```
+
+`[bracketed]` parts of a label are shown in bold. `alert(type: error)` writes to stderr. Numbers in a table line up on the right; `align: ['left', 'right']` sets each column.
 
 ## Language models: KScript.AI
 
