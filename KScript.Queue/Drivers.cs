@@ -259,33 +259,57 @@ namespace KScript.Queueing
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string temp = path + ".tmp-" + Guid.NewGuid().ToString("N").Substring(0, 8);
             File.WriteAllText(temp, job.ToJson());
-            // On Windows a file that was just written can be held for a moment (by a virus scanner, say), so the move
-            // is tried again a few times before it gives up.
+            Retrying(() => File.Move(temp, path, overwrite: true));
+        }
+
+        /// <summary>
+        /// Runs a file operation, trying again for a moment when the file is busy: on Windows a file another worker is
+        /// reading, or that was just written (and a virus scanner is looking at), can't be moved straight away.
+        /// </summary>
+        private static void Retrying(Action work)
+        {
             for (int attempt = 1; ; attempt++)
             {
                 try
                 {
-                    File.Move(temp, path, overwrite: true);
+                    work();
                     return;
                 }
-                catch (Exception ex) when (attempt < 20 && ex is IOException or UnauthorizedAccessException)
+                catch (Exception ex) when (attempt < 20 && ex is IOException or UnauthorizedAccessException && ex is not FileNotFoundException and not DirectoryNotFoundException)
                 {
                     Thread.Sleep(10 * attempt);
                 }
             }
         }
 
-        private static QueuedJob Read(string path)
+        /// <summary>A file's text, or null when it stays busy or has gone.</summary>
+        private static string ReadText(string path)
         {
             try
             {
-                return QueuedJob.FromJson(File.ReadAllText(path));
+                string text = null;
+                Retrying(() => text = File.ReadAllText(path));
+                return text;
             }
-            catch (Exception ex) when (ex is IOException or KScriptException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 return null;
             }
         }
+
+        private static QueuedJob Parse(string text)
+        {
+            try
+            {
+                return QueuedJob.FromJson(text);
+            }
+            catch (KScriptException)
+            {
+                return null;
+            }
+        }
+
+        private static QueuedJob Read(string path) => ReadText(path) is string text ? Parse(text) : null;
 
         public void Push(QueuedJob job) => Write(Path.Combine(QueueFolder(job.Queue), FileName(job)), job);
 
@@ -313,12 +337,19 @@ namespace KScript.Queueing
                     {
                         continue;
                     }
-                    QueuedJob job = Read(claimed);
+                    string text = ReadText(claimed);
+                    if (text == null)
+                    {
+                        // Still busy: put it back for later.
+                        Retrying(() => File.Move(claimed, file, overwrite: true));
+                        continue;
+                    }
+                    QueuedJob job = Parse(text);
                     if (job == null)
                     {
                         // Not a job file: put it with the failed ones so it doesn't block the queue.
                         Directory.CreateDirectory(FailedFolder);
-                        File.Move(claimed, Path.Combine(FailedFolder, "unreadable-" + id + ".json"), overwrite: true);
+                        Retrying(() => File.Move(claimed, Path.Combine(FailedFolder, "unreadable-" + id + ".json"), overwrite: true));
                         continue;
                     }
                     job.Attempts++;

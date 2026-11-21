@@ -111,7 +111,19 @@ namespace KScript.Queueing
                         Interlocked.Decrement(ref started);
                         return;
                     }
-                    QueuedJob job = driver.Reserve(QueuesNow(driver), QueueRuntime.Clock());
+                    QueuedJob job;
+                    try
+                    {
+                        job = driver.Reserve(QueuesNow(driver), QueueRuntime.Clock());
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // Another worker has the files for now: try again after a pause.
+                        Interlocked.Decrement(ref started);
+                        Line($"Couldn't read the queue ({ex.Message}); trying again.");
+                        stop.WaitHandle.WaitOne(TimeSpan.FromSeconds(Math.Max(0.05, sleep)));
+                        continue;
+                    }
                     if (job != null)
                     {
                         try
