@@ -45,6 +45,10 @@ namespace KScript.Docs
             foreach (CliCommand c in CliReference.Commands)
                 sb.Append($"<tr><td><a href=\"#cli-{c.Name}\"><code>{Html.H(c.Name == "run" ? "kscript <script>" : c.Name == "version" ? "kscript --version" : "kscript " + c.Name)}</code></a></td><td>{Html.H(c.Summary)}</td></tr>");
             sb.Append("</tbody></table></div>");
+            sb.Append("<p>Every command takes these too. Colours, labels and tables are used only when the output is a terminal; piped output, files and CI logs get plain text.</p>");
+            sb.Append("<div class=\"table\"><table class=\"params\"><thead><tr><th>Option</th><th>Description</th></tr></thead><tbody>");
+            foreach (CliOption o in CliReference.GlobalOptions) sb.Append($"<tr><td><code>{Html.H(o.Name)}</code></td><td>{Html.H(o.Description)}</td></tr>");
+            sb.Append("</tbody></table></div>");
             foreach (CliCommand c in CliReference.Commands)
             {
                 string id = "cli-" + c.Name;

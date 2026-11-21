@@ -542,12 +542,12 @@ namespace KScript.Language.Tests
 
             (int code1, string folder) = Run(dir, "--check");
             Assert.Equal(1, code1);
-            Assert.Contains("code.kscript: not formatted", folder);
+            Assert.Matches(@"code\.kscript \.+ NOT FORMATTED", folder);
             Assert.Equal(code, File.ReadAllText(path));
 
             (int code2, string named) = Run(path);
             Assert.Equal(0, code2);
-            Assert.Contains("code.kscript: formatted", named);
+            Assert.Matches(@"code\.kscript \.+ FORMATTED", named);
             Assert.Equal("x = 1\nif $x > 0 {\n  echo \"hi\"\n}\n", File.ReadAllText(path));
             Assert.Equal(0, Run(dir, "--check").Code);
         }
@@ -559,7 +559,7 @@ namespace KScript.Language.Tests
             Write("b.ks.xml", Tidy);
             (int code, string output) = Run(dir, "--check");
             Assert.Equal(1, code);
-            Assert.Contains("a.ks.xml: not formatted", output);
+            Assert.Matches(@"a\.ks\.xml \.+ NOT FORMATTED", output);
             Assert.DoesNotContain("b.ks.xml", output);
             Assert.Contains("2 files checked: 1 need formatting.", output);
             Assert.Equal(Messy, File.ReadAllText(path));
@@ -621,7 +621,7 @@ namespace KScript.Language.Tests
             string script = Write("a.ks.xml", Messy);
             (int code, string output) = Run(dir, "--check");
             Assert.Equal(0, code);
-            Assert.Contains("skipped (format.enabled is false", output);
+            Assert.Contains("format.enabled is false", output);
             Assert.Equal(Messy, File.ReadAllText(script));
         }
 
@@ -691,7 +691,7 @@ namespace KScript.Language.Tests
             Assert.Contains("No KScript files found", Run(dir).Output);
 
             string md = Write("notes.md", "# Hi  \n");
-            Assert.Contains("notes.md: skipped (Markdown pages", Run(md).Output);
+            Assert.Matches(@"notes\.md \.+ Markdown pages are not reformatted SKIPPED", Run(md).Output);
 
             Write("_templates/t.ks.xml", Messy);
             string xml = Write("plain.xml", Messy);

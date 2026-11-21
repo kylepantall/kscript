@@ -238,6 +238,28 @@ namespace KScript
             return rest.ToArray();
         }
 
+        /// <summary>
+        /// --ansi and --no-ansi force colours on or off for the whole run (as artisan's do): before a script, or
+        /// anywhere after one of kscript's own commands.
+        /// </summary>
+        static string[] TakeAnsi(string[] args)
+        {
+            bool command = args.Length > 0 && (CliReference.Find(args[0]) != null || args[0].StartsWith("make:", StringComparison.Ordinal) || args[0] == "help");
+            var rest = new List<string>();
+            bool before = true;
+            foreach (string a in args)
+            {
+                if ((before || command) && (a == "--ansi" || a == "--no-ansi"))
+                {
+                    KScript.Output.CliStyle.Override = a == "--ansi";
+                    continue;
+                }
+                if (!a.StartsWith("-", StringComparison.Ordinal)) before = false;
+                rest.Add(a);
+            }
+            return rest.ToArray();
+        }
+
         /// <summary>kscript openapi [folder] [--yaml] [--out file]: the OpenAPI document made from a site's routes.</summary>
         int OpenApi(string[] args)
         {
@@ -301,6 +323,7 @@ namespace KScript
         int Routes(string[] args)
         {
             string folder = args.FirstOrDefault(a => !a.StartsWith("-", StringComparison.Ordinal));
+            bool verbose = args.Contains("-v") || args.Contains("--verbose");
             KScript.Projects.ProjectConfig project;
             try
             {
@@ -319,7 +342,7 @@ namespace KScript
                 Error.WriteLine($"Site folder not found: {folder}");
                 return 1;
             }
-            return KScript.Http.HttpServer.ListRoutes(folder ?? ".", project, Out, Error);
+            return KScript.Http.HttpServer.ListRoutes(folder ?? ".", project, Out, Error, verbose);
         }
 
         /// <summary>
@@ -350,6 +373,8 @@ namespace KScript
             // --env staging (before the script, or anywhere after serve and test) picks the environment for $config.
             try
             {
+                KScript.Output.CliStyle.Override = null;
+                args = TakeAnsi(args);
                 args = TakeEnvironment(args);
             }
             catch (ArgumentException ex)
@@ -366,7 +391,27 @@ namespace KScript
 
             if (args.Length > 0 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help" || args[0] == "-?" || args[0] == "/?"))
             {
+                // kscript help serve shows one command, as artisan help does.
+                if (args.Length > 1 && !args[1].StartsWith("-", StringComparison.Ordinal))
+                {
+                    if (CliReference.Find(args[1] == "make:" ? "make" : args[1]) is CliCommand command)
+                    {
+                        CliReference.PrintCommand(Out, command);
+                        return 0;
+                    }
+                    new KScript.Output.CliOutput(Error).Error($"There is no command '{args[1]}'. kscript --help lists them.");
+                    return 1;
+                }
                 PrintUsage(Out);
+                return 0;
+            }
+
+            // kscript serve --help: the command's help from CliReference. make and ide show their own, which list
+            // their file types and editors.
+            if (args.Length == 2 && (args[1] == "--help" || args[1] == "-h") && args[0] != "make" && args[0] != "ide"
+                && CliReference.Find(args[0]) is CliCommand asked)
+            {
+                CliReference.PrintCommand(Out, asked);
                 return 0;
             }
 
@@ -475,15 +520,14 @@ namespace KScript
 
             if (args[0].StartsWith("-", StringComparison.Ordinal))
             {
-                Error.WriteLine($"Unknown option '{args[0]}'.");
-                Error.WriteLine("Run kscript --help for usage.");
+                new KScript.Output.CliOutput(Error).Error($"Unknown option '{args[0]}'.\nRun kscript --help for usage.");
                 return 1;
             }
 
             string path = ResolveScriptPath(args[0]);
             if (path == null)
             {
-                Error.WriteLine($"There is no script at '{args[0]}'.");
+                new KScript.Output.CliOutput(Error).Error($"There is no script at '{args[0]}'." + (CliReference.Find(args[0]) == null && !args[0].Contains('.') ? " kscript --help lists the commands." : string.Empty));
                 return 2;
             }
 

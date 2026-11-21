@@ -139,15 +139,19 @@ namespace KScript.Compile
 
                 ProgramPlan plan = Plan(source, name, outDir, output, out string sourceFolder);
                 outDir = Path.GetFullPath(outDir ?? Path.Combine(sourceFolder, "dist"));
-                output.WriteLine($"Compiling {plan.Name} ({Describe(plan.Kind)}) with {string.Join(", ", plan.Packages)}");
+                var cli = new KScript.Output.CliOutput(output);
+                cli.Info($"Compiling {cli.Style.Bold(plan.Name)} ({Describe(plan.Kind)}) with {string.Join(", ", plan.Packages)}");
+                cli.NewLine();
 
                 var store = new RuntimeStore(env, output);
                 foreach (Target target in targets)
                 {
                     string kscript = runtime != null ? store.FromFile(runtime, target) : store.Get(target);
                     string built = Write(plan, target, SingleFileBundle.Read(kscript), Path.Combine(outDir, target.Name), env, output);
-                    output.WriteLine($"  {target.Name,-12} {built} ({SizeOf(built)})");
+                    cli.TwoColumn($"{cli.Style.Green(target.Name)} {built}", cli.Style.Gray(SizeOf(built)) + " " + cli.Style.Apply("DONE", "1;32"));
                 }
+                cli.NewLine();
+                cli.Success($"Compiled {plan.Name} for {targets.Count} target{(targets.Count == 1 ? string.Empty : "s")}, in [{outDir}].");
                 return 0;
             }
             catch (CompileException ex)
@@ -504,7 +508,7 @@ namespace KScript.Compile
 
             string asset = SelfUpdater.RuntimeAssetName(target.Runtime);
             string url = $"https://github.com/{env.Repository}/releases/download/v{version}/{asset}";
-            log.WriteLine($"Downloading kscript {version} for {target.Name} (once; kept in {env.RuntimeCache})");
+            new KScript.Output.CliOutput(log).Info($"Downloading kscript {version} for {target.Name} (once; kept in {env.RuntimeCache})");
             using var client = new HttpClient(env.Handler, disposeHandler: false);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("kscript-compile");
             using HttpResponseMessage response = client.GetAsync(url).GetAwaiter().GetResult();

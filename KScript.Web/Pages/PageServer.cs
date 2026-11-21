@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using KScript.Output;
+
 namespace KScript.Pages
 {
     /// <summary>What a URL maps to in a site folder.</summary>
@@ -215,6 +217,7 @@ namespace KScript.Pages
         /// </summary>
         public static async Task<int> RunAsync(PageSite site, int port, string host, TextWriter log, Func<HttpRequest, Task<PageResult>> handler, CancellationToken stop = default, Action<string> onStarted = null)
         {
+            CliOutput cli = log == null ? null : new CliOutput(log);
 
             var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = site.Root });
             builder.Logging.ClearProviders();
@@ -252,14 +255,25 @@ namespace KScript.Pages
                         await http.Response.WriteAsync(result.Body, Encoding.UTF8);
                 }
 
-                log?.WriteLine($"{http.Request.Method} {http.Request.Path}{http.Request.QueryString} -> {result.Status} ({(DateTime.UtcNow - started).TotalMilliseconds:0} ms)");
+                if (cli != null)
+                {
+                    // As artisan serve: the time, the request, dots, then how long it took and the status.
+                    CliStyle style = cli.Style;
+                    string status = result.Status.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    string coloured = result.Status >= 500 ? style.Apply(status, "1;31") : result.Status >= 400 ? style.Apply(status, "1;33") : result.Status >= 300 ? style.Cyan(status) : style.Green(status);
+                    cli.TwoColumn($"{style.Gray(DateTime.Now.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture))} {http.Request.Method} {http.Request.Path}{http.Request.QueryString}",
+                        $"{style.Gray($"~ {(DateTime.UtcNow - started).TotalMilliseconds:0}ms")} {coloured}");
+                }
             });
 
             string url = host == "localhost" ? $"http://localhost:{port}" : $"http://{host}:{port}";
-            if (onStarted == null)
+            if (onStarted == null && cli != null)
             {
-                log?.WriteLine($"Serving {site.Root} on {url}");
-                log?.WriteLine("Press Ctrl+C to stop.");
+                cli.NewLine();
+                cli.Info($"Serving [{site.Root}] on [{url}].");
+                cli.NewLine();
+                cli.Comment("  Press Ctrl+C to stop the server");
+                cli.NewLine();
             }
             try
             {

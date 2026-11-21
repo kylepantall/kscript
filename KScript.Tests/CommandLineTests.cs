@@ -71,7 +71,7 @@ public sealed class CommandLineTests : IDisposable
     {
         var none = Kscript();
         Assert.Equal(1, none.Code);
-        Assert.Contains("Usage: kscript", none.Out);
+        Assert.Contains("kscript <command> [options] [arguments]", none.Out);
         foreach (string help in new[] { "--help", "-h", "help", "-?", "/?" })
         {
             Assert.Equal(0, Kscript(help).Code);
@@ -88,11 +88,39 @@ public sealed class CommandLineTests : IDisposable
     public void Help_lists_every_command()
     {
         string help = Kscript("--help").Out;
+        Assert.StartsWith("KScript ", help);
         foreach (CliCommand command in CliReference.Commands)
         {
-            foreach (string usage in command.Usage.Split('\n')) Assert.Contains(usage, help);
+            Assert.Matches(@"\n  " + command.Name + " +[A-Z]", help);
+            var one = Kscript("help", command.Name);
+            Assert.Equal(0, one.Code);
+            foreach (string usage in command.Usage.Split('\n')) Assert.Contains("  " + usage, one.Out);
+            foreach (CliOption option in command.Options) Assert.Contains(option.Name, one.Out);
         }
-        Assert.StartsWith("Usage: kscript [--env name] <script>", help);
+        Assert.Contains("kscript [--env name] <script>", Kscript("help", "run").Out);
+        Assert.Contains("kscript serve [site folder]", Kscript("serve", "--help").Out);
+        Assert.Contains("kscript serve [site folder]", Kscript("serve", "-h").Out);
+        Assert.Contains("kscript make project", Kscript("help", "make:").Out);
+        var unknown = Kscript("help", "nope");
+        Assert.Equal(1, unknown.Code);
+        Assert.Contains("ERROR  There is no command 'nope'", unknown.Err);
+        Assert.Contains("kscript --help lists the commands", Kscript("serv").Err);
+    }
+
+    [Fact]
+    public void Ansi_flags_force_colours_on_or_off()
+    {
+        try
+        {
+            Assert.Contains("\u001b[1;33mUsage:", Kscript("help", "--ansi").Out);
+            Assert.Contains("\u001b[", Kscript("--ansi", "help", "serve").Out);
+            Assert.DoesNotContain('\u001b', Kscript("--no-ansi", "--help").Out);
+            Assert.False(KScript.Output.CliStyle.Override ?? true);
+        }
+        finally
+        {
+            KScript.Output.CliStyle.Override = null;
+        }
     }
 
     [Fact]
@@ -120,10 +148,10 @@ public sealed class CommandLineTests : IDisposable
     public void Every_subcommand_is_reached()
     {
         string script = Write("ok.ks.xml", "<kscript>\n  <echo>hi</echo>\n</kscript>\n");
-        Assert.Contains("Usage: kscript update", Kscript("update", "--help").Out);
+        Assert.Contains("  kscript update ", Kscript("update", "--help").Out);
         Assert.Contains("kscript ide install", Kscript("ide", "help").Out);
-        Assert.Contains("Usage: kscript compile", Kscript("compile", "--help").Out);
-        Assert.Contains("Usage: kscript docs", Kscript("docs", "--help").Out);
+        Assert.Contains("  kscript compile ", Kscript("compile", "--help").Out);
+        Assert.Contains("  kscript docs ", Kscript("docs", "--help").Out);
         Assert.Contains("1 file checked: 0 errors", Kscript("check", script, "--warnaserror").Out);
         Assert.Contains("kscript:recommended", Kscript("check", "--print-config", dir).Out);
         Assert.Contains("1 file checked: all formatted", Kscript("fmt", script, "--check").Out);
@@ -135,8 +163,8 @@ public sealed class CommandLineTests : IDisposable
         Assert.Equal(0, Kscript("test", test).Code);
         Assert.Equal(0, Kscript(test).Code); // a test file run directly runs its tests
         Assert.Equal(0, Kscript("test", test, "--env=ci").Code);
-        Assert.Contains("Usage: kscript worker", Kscript("worker", "--help").Out);
-        Assert.Contains("Usage: kscript queue", Kscript("queue", "--help").Out);
+        Assert.Contains("  kscript worker ", Kscript("worker", "--help").Out);
+        Assert.Contains("  kscript queue ", Kscript("queue", "--help").Out);
     }
 
     [Fact]
@@ -233,7 +261,7 @@ public sealed class CommandLineTests : IDisposable
     [Fact]
     public void Routes_and_convert()
     {
-        Assert.Contains("Usage: kscript convert", Kscript("convert", "--help").Out);
+        Assert.Contains("  kscript convert ", Kscript("convert", "--help").Out);
 
         Write("site/kscript.json", "{ \"serve\": { \"root\": \"public\" } }");
         Write("site/public/routes.ks.xml", "<KScript.Routes><Get path=\"/hi\"><return value=\"'hi'\" /></Get></KScript.Routes>");
