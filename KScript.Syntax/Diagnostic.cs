@@ -74,6 +74,9 @@ namespace KScript.Syntax
         public const string StatementSyntax = "KS2003";
         public const string BareIdentifier = "KS2004";
 
+        /// <summary>Text used as a value that holds <c>$name</c> or <c>{ }</c>: only templates (after echo, element text) fill those in.</summary>
+        public const string TextNotFilledIn = "KS2005";
+
         public const string UnknownElement = "KS3001";
         public const string RetiredElement = "KS3002";
         public const string UnknownAttribute = "KS3003";
@@ -127,6 +130,10 @@ namespace KScript.Syntax
 
         /// <summary>A list of names written as one string in a .kscript file (<c>use: "log, cors"</c>) rather than an array (<c>use: [log, cors]</c>).</summary>
         public const string PreferArrayList = "KS6006";
+
+        /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
+        public static string HelpUrl(string code) =>
+            "https://github.com/kylepantall/kscript/blob/master/docs/errors.md#" + (code ?? string.Empty).ToLowerInvariant();
 
         /// <summary>
         /// True for the unused-code rules (KS6002-KS6005). Editors show their code faded, as unnecessary, as well as

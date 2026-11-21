@@ -84,10 +84,14 @@ always in the description the package registers.
 | Range | Area |
 | --- | --- |
 | KS1xxx | Markup (malformed XML, unclosed tags, front matter) |
-| KS2xxx | Expressions (syntax, assignment outside `let`/`set`/`do`, bare identifiers) |
+| KS2xxx | Expressions (syntax, assignment outside `let`/`set`/`do`, bare identifiers), KS2005 text used as a value that holds `$name` (only templates fill it in) |
 | KS3xxx | Elements and attributes (unknown, retired, missing, invalid values, placement), imports (KS3009 missing import, KS3010 unknown package) |
 | KS4xxx | Names (undefined variables and functions, constants, duplicates) |
 | KS5xxx | Calls (unknown or retired commands and methods, argument counts, type mismatches), KS5010 a field a `<type>`'s records don't have, KS5011 an error type in `catch`, `throw`, `extends` or `expect-error` that isn't declared or built in, KS5012 a literal that doesn't fit its declared type (`a: Age = 200`, `e: email = bob@`) |
 | KS6xxx | Style: rules that keep code easy to read. They are only on when a standard turns them on; `kscript:recommended`, the default, makes them warnings. KS6001 flags `else` and `elif` in scripts, where an early `return`, `continue` or `break` reads better (see [Early returns instead of else](language.md#early-returns-instead-of-else)). KS6002 to KS6005 flag unused functions, variables, parameters and imports, counting uses from the rest of the project, and are sent with the `Unnecessary` tag so editors fade the code (see [Unused code](language.md#unused-code)). KS6006 suggests `[a, b]` for a list of names written as one string in a `.kscript` file |
+
+Every code is explained for users in [Error codes](errors.md), and the server sends that page as each diagnostic's `codeDescription`, so the code in the editor is a link. `DiagnosticCodeDocsTests` fails when a code has no section there.
+
+In a `.kscript` file, messages use that format's words (`Unknown statement 'x'`, never `<x>`), and words from other languages (`print`, `function`, `x++`, `@len()`) are answered with what KScript writes and a quick fix: see `Analyzer.Habits.cs`.
 
 The constants are in `DiagnosticCodes`; each has positive and negative tests in `AnalyzerTests`.

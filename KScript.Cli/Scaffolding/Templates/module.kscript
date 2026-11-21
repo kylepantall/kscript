@@ -13,12 +13,14 @@ hint: Import it: import "{{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}" (or "../
 {{#each fns}}
 /// {{ item | title }}.
 fn {{ item | snake }}(value) {
+  // TODO: Work out the result from $value.
   return $value
 }
 
 {{else}}
 /// {{ title }}.
 fn {{ snake }}(value) {
+  // TODO: Work out the result from $value.
   return $value
 }
 {{/each}}

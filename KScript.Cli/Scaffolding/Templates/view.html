@@ -12,6 +12,7 @@ hint: Render it from a controller: return @view('{{ dir }}{{ kebab }}'{{#each va
 ---
 <layout src="{{ layout ?? _layout.html }}" title="{{ title }}">
   <h1>{{ title }}</h1>
+  <!-- TODO: Show the values the controller passes to @view. -->
 {{#each vars}}
   <p>{{ item | title }}: {${{ item | var }}}</p>
 {{else}}

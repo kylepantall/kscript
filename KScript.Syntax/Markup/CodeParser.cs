@@ -110,7 +110,7 @@ namespace KScript.Syntax.Markup
                 {
                     if (braced)
                     {
-                        Error(new TextSpan(text.Length, 0), DiagnosticCodes.UnclosedElement, $"This <{parent.Name}> block is missing its closing }}.");
+                        Error(new TextSpan(text.Length, 0), DiagnosticCodes.UnclosedElement, $"This {parent.Name} block is missing its closing }}.");
                     }
                     return;
                 }
@@ -216,6 +216,7 @@ namespace KScript.Syntax.Markup
                 case "const": ParseLet(parent, start, isConst: true, doc, keywordLength: 5); return;
                 case "let":
                 case "set":
+                case "var":
                     {
                         // One way to assign: x = 3 declares x the first time and changes it after that.
                         int keywordEnd = pos + word.Length;
@@ -224,7 +225,8 @@ namespace KScript.Syntax.Markup
                         if (LooksLikeAssignment())
                         {
                             Error(TextSpan.FromBounds(start, keywordEnd), DiagnosticCodes.RetiredElement,
-                                $"Drop '{word}': in a .kscript file, x = 3 declares x the first time and changes it after that.");
+                                $"Drop '{word}': in a .kscript file, x = 3 declares x the first time and changes it after that.",
+                                new QuickFix($"Remove '{word}'", new TextChange(TextSpan.FromBounds(start, pos), string.Empty)));
                             ParseAssignment(parent, pos, doc);
                             return;
                         }
@@ -237,6 +239,13 @@ namespace KScript.Syntax.Markup
                 case "for": ParseFor(parent, start); return;
                 case "match": ParseMatch(parent, start); return;
                 case "fn": ParseFn(parent, start, doc); return;
+                case "function" or "def" or "func" when StartsForeignFunction(word.Length):
+                    // A habit from another language: say what KScript calls it, and read it as the fn it was meant to be.
+                    Error(new TextSpan(start, word.Length), DiagnosticCodes.UnknownElement,
+                        $"Functions start with fn, not {word}: fn greet(who) {{ }}.",
+                        new QuickFix("Change to fn", new TextChange(new TextSpan(start, word.Length), "fn")));
+                    ParseFn(parent, start, doc, keywordLength: word.Length);
+                    return;
                 case "override" when StartsOverride(): ParseFn(parent, start, doc, isOverride: true); return;
                 case "extend" when StartsDeclaration(6): ParseExtend(parent, start, doc); return;
                 case "type" when StartsDeclaration(4): ParseType(parent, start, doc); return;
@@ -669,7 +678,25 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary><c>fn greet(who, greeting = 'Hello') { }</c> or <c>fn double(x: int) => $x * 2</c>.</summary>
-        private void ParseFn(MarkupElement parent, int start, string doc, bool isOverride = false)
+        /// <summary><c>function greet(</c>: a name and an opening bracket after the keyword another language uses for fn.</summary>
+        private bool StartsForeignFunction(int keywordLength)
+        {
+            int p = pos + keywordLength;
+            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t'))
+            {
+                return false;
+            }
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            if (p >= text.Length || !Lexer.IsIdentStart(text[p]))
+            {
+                return false;
+            }
+            while (p < text.Length && Lexer.IsIdentChar(text[p])) p++;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            return p < text.Length && text[p] == '(';
+        }
+
+        private void ParseFn(MarkupElement parent, int start, string doc, bool isOverride = false, int keywordLength = 2)
         {
             int fnStart = start;
             if (isOverride)
@@ -679,7 +706,7 @@ namespace KScript.Syntax.Markup
                 SkipSpaces();
                 fnStart = pos;
             }
-            MarkupElement e = Begin(parent, "fn", start, new TextSpan(fnStart, 2));
+            MarkupElement e = Begin(parent, "fn", start, new TextSpan(fnStart, keywordLength));
             SkipSpaces();
             TextSpan name = ReadNameSpan(allowDash: false);
             if (name.Length == 0)
@@ -1727,6 +1754,12 @@ namespace KScript.Syntax.Markup
                     }
                     if (c == '\n' || c == '\r')
                     {
+                        if (stop is Stop.Line && pos > start && ContinuesAfter(start, pos) && !ContinuesBefore(pos) && StatementStartsAfter(pos))
+                        {
+                            // k = 5 + and then a new statement: the value was left unfinished. Stop here, so the
+                            // problem is reported on this line and not on the correct line after it.
+                            break;
+                        }
                         if (stop is Stop.Argument or Stop.Group || ContinuesAfter(start, pos) || ContinuesBefore(pos))
                         {
                             pos++;
@@ -1800,6 +1833,37 @@ namespace KScript.Syntax.Markup
             return false;
         }
 
+        /// <summary>True when the next line with code on it can only be a new statement: an assignment, or a keyword no value starts with.</summary>
+        private bool StatementStartsAfter(int newline)
+        {
+            int save = pos;
+            try
+            {
+                pos = newline;
+                while (pos < text.Length && char.IsWhiteSpace(text[pos])) pos++;
+                if (pos >= text.Length || !(Lexer.IsIdentStart(text[pos]) || text[pos] == '$'))
+                {
+                    return false;
+                }
+                if (LooksLikeAssignment())
+                {
+                    return true;
+                }
+                if (text[pos] == '$')
+                {
+                    return false;
+                }
+                string word = PeekName();
+                int after = pos + word.Length;
+                bool spaced = after >= text.Length || char.IsWhiteSpace(text[after]);
+                return spaced && word is "echo" or "if" or "for" or "while" or "return" or "import" or "const" or "break" or "continue" or "try" or "throw";
+            }
+            finally
+            {
+                pos = save;
+            }
+        }
+
         private bool ContinuesAfter(int start, int newline)
         {
             int end = newline;
@@ -1869,12 +1933,36 @@ namespace KScript.Syntax.Markup
                 }
                 pos++;
             }
-            if (pos >= text.Length)
+            if (pos >= text.Length || ClosesAnotherString(start, pos))
             {
                 Error(new TextSpan(start, 1), DiagnosticCodes.MarkupSyntax, $"This string is missing its closing {quote}.");
+                pos = EndOfLine(start);
                 return;
             }
             pos++;
+        }
+
+        /// <summary>
+        /// Where the line holding an offset ends. A quote that is never closed is taken to end with its line, so one
+        /// missing quote doesn't swallow the rest of the file.
+        /// </summary>
+        /// <summary>
+        /// True when the quote found at <paramref name="close"/> is on a later line than the one that opened the string
+        /// and is followed by a word or a variable, which never follow the end of a string: it is the opening quote of
+        /// another string (<c>echo "next"</c>), so the first string was never closed.
+        /// </summary>
+        private bool ClosesAnotherString(int open, int close) =>
+            close + 1 < text.Length && (Lexer.IsIdentChar(text[close + 1]) || text[close + 1] is '$' or '{' or '\'' or '"')
+                && text.IndexOf('\n', open, close - open) >= 0;
+
+        private int EndOfLine(int offset)
+        {
+            int end = text.IndexOf('\n', offset);
+            if (end < 0)
+            {
+                return text.Length;
+            }
+            return end > offset && text[end - 1] == '\r' ? end - 1 : end;
         }
 
         /// <summary>At "text" or a ``` block without a type (a typed block is a value, not text).</summary>
@@ -1926,13 +2014,19 @@ namespace KScript.Syntax.Markup
                 value.Append(text[pos]);
                 pos++;
             }
-            map.Add(pos);
-            if (pos >= text.Length)
+            if (pos >= text.Length || ClosesAnotherString(open, pos))
             {
                 Error(new TextSpan(open, 1), DiagnosticCodes.MarkupSyntax, "This text is missing its closing \".");
+                // Only this line is the text: the lines after it are still code.
+                pos = EndOfLine(open);
+                int kept = map.TakeWhile(m => m < pos).Count();
+                value.Length = kept;
+                map.RemoveRange(kept, map.Count - kept);
+                map.Add(pos);
             }
             else
             {
+                map.Add(pos);
                 pos++;
             }
             return (new DecodedText(value.ToString(), map.ToArray()), TextSpan.FromBounds(open, pos));
@@ -2280,8 +2374,8 @@ namespace KScript.Syntax.Markup
 
         private bool Lookahead(string s) => pos + s.Length <= text.Length && string.CompareOrdinal(text, pos, s, 0, s.Length) == 0;
 
-        private void Error(TextSpan span, string code, string message) =>
-            document.Diagnostics.Add(new Diagnostic(span, DiagnosticSeverity.Error, code, message));
+        private void Error(TextSpan span, string code, string message, params QuickFix[] fixes) =>
+            document.Diagnostics.Add(new Diagnostic(span, DiagnosticSeverity.Error, code, message, fixes));
 
         #endregion
     }

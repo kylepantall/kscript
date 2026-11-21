@@ -144,7 +144,7 @@ public sealed class MakeGeneratorTests : IDisposable
         // A page-style [slug] works too, and the controller's function takes the parameter by its name.
         Assert.Equal(0, Make(app, "route", "posts/[slug]").Code);
         Assert.Contains("Get(path: \"/posts/{slug}\", to: posts.show)", Read(app, "routes/web.kscript"));
-        Assert.Contains("fn show(slug) {\n  return { slug: $slug }", Read(app, "controllers/posts.kscript"));
+        Assert.Contains("fn show(slug) {\n  // TODO: Find the one asked for, and answer 404 when there is none: @abort(404)\n  return { slug: $slug }", Read(app, "controllers/posts.kscript"));
 
         // An admin/users controller doesn't take the users name from another import.
         Assert.Equal(0, Make(app, "route", "users").Code);
@@ -211,7 +211,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Equal(0, Make(site.Root, "route", "about", "--controller", "home", "--action", "about").Code);
         Assert.Equal("KScript.Routes {\n  import \"../controllers/home.kscript\" as home\n  Get(path: \"/\", to: home.index)\n  Get(path: \"/about\", to: home.about)\n}\n", Read(site.Root, "routes/web.kscript"));
         // A controller written as a kscript { } block gets the function inside the block.
-        Assert.Equal("kscript {\n  fn index() => 'home'\n\n  /// About.\n  fn about() {\n    return { action: 'about' }\n  }\n}\n", Read(site.Root, "controllers/home.kscript"));
+        Assert.Equal("kscript {\n  fn index() => 'home'\n\n  /// About.\n  fn about() {\n    // TODO: Answer the route.\n    return { action: 'about' }\n  }\n}\n", Read(site.Root, "controllers/home.kscript"));
 
         (code, output, err) = Make(site.Root, "route", "status", "--api");
         Assert.True(code == 0, err);
@@ -293,10 +293,10 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Contains("->json(), ->is_weekend()", output);
         Assert.Equal(
             "/// Methods for every date in the project. $this is the date a method is called on.\n"
-            + "extend date {\n  /// What json does.\n  fn json() => $this\n  /// What is_weekend does.\n  fn is_weekend() => $this\n}\n",
+            + "extend date {\n  /// What json does.\n  fn json() {\n    // TODO: Work out the result from $this.\n    return $this\n  }\n\n  /// What is_weekend does.\n  fn is_weekend() {\n    // TODO: Work out the result from $this.\n    return $this\n  }\n}\n",
             Read(app, "extensions/date.kscript"));
         Assert.Equal(0, Make(app, "extension", "text/string").Code);
-        Assert.Contains("extend string {\n  // fn json() => $this->to_json()\n}", Read(app, "extensions/text/string.kscript"));
+        Assert.Contains("extend string {\n  // TODO: Add methods, e.g. fn json() => $this->to_json()\n}", Read(app, "extensions/text/string.kscript"));
         File.WriteAllText(Path.Combine(app, "try.kscript"), "echo \"{ @date('2026-11-21')->json() == @date('2026-11-21') }\"\n");
         AssertNoErrors(app);
         var o = new StringWriter { NewLine = "\n" };
@@ -382,7 +382,7 @@ public sealed class MakeGeneratorTests : IDisposable
             type Percent with [int] {
               min: 0
               max: 100
-              // Rules: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
+              // TODO: Add the rules a value must follow: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
             }
 
             """.Replace("\r\n", "\n"), Read(app, "natives/percent.kscript"));
@@ -441,7 +441,8 @@ public sealed class MakeGeneratorTests : IDisposable
 
         (code, output, _) = Make(app, "request", "--help");
         Assert.Equal(0, code);
-        Assert.StartsWith("kscript make request <Name> [--fields", output);
+        Assert.StartsWith("Description:\n  A typed request body", output);
+        Assert.Contains("Usage:\n  kscript make request <Name> [--fields", output);
         Assert.Contains("  $ kscript make request NewPerson", output);
 
         // A project's own template shows where it comes from, under its own heading.

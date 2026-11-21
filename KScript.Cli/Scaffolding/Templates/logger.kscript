@@ -13,6 +13,7 @@ import KScript.IO
 
 /// Gets each entry at {{ level ?? warn }} or above.
 fn {{ snake }}(entry) {
+  // TODO: Send the entry where you need it. This writes it to a file.
   // Paths are relative to this script: {{ up }}logs is the project's logs folder.
   @append_text('{{ up }}logs/{{ kebab }}.log', $entry.time + ' ' + $entry.level + ' ' + $entry.message + $os.newline)
 }

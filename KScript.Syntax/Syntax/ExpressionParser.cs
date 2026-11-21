@@ -545,7 +545,10 @@ namespace KScript.Syntax
                     return new ErrorNode { Span = t.Span };
 
                 case TokenKind.EndOfInput:
-                    Error(new TextSpan(t.Span.Start, 0), "Expected an expression.");
+                    // $a + and nothing more: name what was left unfinished.
+                    Error(new TextSpan(t.Span.Start, 0), index > 0 && Raw(buffer[index - 1]) is { Length: > 0 } before
+                        ? $"Expected an expression after '{before}'."
+                        : "Expected an expression.");
                     return new ErrorNode { Span = new TextSpan(t.Span.Start, 0) };
             }
 

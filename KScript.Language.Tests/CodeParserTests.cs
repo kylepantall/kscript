@@ -251,8 +251,10 @@ namespace KScript.Language.Tests
             Assert.Equal("one", Assert.Single(root.Children.OfType<MarkupComment>()).Text.Trim());
 
             Assert.Contains(CodeParser.Parse("x = 1 /* never closed").Diagnostics, d => d.Message.Contains("missing its closing */"));
-            // A stray */ with no /* is just text: the line ends in an operator-like character and goes on.
-            Assert.Single(CodeParser.Parse("x = 2 */\ny = 3").RootElements.Single().ChildElements);
+            // A stray */ with no /* is just text: the line ends in an operator-like character and goes on...
+            Assert.Single(CodeParser.Parse("x = 2 */\n  3").RootElements.Single().ChildElements);
+            // ...unless the next line can only be a new statement, which leaves this one unfinished.
+            Assert.Equal(2, CodeParser.Parse("x = 2 */\ny = 3").RootElements.Single().ChildElements.Count());
         }
 
         [Fact]

@@ -201,6 +201,9 @@ namespace KScript.Language.Analysis
 
         public TypeShape Shape { get; internal set; } = TypeShape.Unknown;
 
+        /// <summary>True once the variable has been given values of different types, so its type is no longer claimed.</summary>
+        public bool HoldsSeveralTypes { get; internal set; }
+
         /// <summary>For functions: the shape of what they return, worked out from <c>value</c> or their <c>&lt;return&gt;</c>s.</summary>
         public TypeShape ReturnShape { get; internal set; } = TypeShape.Unknown;
 
