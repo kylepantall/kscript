@@ -1,0 +1,7 @@
+{
+  "Create a secret reference": {
+    "prefix": ["op://", "secret reference"],
+    "body": ["op://${1:vault}/${2:item}/${3:field}"],
+    "description": "Same shape as the 1Password extension's snippet: no scope, so it applies to every language."
+  }
+}
