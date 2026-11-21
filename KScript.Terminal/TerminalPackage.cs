@@ -1,6 +1,7 @@
 using System.Text;
 
 using KScript.Metadata;
+using KScript.Output;
 using KScript.Runtime;
 
 using A = KScript.Metadata.AttributeInfo;
@@ -10,13 +11,15 @@ namespace KScript.Terminal
 {
     /// <summary>
     /// KScript.Terminal: asking questions and printing nicely in a terminal. &lt;input&gt;, &lt;picker&gt;,
-    /// &lt;menu&gt;, &lt;confirm&gt;, &lt;clear&gt;, &lt;pause&gt;, colours, and <c>&lt;echo format="markdown"&gt;</c>.
+    /// &lt;menu&gt;, &lt;confirm&gt;, &lt;clear&gt;, &lt;pause&gt;, colours, <c>&lt;echo format="markdown"&gt;</c>, and the
+    /// kscript CLI's own output style: &lt;info&gt;, &lt;success&gt;, &lt;warn&gt;, &lt;alert&gt;, &lt;heading&gt;,
+    /// &lt;detail&gt;, &lt;bullets&gt;, &lt;task&gt; and &lt;table&gt;.
     /// </summary>
     public sealed class TerminalPackage : KScriptPackage
     {
         public override string Name => "KScript.Terminal";
 
-        public override string Description => "Prompts, menus, colours and Markdown output for terminal scripts.";
+        public override string Description => "Prompts, menus, colours, Markdown, and artisan-style labels, tasks and tables for terminal scripts.";
 
         protected override void Register(PackageBuilder p)
         {
@@ -107,8 +110,159 @@ namespace KScript.Terminal
             p.Command("is_terminal", "", "yes when a person is at a terminal, no when input or output is redirected (a pipe, a file, a test). Use it to skip animations and prompts.", KType.Bool,
                 c => c.Host.IsInteractive, "<if @is_terminal()><clear /></if>");
 
+            RegisterOutput(p);
+
             p.EchoFormat("markdown", (text, interpreter) => TerminalMarkdown.Render(text, Ansi.Enabled(interpreter.Host)));
             RegisterExamples(p);
+        }
+
+        /// <summary>
+        /// The kscript command line's own output style (KScript.Output.CliOutput), for scripts: INFO / DONE / WARN / ERROR
+        /// labels, headings, dotted details, tasks, bullet lists and tables. Coloured only at a terminal.
+        /// </summary>
+        private static void RegisterOutput(PackageBuilder p)
+        {
+            void Label(string name, string label, string code, string description) =>
+                p.Element(new ElementInfo(name, description, ContentKind.Template)
+                {
+                    Context = ElementContext.Script,
+                    Example = $"<{name}>Saved [report.pdf].</{name}>",
+                }, run =>
+                {
+                    Write(run, o => o.Label(label, code, run.Text()));
+                    return null;
+                });
+            Label("info", "INFO", CliOutput.InfoCode, "Prints the text after a blue INFO label, as kscript's own commands do. [Bracketed] parts are shown bold.");
+            Label("success", "DONE", CliOutput.DoneCode, "Prints the text after a green DONE label.");
+            Label("warn", "WARN", CliOutput.WarnCode, "Prints the text after a yellow WARN label.");
+
+            p.Element(new ElementInfo("alert", "Prints the text after a label: type is info (the default), success, warn or error. Errors go to stderr.", ContentKind.Template,
+                new A("type", K.Enum, "The label: info, success, warn or error.", false, "info", "success", "warn", "error"))
+            {
+                Context = ElementContext.Script,
+                Example = "<alert type=\"error\">The file [data.csv] is empty.</alert>",
+            }, run =>
+            {
+                string type = run.Raw("type")?.Trim().ToLowerInvariant() ?? "info";
+                string text = run.Text();
+                // type is checked against its values before this runs.
+                switch (type)
+                {
+                    case "success": Write(run, o => o.Success(text)); break;
+                    case "warn": Write(run, o => o.Warn(text)); break;
+                    case "error": Write(run, o => o.Error(text), error: true); break;
+                    default: Write(run, o => o.Info(text)); break;
+                }
+                return null;
+            });
+
+            p.Element(new ElementInfo("heading", "Prints a heading in bold yellow, like the sections of kscript --help.", ContentKind.Template)
+            {
+                Context = ElementContext.Script,
+                Example = "<heading>Settings:</heading>",
+            }, run =>
+            {
+                Write(run, o => o.Heading(run.Text()));
+                return null;
+            });
+
+            p.Element(new ElementInfo("detail", "Prints a name, a line of dots and a value: \"  Version ........ 1.2\". The text is the value.", ContentKind.Template,
+                new A("name", K.Template, "The name on the left.", true))
+            {
+                Context = ElementContext.Script,
+                Example = "<detail name=\"Total\">{ 1 + 2 }</detail>",
+            }, run =>
+            {
+                Write(run, o => o.TwoColumn(run.Template("name"), run.Text()));
+                return null;
+            });
+
+            p.Element(new ElementInfo("bullets", "Prints each item of a list on its own line, after a ⇂.", ContentKind.Empty,
+                new A("items", K.Expression, "The list.", true))
+            {
+                Context = ElementContext.Script,
+                Example = "<bullets items=\"['routes/web.kscript', 'views/home.html']\" />",
+            }, run =>
+            {
+                object items = run.Eval("items");
+                if (items is not List<object> list) throw run.Error($"items needs a list, but got {Values.Describe(items)}.", "items", "Type");
+                Write(run, o => o.Bullets(list.Select(Values.ToStr)));
+                return null;
+            });
+
+            p.Element(new ElementInfo("task", "Runs what's inside, then prints \"  name ........ 12ms DONE\" (or FAIL, when it throws: the error goes on to be caught as usual).", ContentKind.Statements,
+                new A("name", K.Template, "What the task does, such as Copying files.", true))
+            {
+                Context = ElementContext.Script,
+                Example = "<task name=\"Adding up\">\n  <let name=\"total\" value=\"1 + 2\" />\n</task>",
+            }, run =>
+            {
+                string name = run.Template("name");
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                bool ok = false;
+                try
+                {
+                    run.RunChildren();
+                    ok = true;
+                }
+                finally
+                {
+                    Write(run, o => o.TaskLine(name, ok, clock.Elapsed));
+                }
+                return null;
+            });
+
+            p.Element(new ElementInfo("table", "Prints a list of maps (or of lists) as a table with borders, like kscript queue status.", ContentKind.Empty,
+                new A("rows", K.Expression, "The rows: a list of maps, or a list of lists.", true),
+                new A("columns", K.Expression, "The keys to show, in order: a list or comma-separated names. Defaults to the first row's keys."),
+                new A("headers", K.Expression, "The header of each column (defaults to the column names)."),
+                new A("align", K.Expression, "left or right for each column, such as ['left', 'right']. Numbers line up right by default."))
+            {
+                Context = ElementContext.Script,
+                Example = "<table rows=\"[{ name: 'Joan', age: 82 }, { name: 'Sam', age: 9 }]\" />",
+            }, run =>
+            {
+                object rowsValue = run.Eval("rows");
+                if (rowsValue is not List<object> rows) throw run.Error($"rows needs a list, but got {Values.Describe(rowsValue)}.", "rows", "Type");
+                List<string> Names(string attribute) => run.Has(attribute)
+                    ? run.Eval(attribute) switch
+                    {
+                        List<object> l => l.Select(Values.ToStr).ToList(),
+                        object o => Values.ToStr(o).Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToList(),
+                        _ => null,
+                    }
+                    : null;
+                List<string> columns = Names("columns")
+                    ?? (rows.FirstOrDefault() is Dictionary<string, object> first ? first.Keys.ToList()
+                        : Enumerable.Range(1, rows.Select(r => r is List<object> l ? l.Count : 1).DefaultIfEmpty(0).Max()).Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToList());
+                List<string> headers = Names("headers") ?? columns;
+                List<object[]> cells = rows.Select(r => columns.Select((c, i) => r switch
+                {
+                    Dictionary<string, object> m => m.TryGetValue(c, out object v) ? v : null,
+                    List<object> l => i < l.Count ? l[i] : null,
+                    _ => i == 0 ? r : null,
+                }).ToArray()).ToList();
+                List<string> alignNames = Names("align");
+                var align = columns.Select((c, i) =>
+                    alignNames != null && i < alignNames.Count ? (alignNames[i].Equals("right", StringComparison.OrdinalIgnoreCase) ? CliAlign.Right : CliAlign.Left)
+                    : cells.Count > 0 && cells.All(row => row[i] is double || row[i] == null) && cells.Any(row => row[i] is double) ? CliAlign.Right : CliAlign.Left).ToList();
+                Write(run, o => o.Table(headers, cells.Select(row => (IReadOnlyList<string>)row.Select(v => v == null ? string.Empty : Values.ToStr(v)).ToList()), align));
+                return null;
+            });
+        }
+
+        /// <summary>Writes styled output through the host (so &lt;capture&gt; and tests see it), coloured when the host may.</summary>
+        private static void Write(ElementRun run, Action<CliOutput> write, bool error = false)
+        {
+            var text = new StringWriter { NewLine = run.Host.Out.NewLine };
+            int? width = null; // COLUMNS, or 80, when the host isn't a terminal
+            if (run.Host.IsInteractive)
+            {
+                try { width = run.Host.TerminalWidth; } catch (IOException) { }
+            }
+            write(new CliOutput(text, run.Host.UseColour, width));
+            if (error) run.Host.Error.Write(text.ToString());
+            else run.Host.Write(text.ToString());
         }
 
         /// <summary>Usage examples, shown in hover and run by kscript docs.</summary>

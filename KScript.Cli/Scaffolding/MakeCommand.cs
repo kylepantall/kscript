@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+using KScript.Output;
+
 namespace KScript.Scaffolding
 {
     /// <summary>
@@ -124,9 +126,10 @@ namespace KScript.Scaffolding
                 if (string.Equals(type, "templates", StringComparison.OrdinalIgnoreCase))
                 {
                     var written = Scaffolder.PublishTemplates(root, force, positional.Skip(1));
-                    if (written.Count == 0) output.WriteLine($"Nothing to copy: {Scaffolder.TemplatesFolder}/ already has those templates. Use --force to replace them.");
-                    foreach (var w in written) output.WriteLine($"Created {w}");
-                    if (written.Count > 0) output.WriteLine($"Edit them to change what kscript make creates, or add new ones (e.g. {Scaffolder.TemplatesFolder}/card.html for kscript make card …).");
+                    var made = new CliOutput(output);
+                    if (written.Count == 0) made.Info($"Nothing to copy: {Scaffolder.TemplatesFolder}/ already has those templates. Use --force to replace them.");
+                    foreach (var w in written) made.Info($"Created {made.Style.Bold(w)}");
+                    if (written.Count > 0) made.Comment($"  Edit them to change what kscript make creates, or add new ones (e.g. {Scaffolder.TemplatesFolder}/card.html for kscript make card …).");
                     return 0;
                 }
 
@@ -134,13 +137,13 @@ namespace KScript.Scaffolding
                 {
                     if (positional.Count > 1) { error.WriteLine($"kscript make auth takes no name (unexpected '{positional[1]}'). Options: --api, --format, --force, --dry-run."); return 1; }
                     AuthResult made = AuthMaker.Make(root, options, force, dryRun);
+                    var cli = new CliOutput(output);
                     foreach (var (action, path) in made.Files)
                     {
                         string where = fromProject && root != "." ? Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, Path.Combine(Path.GetFullPath(root), path)).Replace('\\', '/') : path;
-                        output.WriteLine($"{(dryRun ? "Would: " + action.ToLowerInvariant() : action)} {where}");
+                        cli.Info($"{(dryRun ? "Would: " + action.ToLowerInvariant() : action)} {cli.Style.Bold(where)}");
                     }
-                    output.WriteLine("Next:");
-                    foreach (string line in made.Next) output.WriteLine("  " + line);
+                    NextSteps(cli, made.Next);
                     return 0;
                 }
 
@@ -159,13 +162,16 @@ namespace KScript.Scaffolding
                 if (string.Equals(Scaffolder.FindTemplate(root, type).Type, "route", StringComparison.OrdinalIgnoreCase))
                 {
                     var route = RouteMaker.Make(new MakeRequest { Type = "route", Name = positional[1], Root = root, Options = options, DryRun = dryRun });
+                    var cli = new CliOutput(output);
                     foreach (var (action, path) in route.Files)
                     {
                         string where = fromProject && root != "." ? Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, Path.Combine(Path.GetFullPath(root), path)).Replace('\\', '/') : path;
-                        output.WriteLine($"{(dryRun ? "Would " + (action == "Created" ? "create" : "add" + action.Substring("Added".Length)) : action)} {where}");
+                        cli.Info($"{(dryRun ? "Would " + (action == "Created" ? "create" : "add" + action.Substring("Added".Length)) : action)} {cli.Style.Bold(where)}");
                     }
-                    output.WriteLine("  " + route.Route.Replace("\n", "\n  "));
-                    output.WriteLine(route.Hint);
+                    cli.NewLine();
+                    cli.Line("  " + cli.Style.Cyan(route.Route.Replace("\n", "\n  ")));
+                    cli.NewLine();
+                    cli.Comment("  " + route.Hint);
                     return 0;
                 }
 
@@ -173,25 +179,26 @@ namespace KScript.Scaffolding
                 // In a project, files are made from its site root; show them relative to where the command was run.
                 string shown = !fromProject || root == "." ? result.RelativePath : Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, result.FullPath).Replace('\\', '/');
 
+                var file = new CliOutput(output);
                 if (dryRun)
                 {
-                    output.WriteLine($"Would create {shown}{(result.Overwrote ? " (replacing it)" : "")}:");
+                    file.Info($"Would create {file.Style.Bold(shown)}{(result.Overwrote ? " (replacing it)" : "")}:");
                     output.WriteLine();
                     output.Write(result.Content);
                     if (!result.Content.EndsWith('\n')) output.WriteLine();
                 }
                 else
                 {
-                    output.WriteLine($"{(result.Overwrote ? "Replaced" : "Created")} {shown}{(result.Template.BuiltIn ? "" : $" (from {Scaffolder.TemplatesFolder}/{Path.GetFileName(result.Template.FilePath)})")}");
+                    file.Info($"{(result.Overwrote ? "Replaced" : "Created")} {file.Style.Bold(shown)}{(result.Template.BuiltIn ? "" : $" (from {Scaffolder.TemplatesFolder}/{Path.GetFileName(result.Template.FilePath)})")}");
                 }
                 // A new page that uses the default _layout.html, in a folder without one, gets one too: otherwise the page
                 // renders without <html>/<head>, kscript check warns, and editors don't see the folder as a site.
                 var layout = Scaffolder.MakeDefaultLayoutIfMissing(root, result, options, dryRun);
                 if (layout != null)
                 {
-                    output.WriteLine(dryRun ? $"Would also create {layout.RelativePath}, the layout pages use by default." : $"Created {layout.RelativePath}, the layout pages use by default");
+                    file.Info(dryRun ? $"Would also create {file.Style.Bold(layout.RelativePath)}, the layout pages use by default." : $"Created {file.Style.Bold(layout.RelativePath)}, the layout pages use by default");
                 }
-                if (!string.IsNullOrEmpty(result.Hint)) output.WriteLine(result.Hint);
+                if (!string.IsNullOrEmpty(result.Hint)) file.Comment("  " + result.Hint);
                 return 0;
             }
             catch (KScript.Projects.ProjectConfigException ex)
@@ -273,6 +280,14 @@ namespace KScript.Scaffolding
             if (result.DisplayDirectory != ".") output.WriteLine($"  cd {(result.DisplayDirectory.Contains(' ') ? "\"" + result.DisplayDirectory + "\"" : result.DisplayDirectory)}");
             foreach (string line in result.Next) output.WriteLine("  " + line);
             return 0;
+        }
+
+        /// <summary>"Next:" and the commands to run, after making files.</summary>
+        private static void NextSteps(CliOutput cli, IEnumerable<string> lines)
+        {
+            cli.NewLine();
+            cli.Heading("  Next:");
+            foreach (string line in lines) cli.Line("  " + line);
         }
 
         /// <summary>A path for messages: relative to the current folder when it is inside it, with ~ for the home folder.</summary>

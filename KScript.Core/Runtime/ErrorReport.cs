@@ -137,23 +137,10 @@ namespace KScript.Runtime
         /// <summary>Prints a message after the ERROR label (for errors that aren't exceptions, such as a bad option).</summary>
         public static void WriteMessage(TextWriter output, string message, bool? colour = null) => WriteLabelled(output, message, colour ?? UseColour(output));
 
-        private static void WriteLabelled(TextWriter output, string message, bool colour)
-        {
-            const string indent = "          ";
-            string[] lines = message.Replace("\r\n", "\n").Split('\n');
-            output.Write("  ");
-            output.Write(colour ? "\u001b[1;97;41m ERROR \u001b[0m" : " ERROR ");
-            output.Write(' ');
-            output.WriteLine(lines[0]);
-            for (int i = 1; i < lines.Length; i++) output.WriteLine(lines[i].Length == 0 ? string.Empty : indent + lines[i]);
-            output.Flush();
-        }
+        private static void WriteLabelled(TextWriter output, string message, bool colour) =>
+            new KScript.Output.CliOutput(output, colour).Error(message, format: false);
 
-        internal static bool UseColour(TextWriter output)
-        {
-            if (Environment.GetEnvironmentVariable("NO_COLOR") != null) return false;
-            if (Environment.GetEnvironmentVariable("FORCE_COLOR") != null) return true;
-            return ReferenceEquals(output, Console.Error) && !Console.IsErrorRedirected;
-        }
+        /// <summary>The CLI's colour rule (--ansi/--no-ansi, FORCE_COLOR, NO_COLOR, a terminal), from CliStyle.</summary>
+        internal static bool UseColour(TextWriter output) => KScript.Output.CliStyle.Supports(output);
     }
 }

@@ -55,6 +55,7 @@ namespace KScript.LanguageServer
 
         private static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors, JsonReport report)
         {
+            var cli = new KScript.Output.CliOutput(output);
             List<string> given = paths.ToList();
             var configs = new Dictionary<string, ProjectConfig>(StringComparer.Ordinal);
             var files = new List<(string File, bool Explicit)>();
@@ -140,7 +141,14 @@ namespace KScript.LanguageServer
                     }
                     else
                     {
-                        output.WriteLine($"{shown}({pos.Line + 1},{pos.Character + 1}): {severity} {d.Code}: {d.Message}");
+                        // file(line,col): severity code: message, the shape editors and CI annotations read; coloured at a terminal.
+                        string coloured = d.Severity switch
+                        {
+                            DiagnosticSeverity.Error => cli.Style.Apply(severity, "1;31"),
+                            DiagnosticSeverity.Warning => cli.Style.Apply(severity, "1;33"),
+                            _ => cli.Style.Cyan(severity),
+                        };
+                        output.WriteLine($"{cli.Style.Bold(shown)}{cli.Style.Gray($"({pos.Line + 1},{pos.Character + 1}):")} {coloured} {cli.Style.Gray(d.Code + ":")} {d.Message}");
                     }
                     if (d.Severity == DiagnosticSeverity.Error) errors++;
                     else if (d.Severity == DiagnosticSeverity.Warning) warnings++;
@@ -148,8 +156,17 @@ namespace KScript.LanguageServer
             }
 
             if (report != null) report.Files = files.Count;
-            output.WriteLine($"{files.Count} file{(files.Count == 1 ? string.Empty : "s")} checked: {errors} error{(errors == 1 ? string.Empty : "s")}, {warnings} warning{(warnings == 1 ? string.Empty : "s")}.");
-            return errors > 0 || (anyWarningsAsErrors && warnings > 0) ? 1 : 0;
+            string summary = $"{files.Count} file{(files.Count == 1 ? string.Empty : "s")} checked: {errors} error{(errors == 1 ? string.Empty : "s")}, {warnings} warning{(warnings == 1 ? string.Empty : "s")}.";
+            bool failed = errors > 0 || (anyWarningsAsErrors && warnings > 0);
+            if (report != null) output.WriteLine(summary);
+            else
+            {
+                if (errors + warnings > 0) cli.NewLine();
+                if (failed) cli.Error(summary);
+                else if (warnings > 0) cli.Warn(summary);
+                else cli.Success(summary);
+            }
+            return failed ? 1 : 0;
         }
 
         /// <summary>A problem as JSON: positions are 1-based, and the end is just past the last character.</summary>

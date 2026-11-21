@@ -560,7 +560,8 @@ public class HttpAppTests
         Assert.Contains("routes.ks.xml:4", text);
         var output = new StringWriter();
         Assert.Equal(0, HttpServer.ListRoutes(site.Root, null, output, new StringWriter()));
-        Assert.Contains("METHOD", output.ToString());
+        Assert.Matches(@"GET +/people/\{id\} \.+ people\.show › people\.page", output.ToString());
+        Assert.Contains("Showing [", output.ToString());
     }
 
     [Fact]

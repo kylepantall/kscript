@@ -329,7 +329,7 @@ public class MakeProjectTests : IDisposable
         var e = new StringWriter { NewLine = "\n" };
         int code = KScript.Testing.TestCommand.Run(new[] { Path.Combine(parent.Root, "app") }, o, e, color: false);
         Assert.True(code == 0, o.ToString() + e);
-        Assert.Contains("Tests: 14 passed, 14 total", o.ToString());
+        Assert.Contains("Tests:    14 passed, 14 total", o.ToString());
     }
 
     [Fact]
@@ -388,7 +388,7 @@ public class MakeProjectTests : IDisposable
         var o = new StringWriter { NewLine = "\n" };
         var e = new StringWriter { NewLine = "\n" };
         Assert.True(KScript.Testing.TestCommand.Run(new[] { root }, o, e, color: false) == 0, o.ToString() + e);
-        Assert.Contains("Tests: 14 passed, 14 total", o.ToString());
+        Assert.Contains("Tests:    14 passed, 14 total", o.ToString());
 
         // kscript make in the project follows its make.format.
         Assert.Equal(0, MakeCommandRun("script", "tidy", "--dir", root).Code);
@@ -418,7 +418,7 @@ public class MakeProjectTests : IDisposable
         var o = new StringWriter { NewLine = "\n" };
         var e = new StringWriter { NewLine = "\n" };
         Assert.True(KScript.Testing.TestCommand.Run(new[] { root }, o, e, color: false) == 0, o.ToString() + e);
-        Assert.Contains("Tests: 2 passed, 2 total", o.ToString());
+        Assert.Contains("Tests:    2 passed, 2 total", o.ToString());
 
         // --template bare is the same, and works with --format xml.
         Assert.Equal(0, Make(parent.Root, "xml-tool", "--template", "bare", "--format", "xml").Code);
@@ -454,7 +454,7 @@ public class MakeProjectTests : IDisposable
 
         var o = new StringWriter { NewLine = "\n" };
         Assert.True(KScript.Testing.TestCommand.Run(new[] { root }, o, new StringWriter(), color: false) == 0, o.ToString());
-        Assert.Contains("Tests: 3 passed, 3 total", o.ToString());
+        Assert.Contains("Tests:    3 passed, 3 total", o.ToString());
 
         // An API on its own still gets serve settings; --desktop adds a window and the app section.
         Assert.Equal(0, Make(parent.Root, "api-only", "--bare", "--api", "--desktop").Code);

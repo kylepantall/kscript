@@ -31,10 +31,9 @@ namespace KScript.Runtime
 
         /// <summary>
         /// True when output may use ANSI colours: a person is at a terminal and NO_COLOR isn't set, or FORCE_COLOR is
-        /// set. Colours are never written to files, pipes or tests unless asked for.
+        /// set; kscript --ansi and --no-ansi win over both. Colours are never written to files, pipes or tests unless asked for.
         /// </summary>
-        public bool UseColour =>
-            Environment.GetEnvironmentVariable("FORCE_COLOR") != null || (IsInteractive && Environment.GetEnvironmentVariable("NO_COLOR") == null);
+        public bool UseColour => KScript.Output.CliStyle.Allowed(IsInteractive);
 
         /// <summary>Command line arguments after the script path: <c>$args</c>.</summary>
         public IReadOnlyList<string> Arguments { get; set; } = Array.Empty<string>();

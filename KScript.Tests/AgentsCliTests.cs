@@ -56,8 +56,8 @@ public sealed class AgentsCliTests : IDisposable
         var (code, output, _) = Kscript("agents", dir);
         Assert.Equal(0, code);
         Assert.Contains("wrote AGENTS.md", output);
-        Assert.Contains("--check", Kscript("--help").Out);
-        Assert.Contains("kscript agents [folder] [--check] [--print]", Kscript("--help").Out);
+        Assert.Contains("--check", Kscript("help", "agents").Out);
+        Assert.Contains("kscript agents [folder] [--check] [--print]", Kscript("help", "agents").Out);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class AgentsCliTests : IDisposable
         var once = Kscript("watch", dir, "--once");
         Assert.Equal(0, once.Code);
         Assert.Contains("agents: updated", once.Out);
-        Assert.Contains("kscript watch [folder] [--once] [--check]", Kscript("--help").Out);
+        Assert.Contains("kscript watch [folder] [--once] [--check]", Kscript("help", "watch").Out);
 
         var o = new StringWriter { NewLine = "\n" };
         Assert.Equal(0, new CommandLine { Out = o, Error = new StringWriter(), Cancellation = new CancellationToken(true) }.Run(new[] { "watch", dir }));

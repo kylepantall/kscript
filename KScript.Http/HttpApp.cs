@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 
 using KScript.Auth;
 using KScript.Pages;
@@ -586,7 +587,7 @@ namespace KScript.Http
 
         #region Listing
 
-        /// <summary>The route table as text, for <c>kscript routes</c>.</summary>
+        /// <summary>The route table as a plain table (method, path, name, what answers it, middleware, file), for coding agents' docs.</summary>
         public static string Describe(RouteTable table, string siteRoot)
         {
             var rows = table.Routes.Select(r => new[]
@@ -605,6 +606,45 @@ namespace KScript.Http
             Line(header);
             foreach (var row in rows) Line(row);
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// The route table as text, for <c>kscript routes</c>, laid out like artisan route:list: the method, the path,
+        /// dots, then the route's name and what answers it. <paramref name="verbose"/> adds each route's middleware and
+        /// the file and line it is declared on.
+        /// </summary>
+        public static string Print(RouteTable table, string siteRoot, KScript.Output.CliOutput cli = null, bool verbose = true)
+        {
+            var text = new StringWriter { NewLine = "\n" };
+            cli = cli == null ? new KScript.Output.CliOutput(text, colour: false) : new KScript.Output.CliOutput(text, cli.Style.Enabled, cli.Width);
+            var style = cli.Style;
+            string Methods(Route r) => r.Methods.Count == 0 ? "ANY" : string.Join("|", r.Methods);
+            int methodWidth = table.Routes.Count == 0 ? 3 : table.Routes.Max(r => Methods(r).Length);
+
+            string Colour(string method) => method switch
+            {
+                "GET" => style.Blue(method),
+                "HEAD" or "OPTIONS" => style.Gray(method),
+                "POST" or "PUT" or "PATCH" => style.Yellow(method),
+                _ => style.Red(method),
+            };
+
+            cli.NewLine();
+            foreach (Route r in table.Routes)
+            {
+                string methods = KScript.Output.CliStyle.Pad(string.Join(style.Gray("|"), Methods(r).Split('|').Select(Colour)), methodWidth);
+                string path = Regex.Replace(r.Pattern.Path, @"\{[^}]+\}", m => style.Yellow(m.Value));
+                string answer = r.Name != null ? $"{r.Name} {style.Gray("›")} {style.Gray(r.Target)}" : style.Gray(r.Target);
+                cli.TwoColumn($"{methods}  {path}", answer);
+                if (!verbose) continue;
+                string pad = new string(' ', methodWidth + 4);
+                if (r.Middleware.Count > 0) cli.Line($"{pad}{style.Gray("⇂ " + string.Join(", ", r.Middleware))}");
+                if (r.File != null) cli.Line($"{pad}{style.Gray("⇂ " + Path.GetRelativePath(siteRoot, r.File).Replace('\\', '/') + ":" + r.Line)}");
+            }
+            cli.NewLine();
+            string count = $"Showing [{table.Routes.Count}] route{(table.Routes.Count == 1 ? string.Empty : "s")}";
+            cli.Line(KScript.Output.CliStyle.PadLeft(style.Bold(count), cli.Width - 2));
+            return text.ToString();
         }
 
         #endregion

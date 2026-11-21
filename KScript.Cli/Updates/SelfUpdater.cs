@@ -231,16 +231,16 @@ namespace KScript.Updates
             bool newer = IsNewer(latestTag, current);
             if (checkOnly)
             {
-                output.WriteLine(newer
-                    ? $"kscript {latestTag.TrimStart('v')} is available (you have {current}). Run: kscript update"
-                    : $"kscript {current} is up to date (latest release: {latestTag}).");
+                var check = new KScript.Output.CliOutput(output);
+                if (newer) check.Info($"kscript {latestTag.TrimStart('v')} is available (you have {current}). Run: kscript update");
+                else check.Success($"kscript {current} is up to date (latest release: {latestTag}).");
                 return ide ? await IdeCommand.UpdateInstalledAsync(latestTag, force, checkOnly: true, output, error, env.IdeHost) : 0;
             }
 
             if (!newer && !force && tag == null)
             {
                 // The CLI is current, but an editor may still have an older extension.
-                output.WriteLine($"kscript {current} is up to date.");
+                new KScript.Output.CliOutput(output).Success($"kscript {current} is up to date.");
                 return ide ? await IdeCommand.UpdateInstalledAsync(latestTag, force, checkOnly: false, output, error, env.IdeHost) : 0;
             }
 
@@ -258,7 +258,7 @@ namespace KScript.Updates
                 return 1;
             }
 
-            output.WriteLine($"Downloading kscript {latestTag} ({assetName})...");
+            new KScript.Output.CliOutput(output).Info($"Downloading kscript {latestTag} ({assetName})...");
             string dir = Path.GetDirectoryName(target);
             string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}" + (env.Windows ? ".exe" : ""));
             await using var archive = new MemoryStream();
@@ -303,7 +303,7 @@ namespace KScript.Updates
                 TryDelete(staged);
             }
 
-            output.WriteLine($"Updated kscript {current} -> {latestTag.TrimStart('v')} ({target})");
+            new KScript.Output.CliOutput(output).Success($"Updated kscript {current} -> {latestTag.TrimStart('v')} ([{target}])");
             return ide ? await IdeCommand.UpdateInstalledAsync(latestTag, force, checkOnly: false, output, error, env.IdeHost) : 0;
         }
 

@@ -207,7 +207,7 @@ namespace KScript.Language.Agents
         private static string RoutesOf(string site, ProjectConfig config, ISet<string> skip)
         {
             var table = new StringWriter();
-            if (KScript.Http.HttpServer.ListRoutes(site, config, table, TextWriter.Null) != 0)
+            if (KScript.Http.HttpServer.ListRoutes(site, config, table, TextWriter.Null, plain: true) != 0)
             {
                 return null;
             }
