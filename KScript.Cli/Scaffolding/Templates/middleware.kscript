@@ -14,11 +14,13 @@ import KScript.Http
 /// {{ title }}: runs before the route's controller, and gets its response back from $next.
 fn {{ snake }}(request, next) {
 {{#if before}}
+  // TODO: Replace this check with your own. Return a response to stop the request, or call $next to go on.
   if ($request.headers['x-api-key'] ?? '') == '' {
     return @response({ error: 'Send an X-Api-Key header.' }, status: 401)
   }
   return $next($request)
 {{else}}
+  // TODO: Change $request before the controller runs, or the response after it.
   response = $next($request)
   return $response->with_header('{{ header ?? X-Handled-By }}', '{{ kebab }}')
 {{/if}}
