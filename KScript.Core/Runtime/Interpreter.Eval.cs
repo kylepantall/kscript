@@ -182,7 +182,7 @@ namespace KScript.Runtime
                     return lit.Kind switch
                     {
                         LiteralKind.Number => double.Parse(lit.Value, NumberStyles.Float, CultureInfo.InvariantCulture),
-                        LiteralKind.String => lit.Value,
+                        LiteralKind.String => lit.Template == null ? lit.Value : FillIn(lit.Template, scope, ctx),
                         LiteralKind.Bool => lit.Value == "true",
                         LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid => TypedLiteral(lit, ctx),
                         _ => null,
@@ -233,7 +233,7 @@ namespace KScript.Runtime
                 case MethodCallNode method:
                 {
                     object target = Evaluate(method.Target, scope, ctx);
-                    (List<object> args, Dictionary<string, object> named) = EvaluateArguments(method.Arguments, scope, ctx);
+                    (List<object> args, Dictionary<string, object> named) = EvaluateArguments(method.Arguments, scope, ctx, method.Name);
                     return InvokeMethod(target, method.Name, args, named, scope, ctx, method);
                 }
 
@@ -245,7 +245,7 @@ namespace KScript.Runtime
                         object found = ResolveCallable(command.Name, scope, ctx, command);
                         return found is CommandDefinition cmd ? new NativeFunction(cmd.Name, call => InvokeCommand(cmd, call)) : found;
                     }
-                    (List<object> args, Dictionary<string, object> named) = EvaluateArguments(command.Arguments, scope, ctx);
+                    (List<object> args, Dictionary<string, object> named) = EvaluateArguments(command.Arguments, scope, ctx, command.Name);
                     return CallCommand(command.Name, args, named, scope, ctx, command);
                 }
 
@@ -318,14 +318,29 @@ namespace KScript.Runtime
             return Values.LooseEquals(p, subject);
         }
 
-        private (List<object>, Dictionary<string, object>) EvaluateArguments(IReadOnlyList<ArgumentNode> arguments, Scope scope, EvalContext ctx)
+        /// <summary>"Hello $name, { $n * 2 }": each part worked out and joined.</summary>
+        private string FillIn(Template template, Scope scope, EvalContext ctx)
+        {
+            var sb = new StringBuilder();
+            foreach (TemplateSegment segment in template.Segments)
+            {
+                sb.Append(segment.Kind == TemplateSegmentKind.Text ? segment.Text : Values.ToStr(Evaluate(segment.Node, scope, ctx)));
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>The text of a call that reads it itself (@sql binds each { } as a parameter), as written; null for anything else.</summary>
+        private static string TextAsWritten(ExprNode node, string callName) =>
+            callName != null && TemplateParser.KeepsText(callName) && node is LiteralNode { Kind: LiteralKind.String } text ? text.Value : null;
+
+        private (List<object>, Dictionary<string, object>) EvaluateArguments(IReadOnlyList<ArgumentNode> arguments, Scope scope, EvalContext ctx, string callName = null)
         {
             var args = new List<object>(arguments.Count);
             Dictionary<string, object> named = null;
             foreach (ArgumentNode a in arguments)
             {
                 // A bare word (downloads, recursive, not recursive) means something only to the parameter it lands on.
-                object value = BareWordOf(a.Value, scope, ctx, afterNamed: named != null && a.Name == null) ?? BareListOf(a.Value, scope, ctx) ?? Evaluate(a.Value, scope, ctx);
+                object value = TextAsWritten(a.Value, callName) ?? BareWordOf(a.Value, scope, ctx, afterNamed: named != null && a.Name == null) ?? BareListOf(a.Value, scope, ctx) ?? Evaluate(a.Value, scope, ctx);
                 if (a.Name != null) (named ??= new Dictionary<string, object>(StringComparer.Ordinal))[a.Name] = value;
                 else if (named != null && !(value is BareWord)) args.Add(new LatePositional(value));
                 else args.Add(value);
@@ -752,7 +767,7 @@ namespace KScript.Runtime
 
         private object EvaluateCall(CallNode call, object pipedValue, Scope scope, EvalContext ctx)
         {
-            (List<object> args, Dictionary<string, object> named) = EvaluateArguments(call.Arguments, scope, ctx);
+            (List<object> args, Dictionary<string, object> named) = EvaluateArguments(call.Arguments, scope, ctx, (call.Callee as IdentifierNode)?.Name);
             bool piped = pipedValue != NotPiped;
             if (piped) args.Insert(0, pipedValue);
 
@@ -807,12 +822,19 @@ namespace KScript.Runtime
 
         private object EvaluatePipe(PipeNode pipe, Scope scope, EvalContext ctx)
         {
-            object left = Evaluate(pipe.Left, scope, ctx);
+            // "select ... {$id}" |> @sql(): the text reaches @sql as written, like an argument does.
+            string piped = pipe.Right switch
+            {
+                CommandCallNode c => c.Name,
+                CallNode { Callee: IdentifierNode id } => id.Name,
+                _ => null,
+            };
+            object left = TextAsWritten(pipe.Left, piped) ?? Evaluate(pipe.Left, scope, ctx);
             switch (pipe.Right)
             {
                 case CommandCallNode command:
                 {
-                    (List<object> args, Dictionary<string, object> named) = EvaluateArguments(command.Arguments, scope, ctx);
+                    (List<object> args, Dictionary<string, object> named) = EvaluateArguments(command.Arguments, scope, ctx, command.Name);
                     args.Insert(0, left);
                     return CallCommand(command.Name, args, named, scope, ctx, command);
                 }
