@@ -484,9 +484,10 @@ public sealed class QueueTests : StorageFixture
         FileOf("jobs/count.kscript", "job Count {\n  n: int\n\n  fn handle() {\n    echo \"n{$n}\"\n  }\n}");
         Code("import \"jobs/count.kscript\"\nfor n in 0..20 {\n  dispatch Count(n: $n)\n}");
         Work(null, 4);
-        string[] lines = JobOutput().Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal(20, lines.Length);
-        Assert.Equal(20, lines.Distinct().Count());
+        // Threads can interleave a line and its line break (\r\n on Windows), so count the jobs' words, not lines.
+        string output = JobOutput();
+        List<string> ran = System.Text.RegularExpressions.Regex.Matches(output, @"n\d+").Select(m => m.Value).ToList();
+        Assert.True(ran.Count == 20 && ran.Distinct().Count() == 20, output);
     }
 
     [Fact]
