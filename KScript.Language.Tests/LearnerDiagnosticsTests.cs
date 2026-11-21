@@ -197,7 +197,6 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-<<<<<<< HEAD
         public void SingleQuotesAreNotFilledIn()
         {
             const string text = "name = 'Joan'\nn = 2\ngreeting = 'Hello $name, you have {$n * 2}!'\necho $greeting\n";
@@ -206,21 +205,10 @@ namespace KScript.Language.Tests
             Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
             Assert.StartsWith("$name is not filled in here: single quotes keep text as written. Use double quotes", d.Message);
             string expected = "name = 'Joan'\nn = 2\ngreeting = \"Hello $name, you have {$n * 2}!\"\necho $greeting\n";
-=======
-        public void TextUsedAsAValueIsNotATemplate()
-        {
-            const string text = "name = 'Joan'\nn = 2\ngreeting = \"Hello $name, you have {$n * 2} and {$n}!\"\necho $greeting\n";
-            Diagnostic d = Assert.Single(Analyze(text).Diagnostics);
-            Assert.Equal(DiagnosticCodes.TextNotFilledIn, d.Code);
-            Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
-            Assert.StartsWith("$name is not filled in here: only the text after echo is a template", d.Message);
-            string expected = "name = 'Joan'\nn = 2\ngreeting = 'Hello ' + $name + ', you have ' + ($n * 2) + ' and ' + $n + '!'\necho $greeting\n";
->>>>>>> origin/master
             Assert.Equal(expected, Fixed(text, d));
             Assert.Empty(Analyze(expected).Diagnostics);
         }
 
-<<<<<<< HEAD
         [Fact]
         public void AnXmlScriptIsOfferedTheJoinedForm()
         {
@@ -229,21 +217,10 @@ namespace KScript.Language.Tests
             Assert.Equal(DiagnosticCodes.TextNotFilledIn, d.Code);
             Assert.Contains("Join the parts instead: 'Hi ' + $who.", d.Message);
             Assert.Contains("value=\"'Hi ' + $who\"", Fixed(text, d));
-=======
-        [Theory]
-        [InlineData("fn greet(who) {\n  return \"Hi $who!\"\n}\necho @greet('a')\n", "a.kscript")]
-        [InlineData("<kscript><let name=\"who\" value=\"'a'\" /><let name=\"g\" value=\"'Hi $who'\" /><echo>$g</echo></kscript>", "a.ks.xml")]
-        public void TheWarningCoversReturnsAndXml(string text, string file)
-        {
-            Diagnostic d = Assert.Single(Analyze(text, file).Diagnostics);
-            Assert.Equal(DiagnosticCodes.TextNotFilledIn, d.Code);
-            Assert.Contains("$who is not filled in here", d.Message);
->>>>>>> origin/master
         }
 
         [Theory]
         [InlineData("name = 'Joan'\necho \"Hello $name\"\n")]
-<<<<<<< HEAD
         [InlineData("name = 'Joan'\ng = \"Hello $name\"\necho $g\n")]
         [InlineData("fn greet(who) {\n  return \"Hi $who!\"\n}\necho @greet('a')\n")]
         [InlineData("price = 'It costs $5'\necho $price\n")]
@@ -282,20 +259,11 @@ namespace KScript.Language.Tests
             Assert.Contains(Service.GetCompletions(Analyze(text), offset), i => i.Label == "upper");
             (text, offset) = TestHelpers.WithCaret("name = 'Joan'\ng = \"Hello $na‸\"\necho $g\n");
             Assert.Contains(Service.GetCompletions(Analyze(text), offset), i => i.Label.TrimStart('$') == "name");
-=======
-        [InlineData("price = \"It costs $5\"\necho $price\n")]
-        [InlineData("label = \"$nobody is here\"\necho $label\n")]
-        [InlineData("name = 'Joan'\ntext = 'Hello ' + $name\necho $text\n")]
-        public void TemplatesAndPlainTextAreLeftAlone(string text)
-        {
-            Assert.DoesNotContain(Analyze(text).Diagnostics, d => d.Code == DiagnosticCodes.TextNotFilledIn);
->>>>>>> origin/master
         }
 
         [Fact]
         public void TextThatCannotBeRewrittenGetsNoFix()
         {
-<<<<<<< HEAD
             Diagnostic d = Analyze("name = 'Joan'\ng = 'Say \"hi\" to $name'\necho $g\n").Diagnostics.Single(x => x.Code == DiagnosticCodes.TextNotFilledIn);
             Assert.Empty(d.Fixes);
             Assert.EndsWith("Use double quotes to fill it in.", d.Message);
@@ -311,11 +279,6 @@ namespace KScript.Language.Tests
             // Written in the call, or held in single quotes, the text reaches @sql as written.
             Assert.Empty(Analyze(head + "echo @sql(\"select * from users where id = {$id}\")\n").Diagnostics);
             Assert.DoesNotContain(Analyze(head + "query = 'select * from users where id = {$id}'\necho @sql($query)\n").Diagnostics, x => x.Message.Contains("$query"));
-=======
-            Diagnostic d = Analyze("name = 'Joan'\ng = \"It's $name\"\necho $g\n").Diagnostics.Single(x => x.Code == DiagnosticCodes.TextNotFilledIn);
-            Assert.Empty(d.Fixes);
-            Assert.EndsWith("Join the parts with + instead.", d.Message);
->>>>>>> origin/master
         }
 
         [Fact]
