@@ -15,6 +15,42 @@ async function waitFor(check, what, timeoutMs = 60000) {
   }
 }
 
+// Types "op" on the first empty line, opens the suggest widget and accepts the top suggestion.
+// Returns the line afterwards, so op://vault/item/field means another extension's snippet was offered.
+async function typeAndAccept(folder, file) {
+  const doc = await vscode.workspace.openTextDocument(path.join(folder, file));
+  const editor = await vscode.window.showTextDocument(doc);
+  const line = doc.getText().split('\n').findIndex((l) => l.trim() === '');
+  editor.selection = new vscode.Selection(line, 0, line, 0);
+  await vscode.commands.executeCommand('type', { text: 'op' });
+  await vscode.commands.executeCommand('editor.action.triggerSuggest');
+  await new Promise((r) => setTimeout(r, 3000));
+  await vscode.commands.executeCommand('acceptSelectedSuggestion');
+  await new Promise((r) => setTimeout(r, 500));
+  const text = doc.lineAt(line).text;
+  await vscode.commands.executeCommand('workbench.action.files.revert');
+  return { languageId: doc.languageId, text };
+}
+
+async function snippetsFromOtherExtensions(folder) {
+  const effective = (languageId) => {
+    const editor = vscode.workspace.getConfiguration('editor', { languageId });
+    return { snippetSuggestions: editor.get('snippetSuggestions'), showSnippets: editor.get('suggest.showSnippets') };
+  };
+  console.log('effective settings', JSON.stringify({ kscript: effective('kscript'), 'kscript-code': effective('kscript-code') }));
+
+  // Control: in a plain text file the fixture's snippet is offered.
+  const plain = await typeAndAccept(folder, 'snippets.txt');
+  console.log('plaintext', JSON.stringify(plain));
+  assert.match(plain.text, /op:\/\//, 'the fixture snippet works in plain text: ' + JSON.stringify(plain));
+
+  for (const file of ['snippets.ks.xml', 'snippets.kscript']) {
+    const result = await typeAndAccept(folder, file);
+    console.log(file, JSON.stringify(result));
+    assert.doesNotMatch(result.text, /op:\/\//, `other extensions' snippets are not offered in ${file}: ` + JSON.stringify(result));
+  }
+}
+
 async function run() {
   const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const doc = await vscode.workspace.openTextDocument(path.join(folder, 'hello.ks.xml'));
@@ -49,6 +85,8 @@ async function run() {
   await vscode.window.showTextDocument(layout);
   const layoutTokens = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', layout.uri);
   assert.ok(!layoutTokens.some((t) => /invalid\.illegal/.test(t.t)), '<slot /> is not marked as an error: ' + JSON.stringify(layoutTokens));
+
+  await snippetsFromOtherExtensions(folder);
 
   console.log('VS Code integration test passed');
 }
