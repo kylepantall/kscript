@@ -774,6 +774,10 @@ namespace KScript.Runtime
                             throw Fail(call, ctx, ex.Message, ex.Type);
                         }
                     }
+                    if (piped && Extensions.TryFind(pipedValue, id.Name, ctx.Module, out ExtensionMethod extension))
+                    {
+                        return Extensions.Call(this, extension, pipedValue, args.Skip(1).ToList(), named, scope, ctx.Module);
+                    }
                     if (piped && TryFindMethod(pipedValue, id.Name, ctx.Module, out MethodDefinition method))
                     {
                         return InvokeMethodDefinition(method, pipedValue, args.Skip(1).ToList(), named, scope, ctx);
@@ -860,6 +864,12 @@ namespace KScript.Runtime
         /// <summary>Calls <c>value->name(args)</c>.</summary>
         public object InvokeMethod(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
         {
+            // extend date { fn json() => ... }: methods the script (its imports, its project) adds to the type come first.
+            if (Extensions.TryFind(target, name, ctx.Module, out ExtensionMethod extension))
+            {
+                return Extensions.Call(this, extension, target, args, named, scope, ctx.Module);
+            }
+
             // A <type>'s own methods: fn inside the type, with the record's fields (and $this) as variables.
             if (target is Record record && record.Type.OwnMethods.TryGetValue(name, out MarkupElement methodElement))
             {

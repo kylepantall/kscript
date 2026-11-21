@@ -92,6 +92,9 @@ namespace KScript.Language.Catalog
             methods.Where(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
                    .OrderBy(m => m.ReceiverType == receiverType ? 0 : KType.AcceptsMethod(m.ReceiverType, m.Name, receiverType) ? 1 : 2);
 
+        /// <summary>Every type some method is for, such as date, list or response.</summary>
+        public IEnumerable<string> MethodReceivers => methods.Select(m => m.ReceiverType).Distinct(StringComparer.Ordinal);
+
         public IEnumerable<CallableInfo> MethodsFor(string receiverType) =>
             methods.Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiverType))
                    .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
