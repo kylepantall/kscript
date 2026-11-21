@@ -242,12 +242,8 @@ namespace KScript.LanguageServer
                 ["documentHighlightProvider"] = true,
                 ["renameProvider"] = new JsonObject { ["prepareProvider"] = true },
                 ["documentSymbolProvider"] = true,
-<<<<<<< HEAD
-                ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix", "refactor.rewrite") },
-=======
                 ["workspaceSymbolProvider"] = true,
-                ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix") },
->>>>>>> 7aef25b (Rank everyday suggestions first, name plain arguments, and show examples and use counts)
+                ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix", "refactor.rewrite") },
                 ["documentLinkProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["inlayHintProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["foldingRangeProvider"] = true,
