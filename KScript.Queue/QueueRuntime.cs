@@ -20,6 +20,9 @@ namespace KScript.Queueing
 
         public ProjectConfig Project { get; }
 
+        /// <summary>The running script's host, for the database driver's $config; null for the CLI.</summary>
+        public KScriptHost Host { get; init; }
+
         /// <summary>The project folder (or the script's folder outside a project).</summary>
         public string Directory { get; }
 
@@ -61,6 +64,7 @@ namespace KScript.Queueing
             {
                 "sync" => null,
                 "memory" => MemoryQueueDriver.Named(AppName + "/" + c.Name, c.Name),
+                "database" => DatabaseQueueDriver.For(this, c),
                 _ => new FileQueueDriver(c.Name, FolderFor(c)),
             };
         }
@@ -97,7 +101,7 @@ namespace KScript.Queueing
                 }
             });
             string environment = interpreter.Host.Config?.Environment ?? System.Environment.GetEnvironmentVariable("KSCRIPT_ENV");
-            return new QueueContext(project, directory, environment, interpreter.Host.Items.ContainsKey(QueueRuntime.TestSessionKey));
+            return new QueueContext(project, directory, environment, interpreter.Host.Items.ContainsKey(QueueRuntime.TestSessionKey)) { Host = interpreter.Host };
         }
 
         /// <summary>Forgets the kscript.json files read so far (tests).</summary>
@@ -108,6 +112,14 @@ namespace KScript.Queueing
     {
         /// <summary>Seconds a lease lasts past the job's timeout, so a slow worker isn't overtaken by another.</summary>
         public const double LeaseMargin = 30;
+
+        /// <summary>
+        /// The queue's store can't be used just now: a busy file (file driver), or a database error such as a busy or
+        /// unreachable database (database driver). The worker pauses and tries again rather than stopping.
+        /// </summary>
+        public static bool StoreBusy(Exception ex) =>
+            ex is IOException or UnauthorizedAccessException
+            || ex is KScriptException { Type: "ConnectionError" } || ex is KScriptException { InnerException: System.Data.Common.DbException };
 
         /// <summary>The key KScript.Test keeps its session under: a run with one is a test run.</summary>
         public const string TestSessionKey = "KScript.Test.session";
