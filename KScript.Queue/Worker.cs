@@ -302,7 +302,7 @@ namespace KScript.Queueing
             }
             catch (Exception ex) when (ex is KScriptException or ControlSignal)
             {
-                interpreter.Host.Error.WriteLine($"{type.Name}'s fn failed() stopped with an error: {(ex is KScriptException k ? k.ToString() : ex.Message)}");
+                KScript.Runtime.ErrorReport.Write(interpreter.Host.Error, $"{type.Name}'s fn failed() stopped with an error.", ex);
             }
             interpreter.Host.FlushLogs();
             return new AttemptResult { Outcome = JobOutcome.Failed, Error = error, Elapsed = clock.Elapsed };

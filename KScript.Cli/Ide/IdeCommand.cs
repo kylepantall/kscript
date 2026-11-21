@@ -619,7 +619,7 @@ namespace KScript.Ide
             }
             catch (HttpRequestException ex)
             {
-                error.WriteLine($"Could not reach GitHub: {ex.Message}");
+                KScript.Runtime.ErrorReport.Write(error, "Could not reach GitHub.", ex);
                 return (null, null);
             }
 

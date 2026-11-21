@@ -30,7 +30,7 @@ namespace KScript.Http
                 }
                 catch (KScriptException ex)
                 {
-                    log?.WriteLine($"Route error: {(ex.Location != null ? ex.Location + ": " : string.Empty)}{ex.Message}");
+                    if (log != null) KScript.Runtime.ErrorReport.Write(log, "The routes have an error; requests get an error page until it is fixed.", ex);
                 }
             }
             Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> routes = app.HasRoutes ? app.HandleAsync : null;
@@ -49,7 +49,7 @@ namespace KScript.Http
             }
             catch (FileNotFoundException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
             if (!app.HasRoutes)
@@ -72,7 +72,7 @@ namespace KScript.Http
             }
             catch (KScriptException ex)
             {
-                error.WriteLine((ex.Location != null ? ex.Location + ": " : string.Empty) + ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
         }
@@ -87,7 +87,7 @@ namespace KScript.Http
             }
             catch (FileNotFoundException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
             if (!app.HasRoutes)
@@ -102,7 +102,7 @@ namespace KScript.Http
             }
             catch (KScriptException ex)
             {
-                error.WriteLine((ex.Location != null ? ex.Location + ": " : string.Empty) + ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
         }

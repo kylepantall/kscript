@@ -10,13 +10,21 @@ namespace KScript
 {
     class Program
     {
+        internal static void ReportUnhandled(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject is Exception ex) ErrorReport.Write(Console.Error, ex);
+        }
+
         static int Main(string[] args)
         {
+            WorkingFolder.Remember();
+            // An error on a thread of its own (a timer, a background task) ends the process: say why the KScript way.
+            AppDomain.CurrentDomain.UnhandledException += ReportUnhandled;
             // A program built by kscript compile runs its own script and nothing else. This check comes first, and
             // Run is never reached, because a compiled program leaves out the assemblies Run uses (the command line,
             // the language server and the packages the script doesn't import).
             var commandLine = new CommandLine();
-            if (CompiledApp.IsCompiled) return commandLine.RunCompiled(CompiledApp.FindManifest(), args);
+            if (CompiledApp.IsCompiled) return commandLine.RunCompiledSafely(CompiledApp.FindManifest(), args);
             return commandLine.Run(args);
         }
     }
@@ -128,7 +136,7 @@ namespace KScript
             }
             catch (KScript.Projects.ProjectConfigException ex)
             {
-                Error.WriteLine(ex.Message);
+                ErrorReport.Write(Error, ex);
                 return 1;
             }
 
@@ -174,17 +182,17 @@ namespace KScript
             }
             catch (DirectoryNotFoundException ex)
             {
-                Error.WriteLine(ex.Message);
+                ErrorReport.Write(Error, ex);
                 return 1;
             }
             catch (FileNotFoundException ex)
             {
-                Error.WriteLine(ex.Message);
+                ErrorReport.Write(Error, ex);
                 return 1;
             }
             catch (IOException ex)
             {
-                Error.WriteLine($"Could not start the server: {ex.Message}");
+                ErrorReport.Write(Error, "Could not start the server.", ex);
                 return 1;
             }
             finally
@@ -283,7 +291,7 @@ namespace KScript
             }
             catch (KScript.Projects.ProjectConfigException ex)
             {
-                Error.WriteLine(ex.Message);
+                ErrorReport.Write(Error, ex);
                 return false;
             }
             string given = folder == null ? null : Path.GetFullPath(folder);
@@ -308,7 +316,7 @@ namespace KScript
             }
             catch (KScript.Projects.ProjectConfigException ex)
             {
-                Error.WriteLine(ex.Message);
+                ErrorReport.Write(Error, ex);
                 return 1;
             }
             string given = folder == null ? null : Path.GetFullPath(folder);
@@ -329,7 +337,49 @@ namespace KScript
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         internal static void AddProjectOutputs() => KScript.Language.Outputs.ProjectOutputs.Add(new KScript.Docs.ProjectDocsOutput());
 
+        /// <summary>
+        /// Runs a kscript command. Whatever goes wrong is shown as a KScript error, never as a .NET exception:
+        /// --debug (anywhere before the script, or KSCRIPT_DEBUG=1) adds the .NET details.
+        /// </summary>
         public int Run(string[] args)
+        {
+            args = TakeDebug(args);
+            try
+            {
+                return RunCommand(args);
+            }
+            catch (Exception ex)
+            {
+                Out.Flush();
+                ErrorReport.Write(Error, ex);
+                return ErrorReport.ToKScript(ex).Type == ErrorReport.InternalType ? 70 : 1;
+            }
+        }
+
+        /// <summary>
+        /// Takes --debug out of the arguments and turns on <see cref="ErrorReport.Debug"/>. Like --env, it is read before
+        /// the script path (later arguments are the script's own), or anywhere for commands such as serve.
+        /// </summary>
+        internal static string[] TakeDebug(string[] args)
+        {
+            var rest = new List<string>(args.Length);
+            bool before = true;
+            string first = args.FirstOrDefault(a => !a.StartsWith("-", StringComparison.Ordinal));
+            bool script = first != null && (first.Contains('.') || first.Contains('/') || first.Contains('\\'));
+            foreach (string a in args)
+            {
+                if (a == "--debug" && (before || !script))
+                {
+                    ErrorReport.Debug = true;
+                    continue;
+                }
+                if (!a.StartsWith("-", StringComparison.Ordinal)) before = false;
+                rest.Add(a);
+            }
+            return rest.ToArray();
+        }
+
+        int RunCommand(string[] args)
         {
             AddProjectOutputs();
             if (args.Length > 0 && args[0] == "lsp")
@@ -354,7 +404,7 @@ namespace KScript
             }
             catch (ArgumentException ex)
             {
-                Error.WriteLine(ex.Message);
+                ErrorReport.Write(Error, ex);
                 return 1;
             }
 
@@ -500,6 +550,20 @@ namespace KScript
         /// Runs a program built by kscript compile. Its manifest (extracted by the .NET host next to the program's
         /// files) says what it is: a script, a desktop window, or a site to serve. The arguments all go to the program.
         /// </summary>
+        internal int RunCompiledSafely(string manifest, string[] args)
+        {
+            try
+            {
+                return RunCompiled(manifest, args);
+            }
+            catch (Exception ex)
+            {
+                Out.Flush();
+                ErrorReport.Write(Error, ex);
+                return 70;
+            }
+        }
+
         internal int RunCompiled(string manifest, string[] args)
         {
             if (manifest == null)
@@ -532,10 +596,10 @@ namespace KScript
             {
                 return new Interpreter(host, options: options).RunFile(main);
             }
-            catch (KScriptException ex)
+            catch (Exception ex) when (ex is not ControlSignal)
             {
-                Error.WriteLine(ex.ToString());
-                ShowError(Path.GetFileName(main), ex.ToString());
+                ErrorReport.Write(Error, ex);
+                ShowError(Path.GetFileName(main), ErrorReport.Format(ex));
                 return 1;
             }
         }
@@ -642,7 +706,7 @@ namespace KScript
             }
             catch (ProjectConfigException ex)
             {
-                Error.WriteLine(ex.Message);
+                ErrorReport.Write(Error, ex);
                 return 1;
             }
 
@@ -664,10 +728,11 @@ namespace KScript
                 // Stopped with Ctrl+C: the usual exit code for an interrupted command, without an error report.
                 return 130;
             }
-            catch (KScriptException ex)
+            catch (Exception ex) when (ex is not ControlSignal)
             {
+                // A script's error, or anything else that went wrong while it ran: a KScript error either way.
                 Out.Flush();
-                Error.WriteLine(ex.ToString());
+                ErrorReport.Write(Error, ex);
                 return 3;
             }
             finally
@@ -687,7 +752,7 @@ namespace KScript
                 return Path.GetFullPath(arg);
             }
 
-            string match = Directory.GetFiles(Directory.GetCurrentDirectory())
+            string match = Directory.GetFiles(KScript.Runtime.WorkingFolder.Current)
                 .FirstOrDefault(f => string.Equals(Path.GetFileName(f), arg, StringComparison.OrdinalIgnoreCase));
 
             return match;

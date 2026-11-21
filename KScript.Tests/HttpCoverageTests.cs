@@ -219,7 +219,7 @@ public class HttpCoverageTests
         site.Write("routes.ks.xml", "<KScript.Routes><Get path=\"/hi\" to=\"missing\" /></KScript.Routes>");
         log = new StringWriter();
         await Run(log);
-        Assert.Contains("Route error:", log.ToString());
+        Assert.Contains("ERROR  The routes have an error", log.ToString());
     }
 
     [Fact]

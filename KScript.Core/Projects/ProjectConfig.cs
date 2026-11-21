@@ -8,9 +8,11 @@ using System.Text.RegularExpressions;
 namespace KScript.Projects
 {
     /// <summary>A problem with a kscript.json file that makes it unusable, such as invalid JSON.</summary>
-    public sealed class ProjectConfigException : Exception
+    public sealed class ProjectConfigException : Exception, KScript.Runtime.IKScriptError
     {
         public ProjectConfigException(string message) : base(message) { }
+
+        public KScript.Runtime.KScriptException ToKScriptError() => new KScript.Runtime.KScriptException(Message, "Config", this);
     }
 
     /// <summary>The <c>serve</c> section: what <c>kscript serve</c> uses when no options are given.</summary>

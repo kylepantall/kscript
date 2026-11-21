@@ -169,12 +169,12 @@ namespace KScript.Updates
             }
             catch (HttpRequestException ex)
             {
-                error.WriteLine($"Could not reach GitHub: {ex.Message}");
+                KScript.Runtime.ErrorReport.Write(error, "Could not reach GitHub.", ex);
                 return 1;
             }
             catch (UnauthorizedAccessException ex)
             {
-                error.WriteLine($"No permission to replace the kscript binary: {ex.Message}");
+                KScript.Runtime.ErrorReport.Write(error, "No permission to replace the kscript binary.", ex);
                 error.WriteLine((environment?.Windows ?? OperatingSystem.IsWindows())
                     ? "Re-run from a terminal opened as Administrator, or reinstall with install.ps1."
                     : "Re-run with sudo, or reinstall into a folder you own with install.sh.");
@@ -295,7 +295,7 @@ namespace KScript.Updates
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    error.WriteLine($"kscript was updated, but its UI libraries couldn't be replaced ({ex.Message}). Close any running kscript apps and run: kscript update --force");
+                    KScript.Runtime.ErrorReport.Write(error, "kscript was updated, but its UI libraries couldn't be replaced. Close any running kscript apps and run: kscript update --force", ex);
                 }
             }
             finally
