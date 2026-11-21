@@ -14,12 +14,14 @@ hint: Queue it: import "{{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}", then di
 ---
 /// {{ title }}.
 job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {{ tries }}, {{/if}}{{#if backoff}}backoff: "{{ backoff }}", {{/if}}timeout: "{{#if timeout}}{{ timeout }}{{else}}60s{{/if}}") {
+{{#if fields}}
 {{#each fields}}
   {{ item | trim }}
 {{/each}}
 
+{{/if}}
   fn handle() {
-    // Do the work here. An error retries the job after its backoff, until its tries run out.
+    // TODO: Do the work here. An error retries the job after its backoff, until its tries run out.
     log "{{ title }}"
   }
 
