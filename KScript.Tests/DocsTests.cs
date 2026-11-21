@@ -713,10 +713,11 @@ public sealed class DocsTests
                 checkedCount++;
                 foreach (var d in analysis.Diagnostics.Where(d => OutOfSync.Contains(d.Code)))
                 {
-                    // Examples import files of the reader's that aren't here.
                     // Examples import files of the reader's that aren't here, and use types declared in an earlier example.
                     if (d.Code == DiagnosticCodes.InvalidAttributeValue && (d.Message.StartsWith("File not found", StringComparison.Ordinal)
                         || Regex.IsMatch(d.Message, "^Unknown type '[A-Z]"))) continue;
+                    // Jobs and other types made by calling them (SendWelcome(user_id: 7)) come from those files too.
+                    if (d.Code == DiagnosticCodes.UnknownCommand && Regex.IsMatch(d.Message, "^Unknown function '[A-Z]")) continue;
                     if (d.Code == DiagnosticCodes.UnknownCommand && Regex.Match(d.Message, @"Unknown command @(\w+)\.") is { Success: true } unknown && AssumedFunctions.Contains(unknown.Groups[1].Value)) continue;
                     int line = markdown.Replace("\r\n", "\n").Substring(0, m.Index).Count(c => c == '\n') + 2 + body.Substring(0, Math.Min(d.Span.Start, body.Length)).Count(c => c == '\n') - (code || body == m.Groups[2].Value ? 0 : 1);
                     problems.Add($"{file}:{line}: {d.Code} {d.Message}");

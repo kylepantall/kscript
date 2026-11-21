@@ -94,6 +94,10 @@ namespace KScript.Language.Analysis
                     // NotFound(id: 42) makes an error of that type.
                     return errorType.Instance ?? Analyzer.BaseErrorShape();
 
+                case CallNode call when call.Callee is IdentifierNode jobName && JobTypeNamed(jobName, region) is TypeShape jobType:
+                    // SendWelcome(user_id: 7) makes a job.
+                    return jobType.Instance ?? new TypeShape(KType.Job) { Name = jobName.Name };
+
                 case IdentifierNode id when ErrorTypeNamed(id, region) is TypeShape errorType:
                     return errorType;
 
@@ -230,6 +234,14 @@ namespace KScript.Language.Analysis
                 default:
                     return TypeShape.Unknown;
             }
+        }
+
+        /// <summary>The job type a name means here: a declared job (or null).</summary>
+        private TypeShape JobTypeNamed(IdentifierNode id, ExpressionRegion region)
+        {
+            int offset = region.Source.ToSource(id.Span.Start);
+            Symbol symbol = result.RootScope.Innermost(offset).Lookup(id.Name, offset);
+            return symbol?.Shape.Type == KType.JobType ? symbol.Shape : null;
         }
 
         /// <summary>The error type a bare name means here: a declared &lt;error&gt;, or a built-in such as Validation.</summary>

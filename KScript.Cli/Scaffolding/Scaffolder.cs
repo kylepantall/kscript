@@ -350,7 +350,7 @@ namespace KScript.Scaffolding
             "const" => "limits",
             "storage" => "people",
             "cache" => "api-cache",
-            "job" => "send-reminders",
+            "job" => "SendReminders",
             "window" => "settings",
             "config" => "staging",
             "env" => "base",
@@ -374,6 +374,7 @@ namespace KScript.Scaffolding
             ["enum"] = "enum",
             ["type"] = "type",
             ["error"] = "error",
+            ["job"] = "job",
         };
 
         /// <summary>The command directory's sections, in order, and the built-in types in each.</summary>

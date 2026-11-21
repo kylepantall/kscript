@@ -58,6 +58,11 @@ namespace KScript.Language.Analysis
                     ElementInfo info = catalog.GetElement(e.Name.Substring(8));
                     if (info?.Package != null) ImportPackage(info.Package);
                 }
+                else if (ImpliedPackages.ByElement.TryGetValue(e.Name, out string implied) && catalog.FindPackage(implied) is string impliedPackage)
+                {
+                    // job and dispatch are keywords whose package comes with them, as at run time.
+                    ImportPackage(impliedPackage);
+                }
                 else if (e.Name == "import" && e.GetAttribute("package") is MarkupAttribute packageAttr && packageAttr.Value != null)
                 {
                     HoistPackageImport(e, packageAttr, root);

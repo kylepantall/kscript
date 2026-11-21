@@ -1,0 +1,27 @@
+/// Takes the payment for an order.
+job ChargeCard(queue: "high", tries: 3, fail_on: [Validation]) {
+  order_id: int
+  amount: number(min: 0.01)
+
+  fn handle() {
+    echo "Charged {@format_number($amount, 2)} for order {$order_id}"
+  }
+}
+
+/// Books the courier once the order is paid.
+job ShipOrder(unique_for: "1h", unique_by: [order_id]) {
+  order_id: int
+
+  fn handle() {
+    echo "Shipping order {$order_id}"
+  }
+}
+
+/// Emails the receipt.
+job SendReceipt(queue: "mail") {
+  order_id: int
+
+  fn handle() {
+    echo "Receipt sent for order {$order_id}"
+  }
+}

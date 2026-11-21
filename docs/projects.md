@@ -162,6 +162,7 @@ kscript make project my-app --template ../starters/api   # any folder
 - `http` configures route files, middleware, CORS, auth and rate limits for KScript.Http (see [Routes, controllers and middleware](http.md#settings-kscriptjson)).
 - `types` gives built-in types such as `uuid`, `email` and `password` the same arguments everywhere in the project. Arguments written where a type is used, such as `uuid(v: 8)`, win (see [Types and validation](types.md#project-defaults-in-kscriptjson)).
 - `app.name` (or `name`) also names the app's own folders for settings, data and caches (see [App folders](storage.md)).
+- `queue` names the connections jobs wait on, the queues a worker checks and how long failed jobs are kept (see [Queues and jobs](queues.md#connections-and-drivers)).
 - `app` is read by `kscript compile`, which builds the script (often a desktop app) into a program for macOS, Windows and Linux (see [Programs](compile.md#names-icons-and-versions)).
 
 ## Generating files: kscript make

@@ -1,0 +1,7 @@
+{
+  "name": "queue-app",
+  "queue": {
+    "queues": ["high", "default", "mail"],
+    "failed": { "keep": "3d" }
+  }
+}

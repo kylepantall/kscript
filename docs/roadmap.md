@@ -23,3 +23,7 @@ The plan:
 `kscript compile` already builds programs (`--to exe`, the default; see [Programs](compile.md)), so converters are new `--to` targets of the same command.
 
 This is separate from `kscript convert`, which only switches a script between the XML and `.kscript` formats of KScript itself.
+
+## Queues in a database
+
+[KScript.Queue](queues.md) keeps jobs in files or in memory today. Next is a `database` driver that keeps them in a table, using the project's database connections. Workers would claim jobs with `SELECT ... FOR UPDATE SKIP LOCKED` (or a transaction on SQLite), and `kscript make queue-table` would write the migration. After that: a Redis driver, batches of jobs that report when they all finish, and middleware that wraps a job's `handle`, such as rate limits.

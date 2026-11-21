@@ -330,6 +330,7 @@ namespace KScript.Runtime
             ("KScript.Storage", "KScript.Storage.StoragePackage, KScript.Storage", "App folders for config, data, cache, state and logs, in the right place on each platform."),
             ("KScript.Document", "KScript.Documents.DocumentPackage, KScript.Document", "Scientific and professional documents (papers, reports, letters, invoices) with LaTeX maths, citations and tables, saved as PDF, Word, LaTeX, Markdown or HTML."),
             ("KScript.Cache", "KScript.Caching.CachePackage, KScript.Cache", "A cache of values by key, with time limits: in memory, or in files in the app's cache folder."),
+            ("KScript.Queue", "KScript.Queueing.QueuePackage, KScript.Queue", "Queued jobs: job declarations, dispatch, retries with backoff, failed jobs, and the worker that runs them."),
             ("KScript.Http", "KScript.Http.HttpPackage, KScript.Http", "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve."),
             ("KScript.Auth", "KScript.Auth.AuthPackage, KScript.Auth", "Sign-in for kscript serve apps: users, sessions, the auth and guest middleware, CSRF, password resets and API tokens."),
             ("KScript.Test", "KScript.Testing.TestPackage, KScript.Test", "Tests run by kscript test: <test>, <describe>, <expect>, <assert> and <capture>."),
@@ -420,6 +421,7 @@ namespace KScript.Runtime
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Style.StylePackage", "KScript.Style")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Storage.StoragePackage", "KScript.Storage")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Caching.CachePackage", "KScript.Cache")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Queueing.QueuePackage", "KScript.Queue")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Http.HttpPackage", "KScript.Http")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Testing.TestPackage", "KScript.Test")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.UI.UIPackage", "KScript.UI")]

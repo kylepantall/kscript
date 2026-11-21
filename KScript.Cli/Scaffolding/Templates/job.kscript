@@ -1,18 +1,30 @@
 --- make
-description: A job in jobs/: a script that does one task and logs what it did, for a scheduler or by hand
+description: A queued job in jobs/: dispatch it with dispatch Name(...), and kscript worker runs it, retrying when it fails
 category: Scripts and data
-usage: <name> [--every "15 minutes"]
---every: How often it should run, noted in the file for cron or Task Scheduler
-example: kscript make job send-reminders --every "1 day"
-example: kscript make job cleanup/old-uploads
+usage: <Name> [--fields "user_id: int, email: email"] [--queue mail] [--tries 5] [--backoff "10s, 1m, 5m"] [--timeout 30s]
+--fields: The fields, comma separated, as name: type, with ? for optional and = for a default (default: none)
+--queue: The queue it goes on (default: default)
+--tries: How many attempts it gets before it counts as failed (default: 3)
+--backoff: How long to wait before each retry, such as "10s, 1m, 5m" (default: exponential)
+--timeout: The longest one attempt may run, such as 30s or 5m (default: 60s)
+example: kscript make job SendWelcome --fields "user_id: int, email: email" --queue mail --tries 5
+example: kscript make job reports/BuildReport --fields "month: int" --timeout 5m
 to: {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}
-hint: Run it: kscript {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}{{#if every}} (schedule it every {{ every }} with cron or Task Scheduler){{/if}}
+hint: Queue it: import "{{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}", then dispatch {{ pascal }}(...). Run the queue with kscript worker (kscript queue failed lists failures).
 ---
-// {{ title }}: run it with kscript {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}{{#if every}}, every {{ every }}{{/if}}.
-// It logs to the terminal; set logging providers in config.yaml to keep a file (kscript make logger).
-log "{{ title }} started"
+/// {{ title }}.
+job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {{ tries }}, {{/if}}{{#if backoff}}backoff: "{{ backoff }}", {{/if}}timeout: "{{#if timeout}}{{ timeout }}{{else}}60s{{/if}}") {
+{{#each fields}}
+  {{ item | trim }}
+{{/each}}
 
-// Do the work here.
-done = 0
+  fn handle() {
+    // Do the work here. An error retries the job after its backoff, until its tries run out.
+    log "{{ title }}"
+  }
 
-log(fields: { done: $done }) "{{ title }} finished"
+  /// Runs once, when the job has used up its tries.
+  fn failed(err) {
+    log(level: error, fields: { error: $err.message }) "{{ title }} failed"
+  }
+}

@@ -74,6 +74,7 @@ namespace KScript
             string host = null;
             bool? withDocs = null;
             int? docsPort = null;
+            bool withWorker = false;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -101,6 +102,9 @@ namespace KScript
                         break;
                     case "--no-docs":
                         withDocs = false;
+                        break;
+                    case "--with-worker":
+                        withWorker = true;
                         break;
                     case "--docs-port":
                         if (i + 1 >= args.Length || !int.TryParse(args[++i], out int dp) || dp < 1 || dp > 65535)
@@ -156,6 +160,12 @@ namespace KScript
                     docs = ServeDocs(folder ?? ".", project, docsPort, port ?? 8080, stopDocs.Token);
             }
 
+            // A worker in the server's process runs the jobs routes dispatch, even on the memory connection.
+            System.Threading.Tasks.Task worker = System.Threading.Tasks.Task.CompletedTask;
+            using var stopWorker = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            if (withWorker && allowDocs)
+                worker = StartWorker(project?.Directory ?? Path.GetFullPath(folder ?? "."), stopWorker.Token);
+
             using var watching = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
             try
             {
@@ -181,9 +191,19 @@ namespace KScript
             {
                 stopDocs.Cancel();
                 docs.GetAwaiter().GetResult();
+                stopWorker.Cancel();
+                worker.GetAwaiter().GetResult();
                 watching.Cancel();
             }
         }
+
+        /// <summary>The worker for kscript serve --with-worker, on its own thread until the server stops.</summary>
+        System.Threading.Tasks.Task StartWorker(string directory, System.Threading.CancellationToken stop) =>
+            System.Threading.Tasks.Task.Factory.StartNew(() =>
+            {
+                int code = KScript.Queueing.QueueCommand.RunWorker(Array.Empty<string>(), Out, Error, stop, directory, EnvironmentName);
+                if (code != 0) Error.WriteLine("Worker: stopped.");
+            }, System.Threading.Tasks.TaskCreationOptions.LongRunning);
 
         /// <summary>
         /// Starts the docs for kscript serve --with-docs. A method of its own, so serving a compiled site (whose program
@@ -436,6 +456,16 @@ namespace KScript
                 return RunTests(args.Skip(1).ToArray());
             }
 
+            if (args[0] == "worker")
+            {
+                return RunWorker(args.Skip(1).ToArray());
+            }
+
+            if (args[0] == "queue")
+            {
+                return KScript.Queueing.QueueCommand.RunQueue(args.Skip(1).ToArray(), Out, Error, environment: EnvironmentName);
+            }
+
             // kscript make component Hero, or Artisan-style kscript make:component Hero
             if (args[0] == "make" || args[0].StartsWith("make:", StringComparison.Ordinal))
             {
@@ -554,6 +584,22 @@ namespace KScript
             try
             {
                 return KScript.Docs.Mcp.McpCommand.Run(args, StandardInput(), StandardOutput(), Error, cancel.Token);
+            }
+            finally
+            {
+                Console.CancelKeyPress -= stop;
+            }
+        }
+
+        /// <summary>kscript worker: runs queued jobs until Ctrl+C, which lets the running jobs finish.</summary>
+        int RunWorker(string[] args)
+        {
+            using var cancel = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+            ConsoleCancelEventHandler stop = (_, e) => e.Cancel = StopOnFirstCtrlC(cancel);
+            Console.CancelKeyPress += stop;
+            try
+            {
+                return KScript.Queueing.QueueCommand.RunWorker(args, Out, Error, cancel.Token, environment: EnvironmentName);
             }
             finally
             {
