@@ -107,7 +107,7 @@ namespace KScript.Runtime
             p.Method(l, "is_empty", "", "yes if the list has no items.", KType.Bool, (t, c) => L(t).Count == 0);
             p.Method(l, "first", "", "The first item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[0] : null);
             p.Method(l, "last", "", "The last item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[^1] : null);
-            p.Method(l, "at", "index", "The item at an index; negative counts from the end.", KType.Any, (t, c) =>
+            p.Method(l, "at", "index: number", "The item at an index; negative counts from the end.", KType.Any, (t, c) =>
             {
                 var list = L(t);
                 int i = c.Int(0);
@@ -179,20 +179,20 @@ namespace KScript.Runtime
             p.Method(l, "join", "separator?", "The items joined into text (', ' by default).", KType.String, (t, c) => string.Join(c.Str(0, ", "), L(t).Select(Values.ToStr)));
             p.Method(l, "contains", "item", "yes if the list contains the item.", KType.Bool, (t, c) => L(t).Any(x => Values.LooseEquals(x, c.Arg(0))));
             p.Method(l, "index_of", "item", "The index of an item, or -1.", KType.Number, (t, c) => (double)L(t).FindIndex(x => Values.LooseEquals(x, c.Arg(0))));
-            p.Method(l, "slice", "start, end?", "The items from start up to (not including) end; negative positions count from the end.", l, (t, c) =>
+            p.Method(l, "slice", "start: number, end?: number", "The items from start up to (not including) end; negative positions count from the end.", l, (t, c) =>
             {
                 var list = L(t);
                 int start = Clamp(c.Int(0), list.Count);
                 int end = Math.Max(start, Clamp(c.Int(1, list.Count), list.Count));
                 return list.GetRange(start, end - start);
             });
-            p.Method(l, "take", "count", "The first count items.", l, (t, c) => L(t).Take(c.Int(0)).ToList());
-            p.Method(l, "skip", "count", "All but the first count items.", l, (t, c) => L(t).Skip(c.Int(0)).ToList());
+            p.Method(l, "take", "count: number", "The first count items.", l, (t, c) => L(t).Take(c.Int(0)).ToList());
+            p.Method(l, "skip", "count: number", "All but the first count items.", l, (t, c) => L(t).Skip(c.Int(0)).ToList());
             p.Method(l, "unique", "", "The list without duplicates.", l, (t, c) => L(t).Aggregate(new List<object>(), (acc, x) => { if (!acc.Any(y => Values.StrictEquals(x, y))) acc.Add(x); return acc; }));
             p.Method(l, "push", "items...", "A new list with items added to the end.", l, (t, c) => L(t).Concat(c.Args).ToList());
             p.Method(l, "append", "items...", "A new list with items added to the end (the same as push).", l, (t, c) => L(t).Concat(c.Args).ToList());
             p.Method(l, "prepend", "items...", "A new list with items added to the start.", l, (t, c) => c.Args.Concat(L(t)).ToList());
-            p.Method(l, "insert", "index, item", "A new list with item inserted at index.", l, (t, c) =>
+            p.Method(l, "insert", "index: number, item", "A new list with item inserted at index.", l, (t, c) =>
             {
                 var copy = L(t).ToList();
                 copy.Insert(Clamp(c.Int(0), copy.Count), c.Arg(1));
@@ -200,7 +200,7 @@ namespace KScript.Runtime
             });
             p.Method(l, "pop", "", "A new list without its last item.", l, (t, c) => L(t).Take(Math.Max(0, L(t).Count - 1)).ToList());
             p.Method(l, "remove", "item", "A new list without any items equal to item.", l, (t, c) => L(t).Where(x => !Values.LooseEquals(x, c.Arg(0))).ToList());
-            p.Method(l, "remove_at", "index", "A new list without the item at index.", l, (t, c) =>
+            p.Method(l, "remove_at", "index: number", "A new list without the item at index.", l, (t, c) =>
             {
                 var copy = L(t).ToList();
                 int i = c.Int(0);
@@ -209,7 +209,7 @@ namespace KScript.Runtime
                 return copy;
             });
             p.Method(l, "flatten", "", "Lists inside the list are spread into it.", l, (t, c) => L(t).SelectMany(x => x is List<object> inner ? inner : new List<object> { x }).ToList());
-            p.Method(l, "chunk", "size", "The items in lists of size.", l, (t, c) =>
+            p.Method(l, "chunk", "size: number", "The items in lists of size.", l, (t, c) =>
             {
                 int size = Math.Max(1, c.Int(0));
                 return L(t).Select((x, i) => (x, i)).GroupBy(e => e.i / size).Select(g => (object)g.Select(e => e.x).ToList()).ToList();
@@ -266,14 +266,14 @@ namespace KScript.Runtime
         private static void RegisterNumberMethods(PackageBuilder p)
         {
             string n = KType.Number;
-            p.Method(n, "round", "digits?", "Rounded to a number of decimal places (0 by default).", n, (t, c) => Math.Round(N(t), Math.Clamp(c.Int(0, 0), 0, 15), MidpointRounding.AwayFromZero));
+            p.Method(n, "round", "digits?: number", "Rounded to a number of decimal places (0 by default).", n, (t, c) => Math.Round(N(t), Math.Clamp(c.Int(0, 0), 0, 15), MidpointRounding.AwayFromZero));
             p.Method(n, "floor", "", "Rounded down.", n, (t, c) => Math.Floor(N(t)));
             p.Method(n, "ceil", "", "Rounded up.", n, (t, c) => Math.Ceiling(N(t)));
             p.Method(n, "abs", "", "Without its sign.", n, (t, c) => Math.Abs(N(t)));
-            p.Method(n, "min", "other", "The smaller of the two.", n, (t, c) => Math.Min(N(t), c.Num(0)));
-            p.Method(n, "max", "other", "The larger of the two.", n, (t, c) => Math.Max(N(t), c.Num(0)));
-            p.Method(n, "clamp", "min, max", "The number limited to min..max.", n, (t, c) => Math.Clamp(N(t), c.Num(0), c.Num(1)));
-            p.Method(n, "between", "min, max", "yes if min ≤ the number ≤ max.", KType.Bool, (t, c) => N(t) >= c.Num(0) && N(t) <= c.Num(1));
+            p.Method(n, "min", "other: number", "The smaller of the two.", n, (t, c) => Math.Min(N(t), c.Num(0)));
+            p.Method(n, "max", "other: number", "The larger of the two.", n, (t, c) => Math.Max(N(t), c.Num(0)));
+            p.Method(n, "clamp", "min: number, max: number", "The number limited to min..max.", n, (t, c) => Math.Clamp(N(t), c.Num(0), c.Num(1)));
+            p.Method(n, "between", "min: number, max: number", "yes if min ≤ the number ≤ max.", KType.Bool, (t, c) => N(t) >= c.Num(0) && N(t) <= c.Num(1));
             p.Method(n, "to_number", "default?", "The number itself.", n, (t, c) => N(t));
             p.Method(n, "to_int", "", "The whole-number part.", n, (t, c) => Math.Truncate(N(t)));
             p.Method(n, "format", "pattern?", "Formats the number (.NET format, N0 by default: 1,234).", KType.String, (t, c) => N(t).ToString(c.Str(0, "N0"), CultureInfo.InvariantCulture));
@@ -296,10 +296,10 @@ namespace KScript.Runtime
             p.Method(d, "minute", "", "The minute.", KType.Number, (t, c) => (double)D(t).Minute);
             p.Method(d, "second", "", "The second.", KType.Number, (t, c) => (double)D(t).Second);
             p.Method(d, "weekday", "", "The day of the week, such as Monday.", KType.String, (t, c) => D(t).DayOfWeek.ToString());
-            p.Method(d, "add_days", "days", "The date plus a number of days (negative to go back).", d, (t, c) => D(t).AddDays(c.Num(0)));
-            p.Method(d, "add_hours", "hours", "The date plus a number of hours.", d, (t, c) => D(t).AddHours(c.Num(0)));
-            p.Method(d, "add_minutes", "minutes", "The date plus a number of minutes.", d, (t, c) => D(t).AddMinutes(c.Num(0)));
-            p.Method(d, "add_months", "months", "The date plus a number of months.", d, (t, c) => D(t).AddMonths(c.Int(0)));
+            p.Method(d, "add_days", "days: number", "The date plus a number of days (negative to go back).", d, (t, c) => D(t).AddDays(c.Num(0)));
+            p.Method(d, "add_hours", "hours: number", "The date plus a number of hours.", d, (t, c) => D(t).AddHours(c.Num(0)));
+            p.Method(d, "add_minutes", "minutes: number", "The date plus a number of minutes.", d, (t, c) => D(t).AddMinutes(c.Num(0)));
+            p.Method(d, "add_months", "months: number", "The date plus a number of months.", d, (t, c) => D(t).AddMonths(c.Int(0)));
             p.Method(d, "date", "", "The date at midnight.", d, (t, c) => D(t).Date);
             p.Method(d, "iso", "", "The date in ISO 8601 format.", KType.String, (t, c) => D(t).ToString("o", CultureInfo.InvariantCulture));
             p.Method(d, "timestamp", "", "Seconds since 1970-01-01 UTC.", KType.Number, (t, c) => (double)new DateTimeOffset(D(t)).ToUnixTimeSeconds());
@@ -329,23 +329,23 @@ namespace KScript.Runtime
             p.Method(s, "lines", "", "The lines of the text, as a list.", KType.List, (t, c) => S(t).Replace("\r\n", "\n").Split('\n').Cast<object>().ToList());
             p.Method(s, "chars", "", "The characters, as a list.", KType.List, (t, c) => S(t).Select(ch => (object)ch.ToString()).ToList());
             p.Method(s, "index_of", "text", "Where text first occurs, or -1.", KType.Number, (t, c) => (double)S(t).IndexOf(c.Str(0), StringComparison.Ordinal));
-            p.Method(s, "repeat", "count", "The text repeated count times.", s, (t, c) => string.Concat(Enumerable.Repeat(S(t), Math.Max(0, c.Int(0)))));
+            p.Method(s, "repeat", "count: number", "The text repeated count times.", s, (t, c) => string.Concat(Enumerable.Repeat(S(t), Math.Max(0, c.Int(0)))));
             p.Method(s, "reverse", "", "The text backwards.", s, (t, c) => { char[] a = S(t).ToCharArray(); Array.Reverse(a); return new string(a); });
             p.Method(s, "first", "", "The first character.", s, (t, c) => S(t).Length > 0 ? S(t).Substring(0, 1) : string.Empty);
             p.Method(s, "last", "", "The last character.", s, (t, c) => S(t).Length > 0 ? S(t).Substring(S(t).Length - 1) : string.Empty);
-            p.Method(s, "slice", "start, end?", "Part of the text; negative positions count from the end.", s, (t, c) =>
+            p.Method(s, "slice", "start: number, end?: number", "Part of the text; negative positions count from the end.", s, (t, c) =>
             {
                 int start = Clamp(c.Int(0), S(t).Length);
                 int end = Math.Max(start, Clamp(c.Int(1, S(t).Length), S(t).Length));
                 return S(t).Substring(start, end - start);
             });
-            p.Method(s, "truncate", "length, suffix?", "Shortens the text to length, adding suffix (… by default).", s, (t, c) =>
+            p.Method(s, "truncate", "length: number, suffix?", "Shortens the text to length, adding suffix (… by default).", s, (t, c) =>
             {
                 int max = c.Int(0);
                 return S(t).Length <= max ? S(t) : S(t).Substring(0, Math.Max(0, max)).TrimEnd() + c.Str(1, "…");
             });
-            p.Method(s, "pad_left", "width, char?", "The text padded on the left to width.", s, (t, c) => S(t).PadLeft(c.Int(0), c.Str(1, " ").FirstOrDefault(' ')));
-            p.Method(s, "pad_right", "width, char?", "The text padded on the right to width.", s, (t, c) => S(t).PadRight(c.Int(0), c.Str(1, " ").FirstOrDefault(' ')));
+            p.Method(s, "pad_left", "width: number, char?", "The text padded on the left to width.", s, (t, c) => S(t).PadLeft(c.Int(0), c.Str(1, " ").FirstOrDefault(' ')));
+            p.Method(s, "pad_right", "width: number, char?", "The text padded on the right to width.", s, (t, c) => S(t).PadRight(c.Int(0), c.Str(1, " ").FirstOrDefault(' ')));
             p.Method(s, "capitalize", "", "The text with its first letter upper-cased.", s, (t, c) => S(t).Length == 0 ? S(t) : char.ToUpperInvariant(S(t)[0]) + S(t).Substring(1));
             p.Method(s, "title", "", "The text in Title Case.", s, (t, c) => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(S(t).ToLowerInvariant()));
             p.Method(s, "escape", "", "The text HTML-escaped.", s, (t, c) => Values.HtmlEscape(S(t)));

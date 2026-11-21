@@ -210,6 +210,17 @@ echo "Hello $name"   // right
 
 **A value is the wrong type for what is done with it.** For example `->upper()` on a number. Convert it first: `$n->to_string()->upper()`.
 
+The same code warns about arithmetic and arguments that can only fail when the script runs:
+
+```kscript
+name = 'Joan'
+total = $name - 1            // warning: '-' needs a number here, but $name holds the text 'Joan'
+total = [1, 2] + 3           // warning: + joins two lists. Use ->push(3)
+echo 'ab'->repeat('x')       // warning: the 'count' argument needs a number
+```
+
+Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'ab' * 3` repeats it, so none of those warn. The check only speaks up when the value is certain: text written in the code, or a variable that only ever holds it.
+
 ## KS5006
 
 **A planned feature is used.** It is described in the docs but not built yet.
@@ -228,7 +239,17 @@ echo "Hello $name"   // right
 
 ## KS5010
 
-**A field the type doesn't have.** The records of a `type` only have the fields it declares.
+**A field the value doesn't have.** The records of a `type` only have the fields it declares.
+
+A map written in the code is checked too. Reading a field a map doesn't have gives nothing, so a near miss of one it does have is almost always a typo:
+
+```kscript
+person = { name: 'Joan', age: 82 }
+echo $person.nmae            // warning: Did you mean name?
+echo $person.email ?? '-'    // fine: not close to a field, so it may be optional
+```
+
+Text and numbers have no fields at all, so `$name.upper` stops the script. Call the method instead: `$name->upper()`.
 
 ## KS5011
 

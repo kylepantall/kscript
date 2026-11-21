@@ -42,7 +42,7 @@ namespace KScript.Language.Analysis
 
         private static List<List<ParameterSlot>> SlotsOf(IEnumerable<CallableInfo> callables) =>
             callables.SelectMany(c => c.Signatures)
-                .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null)).ToList())
+                .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null, Type: p.Type is "number" or "int" or "float" ? p.Type : null)).ToList())
                 .ToList();
 
         private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
@@ -86,6 +86,7 @@ namespace KScript.Language.Analysis
         /// <summary>An argument that reached its parameter: a waiting <c>@kyle</c> is a handle there, and a literal is checked against the type.</summary>
         private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
+            CheckNumberArgument(a, slot, region);
             if (pendingHandles.Contains(a))
             {
                 if (slot.RawText != "handle")

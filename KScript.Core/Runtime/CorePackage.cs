@@ -823,7 +823,7 @@ namespace KScript.Runtime
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));
             p.Command("to_lower", "text", "The text in lower case.", KType.String, c => c.Str(0).ToLowerInvariant());
             p.Command("to_upper", "text", "The text in upper case.", KType.String, c => c.Str(0).ToUpperInvariant());
-            p.Command("char_of", "code", "The character with this character code: @char_of(65) is A.", KType.String, c => char.ConvertFromUtf32(c.Int(0)));
+            p.Command("char_of", "code: number", "The character with this character code: @char_of(65) is A.", KType.String, c => char.ConvertFromUtf32(c.Int(0)));
             p.Command("escape", "text", "HTML-escapes text.", KType.String, c => Values.HtmlEscape(c.Str(0)));
             p.Command("env", "name, default?", "An environment variable, or default when it isn't set.", KType.String, c =>
                 Environment.GetEnvironmentVariable(c.Str(0)) ?? (c.Has(1) ? c.Arg(1) : null));
