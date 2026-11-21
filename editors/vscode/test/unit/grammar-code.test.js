@@ -102,6 +102,15 @@ test('comments and doc comments', async () => {
   assert.match(scopeOf(tokens, 'plain'), /comment\.line\.double-slash\.kscript/);
   assert.match(scopeOf(tokens, 'block'), /comment\.block\.kscript/);
 
+  const tags = tokenize(await load(), '/// Calls @greet for you.\n/// @arg $who The person.\n/// @argument times How often.\n/// @example\n///   @greet(\'a\')\n/// @pitfall Not for groups.\n/// @agent hide\nfn f(who, times) => $who');
+  assert.match(scopeOf(tags, '@arg'), /storage\.type\.class\.doc\.kscript/);
+  assert.match(scopeOf(tags, '$who'), /comment\.line\.documentation\.kscript variable\.parameter\.kscript/);
+  assert.match(scopeOf(tags, '@argument'), /storage\.type\.class\.doc\.kscript/);
+  assert.match(scopeOf(tags, 'times'), /variable\.parameter\.kscript/);
+  assert.match(scopeOf(tags, '@pitfall'), /storage\.type\.class\.doc\.kscript/);
+  assert.match(scopeOf(tags, '@agent'), /storage\.type\.class\.doc\.kscript/);
+  assert.doesNotMatch(tags.filter((t) => t.text.includes('@greet')).map((t) => t.scopes).join(), /storage\.type/, 'a tag only counts at the start of a line');
+
   const more = tokenize(await load(), 'x = 1 /* inline */\ny = [\n  1, /* first */\n  2 // second\n]\n/*\n  multi\n  line\n*/\necho "after"');
   assert.match(scopeOf(more, 'inline'), /comment\.block\.kscript/);
   assert.match(scopeOf(more, 'first'), /comment\.block\.kscript/);

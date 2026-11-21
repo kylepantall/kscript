@@ -184,6 +184,10 @@ fn greet(who, greeting = 'Hello') => $greeting + ', ' + $who + '!'
 fn hello(who) => @greet($who)
 ```
 
+`@arg` and `@argument` are other names for `@param`, and `@return` for `@returns`. In the editor, typing `@` at the
+start of a doc line suggests the tags (with an `@param name` for each parameter not described yet), typing a name
+after `@param` or `@arg` suggests the parameters, and hovering a tag says what it means.
+
 `kscript check` and the editor warn about a `@param` that names no parameter (KS4007) and about calls to a
 `@deprecated` function (KS4008). `@public` marks a function used from outside the project, so it is never reported as
 [unused](language.md#unused-code) (KS6002). `@llm`, `@prefer`, `@avoid`, `@pitfall` and `@agent hide` are notes for

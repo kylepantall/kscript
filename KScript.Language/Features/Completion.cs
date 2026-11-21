@@ -32,6 +32,10 @@ namespace KScript.Language.Features
         {
             Cursor cursor = Locate(analysis, offset);
             string text = analysis.Source.Text;
+            if (DocCommentCompletions(analysis, offset) is List<CompletionItem> doc)
+            {
+                return doc;
+            }
             if (InComment(text, offset))
             {
                 return new List<CompletionItem>();
