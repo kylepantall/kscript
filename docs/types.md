@@ -29,7 +29,16 @@ try {
 | `regex` | A regular expression with flags `i`, `m`, `s` and `x`. | | `->test()`, `->match()`, `->match_all()`, `->replace()`, `->split()`, `->pattern()`, `->flags()` |
 | `password` | A secret. It never prints. | | `->hash()`, `->verify()`, `->needs_rehash()`, `->strength()`, `->strong()`, `->reveal()` |
 
-An email, handle, uuid or regex is still text. String methods such as `->upper()` and `->starts_with()` work on it, and it compares equal to the same text. An email compares with its domain lowercased:
+An email, handle, uuid or regex is still text, and it compares equal to the same text. An email compares with its domain lowercased. It keeps the string methods that make sense for it, and the editor only suggests those:
+
+| Type | String methods it keeps |
+| --- | --- |
+| `email` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `lower`, `upper`, `slice`, `split`, `replace`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `handle` | `contains`, `starts_with`, `ends_with`, `length`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `uuid` | `contains`, `starts_with`, `ends_with`, `upper`, `slice`, `split`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `regex` | `contains`, `starts_with`, `ends_with`, `length`, `escape`, `markdown_escape`, `json` |
+
+The rest, such as `->to_date()` on a uuid, are reported in the editor and fail when the script runs. To use one on the text anyway, call `->to_string()` first: `$id->to_string()->to_date()`.
 
 ```kscript
 email: email = ' Joan.Smith@Example.COM '

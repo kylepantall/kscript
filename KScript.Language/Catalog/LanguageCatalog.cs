@@ -84,10 +84,10 @@ namespace KScript.Language.Catalog
         /// <summary>Methods with this name, best match for the receiver type first.</summary>
         public IEnumerable<CallableInfo> GetMethods(string name, string receiverType = KType.Any) =>
             methods.Where(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
-                   .OrderBy(m => m.ReceiverType == receiverType ? 0 : KType.Accepts(m.ReceiverType, receiverType) ? 1 : 2);
+                   .OrderBy(m => m.ReceiverType == receiverType ? 0 : KType.AcceptsMethod(m.ReceiverType, m.Name, receiverType) ? 1 : 2);
 
         public IEnumerable<CallableInfo> MethodsFor(string receiverType) =>
-            methods.Where(m => KType.Accepts(m.ReceiverType, receiverType))
+            methods.Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiverType))
                    .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
                    .Select(g => g.OrderBy(m => m.ReceiverType == receiverType ? 0 : 1).First());
 
