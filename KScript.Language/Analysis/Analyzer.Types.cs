@@ -201,9 +201,19 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
+            if (symbol.HoldsSeveralTypes)
+            {
+                return;
+            }
             if (symbol.Shape.IsVague)
             {
                 symbol.Shape = assigned;
+            }
+            else if (symbol.Shape.Type != assigned.Type && symbol.Kind == SymbolKind.Variable)
+            {
+                // x = 5 and later x = 'text': from here on it could be either, so nothing is claimed about it.
+                symbol.HoldsSeveralTypes = true;
+                symbol.Shape = TypeShape.Unknown;
             }
         }
 

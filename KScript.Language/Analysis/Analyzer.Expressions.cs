@@ -22,8 +22,11 @@ namespace KScript.Language.Analysis
             switch (node)
             {
                 case null:
-                case LiteralNode _:
                 case ErrorNode _:
+                    return;
+
+                case LiteralNode literal:
+                    CheckTextIsNotATemplate(literal, region, scope);
                     return;
 
                 case VariableNode v:
@@ -127,6 +130,8 @@ namespace KScript.Language.Analysis
 
         private void AnalyzeArguments(IEnumerable<ArgumentNode> args, ExpressionRegion region, Scope scope, TypeShape[] lambdaParameters = null)
         {
+            // What a command does with its text is its own business (@sql binds { } itself), so arguments aren't warned about.
+            argumentTexts.UnionWith(args.Select(a => a.Value).OfType<LiteralNode>());
             foreach (ArgumentNode arg in args)
             {
                 if (BareWord(arg) is (_, false, IdentifierNode typeNode) && (ReferenceBareType(typeNode, region, scope) || ReferenceBareErrorType(typeNode, region, scope)))
@@ -294,6 +299,12 @@ namespace KScript.Language.Analysis
             if (retired != null)
             {
                 Report(full, DiagnosticSeverity.Error, DiagnosticCodes.RetiredCommand, $"@{c.Name} was removed in KScript 2. {retired.Replacement}");
+                return;
+            }
+
+            if (ForeignCommandHint(c.Name) is string hint)
+            {
+                Report(full, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"KScript has no @{c.Name}. {hint}");
                 return;
             }
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Errors a learner can act on. A word from another language is answered with what KScript writes, and a quick fix makes the change: `print`, `println`, `console.log` and `puts` become `echo`; `function`, `def` and `func` become `fn`; `var` is dropped; `x++` becomes `x += 1`; `foreach`, `switch` and `raise` name `for`, `match` and `throw`; `@len($list)` points to `$list->length()`. In a `.kscript` file, messages no longer talk about `<elements>` or XML.
+- A line left unfinished (`total = 5 +`) is reported on that line, not on the correct line after it, and a missing quote ends with its line, so the rest of the file is still checked.
+- A warning when text used as a value holds a variable, as in `greeting = "Hello $name"`: only the text after `echo` is a template, so this would keep `$name` as written. The quick fix joins the parts: `'Hello ' + $name`.
+- A variable given a number and later given text is no longer warned about string methods.
+- Every error code is a link: click `KS4001` in a problem to open what it means and how to fix it.
 - Only what works is suggested, in every place: a date, number, bool or file is no longer offered string methods such as `->json()` or `->upper()`, which fail at run time (use `->to_string()` first, or `->to_json()`). A method a package or an `extend` block adds is offered.
 - Signature help in `.kscript` statements: inside `log(‸)`, `wait(‸)` and other element statements, the tooltip lists the attributes (`log(level?: trace|debug|…, message?: text, category?: text, fields?: any)`) and highlights the one you're writing, or the next one not written yet. Parameters are now sent as their exact place in the signature, so the right one is highlighted even when its name also appears earlier in the label.
 - KScript files get their own "K" file icon in the explorer and on editor tabs: `.kscript`, `.ks`, `.ks.xml` and `.test.ks.xml` files. It shows with VS Code's default file icon theme, and with any icon theme that has no icon of its own for KScript.
