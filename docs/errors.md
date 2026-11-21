@@ -1,0 +1,259 @@
+# Error codes
+
+Every problem `kscript check` and the editor report has a code, such as `KS4001`. This page says what each one means and how to fix it. In the editor, click the code in an error to open its entry here.
+
+Codes are grouped by what they are about: `KS1` the shape of the file, `KS2` values, `KS3` statements, `KS4` names, `KS5` calls and `KS6` style. A project can turn a code off or change how serious it is: see [Lint standards](standards.md).
+
+## The shape of the file
+
+## KS1001
+
+**Something is written where it can't go.** A quote, bracket or comment was opened and never closed, or two statements share a line.
+
+```kscript
+echo "Hello          // wrong: the text never ends
+echo "Hello"         // right
+```
+
+A missing quote is taken to end with its line, so the lines after it are still checked.
+
+## KS1002
+
+**An end tag doesn't match its start tag.** In an XML script, `<if>` must end with `</if>`. Check the spelling and the order the tags close in.
+
+## KS1003
+
+**A block is never closed.** Every `{` needs a `}`, and in XML every start tag needs its end tag.
+
+```kscript
+for i in 0..3 {
+  echo $i
+}                    // this line was missing
+```
+
+## KS1004
+
+**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(seconds: 2)`.
+
+## KS1005
+
+**The same argument is given twice.** Keep one of them.
+
+## Values
+
+## KS2001
+
+**A value isn't written correctly.** The message says what was expected. Common causes are a line that ends with an operator, a bracket that is never closed, and `&&`, `||` or `!` (KScript writes `and`, `or` and `not`).
+
+```kscript
+total = 5 +          // wrong: nothing after the +
+total = 5 + 1        // right
+```
+
+## KS2002
+
+**`=` is used where a value is expected.** To compare, write `==`. To give a variable a value, put the assignment on a line of its own.
+
+```kscript
+if $count = 1 { }    // wrong
+if $count == 1 { }   // right
+```
+
+## KS2003
+
+**Two statements run together.** Put each on its own line, or separate them with `;`.
+
+## KS2004
+
+**A bare word is used as a value.** Variables are read with `$`, and text needs quotes.
+
+```kscript
+name = Kyle          // wrong
+name = 'Kyle'        // right: text
+name = $other        // right: another variable
+```
+
+## KS2005
+
+**Text used as a value is not a template.** The text after `echo` fills in `$name` and `{ }`. Text given to a variable, returned from a function or passed to a command is kept exactly as written.
+
+```kscript
+name = 'Joan'
+greeting = "Hello $name"         // wrong: holds the text "Hello $name"
+greeting = 'Hello ' + $name      // right
+echo "Hello $name"               // right: echo's text is a template
+```
+
+## Statements
+
+## KS3001
+
+**KScript has no statement with this name.** Often it is a typo, or a word from another language.
+
+| You wrote | KScript writes |
+| --- | --- |
+| `print "hi"`, `console.log("hi")` | `echo "hi"` |
+| `function greet() { }`, `def greet()` | `fn greet() { }` |
+| `foreach x in $list { }` | `for x in $list { }` |
+| `switch $x { }` | `match $x { }` |
+| `x++` | `x += 1` |
+
+## KS3002
+
+**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element.
+
+## KS3003
+
+**A statement has no argument with this name.** The message lists the ones it has.
+
+## KS3004
+
+**An argument KScript 2 removed.** The message names what replaced it.
+
+## KS3005
+
+**A required argument is missing.** For example `for` needs something to loop over: `for item in $list { }`.
+
+## KS3006
+
+**An argument has a value it can't take.** The message lists the values it accepts.
+
+## KS3007
+
+**A statement is in the wrong place.** `return` only works inside `fn`, `break` and `continue` inside a loop, `case` inside `match`, and `elif` and `else` straight after the `}` of an `if`.
+
+## KS3008
+
+**Something a block can't hold.** In an XML script, loose text is ignored unless it is inside an element that prints it, such as `<echo>`. An `extend` block holds `fn` methods only.
+
+## KS3009
+
+**Something from a package that isn't imported.** Add the import at the top of the script. The quick fix does it for you.
+
+```kscript
+import KScript.IO
+
+text = @read_text('notes.txt')
+```
+
+## KS3010
+
+**An import names a package that doesn't exist.** Check the spelling: packages are named like `KScript.IO` and `KScript.Math`.
+
+## Names
+
+## KS4001
+
+**A variable is read before it has a value.** Usually a typo, and the message suggests the closest name. Otherwise give it a value first.
+
+```kscript
+name = 'Joan'
+echo "Hello $nme"    // wrong
+echo "Hello $name"   // right
+```
+
+## KS4002
+
+**A variable is updated before it has a value.** `count += 1` needs `count` to exist. Give it a starting value first: `count = 0`.
+
+## KS4003
+
+**A constant is given a new value.** A `const` can't change. Use a plain variable if it needs to.
+
+## KS4004
+
+**The same name is declared twice.** Two functions, types or parameters share a name. Rename one of them.
+
+## KS4005
+
+**A function that doesn't exist is named.** Check the spelling, or declare it: `fn greet(who) { }`.
+
+## KS4006
+
+**A KScript 1 way of naming a variable.** Variables are always written `$name`.
+
+## KS4007
+
+**A doc comment describes a parameter the function doesn't have.** Match the name after `@param` to a parameter.
+
+## KS4008
+
+**Something marked `@deprecated` is used.** Its doc comment says what to use instead.
+
+## Calls
+
+## KS5001
+
+**A command that doesn't exist is called.** Commands start with `@`, including your own functions: `@greet('World')`. Some things are methods in KScript and not commands: the length of a list is `$list->length()`.
+
+## KS5002
+
+**A command KScript 2 removed.** The message names what replaced it.
+
+## KS5003
+
+**A method the value doesn't have.** After `->`, the editor lists the methods the value has. Methods are always called with brackets: `$name->upper()`.
+
+## KS5004
+
+**A call has too few or too many arguments.** The message shows what the function takes. An argument with `?` or a default can be left out.
+
+## KS5005
+
+**A value is the wrong type for what is done with it.** For example `->upper()` on a number. Convert it first: `$n->to_string()->upper()`.
+
+## KS5006
+
+**A planned feature is used.** It is described in the docs but not built yet.
+
+## KS5007
+
+**A call names an argument the function doesn't have.** The message lists its parameters.
+
+## KS5008
+
+**A named argument is given twice, or a word is used as a flag on a parameter that isn't yes/no.** Give each argument once, and give other parameters a value: `name: value`.
+
+## KS5009
+
+**An argument takes one of a fixed set of words, and this isn't one of them.** The message lists them.
+
+## KS5010
+
+**A field the type doesn't have.** The records of a `type` only have the fields it declares.
+
+## KS5011
+
+**An error type that isn't declared.** Declare it with `error Name { }`, or use a built-in one such as `Validation`, `NotFound` or `IO`.
+
+## KS5012
+
+**A value doesn't fit its declared type.** For example an `email` without an `@`, or a number outside the range a type allows.
+
+## Style
+
+Style rules keep code easy to read. They are warnings, and a [standard](standards.md) can turn each one off.
+
+## KS6001
+
+**An `else` where an early `return`, `continue` or `break` reads better.** See [Early returns instead of else](language.md#early-returns-instead-of-else).
+
+## KS6002
+
+**A function nothing calls.** Remove it, or start its name with `_` to keep it on purpose.
+
+## KS6003
+
+**A variable whose value is never read.** Remove it, or start its name with `_`.
+
+## KS6004
+
+**A parameter the function never reads.** Remove it, or start its name with `_`.
+
+## KS6005
+
+**An import nothing uses.** Remove it.
+
+## KS6006
+
+**A list of names written as one string.** In a `.kscript` file write an array: `use: [log, cors]`.

@@ -674,6 +674,8 @@ namespace KScript.LanguageServer
                 ["range"] = Range(source, d.Span),
                 ["severity"] = (int)d.Severity,
                 ["code"] = d.Code,
+                // Editors show the code as a link to what it means and how to fix it.
+                ["codeDescription"] = new JsonObject { ["href"] = DiagnosticCodes.HelpUrl(d.Code) },
                 ["source"] = "kscript",
                 ["message"] = d.Message,
             };
