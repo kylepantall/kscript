@@ -592,9 +592,23 @@ namespace KScript.Language.Analysis
             return null;
         }
 
-        /// <summary>For a string method on a uuid, email, handle or regex: how to call it on the text anyway.</summary>
-        private static string ToStringHint(CallableInfo method, string type, string arrow, string name) =>
-            method.ReceiverType == KType.String && IsSemanticText(type) ? $" Use ->to_string(){arrow}{name}() to work on its text." : string.Empty;
+        /// <summary>
+        /// For a string method on a value that isn't a string (a uuid, a date, a number): how to call it on the text anyway.
+        /// <c>->json()</c> reads JSON text, so a value that isn't text is pointed at <c>->to_json()</c> instead.
+        /// </summary>
+        private static string ToStringHint(CallableInfo method, string type, string arrow, string name)
+        {
+            if (method.ReceiverType != KType.String || !(IsSemanticText(type) || HasTextForm(type)))
+            {
+                return string.Empty;
+            }
+            return string.Equals(name, "json", StringComparison.OrdinalIgnoreCase) && !IsSemanticText(type)
+                ? " To write it as JSON text, use ->to_json()."
+                : $" Use ->to_string(){arrow}{name}() to work on its text.";
+        }
+
+        /// <summary>A number, bool, date or file isn't text, but prints as text with <c>->to_string()</c>.</summary>
+        private static bool HasTextForm(string type) => type == KType.Number || type == KType.Bool || type == KType.Date || type == KType.File;
 
         private static bool IsSemanticText(string type) => type == KType.Email || type == KType.Handle || type == KType.Uuid || type == KType.Regex;
 
