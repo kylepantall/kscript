@@ -58,6 +58,12 @@ namespace KScript.Language.Analysis
         public DocumentKind Kind { get; }
         public MarkupDocument Markup { get; }
         public List<Diagnostic> Diagnostics { get; } = new List<Diagnostic>();
+
+        /// <summary>
+        /// Code actions that fix no problem but help write the code, offered when the cursor is on their span: adding
+        /// a job's <c>fn failed(err)</c>, or overriding a method a joined type gets from its bases.
+        /// </summary>
+        public List<CodeAction> Actions { get; } = new List<CodeAction>();
         public List<Symbol> Symbols { get; } = new List<Symbol>();
         public List<SymbolReference> References { get; } = new List<SymbolReference>();
         public List<ExpressionRegion> Regions { get; } = new List<ExpressionRegion>();
@@ -141,5 +147,18 @@ namespace KScript.Language.Analysis
         public DocumentLink LinkAt(int offset) => Links.FirstOrDefault(l => l.Span.Contains(offset));
 
         public IEnumerable<Diagnostic> Errors => Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error);
+    }
+
+    /// <summary>A fix offered on a span without a diagnostic, like "Override fn hi() from User".</summary>
+    public sealed class CodeAction
+    {
+        public CodeAction(TextSpan span, QuickFix fix)
+        {
+            Span = span;
+            Fix = fix;
+        }
+
+        public TextSpan Span { get; }
+        public QuickFix Fix { get; }
     }
 }

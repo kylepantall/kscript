@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Help writing types and jobs, like C#'s "implement missing members" and "generate overrides": a job without `fn handle()` gets an **Add fn handle()** quick fix, and the lightbulb on a job offers **Add fn failed(err)**. On a joined type (`type Admin with [User]`) it offers **Override fn greet(who: string) from User** for each method a base gives it. A method two bases both give is an error with a **Declare fn label in C** fix, as at run time. Each fix writes a stub in the file's own format.
 - Only what works is suggested, in every place: a date, number, bool or file is no longer offered string methods such as `->json()` or `->upper()`, which fail at run time (use `->to_string()` first, or `->to_json()`). A method a package or an `extend` block adds is offered.
 - Signature help in `.kscript` statements: inside `log(‸)`, `wait(‸)` and other element statements, the tooltip lists the attributes (`log(level?: trace|debug|…, message?: text, category?: text, fields?: any)`) and highlights the one you're writing, or the next one not written yet. Parameters are now sent as their exact place in the signature, so the right one is highlighted even when its name also appears earlier in the label.
 - KScript files get their own "K" file icon in the explorer and on editor tabs: `.kscript`, `.ks`, `.ks.xml` and `.test.ks.xml` files. It shows with VS Code's default file icon theme, and with any icon theme that has no icon of its own for KScript.
