@@ -159,6 +159,40 @@ public sealed class SelfUpdaterRunTests : IDisposable
     }
 
     [Fact]
+    public void Skips_files_in_folders_so_a_macos_dsym_never_replaces_kscript()
+    {
+        // v0.6.0's macOS archive held KScript.dsym/Contents/Resources/DWARF/KScript. Flattened beside kscript on a
+        // case-insensitive disk, it replaced the binary with a file that isn't executable.
+        var (github, env) = Setup();
+        string dir = Path.GetDirectoryName(env.TargetPath);
+        github.Routes[Download] = () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(Tarball("new binary", "libSkiaSharp.dylib", "KScript.dsym/Contents/Resources/DWARF/KScript",
+                "KScript.dsym/Contents/Info.plist", "KScript")),
+        };
+        var (code, _, error) = Update(env);
+        Assert.True(code == 0, error);
+        Assert.Equal("new binary", File.ReadAllText(env.TargetPath));
+        Assert.Equal(new[] { "kscript", "libSkiaSharp.dylib" }, Directory.GetFiles(dir).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+
+        // The binary itself is only taken from the top of the archive.
+        var nested = new MemoryStream(Tarball("top", "sub/kscript"));
+        string staged = Path.Combine(dir, "staged");
+        SelfUpdater.ExtractBinary(nested, "kscript-osx-arm64.tar.gz", staged);
+        Assert.Equal("top", File.ReadAllText(staged));
+    }
+
+    [Theory]
+    [InlineData("kscript", "kscript")]
+    [InlineData("./libSkiaSharp.dylib", "libSkiaSharp.dylib")]
+    [InlineData("././a.so", "a.so")]
+    [InlineData("./KScript.dsym/Contents/Info.plist", null)]
+    [InlineData("sub\\a.dll", null)]
+    [InlineData("sub/", null)]
+    [InlineData("./", null)]
+    public void Top_level_names(string entry, string expected) => Assert.Equal(expected, SelfUpdater.TopLevelName(entry));
+
+    [Fact]
     public void Installs_on_windows_by_moving_the_old_exe_aside()
     {
         var (github, env) = Setup();

@@ -77,14 +77,20 @@ jobs:
         shell: bash
         run: |
           mkdir dist runtime-dist
-          # kscript, and the native libraries beside it (no debug symbols).
+          # kscript, and the native libraries beside it (no debug symbols). The macOS symbols come out as KScript.dsym:
+          # match without case, because its DWARF/KScript would otherwise replace kscript when kscript update unpacks it.
+          shopt -s nocasematch
           for f in native/*; do
-            case "$f" in *.dbg|*.pdb|*.dSYM) continue ;; esac
+            case "$f" in *.dbg|*.pdb|*.dsym) continue ;; esac
+            [ -d "$f" ] && continue
             cp -R "$f" dist/
           done
           mv "dist/KScript${{ matrix.ext }}" "dist/kscript${{ matrix.ext }}"
           cp "runtime/KScript${{ matrix.ext }}" "runtime-dist/kscript${{ matrix.ext }}"
+          shopt -u nocasematch
           ls -l dist runtime-dist
+          # Only files, none of them a folder, so every name lands beside kscript.
+          if find dist -mindepth 1 -type d | grep -q .; then echo "dist has a folder in it"; exit 1; fi
           if [ "${{ matrix.ext }}" = ".exe" ]; then
             (cd dist && 7z a "../kscript-${{ matrix.rid }}.zip" *)
             (cd runtime-dist && 7z a "../kscript-runtime-${{ matrix.rid }}.zip" "kscript.exe")
