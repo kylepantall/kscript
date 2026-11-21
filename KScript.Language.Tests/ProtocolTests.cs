@@ -286,6 +286,23 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void CodeActionsOfferOverridesOnAJoinedType()
+        {
+            JsonArray kinds = Initialize()["result"]["capabilities"]["codeActionProvider"]["codeActionKinds"].AsArray();
+            Assert.Contains(kinds, k => k.GetValue<string>() == "refactor.rewrite");
+            Open("<kscript>\n<type name=\"User\" fields=\"name: string\"><fn name=\"greet\" value=\"'hi'\" /></type>\n<type name=\"Admin\" with=\"User\" />\n</kscript>");
+            JsonArray actions = Request("textDocument/codeAction", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = Uri },
+                ["range"] = Range(2, 8, 2, 8),
+                ["context"] = new JsonObject { ["diagnostics"] = new JsonArray() },
+            })["result"].AsArray();
+            JsonNode overrideGreet = Assert.Single(actions, x => x["title"].GetValue<string>() == "Override fn greet() from User");
+            Assert.Equal("refactor.rewrite", overrideGreet["kind"].GetValue<string>());
+            Assert.Contains("<fn name=\"greet\">", overrideGreet["edit"]["changes"][Uri][0]["newText"].GetValue<string>(), StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void UnusedCodeIsTaggedUnnecessary()
         {
             Initialize();

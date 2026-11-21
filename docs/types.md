@@ -359,7 +359,7 @@ admin = $Admin->from({ name: 'Joan', email: 'joan@example.com', created: '2026-0
 echo "{ @welcome($admin) } { $User->is($admin) } { $admin.level }"
 ```
 
-When two bases have a field with the same name but different types, the joined type must declare that field itself. `$User->is($admin)` says whether a value is a User, and `$User->is($Admin)` whether a type is built on User. A `validate:` rule in a type with fields sees the fields as `$name`, `$email` and so on.
+When two bases have a field with the same name but different types, the joined type must declare that field itself. The same goes for a method two bases both have: declare it in the joined type to choose. In the editor, the lightbulb on a joined type offers to override each method it gets from its bases, and writes the stub. `$User->is($admin)` says whether a value is a User, and `$User->is($Admin)` whether a type is built on User. A `validate:` rule in a type with fields sees the fields as `$name`, `$email` and so on.
 
 ## Types read from text
 
