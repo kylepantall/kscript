@@ -33,6 +33,12 @@
       },
       "uniqueItems": true
     },
+    "extensions": {
+      "type": "array",
+      "description": "Where the project's extension files are: folders (everything inside, subfolders too) or globs, relative to kscript.json. Their extend blocks (extend date { fn json() => ... }) apply to every script in the project. Default: [\"extensions\"].",
+      "items": { "type": "string" },
+      "default": ["extensions"]
+    },
     "serve": {
       "type": "object",
       "description": "Defaults for kscript serve. Options on the command line win.",

@@ -69,6 +69,44 @@ namespace KScript.Language.Analysis
         public Scope RootScope { get; internal set; }
 
         /// <summary>
+        /// The methods extend blocks add, by receiver type then name: this file's, its imports' and the project's
+        /// extension files'. External ones have a <see cref="Symbol.SourcePath"/> and an entry in ExternalDeclarations.
+        /// </summary>
+        public Dictionary<string, Dictionary<string, Symbol>> ExtensionMethods { get; } = new Dictionary<string, Dictionary<string, Symbol>>(StringComparer.Ordinal);
+
+        /// <summary>The receivers whose extension methods a value of this shape has, most specific first.</summary>
+        private static IEnumerable<string> ExtensionReceivers(TypeShape receiver)
+        {
+            if (receiver == null)
+            {
+                yield break;
+            }
+            if (receiver.Name != null && receiver.Type == KType.Map)
+            {
+                yield return receiver.Name;
+            }
+            yield return receiver.Type;
+        }
+
+        /// <summary>The extension method <c>value->name()</c> calls, or null.</summary>
+        public Symbol ExtensionMethod(TypeShape receiver, string name)
+        {
+            foreach (string r in ExtensionReceivers(receiver))
+            {
+                if (ExtensionMethods.TryGetValue(r, out Dictionary<string, Symbol> methods) && methods.TryGetValue(name, out Symbol method))
+                {
+                    return method;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>Every extension method a value of this shape has.</summary>
+        public IEnumerable<Symbol> ExtensionMethodsFor(TypeShape receiver) =>
+            ExtensionReceivers(receiver).SelectMany(r => ExtensionMethods.TryGetValue(r, out Dictionary<string, Symbol> m) ? m.Values : Enumerable.Empty<Symbol>())
+                .GroupBy(m => m.Name, StringComparer.Ordinal).Select(g => g.First());
+
+        /// <summary>
         /// The names this document uses from the scripts it imports, as (full path of the script, name): a call to an
         /// imported function, or <c>lib.slugify</c> through an alias. It is how a script's functions count as used
         /// when only another file calls them.

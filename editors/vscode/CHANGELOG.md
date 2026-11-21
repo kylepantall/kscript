@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- KScript files get their own "K" file icon in the explorer and on editor tabs: `.kscript`, `.ks`, `.ks.xml` and `.test.ks.xml` files. It shows with VS Code's default file icon theme, and with any icon theme that has no icon of its own for KScript.
 - Named arguments show as soon as you type `(` or `,` in a call (commands, methods and your own functions), with the enum values and yes/no flags the next argument takes. Picking an enum parameter's `name:` lists its values straight away. Brackets and commas elsewhere, such as `(1 + 2)` or `[1, 2]`, don't open the list.
 - ``` blocks only name languages KScript knows (`text`, `sql`, `html`, `css`, `js`, `json`, `md`, `latex`, `yaml`, `xml` and their long names). A typo such as ```` ```textc ```` is an error that suggests `text`, and the editor suggests the languages after the fence.
 - Doc comment tags: in `///` comments (and `<!--- -->` in XML), typing `@` suggests the tags (`@param`, `@arg`, `@returns`, `@example`, `@deprecated`, `@see`, `@public`, `@llm`, `@prefer`, `@avoid`, `@pitfall`, `@agent`), with an `@param name` for each parameter not described yet. A name after `@param` or `@arg` is completed from the function's parameters, and hovering a tag explains it. Tags written once (such as `@returns`) aren't offered again, and other suggestions stay out of doc comments. `@arg` and `@argument` mean `@param`. All tags are highlighted, in XML doc comments too.

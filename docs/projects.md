@@ -147,6 +147,7 @@ kscript make project my-app --template ../starters/api   # any folder
   "name": "my-site",
   "standard": "kscript:recommended",               // lint rules and format settings to start from (see Standards)
   "packages": ["KScript.Terminal", "KScript.IO"],   // imported by every script in the project
+  "extensions": ["extensions", "shared/**/*.kscript"], // where the project's extend files are (default: extensions/)
   "serve": {
     "root": ".",          // the site folder, relative to kscript.json
     "port": 8080,         // --port and --host on the command line still win
@@ -239,6 +240,7 @@ kscript make document annual-report                   # documents/annual-report.
 kscript make config staging                           # config/config.staging.yaml
 kscript make test checkout                            # tests/checkout.test.kscript
 kscript make error PaymentFailed --status 402 --fields "order: int"   # errors/payment-failed.kscript
+kscript make extension date --methods json,is_weekend # extensions/date.kscript: extend date { fn json() … }
 kscript make auth --api                               # sign up, sign in, resets and API tokens (see Sign-in)
 kscript make                                          # list every type
 ```
@@ -265,6 +267,7 @@ my-app/
   styles/          make css
   lib/             make module, const, cache, storage and logger
   types/           make type, make native, make enum
+  extensions/      make extension: methods every script gets (extend date { … })
   errors/          make error
   jobs/            make job
   documents/       make document

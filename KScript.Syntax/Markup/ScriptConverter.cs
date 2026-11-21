@@ -567,13 +567,24 @@ namespace KScript.Syntax.Markup
                             Line(indent, "}");
                             return;
                         }
-                    case "fn" when Only("name", "params", "value", "description") && Attr("name") != null:
+                    case "extend" when Only("type", "description") && Attr("type") is string extended && IsName(extended.Trim())
+                        && e.Children.All(n => n is MarkupComment || (n is MarkupText t && t.IsWhitespace) || n is MarkupElement { Name: "fn" }):
                         {
                             if (!chained)
                             {
                                 WriteDoc(e, indent);
                             }
-                            string header = "fn " + Attr("name").Trim() + "(" + (Attr("params")?.Trim() ?? string.Empty) + ")";
+                            WriteBlock("extend " + extended.Trim(), e, indent, chained);
+                            return;
+                        }
+                    case "fn" when Only("name", "params", "value", "description", "override") && Attr("name") != null
+                        && (Attr("override") == null || (e.Parent?.Name == "extend" && IsYes(Attr("override")))):
+                        {
+                            if (!chained)
+                            {
+                                WriteDoc(e, indent);
+                            }
+                            string header = (Attr("override") != null ? "override fn " : "fn ") + Attr("name").Trim() + "(" + (Attr("params")?.Trim() ?? string.Empty) + ")";
                             if (Attr("value") is string value && !e.ChildElements.Any())
                             {
                                 sb.Append(pad).Append(header).Append(" => ").Append(Reindent(value.Trim(), Pad(indent))).Append('\n');
