@@ -29,6 +29,8 @@ public sealed class QueueTests : StorageFixture
 
     protected override void OnDispose()
     {
+        KScript.Data.Database.CloseAll();
+        DatabaseQueueDriver.ForgetTables();
         QueueRuntime.Clock = () => DateTime.UtcNow;
         QueueContext.ForgetProjects();
         MemoryQueueDriver.ResetAll();
@@ -847,6 +849,193 @@ public sealed class QueueTests : StorageFixture
         Assert.Equal(1, Cli("worker").Code);
     }
 
+    // ---- the database driver ------------------------------------------------------------------------------------
+
+    private const string DatabaseProject = "\", \"queue\": { \"default\": \"database\" } }";
+
+    private void UseDatabase(string extra = null) =>
+        UseProject("{ \"name\": \"" + app + (extra ?? DatabaseProject));
+
+    /// <summary>Runs SQL on the project's database, as a script's $db would.</summary>
+    private List<Dictionary<string, object>> Sql(string sql, string connection = null, params object[] parameters)
+    {
+        var host = new KScriptHost(null) { WorkingDirectory = Project };
+        return KScript.Data.Database.For(host, Project, connection).Rows(null, new KScript.Data.SqlStatement(sql, parameters));
+    }
+
+    [Fact]
+    public void TheDatabaseDriverKeepsJobsInATable()
+    {
+        UseDatabase();
+        string output = Code("""
+            import "jobs/welcome.kscript"
+            q = Welcome(user_id: 2, email: 'ann@example.com')->dispatch()
+            echo "{$q.connection}"
+            dispatch Welcome(user_id: 3, email: 'bo@example.com', name: 'Bo')
+            Welcome(user_id: 4, email: 'cy@example.com')->dispatch(delay: '5m')
+            """);
+        Assert.Equal("database\n", output);
+        IQueueDriver driver = Driver();
+        Assert.Equal("database", driver.Kind);
+        Assert.Equal(new[] { 2.0, 3.0, 4.0 }, driver.Waiting("mail").Select(j => (double)j.Fields["user_id"]));
+        Assert.Equal(new[] { "mail" }, driver.QueueNames());
+        Assert.True(File.Exists(Path.Combine(Project, "data", "app.sqlite")));
+        Assert.Equal(3L, Sql("SELECT COUNT(*) AS n FROM kscript_jobs")[0]["n"]);
+
+        string log = Work();
+        Assert.Contains(": done (", log);
+        Assert.Equal("Welcome there <ann@example.com> #2 attempt 1 of 3 on mail\nWelcome Bo <bo@example.com> #3 attempt 1 of 3 on mail\n", JobOutput());
+        Assert.Equal(new[] { 4.0 }, driver.Waiting(null).Select(j => (double)j.Fields["user_id"]));
+        Later(300);
+        Work();
+        Assert.Contains("#4 attempt 1", JobOutput());
+        Assert.Empty(driver.Waiting(null));
+        Assert.Empty(driver.Running());
+        Assert.Empty(driver.QueueNames());
+    }
+
+    [Fact]
+    public void DatabaseJobsRetryFailAndComeBack()
+    {
+        UseDatabase();
+        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'x@example.com')");
+        Assert.Contains("Validation: unlucky (retrying in 10s", Work(null, 1, "mail"));
+        Assert.Equal(string.Empty, Work(null, 1, "mail"));
+        Later(10);
+        Assert.Contains("retrying in 60s", Work(null, 1, "mail"));
+        Later(60);
+        Assert.Contains("failed: Validation: unlucky", Work(null, 1, "mail"));
+        Assert.EndsWith("Gave up on 13: JobFailed: Welcome failed: unlucky (Validation)\n", JobOutput());
+
+        IQueueDriver driver = Driver();
+        QueuedJob job = Assert.Single(driver.Failed());
+        Assert.Equal(3, job.Attempts);
+        Assert.Equal("Validation", job.LastError["type"]);
+        Assert.Equal(now, job.FailedAt);
+        Assert.Empty(driver.Waiting(null));
+
+        Assert.True(driver.Retry(job.Id));
+        Assert.False(driver.Retry(job.Id));
+        Assert.Empty(driver.Failed());
+        Assert.Equal(0, driver.Waiting("mail")[0].Attempts);
+        Assert.Equal(0, driver.Clear("other"));
+        Assert.Equal(1, driver.Clear("mail"));
+
+        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'x@example.com', name: 'X')");
+        QueuedJob taken = driver.Reserve(new[] { "mail" }, now);
+        taken.FailedAt = now;
+        driver.Fail(taken);
+        Assert.Equal(0, driver.Prune(now));
+        Assert.Equal(1, driver.Prune(now.AddSeconds(1)));
+        Assert.False(driver.Forget(taken.Id));
+        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 1, email: 'x@example.com')");
+        driver.Fail(driver.Reserve(new[] { "mail" }, now));
+        Assert.True(driver.Forget(Assert.Single(driver.Failed()).Id));
+        Assert.Equal(0, driver.Clear(null));
+    }
+
+    [Fact]
+    public void ADatabaseJobWhoseWorkerStoppedRunsAgainAfterItsLease()
+    {
+        UseDatabase();
+        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 6, email: 'z@example.com')\ndispatch Welcome(user_id: 7, email: 'w@example.com')");
+        IQueueDriver driver = Driver();
+        QueuedJob taken = driver.Reserve(new[] { "other", "mail" }, now);
+        Assert.Equal(6.0, taken.Fields["user_id"]);
+        Assert.Single(driver.Running());
+        Assert.Single(driver.Waiting("mail"));
+        Assert.Equal(7.0, driver.Reserve(new[] { "mail" }, now).Fields["user_id"]);
+        Assert.Null(driver.Reserve(new[] { "mail" }, now));
+        Later(36);
+        QueuedJob again = driver.Reserve(new[] { "mail" }, now);
+        Assert.Equal(taken.Id, again.Id);
+        Assert.Equal(2, again.Attempts);
+        Assert.Equal(now.AddSeconds(35), again.ReservedUntil);
+        driver.Release(again);
+        Assert.Equal(new[] { taken.Id }, driver.Waiting("mail").Select(j => j.Id));
+        Assert.Equal(2, driver.Waiting("mail")[0].Attempts);
+    }
+
+    [Fact]
+    public void ARowThatIsntAJobIsMovedToTheFailedJobs()
+    {
+        UseDatabase();
+        IQueueDriver driver = Driver();
+        Assert.Empty(driver.Waiting(null));
+        Sql("INSERT INTO kscript_jobs (id, queue, available_at, payload) VALUES ('broken', 'mail', 0, 'not json')");
+        Assert.Empty(driver.Waiting(null));
+        Assert.Null(driver.Reserve(new[] { "mail" }, now));
+        Assert.Equal(0L, Sql("SELECT COUNT(*) AS n FROM kscript_jobs")[0]["n"]);
+        Assert.Equal("not json", Sql("SELECT payload FROM kscript_failed_jobs WHERE id = 'broken'")[0]["payload"]);
+        Assert.Empty(driver.Failed());
+        Assert.False(driver.Retry("broken"));
+        Assert.True(driver.Forget("broken"));
+    }
+
+    [Fact]
+    public void TheDatabaseDriverLocksUniqueKeys()
+    {
+        UseDatabase();
+        IQueueDriver driver = Driver();
+        Assert.True(driver.Lock("k", now.AddMinutes(1), now));
+        Assert.False(driver.Lock("k", now.AddMinutes(1), now));
+        Assert.True(driver.Lock("k", now.AddMinutes(5), now.AddMinutes(2)));
+        Assert.False(driver.Lock("k", now.AddMinutes(9), now.AddMinutes(3)));
+        driver.Unlock("k");
+        driver.Unlock("k");
+        Assert.True(driver.Lock("k", now.AddMinutes(1), now));
+
+        FileOf("jobs/sync.kscript", "job SyncUser(unique_for: \"10m\", unique_by: [user_id]) {\n  user_id: int\n\n  fn handle() {\n    echo \"sync {$user_id}\"\n  }\n}");
+        const string dispatch = "import \"jobs/sync.kscript\"\nq = SyncUser(user_id: 1)->dispatch()\necho \"{$q == null}\"";
+        Assert.Equal("false\n", Code(dispatch).ToLowerInvariant());
+        Assert.Equal("true\n", Code(dispatch).ToLowerInvariant());
+        Work();
+        Assert.Equal("false\n", Code(dispatch).ToLowerInvariant());
+    }
+
+    [Fact]
+    public void SeveralWorkersShareADatabaseQueue()
+    {
+        UseDatabase();
+        FileOf("jobs/count.kscript", "job Count {\n  n: int\n\n  fn handle() {\n    echo \"n{$n}\"\n  }\n}");
+        Code("import \"jobs/count.kscript\"\nfor n in 0..20 {\n  dispatch Count(n: $n)\n}");
+        Work(null, 4);
+        string output = JobOutput();
+        List<string> ran = System.Text.RegularExpressions.Regex.Matches(output, @"n\d+").Select(m => m.Value).ToList();
+        Assert.True(ran.Count == 20 && ran.Distinct().Count() == 20, output);
+        IQueueDriver driver = Driver();
+        Assert.Empty(driver.Waiting(null));
+        Assert.Empty(driver.Running());
+        Assert.Empty(driver.Failed());
+    }
+
+    [Fact]
+    public void ADatabaseQueueCanUseANamedDatabaseConnection()
+    {
+        FileOf("config.json", "{ \"database\": { \"connections\": { \"jobs\": { \"url\": \"sqlite:data/jobs.sqlite\" } } } }");
+        UseDatabase("\", \"queue\": { \"default\": \"db\", \"connections\": { \"db\": { \"driver\": \"database\", \"connection\": \"jobs\" }, \"lost\": { \"driver\": \"database\", \"connection\": \"nope\" } } } }");
+        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 2, email: 'b@example.com')");
+        Assert.True(File.Exists(Path.Combine(Project, "data", "jobs.sqlite")));
+        Assert.False(File.Exists(Path.Combine(Project, "data", "app.sqlite")));
+        var status = Cli("status");
+        Assert.Equal(0, status.Code);
+        Assert.Contains("Connection db (database): sqlite database 'jobs' (", status.Out);
+        Assert.Contains("mail     1        0        0        0", status.Out);
+        Assert.Contains("There is no database connection called 'nope'", Cli("status", "--connection", "lost").Error);
+        var worker = Cli("worker", "--stop-when-empty");
+        Assert.Equal(0, worker.Code);
+        Assert.Contains("Ran 1 job.", worker.Out);
+    }
+
+    [Fact]
+    public void AWorkerWaitsOutABusyDatabase()
+    {
+        Assert.True(QueueRuntime.StoreBusy(new IOException("busy")));
+        Assert.True(QueueRuntime.StoreBusy(new KScriptException("down", "ConnectionError")));
+        Assert.True(QueueRuntime.StoreBusy(new KScriptException("locked", "QueryError", new Microsoft.Data.Sqlite.SqliteException("database is locked", 5))));
+        Assert.False(QueueRuntime.StoreBusy(new KScriptException("bad", "Validation")));
+    }
+
     // ---- kscript.json -------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -861,6 +1050,7 @@ public sealed class QueueTests : StorageFixture
                   "fast": { "driver": "Memory" },
                   "db": { "driver": "database", "connection": "main" },
                   "cache": { "driver": "redis", "url_env": "REDIS_URL" },
+                  "lite": { "driver": "sqlite" },
                   "odd": { "driver": "carrier-pigeon" },
                   "none": { "path": "x" },
                   "bad": 5,
@@ -878,7 +1068,9 @@ public sealed class QueueTests : StorageFixture
         Assert.Equal("local", q.Default);
         Assert.Equal("storage/queue", q.Connections["local"].Path);
         Assert.Equal("memory", q.Connections["fast"].Driver);
-        Assert.False(q.Connections.ContainsKey("db"));
+        Assert.Equal("main", q.Connections["db"].Database);
+        Assert.False(q.Connections.ContainsKey("cache"));
+        Assert.False(q.Connections.ContainsKey("lite"));
         Assert.Equal(new[] { "high", "default" }, q.Queues);
         Assert.Equal(3 * 86400, q.FailedKeep);
         Assert.Equal(3, q.WorkerConcurrency);
@@ -886,7 +1078,7 @@ public sealed class QueueTests : StorageFixture
         Assert.Equal("fast", q.DefaultFor("test"));
         Assert.Equal("local", q.DefaultFor(null));
         string warnings = string.Join("\n", config.Warnings);
-        Assert.Contains("the database driver isn't available yet", warnings);
+        Assert.Contains("queue.connections.lite: use the database driver", warnings);
         Assert.Contains("the redis driver isn't available yet", warnings);
         Assert.Contains("there is no queue driver 'carrier-pigeon'", warnings);
         Assert.Contains("queue.connections.none needs a driver", warnings);

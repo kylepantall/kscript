@@ -209,20 +209,20 @@ namespace KScript.Projects
         {
             public string Name { get; set; }
 
-            /// <summary>sync, memory or file (database and redis come later).</summary>
+            /// <summary>sync, memory, file or database (redis comes later).</summary>
             public string Driver { get; set; }
 
             /// <summary>For the file driver: the folder, relative to the project. Default: the app's data folder.</summary>
             public string Path { get; set; }
 
-            /// <summary>For the database driver: the database connection's name.</summary>
+            /// <summary>For the database driver: the database connection's name (database.connections). Default: the default database.</summary>
             public string Database { get; set; }
 
             /// <summary>For the redis driver: the environment variable holding the URL.</summary>
             public string UrlEnv { get; set; }
         }
 
-        public static readonly string[] Drivers = { "sync", "memory", "file" };
+        public static readonly string[] Drivers = { "sync", "memory", "file", "database" };
 
         public static readonly string[] SettingNames = { "default", "connections", "queues", "failed", "worker", "env" };
 
@@ -232,12 +232,13 @@ namespace KScript.Projects
         /// <summary>The default connection per environment: "env": { "test": { "default": "sync" } }.</summary>
         public Dictionary<string, string> DefaultByEnvironment { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>The connections by name. sync, memory and file always exist with their own driver.</summary>
+        /// <summary>The connections by name. sync, memory, file and database always exist with their own driver.</summary>
         public Dictionary<string, Connection> Connections { get; } = new Dictionary<string, Connection>(StringComparer.OrdinalIgnoreCase)
         {
             ["sync"] = new Connection { Name = "sync", Driver = "sync" },
             ["memory"] = new Connection { Name = "memory", Driver = "memory" },
             ["file"] = new Connection { Name = "file", Driver = "file" },
+            ["database"] = new Connection { Name = "database", Driver = "database" },
         };
 
         /// <summary>
@@ -960,9 +961,12 @@ namespace KScript.Projects
                             }
                             if (!QueueSettings.Drivers.Contains(connection.Driver))
                             {
-                                config.Warnings.Add(connection.Driver is "database" or "sqlite" or "redis"
-                                    ? $"{where}: the {connection.Driver} driver isn't available yet. Drivers: {string.Join(", ", QueueSettings.Drivers)}."
-                                    : $"{where}: there is no queue driver '{connection.Driver}'. Drivers: {string.Join(", ", QueueSettings.Drivers)}.");
+                                config.Warnings.Add(connection.Driver switch
+                                {
+                                    "redis" => $"{where}: the redis driver isn't available yet. Drivers: {string.Join(", ", QueueSettings.Drivers)}.",
+                                    "sqlite" => $"{where}: use the database driver, with \"connection\" naming a sqlite database in database.connections.",
+                                    _ => $"{where}: there is no queue driver '{connection.Driver}'. Drivers: {string.Join(", ", QueueSettings.Drivers)}.",
+                                });
                                 continue;
                             }
                             queue.Connections[c.Name] = connection;

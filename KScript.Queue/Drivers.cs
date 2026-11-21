@@ -14,7 +14,7 @@ namespace KScript.Queueing
     /// </summary>
     public interface IQueueDriver
     {
-        /// <summary>memory or file.</summary>
+        /// <summary>memory, file or database.</summary>
         string Kind { get; }
 
         /// <summary>The connection's name in kscript.json.</summary>

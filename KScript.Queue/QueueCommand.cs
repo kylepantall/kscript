@@ -177,7 +177,7 @@ namespace KScript.Queueing
                         }, indented: true));
                         return 0;
                     }
-                    output.WriteLine($"Connection {driver.Name} ({driver.Kind}){(driver is FileQueueDriver f ? ": " + f.Folder : string.Empty)}");
+                    output.WriteLine($"Connection {driver.Name} ({driver.Kind}){driver switch { FileQueueDriver f => ": " + f.Folder, DatabaseQueueDriver d => ": " + d.Where, _ => string.Empty }}");
                     Table(output, new[] { "Queue", "Waiting", "Delayed", "Running", "Failed" },
                         rows.Select(r => new[] { r.Queue, N(r.Waiting), N(r.Delayed), N(r.Running), N(r.Failed) }));
                     return 0;
