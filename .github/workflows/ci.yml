@@ -84,13 +84,13 @@ jobs:
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll "Example Scripts/Find Oldest Person.xml"
 
       - name: Check KScript 2 samples
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents "Example Scripts" --warnaserror
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/data "Example Scripts" --warnaserror
 
       - name: Check KScript formatting
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/code-format "Example Scripts" "Example Sites/team"
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/data samples/code-format "Example Scripts" "Example Sites/team"
 
       - name: Run KScript tests
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab samples/data
 
       - name: Check a new project (kscript make project)
         shell: bash
@@ -272,8 +272,11 @@ jobs:
         run: |
           dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime ${{ matrix.rid }} \
             -p:PublishAot=true -p:TrimmerSingleWarn=false -p:DebugType=none -p:Version=0.0.0-aot --output aot | tee aot.log
-          # Allowed: one warning inside ASP.NET Core 8 (JsonOptions), on a path kscript doesn't use. Anything else fails the job.
-          grep -o "warning IL[0-9]*: [^[]*" aot.log | sort -u | grep -v "Microsoft.AspNetCore.Http.Json.JsonOptions" > warnings.txt || true
+          # Allowed: one warning inside ASP.NET Core 8 (JsonOptions), and the IL2113 warnings on Microsoft.Data.Sqlite's
+          # SqliteConnectionStringBuilder (its designer surface, ICustomTypeDescriptor), both on paths kscript doesn't use.
+          # Anything else fails the job.
+          grep -o "warning IL[0-9]*: [^[]*" aot.log | sort -u | grep -v "Microsoft.AspNetCore.Http.Json.JsonOptions" \
+            | grep -v "IL2113: Microsoft.Data.Sqlite.SqliteConnectionStringBuilder: .*ICustomTypeDescriptor" > warnings.txt || true
           if [ -s warnings.txt ]; then echo "New trim or AOT warnings:"; cat warnings.txt; exit 1; fi
           ls -l aot
           echo "K=$PWD/aot/KScript${{ matrix.ext }}" >> "$GITHUB_ENV"
@@ -284,9 +287,11 @@ jobs:
           "$K" smoke.xml | tee smoke.out
           grep -q "kscript ok: 3" smoke.out
           "$K" "Example Scripts/Find Oldest Person.xml"
-          "$K" check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" --warnaserror
-          "$K" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage "Example Scripts" "Example Sites/team"
-          "$K" test samples/kscript2 samples/life-lab
+          "$K" check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data "Example Scripts" --warnaserror
+          "$K" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data "Example Scripts" "Example Sites/team"
+          "$K" test samples/kscript2 samples/life-lab samples/data
+          # KScript.Data's SQLite library ships beside kscript, like the UI's.
+          (cd samples/data && "$K" shop.kscript | grep -q "Paid orders: 1")
           "$K" openapi samples/http-app | grep -q '"openapi": "3.1.0"'
           time "$K" --version
 

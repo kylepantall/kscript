@@ -183,6 +183,7 @@
         "styles": { "type": "string", "default": "styles", "description": ".ks.css stylesheets (kscript make css)." },
         "lib": { "type": "string", "default": "lib", "description": "Shared functions and constants (kscript make module, kscript make const, kscript make cache)." },
         "types": { "type": "string", "default": "types", "description": "Types and enums (kscript make type, kscript make enum)." },
+        "models": { "type": "string", "default": "models", "description": "Database models (kscript make model)." },
         "storage": { "type": "string", "default": "lib", "description": "JSON file stores (kscript make storage)." },
         "jobs": { "type": "string", "default": "jobs", "description": "Jobs (kscript make job)." },
         "windows": { "type": "string", "default": ".", "description": "Desktop windows (kscript make window)." },

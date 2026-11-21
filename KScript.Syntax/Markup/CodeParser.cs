@@ -231,6 +231,7 @@ namespace KScript.Syntax.Markup
                 case "match": ParseMatch(parent, start); return;
                 case "fn": ParseFn(parent, start, doc); return;
                 case "type" when StartsDeclaration(4): ParseType(parent, start, doc); return;
+                case "model" when StartsDeclaration(5): ParseType(parent, start, doc, "model"); return;
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
                 case "error" when StartsDeclaration(5): ParseError(parent, start, doc); return;
                 case "try": ParseTry(parent, start); return;
@@ -724,9 +725,9 @@ namespace KScript.Syntax.Markup
         /// <c>type Repo(sample: "repo.json") { name: string; stars: int from stargazers_count }</c>: a &lt;type&gt;
         /// whose block holds one field per line.
         /// </summary>
-        private void ParseType(MarkupElement parent, int start, string doc)
+        private void ParseType(MarkupElement parent, int start, string doc, string keyword = "type")
         {
-            MarkupElement e = Begin(parent, "type", start);
+            MarkupElement e = Begin(parent, keyword, start);
             SkipSpaces();
             AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
             if (Peek(0) == '(')
@@ -774,7 +775,10 @@ namespace KScript.Syntax.Markup
             SkipSpaces();
             if (Peek(0) == '{')
             {
+                bool wasModel = inModel;
+                inModel = keyword == "model";
                 ParseBlock(e, fields: true);
+                inModel = wasModel;
             }
             else
             {
@@ -956,11 +960,29 @@ namespace KScript.Syntax.Markup
         private static readonly string[] RuleWords = { "min", "max", "pattern", "one_of", "not", "validate", "normalize", "parse" };
 
         /// <summary>
+        /// A model's settings (KScript.Data), written as lines of its block (<c>table: people</c>, <c>unique: [email]</c>)
+        /// or as options (<c>model User(timestamps: yes)</c>). In a model, a line starting with one is always a setting.
+        /// </summary>
+        public static readonly string[] ModelSettings = { "table", "connection", "key", "timestamps", "soft_deletes", "unique", "index", "hidden", "guarded" };
+
+        /// <summary>True while parsing the block of a model, whose settings are lines too.</summary>
+        private bool inModel;
+
+        /// <summary>
         /// The rule a type's line starts with (<c>min: 0</c>, <c>pattern: /^[a-z]+$/</c>, <c>validate: $value > 0, 'too small'</c>),
         /// or null for a field. A line such as <c>max: int</c> is still a field: the value after ':' is a type and nothing more.
         /// </summary>
         private string RuleLineAhead()
         {
+            if (inModel && ModelSettings.FirstOrDefault(w => Lookahead(w) && pos + w.Length < text.Length && !Lexer.IsIdentChar(text[pos + w.Length])) is string setting)
+            {
+                int after = pos + setting.Length;
+                while (after < text.Length && (text[after] == ' ' || text[after] == '\t')) after++;
+                if (after < text.Length && text[after] == ':')
+                {
+                    return setting;
+                }
+            }
             string word = RuleWords.FirstOrDefault(w => Lookahead(w) && pos + w.Length < text.Length && !Lexer.IsIdentChar(text[pos + w.Length]));
             if (word == null)
             {
@@ -1087,7 +1109,7 @@ namespace KScript.Syntax.Markup
             }
             if (type.GetAttribute(rule) != null)
             {
-                Error(nameSpan, DiagnosticCodes.MarkupSyntax, $"This type already has a {rule} rule.");
+                Error(nameSpan, DiagnosticCodes.MarkupSyntax, ModelSettings.Contains(rule) && type.Name == "model" ? $"This model already sets {rule}." : $"This type already has a {rule} rule.");
                 return;
             }
             AddAttribute(type, rule, DecodedText.Plain(text.Substring(value.Start, value.Length), value.Start), value, nameSpan, '\0');

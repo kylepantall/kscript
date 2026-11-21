@@ -598,7 +598,7 @@ namespace KScript.Syntax.Markup
                             Line(indent, "enum " + enumName.Trim() + (values.Length > 0 ? " { " + values + " }" : " { }"));
                             return;
                         }
-                    case "type" when Attr("name") is string typeName && IsName(typeName.Trim()) && !typeName.Contains('.') && e.Children.All(IsTypeLine)
+                    case "type" or "model" when Attr("name") is string typeName && IsName(typeName.Trim()) && !typeName.Contains('.') && e.Children.All(IsTypeLine)
                         && TypeRuleLines(e) is List<string> rules:
                         {
                             if (!chained)
@@ -607,9 +607,16 @@ namespace KScript.Syntax.Markup
                             }
                             // fields="login: string, id: int" becomes one line per field, the way .kscript writes types.
                             List<string> fieldLines = FieldsAsLines(Attr("fields"));
+                            // A model's settings are lines too: table: people, unique: [email].
+                            bool model = e.Name == "model";
+                            if (model)
+                            {
+                                rules.InsertRange(0, ModelSettingLines(e));
+                            }
                             string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "with") && !RuleAttributes.Contains(a.Name)
+                                && !(model && CodeParser.ModelSettings.Contains(a.Name))
                                 && !(a.Name == "fields" && fieldLines != null)).Select(a => FormatAttribute(e, a)));
-                            sb.Append(pad).Append("type ").Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
+                            sb.Append(pad).Append(e.Name).Append(' ').Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
                             if (Attr("with") is string with)
                             {
                                 // with="User, Auditable" is with [User, Auditable].
@@ -751,6 +758,21 @@ namespace KScript.Syntax.Markup
             }
 
             private static readonly string[] RuleAttributes = { "min", "max", "pattern", "one_of", "not", "parse" };
+
+            /// <summary>A model's settings as .kscript lines: <c>table: people</c>, <c>unique: [email, [team, slug]]</c>.</summary>
+            private static IEnumerable<string> ModelSettingLines(MarkupElement e)
+            {
+                foreach (string name in CodeParser.ModelSettings)
+                {
+                    string value = e.GetAttributeValue(name)?.Trim();
+                    if (value == null)
+                    {
+                        continue;
+                    }
+                    bool list = name is "unique" or "index" or "hidden" or "guarded";
+                    yield return name + ": " + (list && !value.StartsWith('[') ? "[" + string.Join(", ", value.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)) + "]" : value);
+                }
+            }
 
             /// <summary>
             /// A type's rule attributes as .kscript lines (<c>min: 0</c>, <c>pattern: /^[a-z]+$/</c>, <c>one_of: [a, b]</c>),

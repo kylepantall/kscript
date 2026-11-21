@@ -24,7 +24,7 @@ namespace KScript.Language.Analysis
         private void HoistTypes(Scope root)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            List<MarkupElement> elements = result.Markup.DescendantElements().Where(e => IsKScriptElementName(e, "type") && catalog.GetElement("type")?.Package == "KScript.Core").ToList();
+            List<MarkupElement> elements = result.Markup.DescendantElements().Where(IsTypeElement).ToList();
             foreach (MarkupElement e in elements)
             {
                 MarkupAttribute nameAttr = e.GetAttribute("name");
@@ -47,10 +47,11 @@ namespace KScript.Language.Analysis
                 // A refinement type's values are its root's: an Age is a number, a Username a handle.
                 string refinedRoot = RefinedRoot(e);
                 TypeShape rootShape = refinedRoot != null ? TypeNamed(refinedRoot, 0) : null;
-                TypeShape instance = rootShape != null
+                bool model = IsModelElement(e);
+                TypeShape instance = rootShape != null && !model
                     ? new TypeShape(rootShape.Type) { Name = name, Declared = rootShape.Declared, Element = rootShape.Element }
-                    : new TypeShape(KType.Map) { Name = name, Closed = e.GetAttributeValue("extra")?.Trim() != "keep" };
-                Symbol symbol = NewVariable(name, span, e, SymbolKind.Constant, new TypeShape(KType.Type) { Name = name, Instance = instance });
+                    : new TypeShape(KType.Map) { Name = name, Closed = e.GetAttributeValue("extra")?.Trim() != "keep", Kind = model ? KType.Record : null };
+                Symbol symbol = NewVariable(name, span, e, SymbolKind.Constant, new TypeShape(KType.Type) { Name = name, Instance = instance, Kind = model ? KType.Model : null });
                 root.Declare(symbol, 0);
                 declaredTypes[e] = instance;
             }
@@ -65,7 +66,7 @@ namespace KScript.Language.Analysis
                 Symbol symbol = result.Symbols.First(s => s.DeclaringElement == type.Key && s.Shape.Instance == type.Value);
                 string description = type.Key.GetAttributeValue("description");
                 symbol.Description = (description != null ? description + "\n\n" : string.Empty)
-                    + "type " + type.Value.Name + " {\n" + string.Concat(type.Value.Fields.Values.Select(f => "  " + f.Name + ": " + f.Shape.Display() + "\n")) + "}";
+                    + (IsModelElement(type.Key) ? "model " : "type ") + type.Value.Name + " {\n" + string.Concat(type.Value.Fields.Values.Select(f => "  " + f.Name + ": " + f.Shape.Display() + "\n")) + "}";
             }
         }
 
@@ -99,6 +100,10 @@ namespace KScript.Language.Analysis
                     }
                 }
                 FillFields(e, shape);
+                if (IsModelElement(e))
+                {
+                    FillModelFields(e, shape);
+                }
             }
             foreach (MarkupElement fn in e.ChildElements.Where(c => IsKScriptElementName(c, "fn")))
             {
@@ -124,6 +129,34 @@ namespace KScript.Language.Analysis
                 result.Symbols.Add(method);
                 result.References.Add(new SymbolReference(method, span, true, true));
                 shape.Methods[fnName] = method;
+            }
+        }
+
+        /// <summary>
+        /// The fields KScript.Data adds to a model: its key (id, unless it declares its own), created_at and updated_at with
+        /// timestamps, and deleted_at with soft_deletes.
+        /// </summary>
+        private static void FillModelFields(MarkupElement e, TypeShape shape)
+        {
+            string key = e.GetAttributeValue("key")?.Trim();
+            if (string.IsNullOrEmpty(key) && !shape.Fields.ContainsKey("id"))
+            {
+                var fields = shape.Fields.ToList();
+                shape.Fields.Clear();
+                shape.Fields["id"] = new FieldInfo("id", new TypeShape(KType.Number) { Declared = true }, null, "The record's key, numbered by the database.");
+                foreach (KeyValuePair<string, FieldInfo> f in fields)
+                {
+                    shape.Fields[f.Key] = f.Value;
+                }
+            }
+            if (IsYes(e.GetAttributeValue("timestamps")))
+            {
+                shape.Fields["created_at"] = new FieldInfo("created_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was added.");
+                shape.Fields["updated_at"] = new FieldInfo("updated_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was last saved.");
+            }
+            if (IsYes(e.GetAttributeValue("soft_deletes")))
+            {
+                shape.Fields["deleted_at"] = new FieldInfo("deleted_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was deleted, or null.");
             }
         }
 

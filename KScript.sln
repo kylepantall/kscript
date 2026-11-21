@@ -49,6 +49,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Auth", "KScript.Aut
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Document", "KScript.Document\KScript.Document.csproj", "{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Data", "KScript.Data\KScript.Data.csproj", "{450AB47A-3334-497D-93DA-113CE066DCDF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -154,5 +156,9 @@ Global
 		{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{450AB47A-3334-497D-93DA-113CE066DCDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{450AB47A-3334-497D-93DA-113CE066DCDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{450AB47A-3334-497D-93DA-113CE066DCDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{450AB47A-3334-497D-93DA-113CE066DCDF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

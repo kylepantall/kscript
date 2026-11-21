@@ -143,8 +143,10 @@ namespace KScript.Runtime
                     break;
                 case Dictionary<string, object> map:
                     w.WriteStartObject();
+                    HashSet<string> hidden = (map as Record)?.Type.Hidden;
                     foreach (var kv in map)
                     {
+                        if (hidden != null && hidden.Contains(kv.Key)) continue;
                         w.WritePropertyName(kv.Key);
                         WriteJson(w, kv.Value, depth + 1);
                     }

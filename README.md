@@ -126,6 +126,7 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Style` | Stylesheets written in KScript: themes from JSON, breakpoints, fluid sizes and colours |
 | `KScript.Storage` | Settings, data, caches and logs in the right folders on macOS, Windows and Linux |
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
+| `KScript.Data` | Models, a query builder whose conditions are lambdas, transactions and safe raw SQL, on SQLite |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
 | `KScript.Document` | Papers, reports, letters and invoices with LaTeX maths, tables, figures and citations, saved as PDF, Word, LaTeX, Markdown or HTML |
 

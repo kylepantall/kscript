@@ -40,6 +40,9 @@ namespace KScript.Runtime
         /// content may hold any element, which the package interprets itself. The interpreter then doesn't check it.
         /// </summary>
         public bool OwnsContent { get; init; }
+
+        /// <summary>True for declarations that run before the other statements around them, like &lt;type&gt; (a model).</summary>
+        public bool Hoisted { get; init; }
     }
 
     public sealed class CommandDefinition
@@ -158,10 +161,10 @@ namespace KScript.Runtime
             public string Name => package.Name;
 
             /// <summary>Adds an element. <paramref name="handler"/> may be null for elements that only describe syntax.</summary>
-            public ElementDefinition Element(ElementInfo info, ElementHandler handler, bool ownsContent = false)
+            public ElementDefinition Element(ElementInfo info, ElementHandler handler, bool ownsContent = false, bool hoisted = false)
             {
                 info.Package = package.Name;
-                var def = new ElementDefinition(info, handler, package) { OwnsContent = ownsContent };
+                var def = new ElementDefinition(info, handler, package) { OwnsContent = ownsContent, Hoisted = hoisted };
                 package.elements[info.Name] = def;
                 return def;
             }
@@ -329,6 +332,7 @@ namespace KScript.Runtime
             ("KScript.Style", "KScript.Style.StylePackage, KScript.Style", "Stylesheets written in KScript (.ks.css, .ks.scss, .ks.sass), with colour, size and responsive helpers."),
             ("KScript.Storage", "KScript.Storage.StoragePackage, KScript.Storage", "App folders for config, data, cache, state and logs, in the right place on each platform."),
             ("KScript.Document", "KScript.Documents.DocumentPackage, KScript.Document", "Scientific and professional documents (papers, reports, letters, invoices) with LaTeX maths, citations and tables, saved as PDF, Word, LaTeX, Markdown or HTML."),
+            ("KScript.Data", "KScript.Data.DataPackage, KScript.Data", "Databases: models, a query builder, transactions and raw SQL, on SQLite."),
             ("KScript.Cache", "KScript.Caching.CachePackage, KScript.Cache", "A cache of values by key, with time limits: in memory, or in files in the app's cache folder."),
             ("KScript.Http", "KScript.Http.HttpPackage, KScript.Http", "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve."),
             ("KScript.Auth", "KScript.Auth.AuthPackage, KScript.Auth", "Sign-in for kscript serve apps: users, sessions, the auth and guest middleware, CSRF, password resets and API tokens."),
@@ -420,6 +424,7 @@ namespace KScript.Runtime
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Style.StylePackage", "KScript.Style")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Storage.StoragePackage", "KScript.Storage")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Caching.CachePackage", "KScript.Cache")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Data.DataPackage", "KScript.Data")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Http.HttpPackage", "KScript.Http")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.Testing.TestPackage", "KScript.Test")]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, "KScript.UI.UIPackage", "KScript.UI")]

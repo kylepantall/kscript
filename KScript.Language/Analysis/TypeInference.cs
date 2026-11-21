@@ -142,6 +142,11 @@ namespace KScript.Language.Analysis
                     {
                         return json;
                     }
+                    if (command.Package == "KScript.Data" && command.Name == "db")
+                    {
+                        // @db('users') is a query on the table; @db() and @db(connection: reports) are the database.
+                        return new TypeShape(c.Arguments.Any(a => a.Name == null || a.Name == "table") ? KType.Query : KType.Database);
+                    }
                     TypeShape shape = new TypeShape(command.ReturnType);
                     if (command.Name == "files")
                     {
@@ -353,6 +358,42 @@ namespace KScript.Language.Analysis
             return s?.Kind == SymbolKind.Function ? s : null;
         }
 
+        /// <summary>
+        /// The type whose methods a value uses for <paramref name="name"/>: a model's or record's own (KScript.Data's
+        /// <c>$User->where()</c>, <c>$user->save()</c>) when it has that method, otherwise its plain type's.
+        /// </summary>
+        internal string ReceiverType(string name, TypeShape receiver) =>
+            receiver.Kind != null && catalog.GetMethods(name, receiver.Kind).Any(m => m.ReceiverType == receiver.Kind) ? receiver.Kind : receiver.Type;
+
+        /// <summary>
+        /// What a KScript.Data method gives, in terms of the model's records: a query on $User is a query of Users,
+        /// ->get() a list of them, and ->first() one.
+        /// </summary>
+        private static TypeShape ModelResult(CallableInfo method, TypeShape receiver)
+        {
+            TypeShape record = receiver.Kind == KType.Model ? receiver.Instance
+                : receiver.Type == KType.Query ? receiver.Instance
+                : receiver.Kind == KType.Record ? receiver
+                : null;
+            if (record == null || method.Package != "KScript.Data")
+            {
+                return null;
+            }
+            switch (method.ReturnType)
+            {
+                case KType.Query:
+                    return new TypeShape(KType.Query) { Name = record.Name, Instance = record };
+                case KType.Record:
+                    return record;
+                case KType.List when method.Name is "get" or "all":
+                    return new TypeShape(KType.List) { Element = record };
+                case KType.Any when method.Name is "first" or "first_or_fail" or "find" or "find_or_fail":
+                    return record;
+                default:
+                    return null;
+            }
+        }
+
         /// <summary>What a method returns when called on a value of this shape.</summary>
         public static TypeShape MethodResult(CallableInfo method, TypeShape receiver)
         {
@@ -384,8 +425,13 @@ namespace KScript.Language.Analysis
                 }
             }
 
-            List<CallableInfo> methods = catalog.GetMethods(name, receiver.Type).Where(m => KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
+            string type = ReceiverType(name, receiver);
+            List<CallableInfo> methods = catalog.GetMethods(name, type).Where(m => KType.Accepts(m.ReceiverType, type)).ToList();
             CallableInfo method = methods.FirstOrDefault(m => argCount >= m.MinArgs && argCount <= m.MaxArgs) ?? methods.FirstOrDefault();
+            if (method != null && ModelResult(method, receiver) is TypeShape records)
+            {
+                return records;
+            }
             return method != null ? new TypeShape(method.ReturnType) : TypeShape.Unknown;
         }
 

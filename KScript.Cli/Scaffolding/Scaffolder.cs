@@ -346,6 +346,7 @@ namespace KScript.Scaffolding
             "css" => "site",
             "module" => "pricing",
             "type" => "Repo",
+            "model" => "User",
             "enum" => "Size",
             "const" => "limits",
             "storage" => "people",
@@ -373,6 +374,7 @@ namespace KScript.Scaffolding
             ["const"] = "const",
             ["enum"] = "enum",
             ["type"] = "type",
+            ["model"] = "model",
             ["error"] = "error",
         };
 
@@ -381,7 +383,7 @@ namespace KScript.Scaffolding
         {
             ("Routes and APIs", new[] { "route", "controller", "request", "middleware", "view" }),
             ("Pages and styles", new[] { "page", "markdown", "layout", "component", "partial", "css" }),
-            ("Scripts and data", new[] { "script", "module", "type", "enum", "error", "const", "storage", "cache", "job" }),
+            ("Scripts and data", new[] { "script", "module", "type", "model", "enum", "error", "const", "storage", "cache", "job" }),
             ("Desktop apps", new[] { "window" }),
             ("Documents", new[] { "document" }),
             ("Settings", new[] { "config", "env", "locale", "logger" }),

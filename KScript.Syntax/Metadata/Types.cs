@@ -37,6 +37,13 @@ namespace KScript.Metadata
         public const string Users = "users";
         public const string Document = "document";
 
+        // KScript.Data: a model (<c>$User</c>), one of its records, a query, and a database connection.
+        public const string Model = "model";
+        public const string Record = "record";
+        public const string Query = "query";
+        public const string Database = "database";
+        public const string PasswordHash = "password_hash";
+
         /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>
         public const string Type = "type";
 

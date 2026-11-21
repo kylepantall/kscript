@@ -297,6 +297,11 @@ namespace KScript.Runtime
             Add("NotFound", Root, "Something that doesn't exist. Answers 404.", 404);
             Add("Conflict", Root, "A change that clashes with the current state. Answers 409.", 409);
             Add("TooManyRequests", Root, "Too many requests in a short time, such as failed sign-ins. Answers 429, with Retry-After when the error has a retry_after field.", 429);
+            Add("ModelNotFound", "NotFound", "A KScript.Data record that isn't in the database: ->find_or_fail() and ->first_or_fail(). $err.model and $err.id say which. Answers 404.", 404);
+            Add("UniqueViolation", "Conflict", "A save that would give two records the same value in a unique field. $err.fields names them. Answers 409.", 409);
+            Add("ForeignKeyViolation", "Conflict", "A save or delete that would leave a record pointing at one that isn't there. Answers 409.", 409);
+            Add("QueryError", Root, "A database query that failed, or a condition that can't be turned into SQL.");
+            Add("ConnectionError", Root, "A database that can't be reached or opened. Answers 503.", 503);
         }
 
         /// <summary>The built-in error types, by name.</summary>

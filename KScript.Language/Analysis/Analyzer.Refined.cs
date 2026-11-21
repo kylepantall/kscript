@@ -35,7 +35,15 @@ namespace KScript.Language.Analysis
         }
 
         private MarkupElement TypeElementNamed(string name) =>
-            name == null ? null : result.Markup.DescendantElements().FirstOrDefault(e => IsKScriptElementName(e, "type") && e.GetAttributeValue("name")?.Trim().TrimStart('$') == name);
+            name == null ? null : result.Markup.DescendantElements().FirstOrDefault(e => IsTypeElement(e) && e.GetAttributeValue("name")?.Trim().TrimStart('$') == name);
+
+        /// <summary>A &lt;type&gt;, or a KScript.Data &lt;model&gt; (a type whose records are kept in a table).</summary>
+        private bool IsTypeElement(MarkupElement e) =>
+            (IsKScriptElementName(e, "type") && catalog.GetElement("type")?.Package == "KScript.Core")
+            || IsModelElement(e);
+
+        private bool IsModelElement(MarkupElement e) =>
+            IsKScriptElementName(e, "model") && catalog.GetElement("model")?.Package == "KScript.Data";
 
         private static bool IsBuiltInTypeName(string name) =>
             BuiltInTypes.Contains(name, StringComparer.OrdinalIgnoreCase) || SemanticTypeNames.Contains(name, StringComparer.OrdinalIgnoreCase);

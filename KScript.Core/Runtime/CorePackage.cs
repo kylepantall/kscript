@@ -135,7 +135,7 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("field", "One field of a <type> or <error>: in a .kscript file, one line of the block, `stars: int from stargazers_count`.", ContentKind.Empty,
+            p.Element(new ElementInfo("field", "One field of a <type>, <error> or <model>: in a .kscript file, one line of the block, `stars: int from stargazers_count`.", ContentKind.Empty,
                 new A("name", K.Text, "The field's name. End it with ? to make it optional.", true),
                 new A("type", K.TypeName, "The field's type: a built-in such as string or int, an <enum>, another <type>, T[] for a list, T? to allow null. Defaults to any.", false, Values.DeclarableTypes),
                 new A("from", K.Text, "Where to read the value, when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`."),
@@ -149,14 +149,14 @@ namespace KScript.Runtime
                 new A("not", K.Text, "Values that aren't allowed, such as reserved names."),
                 new A("description", K.Text, "What the field holds, shown on hover and completion."))
             {
-                MustBeInside = new[] { "type", "error" },
-            }, run => throw run.Error("<field> must be directly inside <type> or <error>.", null, "Syntax"));
+                MustBeInside = new[] { "type", "error", "model" },
+            }, run => throw run.Error("<field> must be directly inside <type>, <error> or <model>.", null, "Syntax"));
 
             p.Element(new ElementInfo("validate", "A rule a <type> checks: the test must be true. In a type made from one other type, the value is `$value`. In a type with fields, each field is a variable (`$end > $start`). Every rule that fails is reported, with its message.", ContentKind.Empty,
                 new A("test", K.Expression, "What must be true: `$value % 5 == 0`, `$end > $start`.", true),
                 new A("message", K.Text, "What to say when it isn't, such as `must end after it starts`."))
             {
-                MustBeInside = new[] { "type" },
+                MustBeInside = new[] { "type", "model" },
                 Example = "<type name=\"Even\" with=\"int\">\n  <validate test=\"$value % 2 == 0\" message=\"must be even\" />\n</type>\n<echo>{ $Even->from(4) }</echo>",
             }, run => throw run.Error("<validate> must be directly inside <type>.", null, "Syntax"));
 

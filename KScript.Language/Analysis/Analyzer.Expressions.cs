@@ -48,6 +48,10 @@ namespace KScript.Language.Analysis
                     TypeShape receiver = Infer(m.Target, region);
                     AnalyzeArguments(m.Arguments, region, scope, LambdaParameterShapes(m.Name, receiver));
                     CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false, m.Arguments, region);
+                    if (m.Name == "sql" && receiver.Type == KType.Database)
+                    {
+                        ReferenceSqlValues(m.Arguments, region, scope);
+                    }
                     FlushBare(m.Arguments, region, scope);
                     return;
                 }
@@ -197,6 +201,43 @@ namespace KScript.Language.Analysis
             Report(span, DiagnosticSeverity.Error, DiagnosticCodes.BareIdentifier, $"'{id.Name}' isn't a value." + hint, fixes);
         }
 
+        private static readonly System.Text.RegularExpressions.Regex SqlVariable = new System.Text.RegularExpressions.Regex(@"\$([A-Za-z_][A-Za-z0-9_]*)");
+
+        /// <summary>
+        /// @sql("... where email = {$email}"): the { } parts are worked out when the query runs, so the variables in them
+        /// are used.
+        /// </summary>
+        private void ReferenceSqlValues(IReadOnlyList<ArgumentNode> args, ExpressionRegion region, Scope scope)
+        {
+            if (args.Count == 0 || args[0].Name != null || args[0].Value is not LiteralNode { Kind: LiteralKind.String } literal)
+            {
+                return;
+            }
+            string text = literal.Value;
+            int depth = 0;
+            int start = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '{' && depth == 0 && i + 1 < text.Length && text[i + 1] == '{')
+                {
+                    i++;
+                    continue;
+                }
+                if (text[i] == '{' && depth++ == 0)
+                {
+                    start = i + 1;
+                }
+                else if (text[i] == '}' && depth > 0 && --depth == 0)
+                {
+                    foreach (System.Text.RegularExpressions.Match match in SqlVariable.Matches(text.Substring(start, i - start)))
+                    {
+                        TextSpan span = region.Source.ToSource(literal.Span);
+                        ReferenceVariable(match.Groups[1].Value, span, scope, isWrite: false, mustBeMutable: false, offset: span.Start);
+                    }
+                }
+            }
+        }
+
         private void AnalyzeCommand(CommandCallNode c, ExpressionRegion region, Scope scope, int piped)
         {
             AnalyzeArguments(c.Arguments, region, scope);
@@ -229,6 +270,14 @@ namespace KScript.Language.Analysis
             {
                 RequirePackage(command.Package, full, $"@{command.Name}()");
                 ReportDeprecatedCall(command, $"@{command.Name}", nameSpan, count >= 0 ? c.Arguments : null, piped, region);
+                if (command.KeepsBareWords)
+                {
+                    KeepBareWords(c.Arguments);
+                }
+                if (command.Package == "KScript.Data" && command.Name == "sql")
+                {
+                    ReferenceSqlValues(c.Arguments, region, scope);
+                }
                 if (count >= 0 && CheckNamedArguments($"@{command.Name}()", c.Arguments, piped, SlotsOf(new[] { command }), region, full))
                 {
                     return;
@@ -453,10 +502,11 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            List<CallableInfo> candidates = catalog.GetMethods(name, receiver.Type).ToList();
+            string type = (types ??= new TypeInference(catalog, result)).ReceiverType(name, receiver);
+            List<CallableInfo> candidates = catalog.GetMethods(name, type).ToList();
             if (candidates.Count == 0)
             {
-                IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Select(m => m.Name).Concat(receiver.Methods.Keys)
+                IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Concat(receiver.Kind != null ? catalog.MethodsFor(receiver.Kind) : Enumerable.Empty<CallableInfo>()).Select(m => m.Name).Concat(receiver.Methods.Keys)
                     .Concat(pipe ? result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name) : Enumerable.Empty<string>());
                 string suggestion = Suggestions.Closest(name, names);
                 Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod,
@@ -468,22 +518,26 @@ namespace KScript.Language.Analysis
             // A declared type is held to: an int parameter has no string methods.
             // Text with a meaning of its own (an email, a handle) keeps the string methods.
             List<CallableInfo> applicable = candidates.Where(m => receiver.Declared
-                ? m.ReceiverType == KType.Any || m.ReceiverType == receiver.Type || (m.ReceiverType == KType.String && IsSemanticText(receiver.Type))
-                : KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
+                ? m.ReceiverType == KType.Any || m.ReceiverType == type || (m.ReceiverType == KType.String && IsSemanticText(type))
+                : KType.Accepts(m.ReceiverType, type)).ToList();
             usedPackages.UnionWith(applicable.Select(m => m.Package).Where(p => p != null));
             if (applicable.Count == 0 && receiver.Declared)
             {
                 Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
-                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is declared as {Article(receiver.Type)}.");
+                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is declared as {Article(type)}.");
                 return;
             }
             if (applicable.Count == 0)
             {
                 Report(nameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
-                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(receiver.Type)}.");
+                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(type)}.");
                 return;
             }
 
+            if (applicable.Any(m => m.KeepsBareWords) && args != null)
+            {
+                KeepBareWords(args);
+            }
             if (ChecksImports && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
             {
                 RequirePackage(applicable[0].Package, nameSpan, $"{arrow}{name}()");
