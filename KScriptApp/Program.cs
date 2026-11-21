@@ -32,8 +32,12 @@ namespace KScript
     /// <summary>The kscript command: runs scripts and dispatches check, fmt, lsp, test, css, serve, docs, app, update, ide and make.</summary>
     internal sealed class CommandLine
     {
-        public TextWriter Out { get; init; } = Console.Out;
-        public TextWriter Error { get; init; } = Console.Error;
+        private readonly TextWriter output, error;
+
+        // Read Console.Out and Console.Error when they're used, not when this is made: setting Console.OutputEncoding
+        // (Run does) replaces both writers, and colour is only on for the real console writer (CliStyle.Supports).
+        public TextWriter Out { get => output ?? Console.Out; init => output = value; }
+        public TextWriter Error { get => error ?? Console.Error; init => error = value; }
 
         /// <summary>Where kscript lsp reads and writes the protocol.</summary>
         public Func<Stream> StandardInput { get; init; } = Console.OpenStandardInput;
