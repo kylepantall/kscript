@@ -49,10 +49,10 @@ public sealed class NetTests : IDisposable
     private KScriptException Fails(string body, Action<KScriptHost> setup = null) => Assert.Throws<KScriptException>(() => Run(body, setup));
 
     [Fact]
-    public void Fetch_reads_text_json_status_and_headers()
+    public void Api_reads_text_json_status_and_headers()
     {
         string output = Run(
-            $"<let name=\"r\" value=\"@fetch('{server.Url}/json')\" />" +
+            $"<let name=\"r\" value=\"@api('{server.Url}/json')\" />" +
             "<echo>{ $r->status() } { $r->ok() } { $r->reason() } { $r->json().name } { $r->json().tags[1] } { $r->header('content-type') } { $r->header('X-None') ?? 'none' }</echo>" +
             "<echo>{ $r.status } { $r.ok } { $r.text->length() } { $r.headers['Content-Type'] } { $r->url() == $r.url } { $r->text() == $r.text } { $r->headers()->count() > 0 } { $r.nothing ?? 'n' }</echo>" +
             "<echo>{ $r->check()->status() } {$r}</echo>");
@@ -60,30 +60,30 @@ public sealed class NetTests : IDisposable
     }
 
     [Fact]
-    public void Fetch_sends_methods_headers_and_bodies()
+    public void Api_sends_methods_headers_and_bodies()
     {
         string output = Run(
-            $"<echo>{{ @fetch('{server.Url}/echo', {{ method: 'post', body: {{ a: 1 }}, headers: {{ 'X-Key': 'k' }} }})->text() }}</echo>" +
-            $"<echo>{{ @fetch('{server.Url}/echo', {{ method: 'PUT', body: 'plain' }})->text() }}</echo>" +
-            $"<echo>{{ @fetch('{server.Url}/echo', {{ method: 'PATCH', body: 'a=1', headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }})->text() }}</echo>" +
-            $"<echo>{{ @fetch('{server.Url}/echo', null)->status() }}</echo>");
+            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'post', body: {{ a: 1 }}, headers: {{ 'X-Key': 'k' }} }})->text() }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PUT', body: 'plain' }})->text() }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PATCH', body: 'a=1', headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }})->text() }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', null)->status() }}</echo>");
         Assert.Equal("POST application/json {\"a\":1} k\nPUT text/plain; charset=utf-8 plain\nPATCH application/x-www-form-urlencoded a=1\n201\n", output);
     }
 
     [Fact]
-    public void Fetch_errors_are_typed()
+    public void Api_errors_are_typed()
     {
-        Assert.Contains("needs an http:// or https:// address", Fails("<do>@fetch('ftp://x')</do>").Message);
-        Assert.Contains("needs an http:// or https:// address", Fails("<do>@fetch('not a url')</do>").Message);
-        var missing = Fails($"<do>@fetch('{server.Url}/missing')->check()</do>");
+        Assert.Contains("needs an http:// or https:// address", Fails("<do>@api('ftp://x')</do>").Message);
+        Assert.Contains("needs an http:// or https:// address", Fails("<do>@api('not a url')</do>").Message);
+        var missing = Fails($"<do>@api('{server.Url}/missing')->check()</do>");
         Assert.Equal("Network", missing.Type);
         Assert.Contains("answered 404 Not Found", missing.Message);
         Assert.Equal(404.0, missing.Fields["status"]);
-        Assert.Contains("isn't JSON", Fails($"<do>@fetch('{server.Url}/missing')->json()</do>").Message);
-        var timeout = Fails($"<do>@fetch('{server.Url}/slow', {{ timeout: 0.2 }})</do>");
+        Assert.Contains("isn't JSON", Fails($"<do>@api('{server.Url}/missing')->json()</do>").Message);
+        var timeout = Fails($"<do>@api('{server.Url}/slow', {{ timeout: 0.2 }})</do>");
         Assert.Equal("Timeout", timeout.Type);
         Assert.Contains("didn't answer within 0.2 seconds", timeout.Message);
-        Assert.Equal("Network", Fails($"<do>@fetch('http://localhost:{TestServer.FreePort()}/')</do>").Type);
+        Assert.Equal("Network", Fails($"<do>@api('http://localhost:{TestServer.FreePort()}/')</do>").Type);
 
         // A server that accepts the connection and hangs up without answering.
         var tcp = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
@@ -103,7 +103,7 @@ public sealed class NetTests : IDisposable
         });
         try
         {
-            Assert.Equal("Network", Fails($"<do>@fetch('http://127.0.0.1:{port}/')</do>").Type);
+            Assert.Equal("Network", Fails($"<do>@api('http://127.0.0.1:{port}/')</do>").Type);
         }
         finally
         {

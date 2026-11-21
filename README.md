@@ -60,7 +60,7 @@ You get real values (strings, numbers, lists, maps, dates, files), methods on al
 
 ```kscript
 import KScript.Net
-repo = @fetch('https://api.github.com/repos/kylepantall/kscript')->check()->json()
+repo = @api('https://api.github.com/repos/kylepantall/kscript')->check()->json()
 echo "{$repo.full_name} has {$repo.stargazers_count} stars"
 ```
 
@@ -72,7 +72,7 @@ type Repo {
   stars: int from stargazers_count
   owner: string from owner.login
 }
-repo = @fetch($url)->check()->json(as: Repo)
+repo = @api($url)->check()->json(as: Repo)
 echo "{$repo.name} by {$repo.owner} has {$repo.stars} stars"
 ```
 

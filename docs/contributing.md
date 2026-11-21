@@ -70,7 +70,7 @@ To retire something, deprecate it first, so scripts keep working while they move
 
 ```csharp
 p.Deprecate("@read_file", "Reading text has a clearer name", "@read_text");   // a command
-p.Deprecate("@fetch(retries)", "Requests are retried for you");                // one of its parameters
+p.Deprecate("@api(retries)", "Requests are retried for you");                // one of its parameters
 p.Deprecate("string->shout", "", "->upper");                                   // a method
 p.Deprecate("<beep>", "", "<sound>");                                          // an element
 p.Deprecate("<sound tone>", "Renamed", "pitch");                               // one of its attributes

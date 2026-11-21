@@ -13,7 +13,7 @@ namespace KScript.Language.Tests
         [InlineData("<echo>{ $pi }</echo>", "KScript.Math", "pi")]
         [InlineData("<echo>{ [1, 2]->median() }</echo>", "KScript.Math", "median")]
         [InlineData("<move from=\"'a'\" to=\"'b'\" />", "KScript.IO", "move")]
-        [InlineData("<let name=\"r\" value=\"@fetch('https://example.com')\" />", "KScript.Net", "@fetch")]
+        [InlineData("<let name=\"r\" value=\"@api('https://example.com')\" />", "KScript.Net", "@api")]
         public void PackageFeaturesNeedAnImport(string body, string package, string marked)
         {
             DocumentAnalysis a = Analyze(Script(body));

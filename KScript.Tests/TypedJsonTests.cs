@@ -464,9 +464,9 @@ public class TypedJsonTests
         {
             string url = $"http://127.0.0.1:{port}";
             string output = RunBody($"<type name=\"User\" fields=\"login: string, id: int\" />"
-                + $"<echo>{{ @fetch('{url}/list')->json(as: User)->map(fn($u) => $u.login)->join(',') }}</echo>"
-                + $"<echo>{{ @fetch('{url}/one')->json().login }}</echo>"
-                + $"<try><echo>{{ @fetch('{url}/one')->json(as: User) }}</echo><catch as=\"err\"><echo>{{ $err.message->split('\n')[0] }}</echo></catch></try>", "", "KScript.Net");
+                + $"<echo>{{ @api('{url}/list')->json(as: User)->map(fn($u) => $u.login)->join(',') }}</echo>"
+                + $"<echo>{{ @api('{url}/one')->json().login }}</echo>"
+                + $"<try><echo>{{ @api('{url}/one')->json(as: User) }}</echo><catch as=\"err\"><echo>{{ $err.message->split('\n')[0] }}</echo></catch></try>", "", "KScript.Net");
             Assert.Equal($"a,b\nkyle\nThe response from {url}/one doesn't fit User (1 problem):\n", output);
             await served.WaitAsync(TimeSpan.FromSeconds(10));
         }

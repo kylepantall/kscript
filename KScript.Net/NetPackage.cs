@@ -9,7 +9,7 @@ using K = KScript.Metadata.AttributeKind;
 
 namespace KScript.Net
 {
-    /// <summary>The answer to <c>@fetch()</c>: <c>->status()</c>, <c>->ok()</c>, <c>->text()</c>, <c>->json()</c>, <c>->header(name)</c>.</summary>
+    /// <summary>The answer to <c>@api()</c>: <c>->status()</c>, <c>->ok()</c>, <c>->text()</c>, <c>->json()</c>, <c>->header(name)</c>.</summary>
     public sealed class ResponseValue : IKObject
     {
         public ResponseValue(string url, int status, string reason, string body, Dictionary<string, object> headers)
@@ -110,7 +110,7 @@ namespace KScript.Net
 
         public override string Name => "KScript.Net";
 
-        public override string Description => "HTTP requests (@fetch) and downloads.";
+        public override string Description => "HTTP requests (@api) and downloads.";
 
         protected override void Register(PackageBuilder p)
         {
@@ -119,10 +119,10 @@ namespace KScript.Net
 
             p.LogProvider("http", "Sends log entries to a web service as a JSON array (url, headers, batch).", c => new HttpLogProvider(c, Client.Value));
 
-            p.Command("fetch", "url, options?",
+            p.Command("api", "url, options?",
                 "Makes an HTTP request and returns the response. options is a map: method, headers, body (a map is sent as JSON), timeout (seconds, default 100).",
-                KType.Response, Fetch,
-                "<let name=\"repo\" value=\"@fetch('https://api.github.com/repos/kylepantall/kscript')->check()->json()\" />");
+                KType.Response, Api,
+                "<let name=\"repo\" value=\"@api('https://api.github.com/repos/kylepantall/kscript')->check()->json()\" />");
             p.Command("url_encode", "text", "Escapes text for use in a URL.", KType.String, c => Uri.EscapeDataString(c.Str(0)));
             p.Command("url_decode", "text", "Reverses @url_encode().", KType.String, c => Uri.UnescapeDataString(c.Str(0)));
             p.Command("query_string", "map", "A map as a URL query: a=1&b=two.", KType.String, c =>
@@ -156,8 +156,8 @@ namespace KScript.Net
             });
 
             p.AgentNotes(
-                ("@fetch", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test ->ok().",
-                    prefer: "@fetch($url)->check()->json(as: $Type) to fail fast and check the data's shape.")));
+                ("@api", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test ->ok().",
+                    prefer: "@api($url)->check()->json(as: $Type) to fail fast and check the data's shape.")));
         }
 
         private static void CheckUrl(string url, Func<string, string, string, KScriptException> error)
@@ -166,11 +166,11 @@ namespace KScript.Net
                 throw error($"'{url}' isn't an http:// or https:// address.", "url", "Argument");
         }
 
-        private static object Fetch(CallContext c)
+        private static object Api(CallContext c)
         {
             string url = c.Str(0);
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-                throw c.Error($"@fetch() needs an http:// or https:// address, but got '{url}'.", "Argument");
+                throw c.Error($"@api() needs an http:// or https:// address, but got '{url}'.", "Argument");
 
             Dictionary<string, object> options = c.Has(1) && c.Arg(1) != null ? c.Map(1) : new Dictionary<string, object>();
             string method = options.TryGetValue("method", out object m) && m != null ? Values.ToStr(m).ToUpperInvariant() : "GET";

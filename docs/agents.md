@@ -113,13 +113,13 @@ show them under each entry:
 - `->push(items...): list` A new list with items added to the end.
   - pitfall: Returns a new list and leaves the old one alone: write items = $items->push($x).
   - e.g. `[1, 2]->push(3, 4)`
-- `@fetch(url, options?): response` Makes an HTTP request and returns the response.
-  - prefer: @fetch($url)->check()->json(as: $Type) to fail fast and check the data's shape.
+- `@api(url, options?): response` Makes an HTTP request and returns the response.
+  - prefer: @api($url)->check()->json(as: $Type) to fail fast and check the data's shape.
   - pitfall: A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test ->ok().
 ```
 
 A package written in C# adds them with `p.AgentNotes(("list->push", new AgentNotes(pitfall: "...")))`, keyed like
-`p.Examples` (`"@fetch"`, `"list->push"`, or `"<download>"` for an element). Keep each note to one short line,
+`p.Examples` (`"@api"`, `"list->push"`, or `"<download>"` for an element). Keep each note to one short line,
 since agents read all of them.
 
 ## JSON diagnostics
