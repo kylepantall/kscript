@@ -39,9 +39,44 @@
   ],
   "repository": {
     "comment": {
-      "name": "comment.block.kscript",
-      "begin": "<!--",
-      "end": "-->"
+      "patterns": [
+        {
+          "name": "comment.block.documentation.kscript",
+          "comment": "<!--- ... --> documents the element after it, like /// in a .kscript file. Tags count at the start of a line.",
+          "begin": "<!---(?!-)",
+          "end": "-->",
+          "patterns": [
+            {
+              "match": "(?:^|\\G)\\s*(@(?:param|argument|arg))\\s+(\\$?[A-Za-z_][\\w-]*)",
+              "captures": {
+                "1": {
+                  "name": "storage.type.class.doc.kscript"
+                },
+                "2": {
+                  "name": "variable.parameter.kscript"
+                }
+              }
+            },
+            {
+              "match": "(?:^|\\G)\\s*(@(?:returns?|example|deprecated|see|public|llm|prefer|avoid|pitfall|agent|param|argument|arg))(?![\\w-])",
+              "captures": {
+                "1": {
+                  "name": "storage.type.class.doc.kscript"
+                }
+              }
+            },
+            {
+              "match": "`[^`]*`",
+              "name": "markup.inline.raw.kscript"
+            }
+          ]
+        },
+        {
+          "name": "comment.block.kscript",
+          "begin": "<!--",
+          "end": "-->"
+        }
+      ]
     },
     "cdata": {
       "name": "string.unquoted.cdata.kscript",

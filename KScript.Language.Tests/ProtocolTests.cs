@@ -201,6 +201,22 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void CompletionAfterABracketOffersNamedArgumentsAndSuggestsAgainForEnums()
+        {
+            JsonArray triggers = Initialize()["result"]["capabilities"]["completionProvider"]["triggerCharacters"].AsArray();
+            Assert.Contains(triggers, t => t.GetValue<string>() == "(");
+            Assert.Contains(triggers, t => t.GetValue<string>() == ",");
+            Open("<kscript>\n<enum name=\"Size\" values=\"small, large\" />\n<fn name=\"pack\" params=\"size: Size, n = 1\" value=\"1\" />\n<echo>{ @pack() }</echo>\n<echo>{ (1) }</echo>\n</kscript>");
+            JsonArray items = Request("textDocument/completion", At(3, 14).Also(o => o["context"] = new JsonObject { ["triggerKind"] = 2, ["triggerCharacter"] = "(" }))["result"]["items"].AsArray();
+            JsonNode size = items.Single(i => i["label"].GetValue<string>() == "size:");
+            Assert.Equal("editor.action.triggerSuggest", size["command"]["command"].GetValue<string>());
+            Assert.Null(items.Single(i => i["label"].GetValue<string>() == "n:")["command"]);
+            Assert.Contains(items, i => i["label"].GetValue<string>() == "large");
+            JsonArray quiet = Request("textDocument/completion", At(4, 9).Also(o => o["context"] = new JsonObject { ["triggerKind"] = 2, ["triggerCharacter"] = "(" }))["result"]["items"].AsArray();
+            Assert.Empty(quiet);
+        }
+
+        [Fact]
         public void AnswersEditorRequests()
         {
             Initialize();

@@ -131,8 +131,9 @@ repo = ```<Repo>
 - The closing fence's indentation is taken off every line, so the block sits at the code's indentation and keeps any
   indentation inside it. A line indented less than the closing fence is an error. The new lines just inside the
   fences aren't part of the text.
-- A word after the fence (`sql`, `html`, `json`, `latex`, `md`, ...) names the language. It changes nothing at run time;
-  editors use it to highlight the block.
+- A word after the fence names the language: `text`, `sql`, `html`, `css`, `js` (or `javascript`), `json`, `md` (or
+  `markdown`), `latex` (or `tex`), `yaml` (or `yml`) or `xml`. It changes nothing at run time; editors use it to
+  highlight the block. Any other word is an error, so a typo such as ```` ```textc ```` is caught.
 - A type in angle brackets parses the block: `` ```<json> `` is the parsed JSON, and `` ```<Repo> `` maps it onto a
   `type`, with the same checks (and `Shape` errors) as `->json(as: $Repo)`.
 - As an element's text (after `echo`, `Paragraph`, `Math`, ...) a block is the same as `"text"`: `{ }` interpolates
@@ -183,6 +184,10 @@ fn greet(who, greeting = 'Hello') => $greeting + ', ' + $who + '!'
 /// @deprecated Use @greet instead.
 fn hello(who) => @greet($who)
 ```
+
+`@arg` and `@argument` are other names for `@param`, and `@return` for `@returns`. In the editor, typing `@` at the
+start of a doc line suggests the tags (with an `@param name` for each parameter not described yet), typing a name
+after `@param` or `@arg` suggests the parameters, and hovering a tag says what it means.
 
 `kscript check` and the editor warn about a `@param` that names no parameter (KS4007) and about calls to a
 `@deprecated` function (KS4008). `@public` marks a function used from outside the project, so it is never reported as

@@ -292,21 +292,22 @@
         "default": {
           "type": "string",
           "default": "file",
-          "description": "The connection jobs go to unless a job or dispatch names another: file, memory, sync, or one under queue.connections."
+          "description": "The connection jobs go to unless a job or dispatch names another: file, database, memory, sync, or one under queue.connections."
         },
         "connections": {
           "type": "object",
-          "description": "Named connections. file, memory and sync are always there.",
+          "description": "Named connections. file, database, memory and sync are always there.",
           "additionalProperties": {
             "type": "object",
             "additionalProperties": false,
             "required": ["driver"],
             "properties": {
               "driver": {
-                "enum": ["file", "memory", "sync"],
-                "description": "file: one JSON file per job (the default). memory: in this process only, for kscript serve --with-worker. sync: run jobs as they are dispatched."
+                "enum": ["file", "database", "memory", "sync"],
+                "description": "file: one JSON file per job (the default). database: rows in a KScript.Data database. memory: in this process only, for kscript serve --with-worker. sync: run jobs as they are dispatched."
               },
-              "path": { "type": "string", "description": "file only: the folder jobs are kept in, relative to kscript.json. Default: the app's data folder." }
+              "path": { "type": "string", "description": "file only: the folder jobs are kept in, relative to kscript.json. Default: the app's data folder." },
+              "connection": { "type": "string", "description": "database only: the database connection (under database.connections in config) the jobs tables go in. Default: the default database." }
             }
           }
         },

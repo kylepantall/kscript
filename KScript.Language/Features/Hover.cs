@@ -44,6 +44,10 @@ namespace KScript.Language.Features
 
         public HoverResult GetHover(DocumentAnalysis analysis, int offset)
         {
+            if (DocCommentAt(analysis, offset) is DocCommentSpot docComment)
+            {
+                return DocCommentHover(analysis, offset, docComment);
+            }
             Cursor cursor = Locate(analysis, offset);
 
             if (cursor.InElementName || cursor.InEndTagName)
