@@ -201,8 +201,10 @@ namespace KScript.Compile
         }
     }
 
-    public sealed class CompileException : Exception
+    public sealed class CompileException : Exception, KScript.Runtime.IKScriptError
     {
         public CompileException(string message) : base(message) { }
+
+        public KScript.Runtime.KScriptException ToKScriptError() => new KScript.Runtime.KScriptException(Message, "Compile", this);
     }
 }

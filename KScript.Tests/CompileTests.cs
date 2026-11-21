@@ -749,7 +749,9 @@ public sealed class CompileTests : IDisposable
         releases.Respond = _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(TarGz("readme.txt", new byte[1])) };
         Assert.Contains("has no kscript binary inside", Compile(Env(releases), script, "--target", "mac-x64").Err);
         releases.Respond = _ => throw new HttpRequestException("offline");
-        Assert.Contains("Couldn't download the kscript runtime: offline", Compile(Env(releases), script, "--target", "mac-arm64").Err);
+        string offline = Compile(Env(releases), script, "--target", "mac-arm64").Err;
+        Assert.Contains("Couldn't download the kscript runtime.", offline);
+        Assert.Contains(": offline", offline);
 
         // Development builds have no release to download from.
         CompileEnvironment dev = Env();

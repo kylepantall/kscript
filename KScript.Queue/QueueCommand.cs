@@ -75,7 +75,7 @@ namespace KScript.Queueing
                 }
             }
 
-            QueueContext context = Context(project ?? workingDirectory ?? Directory.GetCurrentDirectory(), environment, error);
+            QueueContext context = Context(project ?? workingDirectory ?? KScript.Runtime.WorkingFolder.Current, environment, error);
             if (context == null) return 1;
             var worker = new Worker(context, options, output);
             try
@@ -92,7 +92,7 @@ namespace KScript.Queueing
             }
             catch (KScriptException ex)
             {
-                return Fail(error, ex.Message);
+                return Fail(error, ex);
             }
         }
 
@@ -136,7 +136,7 @@ namespace KScript.Queueing
             }
             if (rest.Count == 0) return Fail(error, "Usage: " + QueueUsage);
 
-            QueueContext context = Context(project ?? workingDirectory ?? Directory.GetCurrentDirectory(), environment, error);
+            QueueContext context = Context(project ?? workingDirectory ?? KScript.Runtime.WorkingFolder.Current, environment, error);
             if (context == null) return 1;
             IQueueDriver driver;
             try
@@ -145,7 +145,7 @@ namespace KScript.Queueing
             }
             catch (KScriptException ex)
             {
-                return Fail(error, ex.Message);
+                return Fail(error, ex);
             }
             if (driver == null) return Fail(error, "The sync connection runs jobs as they are dispatched, so it has no queue to look at. Name another with --connection.");
             string target = rest.Count > 1 ? rest[1] : null;
@@ -177,7 +177,7 @@ namespace KScript.Queueing
                         }, indented: true));
                         return 0;
                     }
-                    output.WriteLine($"Connection {driver.Name} ({driver.Kind}){(driver is FileQueueDriver f ? ": " + f.Folder : string.Empty)}");
+                    output.WriteLine($"Connection {driver.Name} ({driver.Kind}){driver switch { FileQueueDriver f => ": " + f.Folder, DatabaseQueueDriver d => ": " + d.Where, _ => string.Empty }}");
                     Table(output, new[] { "Queue", "Waiting", "Delayed", "Running", "Failed" },
                         rows.Select(r => new[] { r.Queue, N(r.Waiting), N(r.Delayed), N(r.Running), N(r.Failed) }));
                     return 0;
@@ -248,7 +248,7 @@ namespace KScript.Queueing
             }
             catch (ProjectConfigException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return null;
             }
             if (project != null)
@@ -291,6 +291,12 @@ namespace KScript.Queueing
             string Row(string[] cells) => string.Join("  ", cells.Select((c, i) => i == cells.Length - 1 ? c : c.PadRight(widths[i]))).TrimEnd();
             output.WriteLine(Row(headers));
             foreach (string[] row in all) output.WriteLine(Row(row));
+        }
+
+        private static int Fail(TextWriter error, Exception ex)
+        {
+            KScript.Runtime.ErrorReport.Write(error, ex);
+            return 1;
         }
 
         private static int Fail(TextWriter error, string message)

@@ -17,6 +17,7 @@
     <InternalsVisibleTo Include="KScript.Tests" />
     <InternalsVisibleTo Include="KScript.Language" />
     <InternalsVisibleTo Include="KScript.Cli" />
+    <InternalsVisibleTo Include="KScript.Queue" />
   </ItemGroup>
 
   <ItemGroup>

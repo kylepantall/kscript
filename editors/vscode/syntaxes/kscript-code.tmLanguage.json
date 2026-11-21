@@ -51,7 +51,7 @@
           "end": "$",
           "patterns": [
             {
-              "match": "(@(?:param))\\s+([A-Za-z_][\\w-]*)",
+              "match": "(?:^|\\G)\\s*(@(?:param|argument|arg))\\s+(\\$?[A-Za-z_][\\w-]*)",
               "captures": {
                 "1": {
                   "name": "storage.type.class.doc.kscript"
@@ -62,14 +62,19 @@
               }
             },
             {
-              "match": "@(?:returns?|example|deprecated|see|param)\\b",
-              "name": "storage.type.class.doc.kscript"
+              "match": "(?:^|\\G)\\s*(@(?:returns?|example|deprecated|see|public|llm|prefer|avoid|pitfall|agent|param|argument|arg))(?![\\w-])",
+              "captures": {
+                "1": {
+                  "name": "storage.type.class.doc.kscript"
+                }
+              }
             },
             {
               "match": "`[^`]*`",
               "name": "markup.inline.raw.kscript"
             }
-          ]
+          ],
+          "comment": "Tags (@param, @arg, @returns, @example, @llm, ...) count only at the start of a line, as in DocComment.Parse, so '@greet' in the text stays plain."
         },
         {
           "name": "comment.line.double-slash.kscript",

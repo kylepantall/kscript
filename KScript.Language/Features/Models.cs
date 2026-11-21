@@ -43,6 +43,9 @@ namespace KScript.Language.Features
         public string FilterText { get; init; }
         public bool Deprecated { get; init; }
 
+        /// <summary>True when the editor should suggest again straight after the insert, as after <c>size: </c> for an enum's values.</summary>
+        public bool SuggestAgain { get; init; }
+
         /// <summary>Edits made with the insert, such as the import a package's command needs.</summary>
         public IReadOnlyList<TextChange> AdditionalEdits { get; init; }
 

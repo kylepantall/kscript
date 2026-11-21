@@ -92,7 +92,7 @@ namespace KScript.Queueing
         public int Run(CancellationToken stop)
         {
             IQueueDriver driver = context.Driver(options.Connection);
-            if (driver == null) throw new KScriptException("The sync connection runs jobs as they are dispatched, so there is nothing for a worker to do. Use a file or memory connection.", "Config");
+            if (driver == null) throw new KScriptException("The sync connection runs jobs as they are dispatched, so there is nothing for a worker to do. Use a file, database or memory connection.", "Config");
             int concurrency = options.Once ? 1 : options.Concurrency > 0 ? options.Concurrency : context.Settings.WorkerConcurrency;
             double sleep = options.Sleep ?? context.Settings.WorkerSleep;
             var clock = Stopwatch.StartNew();
@@ -116,9 +116,9 @@ namespace KScript.Queueing
                     {
                         job = driver.Reserve(QueuesNow(driver), QueueRuntime.Clock());
                     }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    catch (Exception ex) when (QueueRuntime.StoreBusy(ex))
                     {
-                        // Another worker has the files for now: try again after a pause.
+                        // Another worker has the files (or the database is busy or down) for now: try again after a pause.
                         Interlocked.Decrement(ref started);
                         Line($"Couldn't read the queue ({ex.Message}); trying again.");
                         stop.WaitHandle.WaitOne(TimeSpan.FromSeconds(Math.Max(0.05, sleep)));
@@ -130,9 +130,9 @@ namespace KScript.Queueing
                         {
                             Process(driver, job);
                         }
-                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        catch (Exception ex) when (QueueRuntime.StoreBusy(ex))
                         {
-                            // The job stays in running/ and goes back on its queue when its lease runs out.
+                            // The job stays reserved and goes back on its queue when its lease runs out.
                             Line($"{job.Job} #{Short(job.Id)}: couldn't save what happened ({ex.Message}); it will run again after its lease runs out.");
                         }
                         continue;
@@ -302,7 +302,7 @@ namespace KScript.Queueing
             }
             catch (Exception ex) when (ex is KScriptException or ControlSignal)
             {
-                interpreter.Host.Error.WriteLine($"{type.Name}'s fn failed() stopped with an error: {(ex is KScriptException k ? k.ToString() : ex.Message)}");
+                KScript.Runtime.ErrorReport.Write(interpreter.Host.Error, $"{type.Name}'s fn failed() stopped with an error.", ex);
             }
             interpreter.Host.FlushLogs();
             return new AttemptResult { Outcome = JobOutcome.Failed, Error = error, Elapsed = clock.Elapsed };

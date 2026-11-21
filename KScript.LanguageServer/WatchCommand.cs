@@ -43,7 +43,7 @@ namespace KScript.LanguageServer
                 }
             }
 
-            folder ??= Directory.GetCurrentDirectory();
+            folder ??= KScript.Runtime.WorkingFolder.Current;
             if (!Directory.Exists(folder))
             {
                 output.WriteLine($"{folder}: folder not found");

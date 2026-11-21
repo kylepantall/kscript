@@ -98,6 +98,15 @@ namespace KScript.Syntax.Text
             {
                 block.Fail(block.TagSpan, $"'{block.Tag}' isn't a language or a <Type>. Write ```sql, ```<Repo> or nothing after the fence.");
             }
+            else if (block.Language != null && !Languages.Contains(block.Language))
+            {
+                string near = Languages.Where(l => l.StartsWith(block.Language, StringComparison.OrdinalIgnoreCase) || block.Language.StartsWith(l, StringComparison.OrdinalIgnoreCase)
+                        || Distance(l, block.Language.ToLowerInvariant()) <= 1)
+                    .OrderByDescending(l => l.Length).FirstOrDefault();
+                block.Fail(block.TagSpan, $"'{block.Tag}' isn't a language a ``` block can name."
+                    + (near != null ? $" Did you mean {near}?" : string.Empty)
+                    + " Use " + string.Join(", ", Languages) + ", a <Type>, or nothing after the fence.");
+            }
 
             // The lines of the block, up to the closing fence.
             int contentStart = lineEnd + 1;
@@ -185,6 +194,29 @@ namespace KScript.Syntax.Text
                 if (text[i] != ' ' && text[i] != '\t') return false;
             }
             return true;
+        }
+
+        /// <summary>
+        /// The languages a block can name: the ones editors highlight inside a .kscript file, and <c>text</c> for plain
+        /// text. Any other word after the fence is an error, so a typo such as <c>```textc</c> is caught.
+        /// </summary>
+        public static IReadOnlyList<string> Languages { get; } = new[] { "text", "sql", "html", "css", "js", "javascript", "json", "md", "markdown", "latex", "tex", "yaml", "yml", "xml" };
+
+        private static int Distance(string a, string b)
+        {
+            int[] row = Enumerable.Range(0, b.Length + 1).ToArray();
+            for (int i = 1; i <= a.Length; i++)
+            {
+                int diagonal = row[0];
+                row[0] = i;
+                for (int j = 1; j <= b.Length; j++)
+                {
+                    int above = row[j];
+                    row[j] = Math.Min(Math.Min(row[j] + 1, row[j - 1] + 1), diagonal + (a[i - 1] == b[j - 1] ? 0 : 1));
+                    diagonal = above;
+                }
+            }
+            return row[b.Length];
         }
 
         private static bool ValidTag(string tag)

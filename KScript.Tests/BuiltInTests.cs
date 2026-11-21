@@ -2,6 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 
+using KScript.Metadata;
 using KScript.Projects;
 using KScript.Runtime;
 
@@ -334,6 +335,26 @@ public sealed class BuiltInTests : IDisposable
         Assert.Same(PackageRegistry.Default.Get("Math"), PackageRegistry.Default.Get("Math").Variables["pi"].Package);
         Assert.Equal("ok\nfin\n", Body("<try><echo>ok</echo><catch /><finally><echo>fin</echo></finally></try><try><do>1</do></try>"));
         Assert.Contains("There is no function called m.pi", Fails("<import package=\"KScript.Math\" as=\"m\" /><call fn=\"m.pi\" />").Message);
+    }
+
+    private sealed class DateJsonPackage : KScriptPackage
+    {
+        public override string Name => "KScript.DateJson";
+
+        public override string Description => "Dates written as JSON, for tests.";
+
+        protected override void Register(PackageBuilder p) =>
+            p.Method(KType.Date, "json", "", "The date as a JSON string.", KType.String, (target, call) => "\"" + ((DateTime)target).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\"");
+    }
+
+    [Fact]
+    public void A_package_can_give_dates_a_method_strings_have()
+    {
+        var registry = new PackageRegistry();
+        registry.Register(new DateJsonPackage());
+        var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
+        new Interpreter(KScriptHost.ForText(output), registry).RunText("<kscript><import package=\"KScript.DateJson\" /><echo>{ @date('2026-11-21')->json() }</echo></kscript>");
+        Assert.Equal("\"2026-11-21\"\n", output.ToString());
     }
 
     [Fact]
