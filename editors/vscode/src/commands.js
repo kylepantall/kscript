@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { RUN_ENV, untitledPath, isTestFile, docsArgs } = require('./run');
+const { STARTER, starterSelection } = require('./starter');
 
 const KSCRIPT_LANGUAGES = ['kscript', 'kscript-code'];
 
@@ -114,6 +115,15 @@ function registerCommands(vscode, context, server) {
     };
   }
 
+  /** A new, unsaved .kscript file with a short script that runs as it is, and the first thing to change selected. */
+  async function newScript() {
+    const doc = await vscode.workspace.openTextDocument({ language: 'kscript-code', content: STARTER });
+    const editor = await vscode.window.showTextDocument(doc);
+    const at = starterSelection();
+    editor.selection = new vscode.Selection(at.line, at.start, at.line, at.end);
+    return doc;
+  }
+
   async function newProject() {
     const found = kscript('start a project');
     if (!found) return;
@@ -164,6 +174,7 @@ function registerCommands(vscode, context, server) {
       const found = await vscode.commands.executeCommand('vscode.executeReferenceProvider', uri, at);
       await vscode.commands.executeCommand('editor.action.showReferences', uri, at, found || []);
     }),
+    vscode.commands.registerCommand('kscript.newScript', newScript),
     vscode.commands.registerCommand('kscript.newProject', newProject),
   );
 

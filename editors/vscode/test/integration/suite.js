@@ -55,7 +55,7 @@ async function snippetsFromOtherExtensions(folder) {
 // Run above a script, running it, and the line it stopped on marked as an error.
 async function runsScripts(folder) {
   const commands = await vscode.commands.getCommands(true);
-  for (const id of ['kscript.run', 'kscript.runTest', 'kscript.runTestsInFile', 'kscript.serve', 'kscript.check', 'kscript.formatProject', 'kscript.newProject', 'kscript.openDocs']) {
+  for (const id of ['kscript.run', 'kscript.runTest', 'kscript.runTestsInFile', 'kscript.serve', 'kscript.check', 'kscript.formatProject', 'kscript.newProject', 'kscript.newScript', 'kscript.openDocs', 'kscript.showReferences']) {
     assert.ok(commands.includes(id), `${id} is registered`);
   }
 
@@ -77,6 +77,13 @@ async function runsScripts(folder) {
   const stopped = await waitFor(() => vscode.languages.getDiagnostics(bad.uri).find((d) => /out of stock/.test(d.message)), 'the run-time error on its line');
   assert.strictEqual(stopped.range.start.line, 1, 'the error is on the line that threw: ' + JSON.stringify(stopped));
   assert.strictEqual(stopped.severity, vscode.DiagnosticSeverity.Error);
+
+  // New Script opens a script that is ready to run, with the first thing to change selected.
+  const fresh = await vscode.commands.executeCommand('kscript.newScript');
+  assert.strictEqual(fresh.languageId, 'kscript-code', 'the new script is KScript');
+  assert.ok(fresh.isUntitled && fresh.getText().includes('echo "Hello $name!"'), 'the new script has the starter text');
+  assert.strictEqual(fresh.getText(vscode.window.activeTextEditor.selection), 'world', 'the first thing to change is selected');
+  await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
 
   // A test file gets a lens for each test, and running one test passes.
   const tests = await vscode.workspace.openTextDocument(path.join(folder, 'cart.test.kscript'));

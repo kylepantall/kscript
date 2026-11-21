@@ -13,6 +13,8 @@ Language support for [KScript](https://github.com/kylepantall/kscript): scripts 
 - How many times each function is used, shown above it, and **Go to Symbol in Workspace** (`Ctrl+T`) across every script
 - Format Document and format on save, using the same formatter as `kscript fmt` (XML scripts and pages; `.kscript` files are left as they are)
 
+New to KScript? Open **Help > Welcome**, or run **Welcome: Open Walkthrough…** and pick **Get Started with KScript**: it goes from installing to your first script, running it, fixing a mistake and starting a project.
+
 ## Requirements
 
 The extension uses the language server built into the `kscript` command, version 0.1.0 or later. Install KScript first.
@@ -53,6 +55,7 @@ The `format` section of `kscript.json` sets the formatting style (`"indent": 4`,
 
 - **KScript: Restart Language Server**: after updating `kscript` or changing settings.
 - **KScript: Show Language Server Output**: the server's log, also opened by clicking **KScript** in the status bar.
+- **KScript: New Script** (also in **File > New File…**): opens a short script that runs as it is, as a place to start.
 - **KScript: Run Script** (`F5`, or the run button in the editor title bar): saves and runs the open script in the terminal. If it stops with an error, the line is underlined and listed in Problems. A new file that hasn't been saved yet runs too.
 - **KScript: Run Tests**: runs `kscript test` for the workspace folder in a task.
 - **KScript: Run Tests in This File**: runs the open test file. Test files (`*.test.kscript`, `*.test.ks.xml`) also get a run button in the editor title bar, and every test is listed in the Testing view, where it can be run on its own.

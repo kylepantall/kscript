@@ -79,6 +79,16 @@ const diagnostics = new Promise((resolve) => {
   connection.sendNotification('textDocument/didOpen', { textDocument: { uri: untitled, languageId: 'kscript-code', version: 1, text: "name = 'Joan'\necho \"Hello $nmae\"\n" } });
   assert.ok((await untitledDiagnostics).some((d) => d.code === 'KS4001' && /Did you mean \$name/.test(d.message)), 'an untitled .kscript file is checked');
 
+  // The script New Script opens has nothing to fix, and can be run.
+  const starter = 'untitled:Untitled-2';
+  const starterDiagnostics = new Promise((resolve) => {
+    connection.onNotification('textDocument/publishDiagnostics', (p) => { if (p.uri === starter) resolve(p.diagnostics); });
+  });
+  connection.sendNotification('textDocument/didOpen', { textDocument: { uri: starter, languageId: 'kscript-code', version: 1, text: require('../src/starter').STARTER } });
+  assert.deepStrictEqual(await starterDiagnostics, [], 'the starter script has no problems');
+  const starterLenses = await connection.sendRequest('textDocument/codeLens', { textDocument: { uri: starter } });
+  assert.deepStrictEqual(starterLenses.map((l) => [l.command.title, l.range.start.line]), [['▶ Run', 1], ['1 use', 5]], 'the starter script can be run from its first statement');
+
   const testUri = 'file:///tmp/kscript-smoke/cart.test.kscript';
   connection.sendNotification('textDocument/didOpen', { textDocument: { uri: testUri, languageId: 'kscript-code', version: 1, text: 'describe(name: cart) {\n  test(name: starts empty) {\n    expect(value: 0, equals: 0)\n  }\n}\n' } });
   const tests = await connection.sendRequest('kscript/tests', { textDocument: { uri: testUri } });

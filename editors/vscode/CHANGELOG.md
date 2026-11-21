@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Help writing types and jobs, like C#'s "implement missing members" and "generate overrides": a job without `fn handle()` gets an **Add fn handle()** quick fix, and the lightbulb on a job offers **Add fn failed(err)**. On a joined type (`type Admin with [User]`) it offers **Override fn greet(who: string) from User** for each method a base gives it. A method two bases both give is an error with a **Declare fn label in C** fix, as at run time. Each fix writes a stub in the file's own format.
+- A **Get Started with KScript** walkthrough on the Welcome page: install, write a first script, run it, fix a mistake, find out what you can write, and start a project.
+- **KScript: New Script** (also in **File > New File…**) opens a short script that runs as it is, with a variable, a function, a list and a loop to change.
 - Suggestions put what a script uses every day first. An empty line offers `echo`, `if`, `for`, `fn` and `while` before the rest (in a test file, `test`, `expect` and `describe` come first), text offers `->length()`, `->upper()`, `->lower()` and `->trim()` first, lists `->count()`, `->map()` and `->filter()`, and your own variables come before the built-in ones, the nearest first.
 - A call with several plain values shows what each one is: `$name->pad_left(10, '.')` reads as `pad_left(width: 10, char: '.')`. Arguments that already have a name, variables and one-argument calls are left alone.
 - Hovering a command or method shows an example written the way the file is written (`.kscript` or XML), and ends with **Open docs**, which opens the docs on that name.
