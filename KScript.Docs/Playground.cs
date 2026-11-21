@@ -50,6 +50,7 @@ namespace KScript.Docs
             ["KScript.Cache"] = "keeps values between runs",
             ["KScript.Auth"] = "signs people in to a kscript serve app",
             ["KScript.Document"] = "writes PDF and Word files",
+            ["KScript.Queue"] = "queues jobs for kscript worker",
         };
 
         public const int MaxOutput = 64 * 1024;

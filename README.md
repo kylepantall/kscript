@@ -127,6 +127,7 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Storage` | Settings, data, caches and logs in the right folders on macOS, Windows and Linux |
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
+| `KScript.Queue` | Background jobs: `job`, `dispatch`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
 | `KScript.Document` | Papers, reports, letters and invoices with LaTeX maths, tables, figures and citations, saved as PDF, Word, LaTeX, Markdown or HTML |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.

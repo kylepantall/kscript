@@ -1,0 +1,13 @@
+// Run this, then `kscript worker --stop-when-empty` to run the jobs it queued.
+import KScript.Queue
+import "jobs/send-welcome.kscript"
+import "jobs/orders.kscript"
+
+queued = SendWelcome(user_id: 7, email: 'joan@example.com', name: 'Joan')->dispatch()
+echo "Queued {$queued.job} {$queued.id} on {$queued.queue}"
+
+@chain([ChargeCard(order_id: 42, amount: 19.99), ShipOrder(order_id: 42), SendReceipt(order_id: 42)])->dispatch()
+echo "Queued order 42: charge, ship, then receipt"
+
+later = SendReceipt(order_id: 43)->dispatch(delay: '10m')
+echo "Order 43's receipt waits until {$later.available_at->format('HH:mm')}"

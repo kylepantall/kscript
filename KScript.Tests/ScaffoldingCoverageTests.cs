@@ -29,7 +29,7 @@ public class ScaffoldingCoverageTests
     [InlineData("css", "site")]
     [InlineData("storage", "people")]
     [InlineData("cache", "api-cache")]
-    [InlineData("job", "send-reminders")]
+    [InlineData("job", "SendReminders")]
     [InlineData("window", "settings")]
     [InlineData("config", "staging")]
     [InlineData("env", "base")]

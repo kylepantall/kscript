@@ -308,7 +308,7 @@ namespace KScript.Language.Analysis
                         return;
                     }
 
-                    if (AnalyzeErrorCall(call, id, region, scope))
+                    if (AnalyzeErrorCall(call, id, region, scope) || AnalyzeJobCall(call, id, region, scope))
                     {
                         return;
                     }
@@ -490,7 +490,7 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            if (ChecksImports && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
+            if (ChecksImports && !IsJobValue(receiver) && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
             {
                 RequirePackage(applicable[0].Package, nameSpan, $"{arrow}{name}()");
                 return;

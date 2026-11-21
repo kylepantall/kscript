@@ -189,6 +189,81 @@ namespace KScript.Projects
     /// </code>
     /// </summary>
     /// <summary>
+    /// The queue section of kscript.json (KScript.Queue): which connection jobs go to by default, the connections,
+    /// the order a worker checks its queues in, how long failed jobs are kept, and the worker's defaults.
+    /// <code>
+    /// "queue": {
+    ///   "default": "file",
+    ///   "connections": { "file": { "driver": "file" }, "fast": { "driver": "memory" } },
+    ///   "queues": ["high", "default", "low"],
+    ///   "failed": { "keep": "7d" },
+    ///   "worker": { "concurrency": 2, "sleep": "1s" },
+    ///   "env": { "test": { "default": "sync" } }
+    /// }
+    /// </code>
+    /// </summary>
+    public sealed class QueueSettings
+    {
+        /// <summary>One connection: a driver and its options.</summary>
+        public sealed class Connection
+        {
+            public string Name { get; set; }
+
+            /// <summary>sync, memory or file (database and redis come later).</summary>
+            public string Driver { get; set; }
+
+            /// <summary>For the file driver: the folder, relative to the project. Default: the app's data folder.</summary>
+            public string Path { get; set; }
+
+            /// <summary>For the database driver: the database connection's name.</summary>
+            public string Database { get; set; }
+
+            /// <summary>For the redis driver: the environment variable holding the URL.</summary>
+            public string UrlEnv { get; set; }
+        }
+
+        public static readonly string[] Drivers = { "sync", "memory", "file" };
+
+        public static readonly string[] SettingNames = { "default", "connections", "queues", "failed", "worker", "env" };
+
+        /// <summary>The connection jobs use unless they name one.</summary>
+        public string Default { get; set; } = "file";
+
+        /// <summary>The default connection per environment: "env": { "test": { "default": "sync" } }.</summary>
+        public Dictionary<string, string> DefaultByEnvironment { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The connections by name. sync, memory and file always exist with their own driver.</summary>
+        public Dictionary<string, Connection> Connections { get; } = new Dictionary<string, Connection>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["sync"] = new Connection { Name = "sync", Driver = "sync" },
+            ["memory"] = new Connection { Name = "memory", Driver = "memory" },
+            ["file"] = new Connection { Name = "file", Driver = "file" },
+        };
+
+        /// <summary>
+        /// The queues a worker checks, first to last, when it isn't given --queue. Unless queue.queues lists them
+        /// (<see cref="QueuesListed"/>), a worker checks these and then every other queue that has jobs.
+        /// </summary>
+        public List<string> Queues { get; set; } = new List<string> { "default" };
+
+        /// <summary>True when kscript.json lists queue.queues, so a worker checks only those.</summary>
+        public bool QueuesListed { get; set; }
+
+        /// <summary>How long failed jobs are kept, in seconds (7 days).</summary>
+        public double FailedKeep { get; set; } = 7 * 86400;
+
+        /// <summary>How many jobs a worker runs at once.</summary>
+        public int WorkerConcurrency { get; set; } = 1;
+
+        /// <summary>How long a worker waits, in seconds, when every queue is empty.</summary>
+        public double WorkerSleep { get; set; } = 1;
+
+        /// <summary>The default connection in an environment (KSCRIPT_ENV or --env), else <see cref="Default"/>.</summary>
+        public string DefaultFor(string environment) =>
+            environment != null && DefaultByEnvironment.TryGetValue(environment, out string name) ? name : Default;
+    }
+
+    /// <summary>
     /// The "http" section: route files, middleware and its settings, for KScript.Http (routes, controllers and
     /// middleware served by <c>kscript serve</c>).
     /// </summary>
@@ -361,6 +436,7 @@ namespace KScript.Projects
         public AppSettings App { get; } = new AppSettings();
         public MakeSettings Make { get; } = new MakeSettings();
         public HttpSettings Http { get; } = new HttpSettings();
+        public QueueSettings Queue { get; } = new QueueSettings();
 
         /// <summary>
         /// The recommended folder for each kind of file, which <c>kscript make</c> writes to. kscript.json's "paths"
@@ -586,6 +662,9 @@ namespace KScript.Projects
                         case "http":
                             ReadHttp(prop.Value, config);
                             break;
+                        case "queue":
+                            ReadQueue(prop.Value, config);
+                            break;
                         case "types":
                             ReadTypes(prop.Value, config);
                             break;
@@ -601,7 +680,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, types, serve, http, lint, test, config, format, make or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, types, serve, http, queue, lint, test, config, format, make or app).");
                             break;
                     }
                 }
@@ -831,6 +910,109 @@ namespace KScript.Projects
                         break;
                 }
             }
+        }
+
+        private static void ReadQueue(JsonElement e, ProjectConfig config)
+        {
+            if (!Object(e, "queue", config)) return;
+            QueueSettings queue = config.Queue;
+            foreach (var p in e.EnumerateObject())
+            {
+                string name = "queue." + p.Name;
+                switch (p.Name)
+                {
+                    case "default":
+                        queue.Default = String(p.Value, name, config) ?? queue.Default;
+                        break;
+                    case "queues":
+                        List<string> names = p.Value.ValueKind == JsonValueKind.Array && p.Value.EnumerateArray().All(i => i.ValueKind == JsonValueKind.String)
+                            ? p.Value.EnumerateArray().Select(i => i.GetString().Trim()).Where(q => q.Length > 0).ToList() : null;
+                        if (names == null || names.Count == 0) config.Warnings.Add($"{name} should be a list of queue names, first checked first, e.g. [\"high\", \"default\"].");
+                        else
+                        {
+                            queue.Queues = names;
+                            queue.QueuesListed = true;
+                        }
+                        break;
+                    case "connections":
+                        if (!Object(p.Value, name, config)) break;
+                        foreach (var c in p.Value.EnumerateObject())
+                        {
+                            string where = $"{name}.{c.Name}";
+                            if (!Object(c.Value, where, config)) continue;
+                            var connection = new QueueSettings.Connection { Name = c.Name };
+                            foreach (var o in c.Value.EnumerateObject())
+                            {
+                                switch (o.Name)
+                                {
+                                    case "driver": connection.Driver = String(o.Value, where + ".driver", config)?.Trim().ToLowerInvariant(); break;
+                                    case "path": connection.Path = String(o.Value, where + ".path", config); break;
+                                    case "connection": connection.Database = String(o.Value, where + ".connection", config); break;
+                                    case "url_env": connection.UrlEnv = String(o.Value, where + ".url_env", config); break;
+                                    default: config.Warnings.Add($"unknown setting '{where}.{o.Name}' (expected driver, path, connection or url_env)."); break;
+                                }
+                            }
+                            if (connection.Driver == null)
+                            {
+                                config.Warnings.Add($"{where} needs a driver: {string.Join(", ", QueueSettings.Drivers)}.");
+                                continue;
+                            }
+                            if (!QueueSettings.Drivers.Contains(connection.Driver))
+                            {
+                                config.Warnings.Add(connection.Driver is "database" or "sqlite" or "redis"
+                                    ? $"{where}: the {connection.Driver} driver isn't available yet. Drivers: {string.Join(", ", QueueSettings.Drivers)}."
+                                    : $"{where}: there is no queue driver '{connection.Driver}'. Drivers: {string.Join(", ", QueueSettings.Drivers)}.");
+                                continue;
+                            }
+                            queue.Connections[c.Name] = connection;
+                        }
+                        break;
+                    case "failed":
+                        if (!Object(p.Value, name, config)) break;
+                        foreach (var f in p.Value.EnumerateObject())
+                        {
+                            if (f.Name == "keep") queue.FailedKeep = Duration(f.Value, name + ".keep", config) ?? queue.FailedKeep;
+                            else config.Warnings.Add($"unknown setting '{name}.{f.Name}' (expected keep).");
+                        }
+                        break;
+                    case "worker":
+                        if (!Object(p.Value, name, config)) break;
+                        foreach (var w in p.Value.EnumerateObject())
+                        {
+                            switch (w.Name)
+                            {
+                                case "concurrency":
+                                    if (w.Value.ValueKind == JsonValueKind.Number && w.Value.TryGetInt32(out int n) && n >= 1 && n <= 64) queue.WorkerConcurrency = n;
+                                    else config.Warnings.Add($"{name}.concurrency should be a whole number from 1 to 64.");
+                                    break;
+                                case "sleep":
+                                    queue.WorkerSleep = Duration(w.Value, name + ".sleep", config) ?? queue.WorkerSleep;
+                                    break;
+                                default:
+                                    config.Warnings.Add($"unknown setting '{name}.{w.Name}' (expected concurrency or sleep).");
+                                    break;
+                            }
+                        }
+                        break;
+                    case "env":
+                        if (!Object(p.Value, name, config)) break;
+                        foreach (var env in p.Value.EnumerateObject())
+                        {
+                            if (!Object(env.Value, $"{name}.{env.Name}", config)) continue;
+                            foreach (var o in env.Value.EnumerateObject())
+                            {
+                                if (o.Name == "default" && String(o.Value, $"{name}.{env.Name}.default", config) is string d) queue.DefaultByEnvironment[env.Name] = d;
+                                else if (o.Name != "default") config.Warnings.Add($"unknown setting '{name}.{env.Name}.{o.Name}' (expected default).");
+                            }
+                        }
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting '{name}' (expected {string.Join(", ", QueueSettings.SettingNames)}).");
+                        break;
+                }
+            }
+            if (!queue.Connections.ContainsKey(queue.Default))
+                config.Warnings.Add($"queue.default names the connection '{queue.Default}', which isn't in queue.connections.");
         }
 
         private static void ReadHttp(JsonElement e, ProjectConfig config)

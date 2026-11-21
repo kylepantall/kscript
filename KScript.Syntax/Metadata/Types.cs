@@ -40,6 +40,13 @@ namespace KScript.Metadata
         public const string Users = "users";
         public const string Document = "document";
 
+        // KScript.Queue: a job (SendWelcome(...)), its type, a chain of jobs, a queue and a fake queue for tests.
+        public const string Job = "job";
+        public const string JobType = "job_type";
+        public const string Chain = "chain";
+        public const string Queue = "queue";
+        public const string FakeQueue = "fake_queue";
+
         /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>
         public const string Type = "type";
 

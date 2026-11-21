@@ -176,7 +176,7 @@ namespace KScript.Language.Analysis
                     continue;
                 }
                 // Types and enums are used by name in params and type attributes, which aren't references.
-                if (s.EnumValues != null || s.Shape.Type == KType.Type || s.DeclaringElement.Name == "type" || s.DeclaringElement.Name == "enum" || s.DeclaringElement.Name == "error")
+                if (s.EnumValues != null || s.Shape.Type == KType.Type || s.DeclaringElement.Name == "type" || s.DeclaringElement.Name == "enum" || s.DeclaringElement.Name == "error" || s.DeclaringElement.Name == "job")
                 {
                     continue;
                 }

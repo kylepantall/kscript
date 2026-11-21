@@ -291,7 +291,7 @@ public sealed class MakeGeneratorTests : IDisposable
         {
             new[] { "storage", "people" }, new[] { "cache", "api-cache", "--minutes", "5" }, new[] { "type", "Repo", "--fields", "name: string, stars: int from stargazers_count" },
             new[] { "enum", "Size", "--values", "small,medium,large" }, new[] { "const", "limits", "--values", "max_items = 10" }, new[] { "logger", "alerts", "--level", "error" },
-            new[] { "module", "pricing", "--fns", "total" }, new[] { "request", "NewPerson", "--fields", "name: string, age?: int" }, new[] { "locale", "fr" }, new[] { "config", "staging" }, new[] { "job", "send-reminders", "--every", "1 day" }, new[] { "css", "brand", "--primary", "#0a7" },
+            new[] { "module", "pricing", "--fns", "total" }, new[] { "request", "NewPerson", "--fields", "name: string, age?: int" }, new[] { "locale", "fr" }, new[] { "config", "staging" }, new[] { "job", "SendReminders", "--fields", "user_id: int", "--queue", "mail", "--tries", "5" }, new[] { "css", "brand", "--primary", "#0a7" },
         })
         {
             var (code, _, err) = Make(app, args);

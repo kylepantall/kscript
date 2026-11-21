@@ -203,6 +203,13 @@ namespace KScript.Syntax.Markup
                 return;
             }
 
+            // SendWelcome(user_id: 7)->dispatch(): a call on a value made by a job or error type, not an element.
+            if (char.IsUpper(word[0]) && CallThenArrow(pos + word.Length))
+            {
+                ParseDo(parent, start);
+                return;
+            }
+
             switch (word)
             {
                 case "import": ParseImport(parent, start); return;
@@ -233,6 +240,8 @@ namespace KScript.Syntax.Markup
                 case "type" when StartsDeclaration(4): ParseType(parent, start, doc); return;
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
                 case "error" when StartsDeclaration(5): ParseError(parent, start, doc); return;
+                case "job" when StartsDeclaration(3): ParseJob(parent, start, doc); return;
+                case "dispatch" when StartsDispatch(): ParseDispatch(parent, start); return;
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
@@ -831,6 +840,61 @@ namespace KScript.Syntax.Markup
             Finish(e, start);
         }
 
+        /// <summary>
+        /// <c>job SendWelcome(queue: 'mail', tries: 5) { user_id: int; fn handle() { } }</c>: a &lt;job&gt; (KScript.Queue)
+        /// whose block holds its fields, one per line, and its <c>fn</c> methods.
+        /// </summary>
+        private void ParseJob(MarkupElement parent, int start, string doc)
+        {
+            MarkupElement e = Begin(parent, "job", start);
+            SkipSpaces();
+            AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
+            if (Peek(0) == '(')
+            {
+                ParseAttributeList(e);
+            }
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
+            }
+            int save = pos;
+            SkipSpaces();
+            if (Peek(0) == '{')
+            {
+                ParseBlock(e, fields: true);
+            }
+            else
+            {
+                pos = save;
+                e.StartTagSpan = TextSpan.FromBounds(start, pos);
+            }
+            Finish(e, start);
+        }
+
+        /// <summary>True at <c>dispatch SendWelcome(...)</c> or <c>dispatch $job</c>; <c>dispatch(value: ...)</c> stays an element.</summary>
+        private bool StartsDispatch()
+        {
+            int p = pos + 8;
+            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t'))
+            {
+                return false;
+            }
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p++;
+            }
+            return p < text.Length && (Lexer.IsIdentStart(text[p]) || text[p] is '$' or '@');
+        }
+
+        /// <summary><c>dispatch SendWelcome(user_id: 1)</c>: a &lt;dispatch value="..."&gt; that queues the job.</summary>
+        private void ParseDispatch(MarkupElement parent, int start)
+        {
+            MarkupElement e = Begin(parent, "dispatch", start);
+            SkipSpaces();
+            AddExpressionAttribute(e, "value", Stop.Line);
+            Finish(e, start);
+        }
+
         /// <summary><c>enum Visibility { public, private, internal }</c>: an &lt;enum&gt;; the values are separated by commas.</summary>
         private void ParseEnum(MarkupElement parent, int start, string doc)
         {
@@ -1260,6 +1324,26 @@ namespace KScript.Syntax.Markup
                 ReadExpression(Stop.Line);
             }
             Finish(e, start);
+        }
+
+        /// <summary>True when <paramref name="at"/> is the ( of a call that is followed by -&gt; on the same line.</summary>
+        private bool CallThenArrow(int at)
+        {
+            if (at >= text.Length || text[at] != '(')
+            {
+                return false;
+            }
+            int close = ClosingBracket(at);
+            if (close < 0)
+            {
+                return false;
+            }
+            int p = close + 1;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p++;
+            }
+            return p + 1 < text.Length && text[p] == '-' && text[p + 1] == '>';
         }
 
         /// <summary>True at <c>Name(</c>: a call such as <c>NotFound(id: 42)</c> rather than a bare type name.</summary>
