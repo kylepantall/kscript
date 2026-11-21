@@ -322,6 +322,7 @@ namespace KScript.Language.Analysis
                 Report(TrimmedSpan(e.GetAttribute("sample").Value), DiagnosticSeverity.Warning, DiagnosticCodes.InvalidAttributeValue, $"'{sample}' isn't a JSON file the editor can read, so the type's fields from it aren't known.");
             }
             CheckWithNames(e);
+            CheckInheritedMembers(e);
             // Rules and methods see the value: $value in a refinement type, the fields (and $this) in a record type.
             Scope typeScope = new Scope(inner, e.Span);
             if (instance != null)

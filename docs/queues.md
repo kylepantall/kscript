@@ -18,7 +18,7 @@ job SendWelcome(queue: "mail", tries: 5, backoff: ["10s", "1m", "5m"]) {
 }
 ```
 
-Save it as `jobs/send-welcome.kscript` (`kscript make job SendWelcome` writes one for you). Then, anywhere in the project:
+Save it as `jobs/send-welcome.kscript` (`kscript make job SendWelcome` writes one for you). In the editor, a job without `fn handle()` has a quick fix that writes it, and the lightbulb on a job adds `fn failed(err)`. Then, anywhere in the project:
 
 ```kscript
 import "jobs/send-welcome.kscript"

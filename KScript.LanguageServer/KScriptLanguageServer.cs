@@ -223,7 +223,7 @@ namespace KScript.LanguageServer
                 ["documentHighlightProvider"] = true,
                 ["renameProvider"] = new JsonObject { ["prepareProvider"] = true },
                 ["documentSymbolProvider"] = true,
-                ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix") },
+                ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix", "refactor.rewrite") },
                 ["documentLinkProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["inlayHintProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["foldingRangeProvider"] = true,
@@ -703,6 +703,15 @@ namespace KScript.LanguageServer
                     ["kind"] = "quickfix",
                     ["isPreferred"] = d.Fixes.Count == 1,
                     ["diagnostics"] = new JsonArray(DiagnosticJson(a.Source, d)),
+                    ["edit"] = new JsonObject { ["changes"] = new JsonObject { [doc.Uri] = Edits(a.Source, fix.Changes) } },
+                });
+            }
+            foreach (QuickFix fix in service.GetCodeActions(a, span))
+            {
+                actions.Add((JsonNode)new JsonObject
+                {
+                    ["title"] = fix.Title,
+                    ["kind"] = "refactor.rewrite",
                     ["edit"] = new JsonObject { ["changes"] = new JsonObject { [doc.Uri] = Edits(a.Source, fix.Changes) } },
                 });
             }

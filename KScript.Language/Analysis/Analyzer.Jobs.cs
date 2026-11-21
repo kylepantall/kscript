@@ -88,6 +88,7 @@ namespace KScript.Language.Analysis
                 }
             }
             bool hasHandle = false;
+            bool hasFailed = false;
             foreach (MarkupElement child in e.ChildElements)
             {
                 if (IsKScriptElementName(child, "fn"))
@@ -97,7 +98,11 @@ namespace KScript.Language.Analysis
                     {
                         hasHandle = true;
                     }
-                    else if (fnName != "failed" && child.GetAttribute("name")?.Value is DecodedText fnValue)
+                    else if (fnName == "failed")
+                    {
+                        hasFailed = true;
+                    }
+                    else if (child.GetAttribute("name")?.Value is DecodedText fnValue)
                     {
                         Report(TrimmedSpan(fnValue), DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"A job has two functions, handle and failed, not {fnName}. Put helpers outside the job.");
                     }
@@ -123,8 +128,9 @@ namespace KScript.Language.Analysis
             }
             if (!hasHandle)
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "A job needs a handle function that does its work: fn handle() { ... }.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "A job needs a handle function that does its work: fn handle() { ... }.", AddJobHandleFix(e));
             }
+            OfferJobFailed(e, hasFailed);
 
             string jobName = e.GetAttributeValue("name")?.Trim();
             Scope jobScope = new Scope(inner, e.Span);
