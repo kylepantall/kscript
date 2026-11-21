@@ -50,6 +50,7 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Document", "KScript.Document\KScript.Document.csproj", "{39E015E3-DC9E-45CB-B8EC-DE72418EEEC4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Data", "KScript.Data\KScript.Data.csproj", "{450AB47A-3334-497D-93DA-113CE066DCDF}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KScript.Queue", "KScript.Queue\KScript.Queue.csproj", "{F81C87DC-1F8C-42A0-8CB0-2A318AA986FB}"
 EndProject
 Global
