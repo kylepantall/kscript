@@ -35,6 +35,10 @@
           ".ks.xml",
           ".ks"
         ],
+        "icon": {
+          "light": "./icons/kscript-light.svg",
+          "dark": "./icons/kscript-dark.svg"
+        },
         "firstLine": "^\\s*(<\\?xml[^>]*>\\s*)?<kscript\\b",
         "configuration": "./language-configuration.json"
       },
@@ -46,6 +50,10 @@
         "extensions": [
           ".kscript"
         ],
+        "icon": {
+          "light": "./icons/kscript-light.svg",
+          "dark": "./icons/kscript-dark.svg"
+        },
         "configuration": "./language-configuration-code.json"
       },
       {
