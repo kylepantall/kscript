@@ -237,7 +237,7 @@ namespace KScript.Language.Analysis
                         if (!fn.Parameters.Any(p => p.Name == docName))
                         {
                             Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.DocParameter,
-                                $"The doc comment describes @param {docName}, but {name} has no parameter called {docName}."
+                                $"The doc comment describes a parameter called {docName}, but {name} has no parameter by that name."
                                 + (fn.Parameters.Count > 0 ? " Its parameters: " + string.Join(", ", fn.Parameters.Select(p => p.Name)) + "." : string.Empty));
                         }
                     }

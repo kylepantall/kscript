@@ -61,11 +61,11 @@ jobs:
         include:
           - name: linux
             self-hosted: true
-            runner: '["self-hosted","Linux","X64","kscript"]'
+            runner: '"home-ci-linux"'
             hosted: ubuntu-latest
           - name: windows
             self-hosted: true
-            runner: '["self-hosted","Windows","X64","kscript"]'
+            runner: '"home-ci-windows"'
             hosted: windows-latest
           - name: macos
             self-hosted: false
@@ -170,8 +170,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: linux,   rid: linux-x64, target: linux-x64, self-hosted: true,  runner: '["self-hosted","Linux","X64","kscript"]',   hosted: ubuntu-latest,  ext: '' }
-          - { name: windows, rid: win-x64,   target: win-x64,   self-hosted: true,  runner: '["self-hosted","Windows","X64","kscript"]', hosted: windows-latest, ext: '.exe' }
+          - { name: linux,   rid: linux-x64, target: linux-x64, self-hosted: true,  runner: '"home-ci-linux"',   hosted: ubuntu-latest,  ext: '' }
+          - { name: windows, rid: win-x64,   target: win-x64,   self-hosted: true,  runner: '"home-ci-windows"', hosted: windows-latest, ext: '.exe' }
           - { name: macos,   rid: osx-arm64, target: mac-arm64, self-hosted: false, hosted: macos-latest,   ext: '' }
     defaults:
       run:

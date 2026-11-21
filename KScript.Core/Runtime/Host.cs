@@ -39,7 +39,15 @@ namespace KScript.Runtime
         public IReadOnlyList<string> Arguments { get; set; } = Array.Empty<string>();
 
         /// <summary>The folder relative paths are resolved against when a script has no file (scripts use their own folder).</summary>
-        public string WorkingDirectory { get; set; } = Directory.GetCurrentDirectory();
+        public string WorkingDirectory
+        {
+            // Read when first needed, not when the host is made: a server sets it to the site folder, and its process
+            // folder may since have been deleted or replaced.
+            get => workingDirectory ??= WorkingFolder.Current;
+            set => workingDirectory = value;
+        }
+
+        private string workingDirectory;
 
         /// <summary>
         /// When set, relative file paths start in this folder and no file outside it can be read or written.

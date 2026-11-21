@@ -92,8 +92,21 @@ public class WebCoverageTests
 
         PageResult located = PageServer.ErrorPage(new PageException("it broke") { Location = "bad.html" });
         Assert.Equal(500, located.Status);
-        Assert.Contains("bad.html: it broke", located.Body);
-        Assert.Contains("System.InvalidOperationException: odd", PageServer.ErrorPage(new InvalidOperationException("odd")).Body);
+        Assert.Contains("bad.html: Page: it broke", located.Body);
+        // A .NET exception shows as a KScript error; its stack trace only with --debug.
+        string odd = PageServer.ErrorPage(new InvalidOperationException("odd")).Body;
+        Assert.Contains("Error: odd", odd);
+        Assert.DoesNotContain("System.InvalidOperationException", odd);
+        Assert.DoesNotContain("   at ", odd);
+        KScript.Runtime.ErrorReport.Debug = true;
+        try
+        {
+            Assert.Contains("System.InvalidOperationException: odd", PageServer.ErrorPage(new InvalidOperationException("odd")).Body);
+        }
+        finally
+        {
+            KScript.Runtime.ErrorReport.Debug = false;
+        }
     }
 
     [Fact]

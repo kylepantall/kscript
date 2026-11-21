@@ -236,11 +236,14 @@ namespace KScript.Pages
                 PageResult result;
                 try
                 {
+                    // The folder kscript serve started in may have been deleted or recreated since: go back to it.
+                    KScript.Runtime.WorkingFolder.Check();
                     result = (handler != null ? await handler(http.Request) : null) ?? await HandleAsync(site, http.Request, types);
                 }
                 catch (Exception ex)
                 {
                     result = ErrorPage(ex);
+                    if (log != null) KScript.Runtime.ErrorReport.Write(log, $"{http.Request.Method} {http.Request.Path} failed.", ex);
                 }
 
                 http.Response.StatusCode = result.Status;
@@ -330,7 +333,7 @@ namespace KScript.Pages
                     catch (KScript.Runtime.KScriptException ex)
                     {
                         // The browser ignores a broken stylesheet, so the error goes into it as a comment too.
-                        return new PageResult { Status = 500, ContentType = "text/css; charset=utf-8", Body = $"/* {ex.ToString().Replace("*/", "* /")} */" };
+                        return new PageResult { Status = 500, ContentType = "text/css; charset=utf-8", Body = $"/* {KScript.Runtime.ErrorReport.Format(ex).Replace("*/", "* /")} */" };
                     }
                 }
 
@@ -395,7 +398,7 @@ namespace KScript.Pages
             }
             catch (PageException ex)
             {
-                return new PageResult { Status = 500, ContentType = "text/plain; charset=utf-8", Body = (ex.Location != null ? ex.Location + ": " : string.Empty) + ex.Message };
+                return new PageResult { Status = 500, ContentType = "text/plain; charset=utf-8", Body = KScript.Runtime.ErrorReport.Format(ex) };
             }
         }
 
@@ -433,16 +436,19 @@ namespace KScript.Pages
             };
         }
 
+        /// <summary>
+        /// The page for an error: the KScript error (<c>file:line: Type: message</c>), never a .NET stack trace unless
+        /// kscript runs with --debug or KSCRIPT_DEBUG.
+        /// </summary>
         public static PageResult ErrorPage(Exception ex)
         {
-            string location = ex is PageException pe && pe.Location != null ? pe.Location + ": " : string.Empty;
-            string detail = ex is PageException ? string.Empty : $"\n\n{ex}";
+            string text = KScript.Runtime.ErrorReport.Format(ex);
             return new PageResult
             {
                 Status = 500,
                 Body = "<!doctype html><meta charset=\"utf-8\"><title>KScript error</title>" +
                        "<style>body{font:15px/1.5 system-ui,sans-serif;margin:40px;color:#222}pre{background:#f6f4f1;padding:16px;border-radius:8px;white-space:pre-wrap}</style>" +
-                       $"<h1>KScript error</h1><pre>{KScript.Runtime.Values.HtmlEscape(location + ex.Message + detail)}</pre>",
+                       $"<h1>KScript error</h1><pre>{KScript.Runtime.Values.HtmlEscape(text)}</pre>",
             };
         }
     }

@@ -144,7 +144,7 @@ public sealed class LoggingTests : IDisposable
         var failing = new Failing();
         var (_, error, host) = RunWith("<log-provider type=\"memory\" /><do>$log->info('a'); $log->info('b'); $log->flush()</do><echo>{ $log->entries()->count() }</echo>",
             h => h.Logs.AddProvider(failing, LogLevel.Info, "broken"));
-        Assert.Equal("Log provider 'broken' failed: nope\n", error.Replace("12:30:15 INFO  a\n12:30:15 INFO  b\n", string.Empty));
+        Assert.Equal("   ERROR  Log provider 'broken' failed.\n          Error: nope\n", error.Replace("12:30:15 INFO  a\n12:30:15 INFO  b\n", string.Empty));
         Assert.Equal(2, failing.Writes);
         Assert.Contains(host.Logs.Providers, p => p is MemoryLogProvider);
     }
@@ -201,7 +201,7 @@ public sealed class LoggingTests : IDisposable
         Assert.Equal(new[] { "one", "two" }, JsonDocument.Parse(bodies[0]).RootElement.EnumerateArray().Select(e => e.GetProperty("message").GetString()));
         Assert.Equal("three", JsonDocument.Parse(bodies[1]).RootElement[0].GetProperty("message").GetString());
         Assert.Equal("k1", headers[0]);
-        Assert.Contains("Log provider 'http' failed:", error2);
+        Assert.Contains("Log provider 'http' failed.", error2);
         Assert.Contains("answered 500", error2);
     }
 

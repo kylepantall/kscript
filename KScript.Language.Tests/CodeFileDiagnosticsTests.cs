@@ -55,10 +55,14 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void UndeclaredNumbersStillUseStringMethods()
+        public void UndeclaredNumbersAreWarnedAboutStringMethods()
         {
-            // A value that came from somewhere (not a written type) may be text, as before.
-            Assert.DoesNotContain(Analyze("n = 3\necho $n->upper()\nfn f(x) => $x->trim()\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
+            // n = 3 holds a number at run time, which has no ->upper(), so the editor warns (not an error: its type wasn't written).
+            Diagnostic d = Analyze("n = 3\necho $n->upper()\n", "a.kscript").Diagnostics.Single(x => x.Code == DiagnosticCodes.TypeMismatch);
+            Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+            Assert.Contains("Use ->to_string()->upper()", d.Message);
+            // A parameter without a type may be anything, so text methods are fine on it.
+            Assert.DoesNotContain(Analyze("fn f(x) => $x->trim()\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
         }
     }
 }

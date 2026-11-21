@@ -126,10 +126,12 @@ A connection is where jobs wait. `kscript.json` names them under `queue`:
   "queue": {
     "default": "file",                 // the connection jobs go to
     "connections": {
-      "file": { "driver": "file" },    // these three are always there
+      "file": { "driver": "file" },    // these four are always there
+      "database": { "driver": "database" },
       "memory": { "driver": "memory" },
       "sync": { "driver": "sync" },
-      "uploads": { "driver": "file", "path": "storage/queue" }
+      "uploads": { "driver": "file", "path": "storage/queue" },
+      "reports": { "driver": "database", "connection": "reports" }
     },
     "queues": ["high", "default"],     // only these, first to last (default: default, then every other queue)
     "failed": { "keep": "7d" },        // how long failed jobs are kept
@@ -144,10 +146,23 @@ A connection is where jobs wait. `kscript.json` names them under `queue`:
 | Driver | Where jobs wait | Use it for |
 | --- | --- | --- |
 | `file` | One JSON file per job in the app's data folder (see [App folders](storage.md)), or in `path`. Workers claim a job by moving its file, so several workers, even in different processes, never run the same job twice. | Most apps. It is the default. |
+| `database` | Rows in the project's database (see [Data](data.md#connections)), or in the database `connection` names. | Apps that already have a database, and workers on several machines that share it. |
 | `memory` | In memory, in this process only. | `kscript serve --with-worker`, which runs a worker inside the server. |
 | `sync` | Nowhere: `dispatch` runs the job straight away and its errors reach the caller. | Tests and scripts where waiting isn't worth it. |
 
-A database driver, which keeps jobs in a table, is on the [roadmap](roadmap.md).
+### The database driver
+
+The `database` driver keeps waiting and running jobs in a `kscript_jobs` table, failed jobs in `kscript_failed_jobs`, and the keys of unique jobs in `kscript_job_locks`. It makes the tables the first time it needs them, so there is nothing to set up. With no `connection`, it uses the default database: `data/app.sqlite` in the project folder, or `DATABASE_URL`. To keep jobs apart from the app's data, name another database connection from your config:
+
+```jsonc
+// kscript.json
+{ "queue": { "default": "jobs", "connections": { "jobs": { "driver": "database", "connection": "queue" } } } }
+
+// config.json
+{ "database": { "connections": { "queue": { "url": "sqlite:data/queue.sqlite" } } } }
+```
+
+A worker takes a job in one write transaction that reads the next due row and marks it as running, so two workers never get the same job. If the database is busy or can't be reached, the worker says so and tries again after a pause, rather than stopping.
 
 If a worker stops in the middle of a job (the machine restarts, say), the job is held for its timeout plus 30 seconds, then goes back on the queue for the next worker, and counts as a try.
 

@@ -304,6 +304,14 @@ throw Validation "Age must be positive, got {$age}"
 
 Unknown elements, attributes and syntax errors are reported before a script starts, so a typo near the end doesn't leave a job half done.
 
+An error nothing catches is printed as a KScript error, with where it happened and its type, and the script exits with code 3:
+
+```text
+   ERROR  app.kscript:2:11: Name: Unknown command @nope().
+```
+
+kscript shows every failure this way, in scripts, `kscript serve` error pages and all the other commands, never as a .NET exception. A failure that comes from the computer rather than the script gets the error type that fits (`FileNotFound`, `Access`, `IO`, `Network` and so on), and one kscript didn't expect is an `Internal` error, which is a bug worth [reporting](https://github.com/kylepantall/kscript/issues). To see the .NET exception and stack trace behind an error, run with `--debug` (before the script's path: `kscript --debug app.kscript`) or set `KSCRIPT_DEBUG=1`, which also works for `kscript serve` and compiled programs.
+
 ### Error types
 
 Declare your own error types with `error`. Fields work as in a [`type`](#typed-data), the message can use them, and `extends` says what kind of error it is:

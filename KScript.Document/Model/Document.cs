@@ -25,7 +25,7 @@ namespace KScript.Documents
         public Dictionary<string, Source> Sources { get; } = new Dictionary<string, Source>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Where relative image paths start.</summary>
-        public string BaseDirectory { get; set; } = Directory.GetCurrentDirectory();
+        public string BaseDirectory { get; set; } = KScript.Runtime.WorkingFolder.Current;
 
         /// <summary>Every block, depth first, including those inside sections, lists, quotes and items.</summary>
         public IEnumerable<Block> AllBlocks() => Walk(Abstract).Concat(Walk(Blocks));

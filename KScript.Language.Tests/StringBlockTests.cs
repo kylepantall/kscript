@@ -27,7 +27,25 @@ namespace KScript.Language.Tests
             Assert.Equal("Repo", StringBlock.Read("```< Repo >\n```", 0).TypeName);
             Assert.Null(StringBlock.Read("```< Repo >\n```", 0).Language);
             Assert.Equal(string.Empty, StringBlock.Read("```\n```", 0).Value);
-            Assert.Null(StringBlock.Read("```c++\n```", 0).Error);
+            foreach (string language in StringBlock.Languages)
+            {
+                Assert.Null(StringBlock.Read("```" + language + "\nx\n```", 0).Error);
+            }
+            Assert.Null(StringBlock.Read("```<text>\n```", 0).Error);
+        }
+
+        [Fact]
+        public void OnlyKnownLanguagesCanBeNamed()
+        {
+            StringBlock typo = StringBlock.Read("```textc\nx\n```", 0);
+            Assert.StartsWith("'textc' isn't a language a ``` block can name. Did you mean text?", typo.Error);
+            Assert.Equal(3, typo.ErrorSpan.Start);
+            Assert.Equal(5, typo.ErrorSpan.Length);
+            Assert.Contains("Did you mean yaml?", StringBlock.Read("```yaml2\nx\n```", 0).Error);
+            Assert.Contains("Did you mean html?", StringBlock.Read("```htnl\nx\n```", 0).Error);
+            string other = StringBlock.Read("```c++\nx\n```", 0).Error;
+            Assert.DoesNotContain("Did you mean", other);
+            Assert.Contains("Use text, sql, html", other);
             foreach (string bad in new[] { "<>", "<1x>", "<a b>", "<a", "a b", "a!" })
             {
                 Assert.NotNull(StringBlock.Read("```" + bad + "\nx\n```", 0).Error);
@@ -59,6 +77,19 @@ namespace KScript.Language.Tests
             FormatResult result = Formatter.Format(input, "test.kscript");
             Assert.True(result.Succeeded, result.Error);
             Assert.Equal("if true {\n  q = ```\n    a\n\n      b\n    ```\n}\n", result.Text);
+        }
+    
+        [Fact]
+        public void TheEditorSuggestsTheLanguagesAfterAFence()
+        {
+            var service = new KScript.Language.Features.LanguageService(files: KScript.Language.Analysis.EmptyFileSystem.Instance);
+            (string text, int offset) = TestHelpers.WithCaret("q = ```te\u2038\n  x\n  ```\necho $q");
+            var items = service.GetCompletions(service.Analyze(text, "test.kscript"), offset);
+            Assert.Equal(StringBlock.Languages, items.Select(i => i.Label));
+            Assert.Equal(offset - 2, items[0].ReplaceSpan.Start);
+            Assert.Equal("plain text", items[0].Detail);
+            (string xml, int at) = TestHelpers.WithCaret("<kscript><echo>```te\u2038</echo></kscript>");
+            Assert.DoesNotContain(service.GetCompletions(service.Analyze(xml, "test.ks.xml"), at), i => i.Label == "javascript");
         }
     }
 }

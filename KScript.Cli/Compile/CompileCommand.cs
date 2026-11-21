@@ -125,7 +125,7 @@ namespace KScript.Compile
                 }
                 catch (CompileException ex)
                 {
-                    error.WriteLine(ex.Message);
+                    KScript.Runtime.ErrorReport.Write(error, ex);
                     return 1;
                 }
             }
@@ -156,23 +156,23 @@ namespace KScript.Compile
             }
             catch (CompileException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
             catch (ProjectConfigException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
             catch (KScriptException ex)
             {
                 error.WriteLine("The script has an error, so it wasn't compiled:");
-                error.WriteLine(ex.ToString());
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
             catch (HttpRequestException ex)
             {
-                error.WriteLine($"Couldn't download the kscript runtime: {ex.Message}");
+                KScript.Runtime.ErrorReport.Write(error, "Couldn't download the kscript runtime.", ex);
                 return 1;
             }
         }
