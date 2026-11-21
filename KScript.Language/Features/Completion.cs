@@ -27,8 +27,33 @@ namespace KScript.Language.Features
             ("match", "Match expression: `match $x { 1 => 'one', _ => 'other' }`."),
         };
 
-        /// <summary>Completions at an offset.</summary>
-        public List<CompletionItem> GetCompletions(DocumentAnalysis analysis, int offset)
+        /// <summary>
+        /// Completions at an offset. <paramref name="trigger"/> is the character the editor asked after, if any: after
+        /// <c>(</c> or <c>,</c> the list only shows inside a call that has named arguments or values to offer, so typing
+        /// <c>(1 + 2)</c> or <c>[1, 2]</c> doesn't open it.
+        /// </summary>
+        public List<CompletionItem> GetCompletions(DocumentAnalysis analysis, int offset, string trigger = null)
+        {
+            List<CompletionItem> items = GetCompletionsAt(analysis, offset);
+            if ((trigger == "(" || trigger == ",") && !items.Any(i => i.Kind == CompletionKind.Parameter || i.Kind == CompletionKind.Value || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
+            {
+                return new List<CompletionItem>();
+            }
+            if (trigger == "," && offset > 0 && analysis.Source.Text[offset - 1] == ',')
+            {
+                // Straight after the comma: the pick goes after a space, as the formatter writes it (f(1, size: ...)).
+                return items.Select(i => new CompletionItem
+                {
+                    Label = i.Label, Kind = i.Kind, Detail = i.Detail, Documentation = i.Documentation, IsSnippet = i.IsSnippet,
+                    InsertText = " " + (i.InsertText ?? i.Label),
+                    ReplaceSpan = i.ReplaceSpan, SortText = i.SortText, FilterText = i.FilterText ?? i.Label, Deprecated = i.Deprecated,
+                    SuggestAgain = i.SuggestAgain, AdditionalEdits = i.AdditionalEdits,
+                }).ToList();
+            }
+            return items;
+        }
+
+        private List<CompletionItem> GetCompletionsAt(DocumentAnalysis analysis, int offset)
         {
             Cursor cursor = Locate(analysis, offset);
             string text = analysis.Source.Text;
