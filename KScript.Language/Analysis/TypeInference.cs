@@ -94,6 +94,10 @@ namespace KScript.Language.Analysis
                     // NotFound(id: 42) makes an error of that type.
                     return errorType.Instance ?? Analyzer.BaseErrorShape();
 
+                case CallNode call when call.Callee is IdentifierNode jobName && JobTypeNamed(jobName, region) is TypeShape jobType:
+                    // SendWelcome(user_id: 7) makes a job.
+                    return jobType.Instance ?? new TypeShape(KType.Job) { Name = jobName.Name };
+
                 case IdentifierNode id when ErrorTypeNamed(id, region) is TypeShape errorType:
                     return errorType;
 
@@ -169,7 +173,7 @@ namespace KScript.Language.Analysis
                         TypeShape data = m.Arguments.Count > 0 ? Infer(m.Arguments[0].Value, region) : TypeShape.Unknown;
                         return data.Type == KType.List ? new TypeShape(KType.List) { Element = receiver.Instance } : receiver.Instance;
                     }
-                    if (m.Name == "json" && MappedShape(catalog.GetMethods("json", receiver.Type).FirstOrDefault(x => KType.Accepts(x.ReceiverType, receiver.Type)), m.Arguments, 0, null, region) is TypeShape asType)
+                    if (m.Name == "json" && MappedShape(catalog.GetMethods("json", receiver.Type).FirstOrDefault(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)), m.Arguments, 0, null, region) is TypeShape asType)
                     {
                         return asType;
                     }
@@ -235,6 +239,14 @@ namespace KScript.Language.Analysis
                 default:
                     return TypeShape.Unknown;
             }
+        }
+
+        /// <summary>The job type a name means here: a declared job (or null).</summary>
+        private TypeShape JobTypeNamed(IdentifierNode id, ExpressionRegion region)
+        {
+            int offset = region.Source.ToSource(id.Span.Start);
+            Symbol symbol = result.RootScope.Innermost(offset).Lookup(id.Name, offset);
+            return symbol?.Shape.Type == KType.JobType ? symbol.Shape : null;
         }
 
         /// <summary>The error type a bare name means here: a declared &lt;error&gt;, or a built-in such as Validation.</summary>
@@ -426,7 +438,7 @@ namespace KScript.Language.Analysis
             }
 
             string type = ReceiverType(name, receiver);
-            List<CallableInfo> methods = catalog.GetMethods(name, type).Where(m => KType.Accepts(m.ReceiverType, type)).ToList();
+            List<CallableInfo> methods = catalog.GetMethods(name, type).Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, type)).ToList();
             CallableInfo method = methods.FirstOrDefault(m => argCount >= m.MinArgs && argCount <= m.MaxArgs) ?? methods.FirstOrDefault();
             if (method != null && ModelResult(method, receiver) is TypeShape records)
             {

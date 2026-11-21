@@ -60,7 +60,7 @@ You get real values (strings, numbers, lists, maps, dates, files), methods on al
 
 ```kscript
 import KScript.Net
-repo = @fetch('https://api.github.com/repos/kylepantall/kscript')->check()->json()
+repo = @api('https://api.github.com/repos/kylepantall/kscript')->check()->json()
 echo "{$repo.full_name} has {$repo.stargazers_count} stars"
 ```
 
@@ -72,7 +72,7 @@ type Repo {
   stars: int from stargazers_count
   owner: string from owner.login
 }
-repo = @fetch($url)->check()->json(as: Repo)
+repo = @api($url)->check()->json(as: Repo)
 echo "{$repo.name} by {$repo.owner} has {$repo.stars} stars"
 ```
 
@@ -128,6 +128,7 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
 | `KScript.Data` | Models, a query builder whose conditions are lambdas, transactions and safe raw SQL, on SQLite |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
+| `KScript.Queue` | Background jobs: `job`, `dispatch`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
 | `KScript.Document` | Papers, reports, letters and invoices with LaTeX maths, tables, figures and citations, saved as PDF, Word, LaTeX, Markdown or HTML |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.

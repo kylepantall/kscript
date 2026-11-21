@@ -296,6 +296,8 @@ namespace KScript.Runtime
             Add("Forbidden", Root, "A request the signed-in user isn't allowed to make. Answers 403.", 403);
             Add("NotFound", Root, "Something that doesn't exist. Answers 404.", 404);
             Add("Conflict", Root, "A change that clashes with the current state. Answers 409.", 409);
+            Add("JobTimeout", "Timeout", "A queued job that ran longer than its timeout.");
+            Add("JobFailed", Root, "A queued job that used up its tries. $err.cause is the last error.");
             Add("TooManyRequests", Root, "Too many requests in a short time, such as failed sign-ins. Answers 429, with Retry-After when the error has a retry_after field.", 429);
             Add("ModelNotFound", "NotFound", "A KScript.Data record that isn't in the database: ->find_or_fail() and ->first_or_fail(). $err.model and $err.id say which. Answers 404.", 404);
             Add("UniqueViolation", "Conflict", "A save that would give two records the same value in a unique field. $err.fields names them. Answers 409.", 409);

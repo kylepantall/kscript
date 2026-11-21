@@ -255,7 +255,7 @@ public class PackageTests
     public void NetHelpers()
     {
         Assert.Equal("a=1&b=x%20y", Eval("@query_string({ a: 1, b: 'x y' })", "KScript.Net"));
-        KScriptException ex = Fails("<echo>{ @fetch('ftp://example.com') }</echo>", "KScript.Net");
+        KScriptException ex = Fails("<echo>{ @api('ftp://example.com') }</echo>", "KScript.Net");
         Assert.Contains("http", ex.Message);
     }
 

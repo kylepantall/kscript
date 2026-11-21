@@ -835,8 +835,8 @@ namespace KScript.Runtime
             if (target is Record record && record.Type.RecordKind != null && module.Methods.TryGetValue(record.Type.RecordKind + ":" + name, out method)) return true;
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
-            // An email or a handle is text too, so string methods work on it.
-            if (target is ISemanticText && module.Methods.TryGetValue("string:" + name, out method)) return true;
+            // An email, handle, uuid or regex is text too, so the string methods that make sense for it work on it.
+            if (target is ISemanticText semantic && KType.AcceptsMethod(KType.String, name, semantic.TypeName) && module.Methods.TryGetValue("string:" + name, out method)) return true;
             return module.Methods.TryGetValue("any:" + name, out method);
         }
 
@@ -899,7 +899,9 @@ namespace KScript.Runtime
 
             IEnumerable<string> known = ctx.Module?.Methods.Values.Where(m => m.Receiver == type || m.Receiver == "any").Select(m => m.Name) ?? Enumerable.Empty<string>();
             string noun = type switch { "list" => "Lists", "map" => "Maps", "string" => "Text values", "number" => "Numbers", "date" => "Dates", "bool" => "Bools", "fn" => "Functions", _ => $"Values of type {type}" };
-            string hint = target is Dictionary<string, object> ? $" To read a key, write .{name} or ['{name}']." : string.Empty;
+            string hint = target is Dictionary<string, object> ? $" To read a key, write .{name} or ['{name}']."
+                : target is ISemanticText && (ctx.Module?.Methods.ContainsKey("string:" + name) ?? false) ? $" Use ->to_string()->{name}() to work on its text."
+                : string.Empty;
             throw Fail(node, ctx, $"{noun} have no method ->{name}()." + Suggest(name, known).Replace("Did you mean ", "Did you mean ->").Replace("?", "()?") + hint, "Name");
         }
 

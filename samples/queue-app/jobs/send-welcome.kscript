@@ -1,0 +1,14 @@
+/// Sends the welcome email to someone who just signed up.
+job SendWelcome(queue: "mail", tries: 5, backoff: ["10s", "1m", "5m"], retry_on: [Network, Timeout]) {
+  user_id: int
+  email: email
+  name?: string
+
+  fn handle() {
+    echo "Welcome email to {$name ?? 'a new user'} <{$email}> (attempt {$job.attempt} of {$job.tries})"
+  }
+
+  fn failed(err) {
+    echo "Couldn't welcome user {$user_id}: {$err.cause.message}"
+  }
+}

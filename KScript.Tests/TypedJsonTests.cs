@@ -322,7 +322,7 @@ public class TypedJsonTests
     [InlineData("<type name=\"T\"><field name=\"a\" optional=\"maybe\" /></type>", "optional=\"maybe\" should be yes or no.")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" from=\"b\" /></type>", "it can't also have from or default")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" default=\"2\" /></type>", "it can't also have from or default")]
-    [InlineData("<field name=\"a\" />", "<field> must be inside <type>, <error> or <model>.")]
+    [InlineData("<field name=\"a\" />", "<field> must be inside <type>, <error>, <model> or <job>.")]
     [InlineData("<type name=\"T\"><if test=\"yes\"><field name=\"a\" /></if></type>", "<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <if>.")]
     public void DeclarationMistakesAreExplained(string body, string expected)
     {
@@ -371,7 +371,7 @@ public class TypedJsonTests
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><type name=\"User\" fields=\"login: string\" /></kscript>");
             string script = Path.Combine(dir, "t.ks.xml");
             File.WriteAllText(script, "<kscript><import src=\"lib.ks.xml\" names=\"Usr\" /></kscript>");
-            Assert.Contains("Did you mean User? Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s and <model>s.", Assert.Throws<KScriptException>(() => RunScriptFile(script)).Message);
+            Assert.Contains("Did you mean User? Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s, <model>s and <job>s.", Assert.Throws<KScriptException>(() => RunScriptFile(script)).Message);
         }
         finally
         {
@@ -464,9 +464,9 @@ public class TypedJsonTests
         {
             string url = $"http://127.0.0.1:{port}";
             string output = RunBody($"<type name=\"User\" fields=\"login: string, id: int\" />"
-                + $"<echo>{{ @fetch('{url}/list')->json(as: User)->map(fn($u) => $u.login)->join(',') }}</echo>"
-                + $"<echo>{{ @fetch('{url}/one')->json().login }}</echo>"
-                + $"<try><echo>{{ @fetch('{url}/one')->json(as: User) }}</echo><catch as=\"err\"><echo>{{ $err.message->split('\n')[0] }}</echo></catch></try>", "", "KScript.Net");
+                + $"<echo>{{ @api('{url}/list')->json(as: User)->map(fn($u) => $u.login)->join(',') }}</echo>"
+                + $"<echo>{{ @api('{url}/one')->json().login }}</echo>"
+                + $"<try><echo>{{ @api('{url}/one')->json(as: User) }}</echo><catch as=\"err\"><echo>{{ $err.message->split('\n')[0] }}</echo></catch></try>", "", "KScript.Net");
             Assert.Equal($"a,b\nkyle\nThe response from {url}/one doesn't fit User (1 problem):\n", output);
             await served.WaitAsync(TimeSpan.FromSeconds(10));
         }

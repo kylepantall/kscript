@@ -284,6 +284,64 @@
         }
       }
     },
+    "queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "KScript.Queue: where dispatched jobs wait, and what kscript worker runs (see docs/queues.md).",
+      "properties": {
+        "default": {
+          "type": "string",
+          "default": "file",
+          "description": "The connection jobs go to unless a job or dispatch names another: file, memory, sync, or one under queue.connections."
+        },
+        "connections": {
+          "type": "object",
+          "description": "Named connections. file, memory and sync are always there.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["driver"],
+            "properties": {
+              "driver": {
+                "enum": ["file", "memory", "sync"],
+                "description": "file: one JSON file per job (the default). memory: in this process only, for kscript serve --with-worker. sync: run jobs as they are dispatched."
+              },
+              "path": { "type": "string", "description": "file only: the folder jobs are kept in, relative to kscript.json. Default: the app's data folder." }
+            }
+          }
+        },
+        "queues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "The only queues a worker checks, first to last, e.g. [\"high\", \"default\"]. Without it a worker checks default, then every other queue."
+        },
+        "failed": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "keep": { "type": ["string", "number"], "default": "7d", "description": "How long failed jobs are kept, such as \"7d\" or a number of seconds." }
+          }
+        },
+        "worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "concurrency": { "type": "integer", "minimum": 1, "default": 1, "description": "How many jobs a worker runs at once." },
+            "sleep": { "type": ["string", "number"], "default": "1s", "description": "How long a worker waits when the queues are empty." }
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Settings per environment, e.g. { \"test\": { \"default\": \"sync\" } }. kscript test uses sync unless env.test says otherwise.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": { "default": { "type": "string" } }
+          }
+        }
+      }
+    },
     "format": {
       "type": "object",
       "description": "Used by kscript fmt and the editor's Format Document. Values set here win over the editor's tab settings.",
@@ -307,7 +365,8 @@
             "collapseBlankLines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to maxBlankLines." },
             "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." },
             "spacing": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: one space after commas and colons, around assignments and =>, and before a block's '{'. Off: spacing inside lines is kept." },
-            "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." }
+            "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." },
+            "wrapStrings": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: break a string that runs past printWidth at a space, with a \\ at the end of the line (the break isn't part of the string). Off: long strings stay on one line." }
           }
         },
         "indent": {

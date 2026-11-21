@@ -203,6 +203,13 @@ namespace KScript.Syntax.Markup
                 return;
             }
 
+            // SendWelcome(user_id: 7)->dispatch(): a call on a value made by a job or error type, not an element.
+            if (char.IsUpper(word[0]) && CallThenArrow(pos + word.Length))
+            {
+                ParseDo(parent, start);
+                return;
+            }
+
             switch (word)
             {
                 case "import": ParseImport(parent, start); return;
@@ -234,6 +241,8 @@ namespace KScript.Syntax.Markup
                 case "model" when StartsDeclaration(5): ParseType(parent, start, doc, "model"); return;
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
                 case "error" when StartsDeclaration(5): ParseError(parent, start, doc); return;
+                case "job" when StartsDeclaration(3): ParseJob(parent, start, doc); return;
+                case "dispatch" when StartsDispatch(): ParseDispatch(parent, start); return;
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
@@ -480,10 +489,10 @@ namespace KScript.Syntax.Markup
                 Finish(e, start);
                 return;
             }
-            if (Peek(0) == '"')
+            if (AtText())
             {
                 int save = pos;
-                (DecodedText content, TextSpan span) = ReadString();
+                (DecodedText content, TextSpan span) = ReadText();
                 int after = pos;
                 bool alone = AtStatementEnd();
                 pos = after;
@@ -832,6 +841,61 @@ namespace KScript.Syntax.Markup
                 pos = save;
                 e.StartTagSpan = TextSpan.FromBounds(start, pos);
             }
+            Finish(e, start);
+        }
+
+        /// <summary>
+        /// <c>job SendWelcome(queue: 'mail', tries: 5) { user_id: int; fn handle() { } }</c>: a &lt;job&gt; (KScript.Queue)
+        /// whose block holds its fields, one per line, and its <c>fn</c> methods.
+        /// </summary>
+        private void ParseJob(MarkupElement parent, int start, string doc)
+        {
+            MarkupElement e = Begin(parent, "job", start);
+            SkipSpaces();
+            AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
+            if (Peek(0) == '(')
+            {
+                ParseAttributeList(e);
+            }
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
+            }
+            int save = pos;
+            SkipSpaces();
+            if (Peek(0) == '{')
+            {
+                ParseBlock(e, fields: true);
+            }
+            else
+            {
+                pos = save;
+                e.StartTagSpan = TextSpan.FromBounds(start, pos);
+            }
+            Finish(e, start);
+        }
+
+        /// <summary>True at <c>dispatch SendWelcome(...)</c> or <c>dispatch $job</c>; <c>dispatch(value: ...)</c> stays an element.</summary>
+        private bool StartsDispatch()
+        {
+            int p = pos + 8;
+            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t'))
+            {
+                return false;
+            }
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p++;
+            }
+            return p < text.Length && (Lexer.IsIdentStart(text[p]) || text[p] is '$' or '@');
+        }
+
+        /// <summary><c>dispatch SendWelcome(user_id: 1)</c>: a &lt;dispatch value="..."&gt; that queues the job.</summary>
+        private void ParseDispatch(MarkupElement parent, int start)
+        {
+            MarkupElement e = Begin(parent, "dispatch", start);
+            SkipSpaces();
+            AddExpressionAttribute(e, "value", Stop.Line);
             Finish(e, start);
         }
 
@@ -1269,9 +1333,9 @@ namespace KScript.Syntax.Markup
                 AddRawAttribute(e, "type", ReadNameSpan());
                 SkipSpaces();
             }
-            if (Peek(0) == '"')
+            if (AtText())
             {
-                (DecodedText message, TextSpan span) = ReadString();
+                (DecodedText message, TextSpan span) = ReadText();
                 e.StartTagSpan = TextSpan.FromBounds(start, span.Start);
                 AddText(e, message, span);
                 e.ContentSpan = span;
@@ -1282,6 +1346,26 @@ namespace KScript.Syntax.Markup
                 ReadExpression(Stop.Line);
             }
             Finish(e, start);
+        }
+
+        /// <summary>True when <paramref name="at"/> is the ( of a call that is followed by -&gt; on the same line.</summary>
+        private bool CallThenArrow(int at)
+        {
+            if (at >= text.Length || text[at] != '(')
+            {
+                return false;
+            }
+            int close = ClosingBracket(at);
+            if (close < 0)
+            {
+                return false;
+            }
+            int p = close + 1;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p++;
+            }
+            return p + 1 < text.Length && text[p] == '-' && text[p + 1] == '>';
         }
 
         /// <summary>True at <c>Name(</c>: a call such as <c>NotFound(id: 42)</c> rather than a bare type name.</summary>
@@ -1333,9 +1417,9 @@ namespace KScript.Syntax.Markup
             e.StartTagSpan = TextSpan.FromBounds(start, pos);
             SkipSpaces();
             int contentStart = pos;
-            if (Peek(0) == '"')
+            if (AtText())
             {
-                (DecodedText content, TextSpan span) = ReadString();
+                (DecodedText content, TextSpan span) = ReadText();
                 AddText(e, content, span);
                 contentStart = span.Start;
                 e.ContentSpan = span;
@@ -1526,6 +1610,12 @@ namespace KScript.Syntax.Markup
                 if (c == '\'' || c == '"')
                 {
                     SkipQuoted(c);
+                    continue;
+                }
+                if (c == '`' && StringBlock.Read(text, pos) is StringBlock block)
+                {
+                    // A ``` block: its lines are its own; the expression lexer reads it as a string.
+                    pos = block.End;
                     continue;
                 }
                 if (c == '/' && Peek(1) == '/' && brackets.Count == 0)
@@ -1741,9 +1831,30 @@ namespace KScript.Syntax.Markup
             pos++;
         }
 
+        /// <summary>At "text" or a ``` block without a type (a typed block is a value, not text).</summary>
+        private bool AtText() =>
+            Peek(0) == '"' || (StringBlock.StartsAt(text, pos) && StringBlock.Read(text, pos) is { TypeName: null });
+
+        /// <summary>Reads "text" or a ``` block as the text of an element.</summary>
+        private (DecodedText Value, TextSpan Span) ReadText()
+        {
+            if (Peek(0) == '"')
+            {
+                return ReadString();
+            }
+            StringBlock block = StringBlock.Read(text, pos);
+            if (block.Error != null)
+            {
+                Error(block.ErrorSpan, DiagnosticCodes.MarkupSyntax, block.Error);
+            }
+            pos = block.End;
+            return (new DecodedText(block.Value, block.Map), TextSpan.FromBounds(block.Start, block.End));
+        }
+
         /// <summary>
-        /// Reads "text" as the text of an element or attribute. \" and \\ are escapes; everything else, including
-        /// { } and new lines, is kept as written.
+        /// Reads "text" as the text of an element or attribute. \" and \\ are escapes, and a \ at the end of a line
+        /// joins it to the next (without the break or the next line's indentation); everything else, including { } and
+        /// new lines, is kept as written.
         /// </summary>
         private (DecodedText Value, TextSpan Span) ReadString()
         {
@@ -1757,6 +1868,12 @@ namespace KScript.Syntax.Markup
                     map.Add(pos);
                     value.Append(text[pos + 1]);
                     pos += 2;
+                    continue;
+                }
+                if (LineJoins.At(text, pos, text.Length, out int after))
+                {
+                    // A backslash at the end of a line: the text carries on after the next line's indentation.
+                    pos = after;
                     continue;
                 }
                 map.Add(pos);

@@ -735,6 +735,49 @@ namespace KScript.Syntax.Markup
                             Line(indent, "}");
                             return;
                         }
+                    case "dispatch" when Only("value") && Attr("value") != null && !e.Children.Any(c => !(c is MarkupText t && t.IsWhitespace)):
+                        Line(indent, "dispatch " + Reindent(Attr("value").Trim(), Pad(indent)));
+                        return;
+                    case "job" when Attr("name") is string jobName && IsName(jobName.Trim()) && !jobName.Contains('.')
+                        && e.Children.All(n => IsFieldLine(n) || n is MarkupElement { Name: "fn" }):
+                        {
+                            if (!chained)
+                            {
+                                WriteDoc(e, indent);
+                            }
+                            List<string> fieldLines = FieldsAsLines(Attr("fields"));
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description") && !(a.Name == "fields" && fieldLines != null)).Select(a => FormatAttribute(e, a)));
+                            sb.Append(pad).Append("job ").Append(jobName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
+                            if (!e.ChildElements.Any() && fieldLines == null)
+                            {
+                                sb.Append('\n');
+                                return;
+                            }
+                            sb.Append(" {\n");
+                            foreach (string fieldLine in fieldLines ?? new List<string>())
+                            {
+                                Line(indent + 1, fieldLine);
+                            }
+                            scopes.Push();
+                            foreach (MarkupNode node in e.Children)
+                            {
+                                if (node is MarkupComment c)
+                                {
+                                    WriteComment(c, indent + 1);
+                                }
+                                else if (node is MarkupElement child && child.Name == "field")
+                                {
+                                    WriteField(child, indent + 1);
+                                }
+                                else if (node is MarkupElement method)
+                                {
+                                    WriteElement(method, indent + 1, false);
+                                }
+                            }
+                            scopes.Pop();
+                            Line(indent, "}");
+                            return;
+                        }
                     case "throw" when Only("type", "message") && !e.ChildElements.Any() && (Attr("type") == null || IsName(Attr("type").Trim())):
                         {
                             string message = Attr("message") ?? TrimLayout(TextOf(e));

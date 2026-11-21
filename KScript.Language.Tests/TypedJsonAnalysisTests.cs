@@ -111,7 +111,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void ResponsesAndFilesMapToTypes()
         {
-            Assert.Equal("User", Show(Open("<import package=\"KScript.Net\" />\n" + Types + "<let name=\"r\" value=\"@fetch('https://x')->json(as: User)\" />"), "r"));
+            Assert.Equal("User", Show(Open("<import package=\"KScript.Net\" />\n" + Types + "<let name=\"r\" value=\"@api('https://x')->json(as: User)\" />"), "r"));
             Assert.Equal("list<User>", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json('users.json', as: User)\" />"), "r"));
             Assert.Equal("User", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json($path, as: User)\" />"), "r"));
             Assert.Equal("list<{ login: string, id: number }>", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json('users.json')\" />"), "r"));

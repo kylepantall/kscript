@@ -1,6 +1,7 @@
 using System.Text;
 
 using KScript.Syntax.Markup;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Formatting
 {
@@ -94,7 +95,7 @@ namespace KScript.Language.Formatting
         {
             int start = t.Content?.SourceSpan.Start ?? t.Span.Start;
             string text = d.Source.Text;
-            return (start > 0 && start <= text.Length && text[start - 1] == '"') || (t.Span.Start < text.Length && text[t.Span.Start] == '"');
+            return (start > 0 && start <= text.Length && text[start - 1] == '"') || (t.Span.Start < text.Length && text[t.Span.Start] is '"' or '`');
         }
 
         private static string Where(MarkupDocument d, int offset) => "line " + (d.Source.GetPosition(Math.Min(offset, d.Source.Length)).Line + 1);
@@ -125,7 +126,17 @@ namespace KScript.Language.Formatting
                         i++;
                     }
                     i = Math.Min(value.Length, i + 1);
-                    sb.Append(value, start, i - start);
+                    // A \ at the end of a line joins it to the next, so where a string is broken doesn't matter.
+                    sb.Append(LineJoins.Join(value.Substring(start, i - start)));
+                    continue;
+                }
+                if (c == '`' && StringBlock.Read(value, i) is StringBlock block)
+                {
+                    // A ``` block means its value: its lines can move as long as they keep their indentation inside it.
+                    if (pendingSpace && sb.Length > 0 && IsWord(sb[sb.Length - 1])) sb.Append(' ');
+                    pendingSpace = false;
+                    sb.Append("```").Append(block.Tag).Append('\n').Append(block.Value).Append(block.Error != null ? "\n!" + block.Error : string.Empty).Append("```");
+                    i = block.End;
                     continue;
                 }
                 if (char.IsWhiteSpace(c))

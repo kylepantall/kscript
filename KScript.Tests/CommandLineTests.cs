@@ -135,6 +135,8 @@ public sealed class CommandLineTests : IDisposable
         Assert.Equal(0, Kscript("test", test).Code);
         Assert.Equal(0, Kscript(test).Code); // a test file run directly runs its tests
         Assert.Equal(0, Kscript("test", test, "--env=ci").Code);
+        Assert.Contains("Usage: kscript worker", Kscript("worker", "--help").Out);
+        Assert.Contains("Usage: kscript queue", Kscript("queue", "--help").Out);
     }
 
     [Fact]
@@ -313,6 +315,19 @@ public sealed class CommandLineTests : IDisposable
         using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
         var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site", "blog"), "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { Cancellation = stop.Token });
         Assert.True(code == 0, error);
+    }
+
+    [Fact]
+    public void Serve_with_a_worker_runs_one_beside_the_server()
+    {
+        Write("site/index.html", "<h1>Hi</h1>");
+        Write("site/kscript.json", "{ \"queue\": { \"default\": \"sync\" } }");
+        using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        var (code, _, error) = Run(new[] { "serve", Path.Combine(dir, "site"), "--port", "0", "--host", "127.0.0.1", "--with-worker" }, (o, e) => new CommandLine { Cancellation = stop.Token });
+        Assert.True(code == 0, error);
+        // The sync connection runs jobs as they are dispatched, so its worker stops straight away and says so.
+        Assert.Contains("nothing for a worker to do", error);
+        Assert.Contains("Worker: stopped.", error);
     }
 
     [Fact]

@@ -71,7 +71,13 @@ namespace KScript.Language.Catalog
             name == null ? null : exactElements.TryGetValue(name, out ElementInfo exact) ? exact : elements.TryGetValue(name, out ElementInfo e) ? e : null;
 
         /// <summary>True when an element's attribute holds a list of names, such as &lt;Middleware use&gt; or &lt;Resource only&gt;.</summary>
-        public bool IsNameList(string element, string attribute) => GetElement(element)?.GetAttribute(attribute)?.IsNameList == true;
+        /// <c>KScript.Document</c> is <c>Document</c> from the package that has it, as in a script.
+        public bool IsNameList(string element, string attribute)
+        {
+            ElementInfo info = GetElement(element);
+            if (info == null && element != null && element.StartsWith("KScript.", StringComparison.Ordinal)) info = GetElement(element.Substring(8));
+            return info?.GetAttribute(attribute)?.IsNameList == true;
+        }
 
         public RetiredInfo GetRetiredElement(string name) => name != null && retiredElements.TryGetValue(name, out RetiredInfo r) ? r : null;
 
@@ -84,10 +90,10 @@ namespace KScript.Language.Catalog
         /// <summary>Methods with this name, best match for the receiver type first.</summary>
         public IEnumerable<CallableInfo> GetMethods(string name, string receiverType = KType.Any) =>
             methods.Where(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
-                   .OrderBy(m => m.ReceiverType == receiverType ? 0 : KType.Accepts(m.ReceiverType, receiverType) ? 1 : 2);
+                   .OrderBy(m => m.ReceiverType == receiverType ? 0 : KType.AcceptsMethod(m.ReceiverType, m.Name, receiverType) ? 1 : 2);
 
         public IEnumerable<CallableInfo> MethodsFor(string receiverType) =>
-            methods.Where(m => KType.Accepts(m.ReceiverType, receiverType))
+            methods.Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiverType))
                    .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
                    .Select(g => g.OrderBy(m => m.ReceiverType == receiverType ? 0 : 1).First());
 

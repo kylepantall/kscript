@@ -6,7 +6,7 @@ KScript.Cache keeps values by key for as long as you say, so slow work (a web re
 import KScript.Cache
 import KScript.Net
 
-repos = $cache->remember('repos', fn() => @fetch('https://api.example.com/repos')->json(), ttl: '10m')
+repos = $cache->remember('repos', fn() => @api('https://api.example.com/repos')->json(), ttl: '10m')
 echo "{ $repos->count() } repos"
 ```
 

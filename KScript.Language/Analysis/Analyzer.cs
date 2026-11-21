@@ -85,6 +85,7 @@ namespace KScript.Language.Analysis
             ApplyKnownTypes(root);
             HoistTypes(root);
             HoistErrors(root);
+            HoistJobs(root);
             CheckScriptRoot();
 
             WalkChildren(result.Markup.Children, root, markupMode: Kind != DocumentKind.Script);
@@ -202,7 +203,7 @@ namespace KScript.Language.Analysis
             Dictionary<string, Symbol> seen = new Dictionary<string, Symbol>(StringComparer.Ordinal);
             foreach (MarkupElement e in result.Markup.DescendantElements())
             {
-                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && IsTypeElement(owner)))
+                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && (IsTypeElement(owner) || IsKScriptElementName(owner, "job"))))
                 {
                     MarkupAttribute nameAttr = e.GetAttribute("name");
                     string name = nameAttr?.ValueText?.Trim();
@@ -398,7 +399,7 @@ namespace KScript.Language.Analysis
             {
                 return constants;
             }
-            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum" || x.Name == "type" || x.Name == "model" || x.Name == "error"))
+            foreach (MarkupElement let in root.ChildElements.Where(x => (x.Name == "let" && IsYes(x.GetAttributeValue("const"))) || x.Name == "const" || x.Name == "enum" || x.Name == "type" || x.Name == "model" || x.Name == "error" || x.Name == "job"))
             {
                 MarkupAttribute nameAttr = let.GetAttribute("name");
                 if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
@@ -579,6 +580,10 @@ namespace KScript.Language.Analysis
 
                 case "error" when info.Package == "KScript.Core":
                     AnalyzeError(e, info, scope, inner, markupMode);
+                    return;
+
+                case "job" when info.Package == "KScript.Queue":
+                    AnalyzeJob(e, info, scope, inner, markupMode);
                     return;
 
                 case "field" when info.Package == "KScript.Core":

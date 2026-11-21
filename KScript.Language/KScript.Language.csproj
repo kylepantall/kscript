@@ -36,6 +36,7 @@
     <ProjectReference Include="..\KScript.Storage\KScript.Storage.csproj" />
     <ProjectReference Include="..\KScript.Cache\KScript.Cache.csproj" />
     <ProjectReference Include="..\KScript.Data\KScript.Data.csproj" />
+    <ProjectReference Include="..\KScript.Queue\KScript.Queue.csproj" />
     <ProjectReference Include="..\KScript.Auth\KScript.Auth.csproj" />
     <ProjectReference Include="..\KScript.Document\KScript.Document.csproj" />
   </ItemGroup>

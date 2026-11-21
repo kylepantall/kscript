@@ -26,10 +26,10 @@ The [samples/documents](https://github.com/kylepantall/kscript/tree/master/sampl
 
 ## Saving
 
-`to:` saves the document when the block ends. The extension picks the format, and several paths separated by commas save several formats:
+`to:` saves the document when the block ends. The extension picks the format, and a list of paths saves several formats:
 
 ```kscript
-KScript.Document(title: "Notes", to: "notes.pdf, notes.docx, notes.tex") {
+KScript.Document(title: "Notes", to: [notes.pdf, notes.docx, notes.tex]) {
   Paragraph "Saved three ways."
 }
 ```
@@ -136,7 +136,7 @@ KScript.Document(template: report, title: "Annual Report", author: "The team", t
 
 ## Maths
 
-`Math` is an equation on its own line. Its text is LaTeX, kept exactly as written, so braces and backslashes need no escaping. Equations are numbered, and `id:` lets the text refer to the number with `[#id]`:
+`Math` is an equation on its own line. Its text is LaTeX, kept exactly as written, so braces and backslashes need no escaping. A long equation can go in a ```` ```latex ```` block over several lines, and a long `Paragraph` can end its lines with `\` (see [Long strings and blocks of text](code-format.md#long-strings-and-blocks-of-text)). Equations are numbered, and `id:` lets the text refer to the number with `[#id]`:
 
 ```kscript
 KScript.Document(title: "Maths", to: "maths.pdf") {

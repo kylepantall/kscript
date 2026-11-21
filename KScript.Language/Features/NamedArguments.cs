@@ -80,7 +80,7 @@ namespace KScript.Language.Features
                 case MethodCallNode m:
                 {
                     TypeShape receiver = InferAt(analysis, region, m.Target);
-                    foreach (CallableInfo method in Catalog.GetMethods(m.Name, receiver.Type).Where(x => KType.Accepts(x.ReceiverType, receiver.Type)))
+                    foreach (CallableInfo method in Catalog.GetMethods(m.Name, receiver.Type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)))
                     {
                         AddCallable(method);
                     }
@@ -100,7 +100,7 @@ namespace KScript.Language.Features
                     {
                         piped = 0; // A method's receiver isn't one of its parameters.
                         TypeShape receiver = InferAt(analysis, region, pipe.Left);
-                        foreach (CallableInfo method in Catalog.GetMethods(id.Name, receiver.Type).Where(x => KType.Accepts(x.ReceiverType, receiver.Type)))
+                        foreach (CallableInfo method in Catalog.GetMethods(id.Name, receiver.Type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)))
                         {
                             AddCallable(method);
                         }

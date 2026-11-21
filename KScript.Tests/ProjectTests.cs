@@ -144,7 +144,8 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,app,config,format,http,lint,make,name,packages,paths,serve,standard,test", Keys(props));
+        Assert.Equal("$schema,app,config,format,http,lint,make,name,packages,paths,queue,serve,standard,test", Keys(props));
+        Assert.Equal("connections,default,env,failed,queues,worker", Keys(props.GetProperty("queue").GetProperty("properties")));
         Assert.Equal("api_prefix,auth,cors,groups,middleware,openapi,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
         Assert.Equal("credentials,headers,methods,origins", Keys(props.GetProperty("http").GetProperty("properties").GetProperty("cors").GetProperty("properties")));
         Assert.Equal("icon,id,main,name,version", Keys(props.GetProperty("app").GetProperty("properties")));

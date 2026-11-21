@@ -84,13 +84,13 @@ jobs:
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll "Example Scripts/Find Oldest Person.xml"
 
       - name: Check KScript 2 samples
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/data "Example Scripts" --warnaserror
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data "Example Scripts" --warnaserror
 
       - name: Check KScript formatting
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/data samples/code-format "Example Scripts" "Example Sites/team"
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data samples/code-format "Example Scripts" "Example Sites/team"
 
       - name: Run KScript tests
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab samples/data
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab samples/queue-app samples/data
 
       - name: Check a new project (kscript make project)
         shell: bash
@@ -289,9 +289,11 @@ jobs:
           "$K" "Example Scripts/Find Oldest Person.xml"
           "$K" check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data "Example Scripts" --warnaserror
           "$K" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data "Example Scripts" "Example Sites/team"
-          "$K" test samples/kscript2 samples/life-lab samples/data
+          "$K" test samples/kscript2 samples/life-lab samples/queue-app samples/data
           # KScript.Data's SQLite library ships beside kscript, like the UI's.
           (cd samples/data && "$K" shop.kscript | grep -q "Paid orders: 1")
+          (cd samples/queue-app && export KSCRIPT_STORAGE_ROOT="$RUNNER_TEMP/kscript-queue" && "$K" signup.kscript && "$K" worker --stop-when-empty | tee "$RUNNER_TEMP/worker.out" && "$K" queue status)
+          grep -q "Ran 4 jobs." "$RUNNER_TEMP/worker.out"
           "$K" openapi samples/http-app | grep -q '"openapi": "3.1.0"'
           time "$K" --version
 

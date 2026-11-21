@@ -33,12 +33,14 @@ namespace KScript.Syntax
 
     public readonly struct Token
     {
-        public Token(TokenKind kind, string text, TextSpan span, string error = null)
+        public Token(TokenKind kind, string text, TextSpan span, string error = null, string tag = null, TextSpan? errorSpan = null)
         {
             Kind = kind;
             Text = text;
             Span = span;
             Error = error;
+            Tag = tag;
+            ErrorSpan = errorSpan ?? span;
         }
 
         public TokenKind Kind { get; }
@@ -50,6 +52,12 @@ namespace KScript.Syntax
 
         /// <summary>A lexer error, for <see cref="TokenKind.Error"/> and unterminated strings.</summary>
         public string Error { get; }
+
+        /// <summary>Where <see cref="Error"/> applies: the token, or a line inside a ``` block.</summary>
+        public TextSpan ErrorSpan { get; }
+
+        /// <summary>For a ``` block, what follows the opening fence (<c>sql</c>, <c>&lt;Repo&gt;</c>); otherwise null.</summary>
+        public string Tag { get; }
 
         public bool Is(string punctuation) => Kind == TokenKind.Punctuation && Text == punctuation;
 
@@ -203,11 +211,18 @@ namespace KScript.Syntax
                 if (close < 0)
                 {
                     Position = end;
-                    return new Token(TokenKind.String, text.Substring(start + 1, end - start - 1), TextSpan.FromBounds(start, end),
+                    return new Token(TokenKind.String, LineJoins.Join(text.Substring(start + 1, end - start - 1)), TextSpan.FromBounds(start, end),
                         $"This string is missing its closing {c}.");
                 }
                 Position = close + 1;
-                return new Token(TokenKind.String, text.Substring(start + 1, close - start - 1), TextSpan.FromBounds(start, Position));
+                // A backslash at the end of a line joins it to the next one: the break isn't part of the string.
+                return new Token(TokenKind.String, LineJoins.Join(text.Substring(start + 1, close - start - 1)), TextSpan.FromBounds(start, Position));
+            }
+
+            if (c == '`' && StringBlock.Read(text, start, end) is StringBlock block)
+            {
+                Position = block.End;
+                return new Token(TokenKind.String, block.Value, TextSpan.FromBounds(start, block.End), block.Error, block.Tag, block.Error != null ? block.ErrorSpan : null);
             }
 
             if ((c == '$' || c == '@') && Position + 1 < end && IsIdentStart(text[Position + 1]))
