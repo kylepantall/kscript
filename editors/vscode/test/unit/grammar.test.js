@@ -96,3 +96,17 @@ test('if with a test attribute keeps its attribute colours', async () => {
   assert.match(scopeOf(tokens, 'test'), /entity\.other\.attribute-name\.kscript/);
   assert.doesNotMatch(scopeOf(tokens, 'test'), /meta\.embedded\.expression/);
 });
+
+test('doc comments colour their tags and the parameters they name', async () => {
+  const grammar = await load();
+  const tokens = tokenize(grammar, '<kscript>\n  <!--- Doubles a number, like @twice.\n    @param x The number.\n    @arg $times How many.\n    @returns Twice x.\n    @llm Use for numbers.\n  -->\n  <fn name="double" params="x, times" value="$x * $times" />\n  <!-- @param plain -->\n</kscript>');
+  assert.match(scopeOf(tokens, '@param'), /comment\.block\.documentation\.kscript storage\.type\.class\.doc\.kscript/);
+  assert.match(scopeOf(tokens, 'x'), /comment\.block\.documentation\.kscript variable\.parameter\.kscript/);
+  assert.match(scopeOf(tokens, '@arg'), /storage\.type\.class\.doc\.kscript/);
+  assert.match(scopeOf(tokens, '$times'), /variable\.parameter\.kscript/);
+  assert.match(scopeOf(tokens, '@returns'), /storage\.type\.class\.doc\.kscript/);
+  assert.match(scopeOf(tokens, '@llm'), /storage\.type\.class\.doc\.kscript/);
+  assert.doesNotMatch(tokens.filter((t) => t.text.includes('@twice')).map((t) => t.scopes).join(), /storage\.type/, 'a tag only counts at the start of a line');
+  const plain = tokens.filter((t) => t.text.includes('@param plain'));
+  assert.ok(plain.length === 1 && /comment\.block\.kscript/.test(plain[0].scopes), 'a plain comment has no tags');
+});

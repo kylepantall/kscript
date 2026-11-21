@@ -822,12 +822,13 @@ namespace KScript.Runtime
                 {
                     Call(fn, args, null, null, module);
                 }
-                catch (KScriptException ex)
-                {
-                    Host.Error.WriteLine(ex.ToString());
-                }
                 catch (ControlSignal)
                 {
+                }
+                catch (Exception ex)
+                {
+                    // A spawned function's error can't reach the script, so it is printed (as a KScript error).
+                    ErrorReport.Write(Host.Error, ex);
                 }
             }, 16 * 1024 * 1024) { IsBackground = true, Name = "kscript spawn " + fn.Name };
             lock (spawned) spawned.Add(thread);

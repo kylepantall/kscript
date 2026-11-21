@@ -43,7 +43,7 @@ namespace KScript.LanguageServer
                 }
             }
 
-            folder ??= Directory.GetCurrentDirectory();
+            folder ??= KScript.Runtime.WorkingFolder.Current;
             if (!Directory.Exists(folder) && !File.Exists(folder))
             {
                 output.WriteLine($"{folder}: folder not found");
@@ -60,7 +60,7 @@ namespace KScript.LanguageServer
                 }
 
                 IReadOnlyList<string> changed = AgentDocs.Write(root, check);
-                string where = Path.GetRelativePath(Directory.GetCurrentDirectory(), root);
+                string where = Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, root);
                 where = where == "." ? string.Empty : $" in {where}";
                 if (check)
                 {
@@ -81,7 +81,7 @@ namespace KScript.LanguageServer
             }
             catch (ProjectConfigException ex)
             {
-                output.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(output, ex);
                 return 2;
             }
         }

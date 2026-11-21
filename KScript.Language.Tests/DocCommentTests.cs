@@ -139,5 +139,146 @@ namespace KScript.Language.Tests
             Assert.False(comment.IsDoc);
             Assert.Null(comment.DocText);
         }
+    
+        [Fact]
+        public void ArgAndArgumentAreOtherNamesForParam()
+        {
+            DocComment doc = DocComment.Parse("Adds.\n@arg a The first.\n@argument $b The second.\n@param c The third.\n@return The sum.");
+            Assert.Equal(new[] { "a", "b", "c" }, doc.Params.Select(p => p.Name));
+            Assert.Equal("The second.", doc.ParamText("b"));
+            Assert.Equal("The sum.", doc.Returns);
+
+            (DocumentAnalysis a, int offset) = At("/// Adds.\n/// @arg a The first.\n/// @arg b The second.\nfn add(a, b) => $a + $b\necho @add(1, ‸)", "test.kscript");
+            Assert.Equal("The second.", Service.GetSignatureHelp(a, offset).Signatures.Single().Parameters[1].Documentation);
+            DocumentAnalysis wrong = Analyze("/// @arg nope Not a parameter.\nfn f(x) => $x", "test.kscript");
+            Assert.Contains("nope", AssertSingle(wrong, "KS4007").Message);
+        }
+
+        [Fact]
+        public void TagsAreCompletedAfterTheAt()
+        {
+            (DocumentAnalysis a, int offset) = At("/// Greets.\n/// @param who The person.\n/// @re‸\nfn greet(who, greeting) => $greeting + $who", "test.kscript");
+            List<CompletionItem> items = Service.GetCompletions(a, offset);
+            string[] labels = items.Select(i => i.Label).ToArray();
+            Assert.Contains("@returns", labels);
+            Assert.Contains("@arg", labels);
+            Assert.Contains("@llm", labels);
+            Assert.Contains("@param greeting", labels);
+            Assert.DoesNotContain("@param who", labels);
+            Assert.DoesNotContain(items, i => i.Kind == CompletionKind.Command);
+            CompletionItem returns = items.Single(i => i.Label == "@returns");
+            Assert.Equal("returns ", returns.InsertText);
+            Assert.Equal("returns", returns.FilterText);
+            Assert.Equal(offset - 2, returns.ReplaceSpan.Start);
+            Assert.False(string.IsNullOrEmpty(returns.Documentation));
+        }
+
+        [Fact]
+        public void TagsWrittenOnceAreNotOfferedAgain()
+        {
+            (DocumentAnalysis a, int offset) = At("/// @returns Text.\n/// @deprecated Old.\n/// @‸\nfn f(x) => $x", "test.kscript");
+            string[] labels = Service.GetCompletions(a, offset).Select(i => i.Label).ToArray();
+            Assert.DoesNotContain("@returns", labels);
+            Assert.DoesNotContain("@deprecated", labels);
+            Assert.Contains("@example", labels);
+            Assert.Contains("@param x", labels);
+
+            // The comment's earlier lines count however far up it starts, even below a blank first line.
+            (DocumentAnalysis b, int at) = At("\n/// @param who The person.\n///\n/// @‸\nfn f(who, b) => 1", "test.kscript");
+            string[] more = Service.GetCompletions(b, at).Select(i => i.Label).ToArray();
+            Assert.Contains("@param b", more);
+            Assert.DoesNotContain("@param who", more);
+        }
+
+        [Fact]
+        public void ParameterTagsAreLeftOutForAConstant()
+        {
+            (DocumentAnalysis a, int offset) = At("/// The limit.\n/// @‸\nconst limit = 3\necho $limit", "test.kscript");
+            string[] labels = Service.GetCompletions(a, offset).Select(i => i.Label).ToArray();
+            Assert.DoesNotContain("@param", labels);
+            Assert.DoesNotContain("@returns", labels);
+            Assert.Contains("@see", labels);
+        }
+
+        [Fact]
+        public void ParameterNamesAreCompletedAfterParamOrArg()
+        {
+            (DocumentAnalysis a, int offset) = At("/// @param who The person.\n/// @arg gr‸\nfn greet(who, greeting: string = 'Hi') => $greeting + $who", "test.kscript");
+            CompletionItem item = Assert.Single(Service.GetCompletions(a, offset));
+            Assert.Equal("greeting", item.Label);
+            Assert.Equal("greeting: string = 'Hi'", item.Detail);
+            Assert.Equal(offset - 2, item.ReplaceSpan.Start);
+
+            (DocumentAnalysis b, int at) = At("/// @param $‸\nfn greet(who) => $who", "test.kscript");
+            Assert.Equal("who", Assert.Single(Service.GetCompletions(b, at)).Label);
+        }
+
+        [Fact]
+        public void NothingElseIsSuggestedInADocComment()
+        {
+            (DocumentAnalysis a, int offset) = At("/// Calls ‸\nfn f(x) => $x", "test.kscript");
+            Assert.Empty(Service.GetCompletions(a, offset));
+        }
+
+        [Fact]
+        public void XmlDocCommentsCompleteTagsAndNames()
+        {
+            const string xml = """
+                <kscript>
+                  <!---
+                    Doubles a number.
+                    @‸
+                  -->
+                  <fn name="double" params="x, times" value="$x * $times" />
+                </kscript>
+                """;
+            (DocumentAnalysis a, int offset) = At(xml, "test.ks.xml");
+            string[] labels = Service.GetCompletions(a, offset).Select(i => i.Label).ToArray();
+            Assert.Contains("@param x", labels);
+            Assert.Contains("@param times", labels);
+            Assert.Contains("@returns", labels);
+
+            (DocumentAnalysis b, int at) = At(xml.Replace("@‸", "@param x The number.\n    @argument ‸"), "test.ks.xml");
+            Assert.Equal("times", Assert.Single(Service.GetCompletions(b, at)).Label);
+
+            (DocumentAnalysis plain, int p) = At("<kscript>\n<!-- @‸ -->\n<fn name=\"f\" value=\"1\" />\n</kscript>", "test.ks.xml");
+            Assert.Empty(Service.GetCompletions(plain, p));
+        }
+
+        [Fact]
+        public void HoverExplainsTagsAndTheParametersTheyName()
+        {
+            const string code = "/// @ar‸g who The person.\n/// @param nope Gone.\nfn greet(who: string) => $who";
+            (DocumentAnalysis a, int offset) = At(code, "test.kscript");
+            HoverResult tag = Service.GetHover(a, offset);
+            Assert.Contains("**@arg**", tag.Markdown);
+            Assert.Contains("The same as `@param`.", tag.Markdown);
+            Assert.Equal(4, tag.Span.Start);
+            Assert.Equal(8, tag.Span.End);
+
+            (DocumentAnalysis b, int at) = At(code.Replace("@ar‸g who", "@arg w‸ho"), "test.kscript");
+            Assert.Contains("**who: string**", Service.GetHover(b, at).Markdown);
+
+            (DocumentAnalysis c, int nope) = At(code.Replace("‸", string.Empty).Replace("@param nope", "@param no‸pe"), "test.kscript");
+            Assert.Contains("has no parameter called `nope`", Service.GetHover(c, nope).Markdown);
+
+            (DocumentAnalysis d, int summary) = At("/// Gree‸ts.\nfn f() => 1", "test.kscript");
+            Assert.Null(Service.GetHover(d, summary));
+        }
+    
+        [Theory]
+        [InlineData("editors/vscode/syntaxes/kscript-code.tmLanguage.json")]
+        [InlineData("editors/vscode/syntaxes/kscript.tmLanguage.json")]
+        public void TheEditorGrammarsKnowEveryTag(string relative)
+        {
+            string grammar = File.ReadAllText(Path.Combine(FormatterTests.RepoRoot(), relative));
+            System.Text.RegularExpressions.Match list = System.Text.RegularExpressions.Regex.Match(grammar, @"\(@\(\?:(returns[^)]*)\)\)");
+            Assert.True(list.Success, "The grammar's doc comment tag pattern was not found.");
+            string[] names = list.Groups[1].Value.Split('|').Select(n => n == "returns?" ? "returns" : n).ToArray();
+            foreach (DocTag tag in DocComment.KnownTags)
+            {
+                Assert.True(names.Contains(tag.Name) || (tag.Name == "return" && names.Contains("returns")), $"{relative} doesn't highlight @{tag.Name}.");
+            }
+        }
     }
 }

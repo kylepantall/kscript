@@ -55,7 +55,7 @@ namespace KScript.Docs
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ProjectConfigException)
             {
-                error.WriteLine($"Could not write the project's docs: {ex.Message}");
+                KScript.Runtime.ErrorReport.Write(error, "Could not write the project's docs.", ex);
                 return 1;
             }
         }

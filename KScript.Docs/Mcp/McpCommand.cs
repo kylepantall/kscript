@@ -66,7 +66,7 @@ namespace KScript.Docs.Mcp
                 }
             }
 
-            folder = Path.GetFullPath(folder ?? Directory.GetCurrentDirectory());
+            folder = Path.GetFullPath(folder ?? KScript.Runtime.WorkingFolder.Current);
             var server = new McpServer(format: format ?? DocsCommand.ProjectFormat(folder), workingDirectory: folder);
             if (http)
             {

@@ -67,12 +67,12 @@ namespace KScript.Style
                     string css = Stylesheets.Compile(source, vars);
                     Directory.CreateDirectory(Path.GetDirectoryName(target));
                     File.WriteAllText(target, css);
-                    output.WriteLine($"{Path.GetRelativePath(Directory.GetCurrentDirectory(), source)} -> {Path.GetRelativePath(Directory.GetCurrentDirectory(), target)}");
+                    output.WriteLine($"{Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, source)} -> {Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, target)}");
                 }
                 catch (KScriptException ex)
                 {
                     failed++;
-                    error.WriteLine(ex.ToString());
+                    KScript.Runtime.ErrorReport.Write(error, ex);
                 }
             }
             return failed == 0 ? 0 : 3;

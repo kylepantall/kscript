@@ -9,8 +9,11 @@ using KScript.Syntax.Markup;
 namespace KScript.Pages
 {
     /// <summary>An error in a page. <see cref="Location"/> says where (file and line).</summary>
-    public class PageException : Exception
+    public class PageException : Exception, KScript.Runtime.IKScriptError
     {
+        public KScript.Runtime.KScriptException ToKScriptError() =>
+            InnerException is KScript.Runtime.KScriptException k && k.Message == Message ? k : KScript.Runtime.ErrorReport.At(Message, "Page", Location, this);
+
         public PageException(string message) : base(message) { }
         public PageException(string message, Exception inner) : base(message, inner) { }
 

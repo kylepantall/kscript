@@ -368,7 +368,7 @@ namespace KScript.Runtime
         {
             if (provider.Failed) return;
             provider.Failed = true;
-            host.Error.WriteLine($"Log provider '{provider.Name}' failed: {ex.Message}");
+            ErrorReport.Write(host.Error, $"Log provider '{provider.Name}' failed.", ex);
         }
 
         /// <summary>The entries every memory provider kept.</summary>

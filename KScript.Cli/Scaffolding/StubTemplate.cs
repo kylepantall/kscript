@@ -266,8 +266,10 @@ namespace KScript.Scaffolding
                 : value.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
     }
 
-    public class StubException : Exception
+    public class StubException : Exception, KScript.Runtime.IKScriptError
     {
         public StubException(string message) : base(message) { }
+
+        public KScript.Runtime.KScriptException ToKScriptError() => new KScript.Runtime.KScriptException(Message, "Template", this);
     }
 }

@@ -140,7 +140,7 @@ namespace KScript.Scaffolding
                     var cli = new CliOutput(output);
                     foreach (var (action, path) in made.Files)
                     {
-                        string where = fromProject && root != "." ? Path.GetRelativePath(Directory.GetCurrentDirectory(), Path.Combine(Path.GetFullPath(root), path)).Replace('\\', '/') : path;
+                        string where = fromProject && root != "." ? Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, Path.Combine(Path.GetFullPath(root), path)).Replace('\\', '/') : path;
                         cli.Info($"{(dryRun ? "Would: " + action.ToLowerInvariant() : action)} {cli.Style.Bold(where)}");
                     }
                     NextSteps(cli, made.Next);
@@ -165,7 +165,7 @@ namespace KScript.Scaffolding
                     var cli = new CliOutput(output);
                     foreach (var (action, path) in route.Files)
                     {
-                        string where = fromProject && root != "." ? Path.GetRelativePath(Directory.GetCurrentDirectory(), Path.Combine(Path.GetFullPath(root), path)).Replace('\\', '/') : path;
+                        string where = fromProject && root != "." ? Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, Path.Combine(Path.GetFullPath(root), path)).Replace('\\', '/') : path;
                         cli.Info($"{(dryRun ? "Would " + (action == "Created" ? "create" : "add" + action.Substring("Added".Length)) : action)} {cli.Style.Bold(where)}");
                     }
                     cli.NewLine();
@@ -177,7 +177,7 @@ namespace KScript.Scaffolding
 
                 var result = Scaffolder.Make(new MakeRequest { Type = type, Name = positional[1], Root = root, Options = options, Force = force, DryRun = dryRun });
                 // In a project, files are made from its site root; show them relative to where the command was run.
-                string shown = !fromProject || root == "." ? result.RelativePath : Path.GetRelativePath(Directory.GetCurrentDirectory(), result.FullPath).Replace('\\', '/');
+                string shown = !fromProject || root == "." ? result.RelativePath : Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, result.FullPath).Replace('\\', '/');
 
                 var file = new CliOutput(output);
                 if (dryRun)
@@ -203,22 +203,22 @@ namespace KScript.Scaffolding
             }
             catch (KScript.Projects.ProjectConfigException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
             catch (StubException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
             catch (IOException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
             catch (UnauthorizedAccessException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return 1;
             }
         }
@@ -251,7 +251,7 @@ namespace KScript.Scaffolding
         /// <summary>The site root of the project the current folder is in, or "." outside a project.</summary>
         private static string ProjectRoot()
         {
-            var project = KScript.Projects.ProjectConfig.FindAndLoad(Directory.GetCurrentDirectory());
+            var project = KScript.Projects.ProjectConfig.FindAndLoad(KScript.Runtime.WorkingFolder.Current);
             if (project == null) return ".";
             string root = project.SiteRoot;
             return Path.GetFullPath(".") == root ? "." : root;
@@ -294,7 +294,7 @@ namespace KScript.Scaffolding
         private static string Shown(string path)
         {
             string full = Path.GetFullPath(path);
-            string rel = Path.GetRelativePath(Directory.GetCurrentDirectory(), full);
+            string rel = Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, full);
             if (!rel.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(rel)) return rel.Replace('\\', '/');
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (home.Length > 0 && full.StartsWith(home + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return "~/" + full.Substring(home.Length + 1).Replace('\\', '/');
@@ -310,7 +310,7 @@ namespace KScript.Scaffolding
         {
             string folderName = ProjectTemplate.FolderFor(name);
             string folder;
-            if (!global && (dir != null || KScript.Projects.ProjectConfig.FindAndLoad(Directory.GetCurrentDirectory()) != null))
+            if (!global && (dir != null || KScript.Projects.ProjectConfig.FindAndLoad(KScript.Runtime.WorkingFolder.Current) != null))
             {
                 string root = dir ?? ProjectRoot();
                 folder = Path.Combine(Path.GetFullPath(root), Scaffolder.TemplatesFolder, folderName);

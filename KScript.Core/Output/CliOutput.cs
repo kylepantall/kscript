@@ -155,10 +155,14 @@ namespace KScript.Output
         public void Warn(string message) => Label("WARN", WarnCode, message);
 
         /// <summary>"   ERROR  message".</summary>
-        public void Error(string message) => Label("ERROR", ErrorCode, message);
+        /// <summary>
+        /// The ERROR label. Pass <paramref name="format"/> false for text that must stay as written, such as an error
+        /// report with a code frame: it isn't wrapped and [brackets] aren't made bold.
+        /// </summary>
+        public void Error(string message, bool format = true) => Label("ERROR", ErrorCode, message, format);
 
         /// <summary>A label of any name and SGR code, then the message; later lines line up under the first.</summary>
-        public void Label(string name, string code, string message)
+        public void Label(string name, string code, string message, bool format = true)
         {
             string label = "  " + Style.Apply($" {name} ", code) + " ";
             string indent = new string(' ', name.Length + 5);
@@ -166,12 +170,18 @@ namespace KScript.Output
             var sb = new StringBuilder();
             for (int i = 0; i < lines.Length; i++)
             {
-                foreach (string part in Wrap(lines[i], Width - indent.Length))
+                if (i > 0 && lines[i].Length == 0)
                 {
-                    sb.Append(sb.Length == 0 ? label : indent).Append(Highlight(part)).Append('\n');
+                    sb.Append('\n');
+                    continue;
+                }
+                foreach (string part in format ? Wrap(lines[i], Width - indent.Length) : new[] { lines[i] })
+                {
+                    sb.Append(sb.Length == 0 ? label : indent).Append(format ? Highlight(part) : part).Append('\n');
                 }
             }
             Writer.Write(sb.ToString().Replace("\n", Writer.NewLine));
+            Writer.Flush();
         }
 
         /// <summary>[bracketed] parts of a label's message (paths, names, URLs) are shown bold, as artisan does.</summary>

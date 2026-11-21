@@ -18,7 +18,7 @@ namespace KScript.Testing
 
         public static int Run(string[] args, TextWriter output, TextWriter error, CancellationToken cancellation = default, bool? color = null, string workingDirectory = null)
         {
-            string cwd = workingDirectory ?? Directory.GetCurrentDirectory();
+            string cwd = workingDirectory ?? KScript.Runtime.WorkingFolder.Current;
             var paths = new List<string>();
             var settings = new TestRunSettings { Cancellation = cancellation, BaseDirectory = cwd };
             string junit = null;
@@ -70,7 +70,7 @@ namespace KScript.Testing
                 }
                 catch (ProjectConfigException ex)
                 {
-                    return Fail(error, ex.Message);
+                    return Fail(error, ex);
                 }
                 paths.Add(project?.Directory ?? cwd);
             }
@@ -154,7 +154,7 @@ namespace KScript.Testing
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    error.WriteLine($"Could not write {junit}: {ex.Message}");
+                    KScript.Runtime.ErrorReport.Write(error, $"Could not write {junit}.", ex);
                     return 1;
                 }
             }
@@ -194,6 +194,12 @@ namespace KScript.Testing
         {
             string pad = new string(' ', spaces);
             return string.Join("\n", (text ?? string.Empty).Replace("\r\n", "\n").Split('\n').Select(l => pad + l));
+        }
+
+        private static int Fail(TextWriter error, Exception ex)
+        {
+            KScript.Runtime.ErrorReport.Write(error, ex);
+            return 1;
         }
 
         private static int Fail(TextWriter error, string message)

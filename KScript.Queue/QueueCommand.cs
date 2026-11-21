@@ -76,7 +76,7 @@ namespace KScript.Queueing
                 }
             }
 
-            QueueContext context = Context(project ?? workingDirectory ?? Directory.GetCurrentDirectory(), environment, error);
+            QueueContext context = Context(project ?? workingDirectory ?? KScript.Runtime.WorkingFolder.Current, environment, error);
             if (context == null) return 1;
             var worker = new Worker(context, options, output);
             try
@@ -98,7 +98,7 @@ namespace KScript.Queueing
             }
             catch (KScriptException ex)
             {
-                return Fail(error, ex.Message);
+                return Fail(error, ex);
             }
         }
 
@@ -142,7 +142,7 @@ namespace KScript.Queueing
             }
             if (rest.Count == 0) return Fail(error, "Usage: " + QueueUsage);
 
-            QueueContext context = Context(project ?? workingDirectory ?? Directory.GetCurrentDirectory(), environment, error);
+            QueueContext context = Context(project ?? workingDirectory ?? KScript.Runtime.WorkingFolder.Current, environment, error);
             if (context == null) return 1;
             IQueueDriver driver;
             try
@@ -151,7 +151,7 @@ namespace KScript.Queueing
             }
             catch (KScriptException ex)
             {
-                return Fail(error, ex.Message);
+                return Fail(error, ex);
             }
             if (driver == null) return Fail(error, "The sync connection runs jobs as they are dispatched, so it has no queue to look at. Name another with --connection.");
             string target = rest.Count > 1 ? rest[1] : null;
@@ -187,6 +187,7 @@ namespace KScript.Queueing
                     cli.NewLine();
                     cli.TwoColumn(cli.Style.Bold("Connection"), $"{driver.Name} ({driver.Kind})");
                     if (driver is FileQueueDriver f) cli.TwoColumn(cli.Style.Bold("Folder"), f.Folder);
+                    if (driver is DatabaseQueueDriver d) cli.TwoColumn(cli.Style.Bold("Database"), d.Where);
                     cli.NewLine();
                     string Count(int n, Func<string, string> colour) => n == 0 ? cli.Style.Gray("0") : colour(N(n));
                     cli.Table(new[] { "Queue", "Waiting", "Delayed", "Running", "Failed" },
@@ -262,7 +263,7 @@ namespace KScript.Queueing
             }
             catch (ProjectConfigException ex)
             {
-                error.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(error, ex);
                 return null;
             }
             if (project != null)
@@ -296,6 +297,12 @@ namespace KScript.Queueing
             string message = job.LastError.TryGetValue("message", out object m) ? Values.ToStr(m) : string.Empty;
             string text = type + ": " + message;
             return text.Length > 80 ? text.Substring(0, 77) + "..." : text;
+        }
+
+        private static int Fail(TextWriter error, Exception ex)
+        {
+            KScript.Runtime.ErrorReport.Write(error, ex);
+            return 1;
         }
 
         private static int Fail(TextWriter error, string message)
