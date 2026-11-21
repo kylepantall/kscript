@@ -78,6 +78,15 @@ test('the manifest is consistent', () => {
     JSON.parse(fs.readFileSync(path.join(__dirname, '../..', g.path), 'utf8'));
   }
   assert.ok(fs.existsSync(path.join(__dirname, '../..', pkg.icon)));
+  const ignore = fs.readFileSync(path.join(__dirname, '../../.vscodeignore'), 'utf8');
+  for (const id of ['kscript', 'kscript-code']) {
+    const lang = pkg.contributes.languages.find((l) => l.id === id);
+    for (const theme of ['light', 'dark']) {
+      const icon = lang.icon && lang.icon[theme];
+      assert.ok(icon && fs.existsSync(path.join(__dirname, '../..', icon)), `${id} has a ${theme} file icon`);
+      assert.match(ignore, new RegExp('^!' + path.dirname(icon).replace('./', '') + '/\\*\\*$', 'm'), `${icon} is packaged`);
+    }
+  }
   const used = fs.readFileSync(path.join(__dirname, '../../extension.js'), 'utf8');
   for (const c of pkg.contributes.commands) {
     assert.ok(used.includes(`'${c.command}'`), `${c.command} is registered`);
