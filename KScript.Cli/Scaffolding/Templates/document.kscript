@@ -19,7 +19,8 @@ KScript.Document(
   Abstract "One paragraph on what this document is about."
 
   Section(title: Introduction, id: intro) {
-    Paragraph "Text can be **bold** or *italic*, hold maths such as \( e^{i\pi} + 1 = 0 \), and footnotes.^[Like this one.]"
+    Paragraph "Text can be **bold** or *italic*, hold maths such as \( e^{i\pi} + 1 = 0 \), \
+      and footnotes.^[Like this one.]"
   }
 
   Section(title: Results) {

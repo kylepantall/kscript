@@ -125,6 +125,7 @@ Each thing the formatter does is a rule you can turn off under `format.rules` (`
 | `finalNewline` | Ends the file with exactly one newline. | The file ends as it did. |
 | `spacing` | `.kscript` files: one space after commas and colons, around `=` and `=>`, and before a block's `{`. | Spacing inside lines is kept. |
 | `braceStyle` | `.kscript` files: `} else {`, `} catch {` on one line. | `else` and `catch` stay on the line they're on. |
+| `wrapStrings` | `.kscript` files: breaks a string that runs past `printWidth` at a space, ending the line with `\` so the break isn't part of the string. | Long strings stay on one line. |
 
 In `.kscript` files, `tidyTags` does nothing, `wrapAttributes` wraps long calls, arrays and maps, and `statementPerLine` opens up one-line blocks and splits `;`.
 

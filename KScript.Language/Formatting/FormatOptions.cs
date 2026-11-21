@@ -63,6 +63,9 @@ namespace KScript.Language.Formatting
         /// <summary>.kscript files: <c>} else {</c>, <c>} catch {</c> on one line. Off: else and catch stay on the line they are on.</summary>
         public bool BraceStyle { get; set; } = true;
 
+        /// <summary>.kscript files: break a string past the print width with a \ at the end of the line. Off: long strings stay on one line.</summary>
+        public bool WrapStrings { get; set; } = true;
+
         public static FormatOptions Default => new FormatOptions();
 
         /// <summary>
@@ -101,6 +104,7 @@ namespace KScript.Language.Formatting
                     case "finalNewline": options.FinalNewline = rule.Value; break;
                     case "spacing": options.Spacing = rule.Value; break;
                     case "braceStyle": options.BraceStyle = rule.Value; break;
+                    case "wrapStrings": options.WrapStrings = rule.Value; break;
                 }
             }
             return options;

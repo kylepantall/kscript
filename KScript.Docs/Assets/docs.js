@@ -144,14 +144,27 @@
     return out;
   }
 
-  var KS = new RegExp("(\\/\\/[^\\n]*)|(\"(?:[^\"\\\\]|\\\\.)*\")|('(?:[^'\\\\]|\\\\.)*')|" + LITERALS
+  // A \ at the end of a line carries a string on to the next, so an escape can be followed by a new line.
+  var KS = new RegExp("(\\/\\/[^\\n]*)|(\"(?:[^\"\\\\]|\\\\[\\s\\S])*\")|('(?:[^'\\\\]|\\\\[\\s\\S])*')|" + LITERALS
     + "|(\\$[A-Za-z_]\\w*)|(@[A-Za-z_][\\w.]*)|(->\\s*[A-Za-z_]\\w*)|\\b(\\d+(?:\\.\\d+)?)\\b"
     + "|(:\\s*)(" + TYPES + "|[A-Z]\\w*)(?![\\w-])"
     + "|^(\\s*)(min|max|pattern|one_of|not|validate|normalize|parse)(?=\\s*:\\s*(?![A-Za-z_][\\w.\\[\\]?]*\\s*(?:=|$)))"
     + "|\\b(type|enum)(\\s+)([A-Za-z_]\\w*)(?:(\\s+with\\s*\\[)([^\\]\\n]*)(\\]))?"
     + "|\\b(if|elif|else|for|in|at|while|match|case|when|default|fn|return|try|catch|finally|throw|import|from|as|const|echo|break|continue|exit|and|or|not|yes|no|true|false|null|type|enum|with)\\b"
     + "|\\b([A-Z][\\w.]*|[a-z_][\\w-]*)(?=\\s*[({])", 'gm');
+  // ```lang ... ``` blocks: text up to a closing fence of the same length, with the language or <Type> after the fence.
+  var FENCE = /(`{3,})([^\n`]*)\n[\s\S]*?\n[ \t]*\1(?!`)/g;
   function hlKscript(src) {
+    var out = '', last = 0, m, fence = new RegExp(FENCE.source, 'g');
+    while ((m = fence.exec(src))) {
+      out += hlKscriptCode(src.slice(last, m.index));
+      var body = m[0].slice(m[1].length + m[2].length);
+      out += span('str', esc(m[1])) + (m[2].trim() ? span('type', esc(m[2])) : esc(m[2])) + span('str', m[2].trim() ? esc(body) : hlTemplate(body));
+      last = m.index + m[0].length;
+    }
+    return out + hlKscriptCode(src.slice(last));
+  }
+  function hlKscriptCode(src) {
     var re = new RegExp(KS.source, 'gm'), out = '', last = 0, m;
     while ((m = re.exec(src))) {
       out += esc(src.slice(last, m.index));

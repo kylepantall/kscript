@@ -92,6 +92,54 @@ Row(gap: 8, wrap) {
 }
 ```
 
+## Long strings and blocks of text
+
+End a line inside a string with `\` to carry the string on to the next line. The new line and the next line's
+indentation aren't part of the string, so a long string can follow the code's indentation:
+
+```kscript try
+name = 'Kyle'
+echo "Hello { $name }. KScript reads your whole script, checks it, \
+  and only then runs it."
+```
+
+That prints one line. It works in `"text"` and in `'expression strings'`, and keeps any spaces before the `\`. Write
+`\\` for a backslash of your own at the end of a line of text. `kscript fmt` uses it to wrap a string that runs past
+`printWidth` (the [`wrapStrings`](formatting.md) rule).
+
+For text that should keep its new lines, such as a query, a template or an equation, use a block fenced with three
+backticks, as in Markdown:
+
+````kscript
+echo ```
+  Hi { $name },
+  your order has shipped.
+  ```
+
+query = ```sql
+  SELECT * FROM users
+  WHERE active = 1
+  ```
+
+repo = ```<Repo>
+  { "name": "kscript", "stars": 12 }
+  ```
+````
+
+- The block runs from the opening fence to a line that starts with the same number of backticks. Use four (or more)
+  when the text holds three.
+- The closing fence's indentation is taken off every line, so the block sits at the code's indentation and keeps any
+  indentation inside it. A line indented less than the closing fence is an error. The new lines just inside the
+  fences aren't part of the text.
+- A word after the fence (`sql`, `html`, `json`, `latex`, `md`, ...) names the language. It changes nothing at run time;
+  editors use it to highlight the block.
+- A type in angle brackets parses the block: `` ```<json> `` is the parsed JSON, and `` ```<Repo> `` maps it onto a
+  `type`, with the same checks (and `Shape` errors) as `->json(as: $Repo)`.
+- As an element's text (after `echo`, `Paragraph`, `Math`, ...) a block is the same as `"text"`: `{ }` interpolates
+  where the element interpolates, and `Math` keeps its braces. In an expression it is a string, like `'single quotes'`.
+  No escapes apply inside a block.
+- Code can carry on after the closing fence on the same line: `` ``` ) `` or `` ```->trim() ``.
+
 ## Rules
 
 - A statement ends at a new line, `;` or the `}` that closes its block. It carries on when a bracket is open, the
@@ -100,7 +148,8 @@ Row(gap: 8, wrap) {
 - In the head of `if`, `elif`, `for`, `while`, `match`, `case` and `when`, the first `{` outside brackets opens the
   block. Wrap a map literal in parentheses there.
 - `"double quotes"` are text, exactly like XML element text or an attribute value: `{ }` and `$name` interpolate where
-  the element interpolates, and `\"` and `\\` are the only escapes. `'single quotes'` are string literals inside
+  the element interpolates, and `\"` and `\\` are the only escapes (plus a `\` at the end of a line, which joins it to
+  the next: see [Long strings and blocks of text](#long-strings-and-blocks-of-text)). `'single quotes'` are string literals inside
   expressions, as before.
 - In `name(...)` a value runs to the next `,` or `)` outside brackets; quote it to include a comma. A bare name such
   as `wrap` means `wrap="yes"`.

@@ -89,7 +89,8 @@ namespace KScript.Projects
                       "collapseBlankLines": true,
                       "finalNewline": true,
                       "spacing": true,
-                      "braceStyle": true
+                      "braceStyle": true,
+                      "wrapStrings": true
                     }
                   }
                 }
