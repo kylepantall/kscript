@@ -36,6 +36,15 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ARegexAtTheEndOfALineDoesntContinueIt()
+        {
+            string code = Lines("type Sku with [string] {", "  pattern: /^[A-Z]{3}-\\d{4}$/", "  min: 1", "}",
+                "r = /a\\//", "x = 1", "half = $x /", "  2", "both = $x / 2 /", "  3", "f = fn() => [/a/, /b/]", "list = [", "  /a/", "]", "fn re() {", "  return /x/", "}", "y = 2");
+            Assert.Equal(code, Fmt(code));
+            Assert.Equal(code, Fmt(code.Replace("\n  min: 1", "\n      min: 1")));
+        }
+
+        [Fact]
         public void IndentsBlocksByNesting()
         {
             string input = "x = 1\nif $x > 0 {\n      for i in 1..3 {\necho $i\n}\n}\n";

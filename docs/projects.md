@@ -185,6 +185,7 @@ kscript make page "people/[id]"                       # people/[id].html, with $
 kscript make css theme --primary "#3355ff"            # styles/theme.ks.css, served as /styles/theme.css
 kscript make type Repo --fields "name: string, stars: int from stargazers_count"   # types/repo.kscript
 kscript make enum Size --values small,medium,large    # types/size.kscript
+kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/"   # types/sku.kscript
 kscript make module pricing --fns subtotal,total      # lib/pricing.kscript
 kscript make window settings                          # settings.kscript, a desktop window
 kscript make document annual-report                   # documents/annual-report.kscript, a PDF and Word document
@@ -216,7 +217,7 @@ my-app/
   _partials/       make partial
   styles/          make css
   lib/             make module, const, cache, storage and logger
-  types/           make type, make enum
+  types/           make type, make native, make enum
   errors/          make error
   jobs/            make job
   documents/       make document

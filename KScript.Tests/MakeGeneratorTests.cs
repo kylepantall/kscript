@@ -335,6 +335,64 @@ public sealed class MakeGeneratorTests : IDisposable
     }
 
     [Fact]
+    public void NativeTypesAreCheckedWhereverTheyAreUsed()
+    {
+        string app = Project();
+        foreach (var args in new[]
+        {
+            new[] { "native", "Sku", "--pattern", "/^[A-Z]{3}-\\d{4}$/", "--normalize", "$value->trim()->upper()", "--validate", "not $value->starts_with('ZZZ'), 'ZZZ is kept for tests'" },
+            new[] { "native", "Percent", "--base", "int", "--min", "0", "--max", "100" },
+            new[] { "native", "Username", "--base", "handle", "--max", "16", "--not", "@admin,@root" },
+            new[] { "native", "Tier", "--one-of", "gold,silver" },
+            new[] { "native", "Level", "--base", "int", "--one-of", "1,2,3" },
+            new[] { "native", "Note" },
+        })
+        {
+            var (code, _, err) = Make(app, args);
+            Assert.True(code == 0, string.Join(" ", args) + ": " + err);
+        }
+        Assert.Equal("""
+            /// Percent: a native type built on int. A value that breaks a rule fails where it is made, and the editor checks the values written in code.
+            type Percent with [int] {
+              min: 0
+              max: 100
+              // Rules: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
+            }
+
+            """, Read(app, "types/percent.kscript"));
+        Assert.Contains("  not: [@admin, @root]\n", Read(app, "types/username.kscript"));
+        Assert.Contains("  one_of: ['gold', 'silver']\n", Read(app, "types/tier.kscript"));
+        Assert.Contains("  one_of: [1, 2, 3]\n", Read(app, "types/level.kscript"));
+        Assert.Contains("type Note with [string] {\n", Read(app, "types/note.kscript"));
+
+        File.WriteAllText(Path.Combine(app, "try.kscript"), """
+            import "types/sku.kscript"
+            import "types/percent.kscript"
+            import "types/username.kscript"
+            import "types/tier.kscript"
+            import "types/level.kscript"
+            sku: Sku = abc-1234
+            who: Username = @Joan
+            tier: Tier = gold
+            fn off(p: Percent, l: Level) => $p * $l
+            echo "$sku $who $tier { @off(15, 2) }"
+            try {
+              bad: Sku = zzz-0001
+            } catch err {
+              echo $err.message
+            }
+            """);
+        AssertNoErrors(app);
+        string tryFile = Path.Combine(app, "try.kscript");
+        Assert.Equal("ABC-1234 @joan gold 30\n$bad doesn't fit Sku: ZZZ is kept for tests.\n", ScriptRunner.Run(File.ReadAllText(tryFile), path: tryFile));
+
+        File.AppendAllText(tryFile, "\nlate: Username = @root\necho $late\n");
+        var check = new StringWriter();
+        KScript.LanguageServer.CheckCommand.Run(new[] { app }, check);
+        Assert.True(Regex.IsMatch(check.ToString(), @"try.kscript\(\d+,\d+\): error KS5012: '@root' doesn't fit Username: it is reserved \('@root'\)\."), check.ToString());
+    }
+
+    [Fact]
     public void ListAndHelpShowEachTypesOptionsAndExamples()
     {
         string app = Project();
