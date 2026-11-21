@@ -32,9 +32,9 @@ jobs:
     timeout-minutes: 15
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON('["home-ci-linux"]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         env:
           DOTNET_INSTALL_DIR: ${{ runner.environment == 'self-hosted' && format('{0}/dotnet', runner.tool_cache) || '' }}
         with:
@@ -72,12 +72,12 @@ jobs:
             hosted: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # home-ci has no system-wide .NET SDK and the runner user can't write to
       # setup-dotnet's default /usr/share/dotnet, so on the self-hosted job it
       # installs into the runner's tool cache (kept between jobs) instead.
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         env:
           DOTNET_INSTALL_DIR: ${{ matrix.self-hosted && format('{0}/dotnet', runner.tool_cache) || '' }}
         with:
@@ -85,7 +85,7 @@ jobs:
 
       # GitHub-hosted runners start empty, so keep the NuGet packages between runs (restore on Windows took
       # ~40 s without them). home-ci keeps its own package folder between jobs.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         if: runner.environment == 'github-hosted'
         with:
           path: ~/.nuget/packages
@@ -177,9 +177,9 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         env:
           DOTNET_INSTALL_DIR: ${{ matrix.self-hosted && format('{0}/dotnet', runner.tool_cache) || '' }}
         with:
@@ -187,7 +187,7 @@ jobs:
 
       # GitHub-hosted runners start empty, so keep the NuGet packages between runs (restore on Windows took
       # ~40 s without them). home-ci keeps its own package folder between jobs.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         if: runner.environment == 'github-hosted'
         with:
           path: ~/.nuget/packages
@@ -285,9 +285,9 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -364,7 +364,7 @@ jobs:
           grep -q "search_docs" mcp.out
           cat serve.log docs.log
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -386,13 +386,13 @@ jobs:
       run:
         working-directory: editors/vscode
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -419,7 +419,7 @@ jobs:
       - name: Run in VS Code
         run: xvfb-run -a npm run test:vscode -- ../../KScriptApp/bin/Release/net8.0/KScript.dll
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: kscript-vscode
           path: editors/vscode/kscript-vscode.vsix
