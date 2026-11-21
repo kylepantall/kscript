@@ -26,6 +26,7 @@ namespace KScript.Language.Analysis
                     return;
 
                 case LiteralNode literal:
+<<<<<<< HEAD
                     if (literal.Template != null)
                     {
                         // "Hello $name": each part is a value of its own.
@@ -35,6 +36,8 @@ namespace KScript.Language.Analysis
                         }
                         return;
                     }
+=======
+>>>>>>> origin/master
                     CheckTextIsNotATemplate(literal, region, scope);
                     return;
 

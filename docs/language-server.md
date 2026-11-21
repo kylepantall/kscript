@@ -84,7 +84,11 @@ always in the description the package registers.
 | Range | Area |
 | --- | --- |
 | KS1xxx | Markup (malformed XML, unclosed tags, front matter) |
+<<<<<<< HEAD
 | KS2xxx | Expressions (syntax, assignment outside `let`/`set`/`do`, bare identifiers), KS2005 `'single quotes'` around text that names a variable (only `"double quotes"` fill it in) |
+=======
+| KS2xxx | Expressions (syntax, assignment outside `let`/`set`/`do`, bare identifiers), KS2005 text used as a value that holds `$name` (only templates fill it in) |
+>>>>>>> origin/master
 | KS3xxx | Elements and attributes (unknown, retired, missing, invalid values, placement), imports (KS3009 missing import, KS3010 unknown package) |
 | KS4xxx | Names (undefined variables and functions, constants, duplicates) |
 | KS5xxx | Calls (unknown or retired commands and methods, argument counts, type mismatches), KS5010 a field a `<type>`'s records don't have, KS5011 an error type in `catch`, `throw`, `extends` or `expect-error` that isn't declared or built in, KS5012 a literal that doesn't fit its declared type (`a: Age = 200`, `e: email = bob@`) |

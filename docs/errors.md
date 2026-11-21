@@ -75,6 +75,7 @@ name = $other        // right: another variable
 
 ## KS2005
 
+<<<<<<< HEAD
 **Single quotes keep text as written.** `"Double quotes"` fill in `$name` and `{ }`. `'Single quotes'` never do, so a variable named inside them is not filled in. The quick fix changes the quotes.
 
 ```kscript
@@ -90,6 +91,15 @@ The same code warns when SQL text is filled in before it reaches `@sql`, because
 query = "select * from users where id = {$id}"   // filled in here
 rows = @sql($query)                              // warning: nothing left to send as a parameter
 rows = @sql("select * from users where id = {$id}")   // right: {$id} is a parameter
+=======
+**Text used as a value is not a template.** The text after `echo` fills in `$name` and `{ }`. Text given to a variable, returned from a function or passed to a command is kept exactly as written.
+
+```kscript
+name = 'Joan'
+greeting = "Hello $name"         // wrong: holds the text "Hello $name"
+greeting = 'Hello ' + $name      // right
+echo "Hello $name"               // right: echo's text is a template
+>>>>>>> origin/master
 ```
 
 ## Statements

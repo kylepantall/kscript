@@ -8,4 +8,5 @@ example: kscript make script tools/backup --format xml
 to: {{ paths.scripts }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Run it: kscript {{ paths.scripts }}/{{ dir }}{{ kebab }}{{ ext }}
 ---
+// TODO: Write what the script does.
 echo "Hello from {{ title }}!"

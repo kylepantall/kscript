@@ -105,7 +105,7 @@ public class ScaffolderTests
         Assert.Equal("", err);
         Assert.Contains("Created _components/hero.html", output);
         Assert.Contains("<hero title=\"…\" sub-title=\"…\" />", output);
-        Assert.Equal("<section class=\"hero\">\n  <p>{$title}</p>\n  <p>{$sub_title}</p>\n  <slot />\n</section>\n", Read(site, "_components/hero.html"));
+        Assert.Equal("<section class=\"hero\">\n  <p>{$title}</p>\n  <p>{$sub_title}</p>\n  <!-- TODO: Add what the component shows. <slot /> is where the content between its tags goes. -->\n  <slot />\n</section>\n", Read(site, "_components/hero.html"));
 
         // A one-word component works as <hero>, not only hyphenated names.
         site.Write("index.html", "<hero title=\"Hello\" sub-title=\"World\"><b>inner</b></hero>");
@@ -142,7 +142,7 @@ public class ScaffolderTests
         using var site = new TempSite(("_layout.html", "<html><title>{$title}</title><body><slot /></body></html>"));
         Assert.Equal(0, Make(site.Root, "page", "AboutUs", "--title", "About the team").Code);
 
-        Assert.Equal("<layout src=\"_layout.html\" title=\"About the team\">\n  <h1>About the team</h1>\n</layout>\n", Read(site, "about-us.html"));
+        Assert.Equal("<layout src=\"_layout.html\" title=\"About the team\">\n  <h1>About the team</h1>\n  <!-- TODO: Add what the page shows. -->\n</layout>\n", Read(site, "about-us.html"));
         string html = site.Render("about-us.html").Body;
         Assert.Contains("<title>About the team</title>", html);
         Assert.Contains("<h1>About the team</h1>", html);
@@ -230,7 +230,7 @@ public class ScaffolderTests
         using var site = new TempSite();
         // Scripts are .kscript by default, and XML with --format xml.
         Assert.Equal(0, Make(site.Root, "script", "tidy_downloads").Code);
-        Assert.Equal("echo \"Hello from Tidy Downloads!\"\n", Read(site, "scripts/tidy-downloads.kscript"));
+        Assert.Equal("// TODO: Write what the script does.\necho \"Hello from Tidy Downloads!\"\n", Read(site, "scripts/tidy-downloads.kscript"));
         var output = new StringWriter();
         new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(output, "")).RunFile(Path.Combine(site.Root, "scripts", "tidy-downloads.kscript"));
         Assert.Contains("Hello from Tidy Downloads!", output.ToString());

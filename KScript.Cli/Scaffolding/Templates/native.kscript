@@ -40,5 +40,5 @@ type {{ pascal }} with [{{ base }}] {
 {{#if validate}}
   validate: {{ validate }}
 {{/if}}
-  // Rules: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
+  // TODO: Add the rules a value must follow: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
 }

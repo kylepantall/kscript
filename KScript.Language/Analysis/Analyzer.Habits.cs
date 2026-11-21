@@ -134,6 +134,7 @@ namespace KScript.Language.Analysis
 
         private static readonly Regex TemplatePart = new Regex(@"\$([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)|\{\s*([^{}]+?)\s*\}", RegexOptions.Compiled);
 
+<<<<<<< HEAD
         /// <summary>Variables given text in "double quotes" that was filled in: <c>query = "... {$id}"</c>.</summary>
         private readonly HashSet<string> filledTexts = new HashSet<string>(StringComparer.Ordinal);
 
@@ -141,6 +142,11 @@ namespace KScript.Language.Analysis
         /// <c>greeting = 'Hello $name'</c>: "double quotes" fill in <c>$name</c> and <c>{ $expr }</c>, 'single quotes' keep
         /// the text as written. Warns when single-quoted text names a variable that exists, and offers double quotes
         /// (or, in an XML script, where an attribute's value is already inside double quotes, the joined form).
+=======
+        /// <summary>
+        /// <c>greeting = "Hello $name"</c>: text after echo is a template, but text used as a value is kept as written,
+        /// so this prints "Hello $name". Warns when the text names a variable that exists, and offers the joined form.
+>>>>>>> origin/master
         /// </summary>
         private void CheckTextIsNotATemplate(LiteralNode literal, ExpressionRegion region, Scope scope)
         {
@@ -149,7 +155,11 @@ namespace KScript.Language.Analysis
                 return;
             }
             TextSpan span = region.Source.ToSource(literal.Span);
+<<<<<<< HEAD
             if (span.Length < 2 || span.End > source.Length || source.Text[span.Start] != '\'')
+=======
+            if (span.Length < 2 || span.End > source.Length || (source.Text[span.Start] != '"' && source.Text[span.Start] != '\''))
+>>>>>>> origin/master
             {
                 return;
             }
@@ -170,6 +180,7 @@ namespace KScript.Language.Analysis
                 return;
             }
 
+<<<<<<< HEAD
             // Only offer a rewrite when the text is written exactly as it reads (no escapes or entities inside).
             bool plain = span.Length == literal.Value.Length + 2;
             string rewritten = !plain ? null
@@ -196,6 +207,14 @@ namespace KScript.Language.Analysis
                     $"${v.Name} was given text in double quotes, so its values are already pasted into the SQL and are not sent as parameters. "
                     + $"Give ${v.Name} its text in single quotes, or write the text inside the call.");
             }
+=======
+            // Only offer the rewrite when the text is written exactly as it reads (no escapes or entities inside).
+            string joined = span.Length == literal.Value.Length + 2 ? JoinedText(literal.Value) : null;
+            Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.TextNotFilledIn,
+                $"${names[0]} is not filled in here: only the text after echo is a template, so this stays as written."
+                    + (joined != null ? $" Join the parts instead: {joined}." : " Join the parts with + instead."),
+                joined != null ? new[] { new QuickFix($"Change to {joined}", new TextChange(span, joined)) } : null);
+>>>>>>> origin/master
         }
 
         /// <summary><c>Hello $name!</c> as <c>'Hello ' + $name + '!'</c>, or null when the text can't be written in single quotes.</summary>
