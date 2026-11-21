@@ -29,7 +29,7 @@ namespace KScript.Docs.Mcp
         public McpServer(DocsSite site = null, string format = "kscript", string workingDirectory = null)
         {
             Docs = new DocsMarkdown(site ?? DocsSite.Build());
-            Tools = new DocsTools(Docs, format ?? "kscript", workingDirectory ?? Directory.GetCurrentDirectory());
+            Tools = new DocsTools(Docs, format ?? "kscript", workingDirectory ?? KScript.Runtime.WorkingFolder.Current);
         }
 
         public DocsMarkdown Docs { get; }

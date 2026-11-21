@@ -77,7 +77,8 @@ public class SystemIdeHostTests
         github.Routes[Repo + "latest"] = Release("v0.4.0", url: "https://unreachable.test/x.vsix");
         var (path, _, error) = Download(github, null);
         Assert.Null(path);
-        Assert.Contains("Could not reach GitHub: no route", error);
+        Assert.Contains("ERROR  Could not reach GitHub.", error);
+        Assert.Contains(": no route", error);
     }
 
     [Fact]

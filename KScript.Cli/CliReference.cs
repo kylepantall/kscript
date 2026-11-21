@@ -26,6 +26,7 @@ namespace KScript
                 new[]
                 {
                     O("--env name", "The environment for $config: reads <name>.yaml, .env.<name> and sets KSCRIPT_ENV."),
+                    O("--debug", "Show the .NET exception and stack trace behind an error (also KSCRIPT_DEBUG=1). Works with every command."),
                 },
                 "kscript hello.ks.xml Joan\nkscript --env staging deploy.kscript", "language"),
             new CliCommand("check", "kscript check [file-or-folder]... [--warnaserror] [--format text|json]",

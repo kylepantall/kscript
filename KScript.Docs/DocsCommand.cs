@@ -62,7 +62,7 @@ namespace KScript.Docs
                         openBrowser = false;
                         break;
                     case "--project":
-                        return ProjectDocsOutput.Start(Directory.GetCurrentDirectory(), output, error);
+                        return ProjectDocsOutput.Start(KScript.Runtime.WorkingFolder.Current, output, error);
                     default:
                         if (args[i].StartsWith("-", StringComparison.Ordinal) && !args[i].StartsWith("->", StringComparison.Ordinal))
                         {
@@ -86,7 +86,7 @@ namespace KScript.Docs
             try
             {
                 DocsSite site = DocsSite.Build();
-                site.Format = format ?? ProjectFormat(Directory.GetCurrentDirectory());
+                site.Format = format ?? ProjectFormat(KScript.Runtime.WorkingFolder.Current);
                 site.WriteTo(folder);
                 string query = words.Count == 0 ? string.Empty : "/?q=" + Uri.EscapeDataString(string.Join(" ", words));
                 return KScript.Http.HttpServer.RunAsync(folder, null, chosen, "localhost", null, stop,
@@ -100,7 +100,7 @@ namespace KScript.Docs
             }
             catch (IOException ex)
             {
-                error.WriteLine($"Could not start the docs server: {ex.Message}");
+                KScript.Runtime.ErrorReport.Write(error, "Could not start the docs server.", ex);
                 return 1;
             }
             finally
@@ -138,7 +138,7 @@ namespace KScript.Docs
             }
             catch (IOException ex)
             {
-                error.WriteLine($"Could not start the docs server: {ex.Message}");
+                KScript.Runtime.ErrorReport.Write(error, "Could not start the docs server.", ex);
                 return 1;
             }
             finally

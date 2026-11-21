@@ -64,13 +64,13 @@ namespace KScript.LanguageServer
                 if (given.Count == 0)
                 {
                     // `kscript check` on its own checks the project the current folder is in.
-                    string project = ProjectConfig.Find(Directory.GetCurrentDirectory());
+                    string project = ProjectConfig.Find(KScript.Runtime.WorkingFolder.Current);
                     if (project == null)
                     {
                         output.WriteLine("Usage: kscript check <file-or-folder>...   (or run it in a project with a kscript.json)");
                         return 2;
                     }
-                    given.Add(Path.GetRelativePath(Directory.GetCurrentDirectory(), Path.GetDirectoryName(project)));
+                    given.Add(Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, Path.GetDirectoryName(project)));
                 }
 
                 foreach (string path in given)
@@ -92,7 +92,7 @@ namespace KScript.LanguageServer
             }
             catch (ProjectConfigException ex)
             {
-                output.WriteLine($"{ex.Message}");
+                KScript.Runtime.ErrorReport.Write(output, ex);
                 return 2;
             }
 
@@ -115,7 +115,7 @@ namespace KScript.LanguageServer
                 }
                 catch (ProjectConfigException ex)
                 {
-                    output.WriteLine(ex.Message);
+                    KScript.Runtime.ErrorReport.Write(output, ex);
                     return 2;
                 }
                 anyWarningsAsErrors |= config?.Lint.WarningsAsErrors == true;
@@ -193,7 +193,7 @@ namespace KScript.LanguageServer
         /// </summary>
         public static int PrintConfig(string path, TextWriter output)
         {
-            path ??= Directory.GetCurrentDirectory();
+            path ??= KScript.Runtime.WorkingFolder.Current;
             if (!File.Exists(path) && !Directory.Exists(path))
             {
                 output.WriteLine($"{path}: file not found");
@@ -208,7 +208,7 @@ namespace KScript.LanguageServer
             }
             catch (ProjectConfigException ex)
             {
-                output.WriteLine(ex.Message);
+                KScript.Runtime.ErrorReport.Write(output, ex);
                 return 2;
             }
 

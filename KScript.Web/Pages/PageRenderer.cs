@@ -36,7 +36,7 @@ namespace KScript.Pages
     {
         public PageContext(string siteRoot, Dictionary<string, object> request = null)
         {
-            SiteRoot = Path.GetFullPath(siteRoot ?? Directory.GetCurrentDirectory());
+            SiteRoot = Path.GetFullPath(siteRoot ?? KScript.Runtime.WorkingFolder.Current);
             Request = request ?? new Dictionary<string, object>();
         }
 
@@ -141,7 +141,7 @@ namespace KScript.Pages
         /// <summary>Renders a page from a string. Used by tests and by tools that hold the template in memory.</summary>
         public static PageResult RenderString(string template, PageContext ctx = null, bool markdown = false, string fileName = "page.html")
         {
-            ctx ??= new PageContext(Directory.GetCurrentDirectory());
+            ctx ??= new PageContext(KScript.Runtime.WorkingFolder.Current);
             var scope = NewScope(ctx, null);
             try
             {

@@ -68,7 +68,7 @@ namespace KScript.Testing
         public double? Timeout { get; set; }
 
         /// <summary>Paths are shown relative to this folder.</summary>
-        public string BaseDirectory { get; set; } = Directory.GetCurrentDirectory();
+        public string BaseDirectory { get; set; } = KScript.Runtime.WorkingFolder.Current;
 
         public CancellationToken Cancellation { get; set; }
 
@@ -362,7 +362,7 @@ namespace KScript.Testing
         private static string Display(string path, string baseDirectory)
         {
             if (string.IsNullOrEmpty(path) || !System.IO.Path.IsPathRooted(path)) return path;
-            string rel = System.IO.Path.GetRelativePath(baseDirectory ?? Directory.GetCurrentDirectory(), path);
+            string rel = System.IO.Path.GetRelativePath(baseDirectory ?? KScript.Runtime.WorkingFolder.Current, path);
             return (rel.StartsWith("..", StringComparison.Ordinal) ? path : rel).Replace('\\', '/');
         }
     }
