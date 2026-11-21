@@ -57,6 +57,10 @@ namespace KScript.Language.Features
         {
             Cursor cursor = Locate(analysis, offset);
             string text = analysis.Source.Text;
+            if (FenceTagCompletions(analysis, offset) is List<CompletionItem> fence)
+            {
+                return fence;
+            }
             if (DocCommentCompletions(analysis, offset) is List<CompletionItem> doc)
             {
                 return doc;
@@ -274,6 +278,35 @@ namespace KScript.Language.Features
                 return false;
             }
             return true;
+        }
+
+        /// <summary>Just after the opening fence of a ``` block in a .kscript file: the languages it can name. Null elsewhere.</summary>
+        private static List<CompletionItem> FenceTagCompletions(DocumentAnalysis analysis, int offset)
+        {
+            if (analysis.Markup.Syntax != SourceSyntax.Code)
+            {
+                return null;
+            }
+            string text = analysis.Source.Text;
+            int start = offset;
+            while (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] is '_' or '-' or '+' or '#' or '.'))
+            {
+                start--;
+            }
+            if (start < 3 || string.CompareOrdinal(text, start - 3, "```", 0, 3) != 0)
+            {
+                return null;
+            }
+            TextSpan replace = TextSpan.FromBounds(start, offset);
+            return StringBlock.Languages.Select((language, i) => new CompletionItem
+            {
+                Label = language,
+                Kind = CompletionKind.Keyword,
+                Detail = language == "text" ? "plain text" : "language",
+                Documentation = language == "text" ? "Plain text, with no highlighting." : $"Highlights the block as {language}. It changes nothing at run time.",
+                ReplaceSpan = replace,
+                SortText = i.ToString("D2"),
+            }).ToList();
         }
 
         private static bool InComment(string text, int offset)
