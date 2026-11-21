@@ -214,6 +214,21 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void SignatureHelpSendsEachParameterAsItsPlaceInTheLabel()
+        {
+            Initialize();
+            // The second parameter's name, "number", also appears earlier as the first one's type.
+            Open("<kscript>\n<fn name=\"f\" params=\"a: number, number = 1\" value=\"1\" />\n<echo>{ @f(1, ) }</echo>\n</kscript>");
+            JsonObject help = Request("textDocument/signatureHelp", At(2, 14))["result"].AsObject();
+            JsonObject signature = help["signatures"][0].AsObject();
+            string label = signature["label"].GetValue<string>();
+            JsonArray second = signature["parameters"][1]["label"].AsArray();
+            Assert.Equal("number = 1", label.Substring(second[0].GetValue<int>(), second[1].GetValue<int>() - second[0].GetValue<int>()));
+            Assert.Equal(1, help["activeParameter"].GetValue<int>());
+            Assert.Equal(1, signature["activeParameter"].GetValue<int>());
+        }
+
+        [Fact]
         public void AnswersEditorRequests()
         {
             Initialize();

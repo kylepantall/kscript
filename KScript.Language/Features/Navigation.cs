@@ -15,8 +15,121 @@ namespace KScript.Language.Features
             Cursor cursor = Locate(analysis, offset);
             if (cursor.Region == null || !cursor.InCode)
             {
+                return ElementSignatureHelp(analysis, offset);
+            }
+            return CallSignatureHelp(analysis, cursor) ?? ElementSignatureHelp(analysis, offset);
+        }
+
+        /// <summary>
+        /// A .kscript statement such as <c>log(level: warn, ‸)</c> or <c>wait(‸)</c>: its element's attributes as the
+        /// parameters, with the one being written (or the first not written yet) active.
+        /// </summary>
+        private SignatureHelpResult ElementSignatureHelp(DocumentAnalysis analysis, int offset)
+        {
+            if (analysis.Markup.Syntax != SourceSyntax.Code)
+            {
                 return null;
             }
+            string text = analysis.Source.Text;
+            foreach (MarkupElement e in analysis.Markup.DescendantNodes().OfType<MarkupElement>().Where(x => x.NameSpan.Length > 0).OrderByDescending(x => x.NameSpan.Start))
+            {
+                int open = e.NameSpan.End;
+                if (open >= text.Length || text[open] != '(' || offset <= open || CodeStatementSnippets.ContainsKey(e.Name))
+                {
+                    continue;
+                }
+                int close = CloseOf(text, open);
+                if (close >= 0 && offset > close)
+                {
+                    continue;
+                }
+                ElementInfo info = Catalog.GetElement(e.Name);
+                if (info == null || info.Attributes.Count == 0)
+                {
+                    return null;
+                }
+                List<AttributeInfo> attributes = info.Attributes.Where(a => a.Deprecated == null || e.GetAttribute(a.Name) != null).ToList();
+                string Label(AttributeInfo a) => a.Name + (a.Required ? string.Empty : "?") + ": " + ShortKind(a);
+                SignatureInfo signature = new SignatureInfo
+                {
+                    Label = e.Name + "(" + string.Join(", ", attributes.Select(Label)) + ")",
+                    Documentation = info.Description,
+                    Parameters = attributes.Select(a => (Label(a), DeprecationLine(a.Deprecated, a.Name) + a.Description + OptionsLine(a))).ToList(),
+                };
+
+                // The attribute the cursor is in, else the first one not written yet.
+                int argStart = LastTopLevelComma(text, open, offset) + 1;
+                string written = text.Substring(argStart, offset - argStart).TrimStart();
+                int colon = written.IndexOf(':');
+                string name = colon > 0 ? written.Substring(0, colon).Trim() : null;
+                int active = name != null ? attributes.FindIndex(a => a.Name == name) : -1;
+                if (active < 0)
+                {
+                    active = attributes.FindIndex(a => !e.Attributes.Any(x => x.Name == a.Name && !(x.Span.Start <= offset && offset <= x.Span.End)));
+                }
+                // Every attribute written: none is active (an index past the end highlights nothing).
+                SignatureHelpResult help = new SignatureHelpResult { ActiveParameter = active < 0 ? attributes.Count : active };
+                help.Signatures.Add(signature);
+                return help;
+            }
+            return null;
+        }
+
+        /// <summary>An attribute's type as a signature shows it: <c>trace|debug|info</c>, <c>text</c>, <c>any</c>, <c>bool</c>.</summary>
+        private static string ShortKind(AttributeInfo a) => a.Kind switch
+        {
+            AttributeKind.Enum when a.Options.Count > 0 => string.Join("|", a.Options),
+            AttributeKind.Expression => "any",
+            AttributeKind.Template => "text",
+            AttributeKind.Bool => "bool",
+            _ => KindLabel(a.Kind),
+        };
+
+        /// <summary>The ')' that closes the '(' at <paramref name="open"/>, or -1 when it isn't closed.</summary>
+        private static int CloseOf(string text, int open) => Scan(text, open, text.Length).Close;
+
+        /// <summary>The last comma between the '(' at <paramref name="open"/> and <paramref name="end"/> that separates its arguments, or <paramref name="open"/>.</summary>
+        private static int LastTopLevelComma(string text, int open, int end) => Scan(text, open, end).Comma;
+
+        /// <summary>Walks the arguments after the '(' at <paramref name="open"/>, skipping strings and nested brackets.</summary>
+        private static (int Comma, int Close) Scan(string text, int open, int end)
+        {
+            int depth = 0;
+            int comma = open;
+            char quote = '\0';
+            for (int i = open + 1; i < Math.Min(end, text.Length); i++)
+            {
+                char c = text[i];
+                if (quote != '\0')
+                {
+                    quote = c == quote ? '\0' : quote;
+                }
+                else if (c == '\'' || c == '"')
+                {
+                    quote = c;
+                }
+                else if (c == '(' || c == '[' || c == '{')
+                {
+                    depth++;
+                }
+                else if (c == ')' && depth == 0)
+                {
+                    return (comma, i);
+                }
+                else if (c == ')' || c == ']' || c == '}')
+                {
+                    depth--;
+                }
+                else if (c == ',' && depth == 0)
+                {
+                    comma = i;
+                }
+            }
+            return (comma, -1);
+        }
+
+        private SignatureHelpResult CallSignatureHelp(DocumentAnalysis analysis, Cursor cursor)
+        {
 
             ExpressionRegion region = cursor.Region;
             int index = cursor.LocalIndex;

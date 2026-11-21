@@ -1,0 +1,10 @@
+{
+  "name": "global-snippet",
+  "description": "Test fixture: a snippet for every language, like the one the 1Password extension contributes (op://).",
+  "version": "0.0.1",
+  "publisher": "kscript-test",
+  "engines": { "vscode": "^1.85.0" },
+  "contributes": {
+    "snippets": [{ "path": "./snippets.code-snippets" }]
+  }
+}

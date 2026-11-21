@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Only what works is suggested, in every place: a date, number, bool or file is no longer offered string methods such as `->json()` or `->upper()`, which fail at run time (use `->to_string()` first, or `->to_json()`). A method a package or an `extend` block adds is offered.
+- Signature help in `.kscript` statements: inside `log(‸)`, `wait(‸)` and other element statements, the tooltip lists the attributes (`log(level?: trace|debug|…, message?: text, category?: text, fields?: any)`) and highlights the one you're writing, or the next one not written yet. Parameters are now sent as their exact place in the signature, so the right one is highlighted even when its name also appears earlier in the label.
 - KScript files get their own "K" file icon in the explorer and on editor tabs: `.kscript`, `.ks`, `.ks.xml` and `.test.ks.xml` files. It shows with VS Code's default file icon theme, and with any icon theme that has no icon of its own for KScript.
 - Named arguments show as soon as you type `(` or `,` in a call (commands, methods and your own functions), with the enum values and yes/no flags the next argument takes. Picking an enum parameter's `name:` lists its values straight away. Brackets and commas elsewhere, such as `(1 + 2)` or `[1, 2]`, don't open the list.
 - ``` blocks only name languages KScript knows (`text`, `sql`, `html`, `css`, `js`, `json`, `md`, `latex`, `yaml`, `xml` and their long names). A typo such as ```` ```textc ```` is an error that suggests `text`, and the editor suggests the languages after the fence.

@@ -450,13 +450,21 @@ namespace KScript.LanguageServer
             foreach (SignatureInfo s in help.Signatures)
             {
                 JsonArray ps = new JsonArray();
+                // Each parameter is sent as its [start, end) in the signature's label, found left to right after the '(',
+                // so the editor highlights the right one even when its text also appears earlier (a type, the name).
+                int from = Math.Max(0, s.Label.IndexOf('(') + 1);
                 foreach ((string label, string doc) in s.Parameters)
                 {
-                    JsonObject pj = new JsonObject { ["label"] = label };
+                    int at = s.Label.IndexOf(label, from, StringComparison.Ordinal);
+                    JsonObject pj = new JsonObject { ["label"] = at < 0 ? label : new JsonArray(at, at + label.Length) };
+                    if (at >= 0)
+                    {
+                        from = at + label.Length;
+                    }
                     if (doc != null) pj["documentation"] = doc;
                     ps.Add((JsonNode)pj);
                 }
-                JsonObject sj = new JsonObject { ["label"] = s.Label, ["parameters"] = ps };
+                JsonObject sj = new JsonObject { ["label"] = s.Label, ["parameters"] = ps, ["activeParameter"] = help.ActiveParameter };
                 if (s.Documentation != null) sj["documentation"] = new JsonObject { ["kind"] = "markdown", ["value"] = s.Documentation };
                 signatures.Add((JsonNode)sj);
             }
