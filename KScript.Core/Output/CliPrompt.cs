@@ -126,8 +126,11 @@ namespace KScript.Output
             if (!Interactive) Output.Line();
         }
 
-        /// <summary>Asks for text. <paramref name="validate"/> returns an error message, or null when the answer is fine.</summary>
-        public string Text(string question, string defaultValue = null, Func<string, string> validate = null, string option = null, CliArgs args = null)
+        /// <summary>
+        /// Asks for text. <paramref name="validate"/> returns an error message, or null when the answer is fine. When
+        /// <paramref name="required"/> is false, Enter with no default skips the question and returns "".
+        /// </summary>
+        public string Text(string question, string defaultValue = null, Func<string, string> validate = null, string option = null, CliArgs args = null, bool required = true)
         {
             if (option != null && args?.Value(option) is string given && given != "true")
             {
@@ -136,13 +139,15 @@ namespace KScript.Output
                 return given;
             }
             if (!Interactive && defaultValue != null) return defaultValue;
+            if (!Interactive && !required) return string.Empty;
             if (!Interactive && option != null) throw new CliPromptException($"{question} Pass --{option}=<value>.");
             for (int attempt = 0; attempt < 100; attempt++)
             {
-                Output.Writer.Write(Question(question, defaultValue != null ? $"({defaultValue})" : null));
+                Output.Writer.Write(Question(question, defaultValue != null ? $"({defaultValue})" : required ? null : "(Enter to skip)"));
                 string answer = ReadLine().Trim();
                 Answered(question, answer);
                 if (answer.Length == 0 && defaultValue != null) answer = defaultValue;
+                if (answer.Length == 0 && !required) return string.Empty;
                 string problem = answer.Length == 0 ? "An answer is needed." : validate?.Invoke(answer);
                 if (problem == null) return answer;
                 Output.Line($"    {Style.Red("✗ " + problem)}");
