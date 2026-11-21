@@ -88,6 +88,7 @@ namespace KScript.Language.Analysis
         /// <summary>An argument that reached its parameter: a waiting <c>@kyle</c> is a handle there, and a literal is checked against the type.</summary>
         private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
+            CheckNumberArgument(a, slot, region);
             if (pendingHandles.Contains(a))
             {
                 if (slot.RawText != "handle")

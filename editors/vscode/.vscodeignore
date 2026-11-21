@@ -9,3 +9,4 @@
 !syntaxes/**
 !dist/extension.js
 !schemas/**
+!walkthrough/**

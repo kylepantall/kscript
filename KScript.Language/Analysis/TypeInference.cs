@@ -224,6 +224,9 @@ namespace KScript.Language.Analysis
                             }
                             return l.Type == KType.Number && r.Type == KType.Number ? new TypeShape(KType.Number) : TypeShape.Unknown;
                         }
+                        case "*" when Infer(binary.Left, region).Type == KType.String:
+                            // 'ab' * 3 repeats the text.
+                            return new TypeShape(KType.String);
                         default:
                             return new TypeShape(KType.Number);
                     }

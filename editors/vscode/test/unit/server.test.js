@@ -87,10 +87,33 @@ test('the manifest is consistent', () => {
       assert.match(ignore, new RegExp('^!' + path.dirname(icon).replace('./', '') + '/\\*\\*$', 'm'), `${icon} is packaged`);
     }
   }
-  const used = fs.readFileSync(path.join(__dirname, '../../extension.js'), 'utf8');
+  const used = ['extension.js', 'src/commands.js'].map((f) => fs.readFileSync(path.join(__dirname, '../..', f), 'utf8')).join('\n');
   for (const c of pkg.contributes.commands) {
     assert.ok(used.includes(`'${c.command}'`), `${c.command} is registered`);
   }
+  // Every command a menu, key or the language server's lenses use is one the extension contributes.
+  const contributed = new Set(pkg.contributes.commands.map((c) => c.command));
+  const menus = Object.values(pkg.contributes.menus).flat().map((m) => m.command);
+  for (const id of [...menus, ...pkg.contributes.keybindings.map((k) => k.command), 'kscript.run', 'kscript.runTest', 'kscript.runTestsInFile']) {
+    assert.ok(contributed.has(id), `${id} is contributed`);
+  }
+  for (const matcher of ['$kscript-run', '$kscript-check']) {
+    assert.ok(pkg.contributes.problemMatchers.some((m) => '$' + m.name === matcher), `${matcher} is contributed`);
+    assert.ok(used.includes(`'${matcher}'`), `${matcher} is used`);
+  }
+});
+
+test('the problem matchers read kscript output', () => {
+  const pkg = require('../../package.json');
+  const [run, check] = ['kscript-run', 'kscript-check'].map((name) => pkg.contributes.problemMatchers.find((m) => m.name === name).pattern);
+  const plain = new RegExp(run.regexp).exec("   ERROR  /work/my app/hello.kscript:3:5: Type: '-' needs a number.");
+  assert.deepStrictEqual([plain[run.file], plain[run.line], plain[run.column], plain[run.message]], ['/work/my app/hello.kscript', '3', '5', "Type: '-' needs a number."]);
+  const coloured = new RegExp(run.regexp).exec('\u001b[1;97;41m ERROR \u001b[0m C:\\work\\hello.kscript:12:1: Name: $x is not defined.');
+  assert.strictEqual(coloured[run.file], 'C:\\work\\hello.kscript');
+  assert.strictEqual(new RegExp(run.regexp).exec('   ERROR  Could not start the server.'), null);
+  const found = new RegExp(check.regexp).exec('lib/a.kscript(6,5): warning KS2005: $name is not filled in here.');
+  assert.deepStrictEqual([found[check.file], found[check.line], found[check.column], found[check.severity], found[check.code], found[check.message]],
+    ['lib/a.kscript', '6', '5', 'warning', 'KS2005', '$name is not filled in here.']);
 });
 
 test('page highlighting is injected into the grammar VS Code uses for .html files', () => {
@@ -141,4 +164,33 @@ test('a kscript older than the extension', () => {
   assert.ok(!isOlderThan(null, '0.3.0'));
   assert.ok(!isOlderThan('kscript', '0.3.0'));
   assert.ok(isOlderThan('v0.2.0', '0.3.0-beta.1'));
+});
+
+test('the walkthrough is packaged and only runs commands the extension has', () => {
+  const root = path.join(__dirname, '../..');
+  const pkg = require('../../package.json');
+  const ignore = fs.readFileSync(path.join(root, '.vscodeignore'), 'utf8').split(/\r?\n/);
+  const contributed = new Set(pkg.contributes.commands.map((c) => c.command));
+  const registered = ['extension.js', 'src/commands.js'].map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+  const [walkthrough] = pkg.contributes.walkthroughs;
+  assert.deepStrictEqual(walkthrough.steps.map((s) => s.id), ['install', 'newScript', 'run', 'mistakes', 'explore', 'project']);
+  for (const step of walkthrough.steps) {
+    const media = step.media.markdown;
+    assert.ok(fs.readFileSync(path.join(root, media), 'utf8').startsWith('## '), `${media} starts with a heading`);
+    assert.ok(ignore.includes('!' + path.posix.dirname(media) + '/**'), `${media} is packaged`);
+    const links = [...step.description.matchAll(/\(command:([\w.]+)\)/g)].map((m) => m[1]);
+    for (const id of [...links, ...(step.completionEvents || []).map((e) => e.replace(/^onCommand:/, ''))]) {
+      assert.ok(registered.includes(`'${id}'`), `${step.id}: ${id} is registered`);
+    }
+    // A step's button is a command people can also find by name.
+    for (const id of links.filter((l) => l !== 'kscript.showSetup')) assert.ok(contributed.has(id), `${step.id}: ${id} is contributed`);
+  }
+  assert.ok(pkg.contributes.menus['file/newFile'].some((m) => m.command === 'kscript.newScript'), 'New Script is in File > New File…');
+});
+
+test('the starter script selects the first thing to change', () => {
+  const { STARTER, starterSelection } = require('../../src/starter');
+  const at = starterSelection();
+  assert.strictEqual(STARTER.split('\n')[at.line].slice(at.start, at.end), 'world');
+  assert.ok(STARTER.endsWith('\n') && !/\t|\r/.test(STARTER));
 });

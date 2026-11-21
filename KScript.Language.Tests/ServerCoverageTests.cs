@@ -92,6 +92,22 @@ namespace KScript.Language.Tests
         #endregion
 
         [Fact]
+        public void TheTestListReadsTestFilesThatAreNotOpen()
+        {
+            Memory files = new Memory();
+            string path = Path.Combine(Path.GetDirectoryName(Main), "cart.test.kscript");
+            files.Files[path] = "test(name: adds an item) {\n  expect(value: 1, equals: 1)\n}\n";
+            var (_, output) = Converse(files,
+                Init(),
+                Req(2, "kscript/tests", Doc(Workspace.PathToUri(path))),
+                Req(3, "kscript/tests", Doc(Workspace.PathToUri(path + ".missing"))),
+                Req(4, "kscript/tests", Doc("untitled:Untitled-1")));
+            Assert.Equal("adds an item", Assert.Single(Reply(output, 2)["result"]["tests"].AsArray())["fullName"].GetValue<string>());
+            Assert.Empty(Reply(output, 3)["result"]["tests"].AsArray());
+            Assert.Empty(Reply(output, 4)["result"]["tests"].AsArray());
+        }
+
+        [Fact]
         public void SurvivesBadInput()
         {
             Memory files = new Memory();
@@ -280,6 +296,41 @@ namespace KScript.Language.Tests
             Assert.Equal(new[] { 10, 5, 12, 6, 6, 21, 3, 3, 2, 5, 14, 17, 15, 19, 9 }, completion);
             int[] outline = Enum.GetValues<OutlineKind>().Select(KScriptLanguageServer.OutlineKindToLsp).ToArray();
             Assert.Equal(new[] { 12, 13, 14, 2, 8 }, outline);
+        }
+        [Fact]
+        public void TheFoldersOpenInTheEditorAreSearchedForSymbols()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "kscript-symbols");
+            string other = Path.Combine(Path.GetTempPath(), "kscript-symbols-two");
+            Memory files = new Memory();
+            files.Files[Path.Combine(root, "cart.kscript")] = "fn total(items) => $items->count()\nfn total_with_tax(items) => @total(items: $items) * 1.2\n";
+            files.Files[Path.Combine(root, "page.html")] = "<p>total</p>";
+            files.Files[Path.Combine(root, "notes.txt")] = "fn total() => 1";
+            files.Files[Path.Combine(other, "report.kscript")] = "const TOTAL_ROWS = 10\n";
+            JsonObject Search(int id, string query) => Req(id, "workspace/symbol", new JsonObject { ["query"] = query });
+            JsonObject init = Req(1, "initialize", new JsonObject
+            {
+                ["capabilities"] = new JsonObject(),
+                ["workspaceFolders"] = new JsonArray(
+                    new JsonObject { ["uri"] = Workspace.PathToUri(root), ["name"] = "one" },
+                    new JsonObject { ["uri"] = Workspace.PathToUri(other), ["name"] = "two" },
+                    new JsonObject { ["uri"] = "untitled:nowhere", ["name"] = "three" }),
+            });
+
+            // The second search reads the same files again and answers from what it kept; an open file is searched as typed.
+            var (_, output) = Converse(files, init, Search(2, "total"), Search(3, "total"),
+                OpenDoc(Workspace.PathToUri(Path.Combine(root, "cart.kscript")), "fn sum(items) => 1\n", "kscript-code"), Search(4, "total"), Search(5, "sum"));
+            Assert.Equal(new[] { "total", "total_with_tax", "$TOTAL_ROWS" }, Reply(output, 2)["result"].AsArray().Select(f => f["name"].GetValue<string>()));
+            Assert.Equal(Reply(output, 2)["result"].ToJsonString(), Reply(output, 3)["result"].ToJsonString());
+            Assert.Equal("$TOTAL_ROWS", Assert.Single(Reply(output, 4)["result"].AsArray())["name"].GetValue<string>());
+            Assert.Equal("sum", Assert.Single(Reply(output, 5)["result"].AsArray())["name"].GetValue<string>());
+
+            // One folder given the old way, and a project with more functions than one answer holds.
+            Memory many = new Memory();
+            many.Files[Path.Combine(root, "many.kscript")] = string.Concat(Enumerable.Range(0, KScriptLanguageServer.MaxWorkspaceSymbols + 5).Select(i => $"fn step{i}() => {i}\n"));
+            JsonObject old = Req(1, "initialize", new JsonObject { ["capabilities"] = new JsonObject(), ["rootUri"] = Workspace.PathToUri(root) });
+            (_, output) = Converse(many, old, Search(2, "step"));
+            Assert.Equal(KScriptLanguageServer.MaxWorkspaceSymbols, Reply(output, 2)["result"].AsArray().Count);
         }
     }
 }

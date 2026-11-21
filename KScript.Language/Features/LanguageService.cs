@@ -21,6 +21,12 @@ namespace KScript.Language.Features
         public LanguageCatalog Catalog { get; }
         public IFileSystem Files { get; }
 
+        /// <summary>
+        /// The editor command that opens the docs for a name (the VS Code extension's <c>kscript.openDocs</c>), or null
+        /// when the editor has none. When set, hovers on commands and methods end with an "Open docs" link.
+        /// </summary>
+        public string DocsCommand { get; set; }
+
         public DocumentAnalysis Analyze(string text, string path) => Analyzer.Analyze(text, path, Files, Catalog);
 
         #region Cursor context

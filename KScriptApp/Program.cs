@@ -738,6 +738,9 @@ namespace KScript
         /// <summary>
         /// Runs a script. Packages listed in the nearest kscript.json are imported for it.
         /// </summary>
+        /// <summary>Set to "full" by an editor that runs a script, so an error names its file with the whole path.</summary>
+        public const string ErrorPathsVariable = "KSCRIPT_ERROR_PATHS";
+
         int RunScript(string path, string[] scriptArgs)
         {
             var options = new InterpreterOptions();
@@ -780,7 +783,14 @@ namespace KScript
             {
                 // A script's error, or anything else that went wrong while it ran: a KScript error either way.
                 Out.Flush();
-                ErrorReport.Write(Error, ex);
+                string report = ErrorReport.Format(ex);
+                if (ex is KScriptException { File: not null, Line: > 0 } at && report.StartsWith(at.Location + ": ", StringComparison.Ordinal)
+                    && Environment.GetEnvironmentVariable(ErrorPathsVariable) == "full")
+                {
+                    // For editors: the error names its file with the whole path, so the editor can link to the line.
+                    report = Path.GetFullPath(at.File) + report.Substring(Path.GetFileName(at.File).Length);
+                }
+                ErrorReport.WriteMessage(Error, report);
                 return 3;
             }
             finally

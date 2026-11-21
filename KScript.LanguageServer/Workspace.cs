@@ -13,6 +13,15 @@ namespace KScript.LanguageServer
         public int Version { get; set; }
         public DocumentAnalysis Analysis { get; set; }
 
+        /// <summary>
+        /// The path the document is analysed as. A new, unsaved .kscript file has no path, and the parser is chosen by
+        /// the file name, so it is given one in a folder that doesn't exist: nothing on disk is read for it.
+        /// </summary>
+        public string AnalysisPath => Path ?? (LanguageId == "kscript-code" ? UntitledCodePath : null);
+
+        private static readonly string UntitledCodePath =
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "kscript-untitled-" + Guid.NewGuid().ToString("N"), "untitled.kscript");
+
         public DocumentKind Kind => Path != null ? MarkupParser.KindFromPath(Path) : LanguageId switch
         {
             "html" => DocumentKind.Page,

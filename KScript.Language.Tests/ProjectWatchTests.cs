@@ -133,6 +133,19 @@ namespace KScript.Language.Tests
         public void TheWatcherRebuildsWhenAFileChanges()
         {
             Write("count.on", "");
+            // The watcher may be writing out.txt at the moment it is read (on Windows that read fails), so try again.
+            string Output()
+            {
+                try
+                {
+                    return File.Exists(Path.Combine(dir, "out.txt")) ? File.ReadAllText(Path.Combine(dir, "out.txt")) : null;
+                }
+                catch (IOException)
+                {
+                    return null;
+                }
+            }
+
             Write("main.kscript", "fn one() => 1\n");
             var lines = new List<string>();
             var watcher = new ProjectWatcher(dir, null, l => { lock (lines) lines.Add(l); }) { Delay = TimeSpan.FromMilliseconds(20) };
@@ -140,10 +153,10 @@ namespace KScript.Language.Tests
             Task running = watcher.RunAsync(stop.Token);
             Thread.Sleep(200);
             Write("two.kscript", "fn two() => 2\n");
-            Assert.True(SpinWait.SpinUntil(() => File.Exists(Path.Combine(dir, "out.txt")) && File.ReadAllText(Path.Combine(dir, "out.txt")) == "2", 10_000));
+            Assert.True(SpinWait.SpinUntil(() => Output() == "2", 10_000));
             File.Move(Path.Combine(dir, "two.kscript"), Path.Combine(dir, "three.kscript"));
             File.Delete(Path.Combine(dir, "three.kscript"));
-            Assert.True(SpinWait.SpinUntil(() => File.ReadAllText(Path.Combine(dir, "out.txt")) == "1", 10_000));
+            Assert.True(SpinWait.SpinUntil(() => Output() == "1", 10_000));
             stop.Cancel();
             running.Wait(10_000);
             Assert.True(running.IsCompletedSuccessfully);

@@ -835,8 +835,12 @@ namespace KScript.Language.Features
         private List<CompletionItem> VariableCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool withSigil)
         {
             Scope scope = analysis.ScopeAt(offset);
-            return scope.VisibleAt(offset)
-                .Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import)
+            // The script's own variables come first, the one declared nearest above the cursor at the top; the
+            // variables KScript provides ($args, $env...) follow by name.
+            List<Symbol> visible = scope.VisibleAt(offset).Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import).ToList();
+            Dictionary<Symbol, int> nearest = visible.Where(s => s.Kind != SymbolKind.BuiltIn && s.Kind != SymbolKind.FrontMatter)
+                .OrderByDescending(s => s.DeclarationSpan.Start).Select((s, i) => (s, i)).ToDictionary(p => p.s, p => p.i);
+            return visible
                 .Select(s => new CompletionItem
                 {
                     Label = (withSigil ? "$" : string.Empty) + s.Name,
@@ -846,7 +850,7 @@ namespace KScript.Language.Features
                     ReplaceSpan = replace,
                     // The span replaced is the bare word (the $ isn't typed yet, or sits before it), so filter on the bare name.
                     FilterText = s.Name,
-                    SortText = "0" + s.Name,
+                    SortText = nearest.TryGetValue(s, out int rank) ? "0" + rank.ToString("D4") + s.Name : "1" + s.Name,
                 })
                 .ToList();
         }
@@ -965,7 +969,9 @@ namespace KScript.Language.Features
                     InsertText = m.Name + (m.MaxArgs == 0 ? "()" : "($1)"),
                     IsSnippet = true,
                     ReplaceSpan = replace,
-                    SortText = (m.Deprecated != null ? "9" : receiver.Type == KType.Any || m.ReceiverType == receiver.Type ? "0" : m.ReceiverType == KType.Any ? "1" : "2") + m.Name,
+                    SortText = m.Deprecated != null ? "9" + m.Name
+                        : receiver.Type == KType.Any || m.ReceiverType == receiver.Type ? "0" + Ranking.Method(m.ReceiverType, m.Name)
+                        : (m.ReceiverType == KType.Any ? "1" : "2") + m.Name,
                 }).ToList();
 
         /// <summary>What a method returns on this receiver: list methods such as filter keep the item type.</summary>

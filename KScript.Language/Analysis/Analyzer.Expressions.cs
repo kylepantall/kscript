@@ -111,6 +111,12 @@ namespace KScript.Language.Analysis
                     return;
                 }
 
+                case BinaryNode { Operator: "+" or "-" or "*" or "/" or "%" or "**" } arithmetic:
+                    AnalyzeExpr(arithmetic.Left, region, scope, ExprContext.Value);
+                    AnalyzeExpr(arithmetic.Right, region, scope, ExprContext.Value);
+                    CheckArithmetic(arithmetic, region);
+                    return;
+
                 default:
                     foreach (ExprNode child in node.Children)
                     {
@@ -613,6 +619,7 @@ namespace KScript.Language.Analysis
         {
             TypeShape target = Infer(member.Target, region);
             CheckRecordField(target, member, region);
+            CheckMapField(target, member, region);
             if ((target.Type == KType.Request || target.Type == KType.Error) && member.Name.Length > 0 && !target.Fields.ContainsKey(member.Name))
             {
                 TextSpan span = region.Source.ToSource(member.NameSpan);

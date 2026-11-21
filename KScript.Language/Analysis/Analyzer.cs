@@ -51,6 +51,7 @@ namespace KScript.Language.Analysis
         {
             DocumentKind documentKind = kind ?? MarkupParser.KindFromPath(path);
             Analyzer analyzer = RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog));
+            analyzer.ReportDeferred();
             analyzer.CheckUnused(projectWide);
             analyzer.SpeakCode();
             return analyzer.result;
@@ -1411,6 +1412,10 @@ namespace KScript.Language.Analysis
                     {
                         Symbol symbol = NewVariable(assign.Name, nameSpan, e, SymbolKind.Variable, shape);
                         scope.Declare(symbol, after);
+                        if (assign.Value is LiteralNode { Kind: LiteralKind.String, Template: null } text)
+                        {
+                            literalTexts[symbol] = text.Value;
+                        }
                     }
                     else
                     {
@@ -1446,10 +1451,15 @@ namespace KScript.Language.Analysis
                 if (t is IndexNode ix)
                 {
                     AnalyzeExpr(ix.Index, region, scope, ExprContext.Value);
+                    if (ix.Index is LiteralNode { Kind: LiteralKind.String } key)
+                    {
+                        writtenFields.Add(key.Value);
+                    }
                     t = ix.Target;
                 }
                 else
                 {
+                    writtenFields.Add(((MemberNode)t).Name);
                     t = ((MemberNode)t).Target;
                 }
             }

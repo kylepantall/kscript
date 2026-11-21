@@ -32,7 +32,8 @@ const diagnostics = new Promise((resolve) => {
 
 (async () => {
   connection.listen();
-  const init = await connection.sendRequest('initialize', { processId: process.pid, rootUri: null, capabilities: {} });
+  const init = await connection.sendRequest('initialize', { processId: process.pid, rootUri: null, capabilities: {}, initializationOptions: { codeLens: true } });
+  assert.ok(init.capabilities.codeLensProvider, 'code lenses are offered to an editor that runs them');
   assert.ok(init.capabilities.completionProvider, 'completion capability');
   assert.ok(init.capabilities.semanticTokensProvider.legend.tokenTypes.includes('variable'));
   connection.sendNotification('initialized', {});
@@ -63,6 +64,37 @@ const diagnostics = new Promise((resolve) => {
 
   const folds = await connection.sendRequest('textDocument/foldingRange', { textDocument: { uri } });
   assert.ok(folds.some((f) => f.startLine === 0), 'the script folds');
+
+  const lenses = await connection.sendRequest('textDocument/codeLens', { textDocument: { uri } });
+  assert.deepStrictEqual(lenses.map((l) => [l.command.title, l.command.command, l.command.arguments[0], l.range.start.line]), [['▶ Run', 'kscript.run', uri, 1], ['1 use', 'kscript.showReferences', uri, 5]], 'a Run lens on the first statement and a count of uses on the function');
+
+  const symbols = await connection.sendRequest('workspace/symbol', { query: 'doub' });
+  assert.deepStrictEqual(symbols.map((f) => f.name), ['double'], 'a function is found by part of its name');
+
+  // A new, unsaved .kscript file is checked as code, and a test file lists its tests.
+  const untitled = 'untitled:Untitled-1';
+  const untitledDiagnostics = new Promise((resolve) => {
+    connection.onNotification('textDocument/publishDiagnostics', (p) => { if (p.uri === untitled) resolve(p.diagnostics); });
+  });
+  connection.sendNotification('textDocument/didOpen', { textDocument: { uri: untitled, languageId: 'kscript-code', version: 1, text: "name = 'Joan'\necho \"Hello $nmae\"\n" } });
+  assert.ok((await untitledDiagnostics).some((d) => d.code === 'KS4001' && /Did you mean \$name/.test(d.message)), 'an untitled .kscript file is checked');
+
+  // The script New Script opens has nothing to fix, and can be run.
+  const starter = 'untitled:Untitled-2';
+  const starterDiagnostics = new Promise((resolve) => {
+    connection.onNotification('textDocument/publishDiagnostics', (p) => { if (p.uri === starter) resolve(p.diagnostics); });
+  });
+  connection.sendNotification('textDocument/didOpen', { textDocument: { uri: starter, languageId: 'kscript-code', version: 1, text: require('../src/starter').STARTER } });
+  assert.deepStrictEqual(await starterDiagnostics, [], 'the starter script has no problems');
+  const starterLenses = await connection.sendRequest('textDocument/codeLens', { textDocument: { uri: starter } });
+  assert.deepStrictEqual(starterLenses.map((l) => [l.command.title, l.range.start.line]), [['▶ Run', 1], ['1 use', 5]], 'the starter script can be run from its first statement');
+
+  const testUri = 'file:///tmp/kscript-smoke/cart.test.kscript';
+  connection.sendNotification('textDocument/didOpen', { textDocument: { uri: testUri, languageId: 'kscript-code', version: 1, text: 'describe(name: cart) {\n  test(name: starts empty) {\n    expect(value: 0, equals: 0)\n  }\n}\n' } });
+  const tests = await connection.sendRequest('kscript/tests', { textDocument: { uri: testUri } });
+  assert.strictEqual(tests.tests[0].children[0].fullName, 'cart › starts empty', 'the tests of a test file');
+  const testLenses = await connection.sendRequest('textDocument/codeLens', { textDocument: { uri: testUri } });
+  assert.deepStrictEqual(testLenses.map((l) => l.command.command), ['kscript.runTestsInFile', 'kscript.runTest', 'kscript.runTest'], 'Run test lenses');
 
   await connection.sendRequest('shutdown');
   connection.sendNotification('exit');
