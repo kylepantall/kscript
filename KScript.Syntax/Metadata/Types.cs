@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace KScript.Metadata
 {
@@ -60,7 +61,11 @@ namespace KScript.Metadata
         /// <summary>An error type: <c>NotFound</c> from <c>error NotFound { id: int }</c>, or a built-in such as Validation.</summary>
         public const string ErrorType = "error_type";
 
-        public static readonly string[] Declarable = { "string", "int", "float", "bool", "list", "map", "fn", "email", "password", "handle", "uuid", "regex" };
+        /// <summary>The types a parameter or variable can declare: the basic ones, then every native type.</summary>
+        public static IReadOnlyList<string> Declarable => new[] { "string", "int", "float", "bool", "list", "map", "fn" }.Concat(NativeTypes.Names).ToList();
+
+        /// <summary>True for text with a meaning of its own (email, url, country, ...), which keeps some string methods.</summary>
+        public static bool IsNativeText(string type) => NativeTypes.Get(type) is NativeTypeInfo info && info.StringMethods.Count > 0;
 
         /// <summary>True if a method declared for <paramref name="receiver"/> can be called on a value of type <paramref name="actual"/>.</summary>
         public static bool Accepts(string receiver, string actual)
@@ -73,7 +78,7 @@ namespace KScript.Metadata
             // Values are typed on use: a string that holds a number can use number methods. Text with a meaning of its own
             // (an email, a handle, a uuid, a regex) is still text, so it keeps some string methods (see StringMethodsOf).
             // A number, bool, date or file isn't text and has no string methods, as at run time: use ->to_string() first.
-            if (receiver == String && (actual == Email || actual == Handle || actual == Uuid || actual == Regex))
+            if (receiver == String && IsNativeText(actual))
             {
                 return true;
             }
@@ -103,21 +108,9 @@ namespace KScript.Metadata
             return true;
         }
 
-        /// <summary>The string methods each kind of text with a meaning of its own keeps.</summary>
-        public static IReadOnlyDictionary<string, HashSet<string>> StringMethodsOf { get; } = new Dictionary<string, HashSet<string>>
-        {
-            // Searching, cutting up, re-casing and encoding an address all make sense; to_date and to_number don't.
-            [Email] = Methods("contains", "starts_with", "ends_with", "index_of", "length", "lower", "upper", "slice", "split",
-                "replace", "matches", "truncate", "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json"),
-            // A handle is already lower case and has no spaces, so it keeps the methods for searching and showing it.
-            [Handle] = Methods("contains", "starts_with", "ends_with", "length", "upper", "slice", "matches", "truncate",
-                "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json"),
-            // A uuid is fixed hex: compare its prefix, take a short id, upper-case it or split its groups.
-            [Uuid] = Methods("contains", "starts_with", "ends_with", "upper", "slice", "split", "pad_left", "pad_right",
-                "escape", "url_encode", "markdown_escape", "json"),
-            // A regex has its own replace, split and match; its pattern text can still be looked at and shown.
-            [Regex] = Methods("contains", "starts_with", "ends_with", "length", "escape", "markdown_escape", "json"),
-        };
+        /// <summary>The string methods each kind of text with a meaning of its own keeps (see <see cref="NativeTypes"/>).</summary>
+        public static IReadOnlyDictionary<string, HashSet<string>> StringMethodsOf =>
+            NativeTypes.All.Where(t => t.StringMethods.Count > 0).ToDictionary(t => t.Name, t => t.StringMethods);
 
         private static HashSet<string> Methods(params string[] names) => new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
     }

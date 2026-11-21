@@ -127,6 +127,7 @@ namespace KScript.Language.Features
                             case TokenKind.String:
                             case TokenKind.Email:
                             case TokenKind.Uuid:
+                            case TokenKind.Url:
                                 tokens.Add(new SemanticToken(span, SemanticTokenType.String, SemanticTokenModifiers.None));
                                 break;
                             case TokenKind.Regex:

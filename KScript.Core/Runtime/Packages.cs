@@ -181,6 +181,17 @@ namespace KScript.Runtime
                 return def;
             }
 
+            /// <summary>
+            /// Adds a native type: text with a meaning of its own, checked and tidied by <paramref name="parser"/>, such as
+            /// a package's <c>isbn</c>. Scripts declare values of it (<c>book: isbn = 978-0-306-40615-7</c>) like a built-in
+            /// type, the editor knows it, and methods added for it with <see cref="Method"/> (receiver = its name) work on it.
+            /// </summary>
+            public void NativeType(KScript.Metadata.NativeTypeInfo info, NativeParser parser)
+            {
+                info.Package ??= package.Name;
+                NativeParsers.Register(info, parser);
+            }
+
             /// <summary>Adds a method, called as <c>value->name(args)</c> on values of <paramref name="receiver"/>.</summary>
             public MethodDefinition Method(string receiver, string name, string parameters, string description, string returns, MethodHandler handler)
             {

@@ -148,6 +148,7 @@ kscript make project my-app --template ../starters/api   # any folder
   "standard": "kscript:recommended",               // lint rules and format settings to start from (see Standards)
   "packages": ["KScript.Terminal", "KScript.IO"],   // imported by every script in the project
   "extensions": ["extensions", "shared/**/*.kscript"], // where the project's extend files are (default: extensions/)
+  "natives": ["natives"], // where the project's native types are, used without an import (default: natives/)
   "serve": {
     "root": ".",          // the site folder, relative to kscript.json
     "port": 8080,         // --port and --host on the command line still win
@@ -233,7 +234,7 @@ kscript make page "people/[id]"                       # people/[id].html, with $
 kscript make css theme --primary "#3355ff"            # styles/theme.ks.css, served as /styles/theme.css
 kscript make type Repo --fields "name: string, stars: int from stargazers_count"   # types/repo.kscript
 kscript make enum Size --values small,medium,large    # types/size.kscript
-kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/"   # types/sku.kscript
+kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/"   # natives/sku.kscript: works in every script without an import
 kscript make module pricing --fns subtotal,total      # lib/pricing.kscript
 kscript make window settings                          # settings.kscript, a desktop window
 kscript make document annual-report                   # documents/annual-report.kscript, a PDF and Word document
@@ -266,7 +267,8 @@ my-app/
   _partials/       make partial
   styles/          make css
   lib/             make module, const, cache, storage and logger
-  types/           make type, make native, make enum
+  types/           make type, make enum
+  natives/         make native: types every script gets without an import
   extensions/      make extension: methods every script gets (extend date { … })
   errors/          make error
   jobs/            make job

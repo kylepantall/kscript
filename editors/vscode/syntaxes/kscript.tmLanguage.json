@@ -651,6 +651,10 @@
           "name": "string.regexp.kscript"
         },
         {
+          "match": "(?<![\\w$@.])(?i:https?|wss?|ftp)://[^\\s'\",()\\[\\]{};<>`]+?(?=[.!?:]*(?:[\\s'\",()\\[\\]{};<>`]|->|$))",
+          "name": "string.unquoted.url.kscript"
+        },
+        {
           "match": "(?<![\\w.%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+(?![\\w]|-(?!>))",
           "name": "string.unquoted.email.kscript"
         },

@@ -1664,7 +1664,7 @@ namespace KScript.Syntax.Markup
                     pos = block.End;
                     continue;
                 }
-                if (c == '/' && Peek(1) == '/' && brackets.Count == 0)
+                if (c == '/' && Peek(1) == '/' && brackets.Count == 0 && !Lexer.AfterUrlScheme(text, pos))
                 {
                     break;
                 }
@@ -1686,7 +1686,7 @@ namespace KScript.Syntax.Markup
                     pos = close < 0 ? text.Length : close + 2;
                     continue;
                 }
-                if (c == '/' && Peek(1) == '/')
+                if (c == '/' && Peek(1) == '/' && !Lexer.AfterUrlScheme(text, pos))
                 {
                     // Inside brackets: a comment to the end of the line, skipped by the expression lexer too.
                     while (pos < text.Length && text[pos] != '\n')
@@ -2106,7 +2106,7 @@ namespace KScript.Syntax.Markup
                 p++;
             }
             return p >= text.Length || text[p] == '\n' || text[p] == '\r' || text[p] == ';' || text[p] == '}'
-                || (text[p] == '/' && p + 1 < text.Length && text[p + 1] == '/')
+                || (text[p] == '/' && p + 1 < text.Length && text[p + 1] == '/' && !Lexer.AfterUrlScheme(text, p))
                 || TrailingCommentAt(p);
         }
 
@@ -2127,7 +2127,7 @@ namespace KScript.Syntax.Markup
                 }
             }
             return p >= text.Length || text[p] == '\n' || text[p] == '\r' || text[p] == '}' || text[p] == ';'
-                || (text[p] == '/' && p + 1 < text.Length && text[p + 1] == '/');
+                || (text[p] == '/' && p + 1 < text.Length && text[p + 1] == '/' && !Lexer.AfterUrlScheme(text, p));
         }
 
         private void SkipSpaces()

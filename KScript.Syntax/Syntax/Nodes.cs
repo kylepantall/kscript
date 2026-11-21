@@ -45,6 +45,9 @@ namespace KScript.Syntax
 
         /// <summary><c>3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f</c>, written without quotes.</summary>
         Uuid,
+
+        /// <summary><c>https://example.com/docs</c>, written without quotes.</summary>
+        Url,
     }
 
     public sealed class LiteralNode : ExprNode

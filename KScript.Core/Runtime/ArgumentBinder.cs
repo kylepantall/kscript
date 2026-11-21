@@ -73,7 +73,7 @@ namespace KScript.Runtime
             /// <summary>A list of an enum (<c>sizes: Size[]</c>), whose items can be written bare.</summary>
             public bool IsEnumList => ItemValues != null && ItemValues.Count > 0;
 
-            public static Slot From(ParameterInfo p) => new Slot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.Values);
+            public static Slot From(ParameterInfo p) => new Slot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.Values, RawText: KScript.Metadata.NativeTypes.Get(p.Type)?.RawKind);
         }
 
         /// <summary>

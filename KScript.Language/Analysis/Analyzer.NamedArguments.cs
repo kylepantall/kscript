@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Language.Catalog;
 using KScript.Syntax;
 using KScript.Syntax.Text;
@@ -42,7 +43,8 @@ namespace KScript.Language.Analysis
 
         private static List<List<ParameterSlot>> SlotsOf(IEnumerable<CallableInfo> callables) =>
             callables.SelectMany(c => c.Signatures)
-                .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null)).ToList())
+                .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null,
+                    RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : null, Type: p.Type)).ToList())
                 .ToList();
 
         private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
@@ -104,7 +106,7 @@ namespace KScript.Language.Analysis
             {
                 CheckLiteralFits(word, slot.Type, region.Source.ToSource(node.Span), null, 0);
             }
-            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Number } literal)
+            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Number } literal)
             {
                 object value = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, System.Globalization.CultureInfo.InvariantCulture) : literal.Value;
                 CheckLiteralFits(value, slot.Type, region.Source.ToSource(literal.Span), null, 0);
