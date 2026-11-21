@@ -30,7 +30,7 @@ jobs:
     name: Project templates
     if: github.event.action != 'closed'
     timeout-minutes: 15
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","X64","kscript"]') }}
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON('["home-ci-linux"]') }}
     steps:
       - uses: actions/checkout@v4
 
