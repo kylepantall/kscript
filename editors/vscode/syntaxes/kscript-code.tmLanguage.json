@@ -84,12 +84,15 @@
       ]
     },
     "fn": {
-      "match": "\\b(fn)\\s+([A-Za-z_][\\w-]*)",
+      "match": "\\b(?:(override)\\s+)?(fn)\\s+([A-Za-z_][\\w-]*)",
       "captures": {
         "1": {
-          "name": "storage.type.function.kscript"
+          "name": "storage.modifier.kscript"
         },
         "2": {
+          "name": "storage.type.function.kscript"
+        },
+        "3": {
           "name": "entity.name.function.kscript"
         }
       }
@@ -402,7 +405,7 @@
           ]
         },
         {
-          "match": "\\b(type|enum)\\s+([A-Za-z_]\\w*)",
+          "match": "\\b(type|enum|extend)\\s+([A-Za-z_]\\w*)",
           "captures": {
             "1": {
               "name": "storage.type.kscript"

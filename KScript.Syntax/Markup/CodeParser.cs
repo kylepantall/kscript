@@ -237,6 +237,8 @@ namespace KScript.Syntax.Markup
                 case "for": ParseFor(parent, start); return;
                 case "match": ParseMatch(parent, start); return;
                 case "fn": ParseFn(parent, start, doc); return;
+                case "override" when StartsOverride(): ParseFn(parent, start, doc, isOverride: true); return;
+                case "extend" when StartsDeclaration(6): ParseExtend(parent, start, doc); return;
                 case "type" when StartsDeclaration(4): ParseType(parent, start, doc); return;
                 case "model" when StartsDeclaration(5): ParseType(parent, start, doc, "model"); return;
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
@@ -667,9 +669,17 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary><c>fn greet(who, greeting = 'Hello') { }</c> or <c>fn double(x: int) => $x * 2</c>.</summary>
-        private void ParseFn(MarkupElement parent, int start, string doc)
+        private void ParseFn(MarkupElement parent, int start, string doc, bool isOverride = false)
         {
-            MarkupElement e = Begin(parent, "fn", start);
+            int fnStart = start;
+            if (isOverride)
+            {
+                // override fn to_json() => ...: an extension method that replaces a built-in one.
+                pos = start + "override".Length;
+                SkipSpaces();
+                fnStart = pos;
+            }
+            MarkupElement e = Begin(parent, "fn", start, new TextSpan(fnStart, 2));
             SkipSpaces();
             TextSpan name = ReadNameSpan(allowDash: false);
             if (name.Length == 0)
@@ -679,6 +689,10 @@ namespace KScript.Syntax.Markup
             else
             {
                 AddRawAttribute(e, "name", name);
+            }
+            if (isOverride)
+            {
+                AddAttribute(e, "override", DecodedText.Plain("yes", start), new TextSpan(start, 0));
             }
             SkipSpaces();
             if (Peek(0) == '(')
@@ -712,6 +726,38 @@ namespace KScript.Syntax.Markup
             {
                 ParseBlock(e);
             }
+            Finish(e, start);
+        }
+
+        /// <summary>True at <c>override fn</c>.</summary>
+        private bool StartsOverride()
+        {
+            int p = pos + "override".Length;
+            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t'))
+            {
+                return false;
+            }
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
+            {
+                p++;
+            }
+            return p + 2 < text.Length && text[p] == 'f' && text[p + 1] == 'n' && !Lexer.IsIdentChar(text[p + 2]);
+        }
+
+        /// <summary>
+        /// <c>extend date { fn json() => $this->format('o') }</c>: an &lt;extend&gt; whose block holds the
+        /// methods it adds to a type (built-in or declared). <c>$this</c> is the value the method is called on.
+        /// </summary>
+        private void ParseExtend(MarkupElement parent, int start, string doc)
+        {
+            MarkupElement e = Begin(parent, "extend", start);
+            SkipSpaces();
+            AddRawAttribute(e, "type", ReadNameSpan(allowDash: false));
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
+            }
+            ParseBlock(e);
             Finish(e, start);
         }
 

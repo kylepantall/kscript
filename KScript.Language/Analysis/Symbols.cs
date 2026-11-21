@@ -225,8 +225,11 @@ namespace KScript.Language.Analysis
         /// <summary>True if the user can rename it (not a built-in or front matter key).</summary>
         public bool CanRename => Kind != SymbolKind.BuiltIn;
 
+        /// <summary>For a method an extend block adds: the type it extends, such as date.</summary>
+        public string ExtensionOf { get; internal set; }
+
         public string Signature => Kind == SymbolKind.Function
-            ? $"@{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
+            ? $"{(ExtensionOf != null ? ExtensionOf + "->" : "@")}{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
             : "$" + Name;
 
         /// <summary>The signature with the return type when it is known: <c>@double(x: int): number</c>.</summary>

@@ -485,6 +485,87 @@ namespace KScript.Projects
         public List<string> Packages { get; set; } = new List<string>();
 
         /// <summary>
+        /// Where the project's extension files are: folders (everything inside, subfolders too) or globs, relative
+        /// to kscript.json. Their <c>extend date { fn ... }</c> blocks apply to every script in the project, as if
+        /// each one imported them. Null (the setting left out) means the <c>extensions</c> folder.
+        /// </summary>
+        public List<string> Extensions { get; set; }
+
+        /// <summary>The folder the project reads extensions from when kscript.json doesn't say.</summary>
+        public const string DefaultExtensionsFolder = "extensions";
+
+        private static readonly string[] ScriptSuffixes = { ".kscript", ".ks.xml", ".ks" };
+        private static readonly string[] SkippedFolders = { "node_modules", ".git", "_templates", "bin", "obj" };
+
+        /// <summary>True for a file name that can hold a script's extend blocks (and isn't a test).</summary>
+        public static bool IsExtensionFileName(string path)
+        {
+            string name = Path.GetFileName(path ?? string.Empty);
+            return ScriptSuffixes.Any(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase)) && !TestSettings.IsTestFileName(name);
+        }
+
+        /// <summary>
+        /// The project's extension files, full paths in a stable order: every script under each folder of
+        /// <see cref="Extensions"/>, and every project file a glob there matches.
+        /// </summary>
+        public List<string> ExtensionFiles(Func<string, bool> directoryExists = null, Func<string, bool> fileExists = null,
+            Func<string, IEnumerable<string>> listFiles = null, Func<string, IEnumerable<string>> listDirectories = null)
+        {
+            directoryExists ??= System.IO.Directory.Exists;
+            fileExists ??= File.Exists;
+            listFiles ??= System.IO.Directory.EnumerateFiles;
+            listDirectories ??= System.IO.Directory.EnumerateDirectories;
+            var found = new List<string>();
+            if (Directory == null || !directoryExists(Directory)) return found;
+
+            IEnumerable<string> ScriptsUnder(string folder)
+            {
+                var files = new List<string>();
+                var pending = new Stack<string>();
+                pending.Push(folder);
+                while (pending.Count > 0)
+                {
+                    string dir = pending.Pop();
+                    try
+                    {
+                        files.AddRange(listFiles(dir).Where(IsExtensionFileName));
+                        foreach (string sub in listDirectories(dir))
+                        {
+                            if (!SkippedFolders.Contains(Path.GetFileName(sub.TrimEnd('/', '\\')), StringComparer.OrdinalIgnoreCase)) pending.Push(sub);
+                        }
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    {
+                        // A folder that can't be read has no extensions to give.
+                    }
+                }
+                return files.Select(Path.GetFullPath).OrderBy(f => f, StringComparer.Ordinal);
+            }
+
+            foreach (string entry in Extensions ?? new List<string> { DefaultExtensionsFolder })
+            {
+                string clean = entry.Trim().Replace('\\', '/').TrimEnd('/');
+                if (clean.StartsWith("./", StringComparison.Ordinal)) clean = clean.Substring(2);
+                if (clean.Length == 0) continue;
+                string full = Path.GetFullPath(Path.Combine(Directory, clean));
+                if (directoryExists(full))
+                {
+                    found.AddRange(ScriptsUnder(full));
+                }
+                else if (clean.IndexOfAny(new[] { '*', '?' }) >= 0)
+                {
+                    var whole = new Regex("^" + PathRegex(clean) + "$", OperatingSystem.IsLinux() ? RegexOptions.None : RegexOptions.IgnoreCase);
+                    found.AddRange(ScriptsUnder(Directory).Where(f => whole.IsMatch(Path.GetRelativePath(Directory, f).Replace('\\', '/'))));
+                }
+                else if (fileExists(full))
+                {
+                    found.Add(full);
+                }
+            }
+            return found.Distinct(StringComparer.Ordinal).ToList();
+        }
+
+        /// <summary>
         /// The "types" section: defaults for built-in types, used wherever the type is used without arguments of its
         /// own, such as <c>"uuid": { "v": 4 }</c> or <c>"password": { "min": 12 }</c>. Arguments where a type is used
         /// (<c>password(min: 8)</c>) replace these.
@@ -672,6 +753,9 @@ namespace KScript.Projects
                         case "paths":
                             ReadPaths(prop.Value, config);
                             break;
+                        case "extensions":
+                            config.Extensions = Strings(prop.Value, "extensions", config) ?? config.Extensions;
+                            break;
                         case "packages":
                             config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
                             foreach (string package in config.Packages)
@@ -681,7 +765,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, paths, types, serve, http, queue, lint, test, config, format, make or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, extensions, paths, types, serve, http, queue, lint, test, config, format, make or app).");
                             break;
                     }
                 }

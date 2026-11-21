@@ -183,6 +183,10 @@ namespace KScript.Language.Features
             {
                 return new HoverResult(SymbolMarkdown(analysis, fn), region.Source.ToSource(nameSpan));
             }
+            if (analysis.ExtensionMethod(receiver, name) is Symbol extension)
+            {
+                return new HoverResult(SymbolMarkdown(analysis, extension), region.Source.ToSource(nameSpan));
+            }
             CallableInfo method = Catalog.GetMethods(name, receiver.Type).FirstOrDefault();
             return method != null ? new HoverResult(CallableMarkdown(method, receiver), region.Source.ToSource(nameSpan)) : null;
         }
@@ -360,6 +364,11 @@ namespace KScript.Language.Features
                 && paramDoc.Length > 0)
             {
                 sb.Append("\n\n").Append(paramDoc);
+            }
+            if (s.ExtensionOf != null)
+            {
+                sb.Append("\n\nAdded to ").Append(s.ExtensionOf).Append(" by `extend` in ")
+                  .Append(s.SourcePath != null ? System.IO.Path.GetFileName(s.SourcePath) : "this file").Append('.');
             }
             if (s.Kind != SymbolKind.BuiltIn && s.DeclarationSpan.Length > 0 && s.SourcePath == null)
             {

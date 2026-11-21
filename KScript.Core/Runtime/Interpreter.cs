@@ -181,6 +181,7 @@ namespace KScript.Runtime
             var source = new SourceText(string.Empty);
             var module = new Module(this, path, source, MarkupParser.Parse(source, DocumentKind.Page)) { HasRun = true };
             module.Globals = new Scope();
+            module.ProjectExtensions = ProjectExtensionsFor(module);
             AddPackage(module, Packages.Core, null);
             foreach (string name in Options.DefaultPackages.Concat(packages ?? Enumerable.Empty<string>()))
             {
@@ -210,6 +211,7 @@ namespace KScript.Runtime
                 imported = Load(full);
             }
             RunModule(imported);
+            Extensions.Import(module, imported);
             if (alias != null)
             {
                 module.Aliases[alias] = new ImportNamespace(alias, imported);
@@ -655,6 +657,7 @@ namespace KScript.Runtime
                 {
                     module.Globals.Declare(v.Name, v.Value(this, module));
                 }
+                module.ProjectExtensions = ProjectExtensionsFor(module);
 
                 if (module.IsPackageRoot)
                 {
@@ -695,6 +698,7 @@ namespace KScript.Runtime
         {
             if (!module.ScriptImports.TryGetValue(import, out Module imported)) return;
             RunModule(imported);
+            Extensions.Import(module, imported);
             if (import.GetAttribute("as") != null) return;
             DeclareExports(imported, import.GetAttributeValue("names"), scope);
         }
@@ -741,7 +745,13 @@ namespace KScript.Runtime
             // <type> and <error> declarations are hoisted too, so data can be mapped to a type declared further down.
             foreach (MarkupNode node in nodes)
             {
-                if (node is MarkupElement type && IsTypeDeclaration(module, type)) ExecuteElement(type, scope, module, null);
+                if (node is MarkupElement type && IsTypeDeclaration(module, type) && !IsExtension(module, type)) ExecuteElement(type, scope, module, null);
+            }
+
+            // extend blocks come after the types, since they can add methods to one.
+            foreach (MarkupNode node in nodes)
+            {
+                if (node is MarkupElement extend && IsExtension(module, extend)) ExecuteElement(extend, scope, module, null);
             }
 
             bool? chain = null;
@@ -762,8 +772,11 @@ namespace KScript.Runtime
         private bool IsFunctionDeclaration(Module module, MarkupElement e) =>
             e.Name == "fn" && module.DefinitionOf(e)?.Package is CorePackage;
 
+        private static bool IsExtension(Module module, MarkupElement e) =>
+            e.Name == "extend" && module.DefinitionOf(e)?.Package is CorePackage;
+
         private bool IsTypeDeclaration(Module module, MarkupElement e) =>
-            ((e.Name == "type" || e.Name == "error") && module.DefinitionOf(e)?.Package is CorePackage)
+            ((e.Name == "type" || e.Name == "error" || e.Name == "extend") && module.DefinitionOf(e)?.Package is CorePackage)
             || module.DefinitionOf(e)?.Hoisted == true
             || (e.Name == "job" && module.DefinitionOf(e)?.Package?.Name == "KScript.Queue");
 

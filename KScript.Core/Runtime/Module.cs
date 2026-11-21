@@ -19,6 +19,12 @@ namespace KScript.Runtime
         /// <summary>Packages every script gets without importing them, for example from kscript.json.</summary>
         public List<string> DefaultPackages { get; } = new List<string>();
 
+        /// <summary>
+        /// Whether scripts in a project get the methods from its extension files (the extensions folder, or
+        /// kscript.json's "extensions"). On by default.
+        /// </summary>
+        public bool ProjectExtensions { get; set; } = true;
+
         public CancellationToken Cancellation { get; set; }
     }
 
@@ -93,6 +99,11 @@ namespace KScript.Runtime
         internal readonly Dictionary<string, ElementDefinition> Elements = new Dictionary<string, ElementDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, CommandDefinition> Commands = new Dictionary<string, CommandDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, MethodDefinition> Methods = new Dictionary<string, MethodDefinition>(StringComparer.Ordinal);
+        /// <summary>Methods this script's extend blocks add, and those of the scripts it imports, by "receiver:name".</summary>
+        internal readonly Dictionary<string, ExtensionMethod> Extensions = new Dictionary<string, ExtensionMethod>(StringComparer.Ordinal);
+
+        /// <summary>The methods the project's extension files add, shared by every script in the project (null outside one).</summary>
+        internal ProjectExtensionSet ProjectExtensions;
         internal readonly Dictionary<string, VariableDefinition> Variables = new Dictionary<string, VariableDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, EchoFormatter> EchoFormats = new Dictionary<string, EchoFormatter>(StringComparer.OrdinalIgnoreCase);
         internal readonly Dictionary<string, ImportNamespace> Aliases = new Dictionary<string, ImportNamespace>(StringComparer.Ordinal);

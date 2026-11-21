@@ -84,6 +84,7 @@ namespace KScript.Language.Analysis
             HoistFunctions(root);
             ApplyKnownTypes(root);
             HoistTypes(root);
+            HoistExtensions(root);
             HoistErrors(root);
             HoistJobs(root);
             CheckScriptRoot();
@@ -203,7 +204,7 @@ namespace KScript.Language.Analysis
             Dictionary<string, Symbol> seen = new Dictionary<string, Symbol>(StringComparer.Ordinal);
             foreach (MarkupElement e in result.Markup.DescendantElements())
             {
-                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && (IsTypeElement(owner) || IsKScriptElementName(owner, "job"))))
+                if (IsKScriptElementName(e, "fn") && !(e.Parent is MarkupElement owner && (IsTypeElement(owner) || IsKScriptElementName(owner, "job") || IsKScriptElementName(owner, "extend"))))
                 {
                     MarkupAttribute nameAttr = e.GetAttribute("name");
                     string name = nameAttr?.ValueText?.Trim();
@@ -428,7 +429,7 @@ namespace KScript.Language.Analysis
             SourceText other = new SourceText(text);
             MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
             Dictionary<string, (FunctionParameter[], ExternalLocation, string)> exports = new Dictionary<string, (FunctionParameter[], ExternalLocation, string)>(StringComparer.Ordinal);
-            foreach (MarkupElement fn in doc.DescendantElements().Where(x => x.Name == "fn"))
+            foreach (MarkupElement fn in doc.DescendantElements().Where(x => x.Name == "fn" && x.Parent?.Name != "extend"))
             {
                 MarkupAttribute nameAttr = fn.GetAttribute("name");
                 if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
@@ -580,6 +581,10 @@ namespace KScript.Language.Analysis
 
                 case "error" when info.Package == "KScript.Core":
                     AnalyzeError(e, info, scope, inner, markupMode);
+                    return;
+
+                case "extend" when info.Package == "KScript.Core":
+                    AnalyzeExtend(e, scope, inner, markupMode);
                     return;
 
                 case "job" when info.Package == "KScript.Queue":

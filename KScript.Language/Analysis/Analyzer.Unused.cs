@@ -106,7 +106,7 @@ namespace KScript.Language.Analysis
             }
 
             List<Symbol> candidates = result.Symbols
-                .Where(s => s.Kind == SymbolKind.Function && s.SourcePath == null && s.DeclaringElement?.Name == "fn" && !Ignored(s) && s.Doc?.IsPublic != true && !IsRead(s))
+                .Where(s => s.Kind == SymbolKind.Function && s.SourcePath == null && s.DeclaringElement?.Name == "fn" && s.DeclaringElement.Parent?.Name != "extend" && !Ignored(s) && s.Doc?.IsPublic != true && !IsRead(s))
                 .ToList();
             if (candidates.Count == 0)
             {
