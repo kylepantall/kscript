@@ -213,7 +213,7 @@ namespace KScript.LanguageServer
                 ["textDocumentSync"] = new JsonObject { ["openClose"] = true, ["change"] = 2, ["save"] = true },
                 ["completionProvider"] = new JsonObject
                 {
-                    ["triggerCharacters"] = new JsonArray("<", "$", "@", ">", ".", "\"", "'", "/", "{"),
+                    ["triggerCharacters"] = new JsonArray("<", "$", "@", ">", ".", "\"", "'", "/", "{", "(", ","),
                     ["resolveProvider"] = false,
                 },
                 ["hoverProvider"] = true,
@@ -403,7 +403,7 @@ namespace KScript.LanguageServer
             }
             int offset = Offset(a.Source, p["position"]);
             JsonArray items = new JsonArray();
-            foreach (CompletionItem item in service.GetCompletions(a, offset))
+            foreach (CompletionItem item in service.GetCompletions(a, offset, p["context"]?["triggerCharacter"]?.GetValue<string>()))
             {
                 JsonObject json = new JsonObject
                 {
@@ -417,6 +417,7 @@ namespace KScript.LanguageServer
                 if (item.SortText != null) json["sortText"] = item.SortText;
                 if (item.FilterText != null) json["filterText"] = item.FilterText;
                 if (item.Deprecated) json["tags"] = new JsonArray(1);
+                if (item.SuggestAgain) json["command"] = new JsonObject { ["title"] = "Suggest", ["command"] = "editor.action.triggerSuggest" };
                 if (item.AdditionalEdits != null)
                 {
                     json["additionalTextEdits"] = new JsonArray(item.AdditionalEdits.Select(e => (JsonNode)new JsonObject { ["range"] = Range(a.Source, e.Span), ["newText"] = e.NewText }).ToArray());

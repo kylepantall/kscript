@@ -220,6 +220,8 @@ namespace KScript.Language.Features
                         Deprecated = signature.DeprecatedParameters.Contains(name),
                         Documentation = (doc != null ? doc + "\n\n" : string.Empty) + $"Named argument of `{signature.Label}`.",
                         InsertText = name + ": ",
+                        // An enum or yes/no parameter: show its values as soon as the name is in.
+                        SuggestAgain = signature.Details != null && i < signature.Details.Count && (signature.Details[i].Values?.Count > 0 || signature.Details[i].Flag),
                         ReplaceSpan = replace,
                         FilterText = name,
                         SortText = (signature.DeprecatedParameters.Contains(name) ? "09" : "00") + i.ToString("D2"),

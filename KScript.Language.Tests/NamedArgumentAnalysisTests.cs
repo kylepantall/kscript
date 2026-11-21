@@ -214,5 +214,64 @@ namespace KScript.Language.Tests
             (DocumentAnalysis a, int offset) = At(Script(Pack + "<echo>{ $Size.‸ }</echo>"));
             Assert.Contains("medium", Service.GetCompletions(a, offset).Select(c => c.Label));
         }
+    
+        private static List<CompletionItem> CodeCompletions(string code, string trigger)
+        {
+            (string text, int offset) = WithCaret(code);
+            return Service.GetCompletions(Service.Analyze(text, "test.kscript"), offset, trigger);
+        }
+
+        [Fact]
+        public void OpeningAMethodCallSuggestsItsNamedArguments()
+        {
+            // Typing '(' after a method (or a command or function) opens the list with its parameters' names.
+            List<CompletionItem> items = CodeCompletions("t = 'abc'\necho $t->replace(‸)", "(");
+            Assert.Equal(new[] { "old:", "new:" }, items.Where(i => i.Kind == CompletionKind.Parameter).Select(i => i.Label));
+            Assert.Contains(items, i => i.Label == "$t");
+
+            List<CompletionItem> after = CodeCompletions("t = 'abc'\necho $t->replace('a',‸)", ",");
+            CompletionItem next = Assert.Single(after, i => i.Kind == CompletionKind.Parameter);
+            Assert.Equal("new:", next.Label);
+            Assert.Equal(" new: ", next.InsertText);
+            Assert.Equal("new", next.FilterText);
+            Assert.All(after, i => Assert.StartsWith(" ", i.InsertText));
+
+            // A space already typed after the comma is kept as it is.
+            Assert.Equal("new: ", CodeCompletions("t = 'abc'\necho $t->replace('a', ‸)", ",").Single(i => i.Kind == CompletionKind.Parameter).InsertText);
+        }
+
+        [Fact]
+        public void OpeningACallSuggestsEnumValuesAndFlags()
+        {
+            const string decl = "enum Size { small, large }\nfn pack(size: Size, wrap: bool = false) => 1\n";
+            List<CompletionItem> items = CodeCompletions(decl + "echo @pack(‸)", "(");
+            Assert.Equal(new[] { "small", "large" }, items.Where(i => i.Kind == CompletionKind.Value).Select(i => i.Label));
+            CompletionItem size = items.Single(i => i.Label == "size:");
+            Assert.True(size.SuggestAgain);
+
+            List<CompletionItem> values = CodeCompletions(decl + "echo @pack(size: ‸)", null);
+            Assert.Equal(new[] { "small", "large" }, values.Where(i => i.Kind == CompletionKind.Value).Select(i => i.Label));
+
+            List<CompletionItem> flags = CodeCompletions(decl + "echo @pack(large,‸)", ",");
+            Assert.Contains(flags, i => i.Label == "wrap" && i.Detail == "flag");
+            Assert.True(flags.Single(i => i.Label == "wrap:").SuggestAgain);
+            Assert.False(CodeCompletions("t = 'abc'\necho $t->replace(‸)", "(").Single(i => i.Label == "old:").SuggestAgain);
+        }
+
+        [Theory]
+        [InlineData("x = (‸)", "(")]
+        [InlineData("x = [1,‸]", ",")]
+        [InlineData("x = { a: 1,‸ }", ",")]
+        [InlineData("fn f() => 1\necho @f(‸)", "(")]
+        [InlineData("fn f(a) => 1\necho @f(1,‸)", ",")]
+        public void BracketsAndCommasOutsideACallWithNamesToOfferStayQuiet(string code, string trigger) =>
+            Assert.Empty(CodeCompletions(code, trigger));
+
+        [Fact]
+        public void AskingWithoutATriggerStillListsEverything()
+        {
+            Assert.NotEmpty(CodeCompletions("x = (‸)", null));
+            Assert.NotEmpty(CodeCompletions("x = [1, ‸]", "["));
+        }
     }
 }
