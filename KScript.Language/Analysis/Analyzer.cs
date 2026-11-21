@@ -83,6 +83,7 @@ namespace KScript.Language.Analysis
             DeclareBuiltIns(root);
             AnalyzeFrontMatter(root);
             HoistFunctions(root);
+            HoistProjectNatives(root);
             ApplyKnownTypes(root);
             HoistTypes(root);
             HoistExtensions(root);
@@ -367,6 +368,71 @@ namespace KScript.Language.Analysis
             }
         }
 
+        /// <summary>
+        /// The types and enums in the project's native type files (the natives folder, or kscript.json's "natives"), which
+        /// every script in the project can use without an import. A type this file declares itself wins.
+        /// </summary>
+        private void HoistProjectNatives(Scope root)
+        {
+            MarkupElement owner = result.Markup.RootElements.FirstOrDefault();
+            if (owner == null)
+            {
+                return;
+            }
+            string self = result.Path != null ? System.IO.Path.GetFullPath(result.Path) : null;
+            foreach (string full in ProjectNativeFiles())
+            {
+                if (string.Equals(full, self, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                string text = files.ReadText(full);
+                if (text == null)
+                {
+                    continue;
+                }
+                SourceText other = new SourceText(text);
+                MarkupElement fileRoot = MarkupParser.Parse(other, MarkupParser.KindFromPath(full), full).RootElements.FirstOrDefault();
+                foreach (MarkupElement e in fileRoot?.ChildElements.Where(x => x.Name == "type" || x.Name == "enum") ?? Enumerable.Empty<MarkupElement>())
+                {
+                    MarkupAttribute nameAttr = e.GetAttribute("name");
+                    string name = nameAttr?.ValueText?.Trim().TrimStart('$');
+                    if (string.IsNullOrEmpty(name) || TypeElementIn(result.Markup, name) != null || result.Markup.DescendantElements().Any(x => IsKScriptElementName(x, "enum") && x.GetAttributeValue("name")?.Trim() == name)
+                        || result.Symbols.Any(s => s.SourcePath == full && s.Name == name))
+                    {
+                        continue;
+                    }
+                    TextSpan span = nameAttr.Value.SourceSpan;
+                    string where = ProjectRelative(full);
+                    if (e.Name == "enum")
+                    {
+                        importedEnums[(full, name)] = EnumValuesOf(e);
+                    }
+                    Symbol symbol = ImportedConstant(name, owner.NameSpan, owner, full, where,
+                        (new ExternalLocation(full, other.GetPosition(span.Start), other.GetPosition(span.End)), e.Documentation ?? $"A native type of this project, from {where}"));
+                    root.Declare(symbol, 0);
+                }
+            }
+        }
+
+        private string ProjectRelative(string full)
+        {
+            for (string dir = directory; dir != null; dir = System.IO.Path.GetDirectoryName(dir))
+            {
+                if (files.FileExists(System.IO.Path.Combine(dir, KScript.Projects.ProjectConfig.FileName)))
+                {
+                    return System.IO.Path.GetRelativePath(dir, full).Replace('\\', '/');
+                }
+            }
+            return System.IO.Path.GetFileName(full);
+        }
+
+        /// <summary>The values of the enums other files declare, by file and name, so an imported enum is a type here too.</summary>
+        private readonly Dictionary<(string Path, string Name), List<string>> importedEnums = new Dictionary<(string Path, string Name), List<string>>();
+
+        private static List<string> EnumValuesOf(MarkupElement e) =>
+            (e.GetAttributeValue("values") ?? string.Empty).Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
         private Symbol ImportedConstant(string name, TextSpan at, MarkupElement import, string full, string src, (ExternalLocation Location, string Description) constant)
         {
             Symbol symbol = new Symbol
@@ -379,6 +445,15 @@ namespace KScript.Language.Analysis
                 Description = constant.Description ?? $"Imported from {src}",
                 Shape = TypeShape.Unknown,
             };
+            if (full != null && importedEnums.TryGetValue((full, name), out List<string> values))
+            {
+                symbol.EnumValues = values;
+                symbol.Shape = new TypeShape(KType.Map);
+                foreach (string v in values)
+                {
+                    symbol.Shape.Fields[v] = new FieldInfo(v, new TypeShape(KType.String), null, $"A value of {name}.");
+                }
+            }
             result.ExternalDeclarations[symbol] = constant.Location;
             result.Symbols.Add(symbol);
             return symbol;
@@ -411,6 +486,10 @@ namespace KScript.Language.Analysis
                 if (let.Name == "error")
                 {
                     importedErrors.Add(nameAttr.ValueText.Trim());
+                }
+                if (let.Name == "enum")
+                {
+                    importedEnums[(path, nameAttr.ValueText.Trim())] = EnumValuesOf(let);
                 }
                 TextSpan span = nameAttr.Value.SourceSpan;
                 constants[nameAttr.ValueText.Trim().TrimStart('$')] = (new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), let.Documentation);

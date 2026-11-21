@@ -15,9 +15,13 @@ namespace KScript.Language.Analysis
     public sealed partial class Analyzer
     {
         /// <summary>The built-in types, the semantic ones included: a &lt;type&gt; can't take these names.</summary>
-        private static readonly string[] SemanticTypeNames = { "email", "password", "handle", "uuid", "regex" };
+        private static IEnumerable<string> SemanticTypeNames => KScript.Metadata.NativeTypes.Names;
 
-        private static readonly HashSet<string> TextRootNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "string", "email", "password", "handle", "uuid", "regex" };
+        /// <summary>The first native types, whose names ignore case (Handle is handle), as they always have.</summary>
+        private static readonly string[] FirstNativeTypes = { "email", "password", "handle", "uuid", "regex" };
+
+        /// <summary>Text types: a refinement of one reads raw words. port is a number, so it isn't one.</summary>
+        private static bool IsTextRoot(string root) => root == "string" || (KScript.Metadata.NativeTypes.IsNative(root) && root != "port");
 
         /// <summary>The types named in with="..." (<c>with [User, Auditable]</c>), without brackets.</summary>
         private static List<string> WithNames(MarkupElement type)
@@ -95,7 +99,10 @@ namespace KScript.Language.Analysis
             IsKScriptElementName(e, "model") && catalog.GetElement("model")?.Package == "KScript.Data";
 
         private static bool IsBuiltInTypeName(string name) =>
-            BuiltInTypes.Contains(name, StringComparer.OrdinalIgnoreCase) || SemanticTypeNames.Contains(name, StringComparer.OrdinalIgnoreCase);
+            BuiltInTypes.Contains(name, StringComparer.OrdinalIgnoreCase) || FirstNativeTypes.Contains(name, StringComparer.OrdinalIgnoreCase) || KScript.Metadata.NativeTypes.IsNative(name);
+
+        /// <summary>The built-in type a name means, in its own case: Handle is handle, but Color is a script's own type.</summary>
+        private static string BuiltInTypeName(string name) => KScript.Metadata.NativeTypes.IsNative(name) ? name : name.ToLowerInvariant();
 
         /// <summary>
         /// The built-in type a refinement type comes down to (<c>Username with [Handle]</c>, <c>Handle with [handle]</c>: handle),
@@ -115,7 +122,7 @@ namespace KScript.Language.Analysis
             }
             if (IsBuiltInTypeName(name))
             {
-                return name.ToLowerInvariant();
+                return BuiltInTypeName(name);
             }
             MarkupElement inner = TypeElementNamed(name);
             return inner != null && inner != type ? RefinedRoot(inner, depth + 1) : null;
@@ -158,8 +165,8 @@ namespace KScript.Language.Analysis
             }
             if (IsBuiltInTypeName(t))
             {
-                string lower = t.ToLowerInvariant();
-                return lower == "handle" ? "handle" : SemanticTypeNames.Contains(lower) || (hasArgs && lower == "string") ? "word" : null;
+                string lower = BuiltInTypeName(t);
+                return KScript.Metadata.NativeTypes.Get(lower) is { } native ? (lower == "port" ? null : native.RawKind) : hasArgs && lower == "string" ? "word" : null;
             }
             Symbol symbol = scope?.Lookup(t, offset) ?? result.RootScope.Lookup(t, int.MaxValue);
             if (symbol?.EnumValues != null || result.Markup.DescendantElements().Any(e => IsKScriptElementName(e, "enum") && e.GetAttributeValue("name")?.Trim() == t))
@@ -174,7 +181,7 @@ namespace KScript.Language.Analysis
             string root = RefinedRoot(element);
             if (root != null)
             {
-                return root == "handle" ? "handle" : TextRootNames.Contains(root) ? "word" : null;
+                return root == "handle" ? "handle" : IsTextRoot(root) ? "word" : null;
             }
             return RefinementChain(element).Any(e => e.GetAttribute("pattern") != null || e.GetAttribute("parse") != null) ? "word" : null;
         }
@@ -197,7 +204,7 @@ namespace KScript.Language.Analysis
                 CheckLiteralFits(value.Value.Trim(), type, span, scope, offset);
                 return true;
             }
-            if (parsed.Success && parsed.Root is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Regex or LiteralKind.Number } literal)
+            if (parsed.Success && parsed.Root is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Regex or LiteralKind.Number } literal)
             {
                 object text = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, CultureInfo.InvariantCulture) : literal.Value;
                 CheckLiteralFits(text, type, value.ToSource(literal.Span), scope, offset);
@@ -226,10 +233,10 @@ namespace KScript.Language.Analysis
             string shown = literal is string s ? s : Convert.ToString(literal, CultureInfo.InvariantCulture);
             if (IsBuiltInTypeName(name))
             {
-                string lower = name.ToLowerInvariant();
+                string lower = BuiltInTypeName(name);
                 if (SemanticTypeNames.Contains(lower))
                 {
-                    if (!(literal is string) && lower != "password")
+                    if (!(literal is string) && lower != "password" && !(literal is double && NativeParsers.Get(lower)?.TakesNumbers == true))
                     {
                         return null;
                     }

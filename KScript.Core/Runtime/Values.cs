@@ -290,7 +290,17 @@ namespace KScript.Runtime
         #region Conversion for type="..."
 
         /// <summary>The types a <c>type</c> attribute or a parameter can declare.</summary>
-        public static readonly string[] DeclarableTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "regex", "any" };
+        public static IReadOnlyList<string> DeclarableTypes =>
+            BasicTypes.Concat(KScript.Metadata.NativeTypes.Names.Where(n => !BasicTypes.Contains(n))).Append("any").ToList();
+
+        private static readonly string[] BasicTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "regex" };
+
+        /// <summary>
+        /// True for a built-in type name. The basic types and the first native ones (email, handle, ...) ignore case; the
+        /// newer native types don't, so a script's own Color or Duration type is never taken for color or duration.
+        /// </summary>
+        public static bool IsDeclarable(string name) =>
+            name != null && (name.Equals("any", StringComparison.OrdinalIgnoreCase) || BasicTypes.Contains(name, StringComparer.OrdinalIgnoreCase) || KScript.Metadata.NativeTypes.IsNative(name));
 
         /// <summary>Converts a value to a declared type, or fails with a clear message.</summary>
         public static object ConvertTo(object value, string type, string what)
@@ -338,6 +348,12 @@ namespace KScript.Runtime
                     throw new KScriptException($"{what} {SemanticTypes.Mismatch(semantic, value, reason)}.", "Type");
                 }
                 default:
+                    if (SemanticTypes.IsSemantic(type.Trim()))
+                    {
+                        string native = type.Trim();
+                        if (SemanticTypes.TryConvert(native, value, out object converted, out string reason)) return converted;
+                        throw new KScriptException($"{what} {SemanticTypes.Mismatch(native, value, reason)}.", "Type");
+                    }
                     throw new KScriptException($"Unknown type '{type}' for {what}. Use one of: {string.Join(", ", DeclarableTypes)}.", "Type");
             }
             throw new KScriptException($"{what} must be {Article(type)} {type}, but got {Describe(value)}.", "Type");

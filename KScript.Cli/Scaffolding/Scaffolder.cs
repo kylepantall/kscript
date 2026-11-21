@@ -299,6 +299,10 @@ namespace KScript.Scaffolding
             values["paths.extensions"] = Folder(project?.Extensions?.Select(e => e.Trim().Replace('\\', '/').TrimEnd('/'))
                 .FirstOrDefault(e => e.Length > 0 && e.IndexOfAny(new[] { '*', '?' }) < 0 && !KScript.Projects.ProjectConfig.IsExtensionFileName(e))
                 ?? KScript.Projects.ProjectConfig.DefaultExtensionsFolder);
+            // Native types go in the first folder kscript.json's "natives" lists, or natives/.
+            values["paths.natives"] = Folder(project?.Natives?.Select(e => e.Trim().Replace('\\', '/').TrimEnd('/'))
+                .FirstOrDefault(e => e.Length > 0 && e.IndexOfAny(new[] { '*', '?' }) < 0 && !KScript.Projects.ProjectConfig.IsExtensionFileName(e))
+                ?? KScript.Projects.ProjectConfig.DefaultNativesFolder);
             if (!values.ContainsKey("views")) values["views"] = values["paths.views"];
             return values;
         }

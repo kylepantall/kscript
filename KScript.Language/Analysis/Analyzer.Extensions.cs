@@ -14,7 +14,8 @@ namespace KScript.Language.Analysis
     public sealed partial class Analyzer
     {
         /// <summary>The built-in types an extend block can name, as well as the types packages' methods are for.</summary>
-        private static readonly string[] ExtendableTypes = { "string", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "regex" };
+        private static IEnumerable<string> ExtendableTypes =>
+            new[] { "string", "number", "bool", "list", "map", "fn", "date" }.Concat(KScript.Metadata.NativeTypes.Names);
 
         private static string ExtensionReceiver(string type) => type is "int" or "float" ? KType.Number : type;
 
@@ -83,7 +84,14 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>The project's extension files, from the nearest kscript.json (none outside a project).</summary>
-        private List<string> ProjectExtensionFiles()
+        private List<string> ProjectExtensionFiles() =>
+            ProjectFiles((config, d, f, l, ds) => config.ExtensionFiles(d, f, l, ds));
+
+        /// <summary>The project's native type files (the natives folder, or kscript.json's "natives").</summary>
+        private List<string> ProjectNativeFiles() =>
+            ProjectFiles((config, d, f, l, ds) => config.NativeFiles(d, f, l, ds));
+
+        private List<string> ProjectFiles(Func<ProjectConfig, Func<string, bool>, Func<string, bool>, Func<string, IEnumerable<string>>, Func<string, IEnumerable<string>>, List<string>> pick)
         {
             for (string dir = directory; dir != null; dir = System.IO.Path.GetDirectoryName(dir))
             {
@@ -95,7 +103,7 @@ namespace KScript.Language.Analysis
                 try
                 {
                     string text = files.ReadText(file);
-                    return text == null ? new List<string>() : ProjectConfig.Parse(text, file).ExtensionFiles(files.DirectoryExists, files.FileExists, d => files.ListFiles(d, "*"), files.ListDirectories);
+                    return text == null ? new List<string>() : pick(ProjectConfig.Parse(text, file), files.DirectoryExists, files.FileExists, d => files.ListFiles(d, "*"), files.ListDirectories);
                 }
                 catch (ProjectConfigException)
                 {

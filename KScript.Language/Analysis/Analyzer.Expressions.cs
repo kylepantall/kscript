@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using System.Globalization;
 using KScript.Language.Catalog;
 using KScript.Syntax.Markup;
@@ -653,7 +654,7 @@ namespace KScript.Language.Analysis
         /// <summary>A number, bool, date or file isn't text, but prints as text with <c>->to_string()</c>.</summary>
         private static bool HasTextForm(string type) => type == KType.Number || type == KType.Bool || type == KType.Date || type == KType.File;
 
-        private static bool IsSemanticText(string type) => type == KType.Email || type == KType.Handle || type == KType.Uuid || type == KType.Regex;
+        private static bool IsSemanticText(string type) => KType.IsNativeText(type);
 
         private static string Plural(string type) => type switch
         {
@@ -661,7 +662,7 @@ namespace KScript.Language.Analysis
         };
 
         private static string Article(string type) =>
-            type.Length > 0 && "aeiou".Contains(char.ToLowerInvariant(type[0])) && type != KType.Uuid ? "an " + type : "a " + type;
+            NativeTypes.Get(type)?.WithArticle ?? (type.Length > 0 && "aeiou".Contains(char.ToLowerInvariant(type[0])) ? "an " + type : "a " + type);
 
         private static TextSpan VariableNameSpan(VariableNode v, ExpressionRegion region)
         {

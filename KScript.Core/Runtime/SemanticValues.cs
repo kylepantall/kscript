@@ -28,9 +28,10 @@ namespace KScript.Runtime
         public const string Uuid = "uuid";
         public const string Regex = "regex";
 
-        public static readonly string[] Names = { Email, Password, Handle, Uuid, Regex };
+        /// <summary>Every native type: these five, the rest of the language's own (url, ip, country, ...) and packages' types.</summary>
+        public static IReadOnlyList<string> Names => KScript.Metadata.NativeTypes.Names.ToList();
 
-        public static bool IsSemantic(string type) => Names.Contains(type);
+        public static bool IsSemantic(string type) => type is Email or Password or Handle or Uuid or Regex || NativeParsers.Get(type) != null;
 
         /// <summary>
         /// Converts <paramref name="value"/> to the semantic type. Returns false with <paramref name="reason"/> set to
@@ -65,14 +66,33 @@ namespace KScript.Runtime
                     if (!UuidValue.TryParse(us, out UuidValue uuid, out reason)) return false;
                     result = uuid;
                     return true;
-                default:
+                case Password:
                     if (value is PasswordValue) { result = value; reason = null; return true; }
                     if (value is not string ps) { reason = null; return false; }
                     if (!PasswordValue.TryCreate(ps, out PasswordValue password, out reason)) return false;
                     result = password;
                     return true;
+                default:
+                {
+                    reason = null;
+                    NativeParser parser = NativeParsers.Get(type);
+                    if (parser == null) return false;
+                    if (value is NativeText native && native.TypeName == type) { result = value; return true; }
+                    if (value is double && parser.TakesNumbers) value = Values.ToStr(value);
+                    string text = value switch { string str => str, ISemanticText other => other.Text, _ => null };
+                    if (text == null) return false;
+                    (object made, string why) = parser.Parse(text);
+                    reason = why;
+                    if (made == null) return false;
+                    result = made;
+                    return true;
+                }
             }
         }
+
+        /// <summary>Why a native value breaks the options given where its type is used: ip(version: 4), url(schemes: [https]).</summary>
+        public static IEnumerable<string> OptionProblems(string type, object value, IReadOnlyDictionary<string, object> options) =>
+            options.Count == 0 || NativeParsers.Get(type)?.OptionProblems is not { } check ? Enumerable.Empty<string>() : check(value, options);
 
         /// <summary>
         /// Why a value doesn't fit, starting "needs ...". The value itself is never shown for a password.
@@ -84,16 +104,10 @@ namespace KScript.Runtime
             return reason != null ? $"needs {Article(type)} {type}, but got {Values.Describe(value)}: {reason}" : $"needs {Article(type)} {type}, but got {Values.Describe(value)}";
         }
 
-        private static string Article(string type) => type == Email ? "an" : "a";
+        private static string Article(string type) => KScript.Metadata.NativeTypes.Get(type)?.WithArticle.Split(' ')[0] ?? "a";
 
         /// <summary>The options a semantic type takes besides min, max, pattern, one_of and not.</summary>
-        public static IReadOnlyList<string> OptionsOf(string type) => type switch
-        {
-            Uuid => new[] { "v" },
-            Email => new[] { "domains" },
-            Password => new[] { "upper", "lower", "digit", "symbol", "common", "score", "algorithm" },
-            _ => Array.Empty<string>(),
-        };
+        public static IReadOnlyList<string> OptionsOf(string type) => KScript.Metadata.NativeTypes.Get(type)?.Options ?? Array.Empty<string>();
     }
 
     /// <summary>

@@ -197,6 +197,9 @@ namespace KScript.Runtime
                         yield return $"must be at {(allowed.Count == 1 ? allowed[0] : "one of " + string.Join(", ", allowed))}";
                     break;
                 }
+                case NativeText native:
+                    foreach (string problem in SemanticTypes.OptionProblems(native.TypeName, native, Options)) yield return problem;
+                    break;
                 case PasswordValue password:
                     foreach (string problem in password.RuleProblems(0, null, Flag("upper"), Flag("lower"), Flag("digit"), Flag("symbol"),
                         Flag("common"), null, Options.TryGetValue("score", out object score) ? Values.ToInt(score, "score") : 0))

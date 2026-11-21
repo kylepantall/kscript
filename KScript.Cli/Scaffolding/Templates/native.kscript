@@ -1,8 +1,8 @@
 --- make
-description: A native type in types/: a value of your own, like email or handle, that its validator checks wherever it is used and that can be written without quotes
+description: A native type in natives/: a value of your own, like email or handle, that its validator checks wherever it is used and that can be written without quotes. Every script in the project can use it without an import
 category: Scripts and data
 usage: <Name> [--base string] [--pattern "/^[A-Z]{3}-\d{4}$/"] [--min 3] [--max 30] [--one-of a,b] [--not a,b] [--normalize "$value->trim()"] [--validate "test, 'message'"]
---base: The built-in type it is made from: string, int, float, number, email, handle, uuid or another of your types (default string)
+--base: The type it is made from: string, int, float, number, a native type such as email, url, domain, slug or country, or another of your types (default string)
 --pattern: A regex the whole value must match, such as "/^[A-Z]{3}-\d{4}$/i"
 --min: The smallest number, or the shortest text or list
 --max: The largest number, or the longest text or list
@@ -12,10 +12,11 @@ usage: <Name> [--base string] [--pattern "/^[A-Z]{3}-\d{4}$/"] [--min 3] [--max 
 --validate: Any other check, with the message to show when it fails: "test, 'message'"
 example: kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/" --normalize "$value->trim()->upper()"
 example: kscript make native Percent --base int --min 0 --max 100
+example: kscript make native CompanySite --base url --validate "$value->host()->ends_with('example.com'), 'Use a company site'"
 example: kscript make native Username --base handle --max 16 --not @admin,@root
 defaults: base=string
-to: {{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}
-hint: Import it with import "{{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}", then use it like a built-in type: value: {{ pascal }} = ...
+to: {{ paths.natives }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Every script in the project can now use it like a built-in type, without an import: value: {{ pascal }} = ...
 ---
 /// {{ title }}: a native type built on {{ base }}. A value that breaks a rule fails where it is made, and the editor checks the values written in code.
 type {{ pascal }} with [{{ base }}] {

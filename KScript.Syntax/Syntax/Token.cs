@@ -29,6 +29,9 @@ namespace KScript.Syntax
 
         /// <summary>A UUID written without quotes: <c>3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f</c>.</summary>
         Uuid,
+
+        /// <summary>A URL written without quotes: <c>https://example.com/docs</c>.</summary>
+        Url,
     }
 
     public readonly struct Token
@@ -147,7 +150,7 @@ namespace KScript.Syntax
                     continue;
                 }
                 // // to the end of the line, for expressions written over several lines ('//' is never an operator).
-                if (text[Position] == '/' && Position + 1 < end && text[Position + 1] == '/')
+                if (text[Position] == '/' && Position + 1 < end && text[Position + 1] == '/' && !AfterUrlScheme(text, Position))
                 {
                     while (Position < end && text[Position] != '\n')
                     {
@@ -179,6 +182,12 @@ namespace KScript.Syntax
                 {
                     Position = literalEnd;
                     return Make(TokenKind.Uuid, start);
+                }
+                literalEnd = UrlEnd(text, start, end);
+                if (literalEnd > 0)
+                {
+                    Position = literalEnd;
+                    return Make(TokenKind.Url, start);
                 }
                 literalEnd = EmailEnd(start);
                 if (literalEnd > 0)
@@ -332,6 +341,50 @@ namespace KScript.Syntax
             // A method call may follow: 3f2a...->version().
             bool arrow = i + 1 < end && text[i] == '-' && text[i + 1] == '>';
             return i < end && (IsIdentChar(text[i]) || (text[i] == '-' && !arrow)) ? -1 : i;
+        }
+
+        /// <summary>The schemes a URL written without quotes can start with.</summary>
+        public static readonly string[] UrlSchemes = { "https", "http", "wss", "ws", "ftp" };
+
+        /// <summary>
+        /// The end of a URL written without quotes (https://example.com/docs?page=2) at <paramref name="start"/>, or -1. It
+        /// runs to a space, a quote, a comma, a bracket, ;, -> (a method call) or the end. A . ! or ? at the very end is left out, so a
+        /// URL can end a sentence.
+        /// </summary>
+        public static int UrlEnd(string text, int start, int end)
+        {
+            if (start > 0 && (IsIdentChar(text[start - 1]) || text[start - 1] is '$' or '@' or '.')) return -1;
+            foreach (string scheme in UrlSchemes)
+            {
+                int after = start + scheme.Length;
+                if (after + 3 >= end || string.Compare(text, start, scheme, 0, scheme.Length, StringComparison.OrdinalIgnoreCase) != 0
+                    || string.CompareOrdinal(text, after, "://", 0, 3) != 0 || !UrlChar(text[after + 3]) || text[after + 3] == '/') continue;
+                int i = after + 3;
+                while (i < end && UrlChar(text[i]) && !(text[i] == '-' && i + 1 < end && text[i + 1] == '>'))
+                {
+                    i++;
+                }
+                while (i > after + 3 && text[i - 1] is '.' or '!' or '?' or ':')
+                {
+                    i--;
+                }
+                return i;
+            }
+            return -1;
+        }
+
+        private static bool UrlChar(char c) => !char.IsWhiteSpace(c) && c is not ('\'' or '"' or ',' or ')' or ']' or '}' or ';' or '<' or '>' or '`' or '(' or '[' or '{');
+
+        /// <summary>True when the // at <paramref name="slashes"/> follows a URL's scheme (https://), so it isn't a comment.</summary>
+        public static bool AfterUrlScheme(string text, int slashes)
+        {
+            if (slashes < 1 || text[slashes - 1] != ':') return false;
+            foreach (string scheme in UrlSchemes)
+            {
+                int start = slashes - 1 - scheme.Length;
+                if (start >= 0 && UrlEnd(text, start, text.Length) > 0) return true;
+            }
+            return false;
         }
 
         /// <summary>The end of an email address (local@domain.tld) at <paramref name="start"/>, or -1.</summary>
