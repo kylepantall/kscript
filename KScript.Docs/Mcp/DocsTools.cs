@@ -265,8 +265,8 @@ namespace KScript.Docs.Mcp
             void AddMethods(string method, string receiver)
             {
                 var methods = catalog.GetMethods(method, string.IsNullOrWhiteSpace(receiver) ? KType.Any : receiver.Trim()).ToList();
-                if (!string.IsNullOrWhiteSpace(receiver) && methods.Any(m => KType.Accepts(m.ReceiverType, receiver.Trim())))
-                    methods = methods.Where(m => KType.Accepts(m.ReceiverType, receiver.Trim())).ToList();
+                if (!string.IsNullOrWhiteSpace(receiver) && methods.Any(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiver.Trim())))
+                    methods = methods.Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiver.Trim())).ToList();
                 found.AddRange(methods.Select(m => docs.Callable(m, format)));
             }
 

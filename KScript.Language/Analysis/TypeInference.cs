@@ -164,7 +164,7 @@ namespace KScript.Language.Analysis
                         TypeShape data = m.Arguments.Count > 0 ? Infer(m.Arguments[0].Value, region) : TypeShape.Unknown;
                         return data.Type == KType.List ? new TypeShape(KType.List) { Element = receiver.Instance } : receiver.Instance;
                     }
-                    if (m.Name == "json" && MappedShape(catalog.GetMethods("json", receiver.Type).FirstOrDefault(x => KType.Accepts(x.ReceiverType, receiver.Type)), m.Arguments, 0, null, region) is TypeShape asType)
+                    if (m.Name == "json" && MappedShape(catalog.GetMethods("json", receiver.Type).FirstOrDefault(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)), m.Arguments, 0, null, region) is TypeShape asType)
                     {
                         return asType;
                     }
@@ -384,7 +384,7 @@ namespace KScript.Language.Analysis
                 }
             }
 
-            List<CallableInfo> methods = catalog.GetMethods(name, receiver.Type).Where(m => KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
+            List<CallableInfo> methods = catalog.GetMethods(name, receiver.Type).Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiver.Type)).ToList();
             CallableInfo method = methods.FirstOrDefault(m => argCount >= m.MinArgs && argCount <= m.MaxArgs) ?? methods.FirstOrDefault();
             return method != null ? new TypeShape(method.ReturnType) : TypeShape.Unknown;
         }

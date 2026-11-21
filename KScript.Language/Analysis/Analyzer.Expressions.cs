@@ -466,21 +466,27 @@ namespace KScript.Language.Analysis
             }
 
             // A declared type is held to: an int parameter has no string methods.
-            // Text with a meaning of its own (an email, a handle) keeps the string methods.
+            // Text with a meaning of its own (an email, a uuid) keeps only the string methods that make sense for it.
             List<CallableInfo> applicable = candidates.Where(m => receiver.Declared
-                ? m.ReceiverType == KType.Any || m.ReceiverType == receiver.Type || (m.ReceiverType == KType.String && IsSemanticText(receiver.Type))
-                : KType.Accepts(m.ReceiverType, receiver.Type)).ToList();
+                ? m.ReceiverType == KType.Any || m.ReceiverType == receiver.Type || (m.ReceiverType == KType.String && IsSemanticText(receiver.Type) && KType.AcceptsMethod(m.ReceiverType, m.Name, receiver.Type))
+                : KType.AcceptsMethod(m.ReceiverType, m.Name, receiver.Type)).ToList();
             usedPackages.UnionWith(applicable.Select(m => m.Package).Where(p => p != null));
+            if (IsSemanticText(receiver.Type) && candidates.FirstOrDefault(m => m.ReceiverType == KType.String) is CallableInfo text)
+            {
+                // ->to_number() is on numbers and strings: a uuid is told about the string one, since it is text.
+                candidates.Remove(text);
+                candidates.Insert(0, text);
+            }
             if (applicable.Count == 0 && receiver.Declared)
             {
                 Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
-                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is declared as {Article(receiver.Type)}.");
+                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is declared as {Article(receiver.Type)}." + ToStringHint(candidates[0], receiver.Type, arrow, name));
                 return;
             }
             if (applicable.Count == 0)
             {
                 Report(nameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
-                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(receiver.Type)}.");
+                    $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(receiver.Type)}." + ToStringHint(candidates[0], receiver.Type, arrow, name));
                 return;
             }
 
@@ -532,6 +538,10 @@ namespace KScript.Language.Analysis
             return null;
         }
 
+        /// <summary>For a string method on a uuid, email, handle or regex: how to call it on the text anyway.</summary>
+        private static string ToStringHint(CallableInfo method, string type, string arrow, string name) =>
+            method.ReceiverType == KType.String && IsSemanticText(type) ? $" Use ->to_string(){arrow}{name}() to work on its text." : string.Empty;
+
         private static bool IsSemanticText(string type) => type == KType.Email || type == KType.Handle || type == KType.Uuid || type == KType.Regex;
 
         private static string Plural(string type) => type switch
@@ -540,7 +550,7 @@ namespace KScript.Language.Analysis
         };
 
         private static string Article(string type) =>
-            type.Length > 0 && "aeiou".Contains(char.ToLowerInvariant(type[0])) ? "an " + type : "a " + type;
+            type.Length > 0 && "aeiou".Contains(char.ToLowerInvariant(type[0])) && type != KType.Uuid ? "an " + type : "a " + type;
 
         private static TextSpan VariableNameSpan(VariableNode v, ExpressionRegion region)
         {

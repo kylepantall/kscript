@@ -250,4 +250,30 @@ public class SemanticTypesTests
         Assert.Contains("\"handle\": \"@joan_s\"", accounts);
         Assert.Contains("(3 problems)", accounts);
     }
+
+    [Theory]
+    [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->upper()->slice(0, 8)", "3F2A8C1E")]
+    [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->starts_with('3f2a')", "true")]
+    [InlineData("echo joan@example.com->split('@')", "joan, example.com")]
+    [InlineData("h: handle = @joan\necho $h->length()", "5")]
+    [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->to_string()->length()", "36")]
+    public void NativeValuesKeepTheStringMethodsThatMakeSense(string code, string expected) => Assert.Equal(expected, Code(code));
+
+    [Theory]
+    [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->to_date()", "have no method ->to_date(). Use ->to_string()->to_date() to work on its text.")]
+    [InlineData("echo joan@example.com->to_number()", "have no method ->to_number().")]
+    [InlineData("h: handle = @joan\necho $h->lower()", "have no method ->lower().")]
+    [InlineData("r: regex = /a/\necho $r->upper()", "have no method ->upper().")]
+    public void NativeValuesDontHaveStringMethodsThatDontMakeSense(string code, string expected) => Assert.Contains(expected, CodeFails(code).Message);
+
+    [Fact]
+    public void TheTypesGuideListsTheStringMethodsEachTypeKeeps()
+    {
+        string guide = File.ReadAllText(ScriptRunner.RepoFile("docs", "types.md"));
+        foreach ((string type, HashSet<string> kept) in KScript.Metadata.KType.StringMethodsOf)
+        {
+            string row = guide.Split('\n').Single(l => l.StartsWith($"| `{type}` | `contains`", StringComparison.Ordinal));
+            Assert.Equal(kept.OrderBy(n => n), row.Split('|')[2].Split(',').Select(n => n.Trim().Trim('`')).OrderBy(n => n));
+        }
+    }
 }
