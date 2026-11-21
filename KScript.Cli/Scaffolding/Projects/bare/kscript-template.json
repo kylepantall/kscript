@@ -4,22 +4,28 @@
   "description": "A bare-bones project: kscript.json, one script and a test. Add --web, --api or --desktop for an empty website, API or desktop app.",
   "options": {
     "format": {
+      "question": "Which file format for scripts?",
       "default": "kscript",
+      "choices": ["kscript", "xml"],
       "description": "kscript writes scripts and tests as .kscript files; xml writes them as .ks.xml."
     },
     "web": {
+      "question": "Add an empty website?",
       "default": false,
       "description": "Add an empty website: index.html, _layout.html and site.css, served by kscript serve."
     },
     "api": {
+      "question": "Add an empty JSON API?",
       "default": false,
       "description": "Add an empty JSON API: routes/api.kscript (KScript.Http routes under /api), controllers/hello.kscript and a test for it."
     },
     "desktop": {
+      "question": "Add a desktop app (the same app in a window)?",
       "default": false,
       "description": "Add an empty desktop app: desktop.kscript (a KScript.Window) and the kscript.json app settings."
     },
     "port": {
+      "question": "Which port should kscript serve use?",
       "default": 8080,
       "description": "The port kscript serve uses, with --web or --api"
     }

@@ -120,7 +120,7 @@ namespace KScript.Net
             p.LogProvider("http", "Sends log entries to a web service as a JSON array (url, headers, batch).", c => new HttpLogProvider(c, Client.Value));
 
             p.Command("api", "url, options?",
-                "Makes an HTTP request and returns the response. options is a map: method, headers, body (a map is sent as JSON), timeout (seconds, default 100).",
+                "Makes an HTTP request and returns the response. options is a map: method, headers, body (a map is sent as JSON), timeout (seconds, default 100). A path such as '/api/notes' asks the project's own routes, in this process.",
                 KType.Response, Api,
                 "<let name=\"repo\" value=\"@api('https://api.github.com/repos/kylepantall/kscript')->check()->json()\" />");
             p.Command("url_encode", "text", "Escapes text for use in a URL.", KType.String, c => Uri.EscapeDataString(c.Str(0)));
@@ -169,8 +169,9 @@ namespace KScript.Net
         private static object Api(CallContext c)
         {
             string url = c.Str(0);
+            if (url.StartsWith('/') && !url.StartsWith("//", StringComparison.Ordinal)) return Local(c, url);
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-                throw c.Error($"@api() needs an http:// or https:// address, but got '{url}'.", "Argument");
+                throw c.Error($"@api() needs an http:// or https:// address, or a path on this app such as '/api/notes', but got '{url}'.", "Argument");
 
             Dictionary<string, object> options = c.Has(1) && c.Arg(1) != null ? c.Map(1) : new Dictionary<string, object>();
             string method = options.TryGetValue("method", out object m) && m != null ? Values.ToStr(m).ToUpperInvariant() : "GET";
@@ -211,6 +212,56 @@ namespace KScript.Net
             {
                 throw new KScriptException($"Couldn't reach {url}: {ex.Message}", "Network");
             }
+        }
+
+        /// <summary>
+        /// @api('/api/notes'): a request to the routes of the script's own project, answered in this process. The
+        /// options are the same; a map or list body is sent as JSON.
+        /// </summary>
+        private static object Local(CallContext c, string url)
+        {
+            Dictionary<string, object> options = c.Has(1) && c.Arg(1) != null ? c.Map(1) : new Dictionary<string, object>();
+            string method = options.TryGetValue("method", out object m) && m != null ? Values.ToStr(m).ToUpperInvariant() : "GET";
+            var headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            if (options.TryGetValue("headers", out object h) && h is Dictionary<string, object> given)
+            {
+                foreach (var kv in given) headers[kv.Key.ToLowerInvariant()] = Values.ToStr(kv.Value);
+            }
+            string body = string.Empty;
+            if (options.TryGetValue("body", out object b) && b != null)
+            {
+                bool json = b is Dictionary<string, object> or List<object>;
+                body = json ? Values.ToJson(b) : Values.ToStr(b);
+                headers.TryAdd("content-type", json ? "application/json" : "text/plain; charset=utf-8");
+            }
+
+            int question = url.IndexOf('?');
+            string path = question >= 0 ? url.Substring(0, question) : url;
+            var query = new Dictionary<string, object>(StringComparer.Ordinal);
+            if (question >= 0)
+            {
+                foreach (string pair in url.Substring(question + 1).Split('&', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    int eq = pair.IndexOf('=');
+                    string key = Uri.UnescapeDataString((eq >= 0 ? pair.Substring(0, eq) : pair).Replace('+', ' '));
+                    query[key] = eq >= 0 ? Uri.UnescapeDataString(pair.Substring(eq + 1).Replace('+', ' ')) : string.Empty;
+                }
+            }
+
+            var request = new Dictionary<string, object>
+            {
+                ["method"] = method,
+                ["path"] = path,
+                ["url"] = url,
+                ["query"] = query,
+                ["headers"] = headers,
+                ["body"] = body,
+            };
+            LocalResponse response = LocalRequests.Send(c.Host, c.Module?.Directory ?? c.Host.WorkingDirectory, request);
+            if (response == null)
+                throw c.Error($"@api('{url}') asks this app for a path, but this script isn't in a project with routes. Give a full http:// address instead.", "Network");
+            return new ResponseValue(url, response.Status, response.Reason, response.Body,
+                new Dictionary<string, object>(response.Headers, StringComparer.OrdinalIgnoreCase));
         }
     }
 

@@ -92,6 +92,12 @@ namespace KScript.Projects
         /// <summary>Packages imported by every test file, on top of the project's packages.</summary>
         public List<string> Packages { get; set; } = new List<string>();
 
+        /// <summary>
+        /// The environment tests run in (KSCRIPT_ENV), such as test, so config/config.test.yaml can point the database
+        /// at memory. Null leaves the environment as it is. kscript --env and a KSCRIPT_ENV that is already set win.
+        /// </summary>
+        public string Env { get; set; }
+
         public const double DefaultTimeout = 10;
         public static readonly string[] DefaultInclude = { "**/*.test.kscript", "**/*.test.ks.xml", "**/*.test.xml" };
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
@@ -1413,8 +1419,12 @@ namespace KScript.Projects
                                 config.Warnings.Add($"test.packages: there is no package '{package}'.");
                         }
                         break;
+                    case "env":
+                        if (p.Value.ValueKind == JsonValueKind.String && p.Value.GetString().Trim().Length > 0) config.Test.Env = p.Value.GetString().Trim();
+                        else config.Warnings.Add("test.env should be the name of an environment, such as \"test\".");
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'test.{p.Name}' (expected include, exclude, timeout or packages).");
+                        config.Warnings.Add($"unknown setting 'test.{p.Name}' (expected include, exclude, timeout, packages or env).");
                         break;
                 }
             }

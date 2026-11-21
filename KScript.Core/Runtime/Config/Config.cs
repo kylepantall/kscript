@@ -79,7 +79,10 @@ namespace KScript.Runtime
             if (environment != null && !Regex.IsMatch(environment, @"^[A-Za-z0-9_.\-]+$"))
                 throw new KScriptException($"The environment name '{environment}' can only use letters, digits, '.', '-' and '_'.", "Config");
 
-            string root = host.ResolvePath(string.IsNullOrWhiteSpace(options.Root) ? "." : options.Root, directory);
+            // A full path (from kscript.json's config.root) is used as it is; the files are still checked against FileRoot below.
+            string root = !string.IsNullOrWhiteSpace(options.Root) && Path.IsPathRooted(options.Root)
+                ? Path.GetFullPath(options.Root)
+                : host.ResolvePath(string.IsNullOrWhiteSpace(options.Root) ? "." : options.Root, directory);
             bool defaults = options.Files == null;
             List<string> names = options.Files ?? ConfigOptions.DefaultFiles.ToList();
 
@@ -345,9 +348,31 @@ namespace KScript.Runtime
             lock (host.Items)
             {
                 if (host.Items.TryGetValue(HostKey, out object existing) && existing is ConfigValue c) return c;
-                var created = new ConfigValue(host, directory, host.Config?.Clone());
+                var created = new ConfigValue(host, directory, host.Config?.Clone() ?? ProjectOptions(directory));
                 host.Items[HostKey] = created;
                 return created;
+            }
+        }
+
+        /// <summary>
+        /// The config settings of the project around a folder, for hosts that weren't given any (routes, pages and
+        /// tests): its kscript.json "config" section, with files read from the project folder unless config.root
+        /// says otherwise. Null outside a project.
+        /// </summary>
+        private static ConfigOptions ProjectOptions(string directory)
+        {
+            if (string.IsNullOrEmpty(directory) || !System.IO.Directory.Exists(directory)) return null;
+            try
+            {
+                KScript.Projects.ProjectConfig project = KScript.Projects.ProjectConfig.FindAndLoad(directory);
+                if (project?.FilePath == null) return null;
+                ConfigOptions options = project.ConfigOptions();
+                options.Root ??= project.Directory;
+                return options;
+            }
+            catch (KScript.Projects.ProjectConfigException)
+            {
+                return null;
             }
         }
 

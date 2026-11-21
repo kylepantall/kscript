@@ -1,0 +1,69 @@
+--- make
+when: docker
+---
+# Runs {{ title }}{{#unless db in sqlite, none}} and its database{{/unless}}: docker compose up --build, then open http://localhost:{{ port }}/api/health
+services:
+  app:
+    build: .
+    ports:
+      - "{{ port }}:{{ port }}"
+    environment:
+      KSCRIPT_ENV: production
+{{#if db is postgres}}
+      DATABASE_URL: postgres://{{ snake }}:${DB_PASSWORD:-secret}@db:5432/{{ snake }}
+{{/if}}
+{{#if db is mysql}}
+      DATABASE_URL: mysql://{{ snake }}:${DB_PASSWORD:-secret}@db:3306/{{ snake }}
+{{/if}}
+{{#if cache}}
+      CACHE_STORE: file
+{{/if}}
+    volumes:
+      # The app's data folder{{#if db is sqlite}} (its SQLite database){{/if}} lasts between runs.
+      - app-data:/app/data
+{{#unless db in sqlite, none}}
+    depends_on:
+      db:
+        condition: service_healthy
+{{/unless}}
+{{#if db is postgres}}
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: {{ snake }}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: {{ snake }}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ snake }} -d {{ snake }}"]
+      interval: 5s
+      retries: 10
+{{/if}}
+{{#if db is mysql}}
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_USER: {{ snake }}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_DATABASE: {{ snake }}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
+{{/if}}
+
+volumes:
+  app-data:
+{{#unless db in sqlite, none}}
+  db-data:
+{{/unless}}

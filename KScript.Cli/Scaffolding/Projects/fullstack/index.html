@@ -1,0 +1,28 @@
+<layout src="_layout.html" title="Home">
+  <h1>Welcome to {{ title }}</h1>
+  <p>{{ title }} is a website with its own JSON API. The <a href="/notes">Notes</a> page asks the API for its data with <code>@api('/api/notes')</code>, so the pages and any other client (a phone app, a script) share one set of rules.</p>
+
+  <h2>How it fits together</h2>
+  <ul>
+    <li><code>routes/api{{ ext }}</code>: the API's routes, under <code>/api</code>. See them all at <a href="/_api">/_api</a>.</li>
+    <li><code>controllers/notes{{ ext }}</code>: the functions that answer them.</li>
+{{#unless db is none}}
+    <li><code>models/note{{ ext }}</code>: the Note model, kept in the database (config/config.yaml).</li>
+{{/unless}}
+    <li><code>lib/notes_client{{ ext }}</code>: how the pages call the API.</li>
+    <li><code>tests/</code>: tests for the API and the client. Run them with <code>kscript test</code>.</li>
+  </ul>
+
+  <h2>Next steps</h2>
+  <ul>
+    <li>Add a page: <code>kscript make page contact</code></li>
+    <li>Add an API route: <code>kscript make route tags --api</code></li>
+{{#unless db is none}}
+    <li>Add a model: <code>kscript make model Tag --fields "name: string"</code></li>
+{{/unless}}
+{{#unless auth}}
+    <li>Add sign-in: <code>kscript make auth</code></li>
+{{/unless}}
+    <li>Check the project: <code>kscript check</code></li>
+  </ul>
+</layout>

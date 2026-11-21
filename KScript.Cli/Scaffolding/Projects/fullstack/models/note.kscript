@@ -1,0 +1,24 @@
+--- make
+unless: db is none
+---
+// The Note model: a type whose records live in the notes table (KScript.Data, see docs/data.md).
+import KScript.Data
+
+/// A note{{#if auth}} that belongs to the user who wrote it{{/if}}.
+model Note {
+  timestamps: yes
+{{#if auth}}
+  index: [user_id]
+  hidden: [user_id]
+  user_id: string
+{{/if}}
+  title: string(min: 1, max: 200)
+  body: string = ''
+  done: bool = false
+}
+
+/// The Note model, once its table is there: the first call makes the notes table if the database doesn't have it.
+fn notes() {
+  $db->create_table($Note)
+  return $Note
+}

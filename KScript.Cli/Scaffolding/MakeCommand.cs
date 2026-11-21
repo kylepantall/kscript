@@ -24,18 +24,31 @@ namespace KScript.Scaffolding
     /// </summary>
     public static class MakeCommand
     {
+        /// <summary>
+        /// Makes the prompts the project setup wizard asks with, for the output it writes to. Tests replace it to
+        /// give answers; by default it asks at a terminal, and when input or output is redirected nothing is asked.
+        /// </summary>
+        public static Func<TextWriter, CliPrompt> Prompts { get; set; } = writer => new CliPrompt(new CliOutput(writer));
+
         public static int Run(string[] args, TextWriter output, TextWriter error)
         {
+            bool noInteraction = false;
             var positional = new List<string>();
             var positionalAt = new HashSet<int>();
             var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             string root = null;
             bool force = false, dryRun = false, help = false;
 
+            // kscript make project: a yes/no option (--docker) never takes the next word unless it is yes/no/true/false,
+            // so kscript make project --docker shop names the folder shop.
+            HashSet<string> flags = args.FirstOrDefault(x => !x.StartsWith("-", StringComparison.Ordinal)) is string first
+                && string.Equals(first, "project", StringComparison.OrdinalIgnoreCase) ? ProjectFlags() : new HashSet<string>();
+
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
                 if (a == "-h" || a == "--help") { help = true; continue; }
+                if (a == "-n" || a == "--no-interaction") { noInteraction = true; continue; }
                 if (!a.StartsWith("--", StringComparison.Ordinal) || a.Length == 2)
                 {
                     positional.Add(a);
@@ -68,7 +81,11 @@ namespace KScript.Scaffolding
                 if (value == null)
                 {
                     // --flag on its own (or followed by another option) is true.
-                    value = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal) ? args[++i] : "true";
+                    bool takes = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal)
+                        && (!flags.Contains(key) || args[i + 1].ToLowerInvariant() is "true" or "false" or "yes" or "no");
+                    value = takes ? args[++i] : "true";
+                    if (flags.Contains(key) && value.ToLowerInvariant() is "yes") value = "true";
+                    else if (flags.Contains(key) && value.ToLowerInvariant() is "no") value = "false";
                 }
                 options[key] = value;
             }
@@ -81,9 +98,21 @@ namespace KScript.Scaffolding
                 {
                     if (root != null && !Directory.Exists(root)) { error.WriteLine($"The folder '{root}' does not exist."); return 1; }
                     if (help) { PrintProjectHelp(root ?? ".", options, output); return 0; }
-                    if (positional.Count < 2) { error.WriteLine("Give the project a folder name, e.g. kscript make project my-site (or . for the current folder)."); return 1; }
                     if (positional.Count > 2) { error.WriteLine($"Unexpected '{positional[2]}'. Put names with spaces in quotes."); return 1; }
-                    return MakeProject(root ?? ".", positional[1], options, force, dryRun, output);
+                    string folder = positional.Count > 1 ? positional[1] : null;
+                    // No options at a terminal: the setup wizard asks for them. Any option (or -n) means no questions.
+                    if (options.Count == 0 && !noInteraction)
+                    {
+                        CliPrompt prompt = Prompts(output);
+                        if (prompt.Interactive)
+                        {
+                            ProjectWizard.Answers answers = ProjectWizard.Ask(prompt, root ?? ".", folder);
+                            folder = answers.Name;
+                            foreach (var kv in answers.Options) options[kv.Key] = kv.Value;
+                        }
+                    }
+                    if (folder == null) { error.WriteLine("Give the project a folder name, e.g. kscript make project my-site (or . for the current folder)."); return 1; }
+                    return MakeProject(root ?? ".", folder, options, force, dryRun, output);
                 }
 
                 bool fromProject = root == null;
@@ -209,6 +238,11 @@ namespace KScript.Scaffolding
             catch (StubException ex)
             {
                 KScript.Runtime.ErrorReport.Write(error, ex);
+                return 1;
+            }
+            catch (CliPromptException ex)
+            {
+                error.WriteLine(ex.Message);
                 return 1;
             }
             catch (IOException ex)
@@ -337,6 +371,15 @@ namespace KScript.Scaffolding
                 : $"{command} now uses it for every new project. Edit, add or remove files to change what it makes.");
             output.WriteLine($"{ProjectTemplate.ManifestName} lists its options (such as --no-desktop) and the 'Next:' lines; a '--- make' header with 'when: desktop' copies a file only when that option is on.");
             return 0;
+        }
+
+        /// <summary>The yes/no options of the built-in project templates, and --bare.</summary>
+        private static HashSet<string> ProjectFlags()
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "bare" };
+            foreach (string name in ProjectTemplate.BuiltInNames())
+                foreach (var o in ProjectTemplate.BuiltInTemplate(name).Options.Where(o => o.IsFlag)) names.Add(o.Name);
+            return names;
         }
 
         private static void PrintProjectHelp(string parent, Dictionary<string, string> options, TextWriter output)

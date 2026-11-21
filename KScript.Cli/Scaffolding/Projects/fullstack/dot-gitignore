@@ -1,0 +1,6 @@
+# The app's own database and files (kscript serve keeps them here)
+data/
+# Local settings and secrets
+.env
+# Programs built by kscript compile
+dist/

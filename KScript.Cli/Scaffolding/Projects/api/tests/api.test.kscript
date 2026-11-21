@@ -1,0 +1,23 @@
+// Tests for the API as a whole. @api('/api/...') sends a request to this app's own routes, without a server,
+// so tests check what a client would get: the status, the headers and the JSON. Run with: kscript test
+import KScript.Net
+
+describe(name: "api") {
+  test(name: "GET /api/health says the API is up") {
+    health = @api('/api/health')
+    expect(value: $health->status(), equals: 200)
+    expect(value: $health->json().ok, equals: true)
+  }
+
+  test(name: "every response has a request id, the caller's own when it sends one") {
+    expect(value: @api('/api/health')->header('X-Request-Id'), matches: '^[0-9a-f-]{36}$')
+    sent = @api('/api/health', options: { headers: { 'X-Request-Id': 'abc-123' } })
+    expect(value: $sent->header('X-Request-Id'), equals: 'abc-123')
+  }
+
+  test(name: "a path with no route is a JSON 404") {
+    missing = @api('/api/nothing-here')
+    expect(value: $missing->status(), equals: 404)
+    expect(value: $missing->json().error, contains: 'No route')
+  }
+}

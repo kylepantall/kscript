@@ -411,6 +411,8 @@ namespace KScript.Language.Tests
             {
                 string rel = Path.GetRelativePath(root, f).Replace('\\', '/');
                 if (rel.Contains("/bin/") || rel.Contains("/obj/") || rel.Contains("node_modules") || rel.StartsWith(".git/")) continue;
+                // CodeFormatTests.ConvertRoundTrips writes _rt_ copies beside the samples for a moment, from the other test project.
+                if (Path.GetFileName(f).StartsWith("_rt_", StringComparison.Ordinal)) continue;
                 bool script = f.EndsWith(".xml") && File.ReadAllText(f).Contains("<kscript");
                 bool page = f.EndsWith(".html") && (rel.StartsWith("Example Sites/") || rel.StartsWith("samples/"));
                 if (script || page) yield return new object[] { rel };

@@ -187,12 +187,39 @@ Colours are used when the output is a terminal; set `NO_COLOR` to turn them off 
     "include": ["tests/**/*.test.kscript"],  // default: **/*.test.kscript, **/*.test.ks.xml and **/*.test.xml
     "exclude": ["tests/slow"],              // default: _templates, node_modules, .git
     "timeout": 10,                          // seconds per test; 0 for no limit (default 10)
-    "packages": ["KScript.Terminal"]        // imported by test files only
+    "packages": ["KScript.Terminal"],       // imported by test files only
+    "env": "test"                           // the environment tests run in (KSCRIPT_ENV)
   }
 }
 ```
 
 `timeout: …` on a test wins over `--timeout`, which wins over `test.timeout`.
+
+`test.env` is the environment the tests run in, so `config/config.test.yaml` is laid over the project's [config](language.md) while they run. The api and fullstack [project templates](projects.md#an-api---template-api) use it to give tests an empty database in memory:
+
+```yaml
+# config/config.test.yaml
+database:
+  connections:
+    main:
+      url: "sqlite::memory:"
+```
+
+`kscript test --env staging` and a `KSCRIPT_ENV` that is already set win over `test.env`.
+
+### Testing an API
+
+`@api('/api/notes')` sends a request to the project's own routes without starting a server (see [Calling your own API](http.md#calling-your-own-api)), so a test checks what a client would get:
+
+```kscript
+import KScript.Net
+
+test(name: "a note is saved") {
+  added = @api('/api/notes', options: { method: 'POST', body: { title: 'Ship it' } })
+  expect(value: $added->status(), equals: 201)
+  expect(value: @api('/api/notes/' + $added->json().id)->json().title, equals: 'Ship it')
+}
+```
 
 ## In the editor
 

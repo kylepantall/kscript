@@ -458,6 +458,8 @@ namespace KScript.Language.Tests
             {
                 string rel = Path.GetRelativePath(root, f).Replace('\\', '/');
                 if (rel.Contains("/bin/") || rel.Contains("/obj/") || rel.Contains("node_modules") || rel.StartsWith(".git/")) continue;
+                // CodeFormatTests.ConvertRoundTrips writes _rt_ copies beside the samples for a moment, from the other test project.
+                if (Path.GetFileName(f).StartsWith("_rt_", StringComparison.Ordinal)) continue;
                 yield return new object[] { rel };
             }
         }
@@ -471,8 +473,8 @@ namespace KScript.Language.Tests
             FormatResult result = Formatter.Format(text, path);
             if (!result.Succeeded)
             {
-                // `kscript make` templates hold {{ }} placeholders; anything else must format.
-                Assert.Contains("{{", text);
+                // `kscript make` templates hold {{ }} placeholders or a --- make header; anything else must format.
+                Assert.True(text.Contains("{{", StringComparison.Ordinal) || text.StartsWith("--- make", StringComparison.Ordinal), relative + ": " + result.Error);
                 return;
             }
             AssertSame(text, result.Text);

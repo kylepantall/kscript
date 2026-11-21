@@ -1,0 +1,8 @@
+--- make
+when: docker
+---
+.git
+.env
+data/
+dist/
+node_modules/

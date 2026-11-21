@@ -31,6 +31,9 @@ namespace KScript.Http
 
         public static readonly string[] HttpMethods = { "get", "post", "put", "patch", "delete", "options", "head" };
 
+        // @api('/api/notes') in any script goes to its project's routes once KScript.Http is loaded.
+        static HttpPackage() => LocalApi.Install();
+
         public override string Name => "KScript.Http";
 
         public override string Description => "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve.";

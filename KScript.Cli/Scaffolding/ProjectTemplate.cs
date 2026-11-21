@@ -14,6 +14,12 @@ namespace KScript.Scaffolding
         public string Name { get; init; }
         public string Default { get; init; }
         public string Description { get; init; }
+        /// <summary>What the setup wizard asks for it ("question"), or null to ask with the description.</summary>
+        public string Question { get; init; }
+        /// <summary>The values the option may take ("choices" in kscript-template.json), or empty for any value.</summary>
+        public IReadOnlyList<string> Choices { get; init; } = Array.Empty<string>();
+        /// <summary>True for a yes/no option: its default is true or false.</summary>
+        public bool IsFlag => Default is "true" or "false";
     }
 
     /// <summary>
@@ -39,6 +45,13 @@ namespace KScript.Scaffolding
         public IReadOnlyList<ProjectTemplateOption> Options { get; init; } = Array.Empty<ProjectTemplateOption>();
         /// <summary>Lines printed under "Next:" once the project is made (templates themselves).</summary>
         public IReadOnlyList<string> Next { get; init; } = Array.Empty<string>();
+        /// <summary>
+        /// kscript make kits run in the new project once its files are written ("make" in kscript-template.json):
+        /// lines such as "{{#if auth}}auth{{/if}}", left out when they come out empty. Only auth is known.
+        /// </summary>
+        public IReadOnlyList<string> Makes { get; init; } = Array.Empty<string>();
+        /// <summary>Notes printed once the project is made ("notes"), such as what an option can't do yet.</summary>
+        public IReadOnlyList<string> Notes { get; init; } = Array.Empty<string>();
         /// <summary>The template files by path relative to the template folder, with / separators.</summary>
         public IReadOnlyList<(string Path, string Source)> Files { get; init; }
 
@@ -172,6 +185,8 @@ namespace KScript.Scaffolding
             string description = null;
             var options = new List<ProjectTemplateOption>();
             var next = new List<string>();
+            var makes = new List<string>();
+            var notes = new List<string>();
 
             if (manifest.Source != null)
             {
@@ -194,22 +209,33 @@ namespace KScript.Scaffolding
                     {
                         foreach (var p in o.EnumerateObject())
                         {
-                            string def = null, about = null;
+                            string def = null, about = null, question = null;
+                            var choices = new List<string>();
                             if (p.Value.ValueKind == JsonValueKind.Object)
                             {
                                 if (p.Value.TryGetProperty("default", out var v)) def = Scalar(v);
                                 if (p.Value.TryGetProperty("description", out var a) && a.ValueKind == JsonValueKind.String) about = a.GetString();
+                                if (p.Value.TryGetProperty("question", out var q) && q.ValueKind == JsonValueKind.String) question = q.GetString();
+                                if (p.Value.TryGetProperty("choices", out var ch))
+                                {
+                                    if (ch.ValueKind != JsonValueKind.Array) throw new StubException($"{where}: {p.Name}.choices should be a list of values, such as [\"sqlite\", \"postgres\"].");
+                                    choices.AddRange(ch.EnumerateArray().Select(Scalar).Where(x => x != null));
+                                }
                             }
                             else def = Scalar(p.Value);
-                            options.Add(new ProjectTemplateOption { Name = p.Name, Default = def, Description = about });
+                            options.Add(new ProjectTemplateOption { Name = p.Name, Default = def, Description = about, Question = question, Choices = choices });
                         }
                     }
                     if (root.TryGetProperty("next", out var n) && n.ValueKind == JsonValueKind.Array)
                         next.AddRange(n.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()));
+                    if (root.TryGetProperty("make", out var mk) && mk.ValueKind == JsonValueKind.Array)
+                        makes.AddRange(mk.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()));
+                    if (root.TryGetProperty("notes", out var nt) && nt.ValueKind == JsonValueKind.Array)
+                        notes.AddRange(nt.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()));
                 }
             }
 
-            return new ProjectTemplate { Name = name, Folder = folder, Description = description, Options = options, Next = next, Files = files };
+            return new ProjectTemplate { Name = name, Folder = folder, Description = description, Options = options, Next = next, Makes = makes, Notes = notes, Files = files };
         }
 
         private static string Scalar(JsonElement v) => v.ValueKind switch
@@ -230,8 +256,8 @@ namespace KScript.Scaffolding
             foreach (var (path, source) in Files)
             {
                 var (header, body) = Scaffolder.SplitHeader(source, path);
-                if (header.TryGetValue("when", out var when) && !StubTemplate.IsSet(Lookup(values, when))) continue;
-                if (header.TryGetValue("unless", out var unless) && StubTemplate.IsSet(Lookup(values, unless))) continue;
+                if (header.TryGetValue("when", out var when) && !StubTemplate.Holds(when, values)) continue;
+                if (header.TryGetValue("unless", out var unless) && StubTemplate.Holds(unless, values)) continue;
 
                 string to = header.TryGetValue("to", out var t) ? StubTemplate.Render(t, values).Trim() : path;
                 if (to.EndsWith(StubExtension, StringComparison.OrdinalIgnoreCase)) to = to.Substring(0, to.Length - StubExtension.Length);
@@ -246,6 +272,10 @@ namespace KScript.Scaffolding
             }
             return result;
         }
+
+        /// <summary>Lines of a manifest list (next, make, notes) with these values, leaving out the ones that come out empty.</summary>
+        public static IReadOnlyList<string> RenderLines(IEnumerable<string> lines, IReadOnlyDictionary<string, string> values) =>
+            lines.Select(line => StubTemplate.Render(line, values).TrimEnd()).Where(line => line.Trim().Length > 0).ToList();
 
         /// <summary>The "Next:" lines with these values, leaving out the ones that come out empty.</summary>
         public IReadOnlyList<string> RenderNext(IReadOnlyDictionary<string, string> values) =>

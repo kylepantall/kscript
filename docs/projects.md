@@ -49,6 +49,50 @@ kscript make project my-app --bare --desktop     # a script plus an empty KScrip
 
 `--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `routes/api.kscript` (a `KScript.Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.
 
+### An API: --template api
+
+`kscript make project shop --template api` makes a JSON API with nothing else to set up: routes, controllers, the app's own middleware, a model in a database, sign-up with API tokens, caching and tests.
+
+```sh
+kscript make project shop --template api
+cd shop
+kscript serve      # http://localhost:8080/api/health, and the API's docs at /_api
+kscript test       # 12 tests, against a database in memory
+```
+
+| File | What it is |
+| --- | --- |
+| `routes/api.kscript` | The routes, under `/api`: `GET /health`, `POST /register` and `/tokens` (throttled), `GET` and `DELETE /me`, and a `Resource` for `/notes` behind the `auth` middleware. |
+| `controllers/notes.kscript` | The notes resource: `index`, `store`, `show`, `update` and `destroy`, each answering with JSON. A `NoteInput` [type](types.md) checks what is posted (422 when it doesn't fit), and a note that isn't there (or isn't yours) is a 404. |
+| `controllers/accounts.kscript` | Sign-up, tokens and closing an account, with [KScript.Auth](auth.md). |
+| `models/note.kscript` | The `Note` [model](data.md), whose table is made the first time it is used. |
+| `middleware/request_id.kscript` | The app's own middleware: every response gets an `X-Request-Id` header. |
+| `lib/cache.kscript` | The app's [cache](cache.md), whose store and time limit come from `config/config.yaml`. |
+| `config/config.yaml`, `config/config.test.yaml` | Settings: the database (`${DATABASE_URL:-sqlite:data/app.sqlite}`) and cache. `kscript test` lays `config.test.yaml` over them (see `test.env` below), so tests get an empty database in memory. |
+| `tests/` | Tests that call the API the way a client would, with `@api('/api/notes')` (see [Calling your own API](http.md#calling-your-own-api)). |
+
+### A web app with its API: --template fullstack
+
+`kscript make project notes --template fullstack` makes a website whose pages get their data from the app's own JSON API. `notes.html` is a [live](web.md#reactive-pages-with-live-no-javascript) page that lists, adds, ticks and deletes notes through `lib/notes_client.kscript`, which calls `@api('/api/notes')`. Pages and other clients (a phone app, a script) share one set of rules: `routes/api.kscript`, `controllers/notes.kscript` and `models/note.kscript`, as in the api template. The tests check the API and the client.
+
+### Database, sign-in, cache and Docker
+
+The api and fullstack templates take the same options:
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database the notes are kept in, set up in `config/config.yaml`. `none` keeps them in a JSON file instead (`notes.file` in the config). KScript.Data connects to SQLite only for now, so with `postgres` or `mysql` the settings (and compose file) are ready, the tests still pass on SQLite in memory, and `DATABASE_URL=sqlite:data/app.sqlite` runs the app until that support lands. |
+| `--auth`, `--no-auth` | on (api), off (fullstack) | Sign-in. In the api template: `POST /api/register`, `/api/tokens`, `GET /api/me`, and notes that belong to who is signed in. In the fullstack template it also runs [`kscript make auth`](auth.md) for the sign-in pages; the pages call the API as whoever is viewing them. |
+| `--cache`, `--no-cache` | on | Caches the notes list and answers repeat requests with `304 Not Modified` (the `etag` middleware). |
+| `--docker` | off | Adds a `Dockerfile`, `.dockerignore` and `compose.yaml`, with a Postgres or MySQL service for those databases, and `make up` / `make down`. |
+| `--port` | `8080` | The port `kscript serve` uses. |
+
+Options can be written `--db postgres` or `--db=postgres`, and a yes/no option takes `yes`/`no` (`--cache no`) but never the folder name, so `kscript make project --docker shop` makes `shop`.
+
+### The setup wizard
+
+`kscript make project` at a terminal with no options asks for everything instead: the folder (unless you gave one), the kind of project, and each of that template's options, with its default ready for Enter. Give any option, or `-n` (`--no-interaction`), and nothing is asked: what you didn't give takes its default, which is what scripts and CI want. When the input or output isn't a terminal, nothing is asked either.
+
 ### The Makefile
 
 Every new project has a `Makefile`, so common commands are short: `make serve`, `make test`, `make check`, `make fmt`, `make agents`, `make compile`, and `make routes`, `make desktop` and `make app` when the project has an API or desktop app. Any other target is passed to `kscript make`, with `name=` as the name and `args=` for options:
@@ -72,13 +116,13 @@ kscript make templates project bare       # the bare template, to project-bare i
 kscript make project my-app --template ../starters/api   # any folder
 ```
 
-`--template` takes a folder or a template name. A name such as `bare` (or your own, such as `api`) is looked up as `project-<name>` in the same places as the default template, which lives in `project`, and then among the built-in templates (`web` and `bare`). `kscript make project` uses the first template it finds: the `--template` folder, then `_templates/project` in the project the new one is made inside (handy for a folder of several apps), then `~/.kscript/templates/project` (or `$KSCRIPT_TEMPLATES/project`), then the built-in one. Edit, add or delete files in the template folder to change what new projects get.
+`--template` takes a folder or a template name. A name such as `bare` (or your own, such as `api`) is looked up as `project-<name>` in the same places as the default template, which lives in `project`, and then among the built-in templates (`web`, `api`, `bare` and `fullstack`). `kscript make project` uses the first template it finds: the `--template` folder, then `_templates/project` in the project the new one is made inside (handy for a folder of several apps), then `~/.kscript/templates/project` (or `$KSCRIPT_TEMPLATES/project`), then the built-in one. Edit, add or delete files in the template folder to change what new projects get.
 
 - Write scripts as `.kscript` files and refer to other scripts with `{{ ext }}` (`import "lib/tasks{{ ext }}"`). With `--format xml`, each `.kscript` file is converted to XML and named `.ks.xml`, and `{{ ext }}` is `.ks.xml`; `{{#if xml}}` tells the formats apart. A `.ks.xml` file in the template is copied as it is.
 - Each file is a template with the same `{{ }}` placeholders as [`kscript make` templates](#your-own-templates): `{{ title }}` is the project name as a title (`My App`), `{{ kebab }}` is `my-app`, and every option is a value (`{{ port }}`, `{{#if desktop}} … {{/if}}`).
-- A file can start with a `--- make` header. `when: desktop` copies it only when the option is on, `unless: desktop` only when it is off, and `to: docs/{{ kebab }}.md` writes it somewhere else.
+- A file can start with a `--- make` header. `when: desktop` copies it only when the option is on, `unless: desktop` only when it is off, and `to: docs/{{ kebab }}.md` writes it somewhere else. `when` and `unless` take the same tests as `{{#if}}`: `when: db is none`, `unless: db in sqlite, none`. Two files can write the same path when only one of them is copied (`controllers/notes-file.kscript` with `when: db is none` and `to: controllers/notes.kscript`).
 - A name ending in `.stub` loses the ending: the template keeps `kscript.json.stub` so that editors and `kscript check` don't read it as a real project.
-- `kscript-template.json` describes the template and is not copied. `options` lists each option with its `default` and `description` (an option that defaults to `true` is turned off with `--no-name`), and `next` holds the lines printed under "Next:", which can use placeholders too. An option the template doesn't list is reported, so a typo such as `--no-dekstop` doesn't go unnoticed.
+- `kscript-template.json` describes the template and is not copied. `options` lists each option with its `default` and `description` (an option that defaults to `true` is turned off with `--no-name`), a `question` for the setup wizard, and `choices` when it takes one of a few values (`--db oracle` is then an error that lists them). `next` holds the lines printed under "Next:", `notes` lines printed as notes (a line that comes out empty is left out), and `make` the kits made in the new project once its files are written: `"make": ["{{#if auth}}auth{{/if}}"]` runs `kscript make auth`. An option the template doesn't list is reported, so a typo such as `--no-dekstop` doesn't go unnoticed.
 
 ```jsonc
 // _templates/project/kscript-template.json
@@ -86,7 +130,8 @@ kscript make project my-app --template ../starters/api   # any folder
   "description": "Our standard web app",
   "options": {
     "desktop": { "default": true, "description": "Add the desktop app" },
-    "api": { "default": false, "description": "Add an API page" },
+    "api": { "default": false, "description": "Add an API page", "question": "Add an API page?" },
+    "db": { "default": "sqlite", "choices": ["sqlite", "none"], "description": "Where data is kept" },
     "port": { "default": 8080, "description": "The port kscript serve uses" }
   },
   "next": ["kscript serve   http://localhost:{{ port }}", "{{#if api}}kscript serve, then open /api{{/if}}"]
@@ -123,7 +168,8 @@ kscript make project my-app --template ../starters/api   # any folder
     "include": ["tests/**/*.test.kscript"],  // what `kscript test` runs (default: **/*.test.kscript, **/*.test.ks.xml and **/*.test.xml)
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
-    "packages": ["KScript.Terminal"]        // imported by test files only
+    "packages": ["KScript.Terminal"],       // imported by test files only
+    "env": "test"                           // tests run in this environment, so config/config.test.yaml applies
   },
   "format": {
     "indent": 2,           // spaces per level, or "tab"; used by kscript fmt and Format Document
