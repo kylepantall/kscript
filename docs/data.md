@@ -222,6 +222,8 @@ echo $Account->pluck(balance)
 
 `@sql` runs SQL you write. Each `{ }` in it is worked out and sent as a parameter, never pasted into the SQL, so it is safe with any value. A list becomes `(?, ?, ?)` for `in`. Write `{{` and `}}` for braces.
 
+Write the SQL inside the call, as below. Text in `"double quotes"` given to a variable first is filled in there and then, so its values would be pasted into the SQL; the editor warns about that. To keep SQL in a variable, use `'single quotes'` or a ```` ```sql ```` block.
+
 ```kscript
 import KScript.Data
 

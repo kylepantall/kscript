@@ -134,9 +134,13 @@ namespace KScript.Language.Analysis
 
         private static readonly Regex TemplatePart = new Regex(@"\$([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)|\{\s*([^{}]+?)\s*\}", RegexOptions.Compiled);
 
+        /// <summary>Variables given text in "double quotes" that was filled in: <c>query = "... {$id}"</c>.</summary>
+        private readonly HashSet<string> filledTexts = new HashSet<string>(StringComparer.Ordinal);
+
         /// <summary>
-        /// <c>greeting = "Hello $name"</c>: text after echo is a template, but text used as a value is kept as written,
-        /// so this prints "Hello $name". Warns when the text names a variable that exists, and offers the joined form.
+        /// <c>greeting = 'Hello $name'</c>: "double quotes" fill in <c>$name</c> and <c>{ $expr }</c>, 'single quotes' keep
+        /// the text as written. Warns when single-quoted text names a variable that exists, and offers double quotes
+        /// (or, in an XML script, where an attribute's value is already inside double quotes, the joined form).
         /// </summary>
         private void CheckTextIsNotATemplate(LiteralNode literal, ExpressionRegion region, Scope scope)
         {
@@ -145,7 +149,7 @@ namespace KScript.Language.Analysis
                 return;
             }
             TextSpan span = region.Source.ToSource(literal.Span);
-            if (span.Length < 2 || span.End > source.Length || (source.Text[span.Start] != '"' && source.Text[span.Start] != '\''))
+            if (span.Length < 2 || span.End > source.Length || source.Text[span.Start] != '\'')
             {
                 return;
             }
@@ -166,12 +170,32 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            // Only offer the rewrite when the text is written exactly as it reads (no escapes or entities inside).
-            string joined = span.Length == literal.Value.Length + 2 ? JoinedText(literal.Value) : null;
+            // Only offer a rewrite when the text is written exactly as it reads (no escapes or entities inside).
+            bool plain = span.Length == literal.Value.Length + 2;
+            string rewritten = !plain ? null
+                : IsCode ? (literal.Value.Contains('"') || literal.Value.Contains('\\') ? null : "\"" + literal.Value + "\"")
+                : JoinedText(literal.Value);
+            string advice = IsCode
+                ? (rewritten != null ? $" Use double quotes to fill it in: {rewritten}." : " Use double quotes to fill it in.")
+                : (rewritten != null ? $" Join the parts instead: {rewritten}." : " Join the parts with + instead.");
             Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.TextNotFilledIn,
-                $"${names[0]} is not filled in here: only the text after echo is a template, so this stays as written."
-                    + (joined != null ? $" Join the parts instead: {joined}." : " Join the parts with + instead."),
-                joined != null ? new[] { new QuickFix($"Change to {joined}", new TextChange(span, joined)) } : null);
+                $"${names[0]} is not filled in here: single quotes keep text as written." + advice,
+                rewritten != null ? new[] { new QuickFix($"Change to {rewritten}", new TextChange(span, rewritten)) } : null);
+        }
+
+        /// <summary>
+        /// <c>query = "... where id = {$id}"</c> then <c>@sql($query)</c>: the text was filled in when it was assigned, so
+        /// the value is pasted into the SQL instead of being sent as a parameter. Written inside <c>@sql(...)</c>, or in
+        /// single quotes, it reaches @sql as written and each { } is a parameter.
+        /// </summary>
+        private void CheckSqlTextIsNotFilledIn(IReadOnlyList<ArgumentNode> args, ExpressionRegion region)
+        {
+            if (args.Count > 0 && args[0].Name == null && args[0].Value is VariableNode v && filledTexts.Contains(v.Name))
+            {
+                Report(region.Source.ToSource(v.Span), DiagnosticSeverity.Warning, DiagnosticCodes.TextNotFilledIn,
+                    $"${v.Name} was given text in double quotes, so its values are already pasted into the SQL and are not sent as parameters. "
+                    + $"Give ${v.Name} its text in single quotes, or write the text inside the call.");
+            }
         }
 
         /// <summary><c>Hello $name!</c> as <c>'Hello ' + $name + '!'</c>, or null when the text can't be written in single quotes.</summary>

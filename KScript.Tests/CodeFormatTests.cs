@@ -376,4 +376,24 @@ public class CodeFormatTests
             + "r = '{\"name\": \"kscript\", \"stargazers_count\": 12}'->json(as: Repo)\n"
             + "echo \"$r.name has $r.stars stars, size $r.size\""));
     }
+
+    [Fact]
+    public void DoubleQuotesFillInValuesAndSingleQuotesDoNot()
+    {
+        Assert.Equal(
+            "Hello Joan, you have 4 and 2! Sam a+b {x} /users/{id} \\d{3} $5 a@b.com\nHello $name {$n}\nHi dear Joan!\nJOAN.\n",
+            Run("name = 'Joan'\nn = 2\np = { name: 'Sam', tags: ['a', 'b'] }\n"
+                + "g = \"Hello $name, you have { $n * 2 } and {$n}! $p.name { $p.tags->join('+') } {{x}} /users/{id} \\d{3} $5 a@b.com\"\n"
+                + "echo $g\n"
+                + "s = 'Hello $name {$n}'\necho $s\n"
+                + "fn greet(who) {\n  return \"Hi $who!\"\n}\n"
+                + "echo @greet(\"dear $name\")\n"
+                + "echo \"{ $name->upper() }. \"->trim()\n").Replace("\r\n", "\n"));
+    }
+
+    [Fact]
+    public void FilledInTextIsWorkedOutEachTimeItRuns()
+    {
+        Assert.Equal(" 1 2 3\n", Run("out = ''\nfor i in 1..4 {\n  out = \"$out $i\"\n}\necho $out\n").Replace("\r\n", "\n"));
+    }
 }

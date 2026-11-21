@@ -143,6 +143,93 @@ namespace KScript.Syntax
             return template;
         }
 
+        /// <summary>
+        /// Calls whose text is theirs to read, so "double quotes" given to them are not filled in first:
+        /// <c>@sql("... where id = {$id}")</c> sends each <c>{ }</c> as a parameter instead of pasting it into the SQL.
+        /// </summary>
+        public static bool KeepsText(string callName) => callName == "sql";
+
+        /// <summary>
+        /// The parts of text in "double quotes" inside an expression: <paramref name="text"/> from
+        /// <paramref name="start"/> to <paramref name="end"/> (the quotes left out). <c>$name</c>, <c>$name.field</c>,
+        /// <c>@command(...)</c> and braces that open with a variable or a command (<c>{ $n * 2 }</c>) are filled in;
+        /// any other brace is text, so <c>"/users/{id}"</c> and <c>"\d{3}"</c> stay as written. <c>{{</c> and <c>}}</c>
+        /// are single braces. Spans are positions in <paramref name="text"/>. Null when nothing is filled in.
+        /// </summary>
+        public static Template ParseQuoted(string text, int start, int end)
+        {
+            Template template = new Template();
+            StringBuilder literal = new StringBuilder();
+            int literalStart = start;
+            bool any = false;
+
+            void Flush(int at)
+            {
+                if (literal.Length > 0)
+                {
+                    template.Segments.Add(new TemplateSegment { Kind = TemplateSegmentKind.Text, Text = LineJoins.Join(literal.ToString()), Span = TextSpan.FromBounds(literalStart, at) });
+                    literal.Clear();
+                }
+                literalStart = at;
+            }
+
+            int i = start;
+            while (i < end)
+            {
+                char c = text[i];
+                if ((c == '{' || c == '}') && i + 1 < end && text[i + 1] == c)
+                {
+                    literal.Append(c);
+                    i += 2;
+                    any = true;
+                    continue;
+                }
+
+                if (c == '{' && OpensAValue(text, i + 1, end))
+                {
+                    ParseResult result = ExpressionParser.ParseEmbedded(text, i + 1, out int close);
+                    if (close >= 0 && close < end)
+                    {
+                        Flush(i);
+                        template.Segments.Add(new TemplateSegment { Kind = TemplateSegmentKind.Interpolation, Span = TextSpan.FromBounds(i, close + 1), Expression = result });
+                        i = close + 1;
+                        literalStart = i;
+                        any = true;
+                        continue;
+                    }
+                }
+                else if (i + 1 < end && IsBareReferenceStart(text, i))
+                {
+                    ParseResult result = ExpressionParser.ParseBareReference(text, i, out int stop);
+                    if (stop > i && stop <= end)
+                    {
+                        Flush(i);
+                        template.Segments.Add(new TemplateSegment { Kind = TemplateSegmentKind.Reference, Span = TextSpan.FromBounds(i, stop), Expression = result });
+                        i = stop;
+                        literalStart = i;
+                        any = true;
+                        continue;
+                    }
+                }
+
+                literal.Append(c);
+                i++;
+            }
+
+            Flush(end);
+            return any ? template : null;
+        }
+
+        /// <summary>True when the brace's content starts with a variable or a command: <c>{$n}</c>, <c>{ @now() }</c>.</summary>
+        private static bool OpensAValue(string text, int i, int end)
+        {
+            while (i < end && (text[i] == ' ' || text[i] == '\t'))
+            {
+                i++;
+            }
+            return i + 1 < end && (text[i] == '$' || text[i] == '@') && Lexer.IsIdentStart(text[i + 1]);
+        }
+
         private static bool IsBareReferenceStart(string text, int i)
         {
             char c = text[i];

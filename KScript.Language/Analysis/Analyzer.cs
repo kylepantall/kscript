@@ -1309,6 +1309,10 @@ namespace KScript.Language.Analysis
             {
                 if (node is AssignmentNode assign)
                 {
+                    if (assign.Name != null && assign.Value is LiteralNode { Template: not null })
+                    {
+                        filledTexts.Add(assign.Name);
+                    }
                     TypeShape shape = Infer(assign.Value, region);
                     AnalyzeExpr(assign.Value, region, scope, ExprContext.Value);
                     AnalyzeAssignmentTarget(assign, region, scope);

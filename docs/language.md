@@ -22,6 +22,16 @@ A map, or a list of maps, on its own in `echo` prints as indented JSON, coloured
 
 Variables belong to the block they are declared in. `{{` and `}}` are literal braces.
 
+`"Double quotes"` fill in `$name` and `{ }` wherever they are written: after `echo`, given to a variable, returned from a function or passed to a call. `'Single quotes'` keep text exactly as written.
+
+```kscript
+greeting = "Hello $name, you have { $count * 2 } points." // filled in
+label = 'Write $name to use a variable.' // kept as written
+route = "/users/{id}" // a { } that doesn't start with $ or @ is plain text
+```
+
+In a value, braces are only filled in when they start with `$` or `@`, so routes, patterns such as `"\d{3}"` and translation text such as `"Hello {name}"` keep theirs. The text given to `@sql` is the one exception: its `{ }` are sent as parameters, never pasted in (see [Data](data.md)).
+
 ## Expressions
 
 `+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `lt le gt ge` (or `> >=`), `eq ne`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn($x) => …`. In `.kscript` files `<` and `>` work as written. In XML, use the word forms inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. Write `and`/`or` rather than `&&`/`||` everywhere.
