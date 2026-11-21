@@ -485,7 +485,28 @@ namespace KScript.Language.Analysis
             }
 
             string arrow = pipe ? "|> " : "->";
-            if (receiver.Methods.TryGetValue(name, out Symbol own))
+            // An extend block's method (this file's, an import's or the project's) comes first, as when the script runs.
+            Symbol own = result.ExtensionMethod(receiver, name);
+            if (own != null && own.SourcePath != null)
+            {
+                result.References.Add(new SymbolReference(own, nameSpan, false, false));
+            }
+            if (own != null && own.SourcePath != null && count >= 0 && args != null)
+            {
+                int needed = own.Parameters.Count(p => !p.HasDefault);
+                if (args.Any(a => a.Name != null) || (count >= needed && count <= own.Parameters.Count))
+                {
+                    return;
+                }
+                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
+                    $"{arrow}{name}() takes {(needed == own.Parameters.Count ? needed.ToString(CultureInfo.InvariantCulture) : $"{needed} to {own.Parameters.Count}")} argument{(own.Parameters.Count == 1 ? string.Empty : "s")}, but {count} {(count == 1 ? "was" : "were")} given.");
+                return;
+            }
+            if (own != null && own.SourcePath != null)
+            {
+                return;
+            }
+            if (own != null || receiver.Methods.TryGetValue(name, out own))
             {
                 // A method the record's <type> declares with <fn>.
                 result.References.Add(new SymbolReference(own, nameSpan, false, false));

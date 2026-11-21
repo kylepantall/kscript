@@ -285,6 +285,55 @@ echo "{ @now()->add_days(7)->format(pattern: 'd MMMM yyyy') }"
 
 The editor completes the methods for each type and shows what they do. `@json(text)` and `$value->to_json()` convert to and from JSON.
 
+### Adding methods to a type: extend
+
+`extend` adds your own methods to a type, built-in or your own. Inside, each `fn` is a method, and `$this` is the value it is called on:
+
+```kscript try
+extend date {
+  /// The date as text for an API: 2026-11-21.
+  fn json() => $this->format('yyyy-MM-dd')
+  fn is_weekend() => $this->format('ddd') in ['Sat', 'Sun']
+}
+
+extend list {
+  fn second() => $this[1]
+}
+
+extend string {
+  fn slug() => $this->lower()->trim()->replace(' ', '-')
+}
+
+echo "{ @date('2026-11-21')->json() } { @date('2026-11-21')->is_weekend() }"
+echo "{ ['a', 'b', 'c']->second() } { 'Hello World'->slug() } { 'Hello World' |> slug() }"
+```
+
+You can extend `string`, `number` (or `int` and `float`), `bool`, `list`, `map`, `fn`, `date`, `email`, `password`, `handle`, `uuid` and `regex`, a package's values such as `file` or `response`, and your own `type`s, whose methods see `$this` (a record) and its fields as `$this.name`. Methods take parameters, defaults and named arguments like any `fn`.
+
+A method can't take the name of one the type already has, so a typo or a clash never changes what a built-in method does. To replace one on purpose, write `override`:
+
+```kscript
+extend date {
+  override fn to_json() => '"' + $this->format('yyyy-MM-dd') + '"'
+}
+```
+
+In XML, `extend` is `<extend type="date">` holding `<fn>` elements, and `override fn` is `<fn override="yes">`.
+
+**Where extensions apply.** A file's own `extend` blocks apply in that file and in every file that imports it. In a project (a folder with `kscript.json`), every file in the `extensions/` folder applies to every script, test and page in the project, with no import needed. Split them up however you like, one file per type for example:
+
+```text
+extensions/
+  date.kscript        extend date { … }
+  list.kscript        extend list { … }
+  text/
+    slug.kscript      extend string { … }
+```
+
+`kscript make extension date --methods json,is_weekend` writes `extensions/date.kscript` to start from. To keep them elsewhere, list folders or globs in `kscript.json`, which replaces the default folder: `"extensions": ["extensions", "shared/**/*.kscript"]`. Two extension files adding the same method to the same type is an error that names both. A script's own `extend` (or an import's) wins over the project's.
+
+The editor completes and checks extension methods only where they apply: in a file that neither declares, imports nor (through the project) gets `->json()` on dates, `@today()->json()` is still an unknown method. Hover shows the method's `///` docs and which file adds it, and go to definition opens that file.
+
 ## Errors
 
 ```kscript

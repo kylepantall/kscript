@@ -275,10 +275,23 @@ namespace KScript.Runtime
                 MustBeInside = new[] { "match" },
             }, run => throw run.Error("<default> must be directly inside <match>.", null, "Syntax"));
 
+            p.Element(new ElementInfo("extend", "Adds methods to a type: a built-in one such as date, string or list, a package's (file, response), or a <type>. Each <fn> inside becomes a method, with the value it is called on as $this: `extend date { fn json() => $this->to_json() }` makes `@today()->json()` work. Scripts that import the file get the methods too, and in a project every file in the extensions folder applies everywhere.",
+                ContentKind.Statements,
+                new A("type", K.Text, "The type to add methods to: date, string, number, bool, list, map, fn, email, handle, uuid, regex, password, a package's type such as file or response, or a <type>'s name.", true),
+                new A("description", K.Text, "What the methods are for, shown on hover."))
+            {
+                Example = "<extend type=\"date\">\n  <fn name=\"is_weekend\" value=\"$this->format('ddd') in ['Sat', 'Sun']\" />\n</extend>\n<echo>{ @today()->is_weekend() }</echo>",
+            }, run =>
+            {
+                Extensions.Declare(run);
+                return null;
+            });
+
             p.Element(new ElementInfo("fn", "Declares a function, called like a command: `@name(args)`, or piped: `$x |> @name()`. Functions can be called before the line that declares them.", ContentKind.Statements,
                 new A("name", K.DeclareFunction, "The function's name.", true),
                 new A("params", K.Parameters, "Parameters, with optional types and defaults: `who, greeting = 'Hello'` or `count: int = 1`."),
                 new A("value", K.Expression, "For one-line functions: the result, instead of a body."),
+                new A("override", K.Bool, "Inside <extend>: yes replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
                 new A("description", K.Text, "What the function does. Shown in hover, and to a model when used as an <llm> tool."))
             {
                 Example = "<fn name=\"greet\" params=\"who, greeting = 'Hello'\">\n  <return value=\"$greeting + ', ' + $who + '!'\" />\n</fn>\n<echo>@greet('World')</echo>",

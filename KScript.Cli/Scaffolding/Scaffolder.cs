@@ -91,6 +91,7 @@ namespace KScript.Scaffolding
             ["struct"] = "type",
             ["record"] = "type",
             ["shape"] = "type",
+            ["extend"] = "extension",
         };
 
         /// <summary>Every template available in a project, built-in ones first.</summary>
@@ -294,6 +295,10 @@ namespace KScript.Scaffolding
             foreach (string folder in KScript.Projects.ProjectConfig.DefaultPaths.Keys)
                 values["paths." + folder] = Folder(project?.PathFor(folder) ?? KScript.Projects.ProjectConfig.DefaultPaths[folder]);
             values["paths.config"] = ConfigFolder(project);
+            // Extensions go in the first folder kscript.json's "extensions" lists (not a glob), or extensions/.
+            values["paths.extensions"] = Folder(project?.Extensions?.Select(e => e.Trim().Replace('\\', '/').TrimEnd('/'))
+                .FirstOrDefault(e => e.Length > 0 && e.IndexOfAny(new[] { '*', '?' }) < 0 && !KScript.Projects.ProjectConfig.IsExtensionFileName(e))
+                ?? KScript.Projects.ProjectConfig.DefaultExtensionsFolder);
             if (!values.ContainsKey("views")) values["views"] = values["paths.views"];
             return values;
         }
@@ -360,6 +365,7 @@ namespace KScript.Scaffolding
             "logger" => "alerts",
             "error" => "PaymentFailed",
             "document" => "annual-report",
+            "extension" => "date",
             _ => "Example",
         };
 
@@ -385,7 +391,7 @@ namespace KScript.Scaffolding
         {
             ("Routes and APIs", new[] { "route", "controller", "request", "middleware", "view" }),
             ("Pages and styles", new[] { "page", "markdown", "layout", "component", "partial", "css" }),
-            ("Scripts and data", new[] { "script", "module", "type", "native", "model", "enum", "error", "const", "storage", "cache", "job" }),
+            ("Scripts and data", new[] { "script", "module", "type", "native", "model", "enum", "error", "const", "storage", "cache", "job", "extension" }),
             ("Desktop apps", new[] { "window" }),
             ("Documents", new[] { "document" }),
             ("Settings", new[] { "config", "env", "locale", "logger" }),

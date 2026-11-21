@@ -907,7 +907,7 @@ namespace KScript.Language.Features
                 receiver = InferAt(analysis, region, pipeNode.Left);
             }
 
-            List<CompletionItem> items = MethodItems(receiver, replace);
+            List<CompletionItem> items = MethodItems(analysis, receiver, replace);
 
             if (pipe)
             {
@@ -931,7 +931,29 @@ namespace KScript.Language.Features
         /// The methods a value of this shape has. The value's own type's methods come first, then the ones every
         /// value has, then the ones it gets by conversion (a string's number methods, for text that holds a number).
         /// </summary>
-        private List<CompletionItem> MethodItems(TypeShape receiver, TextSpan replace) =>
+        private List<CompletionItem> MethodItems(DocumentAnalysis analysis, TypeShape receiver, TextSpan replace)
+        {
+            // A <type>'s own fn methods and the methods extend blocks add (this file's, imports', the project's);
+            // an override replaces the built-in method of the same name.
+            List<Symbol> added = analysis.ExtensionMethodsFor(receiver).Concat(receiver.Methods.Values)
+                .GroupBy(m => m.Name, StringComparer.Ordinal).Select(g => g.First()).ToList();
+            var names = new HashSet<string>(added.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
+            List<CompletionItem> items = added.Select(m => new CompletionItem
+            {
+                Label = m.Name,
+                Kind = CompletionKind.Method,
+                Detail = m.TypedSignature + (m.SourcePath != null ? "  (" + Path.GetFileName(m.SourcePath) + ")" : string.Empty),
+                Documentation = m.Description,
+                InsertText = m.Name + (m.Parameters.Count == 0 ? "()" : "($1)"),
+                IsSnippet = true,
+                ReplaceSpan = replace,
+                SortText = "0" + m.Name,
+            }).ToList();
+            items.AddRange(BuiltInMethodItems(receiver, replace).Where(i => !names.Contains(i.Label)));
+            return items;
+        }
+
+        private List<CompletionItem> BuiltInMethodItems(TypeShape receiver, TextSpan replace) =>
             Catalog.MethodsFor(receiver.Type)
                 .Select(m => new CompletionItem
                 {
@@ -967,7 +989,7 @@ namespace KScript.Language.Features
             TypeShape receiver = InferAt(analysis, region, receiverNode);
             if (method)
             {
-                return MethodItems(receiver, replace);
+                return MethodItems(analysis, receiver, replace);
             }
             return receiver.Fields.Values.Select(f => new CompletionItem
             {

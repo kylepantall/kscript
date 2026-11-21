@@ -284,6 +284,31 @@ public sealed class MakeGeneratorTests : IDisposable
     }
 
     [Fact]
+    public void ExtensionsGoInTheExtensionsFolderAndApplyToTheProject()
+    {
+        string app = Project();
+        var (code, output, err) = Make(app, "extension", "date", "--methods", "json,is_weekend");
+        Assert.True(code == 0, err);
+        Assert.Contains("Created extensions/date.kscript", output);
+        Assert.Contains("->json(), ->is_weekend()", output);
+        Assert.Equal(
+            "/// Methods for every date in the project. $this is the date a method is called on.\n"
+            + "extend date {\n  /// What json does.\n  fn json() => $this\n  /// What is_weekend does.\n  fn is_weekend() => $this\n}\n",
+            Read(app, "extensions/date.kscript"));
+        Assert.Equal(0, Make(app, "extension", "text/string").Code);
+        Assert.Contains("extend string {\n  // fn json() => $this->to_json()\n}", Read(app, "extensions/text/string.kscript"));
+        File.WriteAllText(Path.Combine(app, "try.kscript"), "echo \"{ @date('2026-11-21')->json() == @date('2026-11-21') }\"\n");
+        AssertNoErrors(app);
+        var o = new StringWriter { NewLine = "\n" };
+        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(o, string.Empty)).RunFile(Path.Combine(app, "try.kscript"));
+        Assert.Equal("true\n", o.ToString());
+
+        string xml = Project("xml", "xml-app");
+        Assert.Equal(0, Make(xml, "extension", "list", "--methods", "second").Code);
+        Assert.Contains("<extend type=\"list\"", Read(xml, "extensions/list.ks.xml"));
+    }
+
+    [Fact]
     public void GeneratedScriptsRun()
     {
         string app = Project();
