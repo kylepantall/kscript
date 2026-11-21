@@ -16,7 +16,7 @@ KScript.Document(
   subtitle: "A note on Conway's Game of Life",
   date: "20 November 2026",
   keywords: "cellular automata, Game of Life",
-  to: "paper.pdf, paper.docx, paper.tex"
+  to: [paper.pdf, paper.docx, paper.tex]
 ) {
   Author(affiliation: "Department of Computing, Example University", email: "ada@example.org") "Ada Lovelace"
   Author(affiliation: "Institute of Patterns") "Alan Turing"

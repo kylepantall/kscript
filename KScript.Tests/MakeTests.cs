@@ -253,7 +253,10 @@ public class ScaffolderTests
         Assert.True(File.Exists(Path.Combine(site.Root, "documents", "annual-report.docx")));
 
         Assert.Equal(0, Make(site.Root, "document", "annual_report", "--format", "xml", "--template", "report").Code);
-        Assert.Contains("<KScript.Document template=\"report\"", Read(site, "documents/annual-report.ks.xml"));
+        string xml = Read(site, "documents/annual-report.ks.xml");
+        Assert.Contains("<KScript.Document template=\"report\"", xml);
+        // The .kscript template's [a, b] list is plain text in XML.
+        Assert.Contains("to=\"annual-report.pdf, annual-report.docx\"", xml);
     }
 
     [Fact]

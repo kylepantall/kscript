@@ -14,7 +14,7 @@ KScript.Document(
   template: {{ template ?? paper }},
   title: "{{ title }}",
   author: "Your Name",
-  to: "{{ kebab }}.pdf, {{ kebab }}.docx"
+  to: [{{ kebab }}.pdf, {{ kebab }}.docx]
 ) {
   Abstract "One paragraph on what this document is about."
 
