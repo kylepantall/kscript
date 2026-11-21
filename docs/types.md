@@ -172,6 +172,36 @@ try {
 
 A value is converted to the base type first, then normalized, then checked against the rules. One that fails reports every rule it broke. Rules on a field work the same way: `title: string(min: 1)`.
 
+### Your own native types
+
+`kscript make native` writes a refinement type to `types/` that works like a built-in one. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, `->from()` and request bodies), and the editor checks the values written in code, in every file that imports it:
+
+```sh
+kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/" --normalize "$value->trim()->upper()"
+kscript make native Percent --base int --min 0 --max 100
+kscript make native Username --base handle --max 16 --not @admin,@root
+```
+
+The first one writes `types/sku.kscript`:
+
+```kscript
+/// Sku: a native type built on string. A value that breaks a rule fails where it is made, and the editor checks the values written in code.
+type Sku with [string] {
+  normalize: $value->trim()->upper()
+  pattern: /^[A-Z]{3}-\d{4}$/
+  // Rules: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
+}
+```
+
+```kscript
+import "types/sku.kscript"
+
+sku: Sku = abc-1234   // ABC-1234
+fn price(of: Sku) => 10
+```
+
+`--base` is the type it is made from (`string` by default; any built-in type or one of your own). The rules are `--pattern`, `--min`, `--max`, `--one-of a,b`, `--not a,b`, `--normalize` and `--validate "test, 'message'"`. Add methods with `fn` in the body, as in any type. In an XML project, the file is a `<type>` element in `types/sku.ks.xml`.
+
 ## Joined types
 
 A type built on other types with fields has all of their fields, rules and methods, merged left to right. Fields it declares itself win. A value of the joined type fits wherever one of its bases is expected:

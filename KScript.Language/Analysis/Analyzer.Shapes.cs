@@ -537,6 +537,7 @@ namespace KScript.Language.Analysis
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{text}' isn't a type. Write a name such as string, int or Repo, with [] for a list and ? to allow null.");
                 return;
             }
+            ReferenceImportedType(text, span);
             if (TypeNamed(text, offset) == null)
             {
                 IEnumerable<string> known = BuiltInTypes.Concat(SemanticTypeNames).Concat(TypeNames());

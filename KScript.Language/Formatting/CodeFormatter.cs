@@ -847,12 +847,36 @@ namespace KScript.Language.Formatting
             if (p < 0 || s.Text[p] == '\n' || s.States[p] != State.Code) return false;
             int lineStart = s.Text.LastIndexOf('\n', p) + 1;
             string line = s.Text.Substring(lineStart, p + 1 - lineStart);
+            if (EndsWithRegexLiteral(line))
+            {
+                return false;
+            }
             if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal)))
             {
                 // A block's own { or a closing } never continue; '-' and '>' as part of -> and => are covered above.
                 return true;
             }
             return WordContinuations.Any(w => line.EndsWith(" " + w, StringComparison.Ordinal));
+        }
+
+        /// <summary>
+        /// The line ends with a regex literal (<c>pattern: /^[a-z]+$/</c>), whose closing / isn't division. The literal
+        /// opens with a / that follows an operator, a bracket, a comma or nothing, where a value starts.
+        /// </summary>
+        private static bool EndsWithRegexLiteral(string line)
+        {
+            if (!line.EndsWith('/') || line.EndsWith("//", StringComparison.Ordinal)) return false;
+            for (int open = line.Length - 2; open >= 0; open--)
+            {
+                if (line[open] != '/') continue;
+                int backslashes = 0;
+                for (int b = open - 1; b >= 0 && line[b] == '\\'; b--) backslashes++;
+                if (backslashes % 2 == 1) continue;
+                int before = open - 1;
+                while (before >= 0 && (line[before] == ' ' || line[before] == '\t')) before--;
+                return before < 0 || ":=(,[{!&|?>".IndexOf(line[before]) >= 0 || line.Substring(0, before + 1).EndsWith("return", StringComparison.Ordinal);
+            }
+            return false;
         }
 
         private static bool StartsWithContinuation(string text, int p)

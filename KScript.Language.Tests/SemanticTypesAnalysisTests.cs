@@ -195,6 +195,70 @@ namespace KScript.Language.Tests
             Assert.DoesNotContain(tokens, t => a.Source[t.Span] == "v" && t.Type == SemanticTokenType.Type);
         }
 
+        private sealed class FakeFiles : IFileSystem
+        {
+            private readonly Dictionary<string, string> files;
+            public FakeFiles(Dictionary<string, string> files) => this.files = files.ToDictionary(k => Path.GetFullPath(k.Key), k => k.Value);
+            public bool FileExists(string path) => files.ContainsKey(Path.GetFullPath(path));
+            public bool DirectoryExists(string path) => false;
+            public string ReadText(string path) => files.TryGetValue(Path.GetFullPath(path), out string t) ? t : null;
+            public IEnumerable<string> ListFiles(string directory, string pattern) => Enumerable.Empty<string>();
+        }
+
+        /// <summary>Native types made by kscript make native, in types/, imported by the files that use them.</summary>
+        private static readonly LanguageService WithNativeTypes = new LanguageService(files: new FakeFiles(new Dictionary<string, string>
+        {
+            ["/tmp/natives/types/sku.kscript"] = "type Sku with [string] {\n  pattern: /^[A-Z]{3}-\\d{4}$/\n}\n",
+            ["/tmp/natives/types/username.kscript"] = "type Name with [handle] { max: 16 }\ntype Username with [Name] { not: [@admin, @root] }\n",
+            ["/tmp/natives/types/percent.ks.xml"] = "<kscript><type name=\"Percent\" with=\"int\" min=\"0\" max=\"100\" /></kscript>",
+        }));
+
+        private static DocumentAnalysis Native(string code) => WithNativeTypes.Analyze(code, "/tmp/natives/app.kscript");
+
+        [Fact]
+        public void ImportedNativeTypesReadRawValuesAndCheckLiterals()
+        {
+            AssertClean(Native("""
+                import "types/sku.kscript"
+                import "types/username.kscript"
+                import "types/percent.ks.xml"
+                s: Sku = ABC-1234
+                u: Username = @joan
+                fn grow(by: Percent) => $by
+                echo "$s $u { @grow(5) }"
+                """));
+
+            DocumentAnalysis bad = Native("""
+                import "types/missing.kscript" as missing
+                import "types/sku.kscript"
+                import "types/username.kscript"
+                import "types/percent.ks.xml"
+                s: Sku = abc
+                u: Username = @admin
+                p: Percent = 101
+                echo "$s $u $p"
+                """);
+            List<Diagnostic> typed = bad.Diagnostics.Where(d => d.Code == DiagnosticCodes.InvalidTypedValue).ToList();
+            Assert.Equal(3, typed.Count);
+            Assert.StartsWith("'abc' doesn't fit Sku: it must match", typed[0].Message);
+            Assert.Equal("'@admin' doesn't fit Username: it is reserved ('@admin').", typed[1].Message);
+            Assert.Equal("'101' doesn't fit Percent: it must be at most 100.", typed[2].Message);
+        }
+
+        [Fact]
+        public void AnImportUsedOnlyAsATypeIsUsed()
+        {
+            DocumentAnalysis a = Native("""
+                import "types/sku.kscript"
+                import "types/percent.ks.xml"
+                fn label(sku: Sku, off: Percent?) => $sku
+                echo @label('ABC-1234', null)
+                """);
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.UnusedImport);
+            DocumentAnalysis unused = Native("import \"types/sku.kscript\"\necho 'hi'");
+            Assert.Contains(unused.Diagnostics, d => d.Code == DiagnosticCodes.UnusedImport);
+        }
+
         [Fact]
         public void MultiLineFieldDefaultsStayInTheAttribute()
         {
