@@ -23,6 +23,7 @@ model {{ pascal }} {
 {{#each fields}}
   {{ item }}
 {{else}}
+  // TODO: Add the fields, one per line, as name: type.
   name: string
 {{/each}}
 }

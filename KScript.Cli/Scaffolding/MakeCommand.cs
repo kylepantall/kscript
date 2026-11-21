@@ -28,7 +28,8 @@ namespace KScript.Scaffolding
         /// Makes the prompts the project setup wizard asks with, for the output it writes to. Tests replace it to
         /// give answers; by default it asks at a terminal, and when input or output is redirected nothing is asked.
         /// </summary>
-        public static Func<TextWriter, CliPrompt> Prompts { get; set; } = writer => new CliPrompt(new CliOutput(writer));
+        public static Func<TextWriter, CliPrompt> Prompts { get; set; } = writer => new CliPrompt(new CliOutput(writer),
+            interactive: ReferenceEquals(writer, Console.Out) && !Console.IsInputRedirected && !Console.IsOutputRedirected);
 
         public static int Run(string[] args, TextWriter output, TextWriter error)
         {
@@ -66,7 +67,7 @@ namespace KScript.Scaffolding
                     case "dry-run": dryRun = true; continue;
                     case "dir":
                         value ??= i + 1 < args.Length ? args[++i] : null;
-                        if (string.IsNullOrEmpty(value)) { error.WriteLine("--dir needs a folder, e.g. --dir \"Example Sites/team\""); return 1; }
+                        if (string.IsNullOrEmpty(value)) return Fail(error, "--dir needs a folder, e.g. --dir \"Example Sites/team\"");
                         root = value;
                         continue;
                 }
@@ -96,9 +97,9 @@ namespace KScript.Scaffolding
 
                 if (string.Equals(type, "project", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (root != null && !Directory.Exists(root)) { error.WriteLine($"The folder '{root}' does not exist."); return 1; }
+                    if (root != null && !Directory.Exists(root)) return Fail(error, $"The folder '{root}' does not exist.");
                     if (help) { PrintProjectHelp(root ?? ".", options, output); return 0; }
-                    if (positional.Count > 2) { error.WriteLine($"Unexpected '{positional[2]}'. Put names with spaces in quotes."); return 1; }
+                    if (positional.Count > 2) return Fail(error, $"Unexpected '{positional[2]}'. Put names with spaces in quotes.");
                     string folder = positional.Count > 1 ? positional[1] : null;
                     // No options at a terminal: the setup wizard asks for them. Any option (or -n) means no questions.
                     if (options.Count == 0 && !noInteraction)
@@ -111,7 +112,7 @@ namespace KScript.Scaffolding
                             foreach (var kv in answers.Options) options[kv.Key] = kv.Value;
                         }
                     }
-                    if (folder == null) { error.WriteLine("Give the project a folder name, e.g. kscript make project my-site (or . for the current folder)."); return 1; }
+                    if (folder == null) return Fail(error, "Give the project a folder name, e.g. kscript make project my-site (or . for the current folder).");
                     return MakeProject(root ?? ".", folder, options, force, dryRun, output);
                 }
 
@@ -119,8 +120,7 @@ namespace KScript.Scaffolding
                 root ??= ProjectRoot();
                 if (!Directory.Exists(root))
                 {
-                    error.WriteLine($"The folder '{root}' does not exist.");
-                    return 1;
+                    return Fail(error, $"The folder '{root}' does not exist.");
                 }
 
                 if (options.ContainsKey("list") && positional.Count == 0)
@@ -145,8 +145,7 @@ namespace KScript.Scaffolding
                     var rest = positional.Skip(1).Where(p => !string.Equals(p, "project", StringComparison.OrdinalIgnoreCase)).ToList();
                     if (rest.Count > 1 || positional.Count(p => string.Equals(p, "project", StringComparison.OrdinalIgnoreCase)) > 1 || !string.Equals(positional[1], "project", StringComparison.OrdinalIgnoreCase))
                     {
-                        error.WriteLine($"Copy one project template at a time: kscript make templates project [{string.Join("|", ProjectTemplate.BuiltInNames())}]");
-                        return 1;
+                        return Fail(error, $"Copy one project template at a time: kscript make templates project [{string.Join("|", ProjectTemplate.BuiltInNames())}]");
                     }
                     string which = rest.Count == 1 ? rest[0] : options.ContainsKey("bare") ? "bare" : ProjectTemplate.DefaultName;
                     return PublishProjectTemplate(fromProject ? null : root, which, options.ContainsKey("global"), force, output);
@@ -164,7 +163,7 @@ namespace KScript.Scaffolding
 
                 if (string.Equals(type, "auth", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (positional.Count > 1) { error.WriteLine($"kscript make auth takes no name (unexpected '{positional[1]}'). Options: --api, --format, --force, --dry-run."); return 1; }
+                    if (positional.Count > 1) return Fail(error, $"kscript make auth takes no name (unexpected '{positional[1]}'). Options: --api, --format, --force, --dry-run.");
                     AuthResult made = AuthMaker.Make(root, options, force, dryRun);
                     var cli = new CliOutput(output);
                     foreach (var (action, path) in made.Files)
@@ -178,14 +177,16 @@ namespace KScript.Scaffolding
 
                 if (positional.Count < 2)
                 {
+                    // No name at a terminal: ask for it (and, when no options were given, for the type's options).
                     var t = Scaffolder.FindTemplate(root, type);
-                    error.WriteLine($"Give the {t.Type} a name, e.g. kscript make {t.Type} {Scaffolder.Example(t.Type)}.");
-                    return 1;
+                    CliPrompt prompt = noInteraction ? null : Prompts(output);
+                    if (prompt == null || !prompt.Interactive)
+                        return Fail(error, $"Give the {t.Type} a name, e.g. kscript make {t.Type} {Scaffolder.Example(t.Type)}.\nAt a terminal, kscript make {t.Type} asks for it.");
+                    positional.Add(MakeWizard.Ask(prompt, t, options));
                 }
                 if (positional.Count > 2)
                 {
-                    error.WriteLine(TooManyNames(root, positional, args.Where((_, i) => !positionalAt.Contains(i))));
-                    return 1;
+                    return Fail(error, TooManyNames(root, positional, args.Where((_, i) => !positionalAt.Contains(i))));
                 }
 
                 if (string.Equals(Scaffolder.FindTemplate(root, type).Type, "route", StringComparison.OrdinalIgnoreCase))
@@ -242,8 +243,7 @@ namespace KScript.Scaffolding
             }
             catch (CliPromptException ex)
             {
-                error.WriteLine(ex.Message);
-                return 1;
+                return Fail(error, ex.Message);
             }
             catch (IOException ex)
             {
@@ -296,23 +296,28 @@ namespace KScript.Scaffolding
             var result = ProjectScaffolder.Create(parent, name, options, force, dryRun);
             string where = result.DisplayDirectory == "." ? "this folder" : result.DisplayDirectory + "/";
 
+            var cli = new CliOutput(output);
             if (dryRun)
             {
-                output.WriteLine($"Would create a KScript project in {where}:");
-                foreach (var f in result.Files) output.WriteLine($"  {f}");
-                output.WriteLine();
-                output.WriteLine("kscript.json:");
+                cli.Info($"Would create a KScript project in {cli.Style.Bold(where)}:");
+                cli.Bullets(result.Files);
+                cli.NewLine();
+                cli.Heading("  kscript.json:");
                 output.Write(result.Contents["kscript.json"]);
                 return 0;
             }
 
-            output.WriteLine($"Created a KScript project in {where}{(result.Template.BuiltIn ? "" : $", from the template in {Shown(result.Template.Folder)}")}:");
-            foreach (var f in result.Files) output.WriteLine($"  {f}");
-            if (result.Note != null) output.WriteLine(result.Note);
-            output.WriteLine();
-            output.WriteLine("Next:");
-            if (result.DisplayDirectory != ".") output.WriteLine($"  cd {(result.DisplayDirectory.Contains(' ') ? "\"" + result.DisplayDirectory + "\"" : result.DisplayDirectory)}");
-            foreach (string line in result.Next) output.WriteLine("  " + line);
+            cli.Success($"Created a KScript project in {cli.Style.Bold(where)}{(result.Template.BuiltIn ? "" : $", from the template in {cli.Style.Bold(Shown(result.Template.Folder))}")}:");
+            cli.Bullets(result.Files);
+            if (result.Note != null)
+            {
+                cli.NewLine();
+                cli.Comment("  " + result.Note);
+            }
+            var next = new List<string>();
+            if (result.DisplayDirectory != ".") next.Add($"cd {(result.DisplayDirectory.Contains(' ') ? "\"" + result.DisplayDirectory + "\"" : result.DisplayDirectory)}");
+            next.AddRange(result.Next);
+            NextSteps(cli, next);
             return 0;
         }
 
@@ -321,7 +326,30 @@ namespace KScript.Scaffolding
         {
             cli.NewLine();
             cli.Heading("  Next:");
-            foreach (string line in lines) cli.Line("  " + line);
+            foreach (string line in lines) cli.Line("    " + Command(cli.Style, line));
+        }
+
+        /// <summary>An error from kscript make, after the ERROR label.</summary>
+        private static int Fail(TextWriter error, string message)
+        {
+            new CliOutput(error).Error(message);
+            return 1;
+        }
+
+        /// <summary>
+        /// A command line in help and next steps, coloured: kscript and its command in green, &lt;names&gt; in yellow,
+        /// --options in cyan, and [optional parts] in gray. Text after two spaces (a note) is gray.
+        /// </summary>
+        internal static string Command(CliStyle style, string line)
+        {
+            if (!style.Enabled || string.IsNullOrEmpty(line)) return line;
+            int note = line.IndexOf("  ", StringComparison.Ordinal);
+            if (note > 0) return Command(style, line.Substring(0, note)) + style.Gray(line.Substring(note));
+            return System.Text.RegularExpressions.Regex.Replace(line, @"^(kscript(?: [a-z][\w:-]*(?=\s|$))?)|<[^<>]+>|(?<![\w-])--?[a-zA-Z][\w-]*|[\[\]]", m =>
+                m.Groups[1].Success ? style.Green(m.Value)
+                : m.Value[0] == '<' ? style.Yellow(m.Value)
+                : m.Value[0] == '-' ? style.Cyan(m.Value)
+                : style.Gray(m.Value));
         }
 
         /// <summary>A path for messages: relative to the current folder when it is inside it, with ~ for the home folder.</summary>
@@ -357,19 +385,21 @@ namespace KScript.Scaffolding
             var written = ProjectTemplate.Publish(folder, force, name);
             string shown = Shown(folder);
             string what = name == ProjectTemplate.DefaultName ? "the project template" : $"the {name} project template";
+            var cli = new CliOutput(output);
             if (written.Count == 0)
             {
-                output.WriteLine($"Nothing to copy: {shown}/ already has {what}. Use --force to replace it.");
+                cli.Info($"Nothing to copy: {cli.Style.Bold(shown + "/")} already has {what}. Use --force to replace it.");
                 return 0;
             }
-            output.WriteLine($"Copied {what} to {shown}/:");
-            foreach (var w in written) output.WriteLine($"  {w}");
+            cli.Success($"Copied {what} to {cli.Style.Bold(shown + "/")}:");
+            cli.Bullets(written);
+            cli.NewLine();
             bool inProject = folder.Contains(Path.DirectorySeparatorChar + Scaffolder.TemplatesFolder + Path.DirectorySeparatorChar, StringComparison.Ordinal);
             string command = name == ProjectTemplate.DefaultName ? "kscript make project" : $"kscript make project --template {name}";
-            output.WriteLine(inProject
-                ? $"{command} now uses it for projects made inside this one. Edit, add or remove files to change what it makes."
-                : $"{command} now uses it for every new project. Edit, add or remove files to change what it makes.");
-            output.WriteLine($"{ProjectTemplate.ManifestName} lists its options (such as --no-desktop) and the 'Next:' lines; a '--- make' header with 'when: desktop' copies a file only when that option is on.");
+            cli.Comment(inProject
+                ? $"  {command} now uses it for projects made inside this one. Edit, add or remove files to change what it makes."
+                : $"  {command} now uses it for every new project. Edit, add or remove files to change what it makes.");
+            cli.Comment($"  {ProjectTemplate.ManifestName} lists its options (such as --no-desktop) and the 'Next:' lines; a '--- make' header with 'when: desktop' copies a file only when that option is on.");
             return 0;
         }
 
@@ -387,64 +417,96 @@ namespace KScript.Scaffolding
             options.TryGetValue("template", out string templateOption);
             if (templateOption == null && options.TryGetValue("bare", out string bare) && StubTemplate.IsSet(bare)) templateOption = "bare";
             var template = ProjectTemplate.Find(Path.Combine(Path.GetFullPath(parent), "new-project"), templateOption);
-            output.WriteLine("Usage: kscript make project <folder> [--bare] [--template <name or folder>] [options] [--force] [--dry-run]");
-            output.WriteLine();
-            output.WriteLine($"Built-in templates: {string.Join(", ", ProjectTemplate.BuiltInNames())} (web is the default; --bare is --template bare).");
-            output.WriteLine();
+            var o = new CliOutput(output);
+            o.Heading("Usage:");
+            o.Line("  " + Command(o.Style, "kscript make project <folder> [--bare] [--template <name or folder>] [options] [--force] [--dry-run]"));
+            o.Line("  " + Command(o.Style, "kscript make project") + o.Style.Gray("   (at a terminal, with no options: asks for each one)"));
+            o.NewLine();
+            o.Heading("Templates:");
+            o.Line($"  Built-in templates: {string.Join(", ", ProjectTemplate.BuiltInNames())} (web is the default; --bare is --template bare).");
+            o.Definitions(ProjectTemplate.BuiltInNames().Select(n => (n, ProjectTemplate.BuiltInTemplate(n).Description ?? "")));
+            o.NewLine();
             string templateLabel = template.Name ?? "folder";
-            output.WriteLine(template.BuiltIn ? $"Template: {templateLabel} (built in)" : $"Template: {templateLabel}, from {Shown(template.Folder)}");
-            if (template.Description != null) output.WriteLine("  " + template.Description);
+            o.Heading(template.BuiltIn ? $"Template: {templateLabel} (built in)" : $"Template: {templateLabel}, from {Shown(template.Folder)}");
+            if (template.Description != null) o.Line("  " + template.Description);
             if (template.Options.Count > 0)
             {
-                output.WriteLine();
-                output.WriteLine("Options:");
-                int width = template.Options.Max(o => o.Name.Length) + 4;
-                foreach (var o in template.Options)
+                o.NewLine();
+                o.Heading("Options:");
+                o.Definitions(template.Options.Select(opt =>
                 {
-                    bool flag = o.Default is "true" or "false";
-                    string label = flag && o.Default == "true" ? "--no-" + o.Name : "--" + o.Name;
-                    string def = o.Default == null || flag ? "" : $" (default {o.Default})";
-                    output.WriteLine($"  {label.PadRight(width + 5)}{o.Description}{def}");
-                }
+                    bool flag = opt.Default is "true" or "false";
+                    string label = flag && opt.Default == "true" ? "--no-" + opt.Name : "--" + opt.Name;
+                    string def = opt.Default == null || flag ? "" : o.Style.Gray($" (default {opt.Default})");
+                    return (label, (opt.Description ?? "") + def);
+                }).Concat(new[]
+                {
+                    ("--force", "Make the project even when the folder isn't empty"),
+                    ("--dry-run", "Show what would be made, without writing anything"),
+                    ("-n, --no-interaction", "Ask nothing: what isn't given takes its default"),
+                }));
             }
-            output.WriteLine();
-            output.WriteLine("kscript make templates project [bare] copies a template to change it: to _templates/project[-bare] in a");
-            output.WriteLine("project, or to ~/.kscript/templates/project[-bare] (outside a project, or with --global) for every new project.");
+            o.NewLine();
+            o.Comment("  kscript make templates project [bare] copies a template to change it: to _templates/project[-bare] in a");
+            o.Comment("  project, or to ~/.kscript/templates/project[-bare] (outside a project, or with --global) for every new project.");
         }
 
         private static void PrintTemplates(string root, TextWriter output)
         {
-            output.WriteLine("Usage: kscript make <type> <Name> [--key value …] [--dir <project>] [--force] [--dry-run]");
-            output.WriteLine("       kscript make templates [type…]   copy the built-in templates to _templates/ to customise them");
-            output.WriteLine("       kscript make templates project   copy the project template to customise new projects (--global for all)");
-            output.WriteLine("       kscript make project <folder>    start a new web app, with a desktop app unless --no-desktop");
-            output.WriteLine("       kscript make auth                sign-in pages, routes and a controller (KScript.Auth); --api adds token routes");
-            output.WriteLine("       kscript make project <folder> --bare   start a bare project: kscript.json, one script and a test");
-            output.WriteLine();
+            var o = new CliOutput(output);
+            o.Heading("Usage:");
+            o.Line("  " + Command(o.Style, "kscript make <type> <name> [--key value …] [--dir <project>] [--force] [--dry-run]"));
+            o.Line("  " + Command(o.Style, "kscript make <type>") + o.Style.Gray("   (at a terminal: asks for the name and options)"));
+            o.NewLine();
+            o.Heading("Options:");
+            var general = new (string, string)[]
+            {
+                ("--dir <project>", "Make the file in that project (default: the project of the current folder)"),
+                ("--force", "Replace a file that already exists"),
+                ("--dry-run", "Show what would be made, without writing anything"),
+                ("-n, --no-interaction", "Ask nothing; a missing name is an error"),
+                ("--list", "Every type's options and examples"),
+                ("-h, --help", "This list, or one type's help with kscript make <type> --help"),
+            };
+            var projects = new (string, string)[]
+            {
+                ("project <folder>", "Start a new web app, with a desktop app unless --no-desktop (--bare for a bare project)"),
+                ("auth", "Sign-in pages, routes and a controller (KScript.Auth); --api adds token routes"),
+                ("templates [type…]", "Copy the built-in templates to _templates/ to customise them"),
+                ("templates project", "Copy the project template to customise new projects (--global for all)"),
+            };
             var all = Scaffolder.ListTemplates(root);
-            int width = all.Max(t => t.Type.Length) + 2;
+            int width = Math.Max(Math.Max(general.Max(g => g.Item1.Length), projects.Max(g => g.Item1.Length)), all.Max(t => t.Type.Length));
+            o.Definitions(general, nameWidth: width);
+            o.NewLine();
+            o.Heading("Projects:");
+            o.Definitions(projects, nameWidth: width);
             foreach (var (category, types) in Grouped(all))
             {
-                output.WriteLine(category + ":");
-                foreach (var t in types)
+                o.NewLine();
+                o.Heading(category + ":");
+                o.Definitions(types.Select(t =>
                 {
                     string source = t.BuiltIn ? "" : t.OverridesBuiltIn ? $"  [{Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}, replaces built-in]" : $"  [{Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}]";
-                    output.WriteLine($"  {t.Type.PadRight(width)}{t.Description ?? ""}{source}");
-                }
-                output.WriteLine();
+                    return (t.Type, (t.Description ?? "") + o.Style.Gray(source));
+                }), nameWidth: width);
             }
-            output.WriteLine("kscript make --list shows every type's options and examples; kscript make <type> --help shows one.");
-            output.WriteLine();
-            output.WriteLine("Examples:");
-            output.WriteLine("  kscript make project my-app --port 3000");
-            output.WriteLine("  kscript make project my-site --no-desktop");
-            output.WriteLine("  kscript make project my-tool --bare");
-            output.WriteLine("  kscript make route users --api");
-            output.WriteLine("  kscript make controller people --resource");
-            output.WriteLine("  kscript make component Hero --props title,subtitle");
-            output.WriteLine("  kscript make page about --title \"About us\"");
-            output.WriteLine("  kscript make page \"people/[id]\"");
-            output.WriteLine("  kscript make markdown blog/first-post --layout _layouts/blog.html");
+            o.NewLine();
+            o.Heading("Examples:");
+            foreach (string e in new[]
+            {
+                "kscript make project my-app --port 3000",
+                "kscript make project my-site --no-desktop",
+                "kscript make project my-tool --bare",
+                "kscript make route users --api",
+                "kscript make controller people --resource",
+                "kscript make component Hero --props title,subtitle",
+                "kscript make page about --title \"About us\"",
+                "kscript make page \"people/[id]\"",
+                "kscript make markdown blog/first-post --layout _layouts/blog.html",
+            }) o.Line("  " + o.Style.Gray("$ ") + Command(o.Style, e));
+            o.NewLine();
+            o.Comment("  kscript make --list shows every type's options and examples; kscript make <type> --help shows one.");
         }
     
         /// <summary>The templates by the command directory's sections; a project's own types go under "Your templates".</summary>
@@ -465,16 +527,17 @@ namespace KScript.Scaffolding
         /// <summary>kscript make --list: every type, by section, with its usage, options and examples.</summary>
         private static void PrintDirectory(string root, TextWriter output)
         {
-            output.WriteLine("kscript make: every type of file it can make. kscript make <type> --help shows one; kscript make templates");
-            output.WriteLine("copies them to _templates/ to change what they make.");
+            var o = new CliOutput(output);
+            o.Comment("kscript make: every type of file it can make. kscript make <type> --help shows one; kscript make templates");
+            o.Comment("copies them to _templates/ to change what they make.");
             foreach (var (category, types) in Grouped(Scaffolder.ListTemplates(root)))
             {
-                output.WriteLine();
-                output.WriteLine(category);
-                output.WriteLine(new string('-', category.Length));
+                o.NewLine();
+                o.Heading(category);
+                o.Line(o.Style.Gray(new string('-', category.Length)));
                 foreach (var t in types)
                 {
-                    output.WriteLine();
+                    o.NewLine();
                     PrintType(t, output, indent: "  ");
                 }
             }
@@ -482,15 +545,46 @@ namespace KScript.Scaffolding
 
         private static void PrintType(StubInfo t, TextWriter output, string indent = "")
         {
-            output.WriteLine($"{indent}kscript make {t.Type} {t.Usage ?? "<name>"}");
-            if (t.Description != null) output.WriteLine($"{indent}  {t.Description}");
-            if (!t.BuiltIn) output.WriteLine($"{indent}  From {Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}{(t.OverridesBuiltIn ? ", which replaces the built-in template" : "")}.");
+            var o = new CliOutput(output);
+            if (indent.Length == 0)
+            {
+                // kscript make <type> --help: laid out like kscript help <command>.
+                if (t.Description != null)
+                {
+                    o.Heading("Description:");
+                    o.Line("  " + t.Description);
+                    if (!t.BuiltIn) o.Comment($"  From {Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}{(t.OverridesBuiltIn ? ", which replaces the built-in template" : "")}.");
+                    o.NewLine();
+                }
+                o.Heading("Usage:");
+                o.Line("  " + Command(o.Style, $"kscript make {t.Type} {t.Usage ?? "<name>"}"));
+                o.Line("  " + Command(o.Style, $"kscript make {t.Type}") + o.Style.Gray("   (at a terminal: asks for the name and options)"));
+                o.NewLine();
+                o.Heading("Options:");
+                o.Definitions(t.Options.Select(opt => (opt.Name, opt.Description ?? "")).Concat(new[]
+                {
+                    ("--dir <project>", "Make the file in that project"),
+                    ("--force", "Replace the file if it exists"),
+                    ("--dry-run", "Show the file, without writing it"),
+                    ("-n, --no-interaction", "Ask nothing; a missing name is an error"),
+                }));
+                if (t.Examples.Count > 0)
+                {
+                    o.NewLine();
+                    o.Heading("Examples:");
+                    foreach (string e in t.Examples) o.Line($"  {o.Style.Gray("$")} {Command(o.Style, e)}");
+                }
+                return;
+            }
+            o.Line(indent + Command(o.Style, $"kscript make {t.Type} {t.Usage ?? "<name>"}"));
+            if (t.Description != null) o.Line($"{indent}  {t.Description}");
+            if (!t.BuiltIn) o.Comment($"{indent}  From {Scaffolder.TemplatesFolder}/{Path.GetFileName(t.FilePath)}{(t.OverridesBuiltIn ? ", which replaces the built-in template" : "")}.");
             if (t.Options.Count > 0)
             {
-                int width = t.Options.Max(o => o.Name.Length) + 2;
-                foreach (var o in t.Options) output.WriteLine($"{indent}    {o.Name.PadRight(width)}{o.Description}");
+                int width = t.Options.Max(opt => opt.Name.Length) + 2;
+                foreach (var opt in t.Options) o.Line($"{indent}    {o.Style.Cyan(opt.Name)}{new string(' ', width - opt.Name.Length)}{opt.Description}");
             }
-            foreach (string e in t.Examples) output.WriteLine($"{indent}  $ {e}");
+            foreach (string e in t.Examples) o.Line($"{indent}  {o.Style.Gray("$")} {Command(o.Style, e)}");
         }
 }
 }

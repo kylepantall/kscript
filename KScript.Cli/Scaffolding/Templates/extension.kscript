@@ -13,8 +13,14 @@ hint: Every script in the project now has these methods: {{#each methods}}->{{ i
 extend {{ name }} {
 {{#each methods}}
   /// What {{ item | snake }} does.
-  fn {{ item | snake }}() => $this
+  fn {{ item | snake }}() {
+    // TODO: Work out the result from $this.
+    return $this
+  }
+{{#unless last}}
+
+{{/unless}}
 {{else}}
-  // fn json() => $this->to_json()
+  // TODO: Add methods, e.g. fn json() => $this->to_json()
 {{/each}}
 }

@@ -245,6 +245,10 @@ kscript make auth --api                               # sign up, sign in, resets
 kscript make                                          # list every type
 ```
 
+Leave out the name at a terminal and `kscript make` asks for it: `kscript make page` asks what the page should be called and then, because no options were given either, asks about each of the page's options. A yes/no option such as `--timestamps` is a yes/no question, and pressing Enter skips any other option. Give any option and only the name is asked. With `-n` (`--no-interaction`), or when the input or output isn't a terminal, nothing is asked and a missing name is an error.
+
+The files it makes have the functions each kind needs already written, with a `// TODO:` comment (`<!-- TODO: -->` in HTML) saying what to put in them. A controller's `show(id)` says to find the record and answer 404 when there is none, and a job's `handle()` says to do the work there. The files pass `kscript check` and `kscript fmt --check` as they are.
+
 A route goes in `routes/web.kscript`, or `routes/api.kscript` with `--api`. A project that already keeps `routes.kscript` or `api.kscript` at the top, or lists its route files in `http.routes`, gets the route there instead. The route file imports the controller, and the route is refused if the file already has one for the same method and path. `struct` and `record` are other names for `type`, and `fn` and `function` for `module`: there is a generator for every kind of thing a script can declare (functions, constants, enums and types).
 
 ### Where files go: the recommended layout
