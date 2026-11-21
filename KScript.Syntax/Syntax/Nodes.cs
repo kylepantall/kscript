@@ -56,6 +56,15 @@ namespace KScript.Syntax
 
         /// <summary>The literal's value as text: the unquoted string, the number as written, "true"/"false", or "null".</summary>
         public string Value { get; internal set; }
+
+        /// <summary>
+        /// For text in "double quotes" that holds <c>$name</c> or <c>{ $expr }</c>: its parts, filled in when the
+        /// literal is evaluated. Null for 'single quotes', which are kept as written, and for text with nothing to fill in.
+        /// </summary>
+        public Template Template { get; internal set; }
+
+        public override IEnumerable<ExprNode> Children =>
+            Template == null ? Array.Empty<ExprNode>() : Template.Expressions.Select(s => s.Node).Where(n => n != null);
     }
 
     /// <summary><c>$name</c>.</summary>

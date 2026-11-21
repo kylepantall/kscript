@@ -33,7 +33,15 @@ age = $age + 1
 echo "Next year { $name } will be { $age }."
 ```
 
-After `=`, a value is an expression, so text needs quotes: `'Joan'`. The text after `echo` is a template: `$name` and `{ }` are filled in.
+After `=`, a value is an expression, so text needs quotes. `"Double quotes"` fill in `$name` and `{ }` wherever they are written, and `'single quotes'` keep the text exactly as written:
+
+```kscript try
+name = 'Joan'
+greeting = "Hello $name, you are { 80 + 2 }."
+label = 'Write $name to use a variable.'
+echo $greeting
+echo $label
+```
 
 ## Lists and maps
 

@@ -27,6 +27,15 @@ namespace KScript.Language.Analysis
                     return;
 
                 case LiteralNode literal:
+                    if (literal.Template != null)
+                    {
+                        // "Hello $name": each part is a value of its own.
+                        foreach (TemplateSegment part in literal.Template.Expressions.Where(p => p.Node != null))
+                        {
+                            AnalyzeExpr(part.Node, region, scope, ExprContext.Value);
+                        }
+                        return;
+                    }
                     CheckTextIsNotATemplate(literal, region, scope);
                     return;
 
@@ -54,6 +63,7 @@ namespace KScript.Language.Analysis
                     CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false, m.Arguments, region);
                     if (m.Name == "sql" && receiver.Type == KType.Database)
                     {
+                        CheckSqlTextIsNotFilledIn(m.Arguments, region);
                         ReferenceSqlValues(m.Arguments, region, scope);
                     }
                     FlushBare(m.Arguments, region, scope);
@@ -282,6 +292,7 @@ namespace KScript.Language.Analysis
                 }
                 if (command.Package == "KScript.Data" && command.Name == "sql")
                 {
+                    CheckSqlTextIsNotFilledIn(c.Arguments, region);
                     ReferenceSqlValues(c.Arguments, region, scope);
                 }
                 if (count >= 0 && CheckNamedArguments($"@{command.Name}()", c.Arguments, piped, SlotsOf(new[] { command }), region, full))

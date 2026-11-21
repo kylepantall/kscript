@@ -641,6 +641,23 @@ public sealed class DataQueryTests : DataFixture
 public sealed class DataSqlTests : DataFixture
 {
     [Fact]
+    public void SqlTextInDoubleQuotesIsNotFilledInBeforeItIsBound()
+    {
+        // "double quotes" fill in values everywhere else, but text given straight to sql keeps its { } as parameters.
+        string[] lines = Lines(Users + """
+            evil = "x' or '1'='1"
+            echo "select count(*) as n from users where name = {$evil}" |> sql()
+            echo ("select count(*) as n from users where name = {$evil}" |> sql())[0].n
+            echo $db->sql("select count(*) as n from users where name = {$evil}")[0].n
+            held = 'select count(*) as n from users where name = {$evil}'
+            echo @sql($held)[0].n
+            """);
+        Assert.Equal("0", lines[^3]);
+        Assert.Equal("0", lines[^2]);
+        Assert.Equal("0", lines[^1]);
+    }
+
+    [Fact]
     public void BracesAreAlwaysParameters()
     {
         string[] lines = Lines(Users + """

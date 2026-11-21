@@ -149,9 +149,10 @@ repo = ```<Repo>
 - In the head of `if`, `elif`, `for`, `while`, `match`, `case` and `when`, the first `{` outside brackets opens the
   block. Wrap a map literal in parentheses there.
 - `"double quotes"` are text, exactly like XML element text or an attribute value: `{ }` and `$name` interpolate where
-  the element interpolates, and `\"` and `\\` are the only escapes (plus a `\` at the end of a line, which joins it to
+  the element interpolates, and in an expression too (`greeting = "Hello $name"`), where a `{ }` is filled in when it
+  starts with `$` or `@`. `\"` and `\\` are the only escapes (plus a `\` at the end of a line, which joins it to
   the next: see [Long strings and blocks of text](#long-strings-and-blocks-of-text)). `'single quotes'` are string literals inside
-  expressions, as before.
+  expressions and are kept exactly as written.
 - In `name(...)` a value runs to the next `,` or `)` outside brackets; quote it to include a comma. A bare name such
   as `wrap` means `wrap="yes"`.
 - A list of names is an array: `Middleware(use: [secure_headers, json_only])`, `Resource(..., only: [index, show])`.

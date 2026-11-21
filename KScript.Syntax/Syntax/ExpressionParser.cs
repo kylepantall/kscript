@@ -467,7 +467,7 @@ namespace KScript.Syntax
 
                 case TokenKind.String:
                     Advance();
-                    return TypedBlock(t, new LiteralNode { Kind = LiteralKind.String, Value = t.Text, Span = t.Span });
+                    return TypedBlock(t, new LiteralNode { Kind = LiteralKind.String, Value = t.Text, Span = t.Span, Template = QuotedTemplate(t) });
 
                 case TokenKind.Regex:
                     Advance();
@@ -554,6 +554,23 @@ namespace KScript.Syntax
 
             Error(t.Span, $"Expected a value, found '{Raw(t)}'.");
             return new ErrorNode { Span = new TextSpan(t.Span.Start, 0) };
+        }
+
+        /// <summary>"Double quotes" fill in <c>$name</c> and <c>{ $expr }</c>; 'single quotes' and ``` blocks are kept as written.</summary>
+        private Template QuotedTemplate(Token t)
+        {
+            string text = lexer.Text;
+            if (t.Span.Length < 2 || t.Span.End > text.Length || text[t.Span.Start] != '"' || text[t.Span.End - 1] != '"'
+                || (t.Text.IndexOf('$') < 0 && t.Text.IndexOf('{') < 0 && t.Text.IndexOf('@') < 0 && t.Text.IndexOf('}') < 0))
+            {
+                return null;
+            }
+            Template template = TemplateParser.ParseQuoted(text, t.Span.Start + 1, t.Span.End - 1);
+            if (template != null)
+            {
+                errors.AddRange(template.Errors);
+            }
+            return template;
         }
 
         private static ExprNode WithSpan(ExprNode node, int start, int end)
