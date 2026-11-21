@@ -114,7 +114,15 @@ namespace KScript.Queueing
                     QueuedJob job = driver.Reserve(QueuesNow(driver), QueueRuntime.Clock());
                     if (job != null)
                     {
-                        Process(driver, job);
+                        try
+                        {
+                            Process(driver, job);
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            // The job stays in running/ and goes back on its queue when its lease runs out.
+                            Line($"{job.Job} #{Short(job.Id)}: couldn't save what happened ({ex.Message}); it will run again after its lease runs out.");
+                        }
                         continue;
                     }
                     Interlocked.Decrement(ref started);

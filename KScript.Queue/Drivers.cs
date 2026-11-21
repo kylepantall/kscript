@@ -259,7 +259,20 @@ namespace KScript.Queueing
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string temp = path + ".tmp-" + Guid.NewGuid().ToString("N").Substring(0, 8);
             File.WriteAllText(temp, job.ToJson());
-            File.Move(temp, path, overwrite: true);
+            // On Windows a file that was just written can be held for a moment (by a virus scanner, say), so the move
+            // is tried again a few times before it gives up.
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    File.Move(temp, path, overwrite: true);
+                    return;
+                }
+                catch (Exception ex) when (attempt < 20 && ex is IOException or UnauthorizedAccessException)
+                {
+                    Thread.Sleep(10 * attempt);
+                }
+            }
         }
 
         private static QueuedJob Read(string path)
