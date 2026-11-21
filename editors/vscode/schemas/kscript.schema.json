@@ -239,6 +239,11 @@
           "default": 10,
           "description": "Seconds one test may run before it fails (0 for no limit). timeout=\"...\" on a <test> and --timeout win."
         },
+        "env": {
+          "type": "string",
+          "examples": ["test"],
+          "description": "The environment the tests run in (KSCRIPT_ENV), so config/config.test.yaml can give tests their own database. kscript --env and a KSCRIPT_ENV already set win."
+        },
         "packages": {
           "type": "array",
           "description": "Packages every test file imports, on top of the project's packages. KScript.Test is always imported in test files.",

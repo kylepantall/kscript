@@ -1,0 +1,59 @@
+--- make
+when: auth
+---
+// Accounts and API tokens (KScript.Auth, see docs/auth.md). Users, their passwords (hashed) and tokens are kept
+// in the app's data folder. Every other route in routes/api{{ ext }} needs Authorization: Bearer <token>.
+// The functions are named so they don't hide KScript.Auth's own commands (@register, @user...).
+import KScript.Http
+import KScript.Auth
+{{#unless db is none}}
+import KScript.Data
+import "../models/note{{ ext }}"
+{{/unless}}
+
+/// What POST /api/register takes. The email and password types check it (kscript.json can set password rules).
+type SignUp {
+  name: string(min: 1, max: 120)
+  email: email
+  password: password
+}
+
+/// What POST /api/tokens takes.
+type SignIn {
+  email: string
+  password: string
+  device: string = 'api'
+}
+
+/// POST /api/register: makes the account and answers with it and its first token.
+fn sign_up(json: SignUp) {
+  user = null
+  try {
+    user = @register($json.email, $json.password, name: $json.name->trim())
+  } catch err when $err.type eq 'Validation' {
+    return @response({ error: $err.message, problems: $err.problems ?? [] }, status: 422)
+  }
+  return @response({ user: $user, token: @api_token($user, name: 'register') }, status: 201)
+}
+
+/// POST /api/tokens: trades an email and password for a new token.
+fn issue_token(json: SignIn) {
+  user = @attempt($json.email, $json.password, session: false)
+  if $user == null {
+    throw Unauthorized "That email and password don't match an account."
+  }
+  return @response({ token: @api_token($user, name: $json.device) }, status: 201)
+}
+
+/// GET /api/me: who the token belongs to.
+fn profile() => @user()
+
+/// DELETE /api/me: closes the account{{#unless db is none}}, with its notes{{/unless}}, and revokes its tokens.
+fn close_account() {
+  user = @user()
+{{#unless db is none}}
+  $Note->where(user_id: $user.id)->delete()
+{{/unless}}
+  @users()->delete($user.id)
+  return null
+}

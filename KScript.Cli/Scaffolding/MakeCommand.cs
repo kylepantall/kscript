@@ -30,6 +30,11 @@ namespace KScript.Scaffolding
             string root = null;
             bool force = false, dryRun = false, help = false;
 
+            // kscript make project: a yes/no option (--docker) never takes the next word unless it is yes/no/true/false,
+            // so kscript make project --docker shop names the folder shop.
+            HashSet<string> flags = args.FirstOrDefault(x => !x.StartsWith("-", StringComparison.Ordinal)) is string first
+                && string.Equals(first, "project", StringComparison.OrdinalIgnoreCase) ? ProjectFlags() : new HashSet<string>();
+
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
@@ -66,7 +71,11 @@ namespace KScript.Scaffolding
                 if (value == null)
                 {
                     // --flag on its own (or followed by another option) is true.
-                    value = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal) ? args[++i] : "true";
+                    bool takes = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal)
+                        && (!flags.Contains(key) || args[i + 1].ToLowerInvariant() is "true" or "false" or "yes" or "no");
+                    value = takes ? args[++i] : "true";
+                    if (flags.Contains(key) && value.ToLowerInvariant() is "yes") value = "true";
+                    else if (flags.Contains(key) && value.ToLowerInvariant() is "no") value = "false";
                 }
                 options[key] = value;
             }
@@ -322,6 +331,15 @@ namespace KScript.Scaffolding
                 : $"{command} now uses it for every new project. Edit, add or remove files to change what it makes.");
             output.WriteLine($"{ProjectTemplate.ManifestName} lists its options (such as --no-desktop) and the 'Next:' lines; a '--- make' header with 'when: desktop' copies a file only when that option is on.");
             return 0;
+        }
+
+        /// <summary>The yes/no options of the built-in project templates, and --bare.</summary>
+        private static HashSet<string> ProjectFlags()
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "bare" };
+            foreach (string name in ProjectTemplate.BuiltInNames())
+                foreach (var o in ProjectTemplate.BuiltInTemplate(name).Options.Where(o => o.IsFlag)) names.Add(o.Name);
+            return names;
         }
 
         private static void PrintProjectHelp(string parent, Dictionary<string, string> options, TextWriter output)

@@ -1,0 +1,69 @@
+--- make
+unless: db is none
+---
+// The notes API: each function answers one of the Resource routes in routes/api{{ ext }}.
+// A record or list it returns is sent as JSON; a note that isn't there is a 404.
+import KScript.Http
+import KScript.Data
+{{#if auth}}
+import KScript.Auth
+{{/if}}
+{{#if cache}}
+import "../lib/cache{{ ext }}"
+{{/if}}
+import "../models/note{{ ext }}"
+
+/// What POST and PUT /api/notes take. The type checks the JSON before the function runs, and answers 422 if it doesn't fit.
+type NoteInput {
+  title: string(min: 1, max: 200)
+  body: string = ''
+  done: bool = false
+}
+
+/// The notes this request may see{{#if auth}}: the signed-in user's{{/if}}.
+fn mine() => {{#if auth}}$Note->where(user_id: @user().id){{else}}$Note->query(){{/if}}
+
+/// GET /api/notes: the newest first.
+fn index() {
+{{#if cache}}
+  return @cached(@list_key(), fn() => @mine()->latest()->get())
+{{else}}
+  return @mine()->latest()->get()
+{{/if}}
+}
+
+/// POST /api/notes
+fn store(json: NoteInput) {
+  note = $Note->create({{#if auth}}user_id: @user().id, {{/if}}title: $json.title, body: $json.body, done: $json.done)
+{{#if cache}}
+  @forget_cached(@list_key())
+{{/if}}
+  return @response($note, status: 201)
+}
+
+/// GET /api/notes/:id
+fn show(id: int) => @mine()->where(id: $id)->first_or_fail()
+
+/// PUT or PATCH /api/notes/:id
+fn update(id: int, json: NoteInput) {
+  note = @show($id)
+  $note->update(title: $json.title, body: $json.body, done: $json.done)
+{{#if cache}}
+  @forget_cached(@list_key())
+{{/if}}
+  return $note
+}
+
+/// DELETE /api/notes/:id
+fn destroy(id: int) {
+  @show($id)->delete()
+{{#if cache}}
+  @forget_cached(@list_key())
+{{/if}}
+  return null
+}
+{{#if cache}}
+
+/// The cache key of this request's list of notes.
+fn list_key() => {{#if auth}}'notes:' + @user().id{{else}}'notes'{{/if}}
+{{/if}}

@@ -243,7 +243,10 @@ namespace KScript.Scaffolding
         /// The condition of an #if or #unless: <c>name</c> is set; <c>name is text</c> equals it (ignoring case);
         /// <c>name in a, b, c</c> is one of a comma-separated list; <c>name has text</c> is a comma-separated list holding it.
         /// </summary>
-        private static bool Test(string condition, Dictionary<string, string> values)
+        private static bool Test(string condition, Dictionary<string, string> values) => Holds(condition, values);
+
+        /// <summary>An #if condition (or a template header's when: / unless:) against these values.</summary>
+        internal static bool Holds(string condition, IReadOnlyDictionary<string, string> values)
         {
             var match = System.Text.RegularExpressions.Regex.Match(condition, @"^(\S+)\s+(is|in|has)\s+(.*)$");
             if (!match.Success) return IsSet(Lookup(condition, values));
@@ -254,7 +257,7 @@ namespace KScript.Scaffolding
             return wanted.Any(w => string.Equals(w, value.Trim(), StringComparison.OrdinalIgnoreCase));
         }
 
-        private static string Lookup(string name, Dictionary<string, string> values) =>
+        private static string Lookup(string name, IReadOnlyDictionary<string, string> values) =>
             values.TryGetValue(name.Trim(), out var v) ? v : null;
 
         internal static bool IsSet(string value) =>

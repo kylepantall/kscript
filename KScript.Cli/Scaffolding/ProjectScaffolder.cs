@@ -35,6 +35,10 @@ namespace KScript.Scaffolding
     /// </summary>
     public static class ProjectScaffolder
     {
+        /// <summary>"a, b or c".</summary>
+        internal static string Either(IReadOnlyList<string> choices) =>
+            choices.Count == 1 ? choices[0] : string.Join(", ", choices.Take(choices.Count - 1)) + " or " + choices[^1];
+
         public static ProjectResult Create(string parent, string name, IDictionary<string, string> options = null, bool force = false, bool dryRun = false)
         {
             string raw = (name ?? "").Trim().Replace('\\', '/').TrimEnd('/');
@@ -86,6 +90,17 @@ namespace KScript.Scaffolding
             if (given.TryGetValue("port", out string port) && !(int.TryParse(port, out int p) && p > 0 && p < 65536))
                 throw new StubException($"--port should be a number from 1 to 65535, not '{port}'.");
 
+            // An option with choices (--db) takes one of them.
+            foreach (var o in template.Options.Where(o => o.Choices.Count > 0))
+            {
+                string key = o.Name.Replace('-', '_');
+                if (!given.TryGetValue(key, out string chosen)) continue;
+                string match = o.Choices.FirstOrDefault(c => string.Equals(c, chosen?.Trim(), StringComparison.OrdinalIgnoreCase));
+                if (match == null)
+                    throw new StubException($"--{o.Name} should be {Either(o.Choices)}, not '{chosen}'.");
+                values[key] = match;
+            }
+
             // A mistyped option (--no-dekstop) would otherwise be silently ignored.
             var notes = new List<string>();
             if (template.Options.Count > 0)
@@ -122,8 +137,25 @@ namespace KScript.Scaffolding
                 }
             }
 
-            // A template with an AGENTS.md gets its agent docs filled in from the new project's code.
             var files = rendered.Keys.ToList();
+            foreach (string line in template.Notes.Count > 0 ? ProjectTemplate.RenderLines(template.Notes, values) : Array.Empty<string>())
+                notes.Add("Note: " + line.Trim());
+
+            // Kits the template asks for ("make": ["{{#if auth}}auth{{/if}}"]), made in the new project.
+            foreach (string kit in ProjectTemplate.RenderLines(template.Makes, values).Select(k => k.Trim()))
+            {
+                if (!string.Equals(kit, "auth", StringComparison.OrdinalIgnoreCase))
+                    throw new StubException($"The project template asks for 'make: {kit}', but only auth can be made with a project.");
+                if (dryRun)
+                {
+                    notes.Add("Note: --dry-run leaves out the sign-in files (kscript make auth), which are made once the project is.");
+                    continue;
+                }
+                AuthResult auth = AuthMaker.Make(dir, new Dictionary<string, string> { ["format"] = values["format"] }, force, dryRun: false);
+                foreach (var (_, path) in auth.Files) if (!files.Contains(path) && File.Exists(Path.Combine(dir, path))) files.Add(path);
+            }
+
+            // A template with an AGENTS.md gets its agent docs filled in from the new project's code.
             if (!dryRun && rendered.ContainsKey(global::KScript.Language.Agents.AgentDocs.AgentsFile))
             {
                 files.AddRange(global::KScript.Language.Agents.AgentDocs.Write(dir).Where(f => !files.Contains(f)));

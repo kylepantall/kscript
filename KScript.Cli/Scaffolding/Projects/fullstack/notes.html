@@ -1,0 +1,35 @@
+--- make
+unless: auth
+---
+<import src="lib/notes_client{{ ext }}" />
+<layout src="_layout.html" title="Notes">
+  <h1>Notes</h1>
+  <p>This page gets its notes from the app's own JSON API: <code>lib/notes_client{{ ext }}</code> calls <code>@api('/api/notes')</code>, which <code>routes/api{{ ext }}</code> answers. Each click runs KScript on the server, with no JavaScript to write.</p>
+
+  <live id="notes">
+    <state name="draft" value="''" />
+    <state name="problem" value="''" />
+    <let name="notes" value="@list_notes()" />
+
+    <form class="add-note" on-submit="problem = @add_note($draft) ?? ''; draft = $problem == '' ? '' : $draft">
+      <input bind="draft" placeholder="What do you want to remember?" autocomplete="off">
+      <button>Add</button>
+    </form>
+    <if $problem != ''>
+      <p class="problem">{$problem}</p>
+    </if>
+
+    <ul class="notes">
+      <for each="n" in="$notes">
+        <li class="{ $n.done ? 'done' : '' }">
+          <label><input type="checkbox" checked="{$n.done}" on-change="@toggle_note($n)"> {$n.title}</label>
+          <button class="remove" title="Delete" on-click="@delete_note($n.id)">✕</button>
+        </li>
+      </for>
+      <else>
+        <li class="empty">No notes yet.</li>
+      </else>
+    </ul>
+    <p class="note">{ @notes_left($notes) }</p>
+  </live>
+</layout>

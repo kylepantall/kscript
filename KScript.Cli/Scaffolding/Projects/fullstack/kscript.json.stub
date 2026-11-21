@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
+  "name": "{{ kebab }}",
+  "standard": "kscript:recommended",
+  "serve": {
+    "root": ".",
+    "port": {{ port }},
+    "host": "localhost"
+  },
+  "http": {
+    // Every route logs its request; routes/api{{ ext }} adds the app's own middleware.
+    "middleware": ["log"]
+  },
+  // $config reads config/config.yaml (and config.<env>.yaml with kscript --env <env>).
+  "config": {
+    "root": "config"
+  },
+  // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
+  "make": {
+    "format": "{{ format }}"
+  },
+  "lint": {
+    "include": ["**/*.html", "**/*.md", "**/*.kscript", "**/*.ks.xml"],
+    "exclude": ["_templates", "node_modules", "dist"]
+  },
+  "test": {
+    "include": ["tests/**/*.test.kscript", "tests/**/*.test.ks.xml"],
+    // Tests run with config/config.test.yaml laid over config/config.yaml, so they get their own database.
+    "env": "test"
+  }
+}

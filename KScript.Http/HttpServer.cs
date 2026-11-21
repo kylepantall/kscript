@@ -36,7 +36,21 @@ namespace KScript.Http
             Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> routes = app.HasRoutes ? app.HandleAsync : null;
             Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> handler = before == null ? routes : async request =>
                 await before(request) ?? (routes == null ? null : await routes(request));
-            return PageServer.RunAsync(site, port, host, log, handler, stop, onStarted: started);
+            LocalApi.Install();
+            LocalApi.Serve(app);
+            return RunAndForget(app, PageServer.RunAsync(site, port, host, log, handler, stop, onStarted: started));
+        }
+
+        private static async Task<int> RunAndForget(HttpApp app, Task<int> server)
+        {
+            try
+            {
+                return await server;
+            }
+            finally
+            {
+                LocalApi.Stop(app);
+            }
         }
 
         /// <summary>kscript openapi: the OpenAPI document for a site's routes, to the output or a file.</summary>

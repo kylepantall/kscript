@@ -1,0 +1,87 @@
+// Tests for the notes API (controllers/notes{{ ext }}). @api('/api/...') sends a request to this app's own routes,
+// without a server. kscript test uses config/config.test.yaml, so these notes never reach the real {{#if db is none}}notes file{{else}}database{{/if}}.
+import KScript.Net
+{{#if auth}}
+
+/// Signs up someone new and gives the headers that send their API token.
+fn sign_up() {
+  email = 'test-' + @uuid() + '@example.com'
+  body = { name: 'Test', email: $email, password: 'correct horse battery staple' }
+  account = @api('/api/register', options: { method: 'POST', body: $body })->check()->json()
+  return { Authorization: 'Bearer ' + $account.token }
+}
+{{/if}}
+
+/// Sends a request to the notes API{{#if auth}} as the test's user{{/if}}.
+fn notes_api(path, method: string = 'GET', body = null{{#if auth}}, as = {}{{/if}}) {
+  return @api('/api/notes' + $path, options: { method: $method, body: $body{{#if auth}}, headers: $as{{/if}} })
+}
+
+describe(name: "notes") {
+{{#if auth}}
+  // Each test signs up someone new (in before-each), so no test sees another's notes.
+  me = {}
+
+{{/if}}
+  before-each {
+{{#if auth}}
+    me = @sign_up()
+{{else}}
+    for note in @notes_api('')->json() {
+      @notes_api('/' + $note.id, method: 'DELETE')
+    }
+{{/if}}
+  }
+{{#if auth}}
+
+  after-each {
+    @api('/api/me', options: { method: 'DELETE', headers: $me })
+  }
+{{/if}}
+
+  test(name: "the list starts empty") {
+    expect(value: @notes_api(''{{#if auth}}, as: $me{{/if}})->json(), equals: [])
+  }
+
+  test(name: "a new note is saved and listed") {
+    added = @notes_api('', method: 'POST', body: { title: 'Write the docs' }{{#if auth}}, as: $me{{/if}})
+    expect(value: $added->status(), equals: 201)
+    note = $added->json()
+    expect(value: $note.title, equals: 'Write the docs')
+    expect(value: $note.done, equals: false)
+    expect(value: @notes_api('/' + $note.id{{#if auth}}, as: $me{{/if}})->json().title, equals: 'Write the docs')
+    expect(value: @notes_api(''{{#if auth}}, as: $me{{/if}})->json()->map(fn($n) => $n.title), equals: ['Write the docs'])
+  }
+
+  test(name: "a note without a title is turned away with 422") {
+    expect(value: @notes_api('', method: 'POST', body: { title: '' }{{#if auth}}, as: $me{{/if}})->status(), equals: 422)
+  }
+
+  test(name: "a note is changed and deleted") {
+    note = @notes_api('', method: 'POST', body: { title: 'Ship it' }{{#if auth}}, as: $me{{/if}})->json()
+    changed = @notes_api('/' + $note.id, method: 'PUT', body: { title: 'Ship it', done: true }{{#if auth}}, as: $me{{/if}})
+    expect(value: $changed->json().done, equals: true)
+    expect(value: @notes_api('/' + $note.id, method: 'DELETE'{{#if auth}}, as: $me{{/if}})->status(), equals: 204)
+    expect(value: @notes_api('/' + $note.id{{#if auth}}, as: $me{{/if}})->status(), equals: 404)
+  }
+{{#if auth}}
+
+  test(name: "notes need a token, and only their owner sees them") {
+    expect(value: @notes_api('')->status(), equals: 401)
+    note = @notes_api('', method: 'POST', body: { title: 'Mine' }, as: $me)->json()
+    other = @sign_up()
+    expect(value: @notes_api('/' + $note.id, as: $other)->status(), equals: 404)
+    expect(value: @notes_api('', as: $other)->json(), equals: [])
+    @api('/api/me', options: { method: 'DELETE', headers: $other })
+  }
+{{/if}}
+{{#if cache}}
+
+  test(name: "a client that has the list already gets 304 Not Modified") {
+    first = @notes_api(''{{#if auth}}, as: $me{{/if}})
+    tag = $first->header('ETag')
+    again = @api('/api/notes', options: { headers: { 'If-None-Match': $tag{{#if auth}}, Authorization: $me.Authorization{{/if}} } })
+    expect(value: $again->status(), equals: 304)
+  }
+{{/if}}
+}

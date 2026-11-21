@@ -1,0 +1,48 @@
+// kscript make project --template fullstack reads this file to learn about the template. It is not copied into new projects.
+// Every other file in this folder is copied, with {{ }} placeholders filled in (see docs/projects.md).
+{
+  "description": "A web app with its own JSON API: pages that call /api through @api, routes, controllers, a Note model in a database, caching and tests",
+  "options": {
+    "format": {
+      "default": "kscript",
+      "choices": ["kscript", "xml"],
+      "description": "kscript writes scripts, tests and routes as .kscript files; xml writes them as .ks.xml. Pages stay HTML."
+    },
+    "db": {
+      "default": "sqlite",
+      "choices": ["sqlite", "postgres", "mysql", "none"],
+      "description": "The database the notes are kept in (KScript.Data). none keeps them in a JSON file instead."
+    },
+    "auth": {
+      "default": false,
+      "description": "Sign-in pages (kscript make auth): notes belong to who is signed in, and the API needs a session or an API token."
+    },
+    "cache": {
+      "default": true,
+      "description": "Cache the notes list (KScript.Cache) and answer repeat API requests with 304 Not Modified."
+    },
+    "docker": {
+      "default": false,
+      "description": "Add a Dockerfile and compose.yaml (with the database server, for postgres and mysql)."
+    },
+    "port": {
+      "default": 8080,
+      "description": "The port kscript serve uses"
+    }
+  },
+  // kscript make kits run in the new project once its files are written.
+  "make": ["{{#if auth}}auth{{/if}}"],
+  // Printed after the project is made. Lines that come out empty are left out.
+  "notes": [
+    "{{#if db in postgres, mysql}}this version of KScript.Data connects to SQLite only. config/config.yaml{{#if docker}} and compose.yaml{{/if}} are set up for {{ db }}, and the tests use SQLite in memory, so the project is ready when {{ db }} support lands. Until then, set DATABASE_URL=sqlite:data/app.sqlite to run it.{{/if}}"
+  ],
+  // Printed after the project is made, under "Next:". Lines that come out empty are left out.
+  "next": [
+    "kscript serve           serve the site at http://localhost:{{ port }} and its API under /api (docs at /_api)",
+    "kscript routes          list the routes in routes/",
+    "kscript test            run the tests in tests/",
+    "kscript check           check every page and script",
+    "{{#if docker}}docker compose up       run the app{{#unless db in sqlite, none}} and its database{{/unless}} in containers{{/if}}",
+    "kscript ide install     add the KScript extension to VS Code (the project also recommends it)"
+  ]
+}

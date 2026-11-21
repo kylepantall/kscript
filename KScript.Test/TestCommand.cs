@@ -18,6 +18,38 @@ namespace KScript.Testing
         public static int Run(string[] args, TextWriter output, TextWriter error, CancellationToken cancellation = default, bool? color = null, string workingDirectory = null)
         {
             string cwd = workingDirectory ?? Directory.GetCurrentDirectory();
+            // test.env in kscript.json (such as "test") is the environment the tests run in, unless one is already set.
+            string env = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("KSCRIPT_ENV")) ? TestEnvironment(args, cwd) : null;
+            if (env == null) return RunTests(args, output, error, cancellation, color, cwd);
+            Environment.SetEnvironmentVariable("KSCRIPT_ENV", env);
+            try
+            {
+                return RunTests(args, output, error, cancellation, color, cwd);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("KSCRIPT_ENV", null);
+            }
+        }
+
+        /// <summary>test.env of the project around the first path given (or the current folder).</summary>
+        private static string TestEnvironment(string[] args, string cwd)
+        {
+            string first = args.FirstOrDefault(a => !a.StartsWith('-'));
+            string start = first == null ? cwd : Path.GetFullPath(Path.Combine(cwd, first));
+            if (File.Exists(start)) start = Path.GetDirectoryName(start);
+            try
+            {
+                return Directory.Exists(start) ? ProjectConfig.FindAndLoad(start)?.Test.Env : null;
+            }
+            catch (ProjectConfigException)
+            {
+                return null;
+            }
+        }
+
+        private static int RunTests(string[] args, TextWriter output, TextWriter error, CancellationToken cancellation, bool? color, string cwd)
+        {
             var paths = new List<string>();
             var settings = new TestRunSettings { Cancellation = cancellation, BaseDirectory = cwd };
             string junit = null;

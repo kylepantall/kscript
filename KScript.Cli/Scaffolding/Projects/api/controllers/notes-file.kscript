@@ -1,0 +1,81 @@
+--- make
+when: db is none
+to: controllers/notes.kscript
+---
+// The notes API: each function answers one of the Resource routes in routes/api{{ ext }}. A map or list it
+// returns is sent as JSON. With no database, the notes are kept in the JSON file config.yaml names (notes.file).
+import KScript.IO
+import KScript.Http
+{{#if auth}}
+import KScript.Auth
+{{/if}}
+{{#if cache}}
+import "../lib/cache{{ ext }}"
+{{/if}}
+
+/// What POST and PUT /api/notes take. The type checks the JSON before the function runs, and answers 422 if it doesn't fit.
+type NoteInput {
+  title: string(min: 1, max: 200)
+  body: string = ''
+  done: bool = false
+}
+
+/// Every saved note.
+fn all_notes() => @exists($config.notes.file) ? @read_json($config.notes.file) : []
+
+/// The notes this request may see{{#if auth}}: the signed-in user's{{/if}}.
+fn mine() => {{#if auth}}@all_notes()->filter(fn($n) => $n.user_id == @user().id){{else}}@all_notes(){{/if}}
+
+/// Saves every note.
+fn save_notes(notes) {
+  @write_json($config.notes.file, $notes)
+{{#if cache}}
+  @forget_cached(@list_key())
+{{/if}}
+}
+
+/// GET /api/notes: the newest first.
+fn index() {
+{{#if cache}}
+  return @cached(@list_key(), fn() => @mine()->reverse())
+{{else}}
+  return @mine()->reverse()
+{{/if}}
+}
+
+/// POST /api/notes
+fn store(json: NoteInput) {
+  notes = @all_notes()
+  id = $notes->count() == 0 ? 1 : $notes->map(fn($n) => $n.id)->max() + 1
+  note = { id: $id, {{#if auth}}user_id: @user().id, {{/if}}title: $json.title, body: $json.body, done: $json.done }
+  @save_notes($notes->push($note))
+  return @response($note, status: 201)
+}
+
+/// GET /api/notes/:id
+fn show(id: int) {
+  note = @mine()->filter(fn($n) => $n.id == $id)->first()
+  if $note == null {
+    throw NotFound "There is no note $id."
+  }
+  return $note
+}
+
+/// PUT or PATCH /api/notes/:id
+fn update(id: int, json: NoteInput) {
+  note = @show($id)->merge({ title: $json.title, body: $json.body, done: $json.done })
+  @save_notes(@all_notes()->map(fn($n) => $n.id == $id ? $note : $n))
+  return $note
+}
+
+/// DELETE /api/notes/:id
+fn destroy(id: int) {
+  @show($id)
+  @save_notes(@all_notes()->reject(fn($n) => $n.id == $id))
+  return null
+}
+{{#if cache}}
+
+/// The cache key of this request's list of notes.
+fn list_key() => {{#if auth}}'notes:' + @user().id{{else}}'notes'{{/if}}
+{{/if}}

@@ -1,0 +1,21 @@
+# kscript test runs with these settings laid over config.yaml ("test": { "env": "test" } in kscript.json).
+app:
+  name: {{ title }} (tests)
+{{#if db is none}}
+
+notes:
+  file: data/test/notes.json
+{{/if}}
+{{#unless db is none}}
+
+# Each test run starts with an empty database in memory.
+database:
+  connections:
+    main:
+      url: "sqlite::memory:"
+{{/unless}}
+{{#if cache}}
+
+cache:
+  store: memory
+{{/if}}
