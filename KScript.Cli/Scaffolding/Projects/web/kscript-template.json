@@ -4,18 +4,23 @@
   "description": "A web app: pages, a layout, a live Tasks page, a script and tests, plus the same app as a desktop window",
   "options": {
     "format": {
+      "question": "Which file format for scripts?",
       "default": "kscript",
+      "choices": ["kscript", "xml"],
       "description": "kscript writes scripts, tests, routes and the desktop app as .kscript files; xml writes them as .ks.xml. Pages stay HTML."
     },
     "desktop": {
+      "question": "Add a desktop app (the same app in a window)?",
       "default": true,
       "description": "Add desktop.kscript (the app in a <KScript.Window>) and the kscript.json app settings kscript compile uses. --no-desktop leaves them out."
     },
     "http": {
+      "question": "Add a JSON API under /api?",
       "default": true,
       "description": "Add a JSON API (routes/api.kscript and controllers/tasks.kscript, served under /api by KScript.Http). --no-http leaves it out."
     },
     "port": {
+      "question": "Which port should kscript serve use?",
       "default": 8080,
       "description": "The port kscript serve uses"
     }

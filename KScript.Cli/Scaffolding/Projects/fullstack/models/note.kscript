@@ -17,5 +17,8 @@ model Note {
   done: bool = false
 }
 
-// Makes the notes table the first time it is needed (it does nothing once the table is there).
-$db->create_table($Note)
+/// The Note model, once its table is there: the first call makes the notes table if the database doesn't have it.
+fn notes() {
+  $db->create_table($Note)
+  return $Note
+}

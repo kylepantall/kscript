@@ -24,8 +24,15 @@ namespace KScript.Scaffolding
     /// </summary>
     public static class MakeCommand
     {
+        /// <summary>
+        /// Makes the prompts the project setup wizard asks with, for the output it writes to. Tests replace it to
+        /// give answers; by default it asks at a terminal, and when input or output is redirected nothing is asked.
+        /// </summary>
+        public static Func<TextWriter, CliPrompt> Prompts { get; set; } = writer => new CliPrompt(new CliOutput(writer));
+
         public static int Run(string[] args, TextWriter output, TextWriter error)
         {
+            bool noInteraction = false;
             var positional = new List<string>();
             var positionalAt = new HashSet<int>();
             var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -41,6 +48,7 @@ namespace KScript.Scaffolding
             {
                 string a = args[i];
                 if (a == "-h" || a == "--help") { help = true; continue; }
+                if (a == "-n" || a == "--no-interaction") { noInteraction = true; continue; }
                 if (!a.StartsWith("--", StringComparison.Ordinal) || a.Length == 2)
                 {
                     positional.Add(a);
@@ -90,9 +98,21 @@ namespace KScript.Scaffolding
                 {
                     if (root != null && !Directory.Exists(root)) { error.WriteLine($"The folder '{root}' does not exist."); return 1; }
                     if (help) { PrintProjectHelp(root ?? ".", options, output); return 0; }
-                    if (positional.Count < 2) { error.WriteLine("Give the project a folder name, e.g. kscript make project my-site (or . for the current folder)."); return 1; }
                     if (positional.Count > 2) { error.WriteLine($"Unexpected '{positional[2]}'. Put names with spaces in quotes."); return 1; }
-                    return MakeProject(root ?? ".", positional[1], options, force, dryRun, output);
+                    string folder = positional.Count > 1 ? positional[1] : null;
+                    // No options at a terminal: the setup wizard asks for them. Any option (or -n) means no questions.
+                    if (options.Count == 0 && !noInteraction)
+                    {
+                        CliPrompt prompt = Prompts(output);
+                        if (prompt.Interactive)
+                        {
+                            ProjectWizard.Answers answers = ProjectWizard.Ask(prompt, root ?? ".", folder);
+                            folder = answers.Name;
+                            foreach (var kv in answers.Options) options[kv.Key] = kv.Value;
+                        }
+                    }
+                    if (folder == null) { error.WriteLine("Give the project a folder name, e.g. kscript make project my-site (or . for the current folder)."); return 1; }
+                    return MakeProject(root ?? ".", folder, options, force, dryRun, output);
                 }
 
                 bool fromProject = root == null;
@@ -216,6 +236,11 @@ namespace KScript.Scaffolding
                 return 1;
             }
             catch (StubException ex)
+            {
+                error.WriteLine(ex.Message);
+                return 1;
+            }
+            catch (CliPromptException ex)
             {
                 error.WriteLine(ex.Message);
                 return 1;

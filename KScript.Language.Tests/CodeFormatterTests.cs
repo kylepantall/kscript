@@ -471,8 +471,8 @@ namespace KScript.Language.Tests
             FormatResult result = Formatter.Format(text, path);
             if (!result.Succeeded)
             {
-                // `kscript make` templates hold {{ }} placeholders; anything else must format.
-                Assert.Contains("{{", text);
+                // `kscript make` templates hold {{ }} placeholders or a --- make header; anything else must format.
+                Assert.True(text.Contains("{{", StringComparison.Ordinal) || text.StartsWith("--- make", StringComparison.Ordinal), relative + ": " + result.Error);
                 return;
             }
             AssertSame(text, result.Text);

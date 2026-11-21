@@ -311,6 +311,24 @@ Group(middleware: auth) {
 - Read it with `->status()`, `->body()`, `->type()`, `->headers()`, `->header(name)`, `->ok()` and `->json()`.
 - Change it with `->with_status(code)`, `->with_header(name, value)`, `->with_type(type)`, `->with_etag(value)` and `->with_cache(directives)`. Each returns the response, so the calls chain.
 
+## Calling your own API
+
+`@api()` ([KScript.Net](language.md)) with a path instead of an address asks the project's own routes, in the same process and without the network:
+
+```kscript
+import KScript.Net
+
+notes = @api('/api/notes')->check()->json()
+added = @api('/api/notes', options: { method: 'POST', body: { title: 'Ship it' } })
+echo $added->status()   // 201
+```
+
+It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The options and the response are the same as for an address: `method`, `headers` and `body` (a map or list is sent as JSON), then `->status()`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
+
+A request made while answering another one, such as a page calling the API, or a route calling another route, sends on the `Cookie` and `Authorization` headers of the request being answered, so the API sees the same signed-in person. Give your own `headers` to send others. Requests inside one another stop after 8, so a route that calls itself is an error rather than a hang.
+
+The [fullstack project template](projects.md#a-web-app-with-its-api---template-fullstack) uses this: its pages get their notes from `/api/notes`, so the pages and other clients share one API.
+
 ## Settings: kscript.json
 
 ```jsonc

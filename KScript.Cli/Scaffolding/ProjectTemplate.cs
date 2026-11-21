@@ -14,6 +14,8 @@ namespace KScript.Scaffolding
         public string Name { get; init; }
         public string Default { get; init; }
         public string Description { get; init; }
+        /// <summary>What the setup wizard asks for it ("question"), or null to ask with the description.</summary>
+        public string Question { get; init; }
         /// <summary>The values the option may take ("choices" in kscript-template.json), or empty for any value.</summary>
         public IReadOnlyList<string> Choices { get; init; } = Array.Empty<string>();
         /// <summary>True for a yes/no option: its default is true or false.</summary>
@@ -207,12 +209,13 @@ namespace KScript.Scaffolding
                     {
                         foreach (var p in o.EnumerateObject())
                         {
-                            string def = null, about = null;
+                            string def = null, about = null, question = null;
                             var choices = new List<string>();
                             if (p.Value.ValueKind == JsonValueKind.Object)
                             {
                                 if (p.Value.TryGetProperty("default", out var v)) def = Scalar(v);
                                 if (p.Value.TryGetProperty("description", out var a) && a.ValueKind == JsonValueKind.String) about = a.GetString();
+                                if (p.Value.TryGetProperty("question", out var q) && q.ValueKind == JsonValueKind.String) question = q.GetString();
                                 if (p.Value.TryGetProperty("choices", out var ch))
                                 {
                                     if (ch.ValueKind != JsonValueKind.Array) throw new StubException($"{where}: {p.Name}.choices should be a list of values, such as [\"sqlite\", \"postgres\"].");
@@ -220,7 +223,7 @@ namespace KScript.Scaffolding
                                 }
                             }
                             else def = Scalar(p.Value);
-                            options.Add(new ProjectTemplateOption { Name = p.Name, Default = def, Description = about, Choices = choices });
+                            options.Add(new ProjectTemplateOption { Name = p.Name, Default = def, Description = about, Question = question, Choices = choices });
                         }
                     }
                     if (root.TryGetProperty("next", out var n) && n.ValueKind == JsonValueKind.Array)

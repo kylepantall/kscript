@@ -4,28 +4,34 @@
   "description": "A JSON API: routes, controllers, middleware, a Note model in a database, sign-in with API tokens, caching and tests",
   "options": {
     "format": {
+      "question": "Which file format for scripts?",
       "default": "kscript",
       "choices": ["kscript", "xml"],
       "description": "kscript writes scripts, tests and routes as .kscript files; xml writes them as .ks.xml."
     },
     "db": {
+      "question": "Which database?",
       "default": "sqlite",
       "choices": ["sqlite", "postgres", "mysql", "none"],
       "description": "The database the notes are kept in (KScript.Data). none keeps them in a JSON file instead."
     },
     "auth": {
+      "question": "Add sign-in (KScript.Auth)?",
       "default": true,
       "description": "Sign-up and API tokens (KScript.Auth): POST /api/register and /api/tokens, GET /api/me, and notes that belong to who is signed in."
     },
     "cache": {
+      "question": "Cache the notes list (KScript.Cache)?",
       "default": true,
       "description": "Cache the notes list (KScript.Cache) and answer repeat requests with 304 Not Modified."
     },
     "docker": {
+      "question": "Add Docker (a Dockerfile and compose.yaml)?",
       "default": false,
       "description": "Add a Dockerfile and compose.yaml (with the database server, for postgres and mysql)."
     },
     "port": {
+      "question": "Which port should kscript serve use?",
       "default": 8080,
       "description": "The port kscript serve uses"
     }

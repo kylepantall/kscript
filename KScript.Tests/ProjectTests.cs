@@ -154,7 +154,7 @@ public class ProjectConfigTests
         Assert.Equal(props.GetProperty("config").GetProperty("properties").GetProperty("files").GetProperty("default").EnumerateArray().Select(e => e.GetString()), KScript.Runtime.ConfigOptions.DefaultFiles);
         Assert.Equal("docs,docs_port,host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
-        Assert.Equal("exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
+        Assert.Equal("env,exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
         Assert.Equal("enabled,endOfLine,exclude,include,indent,maxBlankLines,preserve,printWidth,rules,tabWidth", Keys(props.GetProperty("format").GetProperty("properties")));
 
         // Every key the schema allows is one ProjectConfig reads.
@@ -518,7 +518,7 @@ public class MakeProjectTests : IDisposable
         var (code, output, _) = Make(parent.Root, "--help");
         Assert.Equal(0, code);
         Assert.Contains("Template: web (built in)", output);
-        Assert.Contains("Built-in templates: web, bare", output);
+        Assert.Contains("Built-in templates: web, api, bare, fullstack", output);
         Assert.Contains("--no-desktop", output);
         Assert.Contains("--port", output);
         Assert.Contains("(default 8080)", output);

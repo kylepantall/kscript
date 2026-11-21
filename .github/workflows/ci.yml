@@ -23,6 +23,29 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
+  # Every kscript make project template, with the option mixes in .github/scripts/check-templates.sh, made and
+  # checked, formatted, tested and served. It skips the unit tests, so it fails within minutes when a change to the
+  # language, the formatter or a package breaks a template.
+  templates:
+    name: Project templates
+    if: github.event.action != 'closed'
+    timeout-minutes: 15
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON('["self-hosted","Linux","X64","kscript"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.environment == 'self-hosted' && format('{0}/dotnet', runner.tool_cache) || '' }}
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build kscript
+        run: dotnet build KScriptApp --configuration Release
+
+      - name: Make, check, test and serve every template
+        run: .github/scripts/check-templates.sh "dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
+
   test:
     name: Build and test (${{ matrix.name }})
     if: github.event.action != 'closed'

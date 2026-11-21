@@ -157,6 +157,9 @@ There is no Swift, C#, XAML or shell script to write, and the programs `kscript 
 ```sh
 kscript make project my-app    # a web app and desktop app with a layout, a live page, scripts, tests and editor settings
 kscript make project my-tool --bare   # just kscript.json, a script and a test
+kscript make project shop --template api        # a JSON API: routes, a model, sign-in with tokens, caching and tests
+kscript make project notes --template fullstack # pages that call their own API with @api('/api/notes')
+kscript make project            # or answer a few questions
 kscript serve                  # run it (--with-docs also serves the docs, with a page about your project)
 kscript test                   # run the tests in tests/
 kscript check                  # report problems in every script and page, for CI
