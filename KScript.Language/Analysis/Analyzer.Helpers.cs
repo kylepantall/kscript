@@ -423,6 +423,11 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
+            if (report && type != null)
+            {
+                int typeStart = start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length);
+                ReferenceImportedType(type, value.ToSource(new TextSpan(typeStart, TypeInference.WithoutTypeArguments(type).TrimEnd('?').TrimEnd().Length)));
+            }
             if (report && type != null && !IsBuiltInTypeName(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
             {
                 Report(value.ToSource(new TextSpan(start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length), type.Length)),

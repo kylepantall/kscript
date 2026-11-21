@@ -35,7 +35,56 @@ namespace KScript.Language.Analysis
         }
 
         private MarkupElement TypeElementNamed(string name) =>
-            name == null ? null : result.Markup.DescendantElements().FirstOrDefault(e => IsKScriptElementName(e, "type") && e.GetAttributeValue("name")?.Trim().TrimStart('$') == name);
+            name == null ? null : TypeElementIn(result.Markup, name) ?? ImportedTypeElement(name);
+
+        private MarkupElement TypeElementIn(MarkupDocument doc, string name) =>
+            doc.DescendantElements().FirstOrDefault(e => IsKScriptElementName(e, "type") && e.GetAttributeValue("name")?.Trim().TrimStart('$') == name);
+
+        /// <summary>The parsed files this one imports, by path, for the types declared in them.</summary>
+        private Dictionary<string, MarkupDocument> importedMarkup;
+
+        /// <summary>
+        /// A &lt;type&gt; declared in an imported file, so a type made with kscript make native (<c>type Sku with [string]</c>
+        /// in types/sku.kscript) reads raw values and checks literals in the files that import it, as it does in its own file.
+        /// The bases it is built on are found in the imported files too.
+        /// </summary>
+        private MarkupElement ImportedTypeElement(string name)
+        {
+            importedMarkup ??= new Dictionary<string, MarkupDocument>(StringComparer.Ordinal);
+            foreach (string path in result.Symbols.Where(s => s.SourcePath != null).Select(s => s.SourcePath).Distinct())
+            {
+                if (!importedMarkup.TryGetValue(path, out MarkupDocument doc))
+                {
+                    string text = files.ReadText(path);
+                    doc = text == null ? null : MarkupParser.Parse(new SourceText(text), MarkupParser.KindFromPath(path), path);
+                    importedMarkup[path] = doc;
+                }
+                MarkupElement found = doc == null ? null : TypeElementIn(doc, name);
+                if (found != null)
+                {
+                    return found;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// A type named where a value is declared (<c>sku: Sku</c>, <c>fn f(p: Percent)</c>) uses the import that brought it
+        /// in, so the import isn't reported as unused and go to definition works on the name.
+        /// </summary>
+        private void ReferenceImportedType(string text, TextSpan span)
+        {
+            string name = TypeInference.WithoutTypeArguments(text ?? string.Empty).Trim().TrimEnd('?').TrimEnd();
+            while (name.EndsWith("[]", StringComparison.Ordinal))
+            {
+                name = name.Substring(0, name.Length - 2).TrimEnd();
+            }
+            Symbol symbol = result.Symbols.FirstOrDefault(s => s.SourcePath != null && s.Kind == SymbolKind.Constant && s.Name == name);
+            if (symbol != null)
+            {
+                result.References.Add(new SymbolReference(symbol, span, false, false));
+            }
+        }
 
         private static bool IsBuiltInTypeName(string name) =>
             BuiltInTypes.Contains(name, StringComparer.OrdinalIgnoreCase) || SemanticTypeNames.Contains(name, StringComparer.OrdinalIgnoreCase);
