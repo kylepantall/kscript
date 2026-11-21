@@ -40,6 +40,7 @@ const diagnostics = new Promise((resolve) => {
 
   const diags = await diagnostics;
   assert.ok(diags.some((d) => d.code === 'KS4001' && /Did you mean \$total/.test(d.message)), 'undefined variable diagnostic: ' + JSON.stringify(diags));
+  assert.ok(diags.every((d) => d.codeDescription.href.endsWith('/docs/errors.md#' + d.code.toLowerCase())), 'each code links to its explanation');
 
   const completion = await connection.sendRequest('textDocument/completion', { textDocument: { uri }, position: { line: 3, character: 18 } });
   assert.ok(completion.items.some((i) => i.label === 'round'), 'number methods offered after ->');

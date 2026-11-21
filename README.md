@@ -226,6 +226,7 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
 - [Coding agents](docs/agents.md): `kscript agents`, AGENTS.md, agent doc tags and `kscript check --format json`
 - [Standards](docs/standards.md): shareable lint and format standards, `kscript:recommended` and `kscript check --print-config`
+- [Error codes](docs/errors.md): what each `KS` code means and how to fix it
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI
 - [Roadmap](docs/roadmap.md): what's planned next, such as compiling KScript to TypeScript

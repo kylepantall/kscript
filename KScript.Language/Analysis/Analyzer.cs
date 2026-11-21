@@ -52,6 +52,7 @@ namespace KScript.Language.Analysis
             DocumentKind documentKind = kind ?? MarkupParser.KindFromPath(path);
             Analyzer analyzer = RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog));
             analyzer.CheckUnused(projectWide);
+            analyzer.SpeakCode();
             return analyzer.result;
         }
 
@@ -817,7 +818,13 @@ namespace KScript.Language.Analysis
 
         private void ReportUnknownElement(MarkupElement e)
         {
-            RetiredInfo retired = catalog.GetRetiredElement(e.Name);
+            if (IsCode && ReportHabit(e))
+            {
+                return;
+            }
+
+            // KScript 1 was XML only, so a .kscript file never holds one of its elements: there the word is just unknown.
+            RetiredInfo retired = IsCode ? null : catalog.GetRetiredElement(e.Name);
             if (retired != null)
             {
                 List<QuickFix> fixes = new List<QuickFix>();
@@ -832,18 +839,20 @@ namespace KScript.Language.Analysis
             IEnumerable<string> candidates = catalog.Elements.Where(x => x.Context.HasFlag(ElementContext.Script)).Select(x => x.Name);
             string suggestion = Suggestions.Closest(e.Name, candidates);
             Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownElement,
-                $"Unknown element <{e.Name}>." + (suggestion != null ? $" Did you mean <{suggestion}>?" : string.Empty),
+                IsCode
+                    ? $"Unknown statement '{e.Name}'." + (suggestion != null ? $" Did you mean {suggestion}?" : string.Empty)
+                    : $"Unknown element <{e.Name}>." + (suggestion != null ? $" Did you mean <{suggestion}>?" : string.Empty),
                 suggestion != null ? new[] { RenameElementFix(e, suggestion) } : null);
         }
 
-        private static QuickFix RenameElementFix(MarkupElement e, string name)
+        private QuickFix RenameElementFix(MarkupElement e, string name)
         {
             List<TextChange> changes = new List<TextChange> { new TextChange(e.NameSpan, name) };
             if (e.EndNameSpan.HasValue)
             {
                 changes.Add(new TextChange(e.EndNameSpan.Value, name));
             }
-            return new QuickFix($"Change to <{name}>", changes.ToArray());
+            return new QuickFix(IsCode ? $"Change to {name}" : $"Change to <{name}>", changes.ToArray());
         }
 
         private void CheckComponent(MarkupElement e, bool required)
@@ -974,7 +983,9 @@ namespace KScript.Language.Analysis
                 if (!ok)
                 {
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
-                        $"<{e.Name}> must be inside {KScript.Runtime.Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.");
+                        IsCode
+                            ? $"'{e.Name}' only works inside {KScript.Runtime.Values.OrList(info.MustBeInside.ToList())}."
+                            : $"<{e.Name}> must be inside {KScript.Runtime.Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.");
                 }
             }
 

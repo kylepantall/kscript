@@ -103,9 +103,10 @@ namespace KScript.Language.Tests
         {
             Assert.Contains("upper", Labels("<let name=\"x\" value=\"null\" />\n<set name=\"x\" value=\"'a'\" />\n<echo>{ $x->‸ }</echo>"));
             Assert.Contains("upper", Labels("<let name=\"x\" value=\"null\" />\n<set>x = 'a'</set>\n<echo>{ $x->‸ }</echo>"));
-            // A known type isn't replaced.
+            // A known type isn't replaced by another one: from then on the variable could hold either, so nothing is claimed.
             DocumentAnalysis a = Open("<let name=\"n\" value=\"1\" />\n<set name=\"n\" value=\"'a'\" />");
-            Assert.Equal("number", Named(a, "n").Shape.Display());
+            Assert.True(Named(a, "n").Shape.IsVague);
+            Assert.Equal("number", Named(Open("<let name=\"n\" value=\"1\" />\n<set name=\"n\" value=\"2\" />"), "n").Shape.Display());
         }
 
         [Fact]

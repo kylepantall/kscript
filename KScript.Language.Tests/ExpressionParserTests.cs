@@ -85,7 +85,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("$a +", "Expected an expression.")]
+        [InlineData("$a +", "Expected an expression after '+'.")]
         [InlineData("($a + 1", "Expected ')'")]
         [InlineData("@f($a", "never closed")]
         [InlineData("[1, 2", "Expected ']'")]
