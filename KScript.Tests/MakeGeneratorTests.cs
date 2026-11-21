@@ -359,7 +359,7 @@ public sealed class MakeGeneratorTests : IDisposable
               // Rules: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
             }
 
-            """, Read(app, "types/percent.kscript"));
+            """.Replace("\r\n", "\n"), Read(app, "types/percent.kscript"));
         Assert.Contains("  not: [@admin, @root]\n", Read(app, "types/username.kscript"));
         Assert.Contains("  one_of: ['gold', 'silver']\n", Read(app, "types/tier.kscript"));
         Assert.Contains("  one_of: [1, 2, 3]\n", Read(app, "types/level.kscript"));
