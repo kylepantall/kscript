@@ -249,7 +249,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void EveryCodeIsExplainedInTheDocs()
         {
-            string docs = File.ReadAllText(Path.Combine(FormatterTests.RepoRoot(), "docs", "errors.md"));
+            string docs = File.ReadAllText(Path.Combine(FormatterTests.RepoRoot(), "docs", "errors.md")).Replace("\r\n", "\n");
             foreach (System.Reflection.FieldInfo field in typeof(DiagnosticCodes).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
             {
                 string code = (string)field.GetValue(null);
