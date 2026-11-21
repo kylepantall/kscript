@@ -328,20 +328,27 @@ namespace KScript.Queueing
                     string id = name.Length > 18 ? name.Substring(18, name.Length - 23) : name;
                     string claimed = Path.Combine(RunningFolder, id + ".json");
                     Directory.CreateDirectory(RunningFolder);
+                    // Creating the claim file is what decides which worker gets the job: only one CreateNew succeeds,
+                    // on every system. (A rename alone isn't enough on Windows.)
+                    if (!TryClaim(id, claimed)) continue;
                     try
                     {
-                        // Only one worker's move succeeds; the others go on to the next file.
                         File.Move(file, claimed);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
+                        // Another worker ran it and finished, or the file is busy: let it go.
+                        DropClaim(id);
                         continue;
                     }
+                    // A move that had to copy can leave the original behind while another worker reads it.
+                    if (File.Exists(file)) Retrying(() => File.Delete(file));
                     string text = ReadText(claimed);
                     if (text == null)
                     {
                         // Still busy: put it back for later.
                         Retrying(() => File.Move(claimed, file, overwrite: true));
+                        DropClaim(id);
                         continue;
                     }
                     QueuedJob job = Parse(text);
@@ -350,6 +357,7 @@ namespace KScript.Queueing
                         // Not a job file: put it with the failed ones so it doesn't block the queue.
                         Directory.CreateDirectory(FailedFolder);
                         Retrying(() => File.Move(claimed, Path.Combine(FailedFolder, "unreadable-" + id + ".json"), overwrite: true));
+                        DropClaim(id);
                         continue;
                     }
                     job.Attempts++;
@@ -382,13 +390,49 @@ namespace KScript.Queueing
                 job.AvailableAt = now;
                 Push(job);
                 File.Delete(recovered);
+                DropClaim(job.Id);
             }
         }
 
         public void Complete(QueuedJob job)
         {
             string file = Path.Combine(RunningFolder, job.Id + ".json");
-            if (File.Exists(file)) File.Delete(file);
+            Retrying(() => File.Delete(file));
+            DropClaim(job.Id);
+        }
+
+        private string ClaimFile(string id) => Path.Combine(RunningFolder, id + ".claim");
+
+        /// <summary>
+        /// Takes the job with this id for this worker. A claim left by a worker that stopped before it moved the job
+        /// (so there is no running file) is taken over after five minutes.
+        /// </summary>
+        private bool TryClaim(string id, string runningFile)
+        {
+            string claim = ClaimFile(id);
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                try
+                {
+                    using (new FileStream(claim, FileMode.CreateNew, FileAccess.Write))
+                    {
+                    }
+                    return true;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    bool stale = !File.Exists(runningFile) && File.Exists(claim) && File.GetLastWriteTimeUtc(claim) < DateTime.UtcNow.AddMinutes(-5);
+                    if (!stale) return false;
+                    DropClaim(id);
+                }
+            }
+            return false;
+        }
+
+        private void DropClaim(string id)
+        {
+            string claim = ClaimFile(id);
+            Retrying(() => File.Delete(claim));
         }
 
         public void Release(QueuedJob job)

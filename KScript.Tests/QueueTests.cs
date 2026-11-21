@@ -467,6 +467,23 @@ public sealed class QueueTests : StorageFixture
     }
 
     [Fact]
+    public void AClaimedJobIsLeftAloneUntilItsClaimIsStale()
+    {
+        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 6, email: 'z@example.com')");
+        var driver = (FileQueueDriver)Driver();
+        string id = driver.Waiting("mail")[0].Id;
+        string claim = Path.Combine(driver.Folder, "running", id + ".claim");
+        Directory.CreateDirectory(Path.GetDirectoryName(claim));
+        File.WriteAllText(claim, string.Empty);
+        Assert.Null(driver.Reserve(new[] { "mail" }, now));
+        File.SetLastWriteTimeUtc(claim, DateTime.UtcNow.AddMinutes(-10));
+        QueuedJob job = driver.Reserve(new[] { "mail" }, now);
+        Assert.Equal(id, job.Id);
+        driver.Complete(job);
+        Assert.False(File.Exists(claim));
+    }
+
+    [Fact]
     public void TheFileDriverLocksUniqueKeys()
     {
         var driver = new FileQueueDriver("x", Path.Combine(Root, "locks"));
