@@ -254,7 +254,7 @@ namespace KScript.Terminal
         /// <summary>Writes styled output through the host (so &lt;capture&gt; and tests see it), coloured when the host may.</summary>
         private static void Write(ElementRun run, Action<CliOutput> write, bool error = false)
         {
-            var text = new StringWriter();
+            var text = new StringWriter { NewLine = run.Host.Out.NewLine };
             int? width = null; // COLUMNS, or 80, when the host isn't a terminal
             if (run.Host.IsInteractive)
             {
