@@ -26,10 +26,10 @@ The [samples/documents](https://github.com/kylepantall/kscript/tree/master/sampl
 
 ## Saving
 
-`to:` saves the document when the block ends. The extension picks the format, and several paths separated by commas save several formats:
+`to:` saves the document when the block ends. The extension picks the format, and a list of paths saves several formats:
 
 ```kscript
-KScript.Document(title: "Notes", to: "notes.pdf, notes.docx, notes.tex") {
+KScript.Document(title: "Notes", to: [notes.pdf, notes.docx, notes.tex]) {
   Paragraph "Saved three ways."
 }
 ```
