@@ -20,6 +20,7 @@ public sealed class QueueTests : StorageFixture
 
     public QueueTests()
     {
+        jobWriter = TextWriter.Synchronized(jobOutput);
         QueueRuntime.Clock = () => now;
         QueueContext.ForgetProjects();
         UseProject("{ \"name\": \"" + app + "\" }");
@@ -99,11 +100,16 @@ public sealed class QueueTests : StorageFixture
         return log.ToString();
     }
 
+    /// <summary>
+    /// A host for one job attempt. Every host shares one synchronized writer: a wrapper per host would give each
+    /// worker thread its own lock, and threads writing to the StringWriter at once lose output.
+    /// </summary>
     private KScriptHost JobHost()
     {
-        TextWriter writer = TextWriter.Synchronized(jobOutput);
-        return new KScriptHost(writer, writer, new StringReader(string.Empty));
+        return new KScriptHost(jobWriter, jobWriter, new StringReader(string.Empty));
     }
+
+    private readonly TextWriter jobWriter;
 
     private string JobOutput()
     {
@@ -505,6 +511,10 @@ public sealed class QueueTests : StorageFixture
         string output = JobOutput();
         List<string> ran = System.Text.RegularExpressions.Regex.Matches(output, @"n\d+").Select(m => m.Value).ToList();
         Assert.True(ran.Count == 20 && ran.Distinct().Count() == 20, output);
+        IQueueDriver driver = Driver();
+        Assert.Empty(driver.Waiting(null));
+        Assert.Empty(driver.Running());
+        Assert.Empty(driver.Failed());
     }
 
     [Fact]
