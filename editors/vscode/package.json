@@ -152,6 +152,11 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Draw a thin line between the top-level blocks of a script (functions, loops and comment-headed sections), like cells in a notebook."
+        },
+        "kscript.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show **Run** above a script and **Run test** above each test."
         }
       }
     },
@@ -172,6 +177,12 @@
         "category": "KScript"
       },
       {
+        "command": "kscript.run",
+        "title": "Run Script",
+        "category": "KScript",
+        "icon": "$(play)"
+      },
+      {
         "command": "kscript.runTests",
         "title": "Run Tests",
         "category": "KScript"
@@ -181,6 +192,36 @@
         "title": "Run Tests in This File",
         "category": "KScript",
         "icon": "$(beaker)"
+      },
+      {
+        "command": "kscript.runTest",
+        "title": "Run Test",
+        "category": "KScript"
+      },
+      {
+        "command": "kscript.serve",
+        "title": "Serve Site",
+        "category": "KScript"
+      },
+      {
+        "command": "kscript.check",
+        "title": "Check Project",
+        "category": "KScript"
+      },
+      {
+        "command": "kscript.formatProject",
+        "title": "Format Project",
+        "category": "KScript"
+      },
+      {
+        "command": "kscript.newProject",
+        "title": "New Project…",
+        "category": "KScript"
+      },
+      {
+        "command": "kscript.openDocs",
+        "title": "Open Docs",
+        "category": "KScript"
       }
     ],
     "jsonValidation": [
@@ -189,7 +230,10 @@
         "url": "./schemas/kscript.schema.json"
       },
       {
-        "fileMatch": ["kscript-standard.json", "*.kscript-standard.json"],
+        "fileMatch": [
+          "kscript-standard.json",
+          "*.kscript-standard.json"
+        ],
         "url": "./schemas/kscript-standard.schema.json"
       }
     ],
@@ -198,10 +242,20 @@
         "key": "enter",
         "command": "kscript.onEnter",
         "when": "editorTextFocus && editorLangId == kscript-code && !editorReadonly && !editorHasMultipleSelections && !suggestWidgetVisible && !inlineSuggestionVisible && !inSnippetMode && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualLine' && vim.mode != 'VisualBlock'"
+      },
+      {
+        "key": "f5",
+        "command": "kscript.run",
+        "when": "editorTextFocus && (editorLangId == kscript || editorLangId == kscript-code) && !inDebugMode"
       }
     ],
     "menus": {
       "editor/title/run": [
+        {
+          "command": "kscript.run",
+          "when": "(editorLangId == kscript || editorLangId == kscript-code) && !(resourceFilename =~ /\\.test\\.((ks\\.)?xml|kscript)$/)",
+          "group": "navigation"
+        },
         {
           "command": "kscript.runTestsInFile",
           "when": "resourceFilename =~ /\\.test\\.((ks\\.)?xml|kscript)$/",
@@ -212,6 +266,14 @@
         {
           "command": "kscript.onEnter",
           "when": "false"
+        },
+        {
+          "command": "kscript.runTest",
+          "when": "false"
+        },
+        {
+          "command": "kscript.run",
+          "when": "(editorLangId == kscript || editorLangId == kscript-code)"
         },
         {
           "command": "kscript.runTestsInFile",
@@ -229,13 +291,19 @@
           "command": {
             "type": "string",
             "enum": [
-              "test"
+              "run",
+              "test",
+              "serve",
+              "check",
+              "fmt",
+              "docs",
+              "make"
             ],
             "description": "The kscript command to run."
           },
           "file": {
             "type": "string",
-            "description": "A test file to run, instead of every test in the folder."
+            "description": "The script to run, or a test file to run instead of every test in the folder."
           }
         }
       }
@@ -329,10 +397,48 @@
           "highContrastLight": "contrastBorder"
         }
       }
+    ],
+    "problemMatchers": [
+      {
+        "name": "kscript-run",
+        "label": "KScript: the error a script stopped with",
+        "owner": "kscript-run",
+        "source": "kscript",
+        "applyTo": "allDocuments",
+        "fileLocation": "absolute",
+        "severity": "error",
+        "pattern": {
+          "regexp": "ERROR\\s+(?:\\u001b\\[[0-9;]*m\\s*)?(.+?):(\\d+):(\\d+): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      },
+      {
+        "name": "kscript-check",
+        "label": "KScript: problems found by kscript check",
+        "owner": "kscript-check",
+        "source": "kscript",
+        "applyTo": "allDocuments",
+        "fileLocation": [
+          "autoDetect",
+          "${cwd}"
+        ],
+        "pattern": {
+          "regexp": "^(.+)\\((\\d+),(\\d+)\\): (error|warning|info) (KS\\d+): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        }
+      }
     ]
   },
   "scripts": {
-    "check": "node --check extension.js && node --check src/server.js && node --check src/site.js && node --check src/blocks.js && node --check src/watch.js && node --check src/comments.js && node --check src/autoclose.js",
+    "check": "node --check extension.js && node --check src/server.js && node --check src/site.js && node --check src/blocks.js && node --check src/watch.js && node --check src/comments.js && node --check src/autoclose.js && node --check src/run.js && node --check src/commands.js && node --check src/testing.js",
     "test": "node --test test/unit/*.test.js",
     "smoke": "node test/smoke.js",
     "package": "vsce package --no-dependencies --skip-license -o kscript-vscode.vsix",

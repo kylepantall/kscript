@@ -47,6 +47,16 @@ Shapes drive member completion, hovers (`TypeShape.Pretty`), inlay hints (`textD
 details. The server also answers `textDocument/foldingRange` and its own `kscript/blocks` request, which the VS Code
 extension uses to draw notebook-style lines between a script's top-level blocks.
 
+For running code from the editor, `kscript/tests` lists the tests and `describe` groups of a test file (open or on
+disk), each with its full name (`group › test`, as `kscript test --filter` matches it) and range. `textDocument/codeLens`
+puts "Run" above a script's first statement and "Run test" above each test. The lenses call the editor commands
+`kscript.run`, `kscript.runTest` and `kscript.runTestsInFile` with the document's URI first, so the server only offers
+them when the editor sends `initializationOptions: { "codeLens": true }` to say it has those commands. A new, unsaved
+`.kscript` document (language id `kscript-code`) is parsed as code even though it has no file name yet.
+
+An editor that runs a script can set `KSCRIPT_ERROR_PATHS=full`, and the error a script stops with then names its file
+with the whole path (`ERROR  /work/app/hello.kscript:3:5: ...`) so the editor can link to the line.
+
 The parsers never throw and keep exact source positions (including through `&lt;` entities), so every feature works
 on half-typed code. Entry points: `ExpressionParser.ParseExpression`, `TemplateParser.Parse`, `MarkupParser.Parse`
 and `Analyzer.Analyze`.

@@ -92,6 +92,22 @@ namespace KScript.Language.Tests
         #endregion
 
         [Fact]
+        public void TheTestListReadsTestFilesThatAreNotOpen()
+        {
+            Memory files = new Memory();
+            string path = Path.Combine(Path.GetDirectoryName(Main), "cart.test.kscript");
+            files.Files[path] = "test(name: adds an item) {\n  expect(value: 1, equals: 1)\n}\n";
+            var (_, output) = Converse(files,
+                Init(),
+                Req(2, "kscript/tests", Doc(Workspace.PathToUri(path))),
+                Req(3, "kscript/tests", Doc(Workspace.PathToUri(path + ".missing"))),
+                Req(4, "kscript/tests", Doc("untitled:Untitled-1")));
+            Assert.Equal("adds an item", Assert.Single(Reply(output, 2)["result"]["tests"].AsArray())["fullName"].GetValue<string>());
+            Assert.Empty(Reply(output, 3)["result"]["tests"].AsArray());
+            Assert.Empty(Reply(output, 4)["result"]["tests"].AsArray());
+        }
+
+        [Fact]
         public void SurvivesBadInput()
         {
             Memory files = new Memory();

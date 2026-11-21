@@ -217,6 +217,18 @@ public sealed class CommandLineTests : IDisposable
         var failed = Kscript(bad);
         Assert.Equal(3, failed.Code);
         Assert.Contains("boom", failed.Err);
+        Assert.DoesNotContain(dir, failed.Err);
+
+        // An editor asks for the whole path of the failing line, to link to it.
+        Environment.SetEnvironmentVariable(CommandLine.ErrorPathsVariable, "full");
+        try
+        {
+            Assert.Contains($"ERROR  {bad}:1:10: ", Kscript(bad).Err);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(CommandLine.ErrorPathsVariable, null);
+        }
 
         string ok = Write("loop.ks.xml", "<kscript><let name=\"n\" value=\"0\" /><while test=\"true\"><set name=\"n\" value=\"$n + 1\" /></while></kscript>");
         var stopped = Run(new[] { ok }, (o, e) => new CommandLine { Cancellation = new CancellationToken(true) });

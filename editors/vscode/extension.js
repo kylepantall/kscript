@@ -9,6 +9,8 @@ const { registerBlockDividers } = require('./src/blocks');
 const { watchedPath, watchBinary } = require('./src/watch');
 const { commentEnter } = require('./src/comments');
 const { autoCloseChange } = require('./src/autoclose');
+const { registerCommands } = require('./src/commands');
+const { registerTestExplorer } = require('./src/testing');
 
 const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-needed';
 
@@ -77,8 +79,7 @@ async function startClient(context) {
 
   const documentSelector = [
     { scheme: 'file', language: 'kscript' }, { scheme: 'untitled', language: 'kscript' },
-    // .kscript files only on disk: the server picks the parser from the file name, which an untitled file lacks.
-    { scheme: 'file', language: 'kscript-code' },
+    { scheme: 'file', language: 'kscript-code' }, { scheme: 'untitled', language: 'kscript-code' },
   ];
   if (await pagesEnabled()) {
     // Pages served by `kscript serve`: HTML and Markdown with KScript elements inline.
@@ -88,6 +89,8 @@ async function startClient(context) {
   client = new LanguageClient('kscript', 'KScript', serverOptions, {
     documentSelector,
     outputChannel: output,
+    // The server only offers the Run and Run test lenses to an editor that says it can run them.
+    initializationOptions: { codeLens: config().get('codeLens.enabled', true) },
     synchronize: { fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{xml,ks,kscript,html,md,json}') },
   });
   client.onDidChangeState((e) => {
@@ -173,43 +176,19 @@ async function activate(context) {
       if (close) editor.insertSnippet(new vscode.SnippetString(`$0</${close.name}>`), event.document.positionAt(close.offset), { undoStopBefore: false, undoStopAfter: false });
     }),
     vscode.commands.registerCommand('kscript.showSetup', () => vscode.env.openExternal(vscode.Uri.parse(INSTALL_URL))),
-    vscode.commands.registerCommand('kscript.runTests', () => runTests()),
-    vscode.commands.registerCommand('kscript.runTestsInFile', (uri) => {
-      const file = uri && uri.fsPath ? uri : vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri;
-      if (!file) return vscode.window.showInformationMessage('Open a .test.ks.xml or .test.kscript file to run its tests.');
-      return runTests(file);
-    }),
     vscode.workspace.onDidChangeConfiguration(async (e) => {
-      if (e.affectsConfiguration('kscript.server') || e.affectsConfiguration('kscript.pages')) {
+      if (e.affectsConfiguration('kscript.server') || e.affectsConfiguration('kscript.pages') || e.affectsConfiguration('kscript.codeLens')) {
         await stopClient();
         await startClient(context);
       }
     }),
   );
 
-  await startClient(context);
-}
+  const kscript = () => resolveServer(config().get('server.path', ''), []);
+  registerCommands(vscode, context, kscript);
+  registerTestExplorer(vscode, context, kscript, () => client);
 
-/** Runs `kscript test` as a task: the whole workspace folder, or one test file. */
-async function runTests(file) {
-  const server = resolveServer(config().get('server.path', ''), []);
-  if (server.error) {
-    vscode.window.showWarningMessage(`${server.error} Install KScript to run tests.`);
-    return;
-  }
-  const folder = (file && vscode.workspace.getWorkspaceFolder(file)) || (vscode.workspace.workspaceFolders || [])[0];
-  if (file) {
-    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === file.toString());
-    if (doc && doc.isDirty) await doc.save();
-  }
-  // A process execution passes each argument as is, so paths with spaces work in every shell.
-  const args = [...server.args, 'test', ...(file ? [file.fsPath] : [])];
-  const execution = new vscode.ProcessExecution(server.command, args, folder ? { cwd: folder.uri.fsPath } : {});
-  const task = new vscode.Task({ type: 'kscript', command: 'test', file: file ? file.fsPath : undefined },
-    folder || vscode.TaskScope.Workspace, file ? `test ${vscode.workspace.asRelativePath(file)}` : 'test', 'kscript', execution);
-  task.group = vscode.TaskGroup.Test;
-  task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, clear: true };
-  await vscode.tasks.executeTask(task);
+  await startClient(context);
 }
 
 function deactivate() {

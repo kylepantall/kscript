@@ -458,6 +458,101 @@ namespace KScript.Language.Tests
             string formatted = text.Substring(0, start) + edit["newText"].GetValue<string>() + text.Substring(end);
             Assert.Equal("x = 1\nif $x > 0 {\n  echo \"hi\"\n}\n", formatted);
         }
+
+        private void OpenAs(string languageId, string text, string uri) => Notify("textDocument/didOpen", new JsonObject
+        {
+            ["textDocument"] = new JsonObject { ["uri"] = uri, ["languageId"] = languageId, ["version"] = 1, ["text"] = text },
+        });
+
+        [Fact]
+        public void LensesAreOnlyOfferedToEditorsThatRunThem()
+        {
+            Assert.False(Initialize()["result"]["capabilities"].AsObject().ContainsKey("codeLensProvider"));
+        }
+
+        [Fact]
+        public void AScriptGetsARunLens()
+        {
+            JsonObject response = Request("initialize", new JsonObject
+            {
+                ["processId"] = null, ["rootUri"] = null, ["capabilities"] = new JsonObject(), ["initializationOptions"] = new JsonObject { ["codeLens"] = true },
+            });
+            Assert.True(response["result"]["capabilities"].AsObject().ContainsKey("codeLensProvider"));
+            Notify("initialized", new JsonObject());
+
+            const string uri = "file:///work/hello.kscript";
+            OpenAs("kscript-code", "// Says hello\nname = 'Joan'\necho \"Hello $name\"\n", uri);
+            JsonObject lens = Assert.Single(Request("textDocument/codeLens", Doc(uri))["result"].AsArray()).AsObject();
+            Assert.Equal("▶ Run", lens["command"]["title"].GetValue<string>());
+            Assert.Equal("kscript.run", lens["command"]["command"].GetValue<string>());
+            Assert.Equal(uri, Assert.Single(lens["command"]["arguments"].AsArray()).GetValue<string>());
+            Assert.Equal(1, lens["range"]["start"]["line"].GetValue<int>());
+
+            // Nothing to run: no lens. Pages get none either.
+            OpenAs("kscript-code", "// Nothing yet\n", "file:///work/empty.kscript");
+            Assert.Empty(Request("textDocument/codeLens", Doc("file:///work/empty.kscript"))["result"].AsArray());
+            OpenAs("html", "<p>{ 1 + 1 }</p>", "file:///work/page.html");
+            Assert.Empty(Request("textDocument/codeLens", Doc("file:///work/page.html"))["result"].AsArray());
+            Assert.Empty(Request("textDocument/codeLens", Doc("file:///work/closed.kscript"))["result"].AsArray());
+        }
+
+        [Fact]
+        public void ATestFileListsItsTestsAndGetsALensForEach()
+        {
+            Initialize();
+            const string uri = "file:///work/tests/strings.test.kscript";
+            OpenAs("kscript-code", string.Join("\n",
+                "describe(name: slugify) {",
+                "  test(name: lower-cases words) {",
+                "    expect(value: 'a', equals: 'a')",
+                "  }",
+                "  test(name: slug of '{$case.text}', each: case, in: \"[{ text: 'One' }]\") {",
+                "    expect(value: $case.text, equals: 'One')",
+                "  }",
+                "}",
+                "test(name: on its own) {",
+                "  expect(value: 1, equals: 1)",
+                "}",
+                ""), uri);
+
+            JsonArray tests = Request("kscript/tests", Doc(uri))["result"]["tests"].AsArray();
+            Assert.Equal(new[] { "slugify", "on its own" }, tests.Select(t => t["name"].GetValue<string>()));
+            Assert.True(tests[0]["group"].GetValue<bool>());
+            JsonArray inner = tests[0]["children"].AsArray();
+            Assert.Equal(new[] { "slugify › lower-cases words", "slugify › slug of '{$case.text}'" }, inner.Select(t => t["fullName"].GetValue<string>()));
+            Assert.False(inner[0]["template"].GetValue<bool>());
+            Assert.True(inner[1]["template"].GetValue<bool>());
+            Assert.Equal(1, inner[0]["range"]["start"]["line"].GetValue<int>());
+            Assert.Equal(8, tests[1]["range"]["start"]["line"].GetValue<int>());
+
+            JsonArray lenses = Request("textDocument/codeLens", Doc(uri))["result"].AsArray();
+            Assert.Equal(new[] { "▶ Run all tests in this file", "▶ Run tests", "▶ Run test", "▶ Run test", "▶ Run test" }, lenses.Select(l => l["command"]["title"].GetValue<string>()));
+            Assert.Equal("kscript.runTestsInFile", lenses[0]["command"]["command"].GetValue<string>());
+            Assert.Equal(new[] { "slugify", "slugify › lower-cases words", "slugify › slug of '", "on its own" },
+                lenses.Skip(1).Select(l => l["command"]["arguments"][1].GetValue<string>()));
+
+            // An XML test file works the same way, and a script that isn't a test file has no tests.
+            const string xml = "file:///work/tests/cart.test.ks.xml";
+            Open("<kscript>\n<test name=\"adds\"><expect value=\"1\" equals=\"1\" /></test>\n<test><expect value=\"1\" equals=\"1\" /></test>\n</kscript>", xml);
+            Assert.Equal("adds", Assert.Single(Request("kscript/tests", Doc(xml))["result"]["tests"].AsArray())["name"].GetValue<string>());
+            Open("<kscript><echo>hi</echo></kscript>");
+            Assert.Empty(Request("kscript/tests", Doc())["result"]["tests"].AsArray());
+            Assert.Empty(Request("kscript/tests", Doc("file:///work/closed.test.kscript"))["result"]["tests"].AsArray());
+            OpenAs("kscript-code", "// No tests yet\nx = 1\n", "file:///work/tests/none.test.kscript");
+            Assert.Empty(Request("textDocument/codeLens", Doc("file:///work/tests/none.test.kscript"))["result"].AsArray());
+        }
+
+        [Fact]
+        public void ANewUnsavedKscriptFileIsCheckedAsCode()
+        {
+            Initialize();
+            const string uri = "untitled:Untitled-1";
+            OpenAs("kscript-code", "name = 'Joan'\necho \"Hello $nmae\"\n", uri);
+            JsonObject d = Assert.Single(Diagnostics(uri), x => x["code"].GetValue<string>() == DiagnosticCodes.UndefinedVariable).AsObject();
+            Assert.Contains("Did you mean $name", d["message"].GetValue<string>());
+            JsonArray items = Request("textDocument/completion", At(1, 14, uri))["result"]["items"].AsArray();
+            Assert.Contains(items, i => i["label"].GetValue<string>().TrimStart('$') == "name");
+        }
     }
 
     internal static class JsonExtensions

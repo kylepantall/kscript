@@ -135,7 +135,7 @@ namespace KScript.LanguageServer
             {
                 case "initialize":
                     initialized = true;
-                    return Initialize();
+                    return Initialize(p?["initializationOptions"]?["codeLens"]?.GetValue<bool>() == true);
                 case "initialized":
                 case "$/cancelRequest":
                 case "$/setTrace":
@@ -196,6 +196,8 @@ namespace KScript.LanguageServer
                 case "textDocument/inlayHint": return InlayHints(p);
                 case "textDocument/foldingRange": return FoldingRanges(p);
                 case "kscript/blocks": return Blocks(p);
+                case "kscript/tests": return Tests(p);
+                case "textDocument/codeLens": return CodeLenses(p);
                 case "textDocument/codeAction": return CodeActions(p);
                 case "textDocument/documentLink": return DocumentLinks(p);
                 case "textDocument/formatting": return Formatting(p);
@@ -205,7 +207,21 @@ namespace KScript.LanguageServer
             return null;
         }
 
-        private static JsonObject Initialize() => new JsonObject
+        /// <param name="codeLens">
+        /// True when the editor runs the lens commands (kscript.run, kscript.runTest, kscript.runTestsInFile), as the
+        /// VS Code extension does. Other editors get no lenses, since clicking one would do nothing.
+        /// </param>
+        private static JsonObject Initialize(bool codeLens = false)
+        {
+            JsonObject result = InitializeResult();
+            if (codeLens)
+            {
+                result["capabilities"]["codeLensProvider"] = new JsonObject { ["resolveProvider"] = false };
+            }
+            return result;
+        }
+
+        private static JsonObject InitializeResult() => new JsonObject
         {
             ["capabilities"] = new JsonObject
             {
@@ -259,7 +275,7 @@ namespace KScript.LanguageServer
         /// <summary>Analyzes a document and applies its project's kscript.json lint settings (rule severities, excluded paths).</summary>
         private DocumentAnalysis Analyze(OpenDocument doc)
         {
-            DocumentAnalysis analysis = Analyzer.Analyze(doc.Text, doc.Path, workspace, service.Catalog, doc.Kind);
+            DocumentAnalysis analysis = Analyzer.Analyze(doc.Text, doc.AnalysisPath, workspace, service.Catalog, doc.Kind);
             LintRules.Apply(analysis.Diagnostics, ProjectFor(doc.Path), doc.Path);
             return analysis;
         }
@@ -569,6 +585,62 @@ namespace KScript.LanguageServer
                 }
             }
             return new JsonObject { ["blocks"] = blocks };
+        }
+
+        private JsonNode CodeLenses(JsonNode p)
+        {
+            DocumentAnalysis a = Analysis(p, out OpenDocument doc);
+            JsonArray lenses = new JsonArray();
+            if (a != null)
+            {
+                foreach (CodeLens lens in service.GetCodeLenses(a))
+                {
+                    JsonArray arguments = new JsonArray { doc.Uri };
+                    foreach (string argument in lens.Arguments)
+                    {
+                        arguments.Add(argument);
+                    }
+                    lenses.Add((JsonNode)new JsonObject
+                    {
+                        ["range"] = Range(a.Source, lens.Span),
+                        ["command"] = new JsonObject { ["title"] = lens.Title, ["command"] = lens.Command, ["arguments"] = arguments },
+                    });
+                }
+            }
+            return lenses;
+        }
+
+        /// <summary>kscript/tests: the tests and groups of a test file, for the editor's test list.</summary>
+        private JsonNode Tests(JsonNode p)
+        {
+            DocumentAnalysis a = Analysis(p, out _) ?? AnalyzeClosed(p?["textDocument"]?["uri"]?.GetValue<string>());
+            return new JsonObject { ["tests"] = a == null ? new JsonArray() : TestsJson(a, service.GetTests(a)) };
+        }
+
+        /// <summary>A test file that isn't open in the editor, read from disk: the test list covers the whole project.</summary>
+        private DocumentAnalysis AnalyzeClosed(string uri)
+        {
+            string path = Workspace.UriToPath(uri);
+            return path != null && workspace.FileExists(path) ? Analyzer.AnalyzeFile(workspace.ReadText(path), path, workspace, service.Catalog) : null;
+        }
+
+        private static JsonArray TestsJson(DocumentAnalysis a, List<TestItem> tests)
+        {
+            JsonArray array = new JsonArray();
+            foreach (TestItem t in tests)
+            {
+                array.Add((JsonNode)new JsonObject
+                {
+                    ["name"] = t.Name,
+                    ["fullName"] = t.FullName,
+                    ["group"] = t.IsGroup,
+                    ["template"] = t.IsTemplate,
+                    ["range"] = Range(a.Source, t.Span),
+                    ["selectionRange"] = Range(a.Source, t.NameSpan),
+                    ["children"] = TestsJson(a, t.Children),
+                });
+            }
+            return array;
         }
 
         private JsonNode InlayHints(JsonNode p)
