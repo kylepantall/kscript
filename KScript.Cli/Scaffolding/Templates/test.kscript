@@ -12,6 +12,7 @@ hint: Run it: kscript test {{ paths.tests }}/{{ dir }}{{ kebab }}.test{{ ext }}
 // Bring in what you're testing, e.g. import "../{{ paths.lib }}/{{ kebab }}{{ ext }}"
 
 describe(name: "{{ title }}") {
+  // TODO: Replace these examples with tests of your own code.
   test(name: "adds numbers") {
     expect(value: 1 + 2, equals: 3)
   }
