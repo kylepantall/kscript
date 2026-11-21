@@ -964,7 +964,7 @@ namespace KScript.Language.Analysis
                 if (!ok)
                 {
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
-                        $"<{e.Name}> must be inside {string.Join(" or ", info.MustBeInside.Select(n => "<" + n + ">"))}.");
+                        $"<{e.Name}> must be inside {KScript.Runtime.Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.");
                 }
             }
 

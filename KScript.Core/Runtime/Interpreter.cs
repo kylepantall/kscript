@@ -301,7 +301,7 @@ namespace KScript.Runtime
 
             if (info.MustBeInside != null && info.MustBeInside.Count > 0 && !e.Ancestors().Any(a => info.MustBeInside.Contains(BareName(a.Name))
                     || (info.MustBeInside.Contains("fn") && module.Elements.TryGetValue(BareName(a.Name), out ElementDefinition outer) && outer.Info.IsFunctionBody)))
-                throw Located(new KScriptException($"<{info.Name}> must be inside <{string.Join("> or <", info.MustBeInside)}>.", "Syntax"), module, e.NameSpan.Start);
+                throw Located(new KScriptException($"<{info.Name}> must be inside {Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.", "Syntax"), module, e.NameSpan.Start);
 
             if (def.OwnsContent) return;
 

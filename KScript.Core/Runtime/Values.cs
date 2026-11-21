@@ -382,6 +382,10 @@ namespace KScript.Runtime
             return d[a.Length, b.Length];
         }
 
+        /// <summary>Words as a list for a sentence: "a", "a or b", "a, b or c".</summary>
+        public static string OrList(IReadOnlyList<string> words) =>
+            words.Count <= 1 ? string.Concat(words) : string.Join(", ", words.Take(words.Count - 1)) + " or " + words[words.Count - 1];
+
         /// <summary>The closest of <paramref name="candidates"/> to <paramref name="name"/>, if it is close enough to suggest.</summary>
         public static string Closest(string name, IEnumerable<string> candidates)
         {
