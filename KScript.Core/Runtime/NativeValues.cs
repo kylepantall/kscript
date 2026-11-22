@@ -656,14 +656,43 @@ namespace KScript.Runtime
                 }
                 catch (Exception e) when (e is TimeZoneNotFoundException or InvalidTimeZoneException)
                 {
-                    // Ids are files on Linux and macOS, so europe/london is only found there once Europe/London
-                    // has been looked up. Find it by name without case, so it doesn't depend on what ran before.
-                    zone = TimeZoneInfo.GetSystemTimeZones().FirstOrDefault(z => string.Equals(z.Id, t, StringComparison.OrdinalIgnoreCase));
+                    // An id is found in the case it was written, or not at all on a first lookup: europe/london only
+                    // worked once Europe/London had been looked up. Find it without case, so it doesn't depend on
+                    // what ran before or on the system (Windows lists its own names, so match their IANA names too).
+                    zone = WithoutCase(t);
                     if (zone == null) return No("it isn't an IANA time zone, such as Europe/London");
                 }
                 string id = zone.HasIanaId ? zone.Id : TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out string iana) ? iana : zone.Id;
                 if (!t.Contains('/') && t != "UTC" && id != t) return No($"it isn't an IANA time zone; use {id}");
                 return Ok(new NativeText("timezone", id, new Dictionary<string, object> { ["zone"] = zone }));
+            }
+
+            private static TimeZoneInfo WithoutCase(string id)
+            {
+                foreach (TimeZoneInfo z in TimeZoneInfo.GetSystemTimeZones())
+                {
+                    if (string.Equals(z.Id, id, StringComparison.OrdinalIgnoreCase)) return z;
+                    if (!z.HasIanaId && TimeZoneInfo.TryConvertWindowsIdToIanaId(z.Id, out string iana) && string.Equals(iana, id, StringComparison.OrdinalIgnoreCase)) return z;
+                }
+
+                // A zone the system doesn't list under that name (an alias, or a second city of a Windows zone):
+                // IANA names start each word with a capital, so try it written that way.
+                var sb = new StringBuilder(id.Length);
+                bool start = true;
+                foreach (char c in id)
+                {
+                    sb.Append(start ? char.ToUpperInvariant(c) : char.ToLowerInvariant(c));
+                    start = c == '/' || c == '_' || c == '-';
+                }
+
+                try
+                {
+                    return TimeZoneInfo.FindSystemTimeZoneById(sb.ToString());
+                }
+                catch (Exception e) when (e is TimeZoneNotFoundException or InvalidTimeZoneException)
+                {
+                    return null;
+                }
             }
 
             // ---- time ---------------------------------------------------------------------------------------------
