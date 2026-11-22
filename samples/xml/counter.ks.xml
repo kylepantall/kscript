@@ -1,0 +1,17 @@
+<!--
+  A desktop app: kscript counter.ks.xml opens the window, and
+  kscript compile counter.ks.xml builds it as a program.
+-->
+<KScript.Window title="Counter" width="320" height="220">
+  <let name="count" value="0" />
+
+  <fn name="reset">
+    <set name="count" value="0" />
+  </fn>
+
+  <Text size="32">{$count}</Text>
+  <Row gap="8">
+    <Button variant="primary" on_click="count += 1">Add one</Button>
+    <Button on_click="@reset()">Reset</Button>
+  </Row>
+</KScript.Window>

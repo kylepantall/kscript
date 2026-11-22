@@ -30,7 +30,11 @@ namespace KScript.Language.Analysis
         internal const string RenameTitle = "Rename to ";
 
         private static bool IsRename(Diagnostic d) =>
-            d.Code is DiagnosticCodes.RetiredElement or DiagnosticCodes.RetiredAttribute && d.Fixes[0].Title.StartsWith(RenameTitle, StringComparison.Ordinal);
+            (d.Code is DiagnosticCodes.RetiredElement or DiagnosticCodes.RetiredAttribute && d.Fixes[0].Title.StartsWith(RenameTitle, StringComparison.Ordinal))
+            || (d.Code == DiagnosticCodes.InvalidAttributeValue && d.Fixes[0].Title == CodeInBracesTitle);
+
+        /// <summary>The fix for code written in double quotes (<c>on_click: "count += 1"</c>): the same code, in braces.</summary>
+        internal const string CodeInBracesTitle = "Write it in braces";
 
         /// <summary>The text with every safe fix applied, and how many were. Runs until nothing more changes.</summary>
         public static (string Text, int Fixed) Apply(string text, string path, ProjectConfig config = null, Func<Diagnostic, bool> also = null)

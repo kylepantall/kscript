@@ -153,15 +153,15 @@ repo = ```<Repo>
   line or a comma. A match used as a value (`label = match $x { 1 => 'one', _ => 'other' }`) writes its arms the
   same way.
 - `"double quotes"` are text, exactly like XML element text or an attribute value: `{ }` and `$name` interpolate where
-  the element interpolates, and in an expression too (`greeting = "Hello $name"`), where a `{ }` is filled in when it
-  starts with `$` or `@`. `\"` and `\\` are the only escapes (plus a `\` at the end of a line, which joins it to
+  the element interpolates, and in an expression too (`greeting = "Hello $name"`): a `{ }` always holds an expression, and
+  `{{` and `}}` are braces. `\"` and `\\` are the only escapes (plus a `\` at the end of a line, which joins it to
   the next: see [Long strings and blocks of text](#long-strings-and-blocks-of-text)). `'single quotes'` are string literals inside
   expressions and are kept exactly as written.
 - In `name(...)` a value runs to the next `,` or `)` outside brackets; quote it to include a comma. A bare name such
   as `wrap` means `wrap="true"`.
 - A list of names is an array: `Middleware(use: [secure_headers, json_only])`, `Resource(..., only: [index, show])`.
   The XML form writes the same list as text, `use="secure_headers, json_only"`, and `kscript convert` turns one into
-  the other. The old string form (`use: "a, b"`) still works in `.kscript`, with a KS6006 hint to use the array.
+  the other. The string form (`use: "a, b"`) is an error in `.kscript` (KS6006) that `kscript check --fix` rewrites.
 - Comparisons are symbols (`<`, `<=`, `>`, `>=`, `==`, `!=`) and logic is words (`and`, `or`, `not`). The comparison
   words `lt`, `le`, `gt`, `ge`, `eq` and `ne` are the XML spellings: `kscript convert` writes the symbols, and a
   word left in a `.kscript` file is reported (KS6012) with a fix.

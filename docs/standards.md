@@ -37,7 +37,10 @@ standard, build it on top of KScript's, and share it between projects. Each proj
 
 The correctness checks (KS1xxx to KS5xxx: unknown elements, undefined variables, wrong argument counts and so on) are
 always on at their built-in severity. A standard can change them, but it doesn't have to list them. Style rules
-(KS6xxx) are opinions, so they are only on when a standard turns them on. That means:
+(KS6001 to KS6005, KS6007, KS6008, KS6013 and KS6018) are opinions, so they are only on when a standard turns them
+on. The old spellings (KS6006, KS6009 to KS6012 and KS6014) are not opinions: in a `.kscript` file each is an error
+the engine itself refuses to run, and no standard or `lint.rules` entry changes that
+(see [Style](errors.md#style)). That means:
 
 - `"standard": []` uses no standard at all: correctness checks only, style rules off, formatter defaults.
 - A standard of your own that has no `extends` also starts with style rules off. Add
@@ -100,10 +103,11 @@ rule, even one its standard set to `"error"` by code.
 
 ## Fixing what can be fixed
 
-`kscript check --fix [file-or-folder]` applies the fixes that are always safe, then checks what is left. It fixes
-the style rules whose answer is never in doubt: text written as a bare word is put in quotes (KS6009), `yes`/`no`
-become `true`/`false` (KS6011), a list written as text becomes an array (KS6006), and old spellings are replaced by
-the one that is kept (KS6010, KS6012, KS6014). A rule the project turned off in `lint.rules` is not fixed either.
+`kscript check --fix [file-or-folder]` applies the fixes that are always safe, then checks what is left. It rewrites
+every old spelling, which is how a script that no longer runs is brought up to date: text written as a bare word is
+put in quotes (KS6009), `yes`/`no` become `true`/`false` (KS6011), a list written as text becomes an array (KS6006),
+and the other old spellings are replaced by the one that is kept (KS6010, KS6012, KS6014). It also adds the unit to
+a length of time (KS6018). A style rule the project turned off in `lint.rules` is not fixed.
 Other problems keep their quick fixes in the editor and in `kscript check --output json`, where each one comes with
 its exact text edits.
 

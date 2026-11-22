@@ -393,9 +393,14 @@ namespace KScript.Runtime
 
         private void CheckAttributes(Module module, MarkupElement e, ElementInfo info)
         {
+            if (module.IsCode && BareName(info.Name) == "model" && OldSpellings.ModelOptionLines(e, module.Source.Text, info.GetAttribute) is { Lines.Count: > 0 } lines)
+                throw Located(new KScriptException(OldSpellings.ModelOptionsInBrackets(e.GetAttributeValue("name")?.Trim(), lines.Options), "Syntax"), module, lines.Lines[0].NameSpan.Start);
+
             foreach (MarkupAttribute a in e.Attributes)
             {
                 AttributeInfo spec = info.GetAttribute(a.Name);
+                if (module.IsCode && spec != null && OldSpellings.InArgument(e, a, spec, module.Source.Text).FirstOrDefault() is OldSpelling old)
+                    throw Located(new KScriptException(old.Message, "Syntax"), module, old.Span.Start);
                 if (spec == null)
                 {
                     if (Retired.RenamedAttribute(info, a.Name) is RetiredInfo renamed)
@@ -461,14 +466,32 @@ namespace KScript.Runtime
                         _ => ExpressionParser.ParseExpression(text.Value),
                     };
                     module.ParseCache[text] = result;
+                    if (module.IsCode && result.Success && OldSpellings.InExpression(result.Nodes, text.Value, codeFile: true).FirstOrDefault() is OldSpelling found)
+                        module.OldSpellingCache[text] = found;
                 }
             }
+            RefuseOldSpelling(module, text);
             if (!result.Success)
             {
                 SyntaxError error = result.Errors[0];
                 throw Located(new KScriptException(error.Words, "Syntax"), module, text.ToSource(error.Span.Start));
             }
             return result;
+        }
+
+        /// <summary>
+        /// A .kscript file written with an old spelling doesn't run: the error is the one kscript check gives, and
+        /// kscript check --fix rewrites it.
+        /// </summary>
+        private void RefuseOldSpelling(Module module, DecodedText text)
+        {
+            if (!module.IsCode || module.OldSpellingCache.Count == 0) return;
+            OldSpelling found;
+            lock (module.ParseCache)
+            {
+                if (!module.OldSpellingCache.TryGetValue(text, out found)) return;
+            }
+            throw Located(new KScriptException(found.Message, "Syntax"), module, text.ToSource(found.Span.Start));
         }
 
         internal Template GetTemplate(Module module, DecodedText text, bool bareReferences, bool check = false, TextLiterals literals = TextLiterals.None)
@@ -480,8 +503,11 @@ namespace KScript.Runtime
                 {
                     template = TemplateParser.Parse(text.Value, bareReferences, literals);
                     module.TemplateCache[text] = template;
+                    if (module.IsCode && !template.Errors.Any() && OldSpellings.InExpression(template.Expressions.Select(s => s.Node), text.Value, codeFile: true).FirstOrDefault() is OldSpelling found)
+                        module.OldSpellingCache[text] = found;
                 }
             }
+            RefuseOldSpelling(module, text);
             SyntaxError error = template.Errors.FirstOrDefault();
             if (error != null)
             {

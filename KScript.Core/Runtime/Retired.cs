@@ -185,6 +185,7 @@ namespace KScript.Runtime
             ("Figure", "src", "path", null),
             ("Bibliography", "src", "path", null),
             ("type", "sample", "path", null),
+            ("log_provider", "colour", "color", null),
             ("test", "each", null, TestInLoop),
             ("test", "in", null, TestInLoop),
             ("test", "index", null, TestInLoop),

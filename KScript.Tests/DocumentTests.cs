@@ -193,7 +193,7 @@ public sealed class DocumentScriptTests : DocumentFixture
         string output = Run(@"
 import KScript.Document
 rows = [{ name: 'Ada', score: 9.5, team: { city: 'London' } }, { name: 'Alan', score: 12, team: { city: 'Manchester' } }]
-Document(template: paper, title: ""Kitchen Sink"", subtitle: ""All of it"", author: ""Ada Lovelace; Alan Turing"", date: ""1 May 2026"", keywords: ['one', 'two'], header: ""[title] | [author] | [date]"", footer: "" | Page [page] of [pages] | "", into: doc, to: ""out/sink.pdf, out/sink.docx"") {
+Document(template: paper, title: ""Kitchen Sink"", subtitle: ""All of it"", author: ""Ada Lovelace; Alan Turing"", date: ""1 May 2026"", keywords: ['one', 'two'], header: ""[title] | [author] | [date]"", footer: "" | Page [page] of [pages] | "", into: doc, to: ['out/sink.pdf', 'out/sink.docx']) {
   Author(affiliation: ""Analytical Engines"", email: ""ada@example.org"") ""Ada King""
   Abstract ""First paragraph of the abstract.
 
@@ -426,11 +426,11 @@ Document(title: ""Values"", to: [""{ $name }.docx""]) {
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", template: poster) {\n}", "template")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", paper: huge) {\n}", "paper")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", margin: \"\") {\n}", "margin")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", size: big) {\n}", "size: 'big' isn't a length")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", size: \"big\") {\n}", "size: 'big' isn't a length")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", accent: \"#zz\") {\n}", "accent: '#zz' isn't a colour")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"[#nowhere]\"\n}", "nowhere")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"[@nobody]\"\n}", "nobody")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph(id: 'x') \"a\"\n  Paragraph(id: 'x') \"b\"\n}", "Two parts of the document have id: x")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph(id: \"x\") \"a\"\n  Paragraph(id: \"x\") \"b\"\n}", "Two parts of the document have id: x")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Math \"\\frac{1}\"\n}", "In the maths")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"\\( \\nosuch \\)\"\n}", "nosuch")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Figure(path: \"missing.png\")\n}", "missing.png")]

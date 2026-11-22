@@ -755,7 +755,7 @@ namespace KScript.Runtime
             // A field two bases disagree on is fine once this type declares it itself.
             string conflict = conflicts.Keys.FirstOrDefault(f => !seen.Contains(f));
             if (conflict != null) throw run.Error(conflicts[conflict], "with", "Syntax");
-            if (type.Fields.Count == 0) throw run.Error($"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.", null, "Syntax");
+            if (type.Fields.Count == 0) throw run.Error(KScript.Syntax.Markup.CodeArguments.TypeNeedsFields(name), null, "Syntax");
             return type;
         }
 
@@ -967,6 +967,8 @@ namespace KScript.Runtime
                 typeText = text.Substring(colon + 1).Trim();
                 text = text.Substring(0, colon).Trim();
             }
+            if (run.Module.IsCode && KScript.Syntax.Markup.OldSpellings.OptionalIsOnName(text, typeText, codeFile: true) is string onName)
+                throw run.Error(onName, "fields", "Syntax");
             bool optional = text.EndsWith('?');
             string name = optional ? text.Substring(0, text.Length - 1).TrimEnd() : text;
             CheckFieldName(name, run, "fields");
@@ -978,6 +980,8 @@ namespace KScript.Runtime
         {
             // The loader has already checked the name is there.
             string name = e.GetAttributeValue("name").Trim();
+            if (run.Module.IsCode && KScript.Syntax.Markup.OldSpellings.OptionalIsOnName(name, e.GetAttributeValue("type")?.Trim(), codeFile: true) is string onName)
+                throw run.Error(onName, null, "Syntax");
             bool optional = name.EndsWith('?');
             if (optional) name = name.Substring(0, name.Length - 1).TrimEnd();
             CheckFieldName(name, run, null);

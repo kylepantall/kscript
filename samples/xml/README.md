@@ -13,6 +13,7 @@ Each script here has a `.kscript` twin with the same name in [`samples/scripts`]
 | `repos.ks.xml`, `types/` | Typed JSON: data checked against a declared type. |
 | `errors.ks.xml`, `errors/` | Declared error types, thrown and caught by type. |
 | `tests/` | Tests, run by `kscript test`. |
+| `counter.ks.xml` | A desktop app: a window with a number and two buttons. |
 | `site/` | A small site of pages, served by `kscript serve`. |
 
 ```sh

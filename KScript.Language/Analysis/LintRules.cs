@@ -31,6 +31,11 @@ namespace KScript.Language.Analysis
             for (int i = diagnostics.Count - 1; i >= 0; i--)
             {
                 Diagnostic d = diagnostics[i];
+                // An old spelling in a .kscript file is an error the script doesn't run with: no setting changes that.
+                if (d.Severity == DiagnosticSeverity.Error && KScript.Syntax.Markup.OldSpellings.IsOldSpelling(d.Code))
+                {
+                    continue;
+                }
                 string severity = config.SeverityFor(d.Code);
                 if (severity == null && Standards.IsStyleRule(d.Code))
                 {

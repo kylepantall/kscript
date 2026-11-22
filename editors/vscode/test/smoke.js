@@ -90,7 +90,7 @@ const diagnostics = new Promise((resolve) => {
   assert.deepStrictEqual(starterLenses.map((l) => [l.command.title, l.range.start.line]), [['▶ Run', 1], ['1 use', 5]], 'the starter script can be run from its first statement');
 
   const testUri = 'file:///tmp/kscript-smoke/cart.test.kscript';
-  connection.sendNotification('textDocument/didOpen', { textDocument: { uri: testUri, languageId: 'kscript-code', version: 1, text: 'describe(name: cart) {\n  test(name: starts empty) {\n    expect(value: 0, equals: 0)\n  }\n}\n' } });
+  connection.sendNotification('textDocument/didOpen', { textDocument: { uri: testUri, languageId: 'kscript-code', version: 1, text: 'describe(name: "cart") {\n  test(name: "starts empty") {\n    expect(value: 0, equals: 0)\n  }\n}\n' } });
   const tests = await connection.sendRequest('kscript/tests', { textDocument: { uri: testUri } });
   assert.strictEqual(tests.tests[0].children[0].fullName, 'cart › starts empty', 'the tests of a test file');
   const testLenses = await connection.sendRequest('textDocument/codeLens', { textDocument: { uri: testUri } });

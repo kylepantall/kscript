@@ -401,7 +401,7 @@ public sealed class DocsTests
     [Fact]
     public void Playground_gives_KScript_Data_a_database_in_memory_for_each_run()
     {
-        const string code = "import KScript.Data\nmodel Note {\n  body: string\n}\n$db->create_table($Note)\n$Note->create(body: 'hi')\necho $Note->count()\necho $db";
+        const string code = "import KScript.Data\nmodel Note {\n  body: string\n}\n$db->create_table(Note)\nNote->create(body: 'hi')\necho Note->count()\necho $db";
         PlaygroundResult first = Playground.Run(code, "kscript");
         Assert.Null(first.Error);
         Assert.Equal("1\nsqlite database 'main' (memory)\n", first.Output);

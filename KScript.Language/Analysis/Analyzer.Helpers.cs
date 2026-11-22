@@ -552,6 +552,8 @@ namespace KScript.Language.Analysis
         private void Report(TextSpan span, DiagnosticSeverity severity, string code, Wording wording, IReadOnlyList<QuickFix> fixes = null)
         {
             string message = wording?.For(IsCode);
+            // An old spelling is an error in a .kscript file, whatever the rule that found it asked for.
+            if (IsCode && OldSpellings.IsOldSpelling(code)) severity = DiagnosticSeverity.Error;
             if (result.Diagnostics.Any(d => d.Span.Equals(span) && d.Code == code))
             {
                 return;

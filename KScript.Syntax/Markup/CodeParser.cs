@@ -260,6 +260,7 @@ namespace KScript.Syntax.Markup
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
+                case "wait" when StartsPositionalValue(4): ParsePositionalValue(parent, start, "wait", "duration"); return;
                 case "throw": ParseThrow(parent, start); return;
                 case "break":
                 case "continue":
@@ -984,6 +985,44 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary>True at <c>type Name</c> or <c>enum Name</c>: the keyword, then a name (<c>type(...)</c> stays an element).</summary>
+        /// <summary>
+        /// <c>wait(500ms)</c>: a statement with one obvious argument takes it without its name, as <c>exit 1</c> does.
+        /// <c>wait(duration: 500ms)</c> names it, and is read as any statement's arguments are.
+        /// </summary>
+        private bool StartsPositionalValue(int keywordLength)
+        {
+            int p = pos + keywordLength;
+            if (p >= text.Length || text[p] != '(')
+            {
+                return false;
+            }
+            p++;
+            while (p < text.Length && char.IsWhiteSpace(text[p]))
+            {
+                p++;
+            }
+            if (p >= text.Length || text[p] == ')')
+            {
+                return false;
+            }
+            int nameEnd = p;
+            while (nameEnd < text.Length && Lexer.IsIdentChar(text[nameEnd]))
+            {
+                nameEnd++;
+            }
+            if (nameEnd == p || !Lexer.IsIdentStart(text[p]))
+            {
+                return true;
+            }
+            while (nameEnd < text.Length && (text[nameEnd] == ' ' || text[nameEnd] == '\t'))
+            {
+                nameEnd++;
+            }
+            // name: or name = starts a named argument (== is a comparison).
+            bool named = nameEnd < text.Length && (text[nameEnd] == ':' || (text[nameEnd] == '=' && (nameEnd + 1 >= text.Length || text[nameEnd + 1] != '=')));
+            return !named;
+        }
+
         private bool StartsDeclaration(int keywordLength)
         {
             int p = pos + keywordLength;
@@ -1637,6 +1676,34 @@ namespace KScript.Syntax.Markup
             {
                 AddExpressionAttribute(e, attribute, Stop.Line);
             }
+            Finish(e, start);
+        }
+
+        /// <summary><c>wait(500ms)</c>: the one argument of a statement, in its brackets without its name.</summary>
+        private void ParsePositionalValue(MarkupElement parent, int start, string name, string attribute)
+        {
+            MarkupElement e = Begin(parent, name, start);
+            int open = pos++;
+            SkipTrivia(newlines: true);
+            AddExpressionAttribute(e, attribute, Stop.Argument);
+            SkipTrivia(newlines: true);
+            if (Peek(0) == ')')
+            {
+                pos++;
+            }
+            else
+            {
+                Error(new TextSpan(open, 1), DiagnosticCodes.MarkupSyntax, $"{name} takes one value: {name}({attribute}), then ).");
+                while (pos < text.Length && text[pos] != ')' && text[pos] != '\n')
+                {
+                    pos++;
+                }
+                if (Peek(0) == ')')
+                {
+                    pos++;
+                }
+            }
+            e.SelfClosing = true;
             Finish(e, start);
         }
 
@@ -2586,9 +2653,12 @@ namespace KScript.Syntax.Markup
         private void Error(TextSpan span, string code, string message, params QuickFix[] fixes) =>
             document.Diagnostics.Add(new Diagnostic(span, DiagnosticSeverity.Error, code, message, fixes));
 
-        /// <summary>A second spelling the parser still reads (KS6012): says which one is the language's, with the fix.</summary>
+        /// <summary>
+        /// An old spelling (KS6012). It is an error, so the script doesn't run, but the parser reads on as if the
+        /// current one had been written: the rest of the file is still checked and kscript check --fix can rewrite it.
+        /// </summary>
         private void Spelling(TextSpan span, string message, string fixTitle, string replacement) =>
-            document.Diagnostics.Add(new Diagnostic(span, DiagnosticSeverity.Warning, DiagnosticCodes.OneSpelling, message,
+            document.Diagnostics.Add(new Diagnostic(span, DiagnosticSeverity.Error, DiagnosticCodes.OneSpelling, message,
                 new[] { new QuickFix(fixTitle, new TextChange(span, replacement)) }));
 
         #endregion

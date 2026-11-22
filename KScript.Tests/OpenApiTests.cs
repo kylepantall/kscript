@@ -21,8 +21,8 @@ public class OpenApiTests
 
           enum Role { member, admin }
 
-          type NewPerson(fields: "name: string, role?: Role")
-          type Search(fields: "role?: Role, page?: int")
+          type NewPerson(fields: [name: string, role?: Role])
+          type Search(fields: [role?: Role, page?: int])
 
           /// Lists the people.
           /// @returns Person[]

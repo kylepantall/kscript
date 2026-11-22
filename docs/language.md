@@ -27,10 +27,11 @@ Variables belong to the block they are declared in. `{{` and `}}` are literal br
 ```kscript
 greeting = "Hello $name, you have { $count * 2 } points." // filled in
 label = 'Write $name to use a variable.' // kept as written
-route = "/users/{id}" // a { } that doesn't start with $ or @ is plain text
+boxes = "{ 2 * 3 } boxes, { [1, 2]->count() } lists" // a { } always holds an expression
+route = '/users/{id}' // text with braces of its own goes in single quotes
 ```
 
-In a value, braces are only filled in when they start with `$` or `@`, so routes, patterns such as `"\d{3}"` and translation text such as `"Hello {name}"` keep theirs. The text given to `@sql` is the one exception: its `{ }` are sent as parameters, never pasted in (see [Data](data.md)).
+A `{ }` in double quotes always holds an expression, whatever it opens with: a variable, a command, a type (`{ Order->count() }`), a number or a bracketed sum. Text with braces of its own, such as a route (`'/users/{id}'`), a pattern (`'\d{3}'`), CSS or translation text (`'Hello {name}'`), goes in single quotes, or doubles them: `"/users/{{id}}"`. The text given to `@sql` is the one exception: its `{ }` are sent as parameters, never pasted in (see [Data](data.md)).
 
 ## Expressions
 
@@ -304,7 +305,7 @@ echo "{ $day.year } { $day.weekday } { $file.name } { $file.size }"
 
 So `$response.status`, `$file.size`, `$url.host` and `$e.status` are fields, and anything that takes arguments or does work is a method: `$response->json()`, `$file->read_text()`, `$day->format('yyyy')`. A name that answers true or false starts with `is_` or `has_`: `$response.is_ok`, `$ip.is_private`, `$list->is_empty()`, `$map->has(key)`.
 
-A length of time is a duration: a number and a unit with no quotes, such as `500ms`, `30s`, `10m`, `2h`, `1d` or `1w`, joined for more (`1h30m`). Everything that takes a length of time takes one: `wait(duration: 500ms)`, `@api($url, timeout: 30s)`, `$cache->set(key, value, ttl: 10m)`. A plain number is always seconds.
+A length of time is a duration: a number and a unit with no quotes, such as `500ms`, `30s`, `10m`, `2h`, `1d` or `1w`, joined for more (`1h30m`). Everything that takes a length of time takes one: `wait(500ms)`, `@api($url, timeout: 30s)`, `$cache->set(key, value, ttl: 10m)`. A plain number is always seconds.
 
 The editor completes the fields and methods for each type and shows what they do. `$text->json()` and `$value->to_json()` convert to and from JSON.
 

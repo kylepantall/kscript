@@ -250,7 +250,7 @@ public class ErrorTypeTests
     [InlineData("error lower", "start with a capital letter")]
     [InlineData("error NotFound", "NotFound is a built-in error type")]
     [InlineData("error Bad(status: 99)", "isn't an HTTP status")]
-    [InlineData("error Bad(status: abc)", "isn't an HTTP status")]
+    [InlineData("error Bad(status: \"abc\")", "isn't an HTTP status")]
     [InlineData("error Bad { message: string }", "'message' is part of every error")]
     [InlineData("error Bad extends Nope\nthrow Bad()", "extends 'Nope', which isn't an error type. Declare it")]
     [InlineData("error Bad extends Notfoundd\nthrow Bad()", "Did you mean NotFound?")]

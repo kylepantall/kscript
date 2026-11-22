@@ -115,7 +115,7 @@ public sealed class DataModelTests : DataFixture
             model BlogPost {
               title: string
             }
-            model Category(table: kinds) {
+            model Category(table: "kinds") {
               name: string
             }
             model Box {
@@ -293,7 +293,7 @@ public sealed class DataModelTests : DataFixture
     public void AModelCanDeclareItsOwnKey()
     {
         string[] lines = Lines("""
-            model Country(key: code) {
+            model Country(key: "code") {
               code: string
               name: string
             }
@@ -312,9 +312,9 @@ public sealed class DataModelTests : DataFixture
     [Fact]
     public void ModelSettingsAreChecked()
     {
-        Assert.Contains("no field 'nope'", Fails("model A {\n  unique: [nope]\n  name: string\n}").Message);
-        Assert.Contains("no field 'nope'", Fails("model A {\n  hidden: [nope]\n  name: string\n}").Message);
-        Assert.Contains("no field 'nope'", Fails("model A {\n  key: nope\n  name: string\n}").Message);
+        Assert.Contains("no field 'nope'", Fails("model A(unique: [nope]) {\n  name: string\n}").Message);
+        Assert.Contains("no field 'nope'", Fails("model A(hidden: [nope]) {\n  name: string\n}").Message);
+        Assert.Contains("no field 'nope'", Fails("model A(key: \"nope\") {\n  name: string\n}").Message);
     }
 
     [Fact]
@@ -938,7 +938,7 @@ public sealed class DataConnectionTests : DataFixture
                   database: db/driver.sqlite
             """);
         string[] lines = Lines("""
-            model Hit(connection: reports) {
+            model Hit(connection: "reports") {
               page: string
             }
             @db(connection: reports)->create_table(Hit)
@@ -1087,7 +1087,7 @@ public sealed class DataCoverageTests : DataFixture
     [Fact]
     public void ModelsThatCantBeTables()
     {
-        Assert.Contains("must be an int", Fails("model Bad {\n  key: tags\n  tags: string[]\n}\n$db->create_table(Bad)").Message);
+        Assert.Contains("must be an int", Fails("model Bad(key: \"tags\") {\n  tags: string[]\n}\n$db->create_table(Bad)").Message);
 
     }
 

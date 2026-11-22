@@ -152,10 +152,12 @@ namespace KScript.Syntax
         /// <summary>
         /// The parts of text in "double quotes" inside an expression: <paramref name="text"/> from
         /// <paramref name="start"/> to <paramref name="end"/> (the quotes left out). <c>$name</c>, <c>$name.field</c>,
-        /// <c>@command(...)</c> and braces that open with a variable or a command (<c>{ $n * 2 }</c>) are filled in;
-        /// any other brace is text, so <c>"/users/{id}"</c> and <c>"\d{3}"</c> stay as written. <c>{{</c> and <c>}}</c>
-        /// are single braces. Spans are positions in <paramref name="text"/>. Null when nothing is filled in.
+        /// <c>@command(...)</c> and every brace are filled in: a brace always holds an expression
+        /// (<c>{ $n * 2 }</c>, <c>{ User->count() }</c>, <c>{ 1 + 2 }</c>), as it does in a statement's text. <c>{{</c> and
+        /// <c>}}</c> are single braces, and 'single quotes' keep braces as written (<c>'/users/{id}'</c>). Spans are positions in <paramref name="text"/>. Null when nothing is filled in.
         /// </summary>
+        private const string LiteralBraceHint = " In double quotes, { } holds an expression: write {{ and }} for braces, or use 'single quotes', which keep the text as written.";
+
         public static Template ParseQuoted(string text, int start, int end)
         {
             Template template = new Template();
@@ -193,20 +195,29 @@ namespace KScript.Syntax
                     continue;
                 }
 
-                if (c == '{' && OpensAValue(text, i + 1, end))
+                if (c == '{')
                 {
+                    // A brace always holds an expression, whatever it opens with: { $n * 2 }, { User->count() }, { 1 + 2 }.
                     ParseResult result = ExpressionParser.ParseEmbedded(text, i + 1, out int close);
-                    if (close >= 0 && close < end)
+                    if (close < 0 || close >= end)
                     {
-                        Flush(i);
-                        template.Segments.Add(new TemplateSegment { Kind = TemplateSegmentKind.Interpolation, Span = TextSpan.FromBounds(i, close + 1), Expression = result });
-                        i = close + 1;
-                        literalStart = i;
-                        any = true;
-                        continue;
+                        // Not closed inside the string: read it again as far as the string goes, so the error says so.
+                        result = ExpressionParser.ParseEmbedded(text.Substring(0, end), i + 1, out close);
+                        if (close < 0) close = end - 1;
                     }
+                    if (result.Errors.Count > 0)
+                    {
+                        SyntaxError first = result.Errors[0];
+                        result.Errors[0] = new SyntaxError(first.Span, first.Words + Wording.Final(LiteralBraceHint), first.Code);
+                    }
+                    Flush(i);
+                    template.Segments.Add(new TemplateSegment { Kind = TemplateSegmentKind.Interpolation, Span = TextSpan.FromBounds(i, close + 1), Expression = result });
+                    i = close + 1;
+                    literalStart = i;
+                    any = true;
+                    continue;
                 }
-                else if (i + 1 < end && IsBareReferenceStart(text, i))
+                if (i + 1 < end && IsBareReferenceStart(text, i))
                 {
                     ParseResult result = ExpressionParser.ParseBareReference(text, i, out int stop);
                     if (stop > i && stop <= end)
@@ -226,16 +237,6 @@ namespace KScript.Syntax
 
             Flush(end);
             return any ? template : null;
-        }
-
-        /// <summary>True when the brace's content starts with a variable or a command: <c>{$n}</c>, <c>{ @now() }</c>.</summary>
-        private static bool OpensAValue(string text, int i, int end)
-        {
-            while (i < end && (text[i] == ' ' || text[i] == '\t'))
-            {
-                i++;
-            }
-            return i + 1 < end && (text[i] == '$' || text[i] == '@') && Lexer.IsIdentStart(text[i + 1]);
         }
 
         private static bool IsBareReferenceStart(string text, int i)

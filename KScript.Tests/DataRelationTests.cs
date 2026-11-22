@@ -523,7 +523,7 @@ public sealed class DataRelationTests : DataFixture
     public void AModelWithAnotherKeyLinksByIt()
     {
         string[] lines = Lines("""
-            model Country(key: code) {
+            model Country(key: "code") {
               code: string(max: 2)
               name: string
               cities: City[]
