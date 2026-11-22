@@ -235,6 +235,7 @@ namespace KScript.Docs.Mcp
         internal async Task HandleHttpAsync(HttpContext http)
         {
             HttpResponse response = http.Response;
+            response.Headers.Server = KScript.Runtime.HttpIdentity.Product;
             if (http.Request.Path != "/mcp")
             {
                 response.StatusCode = 404;
@@ -271,7 +272,11 @@ namespace KScript.Docs.Mcp
         {
             var builder = WebApplication.CreateSlimBuilder();
             builder.Logging.ClearProviders();
-            builder.WebHost.UseKestrel(o => o.ListenLocalhost(port));
+            builder.WebHost.UseKestrel(o =>
+            {
+                o.AddServerHeader = false;
+                o.ListenLocalhost(port);
+            });
             await using var app = builder.Build();
             app.Run(HandleHttpAsync);
             try

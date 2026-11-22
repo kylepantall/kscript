@@ -248,6 +248,7 @@ namespace KScript.Pages
             builder.Logging.ClearProviders();
             builder.WebHost.UseKestrel(o =>
             {
+                o.AddServerHeader = false;
                 if (host == "localhost") o.ListenLocalhost(port);
                 else o.Listen(IPAddress.Parse(host == "*" ? "0.0.0.0" : host), port);
             });
@@ -272,6 +273,7 @@ namespace KScript.Pages
                 }
 
                 http.Response.StatusCode = result.Status;
+                http.Response.Headers.Server = KScript.Runtime.HttpIdentity.Product;
                 foreach (var h in result.Headers) http.Response.Headers[h.Key] = h.Value;
                 foreach (string cookie in result.Cookies) http.Response.Headers.Append("Set-Cookie", cookie);
                 if (result.Status != 304 && !(result.Status >= 300 && result.Status < 400 && result.Body.Length == 0))

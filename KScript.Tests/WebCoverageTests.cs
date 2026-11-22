@@ -134,7 +134,8 @@ public class WebCoverageTests
     [Fact]
     public async Task The_server_sends_files_and_error_pages_and_stops()
     {
-        using var site = new TempSite(("index.html", "<p>{ @nope() }</p>"), ("site.txt", "plain text"));
+        using var site = new TempSite(("index.html", "<p>{ @nope() }</p>"), ("site.txt", "plain text"),
+            ("custom.html", """<respond header-server="my-app">custom</respond>"""));
         int port;
         {
             var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
@@ -154,8 +155,11 @@ public class WebCoverageTests
             catch (HttpRequestException) { await Task.Delay(100); }
         }
         Assert.Equal("plain text", text);
-        HttpResponseMessage broken = await http.GetAsync($"http://127.0.0.1:{port}/");
+        using var custom = await http.GetAsync($"http://127.0.0.1:{port}/custom");
+        Assert.Equal("my-app", Assert.Single(custom.Headers.GetValues("Server")));
+        using var broken = await http.GetAsync($"http://127.0.0.1:{port}/");
         Assert.Equal(System.Net.HttpStatusCode.InternalServerError, broken.StatusCode);
+        Assert.Equal("kscript", Assert.Single(broken.Headers.GetValues("Server")));
         Assert.Contains("KScript error", await broken.Content.ReadAsStringAsync());
 
         stop.Cancel();

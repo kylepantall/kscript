@@ -64,10 +64,18 @@ public sealed class NetTests : IDisposable
     {
         string output = Run(
             $"<echo>{{ @api('{server.Url}/echo', {{ method: 'post', body: {{ a: 1 }}, headers: {{ 'X-Key': 'k' }} }}).text }}</echo>" +
-            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PUT', body: 'plain' }}).text }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PUT', body: 'plain', headers: {{ 'user-agent': 'example-app/1.0' }} }}).text }}</echo>" +
             $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PATCH', body: 'a=1', headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }}).text }}</echo>" +
             $"<echo>{{ @api('{server.Url}/echo', null).status }}</echo>");
         Assert.Equal("POST application/json {\"a\":1} k\nPUT text/plain; charset=utf-8 plain\nPATCH application/x-www-form-urlencoded a=1\n201\n", output);
+        Assert.Equal(new[] { "kscript", "example-app/1.0", "kscript", "kscript" }, server.Requests.Select(r => r.Headers["User-Agent"]));
+    }
+
+    [Fact]
+    public void Http_log_provider_sends_the_default_user_agent()
+    {
+        Run($"<log_provider type=\"http\" url=\"{server.Url}/logs\" batch=\"1\" replace=\"yes\" /><log>ready</log>");
+        Assert.Equal("kscript", Assert.Single(server.Requests).Headers["User-Agent"]);
     }
 
     [Fact]
@@ -122,6 +130,7 @@ public sealed class NetTests : IDisposable
     {
         Run($"<do>@download('{server.Url}/file.txt', 'out/a.txt')</do>");
         Assert.Equal("file body", File.ReadAllText(Path.Combine(dir, "out", "a.txt")));
+        Assert.Equal("kscript", Assert.Single(server.Requests).Headers["User-Agent"]);
         File.WriteAllText(Path.Combine(dir, "keep.txt"), "mine");
         Run($"<do>@download('{server.Url}/file.txt', 'keep.txt', overwrite: false)</do>");
         Assert.Equal("mine", File.ReadAllText(Path.Combine(dir, "keep.txt")));
