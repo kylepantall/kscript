@@ -336,7 +336,7 @@ namespace KScript.LanguageServer
                     });
                     foreach (string warning in config.Warnings)
                     {
-                        Log($"{file}: {warning}");
+                        Log($"{file}: {warning}", LogLevel.Warning);
                     }
                 }
                 catch (ProjectConfigException ex)
@@ -344,7 +344,7 @@ namespace KScript.LanguageServer
                     // Not cached, so that creating a missing standard file fixes it; logged once per problem.
                     if (!configErrors.TryGetValue(file, out string last) || last != ex.Message)
                     {
-                        Log(ex.Message + " Using the default lint settings until it is fixed.");
+                        Log(ex.Message + " Using the default lint settings until it is fixed.", LogLevel.Warning);
                     }
                     configErrors[file] = ex.Message;
                     projectConfigs.Remove(file);
@@ -957,10 +957,6 @@ namespace KScript.LanguageServer
             _ => 15,                          // Snippet
         };
 
-        /// <summary>
-        /// Autoload for coding agents: after a save, rewrites the project's AGENTS.md and .kscript/agents when the
-        /// project has them (kscript agents or kscript make project made them), so agents always read current docs.
-        /// </summary>
         /// <summary>On save: rebuilds what the project makes from its code (the agent docs and other <see cref="KScript.Language.Outputs.ProjectOutputs"/>).</summary>
         private void RefreshOutputs(string uri)
         {
@@ -970,14 +966,26 @@ namespace KScript.LanguageServer
                 return;
             }
             string root = KScript.Language.Agents.AgentDocs.FindRoot(path);
-            foreach (string line in KScript.Language.Outputs.ProjectOutputs.Describe(KScript.Language.Outputs.ProjectOutputs.Build(root)))
+            foreach (KScript.Language.Outputs.OutputResult result in KScript.Language.Outputs.ProjectOutputs.Build(root))
             {
-                Log(line);
+                // A rebuilt file is news, not a problem: editors show Error-level lines as "[Error - ...]".
+                foreach (string line in KScript.Language.Outputs.ProjectOutputs.Describe(new[] { result }))
+                {
+                    Log(line, result.Error != null ? LogLevel.Error : LogLevel.Info);
+                }
             }
         }
 
-        private void Log(string message) =>
-            connection.SendNotification("window/logMessage", new JsonObject { ["type"] = 1, ["message"] = message });
+        /// <summary>The LSP MessageType of a window/logMessage line.</summary>
+        private enum LogLevel
+        {
+            Error = 1,
+            Warning = 2,
+            Info = 3,
+        }
+
+        private void Log(string message, LogLevel level = LogLevel.Error) =>
+            connection.SendNotification("window/logMessage", new JsonObject { ["type"] = (int)level, ["message"] = message });
 
         #endregion
     }

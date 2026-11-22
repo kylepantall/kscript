@@ -92,6 +92,12 @@ the owner of any `<KScript.X>` element. Pages need no imports.
 Completion only offers what the file can use: built-ins and items from the packages it imports, at the top level, inside
 functions and after `->`. Using an item from a package that isn't imported is KS3009, with a quick fix that adds the import.
 
+In the block of a .kscript `type` or `model`, a line is a field, a rule or a setting, so completion there offers the
+model's settings it doesn't have yet (`timestamps`, `hidden`...) or the type's rules (`min`, `pattern`, `validate`...),
+with their docs on hover. After `timestamps: ` it offers yes and no, and inside `hidden: [ ]` and the other field lists
+it offers the model's fields. A type given rules where it is used, `title: string(min: 1)`, offers the rules and the
+native type's own options (`uuid(v: 4)`). This lives in `Features/Completion.TypeBody.cs`.
+
 The `kscript serve` page engine (`KScript.Web/Pages`) runs pages, including `<live>`, `<state>`, `on-*` handlers and
 `bind`. `PageEngineContractTests` read the engine's source and fail when one of its methods, commands or elements is
 missing from the catalog. The tests also check that `Example Sites/team` analyzes without errors.

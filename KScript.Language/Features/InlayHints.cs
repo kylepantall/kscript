@@ -65,6 +65,11 @@ namespace KScript.Language.Features
                     {
                         at = name.Span.End;
                     }
+                    if (analysis.Markup.Syntax == SourceSyntax.Code)
+                    {
+                        // fn name(a, b) =>: after the ')', so it reads as the signature's result: (a, b) → bool.
+                        at = AfterParameterList(analysis.Source.Text, at);
+                    }
                     Add(at, " → " + s.ReturnShape.Brief(), $"`@{s.Name}` returns\n\n```kscript\n{s.ReturnShape.Pretty()}\n```");
                     continue;
                 }
@@ -79,6 +84,16 @@ namespace KScript.Language.Features
 
             AddParameterNames(analysis, Add);
             return hints.OrderBy(h => h.Offset).ToList();
+        }
+
+        /// <summary>
+        /// Past the ')' that closes a .kscript fn's parameter list, from the end of its parameters or (with none) its
+        /// name; <paramref name="at"/> when no list follows.
+        /// </summary>
+        private static int AfterParameterList(string text, int at)
+        {
+            int close = text.IndexOf(')', at);
+            return close >= 0 && text.Substring(at, close - at).Trim() is "" or "(" ? close + 1 : at;
         }
 
         /// <summary>
