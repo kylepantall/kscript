@@ -94,7 +94,7 @@ echo "{ $site.host } { $site.port } { $site.query.page }"
 echo $site->with_query({ page: 3 })
 
 home: ip = 192.168.0.12
-echo "{ $home.is_private } { $home->in('192.168.0.0/16') }"
+echo "{ $home.is_private } { $home in '192.168.0.0/16' }"
 
 v: semver = 1.4.2
 echo "{ $v->satisfies('^1.2.0') } { $v->bump('minor') }"
@@ -103,7 +103,7 @@ uk: country = 'United Kingdom'
 echo "$uk { $uk.name } { $uk.currency->format(1234.5) } { $uk.flag }"
 
 wait: duration = 1h30m
-echo "{ $wait.minutes } { $wait->plus(45m) }"
+echo "{ $wait.minutes } { $wait + 45m }"
 
 brand: color = '#ff8800'
 echo "{ $brand->lighten(0.5) } { $brand->contrast_ratio(white) }"
