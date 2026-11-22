@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
+    <ProjectReference Include="..\KScript.Data\KScript.Data.csproj" />
   </ItemGroup>
 
 </Project>

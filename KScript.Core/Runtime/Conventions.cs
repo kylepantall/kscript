@@ -36,16 +36,15 @@ namespace KScript.Runtime
         public static readonly IReadOnlySet<string> ThingPackages = new HashSet<string>(StringComparer.Ordinal) { "KScript.UI", "KScript.Http", "KScript.Document" };
 
         /// <summary>
-        /// Packages whose elements are actions (snake_case) except for the steps written inside one of them, which
-        /// describe a thing and are PascalCase: package, then the element the steps go inside.
-        /// KScript.Data: the steps of a migration describe a schema (CreateTable, AddField, DropTable), so an element
-        /// registered with MustBeInside = migration (or inside another step) is PascalCase, while model and
-        /// transaction stay snake_case. No migration steps are registered yet; this is here so the first one is
-        /// accepted in that form and no other.
+        /// Packages whose elements are actions (snake_case) except for one that describes a thing, and the steps
+        /// written inside it, which are PascalCase: package, then the element the steps go inside.
+        /// KScript.Data: a migration file describes a schema (Migration { CreateTable(...) { Field(...) } }), so
+        /// Migration itself and an element registered with MustBeInside = Migration (or inside another step, such as
+        /// Field in CreateTable) are PascalCase, while model and transaction stay snake_case.
         /// </summary>
         public static readonly IReadOnlyDictionary<string, string> ThingsInside = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["KScript.Data"] = "migration",
+            ["KScript.Data"] = "Migration",
         };
 
         /// <summary>The names an argument that declares a variable may have: what is declared (name), a result (into), a caught error or import prefix (as), loop variables (each, at).</summary>
@@ -203,8 +202,6 @@ namespace KScript.Runtime
             ["llm"] = "prompt text against a prompt that is a value",
             // Not two forms of one action: the statement changes the current locale, and @locale() reads it.
             ["locale"] = "the statement sets what the command reads",
-            // Not one action either: the statement writes a log entry, and KScript.Math's @log(x) is the logarithm.
-            ["log"] = "a log entry against a logarithm",
             // KScript.Web's page element renders the Markdown written inside it (a block of text); KScript.Markdown's
             // @markdown(text) reads Markdown that is already a value.
             ["markdown"] = "a block of Markdown in a page against Markdown that is a value",
@@ -358,12 +355,12 @@ namespace KScript.Runtime
             if (!snake && !pascal)
                 return Said(package, Show(e), $"element names are PascalCase (things) or snake_case (actions), with no hyphen ({ToSnakeCase(e.Name)} or {ToPascalCase(e.Name)}).");
             if (package == null || !package.StartsWith("KScript.", StringComparison.Ordinal)) return null;
-            bool thing = ThingPackages.Contains(package) || (ThingsInside.TryGetValue(package, out string parent) && IsStepInside(e, parent));
+            bool thing = ThingPackages.Contains(package) || (ThingsInside.TryGetValue(package, out string parent) && (e.Name == parent || IsStepInside(e, parent)));
             if (thing && !pascal)
                 return Said(package, Show(e), $"its elements describe things, so they are PascalCase ({ToPascalCase(e.Name)}).");
             if (!thing && pascal)
                 return Said(package, Show(e), ThingsInside.TryGetValue(package, out string steps)
-                    ? $"only the steps inside {steps} are PascalCase (declare it with MustBeInside); its other elements are actions, in snake_case ({ToSnakeCase(e.Name)})."
+                    ? $"only {steps} and the steps inside it are PascalCase (declare a step with MustBeInside); its other elements are actions, in snake_case ({ToSnakeCase(e.Name)})."
                     : $"its elements are actions, so they are snake_case ({ToSnakeCase(e.Name)}). PascalCase is for the packages whose elements describe things: {string.Join(", ", ThingPackages)}.");
             return null;
         }

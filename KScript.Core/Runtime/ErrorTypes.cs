@@ -316,6 +316,7 @@ namespace KScript.Runtime
             Add("ForeignKeyViolation", "Conflict", "A save or delete that would leave a record pointing at one that isn't there. Answers 409.", 409);
             Add("Query", Root, "A database query that failed, or a condition that can't be turned into SQL.");
             Add("Connection", Root, "A database that can't be reached or opened. Answers 503.", 503);
+            Add("Migration", Root, "A migration that can't be read or run, or a kscript db command that can't go ahead.");
         }
 
         /// <summary>

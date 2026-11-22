@@ -47,6 +47,9 @@ namespace KScript.Data
 
         /// <summary>For the column of a belongs-to relation (<c>author_id</c>): the relation, whose table and key it references.</summary>
         public Relation References { get; init; }
+
+        /// <summary>The database's default for the column (text, a number or a bool), from a migration. Null for none.</summary>
+        public object Default { get; init; }
     }
 
     /// <summary>
@@ -218,6 +221,10 @@ namespace KScript.Data
 
         /// <summary>The interpreter that declared the model, for loading models it names from the models folder.</summary>
         internal Interpreter Interpreter { get; private set; }
+
+        /// <summary>The models a run has declared.</summary>
+        internal static IEnumerable<ModelInfo> DeclaredBy(Interpreter interpreter) =>
+            Declared.TryGetValue(interpreter, out ConcurrentDictionary<string, ModelInfo> models) ? models.Values : Enumerable.Empty<ModelInfo>();
 
         /// <summary>The models each run has declared, by name.</summary>
         private static readonly ConditionalWeakTable<Interpreter, ConcurrentDictionary<string, ModelInfo>> Declared = new ConditionalWeakTable<Interpreter, ConcurrentDictionary<string, ModelInfo>>();

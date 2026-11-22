@@ -116,6 +116,10 @@ namespace KScript.Data
             yield return sb.ToString();
         }
 
+        /// <summary>A text column with no length is LONGTEXT, whose default MySQL only takes as an expression: <c>('member')</c>.</summary>
+        protected internal override string DefaultValue(Column c) =>
+            c.Default is string && ColumnType(c, indexed: false) == "LONGTEXT" ? "(" + base.DefaultValue(c) + ")" : base.DefaultValue(c);
+
         protected override string AutoKey => "BIGINT AUTO_INCREMENT PRIMARY KEY";
 
         // The collation is part of the email column's type above.

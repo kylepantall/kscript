@@ -1,0 +1,11 @@
+--- make
+description: A seeder in database/seeders: a script that fills the database with records, run by kscript db seed
+category: Scripts and data
+usage: <name>
+example: kscript make seeder users
+to: {{ paths.seeders }}/{{ dir }}{{ kebab }}{{ ext }}
+hint: Fill it in, then run kscript db seed {{ kebab }} (or kscript db fresh --seed to start again with it).
+---
+// {{ title }}: run by kscript db seed. Import the models it makes records of, then make them:
+// import "{{ up }}{{ paths.models }}/user{{ ext }}"
+// User->create(name: 'Ada', email: 'ada@example.com')

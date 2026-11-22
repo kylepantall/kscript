@@ -178,6 +178,7 @@ public sealed class CommandLineTests : IDisposable
         Assert.Equal(0, Kscript("test", test, "--env=ci").Code);
         Assert.Contains("  kscript worker ", Kscript("worker", "--help").Out);
         Assert.Contains("  kscript queue ", Kscript("queue", "--help").Out);
+        Assert.Contains("Did you mean db migrate?", Kscript("db", "migrat").Err);
     }
 
     [Fact]

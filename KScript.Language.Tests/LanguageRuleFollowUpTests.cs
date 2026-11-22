@@ -228,5 +228,17 @@ namespace KScript.Language.Tests
             DocumentAnalysis a = Code(name + " = 1\necho $" + name + "\n");
             Assert.Contains("Name the variable " + expected + ":", Assert.Single(a.Diagnostics, d => d.Code == DiagnosticCodes.NamingStyle).Message);
         }
+
+        [Fact]
+        public void TheLogarithmHasItsOwnNameAndLogIsOnlyTheStatement()
+        {
+            DocumentAnalysis old = Code("import KScript.Math\n\necho @log(8, 2)\n");
+            Diagnostic renamed = Assert.Single(old.Diagnostics, d => d.Code == DiagnosticCodes.RetiredCommand);
+            Assert.Contains("renamed to @logarithm(number, base?)", renamed.Message);
+
+            DocumentAnalysis now = Code("import KScript.Math\n\necho @logarithm(8, 2)\nlog(level: warn) \"Retrying\"\n");
+            Assert.DoesNotContain(now.Diagnostics, d => d.Severity == DiagnosticSeverity.Error || d.Message.Contains("logarithm"));
+            Assert.False(KScript.Runtime.Conventions.StatementAndCommand.ContainsKey("log"));
+        }
     }
 }

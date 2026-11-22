@@ -399,9 +399,21 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Playground_gives_KScript_Data_a_database_in_memory_for_each_run()
+    {
+        const string code = "import KScript.Data\nmodel Note {\n  body: string\n}\n$db->create_table(Note)\nNote->create(body: 'hi')\necho Note->count()\necho $db";
+        PlaygroundResult first = Playground.Run(code, "kscript");
+        Assert.Null(first.Error);
+        Assert.Equal("1\nsqlite database 'main' (memory)\n", first.Output);
+        // A second run starts empty: the table isn't there until it makes it again.
+        Assert.Equal(first.Output, Playground.Run(code, "kscript").Output);
+        Assert.Equal("0\n", Playground.Run("import KScript.Data\necho $db->tables()->count()", "kscript").Output);
+    }
+
+    [Fact]
     public void Playground_has_no_network_servers_windows_or_models()
     {
-        foreach (string package in new[] { "KScript.Net", "KScript.Http", "KScript.UI", "KScript.AI", "KScript.Web", "KScript.Test", "KScript.Storage", "KScript.Cache", "KScript.Document", "KScript.Auth" })
+        foreach (string package in Playground.Unavailable.Keys)
         {
             PlaygroundResult result = Playground.Run($"<import package=\"{package}\" />");
             Assert.Contains("can't run in the docs", result.Error);

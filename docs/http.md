@@ -94,6 +94,13 @@ fn store(json: NewPerson) {
 }
 ```
 
+A path parameter typed as a [KScript.Data](data.md) model is the record with that key, so the controller gets the post itself. A key with no record, or one that isn't a key, gets `404`, and OpenAPI shows the key's type:
+
+```kscript
+// routes: Get(path: "/posts/{post}", to: @posts.show)
+fn show(post: Post) => $post
+```
+
 Data that doesn't fit is the client's mistake, so the controller doesn't run. A body, query or form that doesn't fit gets `422 Unprocessable Entity`. API routes answer with JSON that lists every problem: `{ "error": "...", "status": 422, "problems": [{ "path": "$.age", "field": "age", "message": "..." }] }`. A path parameter that doesn't fit, such as `/people/abc` for `id: int`, gets `404`.
 
 ```kscript

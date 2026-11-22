@@ -48,7 +48,7 @@ namespace KScript.Mathematics
             }, "@convert_length(12, 'in', 'cm')");
             p.Command("atan2", "y, x", "The angle in radians of the point (x, y).", KType.Number, c => M.Atan2(c.Num(0), c.Num(1)));
             p.Command("hypot", "x, y", "The length of the hypotenuse: sqrt(x² + y²).", KType.Number, c => M.Sqrt(c.Num(0) * c.Num(0) + c.Num(1) * c.Num(1)));
-            p.Command("log", "number, base?", "The logarithm: natural (base e) unless a base is given.", KType.Number, c => c.Has(1) ? M.Log(c.Num(0), c.Num(1)) : M.Log(c.Num(0)));
+            p.Command("logarithm", "number, base?", "The logarithm: natural (base e) unless a base is given.", KType.Number, c => c.Has(1) ? M.Log(c.Num(0), c.Num(1)) : M.Log(c.Num(0)));
             p.Command("log10", "number", "The base 10 logarithm.", KType.Number, c => M.Log10(c.Num(0)));
             p.Command("log2", "number", "The base 2 logarithm.", KType.Number, c => M.Log2(c.Num(0)));
             p.Command("round", "number, digits?", "Rounded to a number of decimal places (0 by default). Halves round away from zero.", KType.Number,
@@ -135,7 +135,7 @@ namespace KScript.Mathematics
                 ("@trunc", "@trunc(-7.9)"),
                 ("@atan2", "@degrees(@atan2(1, 1))"),
                 ("@hypot", "@hypot(3, 4)"),
-                ("@log", "@log(8, base: 2)"),
+                ("@logarithm", "@logarithm(8, base: 2)"),
                 ("@log10", "@log10(1000)"),
                 ("@log2", "@log2(1024)"),
                 ("@round", "@round(2.675, digits: 2)"),

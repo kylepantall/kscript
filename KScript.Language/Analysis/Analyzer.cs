@@ -1119,7 +1119,7 @@ namespace KScript.Language.Analysis
                 bool ok = info.MustBeInside.Contains("fn") || info.InsideAnyAncestor
                     ? e.Ancestors().Any(a => info.MustBeInside.Contains(ElementInfo.BareName(a.Name))
                         || (info.MustBeInside.Contains("fn") && catalog.GetElement(ElementInfo.BareName(a.Name))?.IsFunctionBody == true))
-                    : e.Parent != null && info.MustBeInside.Contains(e.Parent.Name, StringComparer.OrdinalIgnoreCase);
+                    : e.Parent != null && info.MustBeInside.Contains(ElementInfo.BareName(e.Parent.Name), StringComparer.OrdinalIgnoreCase);
                 if (!ok)
                 {
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,

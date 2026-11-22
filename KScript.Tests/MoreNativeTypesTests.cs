@@ -45,6 +45,8 @@ public class MoreNativeTypesTests
     [InlineData("currency", "'gbp'", "GBP")]
     [InlineData("locale", "'en_gb'", "en-GB")]
     [InlineData("timezone", "'europe/london'", "Europe/London")]
+    [InlineData("timezone", "'america/new_york'", "America/New_York")]
+    [InlineData("timezone", "'EUROPE/JERSEY'", "Europe/Jersey")]
     [InlineData("timezone", "'UTC'", "UTC")]
     // Time
     [InlineData("duration", "'90m'", "1h30m")]

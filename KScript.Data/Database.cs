@@ -220,6 +220,11 @@ namespace KScript.Data
         /// <summary>The database a connection name means for a script in <paramref name="folder"/>: the same object for the same settings.</summary>
         public static Database For(KScriptHost host, string folder, string name)
         {
+            if (host != null && (name == null || name == DatabaseSettings.DefaultName))
+            {
+                if (host.MemoryDatabase) return ForSandbox(host);
+                if (host.TestFile != null && ForTest(host, folder) is Database test) return test;
+            }
             DatabaseSettings settings = DatabaseSettings.Resolve(host, folder, name);
             return Open.GetOrAdd(settings.Dialect.Name + "|" + settings.ConnectionString, _ => new Database(settings));
         }
@@ -264,6 +269,9 @@ namespace KScript.Data
 
         #region Running statements
 
+        /// <summary>A new connection, for work that manages its own transactions, such as migrations.</summary>
+        internal DbConnection OpenConnection() => Connect();
+
         private DbConnection Connect()
         {
             try
@@ -292,14 +300,21 @@ namespace KScript.Data
         /// </summary>
         public T With<T>(Interpreter interpreter, string table, Func<DbConnection, DbTransaction, T> work)
         {
-            TransactionState open = Current(interpreter);
+            TransactionState open = Current(interpreter) ?? BeginTest(interpreter);
             DbConnection connection = open?.Connection ?? Connect();
+            // Postgres ends a transaction at its first error, so in a test's transaction each statement is a
+            // savepoint: a test can expect a UniqueViolation and go on.
+            bool guard = open?.Test == true && Dialect is PostgresDialect;
             try
             {
-                return work(connection, open?.Transaction);
+                if (guard) Raw(connection, open.Transaction, "SAVEPOINT kscript_test_statement");
+                T result = work(connection, open?.Transaction);
+                if (guard) Raw(connection, open.Transaction, "RELEASE SAVEPOINT kscript_test_statement");
+                return result;
             }
             catch (DbException ex)
             {
+                if (guard) Raw(connection, open.Transaction, "ROLLBACK TO SAVEPOINT kscript_test_statement");
                 throw Dialect.Translate(ex, table) ?? new KScriptException(ex.Message, "Query", ex);
             }
             finally
@@ -308,8 +323,9 @@ namespace KScript.Data
             }
         }
 
-        private static DbCommand Command(DbConnection connection, DbTransaction transaction, SqlStatement statement)
+        private DbCommand Command(DbConnection connection, DbTransaction transaction, SqlStatement statement, Interpreter interpreter)
         {
+            QueryLog.Note(interpreter, this, statement);
             DbCommand command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = statement.Text;
@@ -324,11 +340,19 @@ namespace KScript.Data
             return command;
         }
 
+        private static void Raw(DbConnection connection, DbTransaction transaction, string sql)
+        {
+            using DbCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = sql;
+            command.ExecuteNonQuery();
+        }
+
         /// <summary>Runs a statement that returns rows, as maps of column name to database value.</summary>
         public List<Dictionary<string, object>> Rows(Interpreter interpreter, SqlStatement statement, string table = null) =>
             With(interpreter, table, (connection, transaction) =>
             {
-                using DbCommand command = Command(connection, transaction, statement);
+                using DbCommand command = Command(connection, transaction, statement, interpreter);
                 using DbDataReader reader = command.ExecuteReader();
                 return ReadAll(reader);
             });
@@ -352,7 +376,7 @@ namespace KScript.Data
         public int Execute(Interpreter interpreter, SqlStatement statement, string table = null) =>
             With(interpreter, table, (connection, transaction) =>
             {
-                using DbCommand command = Command(connection, transaction, statement);
+                using DbCommand command = Command(connection, transaction, statement, interpreter);
                 return command.ExecuteNonQuery();
             });
 
@@ -363,7 +387,7 @@ namespace KScript.Data
         public object Run(Interpreter interpreter, SqlStatement statement) =>
             With(interpreter, null, (connection, transaction) =>
             {
-                using DbCommand command = Command(connection, transaction, statement);
+                using DbCommand command = Command(connection, transaction, statement, interpreter);
                 using DbDataReader reader = command.ExecuteReader();
                 if (reader.FieldCount == 0) return (object)(double)reader.RecordsAffected;
                 return ReadAll(reader);
@@ -385,6 +409,9 @@ namespace KScript.Data
 
             /// <summary>True once a commit has been tried: the transaction is over, whether it worked or not.</summary>
             public bool Finished;
+
+            /// <summary>True for the transaction a test runs in, which is undone when the test ends.</summary>
+            public bool Test;
         }
 
         private TransactionState Current(Interpreter interpreter) =>
@@ -420,7 +447,7 @@ namespace KScript.Data
 
         private T Once<T>(Interpreter interpreter, Func<T> work, IsolationLevel isolation)
         {
-            TransactionState open = Current(interpreter);
+            TransactionState open = Current(interpreter) ?? BeginTest(interpreter);
             if (open != null)
             {
                 string savepoint = "kscript_" + (++open.Depth).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -493,6 +520,102 @@ namespace KScript.Data
             }
         }
 
+        /// <summary>
+        /// While a test runs, the transaction it runs in: begun at its first statement and rolled back when it ends,
+        /// so no test sees another's rows. Null outside a test.
+        /// </summary>
+        private TransactionState BeginTest(Interpreter interpreter)
+        {
+            KScriptHost host = interpreter?.Host;
+            if (host == null || !host.TestRunning) return null;
+            DbConnection connection = Connect();
+            var state = new TransactionState { Connection = connection, Test = true };
+            state.Transaction = connection.BeginTransaction();
+            transactions.AddOrUpdate(interpreter, state);
+            host.AfterTest.Add(() =>
+            {
+                transactions.Remove(interpreter);
+                try
+                {
+                    state.Transaction.Rollback();
+                }
+                finally
+                {
+                    state.Transaction.Dispose();
+                    connection.Dispose();
+                }
+            });
+            return state;
+        }
+
+        #region Test databases
+
+        private const string TestKey = "KScript.Data.TestDatabase";
+
+        /// <summary>
+        /// The main database of a test file under kscript test: with test.database memory (the default), a new SQLite
+        /// database in memory, made from the project's migrations (or from its models when it has none), that ends
+        /// with the file. Null for test.database config.
+        /// </summary>
+        private static Database ForTest(KScriptHost host, string folder)
+        {
+            lock (host.Items)
+            {
+                if (host.Items.TryGetValue(TestKey, out object made)) return made as Database;
+                ProjectConfig project = ProjectConfig.FindAndLoad(folder);
+                if (project?.Test.Database == "config")
+                {
+                    host.Items[TestKey] = "config";
+                    return null;
+                }
+                Database db = InMemory(host, "memory, for " + Path.GetFileName(host.TestFile));
+                host.Items[TestKey] = db;
+                try
+                {
+                    new Migrations.Migrator(project?.Directory ?? folder, host, project).Build();
+                }
+                catch
+                {
+                    host.Items.Remove(TestKey);
+                    throw;
+                }
+                return db;
+            }
+        }
+
+        /// <summary>A sandbox's main database (see <see cref="KScriptHost.MemoryDatabase"/>): empty, in memory, one per host.</summary>
+        private static Database ForSandbox(KScriptHost host)
+        {
+            lock (host.Items)
+            {
+                if (host.Items.TryGetValue(TestKey, out object made) && made is Database db) return db;
+                db = InMemory(host, "memory");
+                host.Items[TestKey] = db;
+                return db;
+            }
+        }
+
+        /// <summary>A new SQLite database in memory, closed (and so gone) when the host's file or run ends.</summary>
+        private static Database InMemory(KScriptHost host, string where)
+        {
+            var db = new Database(new DatabaseSettings
+            {
+                Name = DatabaseSettings.DefaultName,
+                Dialect = SqliteDialect.Instance,
+                ConnectionString = "Data Source=kscript-test-" + Guid.NewGuid().ToString("N") + ";Mode=Memory;Cache=Shared",
+                Where = where,
+                Memory = true,
+            });
+            host.AfterFile.Add(() =>
+            {
+                db.keeper?.Dispose();
+                db.keeper = null;
+            });
+            return db;
+        }
+
+        #endregion
+
         /// <summary>Leaving the block with return, break or continue finishes the work, so it is kept.</summary>
         private static bool Commits(Exception ex) => ex is ReturnSignal || ex is BreakSignal || ex is ContinueSignal;
 
@@ -521,12 +644,12 @@ namespace KScript.Data
             if (Dialect.Returning) return Rows(interpreter, Query.InsertStatement(Dialect, table, values, key.Name), table)[0].Values.First();
             return With(interpreter, table, (connection, transaction) =>
             {
-                using (DbCommand insert = Command(connection, transaction, Query.InsertStatement(Dialect, table, values, null)))
+                using (DbCommand insert = Command(connection, transaction, Query.InsertStatement(Dialect, table, values, null), interpreter))
                 {
                     insert.ExecuteNonQuery();
                 }
                 if (!key.AutoIncrement) return KeyValue(values.First(v => v.Name == key.Name).Value);
-                using DbCommand last = Command(connection, transaction, new SqlStatement("SELECT LAST_INSERT_ID()", Array.Empty<object>()));
+                using DbCommand last = Command(connection, transaction, new SqlStatement("SELECT LAST_INSERT_ID()", Array.Empty<object>()), null);
                 return last.ExecuteScalar();
             });
         }

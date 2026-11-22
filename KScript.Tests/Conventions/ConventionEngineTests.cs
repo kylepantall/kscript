@@ -102,17 +102,17 @@ public class ConventionEngineTests
     [Fact]
     public void The_steps_of_a_migration_are_PascalCase_and_nothing_else_in_the_package_is()
     {
-        // KScript.Data has no migration steps yet. When it does they are things inside migration { }: CreateTable, AddField.
+        // A migration describes a schema: Migration { } and the steps inside it are things, as CreateTable and AddField are.
         Accepted(p =>
         {
-            p.Element(Element("migration"), null);
-            p.Element(new ElementInfo("CreateTable", "Makes a table.", ContentKind.Statements) { MustBeInside = new[] { "migration" } }, null);
-            p.Element(new ElementInfo("AddField", "Adds a column.", ContentKind.Empty) { MustBeInside = new[] { "migration", "CreateTable" } }, null);
+            p.Element(Element("Migration"), null);
+            p.Element(new ElementInfo("CreateTable", "Makes a table.", ContentKind.Statements) { MustBeInside = new[] { "Migration" } }, null);
+            p.Element(new ElementInfo("AddField", "Adds a column.", ContentKind.Empty) { MustBeInside = new[] { "Migration", "CreateTable" } }, null);
         }, "KScript.Data");
-        Assert.Equal("KScript.Data registers element 'CreateTable': only the steps inside migration are PascalCase (declare it with MustBeInside); its other elements are actions, in snake_case (create_table).",
+        Assert.Equal("KScript.Data registers element 'CreateTable': only Migration and the steps inside it are PascalCase (declare a step with MustBeInside); its other elements are actions, in snake_case (create_table).",
             Refused(p => p.Element(Element("CreateTable"), null), "KScript.Data"));
-        Assert.Contains("only the steps inside migration are PascalCase", Refused(p => p.Element(new ElementInfo("Seed", "Adds rows.", ContentKind.Statements) { MustBeInside = new[] { "transaction" } }, null), "KScript.Data"));
-        Assert.Contains("its elements are actions", Refused(p => p.Element(new ElementInfo("CreateTable", "Makes a table.", ContentKind.Statements) { MustBeInside = new[] { "migration" } }, null), "KScript.Cache"));
+        Assert.Contains("only Migration and the steps inside it are PascalCase", Refused(p => p.Element(new ElementInfo("Seed", "Adds rows.", ContentKind.Statements) { MustBeInside = new[] { "transaction" } }, null), "KScript.Data"));
+        Assert.Contains("its elements are actions", Refused(p => p.Element(new ElementInfo("CreateTable", "Makes a table.", ContentKind.Statements) { MustBeInside = new[] { "Migration" } }, null), "KScript.Cache"));
     }
 
     [Fact]

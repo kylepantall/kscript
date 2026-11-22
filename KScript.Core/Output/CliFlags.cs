@@ -22,6 +22,7 @@ namespace KScript
             [("check", "--format")] = "--output text|json",
             [("check", "--warnaserror")] = "--warnings-as-errors",
             [("queue", "--format")] = "--output text|json",
+            [("db", "--format")] = "--output text|json for db status, or --syntax kscript|xml for db diff",
             [("openapi", "--yaml")] = "--output yaml",
             [("openapi", "--json")] = "--output json",
             [("make", "--format")] = "--syntax kscript|xml",

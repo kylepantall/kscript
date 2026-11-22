@@ -115,6 +115,16 @@ jobs:
       - name: Run KScript tests
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data
 
+      - name: Run the data sample's migrations and seeder
+        shell: bash
+        run: |
+          K="dotnet KScriptApp/bin/Release/net8.0/KScript.dll"
+          $K db migrate --seed --project samples/data --no-ansi < /dev/null
+          # The migrations make the tables the models want, so there is nothing to write.
+          diff=$($K db diff --pretend --project samples/data --no-ansi < /dev/null)
+          echo "$diff"
+          grep -q "Nothing to write" <<< "$diff"
+
       - name: Check a new project (kscript make project)
         shell: bash
         run: |
@@ -390,9 +400,9 @@ jobs:
           python3 .github/scripts/fake-claude.py 8765 &
           sleep 2
           printf '%s\n' 'import KScript.AI' "echo \"{ @llm('Say hi.') }\"" \
-            "llm(to: t, schema: { category: 'bug|feature', urgency: 'int 1-5' }) \"Triage: it crashes\"" 'echo "{$t.category} {$t.urgency}"' \
+            "llm(into: t, schema: { category: 'bug|feature', urgency: 'int 1-5' }) \"Triage: it crashes\"" 'echo "{$t.category} {$t.urgency}"' \
             '/// The status of an order.' "fn order_status(id: int) => \$id == 42 ? 'shipped' : 'unknown'" \
-            'llm(to: a, tools: order_status) "Where is order 42?"' 'echo "{$a}"' > ai.kscript
+            'llm(into: a, tools: [@order_status]) "Where is order 42?"' 'echo "{$a}"' > ai.kscript
           "$K" ai.kscript | tee ai.out
           grep -q "hello from claude" ai.out
           grep -q "bug 4" ai.out

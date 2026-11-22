@@ -86,7 +86,7 @@ namespace KScript.Data
         // A column's collation comes after its type in Postgres: it is added to the type in ColumnDefinition below.
         protected override string CaseInsensitive => string.Empty;
 
-        protected override string ColumnDefinition(Column c, bool indexed)
+        protected internal override string ColumnDefinition(Column c, bool indexed)
         {
             string definition = base.ColumnDefinition(c, indexed);
             if (c.Kind != ColumnKind.Email || c.AutoIncrement) return definition;

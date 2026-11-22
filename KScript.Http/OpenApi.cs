@@ -132,7 +132,10 @@ namespace KScript.Http
             foreach (string name in route.Pattern.Parameters)
             {
                 Parameter p = fn?.Parameters.FirstOrDefault(x => x.Name == name);
-                Dictionary<string, object> schema = p?.Type != null ? Shapes.SchemaFor(p.Type, fn.Closure, fn.Module, schemas, Refs) : null;
+                // A model in the path is its record's key (route model binding).
+                Dictionary<string, object> schema = p?.Type != null && Shapes.ResolveNamed(p.Type, fn.Closure, fn.Module) is RecordType { Tag: IRecordKind kind } keyed ? kind.KeySchema(keyed) : null;
+                bool bound = schema != null;
+                schema ??= p?.Type != null ? Shapes.SchemaFor(p.Type, fn.Closure, fn.Module, schemas, Refs) : null;
                 schema ??= RuleSchema(route.Pattern.Rules.TryGetValue(name, out string rule) ? rule : null);
                 var parameter = new Dictionary<string, object> { ["name"] = name, ["in"] = "path", ["required"] = true, ["schema"] = schema };
                 string text = doc?.ParamText(name);
@@ -140,7 +143,8 @@ namespace KScript.Http
                 else if (route.Pattern.IsOptional(name)) parameter["description"] = "Optional: the route also matches without it.";
                 else if (route.Pattern.IsCatchAll(name)) parameter["description"] = "The rest of the path, which may hold / characters.";
                 parameters.Add(parameter);
-                if (p?.Type != null || route.Pattern.Rules.ContainsKey(name)) responses["404"] = Response($"No such resource: the {{{name}}} in the path doesn't fit.", error: true);
+                if (bound) responses["404"] = Response($"There is no {((RecordType)Shapes.ResolveNamed(p.Type, fn.Closure, fn.Module)).Name} with the {{{name}}} in the path.", error: true);
+                else if (p?.Type != null || route.Pattern.Rules.ContainsKey(name)) responses["404"] = Response($"No such resource: the {{{name}}} in the path doesn't fit.", error: true);
             }
 
             if (fn != null)
@@ -283,12 +287,41 @@ namespace KScript.Http
                 if (description.Length == 0) description = null;
                 if (schema == null && Regex.IsMatch(first, "^(html|view)$", RegexOptions.IgnoreCase)) return Html(description ?? "An HTML page.");
             }
+            // @returns Post[] on a controller that calls ->paginate(): one page of them, with the page's numbers.
+            if (schema != null && schema.TryGetValue("type", out object type) && type as string == "array"
+                && SourceOf(route, fn).Any(t => t.Contains("->paginate(", StringComparison.Ordinal)))
+            {
+                schema = PageSchema(schema);
+            }
             bool html = !route.Api && schema == null && UsesView(route, fn);
             if (html) return Html(description ?? "An HTML page.");
             return new Dictionary<string, object>
             {
                 ["description"] = description ?? Reason(status),
                 ["content"] = new Dictionary<string, object> { ["application/json"] = new Dictionary<string, object> { ["schema"] = schema ?? new Dictionary<string, object>() } },
+            };
+        }
+
+        /// <summary>What ->paginate() returns: { items, page, per_page, total, last_page, from, to, has_more }.</summary>
+        private static Dictionary<string, object> PageSchema(Dictionary<string, object> items)
+        {
+            Dictionary<string, object> Int(string description) => new Dictionary<string, object> { ["type"] = "integer", ["description"] = description };
+            return new Dictionary<string, object>
+            {
+                ["type"] = "object",
+                ["description"] = "One page of the results.",
+                ["properties"] = new Dictionary<string, object>
+                {
+                    ["items"] = items,
+                    ["page"] = Int("This page's number, from 1."),
+                    ["per_page"] = Int("How many items a page holds."),
+                    ["total"] = Int("How many items there are on every page."),
+                    ["last_page"] = Int("The number of the last page."),
+                    ["from"] = Int("The number of this page's first item, from 1 (0 when it's empty)."),
+                    ["to"] = Int("The number of this page's last item."),
+                    ["has_more"] = new Dictionary<string, object> { ["type"] = "boolean", ["description"] = "true when there are pages after this one." },
+                },
+                ["required"] = new List<object> { "items", "page", "per_page", "total", "last_page", "from", "to", "has_more" },
             };
         }
 

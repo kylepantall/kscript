@@ -254,6 +254,11 @@ namespace KScript.Scaffolding
 
         // ---- values ----------------------------------------------------------------------------------------------
 
+        /// <summary>The time {{ timestamp }} gives. Tests set it.</summary>
+        internal static Func<DateTime> Clock { get; set; } = Now;
+
+        internal static DateTime Now() => DateTime.Now;
+
         internal static Dictionary<string, string> Values(StubInfo template, string rawName, Dictionary<string, string> options, KScript.Projects.ProjectConfig project)
         {
             var segments = rawName.Split('/');
@@ -278,6 +283,8 @@ namespace KScript.Scaffolding
                 ["dir"] = dir,
                 ["kebab"] = kebab,
                 ["snake"] = StubNames.Snake(name),
+                // Migrations are named after when they were made, so they sort in order: 2026_11_22_104500_add_bio.
+                ["timestamp"] = Clock().ToString("yyyy_MM_dd_HHmmss", System.Globalization.CultureInfo.InvariantCulture),
                 ["pascal"] = StubNames.Pascal(name),
                 ["camel"] = StubNames.Camel(name),
                 ["title"] = StubNames.Title(titleSource),
@@ -356,6 +363,8 @@ namespace KScript.Scaffolding
             "module" => "pricing",
             "type" => "Repo",
             "model" => "User",
+            "migration" => "add_bio_to_users",
+            "seeder" => "users",
             "native" => "Sku",
             "enum" => "Size",
             "const" => "limits",
@@ -395,7 +404,7 @@ namespace KScript.Scaffolding
         {
             ("Routes and APIs", new[] { "route", "controller", "request", "middleware", "view" }),
             ("Pages and styles", new[] { "page", "markdown", "layout", "component", "partial", "css" }),
-            ("Scripts and data", new[] { "script", "module", "type", "native", "model", "enum", "error", "const", "storage", "cache", "job", "extension" }),
+            ("Scripts and data", new[] { "script", "module", "type", "native", "model", "migration", "seeder", "enum", "error", "const", "storage", "cache", "job", "extension" }),
             ("Desktop apps", new[] { "window" }),
             ("Documents", new[] { "document" }),
             ("Settings", new[] { "config", "env", "locale", "logger" }),

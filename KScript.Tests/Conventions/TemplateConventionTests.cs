@@ -99,7 +99,9 @@ public sealed class TemplateConventionTests : IDisposable
         Assert.True(made > 60, $"Only {made} generator commands ran.");
 
         var (_, output) = Check(app);
-        var problems = ProblemLines(output).Where(l => !NotUsedYet.Any(code => l.Contains($"warning {code}:", StringComparison.Ordinal))).ToList();
+        // KS5014 too: make migration writes an empty migration to fill in by hand, so the models' tables aren't
+        // made yet, which is what that warning is for (kscript db diff writes the migration that makes them).
+        var problems = ProblemLines(output).Where(l => !NotUsedYet.Append(KScript.Syntax.DiagnosticCodes.ModelDrift).Any(code => l.Contains($"warning {code}:", StringComparison.Ordinal))).ToList();
         Assert.True(problems.Count == 0, $"kscript check --warnings-as-errors on what kscript make wrote ({syntax}):\n{string.Join("\n", problems)}");
         Assert.Matches(@"\d\d files checked: 0 errors", output);
         AssertKebabCase(app);
@@ -184,6 +186,9 @@ public sealed class TemplateConventionTests : IDisposable
         var wrong = Directory.EnumerateFileSystemEntries(folder, "*", SearchOption.AllDirectories)
             .Select(p => Path.GetRelativePath(folder, p).Replace('\\', '/'))
             .Where(p => !p.Split('/').Contains(".kscript"))
+            // A migration is named after when it was written and what it does, in snake_case, so the files sort in
+            // the order they run and the name is the one the migrations table keeps: 2026_11_22_101500_update_users.
+            .Where(p => !Regex.IsMatch(p, @"(^|/)database/migrations/\d{4}_\d{2}_\d{2}_\d{6}_[a-z0-9]+(_[a-z0-9]+)*(\.[a-z]+)+$"))
             // A locale file is named after its locale code, which has its own spelling (en-GB).
             .Where(p => !Regex.IsMatch(p, @"(^|/)locales/[a-z]{2,3}(-[A-Za-z0-9]+)*\.yaml$"))
             .Where(p => !IsKebab(p.Substring(p.LastIndexOf('/') + 1)))

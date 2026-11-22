@@ -106,6 +106,7 @@ Argument names are `snake_case`. A hyphenated name is an error that says the new
 | `@guid()` | `@uuid()` |
 | `@contrast(...)` | `@contrast_color(color, dark?, light?)` |
 | `@signed_in()` | `@is_signed_in()` |
+| `@log(8, 2)` | `@logarithm(8, 2)` (`log` is the statement that writes a log entry) |
 | `@config('database.port', 5432)` | `$config.database.port`, or `$config->get('database.port', 5432)` |
 | `@exit(1)`, `@error('Too short')` | `exit 1`, `throw Validation "Too short"` |
 | `@transaction(...)` | the `transaction` statement, or `$db->transaction(fn)` |
