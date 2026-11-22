@@ -1,6 +1,7 @@
 using KScript.Syntax.Markup;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
+using KScript.Metadata;
 using KScript.Syntax;
 using KScript.Syntax.Text;
 
@@ -35,7 +36,7 @@ namespace KScript.Language.Features
                         Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
                         Documentation = c.Description,
                         Parameters = s.Parameters.Select(p => (p.Label, p.Deprecated != null ? DeprecationLine(p.Deprecated, p.Name) + p.Description : p.Description)).ToList(),
-                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : null, p.IsFlag)).ToList(),
+                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : NativeCompletions(p.Type), p.IsFlag)).ToList(),
                         DeprecatedParameters = s.Parameters.Where(p => p.Deprecated != null).Select(p => p.Name).ToList(),
                     });
                 }
@@ -50,10 +51,11 @@ namespace KScript.Language.Features
                     Documentation = doc != null ? doc.ToMarkdown(includeParams: false) : fn.Description,
                     Parameters = fn.Parameters.Select(p => (p.Label, doc?.ParamText(p.Name))).ToList(),
                     Details = fn.Parameters.Select(p => (p.Name,
-                        p.Type != null ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type && x.EnumValues != null)?.EnumValues : null,
+                        p.Type != null ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type && x.EnumValues != null)?.EnumValues ?? NativeCompletions(p.Type) : null,
                         p.Type == KType.Bool)).ToList(),
                     ItemValues = fn.Parameters.Select(p => p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal)
                         ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type.Substring(0, p.Type.Length - 2).Trim() && x.EnumValues != null)?.EnumValues
+                            ?? NativeCompletions(p.Type.Substring(0, p.Type.Length - 2).Trim())
                         : null).ToList(),
                 });
             }
@@ -355,6 +357,38 @@ namespace KScript.Language.Features
                 .GroupBy(item => item.Label)
                 .Select(g => g.First())
                 .ToList();
+        }
+
+        /// <summary>The values a native type offers where it is expected (1h, 30m for a duration), or null for none.</summary>
+        private static IReadOnlyList<string> NativeCompletions(string type) =>
+            NativeTypes.Get(type)?.Completions is { Count: > 0 } values ? values : null;
+
+        /// <summary>
+        /// The start of the value of a variable declared with a native type (<c>wait: duration = ‸</c>, or
+        /// <c>&lt;let type="duration" value="‸"&gt;</c>): the values the type offers.
+        /// </summary>
+        private static List<CompletionItem> DeclaredTypeValueCompletions(ExpressionRegion region, int wordStart, TextSpan replace) =>
+            region.Attribute?.Name == "value" && string.IsNullOrWhiteSpace(region.Source.Value.Substring(0, Math.Min(wordStart, region.Source.Value.Length)))
+                ? DeclaredTypeValueCompletions(region.Element, replace)
+                : new List<CompletionItem>();
+
+        /// <summary>The values the native type a &lt;let&gt; or &lt;const&gt; is declared with offers, or none.</summary>
+        private static List<CompletionItem> DeclaredTypeValueCompletions(MarkupElement declaration, TextSpan replace)
+        {
+            if (declaration == null || ElementInfo.BareName(declaration.Name) is not ("let" or "const")
+                || NativeTypes.Get(declaration.GetAttributeValue("type")?.Trim()) is not NativeTypeInfo native)
+            {
+                return new List<CompletionItem>();
+            }
+            return native.Completions.Select((value, i) => new CompletionItem
+            {
+                Label = value,
+                Kind = CompletionKind.Value,
+                Detail = native.Name,
+                Documentation = native.Description,
+                ReplaceSpan = replace,
+                SortText = "000" + i.ToString("D3", System.Globalization.CultureInfo.InvariantCulture),
+            }).ToList();
         }
 
         /// <summary>Hover on <c>name</c> in <c>name: value</c>: the parameter it fills.</summary>

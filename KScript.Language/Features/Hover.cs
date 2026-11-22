@@ -1,6 +1,7 @@
 using System.Text;
 
 using KScript.Language.Analysis;
+using KScript.Metadata;
 using KScript.Language.Catalog;
 using KScript.Syntax.Markup;
 using KScript.Syntax;
@@ -146,6 +147,11 @@ namespace KScript.Language.Features
                     }
                     break;
                 }
+
+                // 1h + 30m: the operator a native type declares, with what it gives.
+                case BinaryNode binary when binary.OperatorSpan.Contains(index)
+                    && TypeInference.NativeBinary(binary.Operator, InferAt(analysis, region, binary.Left), InferAt(analysis, region, binary.Right)) is NativeOperatorInfo native:
+                    return new HoverResult($"```kscript\n{native.Display}: {native.Result}\n```\n\n{native.Summary}", region.Source.ToSource(binary.OperatorSpan));
 
                 case MemberNode member when member.NameSpan.Contains(index):
                 {

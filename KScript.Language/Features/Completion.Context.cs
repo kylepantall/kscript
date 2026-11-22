@@ -152,6 +152,12 @@ namespace KScript.Language.Features
                 // A .kscript match block is one statement, cases and all: a new line in it starts a case.
                 return StatementCompletions(analysis, wordStart, offset);
             }
+            // wait: duration = ‸ (no value yet): the values a native type offers.
+            if (wordStart > 0 && text.Substring(0, wordStart).TrimEnd().EndsWith('=') && cursor.TagElement.GetAttribute("value")?.Value == null
+                && DeclaredTypeValueCompletions(cursor.TagElement, TextSpan.FromBounds(wordStart, offset)) is { Count: > 0 } typed)
+            {
+                return typed;
+            }
             foreach (MarkupAttribute a in cursor.TagElement.Attributes.Where(a => a.Value != null && a.Value.SourceSpan.End <= wordStart))
             {
                 string gap = text.Substring(a.Value.SourceSpan.End, wordStart - a.Value.SourceSpan.End);
