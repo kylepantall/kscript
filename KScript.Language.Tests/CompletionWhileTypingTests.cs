@@ -7,10 +7,10 @@ namespace KScript.Language.Tests
     {
         private static readonly LanguageService Service = new LanguageService();
 
-        private static List<CompletionItem> Complete(string textWithCaret, string path = "test.kscript")
+        private static List<CompletionItem> Complete(string textWithCaret, string path = "test.kscript", string trigger = null)
         {
             (string text, int offset) = TestHelpers.WithCaret(textWithCaret);
-            return Service.GetCompletions(Service.Analyze(text, path), offset);
+            return Service.GetCompletions(Service.Analyze(text, path), offset, trigger);
         }
 
         private static CompletionItem Item(List<CompletionItem> items, string label) => Assert.Single(items, i => i.Label == label);
@@ -67,6 +67,25 @@ namespace KScript.Language.Tests
             Assert.Contains(Complete("if true { e‸ }"), i => i.Label == "echo");
             Assert.Contains(Complete("ech‸o 'hi'"), i => i.Label == "echo");
             Assert.Contains(Complete("x = 1\nnot‸"), i => i.Label == "not" && i.Kind == CompletionKind.Keyword);
+        }
+
+        [Theory]
+        [InlineData("fn show() {‸")]
+        [InlineData("fn show() {‸}")]
+        [InlineData("type Row {\n  fn label(suffix: string) {‸}\n}")]
+        public void Typing_the_function_body_brace_leaves_the_next_newline_free(string code)
+        {
+            Assert.Empty(Complete(code, trigger: "{"));
+            Assert.Contains(Complete(code), i => i.Label == "return");
+        }
+
+        [Fact]
+        public void Function_statements_and_other_brace_triggers_still_complete()
+        {
+            Assert.Contains(Complete("fn show() { e‸ }"), i => i.Label == "echo");
+            Assert.Contains(Complete("fn show() {\n  ‸\n}"), i => i.Label == "return");
+            Assert.Contains(Complete("fn show() {\n  if true {‸}\n}", trigger: "{"), i => i.Label == "echo");
+            Assert.Contains(Complete("fn show() {\n  echo \"value {‸}\"\n}", trigger: "{"), i => i.Label == "@now");
         }
 
         [Fact]

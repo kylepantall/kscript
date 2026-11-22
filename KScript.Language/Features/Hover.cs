@@ -100,7 +100,10 @@ namespace KScript.Language.Features
             SymbolReference reference = analysis.ReferenceAt(offset);
             if (reference != null)
             {
-                return new HoverResult(SymbolMarkdown(analysis, reference.Symbol), reference.Span);
+                string markdown = reference.IsPatternLiteral
+                    ? $"```kscript\n{analysis.Source[reference.Span]}: {reference.Symbol.Name}\n```"
+                    : SymbolMarkdown(analysis, reference.Symbol);
+                return new HoverResult(markdown, reference.Span);
             }
 
             if (cursor.Region != null && cursor.InCode)

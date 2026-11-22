@@ -74,6 +74,22 @@ namespace KScript.Language.Analysis
                     : $"{id.Name}() takes one value to check: {id.Name}($value).");
                 return true;
             }
+            foreach (ArgumentNode argument in call.Arguments)
+            {
+                string expected = symbol.Name;
+                if (argument.Name != null)
+                {
+                    if (instance == null || !instance.Fields.TryGetValue(argument.Name, out FieldInfo field)) continue;
+                    expected = field.DeclaredType;
+                }
+                if (expected == null) continue;
+                if (argument.Value is IdentifierNode word && pendingBare.Contains(argument) && RawTextKindOf(expected, scope, span.Start) != null)
+                {
+                    pendingBare.Remove(argument);
+                    CheckLiteralFits(word.Name, expected, region.Source.ToSource(word.Span), scope, span.Start);
+                }
+                ClaimRawListItems(argument, expected, region, scope, span.Start);
+            }
             if (record && instance.Closed && instance.Fields.Count > 0)
             {
                 foreach (ArgumentNode arg in call.Arguments.Where(a => a.Name != null && !instance.Fields.ContainsKey(a.Name)))

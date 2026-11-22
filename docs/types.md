@@ -279,6 +279,25 @@ echo @paint(green, @joan)
 echo "{ $me == @joan }"
 ```
 
+### Recognizing a custom literal by its pattern
+
+A visible refinement of `string` can give an unquoted word its type. Declare a `pattern` on the refinement itself. The pattern must match the whole word, with its usual regex flags.
+
+```kscript
+type PasskeySessionKey with [string] {
+  min: 8
+  normalize: $value->trim()
+  pattern: /passkey_[a-zA-Z]+$/
+}
+
+key = passkey_abc
+echo $key  // passkey_abc
+```
+
+KScript selects the type before running its normalization and validation. If several types match the word, the checker and runtime name all the candidates. Choose one with `key = passkey_abc as PasskeySessionKey` or a typed assignment such as `key: PasskeySessionKey = passkey_abc`. The checker also warns when visible types declare identical regexes with the same flags. Recognized names, flags, and enum arguments keep their existing meanings.
+
+Quotes keep text as a string. To check a computed value, write `key = "passkey_{$kind}" as PasskeySessionKey`. A repeated word reuses its type lookup while the same declarations are visible. A computed cast evaluates its input on every call. For a short repeated string, KScript can reuse a successful conversion governed entirely by static rules. With a custom normalizer or validator, it runs that code again and can reuse a successful regex match on the resulting text.
+
 ## Slash paths
 
 A `slash_path` is a list of names joined by `/`: where a page sits on a site, a menu or category path, a route segment or a key in a tree. It reads like a URL path, but it never touches the disk. A file or folder is a `path:` argument and `@file(path)`, so the type has its own name.

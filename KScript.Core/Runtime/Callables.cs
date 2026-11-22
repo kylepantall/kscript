@@ -146,7 +146,7 @@ namespace KScript.Runtime
         public object Call(CallContext call)
         {
             Scope scope = Closure.Child();
-            IReadOnlyList<object> args = call.Named.Count == 0 && !call.Args.Any(a => a is BareWord) ? call.Args : ArgumentBinder.BindByName(call, Parameters, out _, lenient: true);
+            IReadOnlyList<object> args = call.Named.Count == 0 && !call.Args.Any(a => a is BareWord or BareList or LatePositional) ? call.Args : ArgumentBinder.BindByName(call, Parameters, out _, lenient: true);
             for (int i = 0; i < Node.Parameters.Count; i++)
             {
                 scope.Declare(Node.Parameters[i].Name, i < args.Count ? args[i] : null);
@@ -195,9 +195,12 @@ namespace KScript.Runtime
             Scope scope = Closure.Child();
             var enums = new Dictionary<string, EnumType>();
             var enumLists = new Dictionary<string, EnumType>();
+            Dictionary<string, string> rawItems = null;
             foreach (Parameter p in Parameters.Where(p => p.Type != null))
             {
                 TypeRef t = TypeRef.Parse(p.Type);
+                if (t.ListDepth == 1 && Shapes.RawTextKind(t.Item, Closure, Module) is string itemKind)
+                    (rawItems ??= new Dictionary<string, string>())[p.Name] = itemKind;
                 if (t.ListDepth == 1 && !t.Optional && !t.IsBuiltIn && t.Inline == null)
                 {
                     // sizes: Size[] takes [large, small] with bare values.
@@ -227,7 +230,8 @@ namespace KScript.Runtime
             IReadOnlyList<object> args = ArgumentBinder.BindByName(call,
                 Parameters.Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null,
                     TypeName: e?.Name ?? enumLists.GetValueOrDefault(p.Name)?.Name, ItemValues: enumLists.GetValueOrDefault(p.Name)?.Names,
-                    RawText: p.Type == null || e != null ? null : Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module))).ToList(), out HashSet<int> given);
+                    RawText: p.Type == null || e != null ? null : Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module))
+                    { RawItemText = rawItems?.GetValueOrDefault(p.Name) }).ToList(), out HashSet<int> given);
             for (int i = 0; i < Parameters.Count; i++)
             {
                 Parameter p = Parameters[i];

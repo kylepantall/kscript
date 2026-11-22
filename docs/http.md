@@ -318,6 +318,8 @@ Group(middleware: auth) {
 
 `@response()`, `@view()` and `@redirect()` give a response value. Middleware gets one back from `$next($request)`.
 
+`kscript serve` sends `Server: kscript` on HTTP responses. To set your own value for a route, use `->with_header('Server', 'my-app')`.
+
 - Read it with `.status`, `.body`, `.type`, `.headers`, `->header(name)`, `.is_ok` and `->json()`.
 - Change it with `->with_status(code)`, `->with_header(name, value)`, `->with_type(type)`, `->with_etag(value)` and `->with_cache(directives)`. Each returns the response, so the calls chain.
 
@@ -334,6 +336,8 @@ echo $added.status   // 201
 ```
 
 It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The options and the response are the same as for an address: `method`, `headers` and `body` (a map or list is sent as JSON), then `.status`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
+
+`@api()` sends `User-Agent: kscript` by default for both remote and local requests. To identify a particular client, pass `options: { headers: { 'User-Agent': 'my-app' } }`. That override applies to one request.
 
 A request made while answering another one, such as a page calling the API, or a route calling another route, sends on the `Cookie` and `Authorization` headers of the request being answered, so the API sees the same signed-in person. Give your own `headers` to send others. Requests inside one another stop after 8, so a route that calls itself is an error rather than a hang.
 

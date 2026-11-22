@@ -10,6 +10,8 @@ namespace KScript.Runtime
     {
         private readonly Dictionary<string, object> vars = new Dictionary<string, object>(StringComparer.Ordinal);
         private HashSet<string> constants;
+        private PatternLiteralScope inheritedPatterns;
+        private PatternLiteralScope visiblePatterns;
 
         public Scope(Scope parent = null) { Parent = parent; }
 
@@ -55,7 +57,7 @@ namespace KScript.Runtime
             {
                 if (constants != null && constants.Contains(name))
                     throw new KScriptException($"${name} is const and can't be declared again.", "Const");
-                vars[name] = value;
+                SetValue(name, value);
                 if (isConst) (constants ??= new HashSet<string>(StringComparer.Ordinal)).Add(name);
             }
         }
@@ -70,7 +72,7 @@ namespace KScript.Runtime
                     if (!s.vars.ContainsKey(name)) continue;
                     if (s.constants != null && s.constants.Contains(name))
                         throw new KScriptException($"${name} is const, so it can't be changed.", "Const");
-                    s.vars[name] = value;
+                    s.SetValue(name, value);
                     return;
                 }
             }
@@ -89,6 +91,29 @@ namespace KScript.Runtime
                 }
             }
             return false;
+        }
+
+        // Caller holds vars' lock. Changing an ordinary value leaves the set of visible types alone.
+        private void SetValue(string name, object value)
+        {
+            if (visiblePatterns != null && (visiblePatterns.Contains(name) || value is RefinedType type && type.Name == name
+                || vars.TryGetValue(name, out object old) && old is RefinedType previous && previous.Name == name))
+                visiblePatterns = null;
+            vars[name] = value;
+        }
+
+        internal PatternLiteralScope PatternTypes()
+        {
+            PatternLiteralScope parent = Parent?.PatternTypes() ?? PatternLiteralScope.Empty;
+            lock (vars)
+            {
+                if (visiblePatterns == null || inheritedPatterns != parent)
+                {
+                    inheritedPatterns = parent;
+                    visiblePatterns = parent.With(vars);
+                }
+                return visiblePatterns;
+            }
         }
 
         /// <summary>The variables declared in this scope itself.</summary>

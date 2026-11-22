@@ -269,6 +269,10 @@ A built-in type that was renamed is an error, with a fix that writes the new nam
 
 **A model the migrations don't match.** The model's table, as its fields say it should be, isn't what the files in `database/migrations` make. Run `kscript db diff` to write the migration, or `kscript db diff --pretend` to see it first. See [Migrations](data.md#migrations).
 
+## KS5015
+
+**Two visible literal types declare the same pattern.** The checker warns at the declaration or import that brings them together. You can use both types explicitly. If a bare word matches more than one visible pattern, the word itself gets a KS5012 error naming the candidates. See [recognizing a custom literal by its pattern](types.md#recognizing-a-custom-literal-by-its-pattern).
+
 ## Style
 
 The KS6xxx codes come in two kinds.

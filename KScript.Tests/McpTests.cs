@@ -572,16 +572,26 @@ public sealed class McpTests : IDisposable
         using var stop = new CancellationTokenSource();
         var started = new TaskCompletionSource<string>();
         Task running = server.RunHttpAsync(port, stop.Token, url => started.SetResult(url));
-        string endpoint = await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        Assert.Equal($"http://localhost:{port}/mcp", endpoint);
+        try
+        {
+            string endpoint = await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.Equal($"http://localhost:{port}/mcp", endpoint);
 
-        using var client = new HttpClient();
-        var response = await client.PostAsync(endpoint, new StringContent("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"ping\"}", Encoding.UTF8, "application/json"));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("\"id\":7", await response.Content.ReadAsStringAsync());
+            using var client = new HttpClient();
+            using var response = await client.PostAsync(endpoint, new StringContent("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"ping\"}", Encoding.UTF8, "application/json"));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(HttpIdentity.Product, Assert.Single(response.Headers.Server).ToString());
+            Assert.Contains("\"id\":7", await response.Content.ReadAsStringAsync());
 
-        stop.Cancel();
-        await running.WaitAsync(TimeSpan.FromSeconds(30));
+            using var rejected = await client.GetAsync(endpoint);
+            Assert.Equal(HttpStatusCode.MethodNotAllowed, rejected.StatusCode);
+            Assert.Equal(HttpIdentity.Product, Assert.Single(rejected.Headers.Server).ToString());
+        }
+        finally
+        {
+            stop.Cancel();
+            await running.WaitAsync(TimeSpan.FromSeconds(30));
+        }
 
         // Stopped before it started: a normal stop too.
         using var cancelled = new CancellationTokenSource();

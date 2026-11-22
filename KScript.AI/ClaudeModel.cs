@@ -104,6 +104,7 @@ namespace KScript.AI
             {
                 ClaudeConnection connection = (connect ?? (() => ClaudeConnection.FromEnvironment()))();
                 var http = connection.Handler == null ? new HttpClient() : new HttpClient(connection.Handler);
+                http.DefaultRequestHeaders.UserAgent.ParseAdd(HttpIdentity.Product);
                 http.Timeout = TimeSpan.FromMinutes(10);
                 return (connection, http);
             });
