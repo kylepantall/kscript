@@ -27,7 +27,7 @@ public sealed class TypeConstructionTests : DataFixture
 
     private static string Runs(string code) => ScriptRunner.Run(Types + code, path: Path.Combine(Path.GetTempPath(), "construct.kscript"));
 
-    private static KScriptException Fails(string code) => Assert.Throws<KScriptException>(() => Runs(code));
+    private static KScriptException TypeFails(string code) => Assert.Throws<KScriptException>(() => Runs(code));
 
     [Theory]
     [InlineData("r = Repo({ name: 'k', stars: '3' })\necho \"$r.name { $r.stars + 1 } { $r->type() }\"", "k 4 Repo\n")]
@@ -56,7 +56,7 @@ public sealed class TypeConstructionTests : DataFixture
     [InlineData("Size()", "Size() takes one value to check: Size($value).")]
     public void AValueThatDoesNotFitIsAnError(string call, string message)
     {
-        Assert.Contains(message, Fails("x = " + call + "\necho $x").Message);
+        Assert.Contains(message, TypeFails("x = " + call + "\necho $x").Message);
     }
 
     [Theory]
@@ -65,7 +65,7 @@ public sealed class TypeConstructionTests : DataFixture
     [InlineData("Missing->new(what: 'x')", "->new() is gone: call the error type to make an error, Missing(...).")]
     public void FromAndNewAreGone(string call, string message)
     {
-        KScriptException e = Fails("x = " + call + "\necho $x");
+        KScriptException e = TypeFails("x = " + call + "\necho $x");
         Assert.Equal("Retired", e.Type);
         Assert.Contains(message, e.Message);
     }

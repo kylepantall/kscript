@@ -1,0 +1,21 @@
+<Project>
+
+  <!--
+    Every project builds with no warnings: a compiler or analyzer warning (xUnit1031 blocking
+    calls in tests, CS0108 hidden members, nullable warnings...) fails the build, so it is fixed
+    where it appears instead of piling up as CI annotations.
+
+    Left as warnings on purpose:
+    - NU1901-NU1904: a new security advisory for a package. It can appear on any day without a
+      change here, so it is reported but doesn't stop every build until the package is updated.
+    - Trim and Native AOT warnings (ILLink/ILC): the Native AOT job in ci.yml keeps its own list
+      of the few that are allowed and fails on any other.
+  -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
+    <IlcTreatWarningsAsErrors>false</IlcTreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

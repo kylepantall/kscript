@@ -108,7 +108,7 @@ public sealed class AgentsCliTests : IDisposable
     }
 
     [Fact]
-    public void ServeKeepsTheAgentDocsUpToDate()
+    public async Task ServeKeepsTheAgentDocsUpToDate()
     {
         Write("kscript.json", "{ \"name\": \"site\", \"serve\": { \"port\": 0, \"host\": \"127.0.0.1\" } }");
         Write("index.html", "<h1>Hi</h1>");
@@ -125,7 +125,7 @@ public sealed class AgentsCliTests : IDisposable
         bool updated = SpinWait.SpinUntil(() => { try { return File.ReadAllText(index).Contains("@two()"); } catch (IOException) { return false; } }, 15_000);
         stop.Cancel();
         Assert.True(updated, o.ToString() + e);
-        Assert.Equal(0, serving.Result);
+        Assert.Equal(0, await serving);
 
         // Without agent docs, serve watches nothing.
         Directory.Delete(Path.Combine(dir, ".kscript"), true);
