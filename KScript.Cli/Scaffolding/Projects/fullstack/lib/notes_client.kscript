@@ -25,18 +25,18 @@ fn add_note(title: string) {
 }
 
 /// Ticks a note, or unticks it.
-fn toggle_note(note) {
+fn toggle_note(note: map) {
   changed = { title: $note.title, body: $note.body, done: not $note.done }
   @api('/api/notes/' + $note.id, options: { method: 'PUT', body: $changed })->check()
 }
 
 /// Deletes a note.
-fn delete_note(id) {
+fn delete_note(id: int) {
   @api('/api/notes/' + $id, options: { method: 'DELETE' })->check()
 }
 
 /// How many notes are not done yet, as text: '1 note left'.
-fn notes_left(notes) {
+fn notes_left(notes: list) {
   n = $notes->count(fn($n) => not $n.done)
   return $n + ($n == 1 ? ' note left' : ' notes left')
 }

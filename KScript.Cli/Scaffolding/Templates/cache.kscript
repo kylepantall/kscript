@@ -18,7 +18,7 @@ const file = '{{ up }}{{ file }}{{#unless file}}{{ paths.data }}/{{ dir }}{{ keb
 fn saved() => @exists($file) ? @read_json($file) : {}
 
 /// The cached value for key, or what make() returns, which is kept for next time.
-fn remember(key, make, minutes = {{ minutes ?? 10 }}) {
+fn remember(key: string, make: fn, minutes = {{ minutes ?? 10 }}) {
   entries = @saved()
   entry = $entries[$key]
   if $entry != null and @date($entry.expires) gt @now() {
@@ -30,6 +30,6 @@ fn remember(key, make, minutes = {{ minutes ?? 10 }}) {
 }
 
 /// Drops the cached value for key, so the next remember() works it out again.
-fn forget(key) {
+fn forget(key: string) {
   @write_json($file, @saved()->remove($key))
 }

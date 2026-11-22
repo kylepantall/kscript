@@ -18,7 +18,7 @@ type SignUp {
 fn show_login() => @view('auth/login', data: {})
 
 /// POST /login: a wrong email or password shows the form again. After a few wrong tries, @attempt makes them wait.
-fn sign_in(form) {
+fn sign_in(form: map) {
   user = null
   try {
     user = @attempt($form.email ?? '', $form.password ?? '', remember: $form.remember == 'yes')
@@ -35,7 +35,7 @@ fn sign_in(form) {
 fn show_register() => @view('auth/register', data: {})
 
 /// POST /register: makes the account and signs it in.
-fn sign_up(form) {
+fn sign_up(form: map) {
   user = null
   try {
     data = $SignUp->from($form)
@@ -57,7 +57,7 @@ fn sign_out() {
 fn show_forgot() => @view('auth/forgot-password', data: {})
 
 /// POST /forgot-password: the answer is the same whether or not the email has an account.
-fn send_reset(form, request) {
+fn send_reset(form: map, request: map) {
   token = @reset_token($form.email ?? '')
   if $token != null {
     site = ($request.scheme ?? 'http') + '://' + ($request.headers.host ?? 'localhost')
@@ -70,10 +70,10 @@ fn send_reset(form, request) {
 }
 
 /// GET /reset-password/:token
-fn show_reset(token) => @view('auth/reset-password', data: { token: $token })
+fn show_reset(token: string) => @view('auth/reset-password', data: { token: $token })
 
 /// POST /reset-password: sets the new password, ends the account's other sessions and signs it in here.
-fn reset(form) {
+fn reset(form: map) {
   user = null
   try {
     user = @reset_password($form.token ?? '', $form.password ?? '')
@@ -93,13 +93,13 @@ fn reset(form) {
 fn account() => @view('auth/account', data: { user: @user(), tokens: @api_tokens(@user()) })
 
 /// POST /account/tokens: makes an API token, shown once.
-fn make_token(form) {
+fn make_token(form: map) {
   token = @api_token(@user(), name: $form.name ?? 'token')
   return @view('auth/account', data: { user: @user(), tokens: @api_tokens(@user()), new_token: $token })
 }
 
 /// POST /account/tokens/:id/delete
-fn delete_token(id) {
+fn delete_token(id: string) {
   @revoke_token($id, user: @user())
   $session->flash('status', 'The token was revoked.')
   return @redirect('/account')
@@ -107,7 +107,7 @@ fn delete_token(id) {
 {{#if api}}
 
 /// POST {{ api_prefix }}/tokens with a JSON email and password: answers with a new API token.
-fn issue_token(json) {
+fn issue_token(json: map) {
   user = @attempt($json.email ?? '', $json.password ?? '', session: false)
   if $user == null {
     throw Unauthorized "That email and password don't match an account."

@@ -17,7 +17,7 @@
   <let name="board_h" value="20" />
   <let name="frame_ms" value="70" />
 
-  <fn name="draw" params="world, title = ''">
+  <fn name="draw" params="world: map, title = ''">
     <if @is_terminal()>
       <clear />
     </if>
@@ -28,7 +28,7 @@
     <echo>  { @color($s.status, colour: $s.status eq 'Extinct' ? 'red' : $s.status eq 'Evolving' ? 'cyan' : 'yellow') }   { @dim($s.size + ', edges ' + $s.edges) }</echo>
   </fn>
 
-  <fn name="play" params="world, generations: int">
+  <fn name="play" params="world: map, generations: int">
     <!-- Animates at a terminal; when the output is redirected only the last frame is printed. -->
     <let name="w" value="$world" />
     <for each="i" in="0..$generations">
@@ -44,7 +44,7 @@
     <return value="$w" />
   </fn>
 
-  <fn name="load_pattern" params="name_or_path, wrap = true">
+  <fn name="load_pattern" params="name_or_path: string, wrap = true">
     <if $patterns->has($name_or_path)>
       <return value="@pattern_world($name_or_path, width: $board_w, height: $board_h, wrap: $wrap)" />
     </if>

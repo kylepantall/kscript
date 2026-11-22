@@ -405,7 +405,7 @@ public class MakeProjectTests : IDisposable
         string root = Path.Combine(parent.Root, "my-tool");
         var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
         Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config/config.yaml", "kscript.json", "main.kscript", "tests/main.test.kscript" }, files);
-        Assert.Contains("@greeting(name): string", File.ReadAllText(Path.Combine(root, ".kscript", "agents", "index.md")));
+        Assert.Contains("@greeting(name: string): string", File.ReadAllText(Path.Combine(root, ".kscript", "agents", "index.md")));
         Assert.Equal("@AGENTS.md\n", File.ReadAllText(Path.Combine(root, "CLAUDE.md")));
         Assert.Contains("kscript main.kscript    run the script", output);
 

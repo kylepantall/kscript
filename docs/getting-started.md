@@ -100,7 +100,7 @@ match $day {
 ## Functions
 
 ```kscript try
-fn greet(who, greeting = 'Hello') {
+fn greet(who: string, greeting = 'Hello') {
   return $greeting + ', ' + $who + '!'
 }
 fn square(n: number) => $n * $n
@@ -115,7 +115,7 @@ Your own functions and the built-in commands are both called with `@`. Arguments
 ## Errors
 
 ```kscript try
-fn check_age(age) {
+fn check_age(age: int) {
   if $age lt 0 {
     throw Validation "Age must be positive, got {$age}"
   }

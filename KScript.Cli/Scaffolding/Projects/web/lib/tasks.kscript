@@ -3,7 +3,7 @@
 // A task is a map: { id: 1, title: 'Buy milk', done: false }.
 
 /// The list with a new task at the end. A blank title leaves the list as it is.
-fn add_task(tasks, title) {
+fn add_task(tasks: list, title: string) {
   clean = $title->trim()
   if $clean == '' {
     return $tasks
@@ -13,16 +13,16 @@ fn add_task(tasks, title) {
 }
 
 /// The list with one task ticked or unticked.
-fn toggle_task(tasks, id) => $tasks->map(fn($t) => $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)
+fn toggle_task(tasks: list, id: int) => $tasks->map(fn($t) => $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)
 
 /// The list without one task.
-fn remove_task(tasks, id) => $tasks->reject(fn($t) => $t.id == $id)
+fn remove_task(tasks: list, id: int) => $tasks->reject(fn($t) => $t.id == $id)
 
 /// The list without the finished tasks.
-fn clear_done(tasks) => $tasks->reject(fn($t) => $t.done)
+fn clear_done(tasks: list) => $tasks->reject(fn($t) => $t.done)
 
 /// How many tasks are not done yet, as text: '1 task left'.
-fn tasks_left(tasks) {
+fn tasks_left(tasks: list) {
   n = $tasks->count(fn($t) => not $t.done)
   return $n + ($n == 1 ? ' task left' : ' tasks left')
 }

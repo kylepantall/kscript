@@ -1,6 +1,6 @@
 // {{ title }}. Run it with: kscript main{{ ext }}, or kscript main{{ ext }} Ellie
 
 /// A friendly hello for someone.
-fn greeting(name) => 'Hello, ' + $name->trim()->title() + '!'
+fn greeting(name: string) => 'Hello, ' + $name->trim()->title() + '!'
 
 echo "{ @greeting($args[0] ?? 'world') }"
