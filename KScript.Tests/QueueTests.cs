@@ -937,6 +937,14 @@ public sealed class QueueTests : StorageFixture
     }
 
     [Fact]
+    public void IdsMadeInTheSameMillisecondSortInTheOrderTheyWereMade()
+    {
+        var ids = Enumerable.Range(0, 2000).Select(_ => QueuedJob.NewId()).ToList();
+        Assert.Equal(ids, ids.OrderBy(id => id, StringComparer.Ordinal).ToList());
+        Assert.Equal(ids.Count, ids.Distinct().Count());
+    }
+
+    [Fact]
     public void ADatabaseJobWhoseWorkerStoppedRunsAgainAfterItsLease()
     {
         UseDatabase();
