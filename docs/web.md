@@ -11,7 +11,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 <let name="people" value="@read_json('data/people.json')" />
 <let name="min" value="($request.query.min_age ?? '0')->to_number(default: 0)" />
 
-<layout src="_layout.html" title="People">
+<layout path="_layout.html" title="People">
   <h1>People aged {$min} and over</h1>
   <ul>
     <for each="p" in="$people |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)">
@@ -31,12 +31,12 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 | `<let name value>` / `<let>x = 3</let>` | Declare a variable in the current block. |
 | `<set name value op>` / `<set>x += 1</set>` / `<do>$a = 1; $b += 2</do>` | Change existing variables. |
 | `<if test>`, `<elif test>`, `<else>` | Branches. `<else>` after a `<for>` runs when the loop had nothing to loop over. |
-| `<for each="p" in="$list" index="i">`, `<for each="key, value" in="$map">` | Loops. `$loop.index` and `$loop.first` are set too. |
+| `<for each="p" in="$list" at="i">`, `<for each="key, value" in="$map">` | Loops. `$loop.index` and `$loop.first` are set too. |
 | `<while test>` | Loop while true (stopped after 100,000 runs). |
 | `<match value>` with `<case is="1, 2">`, `<case when="$it gt 9">`, `<default>` | Pick one branch. |
-| `<layout src="_layout.html" title="…">` and `<slot />` | Wrap the page in a layout; extra attributes become variables. |
+| `<layout path="_layout.html" title="…">` and `<slot />` | Wrap the page in a layout; extra attributes become variables. |
 | `<my-card user="{$u}">`, `<hero>` | A component: `_components/my-card.html`, with `<slot />` for its children. Any element that isn't an HTML or KScript element can be a component. Components only see their own attributes. |
-| `<include src="_part.html">` | Insert another template here. |
+| `<include path="_part.html">` | Insert another template here. |
 | `<markdown>` | Render Markdown, with `{ }` values escaped. |
 | `<respond status json type header-x>` / `<redirect to>` | Send a different response, e.g. JSON or a 404. |
 
@@ -46,7 +46,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **Routing**: `/people` serves `people.html`, `people.md` or `people/index.html`; `/people/42` can match `people/[id].html` (`$request.params.id`). Files and folders starting with `_` or `.` and KScript sources (`.xml`) are never served. `_404.html` is used for missing pages.
 - **`$request`**: `method`, `path`, `query`, `form`, `headers`, `cookies`, `params` and `body`.
 - **Same language as scripts**: pages run on the KScript 2 interpreter, so every KScript.Core command and method works in them. Pages also get KScript.IO, KScript.Markdown and KScript.Web without importing them: `@read_json`, `@read_text`, `@read_markdown` (gives `html`, `title` and `meta`), `@files`, `@exists`, `@markdown`. Other packages are imported at the top of the page, as in a script: `<import package="KScript.Math" as="math" />` and then `{ @math.sqrt(2) }`.
-- **Sharing code with scripts**: `<import src="lib/text.ks.xml" />` at the top of a page gives it that script's top-level `<fn>` functions and `<let const="true">` values. `as="text"` (then `@text.shout(...)`) and `names="shout"` work as they do in scripts.
+- **Sharing code with scripts**: `<import path="lib/text.ks.xml" />` at the top of a page gives it that script's top-level `<fn>` functions and `<let const="true">` values. `as="text"` (then `@text.shout(...)`) and `names="shout"` work as they do in scripts.
 - **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
 - **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
 

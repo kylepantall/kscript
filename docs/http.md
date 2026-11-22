@@ -32,8 +32,8 @@ KScript.Routes {
   Middleware(use: secure_headers)
 
   Get(path: /, view: home, name: home)
-  Get(path: /people, to: people.list, name: people.list)
-  Get(path: /people/{id}, to: people.page, name: people.page, where: id: int)
+  Get(path: /people, to: @people.list, name: people.list)
+  Get(path: /people/{id}, to: @people.page, name: people.page, where: id: int)
   Get(path: /team, redirect: /people, status: 301)
 
   Get(path: /ping) {
@@ -55,7 +55,7 @@ A route has a `path` and one way to answer:
 | Attribute | Use |
 | --- | --- |
 | `path` | `/people/{id}`. `{name?}` is optional and `{name*}` takes the rest of the path (`/files/{path*}`). |
-| `to` | The controller: a function of an imported script (`people.show`) or an `fn` in the route file (`show`). |
+| `to` | The controller: a function of an imported script (`@people.show`) or an `fn` in the route file (`@show`). In XML: `to="people.show"`. |
 | `view` | Render this view with the path parameters as its variables. |
 | `redirect`, `status` | Redirect, with 302 by default. |
 | a `{ }` block | The route's own body, like an `fn`: `Get(path: /ping) { return 'pong' }`. |
@@ -243,8 +243,8 @@ Browsers and proxies can keep an answer and ask again only when it may have chan
 KScript.Routes {
   import "controllers/people.kscript" as people
 
-  Get(path: /people, to: people.index, etag: true, cache: 60)
-  Get(path: /people/{id}, to: people.show, etag: true, cache: "private, max-age=0, must-revalidate")
+  Get(path: /people, to: @people.index, etag: true, cache: 60)
+  Get(path: /people/{id}, to: @people.show, etag: true, cache: "private, max-age=0, must-revalidate")
 }
 ```
 
@@ -388,7 +388,7 @@ To keep the document in your project, for example to commit it or hand it to a c
 
 Route files get the same checking and completion as scripts:
 
-- `to` completes the functions of imported controllers (`people.show`). A name that doesn't exist is an error with a did-you-mean.
+- `to` completes the functions of imported controllers (`@people.show`). A name that doesn't exist is an error with a did-you-mean.
 - `middleware` and `use` complete the built-ins too, and accept `http.groups` names.
 - Names in a list are checked and completed one by one, inside `[ ]` too.
 - Route elements are only offered inside `KScript.Routes` or `Group`.

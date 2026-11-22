@@ -95,7 +95,7 @@ namespace KScript.Metadata
         /// <summary>True if attributes other than the listed ones are allowed (they become variables, as in <c>&lt;layout&gt;</c>).</summary>
         public bool AllowsExtraAttributes { get; init; }
 
-        /// <summary>The type of the variable its declare-variable attribute (to:, into:) makes, when not text.</summary>
+        /// <summary>The type of the variable its declare-variable attribute (into:) makes, when not text.</summary>
         public string DeclaresType { get; init; }
 
         /// <summary>True if the element is in the KScript 2 design but no package implements it yet.</summary>
@@ -130,5 +130,15 @@ namespace KScript.Metadata
 
         /// <summary>If the fix is a plain rename, the new name (offered as a quick fix).</summary>
         public string Rename { get; }
+
+        /// <summary>
+        /// True for a name KScript 2 itself changed (<c>before-each</c> is now <c>before_each</c>), rather than
+        /// KScript 1 syntax that was removed. <see cref="Replacement"/> then finishes the sentence: "is now before_each."
+        /// </summary>
+        public bool Renamed { get; init; }
+
+        /// <summary>The whole message for something written the old way: what it was, and what to write instead.</summary>
+        public string Message(string written) =>
+            Renamed ? $"{written} {Replacement}" : $"{written} was removed in KScript 2. {Replacement}";
     }
 }

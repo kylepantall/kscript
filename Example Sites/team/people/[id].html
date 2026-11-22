@@ -6,7 +6,7 @@
   <respond status="404">No one has id {$request.params.id}.</respond>
 </if>
 
-<layout src="_layout.html" title="{$person.name}">
+<layout path="_layout.html" title="{$person.name}">
   <person-card person="{$person}" />
   <match $person.role>
     <case is="'Founder'">

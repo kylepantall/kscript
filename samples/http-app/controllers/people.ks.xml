@@ -1,9 +1,9 @@
 <kscript>
   <import package="KScript.IO" />
   <import package="KScript.Http" />
-  <import src="../requests/new-person.ks.xml" />
-  <import src="../requests/people-query.ks.xml" />
-  <import src="../types/person.ks.xml" />
+  <import path="../requests/new-person.ks.xml" />
+  <import path="../requests/people-query.ks.xml" />
+  <import path="../types/person.ks.xml" />
 
   <const name="file" value="'data/people.json'" />
 

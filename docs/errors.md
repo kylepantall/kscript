@@ -108,7 +108,7 @@ rows = @sql("select * from users where id = {$id}")   // right: {$id} is a param
 
 ## KS3002
 
-**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element.
+**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element. A statement that was renamed says its new name in both formats (`before-each is now before_each.`), and `kscript check --fix` renames it.
 
 ## KS3003
 
@@ -116,7 +116,7 @@ rows = @sql("select * from users where id = {$id}")   // right: {$id} is a param
 
 ## KS3004
 
-**An argument KScript 2 removed.** The message names what replaced it.
+**An argument KScript 2 removed, or one that was renamed.** The message names what replaced it: `'to' is now into.`, `'must-exist' is now must_exist`, `'src' is now path.` A renamed argument has a quick fix, and `kscript check --fix` applies it. See [Names of statements and arguments](language.md#names-of-statements-and-arguments).
 
 ## KS3005
 
@@ -309,7 +309,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6012
 
-**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`). Logic stays as words: `and`, `or`, `not`.
+**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`). Logic stays as words: `and`, `or`, `not`. A function is named as `@name` in an argument, as it is in an expression: `spawn(fn: @job)`, `llm(tools: [@lookup])`, `Get(to: @people.show)`, not a bare `job`.
 
 ## KS6013
 

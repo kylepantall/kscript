@@ -113,7 +113,7 @@ namespace KScript.Language.Tests
                 <error name="Gone2" fields="a: int, a: int" />
                 <error />
                 <throw value="Gone(what: 'x')" />
-                <expect-error type="Gone2" />
+                <expect_error type="Gone2" />
                 """), "/tmp/errors/test.ks.xml"));
             Assert.Equal("KS4004 KS3007 KS4001 KS4004 KS3005 KS5004 KS3009", string.Join(" ", a.Diagnostics.Select(d => d.Code)));
         }

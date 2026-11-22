@@ -66,7 +66,7 @@ namespace KScript.Language.Features
                 RetiredInfo retired = Catalog.GetRetiredElement(e.Name);
                 if (retired != null)
                 {
-                    return new HoverResult($"**<{e.Name}>** was removed in KScript 2.\n\n{retired.Replacement}", span);
+                    return new HoverResult(retired.Renamed ? retired.Message($"**{e.Name}**") : $"**<{e.Name}>** was removed in KScript 2.\n\n{retired.Replacement}", span);
                 }
                 DocumentLink link = analysis.LinkAt(offset);
                 if (link != null)
@@ -84,10 +84,10 @@ namespace KScript.Language.Features
                 {
                     return new HoverResult($"**{a.Name}** ({KindLabel(a.Kind)}{(a.Required ? ", required" : string.Empty)})\n\n{DeprecationLine(a.Deprecated, a.Name)}{a.Description}{OptionsLine(a)}", cursor.Attribute.NameSpan);
                 }
-                RetiredInfo retired = Catalog.GetRetiredAttribute(cursor.Attribute.Name);
+                RetiredInfo retired = Catalog.GetRetiredAttribute(info, cursor.Attribute.Name);
                 if (retired != null)
                 {
-                    return new HoverResult($"**{cursor.Attribute.Name}** was removed in KScript 2.\n\n{retired.Replacement}", cursor.Attribute.NameSpan);
+                    return new HoverResult(retired.Renamed ? retired.Message($"**{cursor.Attribute.Name}**") : $"**{cursor.Attribute.Name}** was removed in KScript 2.\n\n{retired.Replacement}", cursor.Attribute.NameSpan);
                 }
                 return null;
             }

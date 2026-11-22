@@ -57,7 +57,7 @@ namespace KScript.Style
 
         /// <summary>
         /// Turns stylesheet text into a KScript script: KScript elements stay as they are, and the CSS between them
-        /// goes into &lt;css-text&gt; elements. A KScript element alone on its line leaves no blank line behind.
+        /// goes into &lt;css_text&gt; elements. A KScript element alone on its line leaves no blank line behind.
         /// Line numbers stay the same, so errors point at the stylesheet's own lines.
         /// </summary>
         public static string ToScript(string source)
@@ -121,12 +121,12 @@ namespace KScript.Style
         private static void Flush(StringBuilder sb, StringBuilder text, bool wrap)
         {
             if (text.Length == 0) return;
-            if (wrap) sb.Append("<css-text>");
+            if (wrap) sb.Append("<css_text>");
             foreach (char c in text.ToString())
             {
                 sb.Append(c switch { '&' => "&amp;", '<' => "&lt;", '>' => "&gt;", _ => c.ToString() });
             }
-            if (wrap) sb.Append("</css-text>");
+            if (wrap) sb.Append("</css_text>");
             text.Clear();
         }
 

@@ -64,7 +64,7 @@ namespace KScript.Language.Tests
         {
             List<CompletionItem> items = Complete(Script("<for each=\"i\" ‸></for>"));
             Assert.Contains(items, i => i.Label == "in" && i.Kind == CompletionKind.Attribute);
-            Assert.Contains(items, i => i.Label == "index");
+            Assert.Contains(items, i => i.Label == "at");
             Assert.DoesNotContain(items, i => i.Label == "each"); // already present
         }
 

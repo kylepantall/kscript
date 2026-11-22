@@ -136,7 +136,7 @@ namespace KScript.Runtime
         public IReadOnlyDictionary<string, VariableDefinition> Variables { get { EnsureRegistered(); return variables; } }
         public IReadOnlyDictionary<string, EchoFormatter> EchoFormats { get { EnsureRegistered(); return echoFormats; } }
 
-        /// <summary>Kinds of log provider this package adds, by type name: logging.providers[].type and &lt;log-provider type&gt;.</summary>
+        /// <summary>Kinds of log provider this package adds, by type name: logging.providers[].type and &lt;log_provider type&gt;.</summary>
         public IReadOnlyDictionary<string, LogProviderType> LogProviders { get { EnsureRegistered(); return logProviders; } }
 
         /// <summary>Packages that are imported along with this one.</summary>
@@ -341,7 +341,7 @@ namespace KScript.Runtime
 
             /// <summary>
             /// Adds a kind of log provider, such as http. Scripts that import the package can name it in
-            /// logging.providers (type: http) or &lt;log-provider type="http"&gt;; <paramref name="create"/> gets the options.
+            /// logging.providers (type: http) or &lt;log_provider type="http"&gt;; <paramref name="create"/> gets the options.
             /// </summary>
             public void LogProvider(string type, string description, Func<LogProviderContext, ILogProvider> create) =>
                 package.logProviders[type] = new LogProviderType(type, description, create, package.Name);

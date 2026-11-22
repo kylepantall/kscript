@@ -30,13 +30,13 @@ public class TypedFunctionTests
     public void InputReadsTheNewTypes()
     {
         Assert.Equal("Email: \nThat isn't an email: there's nothing after the @. Try again.\nEmail: \nJoan@example.com example.com\n",
-            RunBody("<input to=\"e\" type=\"email\">Email: </input><echo>$e { $e.domain }</echo>", "joan@\n Joan@Example.COM \n", "KScript.Terminal"));
-        Assert.Equal("Who: \n@joan\n", RunBody("<input to=\"h\" type=\"handle\">Who: </input><echo>$h</echo>", "@Joan\n", "KScript.Terminal"));
-        Assert.Equal("Id: \n4\n", RunBody("<input to=\"u\" type=\"uuid\">Id: </input><echo>{ $u.version }</echo>", "3F2A8C1E-9B7D-4C2A-8E1F-0A9B8C7D6E5F\n", "KScript.Terminal"));
-        Assert.Equal("Password: \n******** true\n", RunBody("<input to=\"p\" type=\"password\">Password: </input><echo>$p { $p->reveal() == ' secret ' }</echo>", " secret \n", "KScript.Terminal"));
-        Assert.Contains("Nope", RunBody("<input to=\"u\" type=\"uuid\" error=\"Nope\">Id: </input>", "x\n3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\n", "KScript.Terminal"));
+            RunBody("<input into=\"e\" type=\"email\">Email: </input><echo>$e { $e.domain }</echo>", "joan@\n Joan@Example.COM \n", "KScript.Terminal"));
+        Assert.Equal("Who: \n@joan\n", RunBody("<input into=\"h\" type=\"handle\">Who: </input><echo>$h</echo>", "@Joan\n", "KScript.Terminal"));
+        Assert.Equal("Id: \n4\n", RunBody("<input into=\"u\" type=\"uuid\">Id: </input><echo>{ $u.version }</echo>", "3F2A8C1E-9B7D-4C2A-8E1F-0A9B8C7D6E5F\n", "KScript.Terminal"));
+        Assert.Equal("Password: \n******** true\n", RunBody("<input into=\"p\" type=\"password\">Password: </input><echo>$p { $p->reveal() == ' secret ' }</echo>", " secret \n", "KScript.Terminal"));
+        Assert.Contains("Nope", RunBody("<input into=\"u\" type=\"uuid\" error=\"Nope\">Id: </input>", "x\n3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\n", "KScript.Terminal"));
         string many = string.Concat(Enumerable.Repeat("x\n", 101));
-        Assert.Contains("No valid uuid after 100 tries", Assert.Throws<KScriptException>(() => RunBody("<input to=\"u\" type=\"uuid\">?</input>", many, "KScript.Terminal")).Message);
+        Assert.Contains("No valid uuid after 100 tries", Assert.Throws<KScriptException>(() => RunBody("<input into=\"u\" type=\"uuid\">?</input>", many, "KScript.Terminal")).Message);
     }
 
     [Fact]

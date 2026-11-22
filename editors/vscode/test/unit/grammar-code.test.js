@@ -80,7 +80,7 @@ test('assignment targets and constants', async () => {
   assert.match(scopeOf(tokens, '=='), /keyword\.operator\.kscript/);
 });
 
-test('double quotes are text that interpolates; single quotes are expression strings', async () => {
+test('double quotes fill in $name and { }; single quotes are kept as written', async () => {
   const tokens = tokenize(await load(), "echo \"Hi $name, { @upper('x') } \\\" done\"\nx = $s->replace('a', 'b')");
   assert.match(scopeOf(tokens, 'echo'), /support\.function\.builtin\.kscript/);
   assert.match(scopeOf(tokens, '$name'), /string\.quoted\.double\.kscript variable\.other\.kscript/);
@@ -92,11 +92,11 @@ test('double quotes are text that interpolates; single quotes are expression str
 });
 
 test('elements and their attributes', async () => {
-  const tokens = tokenize(await load(), 'Row(gap: 8, wrap) {\n  Button(variant: primary, on-click: "go()") "Play"\n  div {\n  }\n}');
+  const tokens = tokenize(await load(), 'Row(gap: 8, wrap) {\n  Button(variant: primary, on_click: "go()") "Play"\n  div {\n  }\n}');
   assert.match(scopeOf(tokens, 'Row'), /entity\.name\.tag\.kscript/);
   assert.match(scopeOf(tokens, 'gap'), /entity\.other\.attribute-name\.kscript/);
   assert.match(scopeOf(tokens, 'Button'), /entity\.name\.tag\.kscript/);
-  assert.match(scopeOf(tokens, 'on-click'), /entity\.other\.attribute-name\.kscript/);
+  assert.match(scopeOf(tokens, 'on_click'), /entity\.other\.attribute-name\.kscript/);
   assert.match(scopeOf(tokens, 'div'), /entity\.name\.tag\.kscript/);
   assert.match(scopeOf(tokens, 'Play'), /string\.quoted\.double\.kscript/);
 });

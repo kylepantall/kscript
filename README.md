@@ -9,7 +9,7 @@ KScript is an open source language for scripts, web pages and desktop apps. You 
 ```kscript
 import KScript.Terminal
 
-input(to: name) "What's your name? "
+input(into: name) "What's your name? "
 echo "Hello, { $name->trim()->title() }!"
 ```
 
@@ -47,7 +47,7 @@ for f in $big {
 }
 
 if $big->count() gt 0 {
-  confirm(to: ok) "Move them to an archive folder?"
+  confirm(into: ok) "Move them to an archive folder?"
   if $ok {
     for f in $big {
       move(from: $f, to: @join_path(base: $folder, ['archive', $f.name]))
@@ -141,7 +141,7 @@ A `KScript.Window { }` block opens a native window on macOS, Windows or Linux. I
 KScript.Window(title: Counter, width: 320, height: 200) {
   count = 0
   Text(size: 32) "{$count}"
-  Button(variant: primary, on-click: count += 1) "Add one"
+  Button(variant: primary, on_click: count += 1) "Add one"
 }
 ```
 

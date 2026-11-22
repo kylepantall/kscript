@@ -90,7 +90,7 @@ namespace KScript.Language.Tests
         public void SiteFoldersCheckTheirPages()
         {
             Write("_layout.html", "<!doctype html>\n<html><body><main><slot /></main></body></html>");
-            Write("index.html", "<layout src=\"_layout.html\" title=\"Home\">\n  <p class=\"lead\">Hi<br>there</p>\n</layout>");
+            Write("index.html", "<layout path=\"_layout.html\" title=\"Home\">\n  <p class=\"lead\">Hi<br>there</p>\n</layout>");
             string bad = Write("about.md", "---\ntitle: About\n---\n\n# {$titel}\n");
             Write(Path.Combine("_templates", "page.html"), "<p>{{ title }} {$nope}</p>");
             (int code, string output) = Run(false, dir);
@@ -103,7 +103,7 @@ namespace KScript.Language.Tests
         public void NestedPagesFindTheLayoutAtTheSiteRoot()
         {
             Write("_layout.html", "<html><body><slot /></body></html>");
-            string page = Write(Path.Combine("people", "[id].html"), "<layout src=\"_layout.html\" title=\"Person\"><p>hi</p></layout>");
+            string page = Write(Path.Combine("people", "[id].html"), "<layout path=\"_layout.html\" title=\"Person\"><p>hi</p></layout>");
             (int code, string output) = Run(true, page);
             Assert.True(code == 0, output);
         }
@@ -177,7 +177,7 @@ namespace KScript.Language.Tests
             Assert.Equal(1, code);
             Assert.Contains("index.html(1,6): error KS4001", output);
 
-            Write("index.html", "<layout src=\"missing.html\" title=\"x\"></layout>");
+            Write("index.html", "<layout path=\"missing.html\" title=\"x\"></layout>");
             (code, output) = Run(false, dir);
             Assert.True(code == 1, output);
             Assert.Contains("0 errors, 1 warning", output);

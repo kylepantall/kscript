@@ -357,13 +357,13 @@ public sealed class QueueTests : StorageFixture
     public void TheDispatchElementTakesOptionsAndAVariable()
     {
         string output = Run("""
-            <import src="jobs/welcome.kscript" />
-            <dispatch value="Welcome(user_id: 1, email: 'a@example.com')" delay="1m" queue="'q1'" connection="file" to="queued" />
+            <import path="jobs/welcome.kscript" />
+            <dispatch value="Welcome(user_id: 1, email: 'a@example.com')" delay="1m" queue="'q1'" connection="file" into="queued" />
             <dispatch value="@chain([Welcome(user_id: 2, email: 'b@example.com')])" at="@date('2026-11-21T09:30:00Z')" />
             <echo>{ $queued.queue } { $queued.available_at->format('HH:mm') }</echo>
             """, file: "main.ks.xml", setup: h => h.WorkingDirectory = Project);
         Assert.Equal("q1 09:01\n", output);
-        Assert.Contains("at should be a date", Assert.Throws<KScriptException>(() => Run("<import src=\"jobs/welcome.kscript\" /><dispatch value=\"Welcome(user_id: 1, email: 'a@example.com')\" at=\"5\" />", file: "main.ks.xml")).Message);
+        Assert.Contains("at should be a date", Assert.Throws<KScriptException>(() => Run("<import path=\"jobs/welcome.kscript\" /><dispatch value=\"Welcome(user_id: 1, email: 'a@example.com')\" at=\"5\" />", file: "main.ks.xml")).Message);
     }
 
     [Fact]
@@ -728,7 +728,7 @@ public sealed class QueueTests : StorageFixture
 
     [Fact]
     public void ImportingAJobThatIsntThereSaysWhatScriptsExport() =>
-        Assert.Contains("<error>s, <model>s and <job>s", Assert.Throws<KScriptException>(() => Run("<import src=\"jobs/welcome.kscript\" names=\"Nope\" />", setup: h => h.WorkingDirectory = Project)).Message);
+        Assert.Contains("<error>s, <model>s and <job>s", Assert.Throws<KScriptException>(() => Run("<import path=\"jobs/welcome.kscript\" names=\"Nope\" />", setup: h => h.WorkingDirectory = Project)).Message);
 
     [Fact]
     public void ABrokenKscriptJsonMeansTheDefaults()

@@ -152,7 +152,7 @@ KScript.Terminal reads from the keyboard. In the docs, click **Input** and type 
 ```kscript try
 import KScript.Terminal
 
-input(to: name, default: 'stranger') "What's your name? "
+input(into: name, default: 'stranger') "What's your name? "
 echo "Hello, $name!"
 ```
 

@@ -14,7 +14,7 @@ kscript compile --target mac-arm64,win-x64           # some of them
 kscript compile counter.ks.xml --name "Counter" --out build
 ```
 
-Each program is one file. The exception is a Mac desktop app, which is an `.app` folder around one file. The program holds the script, the scripts it imports and every other file in its folder or project, such as data, pages and pictures, so `<import src>`, `@readFile` and pages work as they do with `kscript`. The arguments a program is started with are the script's `$args`.
+Each program is one file. The exception is a Mac desktop app, which is an `.app` folder around one file. The program holds the script, the scripts it imports and every other file in its folder or project, such as data, pages and pictures, so `<import path>`, `@readFile` and pages work as they do with `kscript`. The arguments a program is started with are the script's `$args`.
 
 ## What a program holds
 

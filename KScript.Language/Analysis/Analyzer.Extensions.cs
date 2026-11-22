@@ -71,9 +71,9 @@ namespace KScript.Language.Analysis
             {
                 visited.Add(System.IO.Path.GetFullPath(result.Path));
             }
-            foreach (MarkupElement import in result.Markup.DescendantElements().Where(x => IsKScriptElementName(x, "import") && x.GetAttribute("src") != null))
+            foreach (MarkupElement import in result.Markup.DescendantElements().Where(x => IsKScriptElementName(x, "import") && x.GetAttribute("path") != null))
             {
-                AddExternalExtensions(ResolvePath(import.GetAttributeValue("src")?.Trim()), visited, project: false);
+                AddExternalExtensions(ResolvePath(import.GetAttributeValue("path")?.Trim()), visited, project: false);
             }
             List<string> projectFiles = ProjectExtensionFiles();
             projectExtensionFile = result.Path != null && projectFiles.Contains(System.IO.Path.GetFullPath(result.Path), StringComparer.Ordinal);
@@ -180,9 +180,9 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            foreach (MarkupElement import in doc.DescendantElements().Where(x => x.Name == "import" && x.GetAttribute("src") != null))
+            foreach (MarkupElement import in doc.DescendantElements().Where(x => x.Name == "import" && x.GetAttribute("path") != null))
             {
-                string src = import.GetAttributeValue("src")?.Trim();
+                string src = import.GetAttributeValue("path")?.Trim();
                 string dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path));
                 AddExternalExtensions(string.IsNullOrEmpty(src) || dir == null ? null : System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, src)), visited, project: false);
             }

@@ -82,7 +82,7 @@ namespace KScript.Language.Tests
             {
                 ["/tmp/typed/lib.ks.xml"] = "<kscript>\n  <fn name=\"make\" value=\"{ id: 1, tags: ['a'] }\" />\n  <let name=\"limit\" const=\"yes\" value=\"10\" />\n</kscript>",
             }));
-            List<string> fields = Complete("<import src=\"lib.ks.xml\" />\n<let name=\"m\" value=\"@make()\" />\n<echo>{ $m.‸ }</echo>", service).Select(i => i.Label).ToList();
+            List<string> fields = Complete("<import path=\"lib.ks.xml\" />\n<let name=\"m\" value=\"@make()\" />\n<echo>{ $m.‸ }</echo>", service).Select(i => i.Label).ToList();
             Assert.Equal(new[] { "id", "tags" }, fields.OrderBy(l => l));
         }
 
@@ -91,10 +91,10 @@ namespace KScript.Language.Tests
         {
             LanguageService service = new LanguageService(files: new FakeFiles(new Dictionary<string, string>
             {
-                ["/tmp/typed/a.ks.xml"] = "<kscript><import src=\"b.ks.xml\" /><fn name=\"fa\" value=\"@fb()\" /></kscript>",
-                ["/tmp/typed/b.ks.xml"] = "<kscript><import src=\"a.ks.xml\" /><fn name=\"fb\" value=\"@fa()\" /></kscript>",
+                ["/tmp/typed/a.ks.xml"] = "<kscript><import path=\"b.ks.xml\" /><fn name=\"fa\" value=\"@fb()\" /></kscript>",
+                ["/tmp/typed/b.ks.xml"] = "<kscript><import path=\"a.ks.xml\" /><fn name=\"fb\" value=\"@fa()\" /></kscript>",
             }));
-            DocumentAnalysis a = service.Analyze("<kscript><import src=\"a.ks.xml\" /><let name=\"x\" value=\"@fa()\" /></kscript>", "/tmp/typed/main.ks.xml");
+            DocumentAnalysis a = service.Analyze("<kscript><import path=\"a.ks.xml\" /><let name=\"x\" value=\"@fa()\" /></kscript>", "/tmp/typed/main.ks.xml");
             Assert.True(Named(a, "x").Shape.IsVague);
         }
 

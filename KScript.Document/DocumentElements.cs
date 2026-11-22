@@ -162,7 +162,7 @@ namespace KScript.Documents
                 Title = Inlines(run, run.RequiredTemplate("title")),
                 Id = Blank(run.Raw("id")),
                 Numbered = run.Flag("numbered", true),
-                NewPage = run.Flag("new-page"),
+                NewPage = run.Flag("new_page"),
             };
             b.Target.Add(section);
             Into(run, section.Blocks, () => run.RunChildren());
@@ -189,11 +189,11 @@ namespace KScript.Documents
         {
             Builder b = Current(run);
             List<Block> blocks;
-            if (run.Has("src"))
+            if (run.Has("path"))
             {
-                string path = Located(run, () => run.Host.ResolvePath(run.Template("src"), run.Module.Directory), "src");
-                if (!File.Exists(path)) throw run.Error($"There is no Markdown file at {path}.", "src", "IO");
-                blocks = Located(run, () => MarkdownBlocks.Parse(File.ReadAllText(path), dollarMaths: true), "src");
+                string path = Located(run, () => run.Host.ResolvePath(run.Template("path"), run.Module.Directory), "path");
+                if (!File.Exists(path)) throw run.Error($"There is no Markdown file at {path}.", "path", "IO");
+                blocks = Located(run, () => MarkdownBlocks.Parse(File.ReadAllText(path), dollarMaths: true), "path");
             }
             else
             {
@@ -335,15 +335,15 @@ namespace KScript.Documents
                 width = text.EndsWith("%", StringComparison.Ordinal) ? Values.ToNumber(text.TrimEnd('%'), "Figure width") / 100 : Values.ToNumber(w, "Figure width");
                 if (width <= 0 || width > 1) throw run.Error($"width: {text} should be a share of the text width from 0 to 1, such as 0.6 or '60%'.", "width", "Argument");
             }
-            string src = run.RequiredTemplate("src");
-            string full = Located(run, () => run.Host.ResolvePath(src, run.Module.Directory), "src");
+            string src = run.RequiredTemplate("path");
+            string full = Located(run, () => run.Host.ResolvePath(src, run.Module.Directory), "path");
             var figure = new Figure
             {
                 Source = System.IO.Path.GetRelativePath(b.Doc.BaseDirectory, full),
                 Caption = run.Has("caption") ? Inlines(run, run.Template("caption")) : null,
                 Id = Blank(run.Raw("id")),
                 Width = width,
-                Image = Located(run, () => ImageData.Load(full), "src"),
+                Image = Located(run, () => ImageData.Load(full), "path"),
             };
             b.Target.Add(figure);
             return null;
@@ -385,11 +385,11 @@ namespace KScript.Documents
         {
             Builder b = Current(run);
             var bib = new Bibliography { Title = run.Template("title", "References") };
-            if (run.Has("src"))
+            if (run.Has("path"))
             {
-                string path = Located(run, () => run.Host.ResolvePath(run.Template("src"), run.Module.Directory), "src");
-                if (!File.Exists(path)) throw run.Error($"There is no BibTeX file at {path}.", "src", "IO");
-                foreach (Source s in Located(run, () => BibTex.Parse(File.ReadAllText(path)), "src")) b.Doc.Sources[s.Key] = s;
+                string path = Located(run, () => run.Host.ResolvePath(run.Template("path"), run.Module.Directory), "path");
+                if (!File.Exists(path)) throw run.Error($"There is no BibTeX file at {path}.", "path", "IO");
+                foreach (Source s in Located(run, () => BibTex.Parse(File.ReadAllText(path)), "path")) b.Doc.Sources[s.Key] = s;
             }
             b.Target.Add(bib);
             b.Bibliography = bib;
@@ -540,7 +540,7 @@ namespace KScript.Documents
                 double rate = Values.ToNumber(run.Eval("tax"), "Invoice tax");
                 double tax = System.Math.Round(subtotal * rate / 100, 2, MidpointRounding.AwayFromZero);
                 Total("Subtotal", subtotal, bold: false, rule: true);
-                Total($"{Blank(run.Template("tax-name")) ?? "VAT"} at {Format(rate)}%", tax, bold: false, rule: false);
+                Total($"{Blank(run.Template("tax_name")) ?? "VAT"} at {Format(rate)}%", tax, bold: false, rule: false);
                 total += tax;
                 Total("Total", total, bold: true, rule: true);
             }

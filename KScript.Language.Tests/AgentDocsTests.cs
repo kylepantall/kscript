@@ -400,7 +400,7 @@ namespace KScript.Language.Tests
         public void TheIndexStartsWithTheRoutes()
         {
             Write("kscript.json", "{ \"name\": \"site\" }");
-            Write("api.ks.xml", "<KScript.Routes prefix=\"/api\"><import src=\"controllers/ping.ks.xml\" as=\"ping\" /><Get path=\"/ping\" to=\"ping.show\" /></KScript.Routes>");
+            Write("api.ks.xml", "<KScript.Routes prefix=\"/api\"><import path=\"controllers/ping.ks.xml\" as=\"ping\" /><Get path=\"/ping\" to=\"ping.show\" /></KScript.Routes>");
             Write("controllers/ping.ks.xml", "<kscript><fn name=\"show\" value=\"'pong'\" /></kscript>");
             string index = AgentDocs.Index(AgentDocs.Read(dir));
             Assert.Contains("## Routes (kscript routes)", index);

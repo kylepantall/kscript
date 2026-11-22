@@ -91,7 +91,7 @@ public class HttpCoverageTests
 
     [Theory]
     [InlineData("""<Resource path="/x" to="nope" />""", "names a controller script imported")]
-    [InlineData("""<import src="controllers/people.ks.xml" as="people" /><Resource path="/x" to="people" only="bogus" />""", "a resource action")]
+    [InlineData("""<import path="controllers/people.ks.xml" as="people" /><Resource path="/x" to="people" only="bogus" />""", "a resource action")]
     [InlineData("""<Get path="/p/{id}" where="id: '[a'" to="people.index" />""", "a valid pattern")]
     [InlineData("""<abort status="403" />""", "")]
     public void RouteFileMistakesAnswerWithAnError(string routes, string message)

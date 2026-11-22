@@ -113,7 +113,7 @@ namespace KScript.Runtime
         /// <summary>Each element's definition, found when the script was checked.</summary>
         internal readonly Dictionary<MarkupElement, ElementDefinition> Resolved = new Dictionary<MarkupElement, ElementDefinition>(ReferenceEqualityComparer.Instance);
 
-        /// <summary>Scripts imported with &lt;import src&gt;, by their import element.</summary>
+        /// <summary>Scripts imported with &lt;import path&gt;, by their import element.</summary>
         internal readonly Dictionary<MarkupElement, Module> ScriptImports = new Dictionary<MarkupElement, Module>(ReferenceEqualityComparer.Instance);
 
         internal readonly Dictionary<object, ParseResult> ParseCache = new Dictionary<object, ParseResult>(ReferenceEqualityComparer.Instance);

@@ -142,8 +142,8 @@ public sealed class BuiltInTests : IDisposable
     public void Call_finds_commands_aliases_and_functions()
     {
         Assert.Equal("A 3 6\n", Body(
-            "<import package=\"KScript.Math\" as=\"m\" /><import src=\"lib.ks.xml\" as=\"lib\" />" +
-            "<call fn=\"to_upper\" args=\"'a'\" to=\"a\" /><call fn=\"m.sqrt\" args=\"9\" to=\"b\" /><call fn=\"lib.helper\" args=\"5\" to=\"c\" />" +
+            "<import package=\"KScript.Math\" as=\"m\" /><import path=\"lib.ks.xml\" as=\"lib\" />" +
+            "<call fn=\"to_upper\" args=\"'a'\" into=\"a\" /><call fn=\"m.sqrt\" args=\"9\" into=\"b\" /><call fn=\"lib.helper\" args=\"5\" into=\"c\" />" +
             "<echo>$a $b $c</echo>"));
         Assert.Contains("There is no function called nope. Declare it with <fn name=\"nope\"", Fails("<call fn=\"nope\" />").Message);
         Assert.Contains("Did you mean greet?", Fails("<fn name=\"greet\" value=\"1\" /><call fn=\"gret\" />").Message);
@@ -308,7 +308,7 @@ public sealed class BuiltInTests : IDisposable
     [Fact]
     public void Elements_check_variable_names_at_run_time()
     {
-        Assert.Contains("isn't a variable name", Fails("<for each=\"i\" in=\"[1]\" index=\"2x\"></for>").Message);
+        Assert.Contains("isn't a variable name", Fails("<for each=\"i\" in=\"[1]\" at=\"2x\"></for>").Message);
     }
 
     [Fact]

@@ -330,7 +330,7 @@ public class ErrorTypeTests
                   throw PersonNotFound(id: $id)
                 }
                 test(name: "subtypes count") {
-                  expect-error(type: NotFound, as: e) {
+                  expect_error(type: NotFound, as: e) {
                     @find(1)
                   }
                   expect(value: $e.id, equals: 1)
@@ -346,8 +346,8 @@ public class ErrorTypeTests
                 test(name: "throws nothing") {
                   expect(value: 1 + 1, throws: IO)
                 }
-                test(name: "expect-error the wrong type") {
-                  expect-error(type: IO) {
+                test(name: "expect_error the wrong type") {
+                  expect_error(type: IO) {
                     @find(4)
                   }
                 }
@@ -408,11 +408,11 @@ public class ErrorStatusTests
     private const string Routes = """
         KScript.Routes {
           import "controllers/people.kscript" as people
-          Get(path: "/people/{id}", to: people.show, where: "id: int")
-          Get(path: "/pay", to: people.pay)
-          Get(path: "/forbid", to: people.forbid)
-          Get(path: "/caught", to: people.caught)
-          Get(path: "/crash", to: people.crash)
+          Get(path: "/people/{id}", to: @people.show, where: "id: int")
+          Get(path: "/pay", to: @people.pay)
+          Get(path: "/forbid", to: @people.forbid)
+          Get(path: "/caught", to: @people.caught)
+          Get(path: "/crash", to: @people.crash)
         }
         """;
 

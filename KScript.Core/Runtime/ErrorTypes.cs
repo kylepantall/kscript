@@ -239,7 +239,7 @@ namespace KScript.Runtime
     }
 
     /// <summary>
-    /// A caught error: what <c>catch NotFound as e</c> and <c>&lt;expect-error as&gt;</c> declare. It is a map
+    /// A caught error: what <c>catch NotFound as e</c> and <c>&lt;expect_error as&gt;</c> declare. It is a map
     /// (<c>$e.type</c>, <c>$e.message</c>, <c>$e.status</c>, <c>$e.cause</c>, its fields), so it prints and converts to
     /// JSON like one, and it remembers the error so <c>throw $e</c> rethrows it unchanged.
     /// </summary>

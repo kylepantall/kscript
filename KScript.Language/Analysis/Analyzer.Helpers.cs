@@ -293,7 +293,7 @@ namespace KScript.Language.Analysis
             {
                 IEnumerable<string> aliases = result.Symbols.Where(s => s.Kind == SymbolKind.Import).Select(s => s.Name);
                 Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
-                    $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode ? $"import \"...\" as {aliasName}." : $"<import src=\"...\" as=\"{aliasName}\" />."),
+                    $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode ? $"import \"...\" as {aliasName}." : $"<import path=\"...\" as=\"{aliasName}\" />."),
                     SuggestFix(aliasSpan, aliasName, aliases, n => n));
                 return;
             }
@@ -489,7 +489,7 @@ namespace KScript.Language.Analysis
         private string siteRoot;
 
         /// <summary>
-        /// kscript serve resolves &lt;layout src&gt; and &lt;include src&gt; against the site's root folder, not the page's
+        /// kscript serve resolves &lt;layout path&gt; and &lt;include path&gt; against the site's root folder, not the page's
         /// folder, so people/[id].html still uses _layout.html. The root is the nearest folder above the page with
         /// kscript.json, _layout.html, _components/ or _layouts/; without one, the page's own folder.
         /// </summary>

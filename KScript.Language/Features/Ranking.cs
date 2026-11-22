@@ -12,7 +12,7 @@ namespace KScript.Language.Features
         internal static readonly string[] Statements = { "echo", "if", "for", "fn", "while", "return", "match", "try", "import", "const" };
 
         /// <summary>In a test file, the test statements come before those.</summary>
-        internal static readonly string[] TestStatements = { "test", "expect", "describe", "expect-error" };
+        internal static readonly string[] TestStatements = { "test", "expect", "describe", "expect_error" };
 
         /// <summary>The methods reached for first on each type of value.</summary>
         internal static readonly Dictionary<string, string[]> Methods = new Dictionary<string, string[]>(StringComparer.Ordinal)

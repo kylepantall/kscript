@@ -225,7 +225,7 @@ Line two""
       }
     }
   }
-  Section(title: Results, new-page: yes) {
+  Section(title: Results, new_page: yes) {
     Math(id: eq-one) ""E = mc^2""
     Math(numbered: no) ""\int_0^1 x \, dx = \tfrac{1}{2}""
     Code(language: python) ""def f(x):
@@ -243,9 +243,9 @@ Two paragraphs.""
       Tr ""1 \| one | 2 | 3""
       Tr ""wide cell that keeps going and going and going and going and going and going | x | y""
     }
-    Figure(src: ""fig.png"", caption: ""A figure."", id: fig-one, width: '50%')
-    Figure(src: ""photo.jpg"", width: 0.3)
-    Markdown(src: ""ch/intro.md"")
+    Figure(path: ""fig.png"", caption: ""A figure."", id: fig-one, width: '50%')
+    Figure(path: ""photo.jpg"", width: 0.3)
+    Markdown(path: ""ch/intro.md"")
     Markdown ""
       ### Inline markdown
 
@@ -256,7 +256,7 @@ Two paragraphs.""
     PageBreak
     Paragraph ""After the break.""
   }
-  Bibliography(src: ""refs.bib"", title: ""Sources"") {
+  Bibliography(path: ""refs.bib"", title: ""Sources"") {
     Source(id: extra, type: book, author: ""Jane Doe"", title: ""Uncited"", year: 2000)
   }
 }
@@ -337,7 +337,7 @@ KScript.Document(template: letter, to: ""letter.pdf, letter.docx"") {
   }
 }
 KScript.Document(template: invoice, to: ""invoice.pdf, invoice.docx, invoice.html"") {
-  Invoice(number: 7, title: ""Bill"", from: ""Us"", to: ""Them"", due: ""Soon"", tax: 10, tax-name: ""Sales tax"", paid: 50, notes: ""Thanks"", currency: USD, items: [{ description: 'A', qty: 2, unit_price: 10 }, { item: 'B', amount: 5 }, { name: 'C', rate: 1.5, quantity: 3 }, { description: 'Free' }])
+  Invoice(number: 7, title: ""Bill"", from: ""Us"", to: ""Them"", due: ""Soon"", tax: 10, tax_name: ""Sales tax"", paid: 50, notes: ""Thanks"", currency: USD, items: [{ description: 'A', qty: 2, unit_price: 10 }, { item: 'B', amount: 5 }, { name: 'C', rate: 1.5, quantity: 3 }, { description: 'Free' }])
   Invoice(items: [{ description: 'Yen', price: 1000 }], currency: JPY)
   Invoice(items: [{ description: 'Other', price: -3 }], currency: XYZ)
   Invoice(items: [{ description: 'Odd', price: 3 }], currency: ""Ð"")
@@ -362,7 +362,7 @@ KScript.Document(template: invoice, to: ""invoice.pdf, invoice.docx, invoice.htm
     public void Style_options_change_the_page()
     {
         Run(@"
-KScript.Document(paper: letter, landscape: yes, margin: ""1in 2cm 30mm 40pt"", font: sans, heading-font: mono, size: 12, line-height: 1.5, align: left, accent: navy, numbered: no, title-page: yes, chapters: yes, citations: numeric, header: ""Left"", footer: """", rules: grid, language: ""en-GB"", title: ""Styled"", to: ""styled.pdf, styled.docx, styled.html, styled.tex"") {
+KScript.Document(paper: letter, landscape: yes, margin: ""1in 2cm 30mm 40pt"", font: sans, heading_font: mono, size: 12, line_height: 1.5, align: left, accent: navy, numbered: no, title_page: yes, chapters: yes, citations: numeric, header: ""Left"", footer: """", rules: grid, language: ""en-GB"", title: ""Styled"", to: ""styled.pdf, styled.docx, styled.html, styled.tex"") {
   Abstract ""On the title page.""
   Section(title: A) {
     Paragraph ""Text.""
@@ -431,11 +431,11 @@ KScript.Document(title: ""Values"", to: [""{ $name }.docx""]) {
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  Paragraph(id: x) \"a\"\n  Paragraph(id: x) \"b\"\n}", "Two parts of the document have id: x")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  Math \"\\frac{1}\"\n}", "In the maths")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  Paragraph \"\\( \\nosuch \\)\"\n}", "nosuch")]
-    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Figure(src: \"missing.png\")\n}", "missing.png")]
-    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Figure(src: \"text.png\")\n}", "PNG or JPEG")]
-    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Figure(src: \"x.png\", width: 2)\n}", "width")]
-    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Markdown(src: \"none.md\")\n}", "no Markdown file")]
-    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Bibliography(src: \"none.bib\")\n}", "no BibTeX file")]
+    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Figure(path: \"missing.png\")\n}", "missing.png")]
+    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Figure(path: \"text.png\")\n}", "PNG or JPEG")]
+    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Figure(path: \"x.png\", width: 2)\n}", "width")]
+    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Markdown(path: \"none.md\")\n}", "no Markdown file")]
+    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Bibliography(path: \"none.bib\")\n}", "no BibTeX file")]
     [InlineData("s = 'stars'\nKScript.Document(to: \"a.pdf\") {\n  List(style: \"{ $s }\") {\n  }\n}", "should be bullet")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  List {\n    List {\n    }\n  }\n}", "after the Item")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  Table(align: ['left', 'x'])\n}", "isn't a column alignment")]

@@ -35,7 +35,7 @@ public class HttpCachingTests
     private const string Routes = """
         <KScript.Routes>
           <import package="KScript.IO" />
-          <import src="c.ks.xml" as="c" />
+          <import path="c.ks.xml" as="c" />
           <Get path="/tagged" etag="yes" cache="60"><return value="'same'" /></Get>
           <Get path="/weak" middleware="etag:weak"><return value="'w'" /></Get>
           <Get path="/strong" middleware="etag:strong, cache_control:private;max_age=10"><return value="'s'" /></Get>

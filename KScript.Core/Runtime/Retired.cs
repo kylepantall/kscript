@@ -30,7 +30,7 @@ namespace KScript.Runtime
             ("run", "Use <fn> and @name(), or <call fn=\"...\">.", null),
             ("thread", "Use <spawn fn=\"...\" />.", "spawn"),
             ("onexception", "Use <try> with <catch as=\"err\">.", null),
-            ("load", "Use <import src=\"...\" />.", "import"),
+            ("load", "Use <import path=\"...\" />.", "import"),
             ("ref", "Loading plug-in assemblies isn't part of KScript 2; import a package with <import package=\"...\" />.", null),
             ("group", "Use <fn> to group related steps.", null),
             ("x", "Not part of KScript 2.", null),
@@ -40,7 +40,7 @@ namespace KScript.Runtime
             ("watch", "Not part of KScript 2; check the value with <if> where it changes.", null),
             ("rule", "Not part of KScript 2; check the value with <if> where it changes.", null),
             ("loadHtml", "Use kscript serve with HTML pages (KScript.Web).", null),
-            ("ginput", "Use <input to=\"...\"> from KScript.Terminal.", "input"),
+            ("ginput", "Use <input into=\"...\"> from KScript.Terminal.", "input"),
             ("end", "Use <exit /> (or <exit code=\"1\" />).", "exit"),
             ("anykey", "Use <pause /> from KScript.Terminal.", "pause"),
             ("new_dir", "Use <mkdir path=\"...\" /> from KScript.IO.", "mkdir"),
@@ -111,6 +111,77 @@ namespace KScript.Runtime
             // Renamed so the standard packages follow one set of conventions (docs/contributing.md).
             ("config", "Read a setting as $config.database.port, or $config->get('database.port', 5432) for a path held in a variable or a default.", null),
             ("signed_in", "Use @is_signed_in() (KScript.Auth).", "is_signed_in"));
+
+        /// <summary>
+        /// Elements whose name changed so that every statement name is one word, snake_case or PascalCase, with no
+        /// hyphen and no abbreviation. The old name is an error that says the new one; it is not an alias.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, RetiredInfo> RenamedElements = new[]
+        {
+            ("before-each", "before_each"),
+            ("after-each", "after_each"),
+            ("expect-error", "expect_error"),
+            ("log-provider", "log_provider"),
+            ("css-text", "css_text"),
+            ("marray", "collection"),
+        }.ToDictionary(r => r.Item1, r => new RetiredInfo(r.Item1, $"is now {r.Item2}.", r.Item2) { Renamed = true }, StringComparer.Ordinal);
+
+        /// <summary>
+        /// Arguments whose name changed, by element: the variable a result goes into is <c>into</c> (<c>to</c> is
+        /// only ever a destination), the file an element reads is <c>path</c>, and a position is <c>at</c> as in
+        /// <c>for item at i</c>. An element of <c>*</c> means every element that has the new name. Names that only
+        /// swapped a hyphen for an underscore (<c>max-tokens</c>) need no row: see <see cref="Attribute"/>.
+        /// </summary>
+        public static readonly (string Element, string Old, string New, string Instead)[] RenamedAttributes =
+        {
+            ("input", "to", "into", null),
+            ("picker", "to", "into", null),
+            ("menu", "to", "into", null),
+            ("confirm", "to", "into", null),
+            ("llm", "to", "into", null),
+            ("capture", "to", "into", null),
+            ("config", "to", "into", null),
+            ("call", "to", "into", null),
+            ("dispatch", "to", "into", null),
+            ("menu", "index", "at", null),
+            ("for", "index", "at", null),
+            ("import", "src", "path", null),
+            ("stylesheet", "src", "path", null),
+            ("include", "src", "path", null),
+            ("layout", "src", "path", null),
+            ("Markdown", "src", "path", null),
+            ("Figure", "src", "path", null),
+            ("Bibliography", "src", "path", null),
+            ("type", "sample", "path", null),
+            ("test", "each", null, TestInLoop),
+            ("test", "in", null, TestInLoop),
+            ("test", "index", null, TestInLoop),
+        };
+
+        private const string TestInLoop = "was replaced by a for loop round the test, the same loop as anywhere else: for n at i in [1, 2, 3] { test(name: \"doubles {$n}\") { } } (in XML, <for each=\"n\" in=\"[1, 2, 3]\"><test name=\"doubles {$n}\">...</test></for>).";
+
+        /// <summary>A renamed element by its old name, or null.</summary>
+        public static RetiredInfo RenamedElement(string name) =>
+            name != null && RenamedElements.TryGetValue(name, out RetiredInfo r) ? r : null;
+
+        /// <summary>
+        /// An argument of <paramref name="element"/> written by a name it no longer has: a renamed one (see
+        /// <see cref="RenamedAttributes"/>), or a hyphenated spelling of one it has (<c>must-exist</c> for
+        /// <c>must_exist</c>). Null when the name was never one of the element's.
+        /// </summary>
+        public static RetiredInfo RenamedAttribute(ElementInfo element, string name)
+        {
+            if (element == null || name == null || element.GetAttribute(name) != null) return null;
+            foreach (var row in RenamedAttributes)
+            {
+                if (row.Old != name || row.Element != element.Name) continue;
+                if (row.New == null) return new RetiredInfo(name, row.Instead) { Renamed = true };
+                if (element.GetAttribute(row.New) != null) return new RetiredInfo(name, $"is now {row.New}.", row.New) { Renamed = true };
+            }
+            if (name.Contains('-') && element.GetAttribute(name.Replace('-', '_')) is AttributeInfo snake)
+                return new RetiredInfo(name, $"is now {snake.Name}: argument names use _ and never a hyphen.", snake.Name) { Renamed = true };
+            return null;
+        }
 
         private static IReadOnlyDictionary<string, RetiredInfo> Table(params (string Name, string Replacement, string Rename)[] rows) =>
             rows.ToDictionary(r => r.Name, r => new RetiredInfo(r.Name, r.Replacement, r.Rename), StringComparer.Ordinal);

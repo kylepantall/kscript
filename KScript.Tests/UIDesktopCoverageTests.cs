@@ -98,7 +98,7 @@ public class UIDesktopCoverageTests
             <Spacer size="20" />
             <Spacer />
             <TextBox bind="fixed" />
-            <Box width="40" height="40" border="teal" background="#334155" radius="4" on-click="clicks += 1">
+            <Box width="40" height="40" border="teal" background="#334155" radius="4" on_click="clicks += 1">
               <Text>Box</Text>
             </Box>
             <Box border="red" />
@@ -110,8 +110,8 @@ public class UIDesktopCoverageTests
           <Row align="end"><Text>c</Text></Row>
           <Row align="stretch"><Text>d</Text></Row>
           <Row><Text>e</Text></Row>
-          <Timer every="10ms" when="$timing" on-tick="ticks += 1" />
-          <if test="$narrow"><Timer every="10ms" on-tick="ticks += 0" /></if>
+          <Timer every="10ms" when="$timing" on_tick="ticks += 1" />
+          <if test="$narrow"><Timer every="10ms" on_tick="ticks += 0" /></if>
         </KScript.Window>
         """;
 
@@ -146,7 +146,7 @@ public class UIDesktopCoverageTests
             Assert.Equal(20, view.ControlFor(s.FindAll("Spacer")[0]).Width);
             Assert.Equal(12, view.ControlFor(s.FindAll("Spacer")[1]).Width);
 
-            // A press on a Box with on-click runs it.
+            // A press on a Box with on_click runs it.
             var box = view.ControlFor(s.FindAll("Box")[0]);
             Dispatcher.UIThread.RunJobs();
             view.Window.UpdateLayout();
@@ -207,8 +207,8 @@ public class UIDesktopCoverageTests
             <KScript.Window title="Ticks">
               <let name="n" value="0" />
               <Text>{ $n }</Text>
-              <Timer every="15ms" on-tick="n += 1" />
-              <Timer every="15ms" when="$n ge 3" on-tick="@close_window()" />
+              <Timer every="15ms" on_tick="n += 1" />
+              <Timer every="15ms" when="$n ge 3" on_tick="@close_window()" />
             </KScript.Window>
             <echo>closed</echo>
             </kscript>

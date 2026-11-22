@@ -353,7 +353,7 @@ public sealed class CommandLineTests : IDisposable
         var missing = Kscript("openapi", Path.Combine(dir, "missing"));
         Assert.Equal(1, missing.Code);
         Assert.Contains("nope.ks.xml", missing.Err);
-        Write("broken/api.kscript", "KScript.Routes {\n  Get(path: \"/hi\", to: nowhere.fn)\n}\n");
+        Write("broken/api.kscript", "KScript.Routes {\n  Get(path: \"/hi\", to: @nowhere.fn)\n}\n");
         var broken = Kscript("openapi", Path.Combine(dir, "broken"));
         Assert.Equal(1, broken.Code);
         Assert.NotEqual(string.Empty, broken.Err);

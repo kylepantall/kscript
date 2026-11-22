@@ -54,6 +54,22 @@ namespace KScript.Language.Analysis
                 ReportDurationUnit(written, attr.Name, duration);
                 return;
             }
+            if (attr.Quote == '\0' && CodeArguments.TakesFunctions(ElementInfo.BareName(e.Name), a))
+            {
+                // KS6012: a function is @name wherever one is named, as it is in an expression: fn: @send, tools: [@lookup].
+                foreach ((string name, int at) in NameList.Split(attr.ValueText))
+                {
+                    if (!Lexer.IsIdentStart(name[0]) || !name.All(c => Lexer.IsIdentChar(c) || c == '.'))
+                    {
+                        continue;
+                    }
+                    TextSpan span = new TextSpan(attr.Value.ToSource(at), name.Length);
+                    Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.OneSpelling,
+                        $"Write @{name}: a function is referred to as @name wherever one is named.",
+                        new[] { new QuickFix($"Write @{name}", new TextChange(new TextSpan(span.Start, 0), "@")) });
+                }
+                return;
+            }
             if (attr.Quote == '\0' && a.IsNameList)
             {
                 // Text in a list is quoted like any other text: to: ['paper.pdf', 'paper.docx']. Names stay bare.

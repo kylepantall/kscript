@@ -10,7 +10,7 @@ example: kscript make view home --title "Welcome"
 to: {{ paths.views }}/{{ dir }}{{ kebab }}.html
 hint: Render it from a controller: return @view('{{ dir }}{{ kebab }}'{{#each vars}}, {{ item | var }}: ${{ item | var }}{{/each}}), or route to it: kscript make route {{ path }} --view {{ dir }}{{ kebab }}
 ---
-<layout src="{{ layout ?? _layout.html }}" title="{{ title }}">
+<layout path="{{ layout ?? _layout.html }}" title="{{ title }}">
   <h1>{{ title }}</h1>
   <!-- TODO: Show the values the controller passes to @view. -->
 {{#each vars}}
