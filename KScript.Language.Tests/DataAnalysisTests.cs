@@ -315,6 +315,35 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void MigrationFilesAreChecked()
+        {
+            DocumentAnalysis a = Code("""
+                import KScript.Data
+
+                Migration {
+                  CreateTable(name: teams) {
+                    Field(name: id, type: int, key, auto)
+                    Field(name: name, type: string, max: 40)
+                    Index(columns: [name], unique)
+                  }
+                  AddField(table: teams, name: size, type: int, default: 0)
+                  Down {
+                    DropTable(name: teams)
+                  }
+                }
+                """);
+            TestHelpers.AssertClean(a);
+
+            DocumentAnalysis outside = Code("import KScript.Data\n\nField(name: x, type: string)\n");
+            Assert.Contains(outside.Diagnostics, d => d.Code == "KS3007" && d.Message.Contains("inside CreateTable", StringComparison.Ordinal));
+
+            DocumentAnalysis xml = TestHelpers.WithoutUnused(Analyzer.Analyze(
+                "<kscript><import package=\"KScript.Data\" /><Migration><DropTable name=\"teams\" /></Migration></kscript>",
+                Path.Combine(Folder, "m.ks.xml"), EmptyFileSystem.Instance));
+            TestHelpers.AssertClean(xml);
+        }
+
+        [Fact]
         public void TheErrorTypesAreKnown()
         {
             DocumentAnalysis a = Code(Users + """

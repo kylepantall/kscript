@@ -264,6 +264,9 @@ namespace KScript.Data
 
         #region Running statements
 
+        /// <summary>A new connection, for work that manages its own transactions, such as migrations.</summary>
+        internal DbConnection OpenConnection() => Connect();
+
         private DbConnection Connect()
         {
             try

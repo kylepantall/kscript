@@ -560,6 +560,11 @@ namespace KScript
                 return RunWorker(args.Skip(1).ToArray());
             }
 
+            if (args[0] == "db")
+            {
+                return KScript.Databases.DbCommand.Run(args.Skip(1).ToArray(), Out, Error, environment: EnvironmentName);
+            }
+
             if (args[0] == "queue")
             {
                 return KScript.Queueing.QueueCommand.RunQueue(args.Skip(1).ToArray(), Out, Error, environment: EnvironmentName);

@@ -449,3 +449,89 @@ kscript make model User --fields "name: string, email: email, password: password
 ```
 
 writes `models/user.kscript` (the folder is `paths.models` in `kscript.json`).
+
+## Migrations
+
+`$db->create_table()` is enough for a script, but a project whose tables already hold rows changes them with migrations: files in `database/migrations` (`paths.migrations` in `kscript.json`) that say, step by step, how the tables change. `kscript db migrate` runs the ones that haven't run, and `kscript db rollback` undoes them.
+
+You don't usually write them yourself. Change the models, then let `kscript db diff` write the migration that takes the tables from what the migrations make to what the models want:
+
+```
+kscript db diff              # writes database/migrations/2026_11_22_101500_update_users.kscript
+kscript db diff add_bio      # the same, named add_bio
+kscript db diff --pretend    # prints it instead
+kscript db migrate
+```
+
+A migration it writes looks like this:
+
+```kscript
+// Written by kscript db diff from the models.
+KScript.Migration {
+  CreateTable(name: users) {
+    Field(name: id, type: int, key, auto)
+    Field(name: name, type: string, max: 80)
+    Field(name: email, type: email)
+    Field(name: role, type: enum, values: [member, admin], default: 'member')
+    Index(columns: [email], unique)
+  }
+  AddField(table: posts, name: views, type: int, default: 0)
+}
+```
+
+When a table or a column has gone and another has come, `diff` asks whether it was renamed, so a rename keeps its rows instead of dropping them. Where it can't ask (in CI, or with its input piped in) it takes the answer as no, drops and adds, and warns about each one it couldn't ask about. Read the migration it writes before you run it.
+
+### The steps
+
+Steps call a table's columns fields, as models do: `AddField` adds a column to the table.
+
+| Step | What it does |
+| --- | --- |
+| `CreateTable(name:) { ... }` | Makes a table: a `Field` for each column, an `Index` for each index, and a `Key(columns: [a, b])` for a key of two columns (a pivot table's). |
+| `DropTable(name:)` | Drops a table and its rows. |
+| `RenameTable(from:, to:)` | Renames a table. Foreign keys that point to it follow. |
+| `AddField(table:, name:, type:, ...)` | Adds a field. A required field needs a `default:` when the table has rows. |
+| `DropField(table:, name:)` | Drops a field, and its indexes. |
+| `RenameField(table:, from:, to:)` | Renames a field, keeping its values. |
+| `ChangeField(table:, name:, type:, ...)` | Makes a field the one described: its type, whether it is optional, its default or what it references. The rows are kept. |
+| `AddIndex(table:, columns:)` (with `unique`), `DropIndex(...)` | Adds or drops the index on those columns. |
+| `Sql(up:, down:)` | SQL to run as it is, for anything the other steps can't do. |
+| `Down { ... }` | The steps that undo this migration, when you want to say them yourself. |
+
+A field (`Field`, `AddField`, `ChangeField`) has a `type:` of `string`, `int`, `number`, `bool`, `date`, `email`, `handle`, `uuid`, `password`, `json` or `enum` (with `values:`), each stored the way a model's field of that type is. `max:` gives a string a length, `optional` lets it be empty, `default:` is what the database fills in (text, a number, `true` or `false`), the `key` and `auto` flags make a numbered key, and `references:` (with `references_column:` and `on_delete:`) makes a foreign key, like a model's relation field.
+
+Each step is checked against the tables the migrations before it make, before anything runs: dropping a table that isn't there, adding a column twice or pointing at a column that isn't a key says which migration and what's wrong, with the closest name when it's a typo.
+
+### Running and undoing
+
+```
+kscript db migrate            # runs what hasn't run, as one batch
+kscript db migrate --pretend  # prints the SQL instead
+kscript db rollback           # undoes the last batch
+kscript db rollback --steps 2 # undoes the last two migrations
+kscript db status             # what has run, and what the models want that no migration makes (--format json too)
+kscript db fresh              # drops every table and runs every migration again
+```
+
+Each migration runs in a transaction on SQLite and Postgres, so one that fails changes nothing. MySQL and MariaDB commit each change to a table as it is made, so a migration that fails there stops where it failed: the error says how many of its steps ran and stay, and the migration isn't marked as run.
+
+Rollback undoes each step the other way round: a created table is dropped, an added column is dropped, and a dropped table or column comes back as it was (empty). A `Sql` step needs its `down:` for that, and a migration with a `Down { }` block runs that block instead. The migrations that have run are kept in the `kscript_migrations` table, with the batch each ran in.
+
+In the production environment (`config.environment` in `kscript.json`), `migrate`, `rollback` and `seed` ask first, and `fresh` won't run without `--force`.
+
+`diff` and `status` see the models in the models folder that use the default connection. Models on another connection, and what a `Sql` step changes, are left out, so after a `Sql` step that changes a table `diff` may suggest changing it back.
+
+### Seeders
+
+A seeder is a script in `database/seeders` (`paths.seeders`) that fills the database with records, for development and tests:
+
+```kscript
+import KScript.Data
+import "../../models/user.kscript"
+
+$User->create(name: 'Ada', email: 'ada@example.com')
+```
+
+`kscript db seed` runs every seeder in name order, and `kscript db seed users` runs one. `kscript db migrate --seed` and `kscript db fresh --seed` run them after migrating.
+
+`kscript make migration add_bio_to_users` writes an empty migration to fill in by hand, and `kscript make seeder users` writes a seeder.

@@ -465,6 +465,8 @@ namespace KScript.Projects
             ["lib"] = "lib",
             ["types"] = "types",
             ["models"] = "models",
+            ["migrations"] = "database/migrations",
+            ["seeders"] = "database/seeders",
             ["errors"] = "errors",
             ["storage"] = "lib",
             ["jobs"] = "jobs",
@@ -525,6 +527,14 @@ namespace KScript.Projects
         public List<string> ModelFiles(Func<string, bool> directoryExists = null, Func<string, bool> fileExists = null,
             Func<string, IEnumerable<string>> listFiles = null, Func<string, IEnumerable<string>> listDirectories = null) =>
             FilesIn(new List<string> { PathFor("models") }, directoryExists, fileExists, listFiles, listDirectories);
+
+        /// <summary>A script's file name without its .kscript, .ks.xml or .ks ending.</summary>
+        public static string ScriptName(string path)
+        {
+            string name = Path.GetFileName(path);
+            string suffix = ScriptSuffixes.FirstOrDefault(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase));
+            return suffix == null ? name : name.Substring(0, name.Length - suffix.Length);
+        }
 
         /// <summary>
         /// The model file a model's name points to, by the file's name (blog-post.kscript, blog_post.ks.xml and
