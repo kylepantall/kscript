@@ -69,14 +69,8 @@ namespace KScript.Runtime
                 Searchable));
             Add(new NativeTypeInfo("locale", "A language tag (BCP 47) such as en, en-GB or pt-BR, in its usual case.", "en-GB",
                 With("split")));
-            Add(new NativeTypeInfo("timezone", "An IANA time zone such as Europe/London or America/New_York, or UTC.", "Europe/London",
-                With("split")));
 
             // Time and things that run on it.
-            Add(new NativeTypeInfo("cron", "A cron schedule of five fields (minute hour day month weekday), or @daily, @hourly and the like.", "'*/15 9-17 * * mon-fri'",
-                Searchable));
-            Add(new NativeTypeInfo("color", "A colour: #rgb, #rrggbb, #rrggbbaa, rgb(...) or a CSS name. Kept as lowercase #rrggbb (#rrggbbaa with alpha).", "#ff8800",
-                With("upper")));
 
             // Money.
             Add(new NativeTypeInfo("iban", "An international bank account number, checked with its mod-97 digits. Kept in capitals without spaces.", "GB82WEST12345698765432",
