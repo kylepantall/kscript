@@ -373,7 +373,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ \"name\": \"local\" }"),
-            ("routes/api.kscript", "KScript.Routes {\n  Get(path: \"/echo\") {\n    return { query: $request.query, auth: $request.headers.authorization ?? '', cookie: $request.cookies.sid ?? '' }\n  }\n  Post(path: \"/echo\") {\n    return @response({ body: $request.body, type: $request.headers['content-type'] }, status: 201)\n  }\n  Get(path: \"/loop\") {\n    return @api('/api/loop')->json()\n  }\n  Get(path: \"/again\") {\n    return @api('/api/echo')->json()\n  }\n}\n"),
+            ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/echo\") {\n    return { query: $request.query, auth: $request.headers.authorization ?? '', cookie: $request.cookies.sid ?? '' }\n  }\n  Post(path: \"/echo\") {\n    return @response({ body: $request.body, type: $request.headers['content-type'] }, status: 201)\n  }\n  Get(path: \"/loop\") {\n    return @api('/api/loop')->json()\n  }\n  Get(path: \"/again\") {\n    return @api('/api/echo')->json()\n  }\n}\n"),
             ("scripts/ask.kscript", "import KScript.Net\nr = @api('/api/echo?a=1&b=two+words&flag')\necho $r->status()\necho $r->json().query\necho @api('/api/echo', options: { method: 'post', body: 'plain' })->json()\necho @api('/api/echo', options: { method: 'POST', body: { x: 1 }, headers: { 'Content-Type': 'application/merge+json' } })->json().type\necho @api('/nothing')->status()\necho @api('/api/missing')->status()\n"),
             ("scripts/loop.kscript", "import KScript.Net\necho @api('/api/loop')->status()\n"));
         var (output, error) = RunScript(Path.Combine(site.Root, "scripts", "ask.kscript"));
@@ -397,7 +397,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ \"name\": \"fwd\" }"),
-            ("routes/api.kscript", "KScript.Routes {\n  import KScript.Net\n  Get(path: \"/who\") {\n    return { auth: $request.headers.authorization ?? '', sid: $request.cookies.sid ?? '' }\n  }\n  Get(path: \"/relay\") {\n    return @api('/api/who')->json()\n  }\n  Get(path: \"/own\") {\n    return @api('/api/who', options: { headers: { Cookie: 'sid=mine' } })->json()\n  }\n}\n"),
+            ("routes/api.kscript", "import KScript.Http\nimport KScript.Net\n\nRoutes {\n  Get(path: \"/who\") {\n    return { auth: $request.headers.authorization ?? '', sid: $request.cookies.sid ?? '' }\n  }\n  Get(path: \"/relay\") {\n    return @api('/api/who')->json()\n  }\n  Get(path: \"/own\") {\n    return @api('/api/who', options: { headers: { Cookie: 'sid=mine' } })->json()\n  }\n}\n"),
             ("page.html", "<import package=\"KScript.Net\" />\n<p>{ @api('/api/who')->json().sid }</p>\n"));
         var app = new HttpApp(site.Root, ProjectConfig.Load(Path.Combine(site.Root, "kscript.json")));
         var request = new Dictionary<string, object>
@@ -479,7 +479,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     [Fact]
     public void ServedAppsAnswerLocalRequestsWhileTheyServe()
     {
-        using var site = new TempSite(("kscript.json", "{ }"), ("routes/api.kscript", "KScript.Routes {\n  Get(path: \"/n\") {\n    return { n: 1 }\n  }\n}\n"));
+        using var site = new TempSite(("kscript.json", "{ }"), ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/n\") {\n    return { n: 1 }\n  }\n}\n"));
         var app = new HttpApp(site.Root, ProjectConfig.Load(Path.Combine(site.Root, "kscript.json")));
         LocalApi.Serve(app);
         try
@@ -500,7 +500,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ }"),
-            ("routes/api.kscript", "KScript.Routes {\n  import KScript.Auth\n  Get(path: \"/c\") {\n    $session->put('k', 'v')\n    return { ok: true }\n  }\n}\n"));
+            ("routes/api.kscript", "import KScript.Http\nimport KScript.Auth\n\nRoutes {\n  Get(path: \"/c\") {\n    $session->put('k', 'v')\n    return { ok: true }\n  }\n}\n"));
         LocalResponse r = LocalRequests.Send(new KScriptHost(TextWriter.Null, TextWriter.Null), site.Root,
             new Dictionary<string, object> { ["method"] = "GET", ["path"] = "/api/c", ["headers"] = new Dictionary<string, object>() });
         Assert.Equal(200, r.Status);
@@ -551,7 +551,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         using var site = new TempSite(
             ("kscript.json", "{ \"config\": { \"root\": \"config\" } }"),
             ("config/config.yaml", "app:\n  name: Configured\n"),
-            ("routes/api.kscript", "KScript.Routes {\n  Get(path: \"/name\") {\n    return { name: $config.app.name }\n  }\n}\n"),
+            ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/name\") {\n    return { name: $config.app.name }\n  }\n}\n"),
             ("blog/page.html", "<p>{ $config.app.name }</p>\n"));
         var app = new HttpApp(site.Root, ProjectConfig.Load(Path.Combine(site.Root, "kscript.json")));
         Assert.Contains("Configured", Get(app, "/api/name").Body);

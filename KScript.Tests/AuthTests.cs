@@ -347,7 +347,7 @@ public sealed class AuthMakeTests : AuthSiteFixture
     {
         Assert.Contains("takes no name", Make(Dir, "auth", "users").Err);
 
-        Write("routes/web.kscript", "KScript.Routes {\n  Get(path: \"/login\", view: login)\n}\n");
+        Write("routes/web.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/login\", view: login)\n}\n");
         var taken = Make(Dir, "auth");
         Assert.Equal(1, taken.Code);
         Assert.Contains("routes/web.kscript already has a /login route", taken.Err);
@@ -364,7 +364,7 @@ public sealed class AuthMakeTests : AuthSiteFixture
     public void ItUsesTheRouteFilesKScriptJsonLists()
     {
         Write("kscript.json", "{ \"http\": { \"routes\": [\"site.kscript\", { \"file\": \"rest.kscript\", \"api\": true }] } }");
-        Write("site.kscript", "KScript.Routes {\n}\n");
+        Write("site.kscript", "import KScript.Http\n\nRoutes {\n}\n");
         var made = Make(Dir, "auth", "--api");
         Assert.True(made.Code == 0, made.Err);
         Assert.Contains("Added to site.kscript", made.Out);

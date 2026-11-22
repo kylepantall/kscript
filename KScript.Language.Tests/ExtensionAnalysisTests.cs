@@ -102,7 +102,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void DeclaredTypesCanBeExtended()
         {
-            DocumentAnalysis a = Code("type User {\n  name: string\n}\nextend User {\n  fn hello() => 'Hi ' + $this.name\n}\nu = $User->from({ name: 'Kyle' })\necho \"{ $u->hello() }\"\n");
+            DocumentAnalysis a = Code("type User {\n  name: string\n}\nextend User {\n  fn hello() => 'Hi ' + $this.name\n}\nu = User({ name: 'Kyle' })\necho \"{ $u->hello() }\"\n");
             AssertClean(a);
             Assert.Contains("A User already has ->keys()", AssertSingle(Code("type User {\n  name: string\n}\nextend User {\n  fn keys() => 1\n}\n"), DiagnosticCodes.DuplicateDeclaration).Message);
         }

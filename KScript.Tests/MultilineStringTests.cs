@@ -189,7 +189,9 @@ public sealed class MultilineDocumentTests : DocumentFixture
     public void JoinedLinesAndLatexBlocksBuildAPaper()
     {
         Run("""
-            KScript.Document(template: paper, title: "Reaction Rates", to: "rates.tex, rates.md") {
+            import KScript.Document
+
+            Document(template: paper, title: "Reaction Rates", to: "rates.tex, rates.md") {
               Abstract "Most chemical reactions speed up as they get warmer. \
                 This paper reviews the rate law, \( \mathrm{A} \rightarrow \text{products} \), \
                 and the Arrhenius equation."

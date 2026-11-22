@@ -288,7 +288,7 @@ namespace KScript.Language.Tests
 
             string io = AgentDocs.Package("KScript.IO");
             Assert.Contains("Import with `import KScript.IO`.", io);
-            Assert.Contains("  - prefer: @read_json($path, as: $Type)", io);
+            Assert.Contains("  - prefer: @read_json($path, as: Type)", io);
             Assert.Contains("  - pitfall: A missing file throws FileNotFound", io);
             Assert.Contains("Import with `<import package=\"KScript.IO\" />`.", AgentDocs.Package("KScript.IO", format: "xml"));
             Assert.Contains("  - pitfall: A 4xx or 5xx status doesn't throw", AgentDocs.Package("KScript.Net"));

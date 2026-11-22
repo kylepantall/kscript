@@ -72,7 +72,7 @@ namespace KScript.Language.Tests
                 } catch IO {
                   echo "{ $err.message } { $err.cause.message } { $err.cause.cause.cause.cause.anything }"
                 } catch err {
-                  saved = $Plain->new()
+                  saved = Plain()
                   throw $saved
                 }
                 """));
@@ -156,8 +156,9 @@ namespace KScript.Language.Tests
             Assert.Contains("cause", fields);
             Assert.Contains("item", Labels(Declarations + "x = OutOfStock(item: 'a')\necho \"{ $x.‸ }\""));
             Assert.Contains("is", Labels(Declarations + "try { } catch e {\n  echo \"{ $e->‸ }\"\n}"));
-            Assert.Contains("new", Labels(Declarations + "echo \"{ $Plain->‸ }\""));
-            Assert.Contains("new", Labels(Declarations + "t = Plain\necho \"{ $t->‸ }\""));
+            Assert.Contains("fields", Labels(Declarations + "echo \"{ Plain->‸ }\""));
+            Assert.Contains("fields", Labels(Declarations + "t = Plain\necho \"{ $t->‸ }\""));
+            Assert.DoesNotContain("new", Labels(Declarations + "echo \"{ Plain->‸ }\""));
         }
 
         [Fact]

@@ -19,7 +19,7 @@ namespace KScript.Language.Tests
             File.WriteAllText(path, text);
         }
 
-        private const string Api = "KScript.Routes {\n  Get(path: \"/hi\") {\n    return 'hi'\n  }\n}\n";
+        private const string Api = "import KScript.Http\n\nRoutes {\n  Get(path: \"/hi\") {\n    return 'hi'\n  }\n}\n";
 
         [Fact]
         public void IsRegisteredAndOffUntilAFileIsSet()
@@ -80,7 +80,7 @@ namespace KScript.Language.Tests
         public void ARouteErrorIsReportedNotThrown()
         {
             Write("kscript.json", "{ \"http\": { \"openapi\": { \"file\": \"openapi.yml\" } } }");
-            Write("api.kscript", "KScript.Routes {\n  Get(path: \"/hi\", to: nowhere.fn)\n}\n");
+            Write("api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/hi\", to: nowhere.fn)\n}\n");
             OutputResult result = Assert.Single(ProjectOutputs.Build(dir, only: new[] { output }));
             Assert.NotNull(result.Error);
         }

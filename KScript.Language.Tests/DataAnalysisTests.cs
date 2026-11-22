@@ -21,15 +21,11 @@ namespace KScript.Language.Tests
             enum Role { member, admin }
 
             /// Someone who can sign in.
-            model User {
-              timestamps: yes
-              soft_deletes: yes
-              unique: [email]
-              hidden: [password]
+            model User(timestamps, soft_deletes, unique: [email], hidden: [password]) {
               name: string
               email: email
               role: Role = 'member'
-              password: password?
+              password?: password
 
               fn label() => $name + ' <' + $email + '>'
             }
@@ -40,24 +36,24 @@ namespace KScript.Language.Tests
         public void ModelsAreTypesWithQueryMethods()
         {
             DocumentAnalysis a = Code(Users + """
-                $db->create_table($User)
-                u = $User->create(name: 'Ada', email: 'ada@example.com')
+                $db->create_table(User)
+                u = User->create(name: 'Ada', email: 'ada@example.com')
                 $u->save()
                 echo $u->label()
                 echo [$u.id, $u.created_at, $u.updated_at, $u.deleted_at]
-                adults = $User->where(role: admin, name: ['a', 'b'])->or_where(fn($x) => $x.name->starts_with('A'))->order_by(name: desc, email)->get()
+                adults = User->where(role: admin, name: ['a', 'b'])->or_where(fn($x) => $x.name->starts_with('A'))->order_by(name: desc, email)->get()
                 for one in $adults {
                   echo $one.name
                   $one->delete()
                 }
-                first = $User->where(role: member)->first()
+                first = User->where(role: member)->first()
                 echo $first.email
-                echo $User->pluck(email)
-                echo $User->find_or_fail(1).name
-                echo $User->paginate(10).items
-                q = $User->query()
+                echo User->pluck(email)
+                echo User->find_or_fail(1).name
+                echo User->paginate(10).items
+                q = User->query()
                 echo $q->count()
-                echo $User->all()->count()
+                echo User->all()->count()
                 email = 'ada@example.com'
                 limit = 3
                 echo @sql("select * from users where email = {$email} and id > {{ 1 }}")
@@ -67,7 +63,7 @@ namespace KScript.Language.Tests
                 echo @db(users)->where(name: 'Ada')->get()
                 echo @db(connection: main)->tables()
                 transaction {
-                  $User->where(name: 'Ada')->update(name: 'Ada L')
+                  User->where(name: 'Ada')->update(name: 'Ada L')
                 }
                 """);
             TestHelpers.AssertClean(a);
@@ -77,10 +73,10 @@ namespace KScript.Language.Tests
         public void MistakesOnModelsAndRecordsAreFound()
         {
             DocumentAnalysis a = Code(Users + """
-                u = $User->find(1)
+                u = User->find(1)
                 echo $u.nme
-                echo $User->wher(name: 'x')
-                echo $User->where(name: 'x')->frist()
+                echo User->wher(name: 'x')
+                echo User->where(name: 'x')->frist()
                 """);
             Assert.Contains(a.Diagnostics, d => d.Message.Contains("User has no field 'nme'"));
             Assert.Contains(a.Diagnostics, d => d.Message.Contains("Unknown method ->wher()"));
@@ -93,11 +89,10 @@ namespace KScript.Language.Tests
             DocumentAnalysis a = Code("""
                 import KScript.Data
 
-                model Country {
-                  key: code
+                model Country(key: code) {
                   code: string
                 }
-                c = $Country->find('nz')
+                c = Country->find('nz')
                 echo $c.code
                 echo $c.id
                 """);
@@ -107,9 +102,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void HoverShowsTheModel()
         {
-            string text = Users + "q = $User->where(name: 'x')\necho $q\n";
+            string text = Users + "q = User->where(name: 'x')\necho $q\n";
             DocumentAnalysis a = Service.Analyze(text, Path.Combine(Folder, "app.kscript"));
-            string hover = Service.GetHover(a, text.IndexOf("$User->where", StringComparison.Ordinal) + 2).Markdown;
+            string hover = Service.GetHover(a, text.IndexOf("User->where", StringComparison.Ordinal) + 2).Markdown;
             Assert.Contains("model User {", hover);
             Assert.Contains("created_at", hover);
             string query = Service.GetHover(a, text.LastIndexOf("$q", StringComparison.Ordinal) + 1).Markdown;
@@ -131,7 +126,7 @@ namespace KScript.Language.Tests
                 import KScript.Data
                 import "user.ks.xml"
 
-                echo $User->first().name
+                echo User->first().name
                 """, files);
             TestHelpers.AssertClean(a);
             DocumentAnalysis xml = TestHelpers.WithoutUnused(Analyzer.Analyze(files.ReadText(Path.Combine(Folder, "user.ks.xml")), Path.Combine(Folder, "user.ks.xml"), files));
@@ -145,11 +140,7 @@ namespace KScript.Language.Tests
             const string code = """
                 import KScript.Data
 
-                model Post(table: posts) {
-                  timestamps: yes
-                  unique: [slug, [team, slug]]
-                  index: [team]
-                  guarded: [team]
+                model Post(table: posts, timestamps, unique: [slug, [team, slug]], index: [team], guarded: [team]) {
                   slug: string
                   team: int
                 }
@@ -164,8 +155,9 @@ namespace KScript.Language.Tests
             string xml = ScriptConverter.Convert(code, "post.kscript").Text;
             Assert.Contains("<model name=\"Post\" table=\"posts\" timestamps=\"yes\" unique=\"[slug, [team, slug]]\" index=\"[team]\" guarded=\"[team]\">", xml);
             string back = ScriptConverter.Convert(xml, "post.ks.xml").Text;
-            Assert.Contains("model Post {\n  table: posts\n  timestamps: yes\n  unique: [slug, [team, slug]]\n  index: [team]\n  guarded: [team]\n  slug: string", back);
-            Assert.Contains("model User {\n  hidden: [password]", ScriptConverter.Convert("<kscript><import package=\"KScript.Data\" /><model name=\"User\" hidden=\"password\" fields=\"name: string, password: password\" /></kscript>", "u.ks.xml").Text);
+            // Options go in the brackets, whichever way the file was written.
+            Assert.Contains("model Post(table: \"posts\", timestamps, unique: [slug, [team, slug]], index: [team], guarded: [team]) {\n  slug: string", back);
+            Assert.Contains("model User(hidden: [password]) {\n  name: string", ScriptConverter.Convert("<kscript><import package=\"KScript.Data\" /><model name=\"User\" hidden=\"password\" fields=\"name: string, password: password\" /></kscript>", "u.ks.xml").Text);
 
             MarkupDocument twice = CodeParser.Parse("model A {\n  timestamps: yes\n  timestamps: no\n  name: string\n}\n");
             Assert.Contains(twice.Diagnostics, d => d.Message == "This model already sets timestamps.");
@@ -176,7 +168,7 @@ namespace KScript.Language.Tests
         {
             DocumentAnalysis a = Code(Users + """
                 try {
-                  $User->find_or_fail(1)
+                  User->find_or_fail(1)
                 } catch ModelNotFound as e {
                   echo $e.message
                 } catch UniqueViolation {

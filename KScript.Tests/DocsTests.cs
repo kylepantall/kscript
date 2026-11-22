@@ -862,8 +862,8 @@ public sealed class DocsTests
         Assert.Contains("<span class=\"f-xml\">A branch of &lt;match&gt;:", core.Body);
         Assert.Contains("<a href=\"#el-break\"><span class=\"f-xml\">&lt;break&gt;</span><span class=\"f-ks\">break</span></a>", html);
         Assert.Contains("<a href=\"#elements\"><span class=\"f-xml\">Elements</span><span class=\"f-ks\">Statements</span></a>", html);
-        Assert.Equal("KScript.Window", DocsSite.CodeName(site.Catalog.GetElement("Window")));
-        Assert.Contains("A file made of a <code>KScript.Window { }</code> block imports it for you.", site.Find("/reference/ui").Body);
+        Assert.Equal("Window", DocsSite.CodeName(site.Catalog.GetElement("Window")));
+        Assert.Contains("A .kscript file names a package only in its import: write <code>Window { }</code>, never <code>KScript.Window { }</code>.", site.Find("/reference/ui").Body);
 
         string css = DocsSite.ReadAsset("docs.css");
         Assert.Contains(":root[data-format=\"kscript\"] .f-xml, :root:not([data-format=\"kscript\"]) .f-ks { display: none; }", css);

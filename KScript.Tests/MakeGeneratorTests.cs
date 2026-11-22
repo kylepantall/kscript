@@ -86,9 +86,10 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Equal(
             "// Web routes, served by kscript serve (see the Routes and APIs guide). kscript\n" +
             "// routes lists them.\n" +
-            "KScript.Routes {\n" +
-            "  import \"../controllers/users.kscript\" as users\n" +
+            "import KScript.Http\n" +
+            "import \"../controllers/users.kscript\" as users\n" +
             "\n" +
+            "Routes {\n" +
             "  Get(path: \"/users\", to: users.index)\n" +
             "  Get(path: \"/users/{id}\", to: users.show, where: \"id: int\")\n" +
             "  Post(path: \"/users\", to: users.store)\n" +
@@ -127,7 +128,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.True(code == 0, err);
         Assert.Contains("Added to routes/api.kscript", output);
         string api = Read(app, "routes/api.kscript");
-        Assert.Contains("  import \"../controllers/hello.kscript\" as hello\n  import \"../controllers/people.kscript\" as people\n", api);
+        Assert.Contains("import KScript.Http\nimport \"../controllers/hello.kscript\" as hello\nimport \"../controllers/people.kscript\" as people\n\nRoutes {\n", api);
         Assert.Contains("  Get(path: \"/hello\", to: hello.show)\n  Resource(path: \"/people\", to: people)\n}", api);
         foreach (string action in new[] { "index", "show", "store", "update", "destroy" })
             Assert.Contains($"fn {action}(", Read(app, "controllers/people.kscript"));
@@ -196,7 +197,7 @@ public sealed class MakeGeneratorTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ \"http\": { \"routes\": [ { \"file\": \"routes/web.kscript\" }, { \"file\": \"routes/v1.kscript\", \"prefix\": \"/api/v1\", \"api\": true } ] } }"),
-            ("routes/web.kscript", "KScript.Routes {\n  import \"../controllers/home.kscript\" as home\n  Get(path: \"/\", to: home.index)\n}\n"),
+            ("routes/web.kscript", "import KScript.Http\nimport \"../controllers/home.kscript\" as home\n\nRoutes {\n  Get(path: \"/\", to: home.index)\n}\n"),
             ("controllers/home.kscript", "kscript {\n  fn index() => 'home'\n}\n"));
 
         var (code, output, err) = Make(site.Root, "route", "/", "--action", "about", "--method", "get", "--dry-run");
@@ -210,7 +211,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Equal("kscript {\n  fn index() => 'home'\n}\n", Read(site.Root, "controllers/home.kscript"));
 
         Assert.Equal(0, Make(site.Root, "route", "about", "--controller", "home", "--action", "about").Code);
-        Assert.Equal("KScript.Routes {\n  import \"../controllers/home.kscript\" as home\n  Get(path: \"/\", to: home.index)\n  Get(path: \"/about\", to: home.about)\n}\n", Read(site.Root, "routes/web.kscript"));
+        Assert.Equal("import KScript.Http\nimport \"../controllers/home.kscript\" as home\n\nRoutes {\n  Get(path: \"/\", to: home.index)\n  Get(path: \"/about\", to: home.about)\n}\n", Read(site.Root, "routes/web.kscript"));
         // A controller written as a kscript { } block gets the function inside the block.
         Assert.Equal("kscript {\n  fn index() => 'home'\n\n  /// About.\n  fn about() {\n    // TODO: Answer the route.\n    return { action: 'about' }\n  }\n}\n", Read(site.Root, "controllers/home.kscript"));
 
@@ -218,7 +219,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.True(code == 0, err);
         Assert.Contains("Created routes/v1.kscript", output);
         Assert.Contains("open /api/status", output);
-        Assert.Contains("import \"../controllers/status.kscript\" as status\n\n  Get(path: \"/status\", to: status.index)", Read(site.Root, "routes/v1.kscript"));
+        Assert.Contains("import KScript.Http\nimport \"../controllers/status.kscript\" as status\n\nRoutes {\n  Get(path: \"/status\", to: status.index)", Read(site.Root, "routes/v1.kscript"));
     }
 
     [Fact]
@@ -237,7 +238,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Contains("adds to a file", ex.Message);
 
         using var broken = new TempSite(("routes/web.kscript", "// no routes block\necho 'hi'\n"));
-        Assert.Contains("has no KScript.Routes { … } block", Make(broken.Root, "route", "users").Err);
+        Assert.Contains("has no Routes { … } block", Make(broken.Root, "route", "users").Err);
     }
 
     [Fact]
@@ -344,8 +345,8 @@ public sealed class MakeGeneratorTests : IDisposable
             echo "$first $second"
             @cache.forget('x')
             echo "{ @cache.remember('x', fn() => 7) }"
-            echo "{ $Repo->from({ name: 'k', stargazers_count: 3 }).stars } { $Size.large } $max_items { @total(5) }"
-            echo "{ $NewPerson->from({ name: 'Sam', age: 9 }).age }"
+            echo "{ Repo({ name: 'k', stargazers_count: 3 }).stars } { Size.large } $max_items { @total(5) }"
+            echo "{ NewPerson({ name: 'Sam', age: 9 }).age }"
             locale(set: fr)
             echo "{ @t('items', { count: 2 }) }"
             log(level: error) "boom"

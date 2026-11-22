@@ -143,11 +143,29 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void APackageElementAloneIsTheRoot()
+        public void APackageElementIsAStatementAfterItsImport()
         {
-            MarkupElement root = Root("// a window\nKScript.Window(title: \"Hi\") {\n  Text \"Hello\"\n}");
-            Assert.Equal("KScript.Window(title: Hi) { Text \"Hello\" }", Shape(root));
-            Assert.Null(root.Parent);
+            MarkupElement root = Root("// a window\nimport KScript.UI\n\nWindow(title: \"Hi\") {\n  Text \"Hello\"\n}");
+            Assert.Equal("kscript", root.Name);
+            Assert.Equal(new[] { "import", "Window" }, root.ChildElements.Select(c => c.Name));
+            Assert.Equal("Hi", root.ChildElements.Last().GetAttributeValue("title"));
+        }
+
+        /// <summary>A package is named only in its import: KScript.Window { } is an error whose fix drops the prefix.</summary>
+        [Fact]
+        public void AStatementWithThePackagePrefixIsAnError()
+        {
+            string text = "import KScript.UI\n\nKScript.Window(title: \"Hi\") {\n  Text \"Hello\"\n}\n";
+            MarkupDocument doc = CodeParser.Parse(text);
+            Diagnostic d = Assert.Single(doc.Diagnostics);
+            Assert.Equal("KS1001", d.Code);
+            Assert.Equal(DiagnosticSeverity.Error, d.Severity);
+            Assert.Contains("Write Window", d.Message);
+            Assert.Equal("KScript.Window", text.Substring(d.Span.Start, d.Span.Length));
+            TextChange change = Assert.Single(Assert.Single(d.Fixes).Changes);
+            Assert.Equal(text.Replace("KScript.Window", "Window"), text.Remove(change.Span.Start, change.Span.Length).Insert(change.Span.Start, change.NewText));
+            // The element is still read, under its own name, so the rest of the file is checked as usual.
+            Assert.Equal(new[] { "import", "Window" }, doc.RootElements.Single().ChildElements.Select(c => c.Name));
         }
 
         [Theory]
@@ -201,8 +219,16 @@ namespace KScript.Language.Tests
         {
             MarkupDocument xml = MarkupParser.Parse(File.ReadAllText(RepoFile(xmlFile.Split('/'))), DocumentKind.Script);
             MarkupDocument code = Code(File.ReadAllText(RepoFile(codeFile.Split('/'))));
-            Assert.Equal(Outline(xml.RootElements.Single()), Outline(code.RootElements.Single()));
+            Assert.Equal(SamePackageForm(Outline(xml.RootElements.Single())), SamePackageForm(Outline(code.RootElements.Single())));
         }
+
+        /// <summary>
+        /// An XML file names its package in the root tag (&lt;KScript.Window&gt;, imports inside); a .kscript file imports it
+        /// and writes Window { }. Both are the same script, so the root, the imports and the prefix are left out.
+        /// </summary>
+        private static List<string> SamePackageForm(List<string> outline) =>
+            outline.Where(o => o != "kscript()" && !o.StartsWith("import(", StringComparison.Ordinal))
+                .Select(o => o.StartsWith("KScript.", StringComparison.Ordinal) ? o.Substring("KScript.".Length) : o).ToList();
 
         /// <summary>Element names and attribute names (values differ in spelling, such as lt and &lt;).</summary>
         private static List<string> Outline(MarkupElement root) =>
@@ -298,15 +324,15 @@ namespace KScript.Language.Tests
         public void TypesInCodeFilesGetTheSameChecksAndCompletion()
         {
             const string types = "enum Size { s, m }\ntype Repo {\n  name: string\n  stars: int from stargazers_count\n  size: Size = 's'\n}\n";
-            AssertNoDiagnostics(types + "r = $Repo->from({ name: 'k', stargazers_count: 1 })\necho \"$r.name { $r.stars }\"");
+            AssertNoDiagnostics(types + "r = Repo({ name: 'k', stargazers_count: 1 })\necho \"$r.name { $r.stars }\"");
 
-            DocumentAnalysis bad = Analyzer.Analyze(types + "r = $Repo->from({})\necho $r.stras\ntype T { a: Nope }", "test.kscript");
+            DocumentAnalysis bad = Analyzer.Analyze(types + "r = Repo({})\necho $r.stras\ntype T { a: Nope }", "test.kscript");
             Assert.Contains(bad.Diagnostics, d => d.Code == "KS5010" && d.Message.Contains("stars"));
             Diagnostic nope = Assert.Single(bad.Diagnostics, d => d.Message.Contains("Nope"));
-            Assert.Equal("Nope", (types + "r = $Repo->from({})\necho $r.stras\ntype T { a: Nope }").Substring(nope.Span.Start, nope.Span.Length));
+            Assert.Equal("Nope", (types + "r = Repo({})\necho $r.stras\ntype T { a: Nope }").Substring(nope.Span.Start, nope.Span.Length));
 
             var service = new LanguageService();
-            (string text, int offset) = TestHelpers.WithCaret(types + "r = $Repo->from({})\necho \"{ $r.‸ }\"");
+            (string text, int offset) = TestHelpers.WithCaret(types + "r = Repo({})\necho \"{ $r.‸ }\"");
             Assert.Contains(service.GetCompletions(service.Analyze(text, "test.kscript"), offset), i => i.Label == "stars");
             (text, offset) = TestHelpers.WithCaret(types + "type T { a: ‸ }");
             Assert.Contains(service.GetCompletions(service.Analyze(text, "test.kscript"), offset), i => i.Label == "Size");
