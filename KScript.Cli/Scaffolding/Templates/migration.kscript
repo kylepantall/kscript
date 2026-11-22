@@ -1,0 +1,13 @@
+--- make
+description: A migration in database/migrations to write by hand: steps that change the tables, run by kscript db migrate. kscript db diff writes one from the models instead
+category: Scripts and data
+usage: <name>
+example: kscript make migration add_bio_to_users
+example: kscript make migration backfill_slugs
+to: {{ paths.migrations }}/{{ timestamp }}_{{ snake }}{{ ext }}
+hint: Add its steps, then run kscript db migrate. kscript db rollback undoes it.
+---
+// {{ title }}: run by kscript db migrate, undone by kscript db rollback.
+KScript.Migration {
+  // TODO: Add the steps: CreateTable, AddColumn, ChangeColumn, AddIndex, Sql and the rest.
+}

@@ -28,6 +28,7 @@ namespace KScript.Data
             RegisterQueries(p);
             RegisterRecords(p);
             RegisterDatabase(p);
+            Migrations.MigrationElements.Register(p);
         }
 
         #region Models
