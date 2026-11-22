@@ -423,6 +423,19 @@ namespace KScript.Syntax
                     continue;
                 }
 
+                if (t.Is(".") && Peek(1).Kind == TokenKind.Number && t.Span.Start == node.Span.End && Peek(1).Span.Start == t.Span.End
+                    && node is LiteralNode { Kind: LiteralKind.Number } or BinaryNode { Operator: "." } or IdentifierNode or MemberNode { Target: IdentifierNode })
+                {
+                    // 10.0.0.1, 1.4.2 and beta.1: words and numbers joined by dots are a value only where the type reads
+                    // text (an ip, a semver); the interpreter takes them as written there and reports them anywhere else.
+                    Token number = Peek(1);
+                    Advance();
+                    Advance();
+                    var right = new LiteralNode { Kind = LiteralKind.Number, Value = number.Text, Span = number.Span };
+                    node = new BinaryNode { Operator = ".", OperatorText = ".", OperatorSpan = t.Span, Left = node, Right = right, Span = TextSpan.FromBounds(node.Span.Start, number.Span.End) };
+                    continue;
+                }
+
                 if (t.Is(".") || t.Is("?."))
                 {
                     Token name = Peek(1);
@@ -503,6 +516,10 @@ namespace KScript.Syntax
                 case TokenKind.Duration:
                     Advance();
                     return new LiteralNode { Kind = LiteralKind.Duration, Value = t.Text, Span = t.Span };
+
+                case TokenKind.SlashPath:
+                    Advance();
+                    return new LiteralNode { Kind = LiteralKind.SlashPath, Value = t.Text, Span = t.Span, Template = SlashPathTemplate(t) };
 
                 case TokenKind.Variable:
                     Advance();
@@ -589,6 +606,44 @@ namespace KScript.Syntax
             {
                 errors.AddRange(template.Errors);
             }
+            return template;
+        }
+
+        /// <summary>
+        /// The parts of a slash path that fills in values (/people/$id/edit, /docs/{ $section }), or null. A route
+        /// parameter such as {id} is kept as written; the rest is read the way double quotes are.
+        /// </summary>
+        private Template SlashPathTemplate(Token t)
+        {
+            string text = lexer.Text;
+            if (t.Span.End > text.Length || !Lexer.SlashPathFillsIn(t.Text)) return null;
+            var template = new Template();
+            int start = t.Span.Start, end = t.Span.End, chunk = start;
+            void Add(int to)
+            {
+                if (to <= chunk) return;
+                Template part = TemplateParser.ParseQuoted(text, chunk, to);
+                if (part != null)
+                {
+                    template.Segments.AddRange(part.Segments);
+                    errors.AddRange(part.Errors);
+                }
+                else
+                {
+                    template.Segments.Add(new TemplateSegment { Kind = TemplateSegmentKind.Text, Text = text.Substring(chunk, to - chunk), Span = TextSpan.FromBounds(chunk, to) });
+                }
+            }
+            for (int i = start; i < end; i++)
+            {
+                if (text[i] != '{') continue;
+                int close = text.IndexOf('}', i);
+                if (close < 0 || close >= end || !Lexer.IsRouteParameter(text.Substring(i, close + 1 - i))) continue;
+                Add(i);
+                template.Segments.Add(new TemplateSegment { Kind = TemplateSegmentKind.Text, Text = text.Substring(i, close + 1 - i), Span = TextSpan.FromBounds(i, close + 1) });
+                chunk = close + 1;
+                i = close;
+            }
+            Add(end);
             return template;
         }
 

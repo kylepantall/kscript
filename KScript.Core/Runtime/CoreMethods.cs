@@ -25,6 +25,10 @@ namespace KScript.Runtime
         private static double N(object target) => (double)target;
         private static DateTime D(object target) => (DateTime)target;
 
+        /// <summary>The .NET format for a date_format argument: a date_format value, or text that is one (checked, with the reason when it isn't).</summary>
+        private static string DateFormatOf(object value) =>
+            NativeParsers.DotNetDateFormat(value is NativeText { TypeName: "date_format" } format ? format : (NativeText)Native("date_format", Values.ToStr(value)));
+
         private static string ErrorName(CallContext c, object type) => type switch
         {
             ErrorType t => t.Name,
@@ -290,7 +294,8 @@ namespace KScript.Runtime
         private static void RegisterDateMethods(PackageBuilder p)
         {
             string d = KType.Date;
-            p.Method(d, "format", "pattern?", "Formats the date, for example 'd MMMM yyyy' or 'HH:mm'.", KType.String, (t, c) => D(t).ToString(c.Str(0, "yyyy-MM-dd"), CultureInfo.InvariantCulture));
+            p.Method(d, "format", "pattern?: date_format", "Writes the date the way a date_format says: ->format(dd-MM-yyyy), ->format('d MMMM yyyy') or ->format('HH:mm'). yyyy-MM-dd by default.", KType.String, (t, c) =>
+                D(t).ToString(c.Has(0) && c.Arg(0) != null ? DateFormatOf(c.Arg(0)) : "yyyy-MM-dd", CultureInfo.InvariantCulture));
             p.Field(d, "year", KType.Number, "The year.", (t, _) => (double)D(t).Year);
             p.Field(d, "month", KType.Number, "The month, 1 to 12.", (t, _) => (double)D(t).Month);
             p.Field(d, "day", KType.Number, "The day of the month.", (t, _) => (double)D(t).Day);
@@ -368,8 +373,16 @@ namespace KScript.Runtime
                 Values.TryNumber(S(t), out double d) ? Math.Truncate(d) : c.Has(0) ? c.Arg(0) : throw c.Error($"'{S(t)}' is not a number. Pass a default: ->to_int(0).", "Type"));
             p.Method(s, "to_bool", "", "Text such as 'true', 'false', 'yes', 'no', '1' or '0' as a bool.", KType.Bool, (t, c) =>
                 Values.ParseBool(S(t)) ?? throw c.Error($"'{S(t)}' is not a true/false value.", "Type"));
-            p.Method(s, "to_date", "", "Parses the text as a date.", KType.Date, (t, c) =>
-                DateTime.TryParse(S(t), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime dt) ? dt : throw c.Error($"'{S(t)}' is not a date.", "Format"));
+            p.Method(s, "to_date", "format?: date_format", "Reads the text as a date: '2026-11-22'->to_date(), or with the way it is written, '22-11-2026'->to_date(dd-MM-yyyy).", KType.Date, (t, c) =>
+            {
+                if (c.Has(0) && c.Arg(0) != null)
+                {
+                    string format = DateFormatOf(c.Arg(0));
+                    return DateTime.TryParseExact(S(t).Trim(), format, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime exact)
+                        ? exact : throw c.Error($"'{S(t)}' isn't a date written {Values.ToStr(c.Arg(0))}.", "Format");
+                }
+                return DateTime.TryParse(S(t), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime dt) ? dt : throw c.Error($"'{S(t)}' is not a date.", "Format");
+            });
             p.Method(s, "to_base64", "url?: bool", "The text encoded as base64. With url: true, it is URL-safe base64 without padding.", "base64", (t, c) =>
             {
                 string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(S(t)));

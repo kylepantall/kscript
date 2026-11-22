@@ -35,6 +35,9 @@ namespace KScript.Syntax
 
         /// <summary>A length of time written without quotes: <c>30s</c>, <c>500ms</c>, <c>1h30m</c>.</summary>
         Duration,
+
+        /// <summary>A slash path written without quotes: <c>/docs/getting-started</c>.</summary>
+        SlashPath,
     }
 
     public readonly struct Token
@@ -172,9 +175,22 @@ namespace KScript.Syntax
             int start = Position;
             char c = text[Position];
 
-            if (c == '/' && ValueCanStart() && ReadRegex(start) is Token regex)
+            if (c == '/' && ValueCanStart())
             {
-                return regex;
+                // /^[a-z]+$/i is a regex and /docs/start is a slash path. A regex wins when it reaches at least as far
+                // and its flags are real ones, so /blog/ and /a/i stay regexes; /a/b/c, /docs/start (flags "start")
+                // and /my-site (no closing /) were never valid code, so reading them as paths changes nothing.
+                int pathEnd = SlashPathLiteralEnd(text, start, end);
+                if (pathEnd < 0 && ReadRegex(start) is Token regex)
+                {
+                    return regex;
+                }
+                if (pathEnd > 0)
+                {
+                    Position = pathEnd;
+                    return Make(TokenKind.SlashPath, start);
+                }
+                Position = start;
             }
 
             // kyle@example.com and 3f2a8c1e-...: never valid code before these were literals, so nothing changes meaning.
@@ -330,6 +346,155 @@ namespace KScript.Syntax
             Position = i;
             return Make(TokenKind.Regex, start);
         }
+
+        /// <summary>
+        /// Where a slash path literal at <paramref name="start"/> ends, or -1 when the / starts a regex instead (or
+        /// nothing). A regex wins when it reaches at least as far as the path and its flags are real ones, so
+        /// <c>/blog/</c> and <c>/a/i</c> stay regexes. The lexer and the .kscript argument reader both ask this.
+        /// </summary>
+        public static int SlashPathLiteralEnd(string text, int start, int end)
+        {
+            int pathEnd = SlashPathEnd(text, start, end);
+            if (pathEnd < 0) return -1;
+            int regexEnd = RegexEnd(text, start, end);
+            if (regexEnd > 0 && pathEnd <= regexEnd && RegexFlagsAreReal(text.Substring(start, regexEnd - start))) return -1;
+            return pathEnd;
+        }
+
+        /// <summary>The end of a /pattern/flags regex at <paramref name="start"/> (as the lexer reads one), or -1.</summary>
+        private static int RegexEnd(string text, int start, int end)
+        {
+            int i = start + 1;
+            bool inClass = false;
+            for (; i < end && text[i] != '\n'; i++)
+            {
+                char ch = text[i];
+                if (ch == '\\')
+                {
+                    i++;
+                    continue;
+                }
+                if (ch == '[') inClass = true;
+                else if (ch == ']') inClass = false;
+                else if (ch == '/' && !inClass) break;
+            }
+            if (i >= end || text[i] != '/' || i == start + 1) return -1;
+            i++;
+            while (i < end && char.IsAsciiLetterLower(text[i])) i++;
+            return i;
+        }
+
+        /// <summary>True when the flags after a regex's closing / are only i, m, s and x.</summary>
+        private static bool RegexFlagsAreReal(string regex)
+        {
+            int close = regex.LastIndexOf('/');
+            for (int i = close + 1; i < regex.Length; i++)
+            {
+                if (regex[i] is not ('i' or 'm' or 's' or 'x')) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// The end of a slash path written without quotes (/docs/getting-started, /v1/users/12) at <paramref name="start"/>,
+        /// or -1. Each part is letters, digits, _, -, ., ~ or %, a route parameter such as {id}, or a value filled in
+        /// ($id, { $id }); a space, a quote, a bracket, a comma, -> or // (a comment)
+        /// ends it. A part with spaces in it (/My Apps/Notes) needs quotes, except as the whole value of a declared
+        /// slash_path, which is read as written.
+        /// </summary>
+        public static int SlashPathEnd(string text, int start, int end)
+        {
+            if (start >= end || text[start] != '/') return -1;
+            // / on its own is the top: path: /, view: "home".
+            if (start + 1 >= end || char.IsWhiteSpace(text[start + 1]) || text[start + 1] is ',' or ')' or ']' or '}' or ';') return start + 1;
+            if (!(SlashPathChar(text[start + 1]) || text[start + 1] == '{' || FillsInAt(text, start + 1, end))) return -1;
+            int i = start;
+            while (i < end && text[i] == '/')
+            {
+                int part = i + 1;
+                int j = part;
+                while (j < end && !(text[j] == '-' && j + 1 < end && text[j + 1] == '>'))
+                {
+                    if (SlashPathChar(text[j]))
+                    {
+                        j++;
+                    }
+                    else if (FillsInAt(text, j, end))
+                    {
+                        j += 2;
+                    }
+                    else if (text[j] == '{' && BraceEnd(text, j, end) is int close && close > 0)
+                    {
+                        // A route parameter ({id}, {id?}, {path*}) or a value filled in ({ $id }).
+                        j = close;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                if (j == part)
+                {
+                    // A trailing / is part of it (/docs/), but not the start of a // comment.
+                    if (part == start + 1) return -1;
+                    return j < end && text[j] is '/' or '*' ? i : j;
+                }
+                i = j;
+            }
+            return i;
+        }
+
+        /// <summary>True for $name at <paramref name="i"/>: a variable filled into a slash path.</summary>
+        private static bool FillsInAt(string text, int i, int end) => text[i] == '$' && i + 1 < end && IsIdentStart(text[i + 1]);
+
+        /// <summary>The end (after the }) of the braces opening at <paramref name="open"/>, on one line; -1 when they don't close.</summary>
+        private static int BraceEnd(string text, int open, int end)
+        {
+            int depth = 0;
+            for (int i = open; i < end && text[i] != '\n'; i++)
+            {
+                char c = text[i];
+                if (c is '\'' or '"')
+                {
+                    int close = text.IndexOf(c, i + 1);
+                    if (close < 0 || close >= end) return -1;
+                    i = close;
+                }
+                else if (c == '{') depth++;
+                else if (c == '}' && --depth == 0) return i + 1;
+            }
+            return -1;
+        }
+
+        /// <summary>True when <paramref name="braces"/> (the text of {...}, braces included) is a route parameter: {id}, {id?} or {path*}.</summary>
+        public static bool IsRouteParameter(string braces)
+        {
+            if (braces.Length < 3 || braces[0] != '{' || braces[^1] != '}' || !IsIdentStart(braces[1])) return false;
+            int i = 2;
+            while (i < braces.Length - 1 && IsIdentChar(braces[i])) i++;
+            if (i < braces.Length - 1 && braces[i] is '?' or '*') i++;
+            return i == braces.Length - 1;
+        }
+
+        /// <summary>
+        /// True when a slash path fills in values: a $name, or braces holding an expression ({ $id }) rather than a
+        /// route parameter ({id}).
+        /// </summary>
+        public static bool SlashPathFillsIn(string path)
+        {
+            for (int i = 0; i < path.Length; i++)
+            {
+                if (FillsInAt(path, i, path.Length)) return true;
+                if (path[i] == '{' && BraceEnd(path, i, path.Length) is int close && close > 0)
+                {
+                    if (!IsRouteParameter(path.Substring(i, close - i))) return true;
+                    i = close - 1;
+                }
+            }
+            return false;
+        }
+
+        private static bool SlashPathChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '-' or '.' or '~' or '%';
 
         /// <summary>The end of a UUID (8-4-4-4-12 hex digits) at <paramref name="start"/>, or -1.</summary>
         private int UuidEnd(int start)

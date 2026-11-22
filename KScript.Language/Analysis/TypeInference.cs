@@ -41,6 +41,7 @@ namespace KScript.Language.Analysis
                         LiteralKind.Email => KType.Email,
                         LiteralKind.Uuid => KType.Uuid,
                         LiteralKind.Url => "url",
+                        LiteralKind.SlashPath => "slash_path",
                         LiteralKind.Duration => "duration",
                         _ => KType.Null,
                     });
@@ -237,6 +238,11 @@ namespace KScript.Language.Analysis
                         {
                             TypeShape l = Infer(binary.Left, region);
                             TypeShape r = Infer(binary.Right, region);
+                            if (l.Type == "slash_path")
+                            {
+                                // /docs + 'start' adds names.
+                                return l;
+                            }
                             if (l.Type == KType.String || r.Type == KType.String)
                             {
                                 return new TypeShape(KType.String);

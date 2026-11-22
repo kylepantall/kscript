@@ -2,7 +2,7 @@
 description: A controller in controllers/: functions that answer routes
 category: Routes and APIs
 usage: <name> [--resource] [--actions index,export]
---resource: Write index, show, store, update and destroy, for Resource(path: "/people", to: people)
+--resource: Write index, show, store, update and destroy, for Resource(path: /people, to: people)
 --actions: The functions to write, comma separated (default index)
 example: kscript make controller people --resource
 example: kscript make controller reports --actions index,export

@@ -137,8 +137,8 @@ public sealed class AuthKitTests : AuthSiteFixture
         Assert.Contains("import KScript.Auth", web);
         Assert.Contains("import \"../controllers/accounts.kscript\" as accounts", web);
         Assert.Contains("Group(middleware: guest) {", web);
-        Assert.Contains("Post(path: \"/logout\", to: @accounts.sign_out, name: \"logout\")", web);
-        Assert.Contains("Post(path: \"/tokens\", to: @accounts.issue_token)", Read("routes/api.kscript"));
+        Assert.Contains("Post(path: /logout, to: @accounts.sign_out, name: \"logout\")", web);
+        Assert.Contains("Post(path: /tokens, to: @accounts.issue_token)", Read("routes/api.kscript"));
         Assert.Contains("fn issue_token(json: map)", Read("controllers/accounts.kscript"));
         Assert.Contains("import \"../requests/sign-up.kscript\"", Read("controllers/accounts.kscript"));
         Assert.Contains("type SignUp {", Read("requests/sign-up.kscript"));

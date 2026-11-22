@@ -41,6 +41,9 @@ namespace KScript.Language.Analysis
         /// <summary>Bare-word arguments (<c>downloads</c>, <c>not recursive</c>) waiting for their call to say what they are.</summary>
         private readonly HashSet<ArgumentNode> pendingBare = new HashSet<ArgumentNode>();
 
+        /// <summary>Words joined by - . + or / (<c>dd-MM-yyyy</c>, <c>1.4.2</c>) waiting for their call: text for a parameter whose type reads it.</summary>
+        private readonly HashSet<ArgumentNode> pendingRaw = new HashSet<ArgumentNode>();
+
         private static List<List<ParameterSlot>> SlotsOf(IEnumerable<CallableInfo> callables) =>
             callables.SelectMany(c => c.Signatures)
                 .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null,
@@ -92,6 +95,20 @@ namespace KScript.Language.Analysis
         private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
             CheckNumberArgument(a, slot, region);
+            if (pendingRaw.Contains(a))
+            {
+                if (slot.RawText == null || slot.RawText == "handle")
+                {
+                    return;
+                }
+                pendingRaw.Remove(a);
+                if (slot.Type != null)
+                {
+                    string written = region.Source.Value.Substring(a.Value.Span.Start, a.Value.Span.Length).Trim();
+                    CheckLiteralFits(written, slot.Type, region.Source.ToSource(a.Value.Span), null, 0);
+                }
+                return;
+            }
             if (pendingHandles.Contains(a))
             {
                 if (slot.RawText != "handle")
@@ -117,7 +134,7 @@ namespace KScript.Language.Analysis
             {
                 CheckLiteralFits(word, slot.Type, region.Source.ToSource(node.Span), null, 0);
             }
-            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Duration or LiteralKind.Number } literal)
+            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.SlashPath or LiteralKind.Duration or LiteralKind.Number } literal)
             {
                 object value = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, System.Globalization.CultureInfo.InvariantCulture) : literal.Value;
                 CheckLiteralFits(value, slot.Type, region.Source.ToSource(literal.Span), null, 0);
@@ -142,6 +159,11 @@ namespace KScript.Language.Analysis
             foreach (ArgumentNode a in args)
             {
                 if (pendingHandles.Remove(a))
+                {
+                    AnalyzeExpr(a.Value, region, scope, ExprContext.Argument);
+                    continue;
+                }
+                if (pendingRaw.Remove(a))
                 {
                     AnalyzeExpr(a.Value, region, scope, ExprContext.Argument);
                     continue;
@@ -176,7 +198,7 @@ namespace KScript.Language.Analysis
         private bool CheckNamedArguments(string display, IReadOnlyList<ArgumentNode> args, int piped, List<List<ParameterSlot>> signatures, ExpressionRegion region, TextSpan callSpan)
         {
             // Every command, method and function has at least one signature.
-            bool special = args.Any(a => a.Name != null || BareWord(a) != null);
+            bool special = args.Any(a => a.Name != null || BareWord(a) != null || pendingRaw.Contains(a));
 
             static int IndexOf(List<ParameterSlot> s, string name) => s.FindIndex(p => !p.Variadic && p.Name == name);
             // Of the signatures that have every name given, one that takes as many arguments as were given (->with() on

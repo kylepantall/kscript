@@ -1,12 +1,12 @@
 // The pages' client for the app's own JSON API (routes/api{{ ext }}).
-// @api('/api/...') sends the request to this
+// @api(/api/...) sends the request to this
 // app's routes in the same process, with the cookies of the person viewing the page{{#if auth}}, so it is signed in as them{{/if}}.
 // Another client (a phone app, a script) uses the same API over HTTP.
 import KScript.Net
 
 /// The notes, newest first{{#if auth}}, or null when nobody is signed in{{/if}}.
 fn list_notes() {
-  answer = @api('/api/notes')
+  answer = @api(/api/notes)
 {{#if auth}}
   if $answer.status == 401 {
     return null
@@ -18,7 +18,7 @@ fn list_notes() {
 /// Adds a note. Gives what was wrong as text when the API turns it away (a
 /// blank title), or null when it was added.
 fn add_note(title: string) {
-  answer = @api('/api/notes', options: { method: 'POST', body: { title: $title->trim() } })
+  answer = @api(/api/notes, options: { method: 'POST', body: { title: $title->trim() } })
   if $answer.status == 422 {
     return 'Give the note a title.'
   }
@@ -29,12 +29,12 @@ fn add_note(title: string) {
 /// Ticks a note, or unticks it.
 fn toggle_note(note: map) {
   changed = { title: $note.title, body: $note.body, done: not $note.done }
-  @api('/api/notes/' + $note.id, options: { method: 'PUT', body: $changed })->check()
+  @api(/api/notes/$note.id, options: { method: 'PUT', body: $changed })->check()
 }
 
 /// Deletes a note.
 fn delete_note(id: int) {
-  @api('/api/notes/' + $id, options: { method: 'DELETE' })->check()
+  @api(/api/notes/$id, options: { method: 'DELETE' })->check()
 }
 
 /// How many notes are not done yet, as text: '1 note left'.

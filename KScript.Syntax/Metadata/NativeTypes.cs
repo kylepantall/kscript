@@ -37,7 +37,10 @@ namespace KScript.Metadata
         /// <summary>The package that adds it: null for the language's own types.</summary>
         public string Package { get; set; }
 
-        /// <summary>How a raw (unquoted) value is read where the type is expected: "word" (most types) or "handle" (@name).</summary>
+        /// <summary>
+        /// How a raw (unquoted) value is read where the type is expected: "word" (most types), "handle" (@name) or
+        /// "slash" (slash_path: anything starting with /, spaces and a closing / included, is the text as written).
+        /// </summary>
         public string RawKind { get; init; } = "word";
 
         /// <summary>Its values print masked (a card number, a password), so they never show up in logs or JSON.</summary>
@@ -106,6 +109,8 @@ namespace KScript.Metadata
             // Identifiers and formats.
             Add(new NativeTypeInfo("slug", "Lowercase words joined by -, for URLs: my-first-post.", "my-first-post",
                 With("split", "upper", "replace")));
+            Add(new NativeTypeInfo("slash_path", "Names joined by /, such as /docs/getting-started or /My Apps/Notes: a page, menu or category path rather than a file. It always starts with /, so home is /home. Spaces around each name, empty parts, . and a trailing / are dropped, and .. goes up one.", "/docs/getting-started",
+                With("split", "lower", "upper", "replace")) { RawKind = "slash" });
             Add(new NativeTypeInfo("semver", "A semantic version such as 1.4.2, 2.0.0-beta.1 or 1.0.0+build.5. A leading v is dropped.", "1.4.2",
                 With("split")));
             Add(new NativeTypeInfo("mime", "A media type such as text/html or application/json, lowercased, with any parameters.", "application/json",
@@ -133,6 +138,8 @@ namespace KScript.Metadata
 
             // Time and things that run on it.
             Add(new NativeTypeInfo("duration", "A length of time: 1h30m, 90s, 2d or ISO 8601 such as PT1H30M. Kept in its short form.", "1h30m",
+                Searchable));
+            Add(new NativeTypeInfo("date_format", "How a date is written, such as dd-MM-yyyy or d MMMM yyyy, HH:mm: dd is the day, MM the month, yyyy the year, HH the hour and mm the minute. Text goes in quotes ('at' HH:mm).", "dd-MM-yyyy",
                 Searchable));
             Add(new NativeTypeInfo("cron", "A cron schedule of five fields (minute hour day month weekday), or @daily, @hourly and the like.", "'*/15 9-17 * * mon-fri'",
                 Searchable));
