@@ -98,6 +98,15 @@ namespace KScript.Projects
         /// </summary>
         public string Env { get; set; }
 
+        /// <summary>
+        /// The database KScript.Data gives a test file: memory (a new SQLite database in memory for each file, made
+        /// from the migrations, or from the models when there are none) or config (the one the config names). Either
+        /// way each test's changes are undone when it ends.
+        /// </summary>
+        public string Database { get; set; } = "memory";
+
+        public static readonly string[] DatabaseChoices = { "memory", "config" };
+
         public const double DefaultTimeout = 10;
         public static readonly string[] DefaultInclude = { "**/*.test.kscript", "**/*.test.ks.xml", "**/*.test.xml" };
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
@@ -1486,8 +1495,13 @@ namespace KScript.Projects
                         if (p.Value.ValueKind == JsonValueKind.String && p.Value.GetString().Trim().Length > 0) config.Test.Env = p.Value.GetString().Trim();
                         else config.Warnings.Add("test.env should be the name of an environment, such as \"test\".");
                         break;
+                    case "database":
+                        string database = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString().Trim() : null;
+                        if (TestSettings.DatabaseChoices.Contains(database)) config.Test.Database = database;
+                        else config.Warnings.Add("test.database should be memory or config.");
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'test.{p.Name}' (expected include, exclude, timeout, packages or env).");
+                        config.Warnings.Add($"unknown setting 'test.{p.Name}' (expected include, exclude, timeout, packages, env or database).");
                         break;
                 }
             }

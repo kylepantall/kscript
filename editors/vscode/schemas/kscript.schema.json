@@ -257,6 +257,11 @@
           "examples": ["test"],
           "description": "The environment the tests run in (KSCRIPT_ENV), so config/config.test.yaml can give tests their own database. kscript --env and a KSCRIPT_ENV already set win."
         },
+        "database": {
+          "enum": ["memory", "config"],
+          "default": "memory",
+          "description": "The database KScript.Data gives each test file: memory (a new SQLite database in memory, made from the migrations or the models) or config (the one the config names). Each test's changes are undone when it ends."
+        },
         "packages": {
           "type": "array",
           "description": "Packages every test file imports, on top of the project's packages. KScript.Test is always imported in test files.",

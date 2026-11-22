@@ -185,6 +185,19 @@ namespace KScript.Testing
 
         private static void RunFileHere(string full, TestRunSettings settings, TestFileResult result, Action<TestResult> onResult)
         {
+            KScriptHost host = null;
+            try
+            {
+                RunFileIn(full, settings, result, onResult, h => host = h);
+            }
+            finally
+            {
+                foreach (Action done in host?.AfterFile ?? new List<Action>()) done();
+            }
+        }
+
+        private static void RunFileIn(string full, TestRunSettings settings, TestFileResult result, Action<TestResult> onResult, Action<KScriptHost> made)
+        {
             ProjectConfig project;
             try
             {
@@ -209,7 +222,9 @@ namespace KScript.Testing
             var host = new KScriptHost(fileOutput, fileOutput, new StringReader(string.Empty))
             {
                 WorkingDirectory = System.IO.Path.GetDirectoryName(full),
+                TestFile = full,
             };
+            made(host);
             var session = new TestSession();
             session.Attach(host);
             var interpreter = new Interpreter(host, settings.Packages ?? PackageRegistry.Default, options);
@@ -277,6 +292,7 @@ namespace KScript.Testing
             {
                 interpreter.Options.Cancellation = limit.Token;
                 session.Running = test;
+                interpreter.Host.TestRunning = true;
                 try
                 {
                     try
@@ -321,6 +337,9 @@ namespace KScript.Testing
                 finally
                 {
                     session.Running = null;
+                    interpreter.Host.TestRunning = false;
+                    KScriptException ending = EndTest(interpreter.Host);
+                    failure ??= ending;
                 }
 
                 if (failure != null) message = Describe(failure, settings, limit, settings.Cancellation, timeout, "the test");
@@ -342,7 +361,27 @@ namespace KScript.Testing
             };
         }
 
-        private static CancellationTokenSource Limit(CancellationToken outer, double seconds)
+        /// <summary>Runs what packages left to do when the test ended (newest first), such as undoing its database changes.</summary>
+        private static KScriptException EndTest(KScriptHost host)
+        {
+            KScriptException failure = null;
+            List<Action> work = host.AfterTest.ToList();
+            host.AfterTest.Clear();
+            for (int i = work.Count - 1; i >= 0; i--)
+            {
+                try
+                {
+                    work[i]();
+                }
+                catch (KScriptException ex)
+                {
+                    failure ??= ex;
+                }
+            }
+            return failure;
+        }
+
+                private static CancellationTokenSource Limit(CancellationToken outer, double seconds)
         {
             var cts = CancellationTokenSource.CreateLinkedTokenSource(outer);
             if (seconds > 0) cts.CancelAfter(TimeSpan.FromSeconds(seconds));

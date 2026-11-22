@@ -35,6 +35,21 @@ namespace KScript.Runtime
         /// </summary>
         public bool UseColour => KScript.Output.CliStyle.Allowed(IsInteractive);
 
+        /// <summary>The test file kscript test is running in this host, or null outside a test run.</summary>
+        public string TestFile { get; set; }
+
+        /// <summary>True while one test of <see cref="TestFile"/> runs (not its top-level code).</summary>
+        public bool TestRunning { get; set; }
+
+        /// <summary>
+        /// Work to do when the running test ends, such as undoing its database changes. Packages add to it while a
+        /// test runs; the test runner runs it, newest first, and empties it.
+        /// </summary>
+        public List<Action> AfterTest { get; } = new List<Action>();
+
+        /// <summary>Work to do when <see cref="TestFile"/>'s tests have all run, such as closing its database.</summary>
+        public List<Action> AfterFile { get; } = new List<Action>();
+
         /// <summary>Command line arguments after the script path: <c>$args</c>.</summary>
         public IReadOnlyList<string> Arguments { get; set; } = Array.Empty<string>();
 

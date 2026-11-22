@@ -296,6 +296,21 @@ namespace KScript.Data
                     return Records.Create(c, q.Model, values);
                 }),
             new("query", "", "A query on the model with no conditions yet, to build on.", KType.Query, (q, c) => q),
+            new("fake", "values...", "Saves a record with made-up values for the fields that need one, and these values: `$User->fake(role: 'admin')`. Optional fields and fields with defaults are left to the model, and a required relation gets a fake record too. For tests and seeders.", KType.Record,
+                (q, c) => Fakes.Make(c, q.Model, ValuesOf(c, "fake", allowEmpty: true)), Bare: true),
+            new("fake_many", "count: number, values...", "Saves count fake records, each with these values, and returns them: `$Post->fake_many(3, author: $joan)`.", KType.List,
+                (q, c) =>
+                {
+                    int count = Count(c.Arg(0, "count"), "->fake_many()'s count");
+                    var values = new Dictionary<string, object>(StringComparer.Ordinal);
+                    foreach (object a in c.Args.Skip(1))
+                    {
+                        if (a is not Dictionary<string, object> map) throw new KScriptException($"->fake_many() takes a count, then a map of values or names and values, not {Values.Describe(a)}.", "Argument");
+                        foreach (KeyValuePair<string, object> kv in map) values[kv.Key] = kv.Value;
+                    }
+                    foreach (KeyValuePair<string, object> kv in c.Named.Where(kv => kv.Key != "count")) values[kv.Key] = kv.Value;
+                    return Enumerable.Range(0, count).Select(_ => (object)Fakes.Make(c, q.Model, values)).ToList();
+                }, Bare: true),
         };
 
         private static void RegisterQueries(PackageBuilder p)
@@ -479,6 +494,9 @@ namespace KScript.Data
                     string connection = c.Arg(2, "connection") != null ? Word(c.Arg(2, "connection"), "connection") : null;
                     return RunSql(c, Database.For(c, connection), c.Str(0), c.Arg(1, "as"));
                 }).Info.KeepsBareWords = true;
+
+            p.Command("queries", "", "The SQL statements this run has sent, oldest first (the last 1000), each as { sql, bindings, database }. In a test, only the test's own: `expect(value: @queries(), count-at-most: 4)` catches a page that makes a query per row.", KType.List,
+                c => QueryLog.Of(c.Interpreter));
 
             p.Command("transaction", "work: fn, retries?: number, connection?", "Runs work in a transaction and returns what it returns: everything it saves is kept together, or (when it fails) not at all. retries tries again when the database is busy.", KType.Any,
                 c =>

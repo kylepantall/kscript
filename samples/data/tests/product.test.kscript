@@ -1,21 +1,30 @@
 import KScript.Data
 import "../models/product.kscript"
 
+// kscript test gives this file its own database in memory, made from the
+// migrations, and undoes each test's changes when it ends.
 describe(name: 'Product') {
   test(name: 'is saved and found again') {
-    $db->create_table($Product)
     tea = $Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
     expect(value: $Product->find($tea.id).name, equals: 'Black tea')
     expect(value: $tea.stock, equals: 0)
-    $db->drop_table($Product)
+  }
+
+  test(name: 'starts each test with no products') {
+    expect(value: $Product->count(), equals: 0)
   }
 
   test(name: 'keeps skus unique') {
-    $db->create_table($Product)
-    $Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
+    $Product->fake(sku: 'TEA-9')
     expect-error(type: UniqueViolation) {
-      $Product->create(sku: 'TEA-9', name: 'Other tea', price: 6)
+      $Product->fake(sku: 'TEA-9')
     }
-    $db->drop_table($Product)
+  }
+
+  test(name: 'lists products in one query') {
+    $Product->fake_many(3)
+    names = $Product->order_by(name)->pluck(name)
+    expect(value: $names, count: 3)
+    expect(value: @queries(), count-at-most: 4)
   }
 }
