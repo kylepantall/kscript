@@ -322,11 +322,11 @@ namespace KScript.Language.Tests
 
                 Migration {
                   CreateTable(name: teams) {
-                    Field(name: id, type: int, key: yes, auto: yes)
+                    Field(name: id, type: int, key, auto)
                     Field(name: name, type: string, max: 40)
-                    Index(columns: [name], unique: yes)
+                    Index(columns: [name], unique)
                   }
-                  AddColumn(table: teams, name: size, type: int, default: 0)
+                  AddField(table: teams, name: size, type: int, default: 0)
                   Down {
                     DropTable(name: teams)
                   }

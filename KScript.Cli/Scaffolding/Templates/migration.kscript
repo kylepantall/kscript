@@ -9,5 +9,5 @@ hint: Add its steps, then run kscript db migrate. kscript db rollback undoes it.
 ---
 // {{ title }}: run by kscript db migrate, undone by kscript db rollback.
 KScript.Migration {
-  // TODO: Add the steps: CreateTable, AddColumn, ChangeColumn, AddIndex, Sql and the rest.
+  // TODO: Add the steps: CreateTable, AddField, ChangeField, AddIndex, Sql and the rest.
 }

@@ -14,7 +14,7 @@ namespace KScript.Data.Migrations
     /// </summary>
     internal abstract class Step
     {
-        /// <summary>What it does, for messages: "add column users.bio".</summary>
+        /// <summary>What it does, for messages: "add field users.bio".</summary>
         public abstract string Describe();
 
         /// <summary>Changes the schema as the step does, or throws when it can't be done to it.</summary>
@@ -157,7 +157,7 @@ namespace KScript.Data.Migrations
 
         public ColumnSpec Column { get; }
 
-        public override string Describe() => $"add column {Table}.{Column.Name}";
+        public override string Describe() => $"add field {Table}.{Column.Name}";
 
         public override void Apply(Schema schema)
         {
@@ -174,7 +174,7 @@ namespace KScript.Data.Migrations
         public override IEnumerable<Step> Reverse(Schema before) => new[] { new DropColumnStep(Table, Column.Name) };
 
         public override void Write(MigrationWriter w) =>
-            w.Line(MigrationWriter.Call("AddColumn", new[] { ("table", MigrationWriter.Name(Table)) }.Concat(MigrationWriter.Column(Column)).ToArray()));
+            w.Line(MigrationWriter.Call("AddField", new[] { ("table", MigrationWriter.Name(Table)) }.Concat(MigrationWriter.Column(Column)).ToArray()));
     }
 
     internal sealed class DropColumnStep : Step
@@ -189,7 +189,7 @@ namespace KScript.Data.Migrations
 
         public string Name { get; }
 
-        public override string Describe() => $"drop column {Table}.{Name}";
+        public override string Describe() => $"drop field {Table}.{Name}";
 
         public override void Apply(Schema schema)
         {
@@ -218,7 +218,7 @@ namespace KScript.Data.Migrations
             foreach (TableIndex i in t.Indexes.Where(i => i.Columns.Contains(Name))) yield return new AddIndexStep(Table, i.Columns, i.Unique);
         }
 
-        public override void Write(MigrationWriter w) => w.Line(MigrationWriter.Call("DropColumn", ("table", MigrationWriter.Name(Table)), ("name", MigrationWriter.Name(Name))));
+        public override void Write(MigrationWriter w) => w.Line(MigrationWriter.Call("DropField", ("table", MigrationWriter.Name(Table)), ("name", MigrationWriter.Name(Name))));
     }
 
     internal sealed class RenameColumnStep : Step
@@ -236,7 +236,7 @@ namespace KScript.Data.Migrations
 
         public string To { get; }
 
-        public override string Describe() => $"rename column {Table}.{From} to {To}";
+        public override string Describe() => $"rename field {Table}.{From} to {To}";
 
         public override void Apply(Schema schema)
         {
@@ -266,7 +266,7 @@ namespace KScript.Data.Migrations
         public override IEnumerable<Step> Reverse(Schema before) => new[] { new RenameColumnStep(Table, To, From) };
 
         public override void Write(MigrationWriter w) =>
-            w.Line(MigrationWriter.Call("RenameColumn", ("table", MigrationWriter.Name(Table)), ("from", MigrationWriter.Name(From)), ("to", MigrationWriter.Name(To))));
+            w.Line(MigrationWriter.Call("RenameField", ("table", MigrationWriter.Name(Table)), ("from", MigrationWriter.Name(From)), ("to", MigrationWriter.Name(To))));
     }
 
     internal sealed class ChangeColumnStep : Step
@@ -281,7 +281,7 @@ namespace KScript.Data.Migrations
 
         public ColumnSpec Column { get; }
 
-        public override string Describe() => $"change column {Table}.{Column.Name}";
+        public override string Describe() => $"change field {Table}.{Column.Name}";
 
         public override void Apply(Schema schema)
         {
@@ -306,7 +306,7 @@ namespace KScript.Data.Migrations
         }
 
         public override void Write(MigrationWriter w) =>
-            w.Line(MigrationWriter.Call("ChangeColumn", new[] { ("table", MigrationWriter.Name(Table)) }.Concat(MigrationWriter.Column(Column)).ToArray()));
+            w.Line(MigrationWriter.Call("ChangeField", new[] { ("table", MigrationWriter.Name(Table)) }.Concat(MigrationWriter.Column(Column)).ToArray()));
     }
 
     internal sealed class AddIndexStep : Step
@@ -416,7 +416,7 @@ namespace KScript.Data.Migrations
                 ?? throw new KScriptException($"{table.Name}.{c.Name} points to {c.References}, which has no key of one column. Say which column with references_column.", "Migration");
             if (target.Column(key) == null) throw NoColumn(target, key, $"point {table.Name}.{c.Name} to it");
             if (!target.Column(key).IsKey && target.IndexOf(new[] { key }, unique: true) == null)
-                throw new KScriptException($"{table.Name}.{c.Name} points to {target.Name}.{key}, which isn't the table's key or unique, so a row could match more than one. Give it a unique index first: AddIndex(table: {target.Name}, columns: [{key}], unique: yes).", "Migration");
+                throw new KScriptException($"{table.Name}.{c.Name} points to {target.Name}.{key}, which isn't the table's key or unique, so a row could match more than one. Give it a unique index first: AddIndex(table: {target.Name}, columns: [{key}], unique).", "Migration");
             return new ColumnSpec
             {
                 Name = c.Name, Kind = c.Kind, Nullable = c.Nullable, Length = c.Length, Words = c.Words, IsKey = c.IsKey, AutoIncrement = c.AutoIncrement, Default = c.Default,
@@ -478,7 +478,7 @@ namespace KScript.Data.Migrations
         }
 
         public static string Call(string element, params (string Name, string Value)[] args) =>
-            args.Length == 0 ? element + (element.StartsWith("KScript.", StringComparison.Ordinal) ? string.Empty : "()") : element + "(" + string.Join(", ", args.Select(a => a.Name + ": " + a.Value)) + ")";
+            args.Length == 0 ? element + (element.StartsWith("KScript.", StringComparison.Ordinal) ? string.Empty : "()") : element + "(" + string.Join(", ", args.Select(a => a.Value == null ? a.Name : a.Name + ": " + a.Value)) + ")";
 
         /// <summary>A table or column name: bare when it is a word, else in quotes.</summary>
         public static string Name(string name) =>
@@ -494,7 +494,7 @@ namespace KScript.Data.Migrations
             var args = new List<(string, string)>();
             if (table != null) args.Add(("table", Name(table)));
             args.Add(("columns", List(index.Columns)));
-            if (index.Unique) args.Add(("unique", "yes"));
+            if (index.Unique) args.Add(("unique", null));
             return args.ToArray();
         }
 
@@ -505,9 +505,9 @@ namespace KScript.Data.Migrations
             yield return ("type", c.TypeWord);
             if (c.Kind == ColumnKind.Enum && c.Words != null) yield return ("values", List(c.Words));
             if (c.Length != null && !(c.Kind == ColumnKind.Email && c.Length == 254)) yield return ("max", c.Length.Value.ToString(CultureInfo.InvariantCulture));
-            if (c.Nullable) yield return ("null", "yes");
-            if (c.IsKey) yield return ("key", "yes");
-            if (c.AutoIncrement) yield return ("auto", "yes");
+            if (c.Nullable) yield return ("optional", null);
+            if (c.IsKey) yield return ("key", null);
+            if (c.AutoIncrement) yield return ("auto", null);
             if (c.Default != null) yield return ("default", Literal(c.Default));
             if (c.References != null)
             {

@@ -40,7 +40,7 @@ namespace KScript.Data.Migrations
             new A("type", K.Enum, "string, int, number, bool, date, email, handle, uuid, password, json or enum (with values:). Each database stores it the way models do.", true, TypeWords),
             new A("max", K.Expression, "The most characters a string may have: varchar(max)."),
             new A("values", K.Text, "The words an enum column may hold: [member, admin].") { NameList = true },
-            new A("null", K.Bool, "true lets the column be null."),
+            new A("optional", K.Bool, "Lets the column be empty (null)."),
             new A("default", K.Expression, "What the database fills in when a row doesn't give it: 'member', 0, true."),
             new A("key", K.Bool, "true makes it the table's key."),
             new A("auto", K.Bool, "true on an int key: the database numbers the rows itself."),
@@ -69,7 +69,7 @@ namespace KScript.Data.Migrations
             p.Element(new ElementInfo("Migration", "A migration file, in database/migrations: the steps that change the tables, run in order by kscript db migrate and undone by kscript db rollback. kscript db diff writes them from the models.", ContentKind.Statements)
             {
                 Context = ElementContext.Script,
-                Example = "<KScript.Migration>\n  <AddColumn table=\"users\" name=\"bio\" type=\"string\" null=\"yes\" />\n</KScript.Migration>",
+                Example = "<KScript.Migration>\n  <AddField table=\"users\" name=\"bio\" type=\"string\" optional=\"true\" />\n</KScript.Migration>",
             }, run =>
             {
                 Plan(run);
@@ -78,7 +78,7 @@ namespace KScript.Data.Migrations
             });
 
             p.Element(Step("CreateTable", "Makes a table, with a Field for each column, its Index lines and a Key of two columns if it has one.", ContentKind.Statements,
-                "<CreateTable name=\"posts\">\n    <Field name=\"id\" type=\"int\" key=\"yes\" auto=\"yes\" />\n    <Field name=\"title\" type=\"string\" max=\"200\" />\n  </CreateTable>",
+                "<CreateTable name=\"posts\">\n    <Field name=\"id\" type=\"int\" key=\"true\" auto=\"true\" />\n    <Field name=\"title\" type=\"string\" max=\"200\" />\n  </CreateTable>",
                 new A("name", K.Text, "The table's name.", true) { Literal = true }), run =>
             {
                 MigrationPlan plan = Plan(run);
@@ -146,14 +146,14 @@ namespace KScript.Data.Migrations
                 return null;
             });
 
-            p.Element(Step("AddColumn", "Adds a column to a table. A required column needs a default when the table has rows.", ContentKind.Empty,
-                "<AddColumn table=\"users\" name=\"bio\" type=\"string\" null=\"yes\" />", ColumnAttributes(true, "to add it to")), run =>
+            p.Element(Step("AddField", "Adds a column to a table. A required column needs a default when the table has rows.", ContentKind.Empty,
+                "<AddField table=\"users\" name=\"bio\" type=\"string\" optional=\"true\" />", ColumnAttributes(true, "to add it to")), run =>
             {
                 Plan(run).Add(new AddColumnStep(run.RequiredRaw("table").Trim(), Column(run)));
                 return null;
             });
 
-            p.Element(Step("DropColumn", "Drops a column, with its indexes. Rollback adds it back, empty.", ContentKind.Empty, "<DropColumn table=\"users\" name=\"nickname\" />",
+            p.Element(Step("DropField", "Drops a column, with its indexes. Rollback adds it back, empty.", ContentKind.Empty, "<DropField table=\"users\" name=\"nickname\" />",
                 new A("table", K.Text, "The table.", true) { Literal = true },
                 new A("name", K.Text, "The column.", true) { Literal = true }), run =>
             {
@@ -161,7 +161,7 @@ namespace KScript.Data.Migrations
                 return null;
             });
 
-            p.Element(Step("RenameColumn", "Renames a column, keeping its rows.", ContentKind.Empty, "<RenameColumn table=\"users\" from=\"nick\" to=\"handle\" />",
+            p.Element(Step("RenameField", "Renames a column, keeping its rows.", ContentKind.Empty, "<RenameField table=\"users\" from=\"nick\" to=\"handle\" />",
                 new A("table", K.Text, "The table.", true) { Literal = true },
                 new A("from", K.Text, "The column's name now.", true) { Literal = true },
                 new A("to", K.Text, "Its new name.", true) { Literal = true }), run =>
@@ -170,8 +170,8 @@ namespace KScript.Data.Migrations
                 return null;
             });
 
-            p.Element(Step("ChangeColumn", "Changes a column to the one described: its type, whether it may be null, its default or what it references. The rows are kept.", ContentKind.Empty,
-                "<ChangeColumn table=\"users\" name=\"bio\" type=\"string\" max=\"500\" null=\"yes\" />", ColumnAttributes(true, "the column is in")), run =>
+            p.Element(Step("ChangeField", "Changes a column to the one described: its type, whether it may be null, its default or what it references. The rows are kept.", ContentKind.Empty,
+                "<ChangeField table=\"users\" name=\"bio\" type=\"string\" max=\"500\" optional=\"true\" />", ColumnAttributes(true, "the column is in")), run =>
             {
                 Plan(run).Add(new ChangeColumnStep(run.RequiredRaw("table").Trim(), Column(run)));
                 return null;
@@ -235,7 +235,7 @@ namespace KScript.Data.Migrations
             return names;
         }
 
-        /// <summary>A column from a Field, AddColumn or ChangeColumn's attributes.</summary>
+        /// <summary>A column from a Field, AddField or ChangeColumn's attributes.</summary>
         private static ColumnSpec Column(ElementRun run)
         {
             string word = run.RequiredRaw("type").Trim();
@@ -249,11 +249,11 @@ namespace KScript.Data.Migrations
             if (fallback is not (null or string or double or bool)) throw run.Error("A default is text, a number, true or false.", "default", "Migration");
             bool key = run.Flag("key");
             bool auto = run.Flag("auto");
-            if (auto && (!key || kind != ColumnKind.Integer)) throw run.Error("auto: yes numbers the rows of an int key: type: int, key: yes, auto: yes.", "auto", "Migration");
+            if (auto && (!key || kind != ColumnKind.Integer)) throw run.Error("auto numbers the rows of an int key: type: int, key, auto.", "auto", "Migration");
             string references = run.Raw("references")?.Trim();
             string onDelete = run.Raw("on_delete")?.Trim().Replace('_', ' ');
-            bool nullable = run.Flag("null");
-            if (onDelete == "set null" && !nullable) throw run.Error("on_delete: set_null needs a column that may be null (null: yes).", "on_delete", "Migration");
+            bool nullable = run.Flag("optional");
+            if (onDelete == "set null" && !nullable) throw run.Error("on_delete: set_null needs a column that may be empty (optional).", "on_delete", "Migration");
             return new ColumnSpec
             {
                 Name = run.RequiredRaw("name").Trim(),

@@ -120,13 +120,13 @@ public sealed class MigrationTests : DataFixture
         Assert.Contains("Wrote database/migrations/2026_11_22_100000_create_tags_users_posts_and_more.kscript, with 4 steps.", wrote);
         string text = Migration("create_");
         Assert.Contains("CreateTable(name: users) {", text);
-        Assert.Contains("Field(name: id, type: int, key: yes, auto: yes)", text);
+        Assert.Contains("Field(name: id, type: int, key, auto)", text);
         Assert.Contains("Field(name: name, type: string, max: 80)", text);
         Assert.Contains("Field(name: email, type: email)", text);
         Assert.Contains("Field(name: role, type: enum, values: [member, admin], default: 'member')", text);
         Assert.Contains("Field(name: active, type: bool, default: true)", text);
-        Assert.Contains("Field(name: created_at, type: date, null: yes)", text);
-        Assert.Contains("Index(columns: [email], unique: yes)", text);
+        Assert.Contains("Field(name: created_at, type: date, optional)", text);
+        Assert.Contains("Index(columns: [email], unique)", text);
         Assert.Contains("Field(name: author_id, type: int, references: users)", text);
         Assert.Contains("Key(columns: [post_id, tag_id])", text);
         // Tables come after the ones they point to.
@@ -173,11 +173,11 @@ public sealed class MigrationTests : DataFixture
         Assert.Contains("The models want 6 changes", status);
         Ok("diff", "grow_users");
         string text = Migration("grow_users");
-        Assert.Contains("AddColumn(table: users, name: bio, type: string, null: yes)", text);
-        Assert.Contains("AddColumn(table: users, name: score, type: number, default: 1.5)", text);
-        Assert.Contains("ChangeColumn(table: users, name: name, type: string, max: 120)", text);
-        Assert.True(text.Contains("ChangeColumn(table: users, name: role, type: enum, values: [member, editor, admin], default: 'member')", StringComparison.Ordinal), text);
-        Assert.Contains("DropColumn(table: posts, name: views)", text);
+        Assert.Contains("AddField(table: users, name: bio, type: string, optional)", text);
+        Assert.Contains("AddField(table: users, name: score, type: number, default: 1.5)", text);
+        Assert.Contains("ChangeField(table: users, name: name, type: string, max: 120)", text);
+        Assert.True(text.Contains("ChangeField(table: users, name: role, type: enum, values: [member, editor, admin], default: 'member')", StringComparison.Ordinal), text);
+        Assert.Contains("DropField(table: posts, name: views)", text);
         Assert.Contains("AddIndex(table: users, columns: [name, active])", text);
 
         Ok("migrate");
@@ -201,7 +201,7 @@ public sealed class MigrationTests : DataFixture
             echo "{$ada.name} {$ada.role} {$Post->count()}"
             """));
         // The rolled back migration is still there, so the old models want it undone.
-        Assert.Contains("drop column users.bio", Ok("status"));
+        Assert.Contains("drop field users.bio", Ok("status"));
         Ok("migrate");
         Ok("rollback", "--all");
         Assert.Contains("Nothing to roll back", Ok("rollback"));
@@ -224,8 +224,8 @@ public sealed class MigrationTests : DataFixture
         Assert.Contains("Was users.name renamed to full_name?", output);
         string text = Migration("renames");
         Assert.Contains("RenameTable(from: posts, to: articles)", text);
-        Assert.Contains("RenameColumn(table: users, from: name, to: full_name)", text);
-        Assert.DoesNotContain("DropColumn", text);
+        Assert.Contains("RenameField(table: users, from: name, to: full_name)", text);
+        Assert.DoesNotContain("DropField", text);
         Ok("migrate");
         Assert.Equal("Ada", Keep("echo $User->first().full_name"));
         Assert.Contains("Nothing to write", Ok("diff"));
@@ -237,8 +237,8 @@ public sealed class MigrationTests : DataFixture
         Assert.Contains("If you renamed the table posts to articles, the migration drops it", unasked);
         Assert.Contains("If you renamed users.name to full_name", unasked);
         text = Migration("replace");
-        Assert.Contains("DropColumn(table: users, name: name)", text);
-        Assert.Contains("AddColumn(table: users, name: full_name, type: string, max: 80)", text);
+        Assert.Contains("DropField(table: users, name: name)", text);
+        Assert.Contains("AddField(table: users, name: full_name, type: string, max: 80)", text);
         Assert.Contains("CreateTable(name: articles)", text);
         Assert.Contains("DropTable(name: posts)", text);
         // Asked, and told no.
@@ -255,20 +255,20 @@ public sealed class MigrationTests : DataFixture
         FileOf("database/migrations/2026_01_01_000000_teams.kscript", """
             KScript.Migration {
               CreateTable(name: teams) {
-                Field(name: id, type: int, key: yes, auto: yes)
+                Field(name: id, type: int, key, auto)
                 Field(name: name, type: string, max: 40)
-                Field(name: level, type: enum, values: [low, high], null: yes)
+                Field(name: level, type: enum, values: [low, high], optional)
               }
               CreateTable(name: people) {
-                Field(name: code, type: string, max: 10, key: yes)
-                Field(name: team_id, type: int, references: teams, null: yes)
-                Field(name: nick, type: string, null: yes)
-                Field(name: joined, type: date, null: yes)
-                Field(name: email, type: email, null: yes)
-                Field(name: extra, type: json, null: yes)
-                Field(name: secret, type: password, null: yes)
-                Field(name: tag, type: handle, null: yes)
-                Field(name: ref, type: uuid, null: yes)
+                Field(name: code, type: string, max: 10, key)
+                Field(name: team_id, type: int, references: teams, optional)
+                Field(name: nick, type: string, optional)
+                Field(name: joined, type: date, optional)
+                Field(name: email, type: email, optional)
+                Field(name: extra, type: json, optional)
+                Field(name: secret, type: password, optional)
+                Field(name: tag, type: handle, optional)
+                Field(name: ref, type: uuid, optional)
                 Index(columns: [nick])
               }
               CreateTable(name: memberships) {
@@ -281,15 +281,15 @@ public sealed class MigrationTests : DataFixture
             """);
         FileOf("database/migrations/2026_01_02_000000_change.kscript", """
             KScript.Migration {
-              AddColumn(table: teams, name: size, type: int, default: 3)
-              AddColumn(table: teams, name: owner_code, type: string, max: 10, references: people, null: yes)
-              RenameColumn(table: people, from: nick, to: handle)
-              ChangeColumn(table: teams, name: level, type: enum, values: [low, mid, high], default: 'mid')
-              ChangeColumn(table: teams, name: name, type: string, max: 80, null: yes)
-              AddIndex(table: teams, columns: [name, size], unique: yes)
+              AddField(table: teams, name: size, type: int, default: 3)
+              AddField(table: teams, name: owner_code, type: string, max: 10, references: people, optional)
+              RenameField(table: people, from: nick, to: handle)
+              ChangeField(table: teams, name: level, type: enum, values: [low, mid, high], default: 'mid')
+              ChangeField(table: teams, name: name, type: string, max: 80, optional)
+              AddIndex(table: teams, columns: [name, size], unique)
               DropIndex(table: people, columns: [handle])
               RenameTable(from: memberships, to: members)
-              DropColumn(table: people, name: joined)
+              DropField(table: people, name: joined)
             }
             """);
         string ran = Ok("migrate");
@@ -423,13 +423,13 @@ public sealed class MigrationTests : DataFixture
             Assert.True(text.Contains(message, StringComparison.Ordinal), $"Expected '{message}' in:\n{text}");
         }
 
-        const string Teams = "CreateTable(name: teams) {\n  Field(name: id, type: int, key: yes, auto: yes)\n  Field(name: name, type: string, max: 40)\n}\n";
+        const string Teams = "CreateTable(name: teams) {\n  Field(name: id, type: int, key, auto)\n  Field(name: name, type: string, max: 40)\n}\n";
         Bad("DropTable(name: team)", "the migrations before this one don't make a table called team");
         Bad(Teams + "DropTable(name: team)", "Did you mean teams?");
         Bad(Teams + Teams, "an earlier migration made it already");
         Bad("CreateTable(name: x) {\n}", "needs at least one Field");
         Bad("CreateTable(name: x) {\n  Field(name: a, type: int)\n  Field(name: a, type: int)\n}", "two columns called a");
-        Bad("CreateTable(name: x) {\n  Field(name: a, type: int, key: yes)\n  Field(name: b, type: int)\n  Key(columns: [a, b])\n}", "more than one key");
+        Bad("CreateTable(name: x) {\n  Field(name: a, type: int, key)\n  Field(name: b, type: int)\n  Key(columns: [a, b])\n}", "more than one key");
         Bad("CreateTable(name: x) {\n  Field(name: a, type: int)\n  Key(columns: [a, c])\n}", "names c, which isn't one of its columns");
         Bad("CreateTable(name: x) {\n  Field(name: a, type: int)\n  Index(columns: [b])\n}", "x has no column called b");
         Bad("CreateTable(name: x) {\n  Field(name: a, type: int, references: nope)\n}", "there is no table called nope by then");
@@ -437,25 +437,25 @@ public sealed class MigrationTests : DataFixture
         Bad(Teams + "CreateTable(name: y) {\n  Field(name: a, type: int, references: teams, references_column: nope)\n}", "teams has no column called nope");
         Bad(Teams + "CreateTable(name: y) {\n  Field(name: t, type: int, references: teams)\n}\nDropTable(name: teams)", "y.t points to it");
         Bad(Teams + "RenameTable(from: teams, to: teams)", "there is a table called teams already");
-        Bad(Teams + "AddColumn(table: teams, name: name, type: string)", "it has that column already");
-        Bad(Teams + "AddColumn(table: teams, name: k, type: int, key: yes)", "a table's key is made with it");
-        Bad(Teams + "DropColumn(table: teams, name: id)", "it is the table's key");
-        Bad(Teams + "DropColumn(table: teams, name: nme)", "Did you mean name?");
-        Bad(Teams + "CreateTable(name: y) {\n  Field(name: t, type: int, references: teams)\n}\nDropColumn(table: teams, name: id)", "is the table's key");
+        Bad(Teams + "AddField(table: teams, name: name, type: string)", "it has that column already");
+        Bad(Teams + "AddField(table: teams, name: k, type: int, key)", "a table's key is made with it");
+        Bad(Teams + "DropField(table: teams, name: id)", "it is the table's key");
+        Bad(Teams + "DropField(table: teams, name: nme)", "Did you mean name?");
+        Bad(Teams + "CreateTable(name: y) {\n  Field(name: t, type: int, references: teams)\n}\nDropField(table: teams, name: id)", "is the table's key");
         Bad(Teams + "CreateTable(name: y) {\n  Field(name: t, type: string, references: teams, references_column: name)\n}", "which isn't the table's key or unique");
-        Bad(Teams + "AddIndex(table: teams, columns: [name], unique: yes)\nCreateTable(name: y) {\n  Field(name: t, type: string, references: teams, references_column: name)\n}\nDropColumn(table: teams, name: name)", "y.t points to it");
-        Bad(Teams + "RenameColumn(table: teams, from: name, to: id)", "there is a column called id already");
-        Bad(Teams + "ChangeColumn(table: teams, name: name, type: int, key: yes)", "whether teams.name is the key");
+        Bad(Teams + "AddIndex(table: teams, columns: [name], unique)\nCreateTable(name: y) {\n  Field(name: t, type: string, references: teams, references_column: name)\n}\nDropField(table: teams, name: name)", "y.t points to it");
+        Bad(Teams + "RenameField(table: teams, from: name, to: id)", "there is a column called id already");
+        Bad(Teams + "ChangeField(table: teams, name: name, type: int, key)", "whether teams.name is the key");
         Bad(Teams + "AddIndex(table: teams, columns: [name])\nAddIndex(table: teams, columns: [name])", "has that index already");
-        Bad(Teams + "DropIndex(table: teams, columns: [name], unique: yes)", "has no unique index on (name) to drop");
+        Bad(Teams + "DropIndex(table: teams, columns: [name], unique)", "has no unique index on (name) to drop");
         Bad("Field(name: a, type: int)", "Field");
         Bad("CreateTable(name: x) {\n  CreateTable(name: y) {\n  }\n}", "can't be inside another");
-        Bad(Teams + "AddColumn(table: teams, name: a, type: nope)", "type=\"nope\" isn't one of: string, int");
-        Bad(Teams + "AddColumn(table: teams, name: a, type: enum)", "An enum column needs its values");
-        Bad(Teams + "AddColumn(table: teams, name: a, type: string, max: 0)", "max should be a number");
-        Bad(Teams + "AddColumn(table: teams, name: a, type: string, default: [1])", "A default is text, a number, true or false");
-        Bad(Teams + "AddColumn(table: teams, name: a, type: string, auto: yes)", "auto: yes numbers the rows of an int key");
-        Bad(Teams + "AddColumn(table: teams, name: a, type: int, references: teams, on_delete: set_null)", "needs a column that may be null");
+        Bad(Teams + "AddField(table: teams, name: a, type: nope)", "type=\"nope\" isn't one of: string, int");
+        Bad(Teams + "AddField(table: teams, name: a, type: enum)", "An enum column needs its values");
+        Bad(Teams + "AddField(table: teams, name: a, type: string, max: 0)", "max should be a number");
+        Bad(Teams + "AddField(table: teams, name: a, type: string, default: [1])", "A default is text, a number, true or false");
+        Bad(Teams + "AddField(table: teams, name: a, type: string, auto)", "auto numbers the rows of an int key");
+        Bad(Teams + "AddField(table: teams, name: a, type: int, references: teams, on_delete: set_null)", "needs a column that may be empty (optional)");
         Bad("Down {\n}\nDown {\n}", "one Down block");
         Bad(Teams + "Sql(up: \"INSERT INTO nope VALUES (1)\")", "failed at 'SQL: INSERT INTO nope VALUES (1)'");
 
@@ -485,7 +485,7 @@ public sealed class MigrationTests : DataFixture
         FileOf("database/migrations/2026_01_01_000000_down.kscript", """
             KScript.Migration {
               CreateTable(name: notes) {
-                Field(name: id, type: int, key: yes, auto: yes)
+                Field(name: id, type: int, key, auto)
                 Field(name: body, type: string)
               }
               Down {
@@ -509,7 +509,7 @@ public sealed class MigrationTests : DataFixture
         string json = Ok("status", "--format", "json");
         Assert.Contains("\"ran\": true", json);
         Assert.Contains("\"batch\": 1", json);
-        Assert.Contains("add column posts.draft", json);
+        Assert.Contains("add field posts.draft", json);
     }
 
     [Fact]
@@ -564,7 +564,7 @@ public sealed class MigrationTests : DataFixture
         Assert.Equal("create table teams", Assert.Single(new DropTableStep("teams").Reverse(schema)).Describe());
         Assert.IsType<AddIndexStep>(Assert.Single(new DropIndexStep("teams", new[] { "name" }, false).Reverse(schema)));
         string file = MigrationWriter.File(new Step[] { new DropIndexStep("teams", new[] { "name" }, true), new SqlStep("UPDATE teams SET name = 'x'", "SELECT 1") }, null);
-        Assert.Contains("DropIndex(table: teams, columns: [name], unique: yes)", file);
+        Assert.Contains("DropIndex(table: teams, columns: [name], unique)", file);
         Assert.Contains("Sql(up: \"UPDATE teams SET name = 'x'\", down: 'SELECT 1')", file);
         Assert.Contains("Sql(up: 'SELECT 2')", MigrationWriter.File(new Step[] { new SqlStep("SELECT 2", null) }, null));
     }
@@ -668,6 +668,6 @@ public sealed class MigrationTests : DataFixture
     {
         Models(user: User.Replace("  active: bool = true\n", "  active: bool = true\n  nick: string? = null\n"));
         Ok("diff");
-        Assert.Contains("Field(name: nick, type: string, null: yes)\n", Migration("create"));
+        Assert.Contains("Field(name: nick, type: string, optional)\n", Migration("create"));
     }
 }

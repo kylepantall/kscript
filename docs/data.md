@@ -469,13 +469,13 @@ A migration it writes looks like this:
 // Written by kscript db diff from the models.
 KScript.Migration {
   CreateTable(name: users) {
-    Field(name: id, type: int, key: yes, auto: yes)
+    Field(name: id, type: int, key, auto)
     Field(name: name, type: string, max: 80)
     Field(name: email, type: email)
     Field(name: role, type: enum, values: [member, admin], default: 'member')
-    Index(columns: [email], unique: yes)
+    Index(columns: [email], unique)
   }
-  AddColumn(table: posts, name: views, type: int, default: 0)
+  AddField(table: posts, name: views, type: int, default: 0)
 }
 ```
 
@@ -483,20 +483,22 @@ When a table or a column has gone and another has come, `diff` asks whether it w
 
 ### The steps
 
+Steps call a table's columns fields, as models do: `AddField` adds a column to the table.
+
 | Step | What it does |
 | --- | --- |
 | `CreateTable(name:) { ... }` | Makes a table: a `Field` for each column, an `Index` for each index, and a `Key(columns: [a, b])` for a key of two columns (a pivot table's). |
 | `DropTable(name:)` | Drops a table and its rows. |
 | `RenameTable(from:, to:)` | Renames a table. Foreign keys that point to it follow. |
-| `AddColumn(table:, name:, type:, ...)` | Adds a column. A required column needs a `default:` when the table has rows. |
-| `DropColumn(table:, name:)` | Drops a column, and its indexes. |
-| `RenameColumn(table:, from:, to:)` | Renames a column, keeping its rows. |
-| `ChangeColumn(table:, name:, type:, ...)` | Makes a column the one described: its type, whether it may be null, its default or what it references. The rows are kept. |
-| `AddIndex(table:, columns:, unique:)`, `DropIndex(...)` | Adds or drops the index on those columns. |
+| `AddField(table:, name:, type:, ...)` | Adds a field. A required field needs a `default:` when the table has rows. |
+| `DropField(table:, name:)` | Drops a field, and its indexes. |
+| `RenameField(table:, from:, to:)` | Renames a field, keeping its values. |
+| `ChangeField(table:, name:, type:, ...)` | Makes a field the one described: its type, whether it is optional, its default or what it references. The rows are kept. |
+| `AddIndex(table:, columns:)` (with `unique`), `DropIndex(...)` | Adds or drops the index on those columns. |
 | `Sql(up:, down:)` | SQL to run as it is, for anything the other steps can't do. |
 | `Down { ... }` | The steps that undo this migration, when you want to say them yourself. |
 
-A column (`Field`, `AddColumn`, `ChangeColumn`) has a `type:` of `string`, `int`, `number`, `bool`, `date`, `email`, `handle`, `uuid`, `password`, `json` or `enum` (with `values:`), each stored the way a model's field of that type is. `max:` gives a string a length, `null: yes` lets it be empty, `default:` is what the database fills in (text, a number, `true` or `false`), `key: yes` and `auto: yes` make a numbered key, and `references:` (with `references_column:` and `on_delete:`) makes a foreign key, like a model's relation field.
+A field (`Field`, `AddField`, `ChangeField`) has a `type:` of `string`, `int`, `number`, `bool`, `date`, `email`, `handle`, `uuid`, `password`, `json` or `enum` (with `values:`), each stored the way a model's field of that type is. `max:` gives a string a length, `optional` lets it be empty, `default:` is what the database fills in (text, a number, `true` or `false`), the `key` and `auto` flags make a numbered key, and `references:` (with `references_column:` and `on_delete:`) makes a foreign key, like a model's relation field.
 
 Each step is checked against the tables the migrations before it make, before anything runs: dropping a table that isn't there, adding a column twice or pointing at a column that isn't a key says which migration and what's wrong, with the closest name when it's a typo.
 
