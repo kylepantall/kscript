@@ -311,7 +311,7 @@ public class CodeFormatTests
         {
             Assert.StartsWith("type Odd(fields: ", Code($"<type name=\"Odd\" fields=\"{odd}\" />").Trim());
         }
-        Assert.Equal(new[] { "a: string = 'it\\'s, ok'", "b: int" }, KScript.Syntax.Markup.ScriptConverter.FieldsAsLines("a: string = 'it\\'s, ok', b: int"));
+        Assert.Equal(new[] { "a: string = \"it's, ok\"", "b: int" }, KScript.Syntax.Markup.ScriptConverter.FieldsAsLines("a: string = \"it's, ok\", b: int"));
         Assert.Null(KScript.Syntax.Markup.ScriptConverter.FieldsAsLines(" "));
     }
 

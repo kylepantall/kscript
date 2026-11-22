@@ -23,6 +23,9 @@ namespace KScript.Metadata
         /// <summary>True for text that is used as written, without <c>{ }</c> interpolation, such as a route path <c>/people/{id}</c>.</summary>
         public bool Literal { get; init; }
 
+        /// <summary>True for a bare word that names something in the project (a controller, a queue), so it is written without quotes like any other name.</summary>
+        public bool IsName { get; init; }
+
         /// <summary>Set when the attribute is deprecated; it still works, with a warning.</summary>
         public Deprecation Deprecated { get; internal set; }
 

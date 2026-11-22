@@ -13,7 +13,7 @@ items = [
   { description: 'Travel', price: 64.2 },
 ]
 
-KScript.Document(template: invoice, to: [invoice.pdf, invoice.docx]) {
+KScript.Document(template: invoice, to: ['invoice.pdf', 'invoice.docx']) {
   Invoice(
     number: "INV-2026-042",
     date: "20 November 2026",
@@ -21,7 +21,7 @@ KScript.Document(template: invoice, to: [invoice.pdf, invoice.docx]) {
     from: "**Life Lab Ltd**\n12 Grid Street\nCambridge CB1 2AB",
     to: "Example University\nAccounts Payable\nOxford OX1 3QD",
     items: $items,
-    currency: GBP,
+    currency: "GBP",
     tax: 20,
     notes: "Please pay by bank transfer to sort code 00-00-00, account 12345678, quoting the invoice number."
   )

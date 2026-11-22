@@ -141,8 +141,8 @@ public sealed class ConvertProjectTests : IDisposable
         Assert.Contains("<Middleware use=\"log, cors, throttle:30\" />", back);
         Assert.Contains("only=\"index, show\"", back);
 
-        // Without the catalog, values are kept as written.
-        Assert.Contains("use: \"log, cors, throttle:30\"", ScriptConverter.Convert(xml, "routes.ks.xml").Text);
+        // An element nothing is known about: its values are text.
+        Assert.Contains("use: \"log, cors, throttle:30\"", ScriptConverter.Convert(xml, "routes.ks.xml", elements: _ => null).Text);
     }
 
     [Theory]
@@ -181,7 +181,7 @@ public sealed class ConvertProjectTests : IDisposable
         Write("tests/m.test.ks.xml", "<kscript>\n  <import src=\"../lib/m.ks.xml\" />\n  <describe name=\"double\">\n    <test name=\"doubles\">\n      <expect value=\"@double(2)\" equals=\"4\" />\n    </test>\n  </describe>\n</kscript>");
         Assert.Equal(0, Convert(dir).Code);
         string test = Read("tests/m.test.kscript");
-        Assert.Contains("describe(name: double) {", test);
+        Assert.Contains("describe(name: \"double\") {", test);
 
         File.Delete(Path.Combine(dir, "tests", "m.test.ks.xml"));
         var output = new StringWriter();

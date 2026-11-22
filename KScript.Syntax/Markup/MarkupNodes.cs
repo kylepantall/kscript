@@ -143,6 +143,21 @@ namespace KScript.Syntax.Markup
         /// </summary>
         public bool IsShorthand { get; internal set; }
 
+        /// <summary>True for a value written in the argument list of a .kscript statement: <c>name(key: value)</c>.</summary>
+        public bool IsArgument { get; internal set; }
+
+        /// <summary>True once <see cref="CodeArguments"/> has turned what was written into the text the element reads.</summary>
+        public bool Normalised { get; internal set; }
+
+        /// <summary>True for an argument written as a string in quotes.</summary>
+        public bool QuotedValue { get; internal set; }
+
+        /// <summary>True for an argument that gives text as a value (<c>title: $name</c>).</summary>
+        public bool CodeValue { get; internal set; }
+
+        /// <summary>What is wrong with the way the argument is written, or null.</summary>
+        public string FormError { get; internal set; }
+
         public string ValueText => Value?.Value;
     }
 

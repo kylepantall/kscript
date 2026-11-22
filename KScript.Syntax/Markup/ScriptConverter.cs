@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using System.Text;
 
 using KScript.Syntax.Text;
@@ -20,13 +21,13 @@ namespace KScript.Syntax.Markup
     public static class ScriptConverter
     {
         /// <summary>Converts a file's text to the other format, chosen by its path (.kscript becomes XML, anything else .kscript).</summary>
-        public static ConversionResult Convert(string text, string path, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
+        public static ConversionResult Convert(string text, string path, Func<string, string> importPath = null, Func<string, string, bool> nameList = null, Func<string, ElementInfo> elements = null)
         {
             if (MarkupParser.IsCodePath(path))
             {
-                return ToXml(CodeParser.Parse(text), importPath, nameList);
+                return ToXml(CodeParser.Parse(text), importPath, nameList, elements);
             }
-            return ToCode(MarkupParser.Parse(text, DocumentKind.Script), importPath, nameList);
+            return ToCode(MarkupParser.Parse(text, DocumentKind.Script), importPath, nameList, elements);
         }
 
         /// <summary>The path a converted file gets: x.ks.xml or x.xml becomes x.kscript, and x.kscript becomes x.ks.xml.</summary>
@@ -55,19 +56,58 @@ namespace KScript.Syntax.Markup
         /// LanguageCatalog.IsNameList. Such lists are written <c>[a, b]</c> in
         /// .kscript and <c>"a, b"</c> in XML. Null leaves every value as written.
         /// </param>
-        public static ConversionResult ToCode(MarkupDocument document, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
+        public static ConversionResult ToCode(MarkupDocument document, Func<string, string> importPath = null, Func<string, string, bool> nameList = null, Func<string, ElementInfo> elements = null)
         {
-            var writer = new CodeWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? ((_, _) => false) };
+            elements ??= Elements;
+            var writer = new CodeWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? NameListFrom(elements), Elements = elements };
             writer.WriteDocument(document);
             return writer.Result;
         }
 
-        public static ConversionResult ToXml(MarkupDocument document, Func<string, string> importPath = null, Func<string, string, bool> nameList = null)
+        public static ConversionResult ToXml(MarkupDocument document, Func<string, string> importPath = null, Func<string, string, bool> nameList = null, Func<string, ElementInfo> elements = null)
         {
-            var writer = new XmlWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? ((_, _) => false) };
+            elements ??= Elements;
+            // What each argument means depends on the element, so read them by the one rule before printing.
+            if (elements != null) CodeArguments.Normalise(document, elements);
+            var writer = new XmlWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? NameListFrom(elements) };
             writer.WriteDocument(document);
             return writer.Result;
         }
+
+        private static Func<string, ElementInfo> elementsHook;
+        private static bool elementsLooked;
+
+        /// <summary>
+        /// Describes each element by name (the language catalog), so values are written the way each argument is
+        /// read: text in quotes, values and names bare, lists as arrays, handlers in braces. KScript.Language sets it;
+        /// when it hasn't been set, the catalog is looked up the first time it is needed.
+        /// </summary>
+        public static Func<string, ElementInfo> Elements
+        {
+            get
+            {
+                if (elementsHook == null && !elementsLooked)
+                {
+                    elementsLooked = true;
+                    try
+                    {
+                        Type catalog = Type.GetType("KScript.Language.Catalog.LanguageCatalog, KScript.Language");
+                        object instance = catalog?.GetProperty("Default")?.GetValue(null);
+                        System.Reflection.MethodInfo get = catalog?.GetMethod("GetElement", new[] { typeof(string) });
+                        if (instance != null && get != null) elementsHook = name => (ElementInfo)get.Invoke(instance, new object[] { name });
+                    }
+                    catch (Exception)
+                    {
+                        // No catalog here (the syntax library on its own): values are copied as written.
+                    }
+                }
+                return elementsHook;
+            }
+            set => elementsHook = value;
+        }
+
+        private static Func<string, string, bool> NameListFrom(Func<string, ElementInfo> elements) =>
+            elements == null ? (_, _) => false : (element, attribute) => elements(ElementInfo.BareName(element))?.GetAttribute(attribute)?.IsNameList == true;
 
         #region Shared
 
@@ -179,7 +219,7 @@ namespace KScript.Syntax.Markup
                 char c = text[i];
                 if (quote != '\0')
                 {
-                    if (c == '\\')
+                    if (Quotes.IsEscape(text, i, text.Length, quote))
                     {
                         i++;
                     }
@@ -237,7 +277,7 @@ namespace KScript.Syntax.Markup
                 char c = fields[i];
                 if (quote != '\0')
                 {
-                    if (c == '\\') i++;
+                    if (Quotes.IsEscape(fields, i, fields.Length, quote)) i++;
                     else if (c == quote) quote = '\0';
                     continue;
                 }
@@ -285,6 +325,9 @@ namespace KScript.Syntax.Markup
 
             /// <summary>True for an element's attribute that holds a list of names.</summary>
             public Func<string, string, bool> NameList { get; init; }
+
+            /// <summary>Describes an element by name, or null when nothing is known about elements.</summary>
+            public Func<string, ElementInfo> Elements { get; init; }
 
             private readonly StringBuilder sb = new StringBuilder();
             private readonly Scopes scopes = new Scopes();
@@ -445,7 +488,7 @@ namespace KScript.Syntax.Markup
                 {
                     return m.Value;
                 }
-                var writer = new CodeWriter { ImportPath = ImportPath, NameList = NameList };
+                var writer = new CodeWriter { ImportPath = ImportPath, NameList = NameList, Elements = Elements };
                 writer.WriteDocument(doc);
                 string text = writer.Result.Text.Trim();
                 return text.Length == 0 || text.Contains('\n') ? m.Value : text;
@@ -1109,14 +1152,72 @@ namespace KScript.Syntax.Markup
                 {
                     return a.Name;
                 }
+                ElementInfo element = Elements?.Invoke(ElementInfo.BareName(e.Name));
+                AttributeInfo info = element?.GetAttribute(a.Name);
+                bool text = info != null && info.Kind is AttributeKind.Template or AttributeKind.Path;
                 if (NameList(e.Name, a.Name) && global::KScript.Metadata.NameList.Names(a.ValueText) is { Count: > 1 } names
                     && names.All(n => IsSafeBare(n)))
                 {
-                    // <Middleware use="log, cors"> becomes Middleware(use: [log, cors]).
-                    return a.Name + ": [" + string.Join(", ", names) + "]";
+                    // <Middleware use="log, cors"> becomes Middleware(use: [log, cors]); text in a list is quoted.
+                    return a.Name + ": [" + string.Join(", ", names.Select(n => text ? "'" + n + "'" : n)) + "]";
                 }
-                return a.Name + ": " + FormatValue(a.ValueText);
+                if (Elements == null)
+                {
+                    return a.Name + ": " + FormatValue(a.ValueText);
+                }
+                return a.Name + ": " + FormatByKind(a, info, element);
             }
+
+            /// <summary>
+            /// The value as .kscript writes it for what the argument holds: quotes make a string and everything else
+            /// is code, so text is quoted, values and names are bare, lists are arrays and handlers are in braces.
+            /// </summary>
+            private static string FormatByKind(MarkupAttribute a, AttributeInfo info, ElementInfo element)
+            {
+                string value = a.ValueText;
+                string trimmed = value.Trim();
+                AttributeKind kind = info?.Kind ?? (a.Name.StartsWith("on-", StringComparison.Ordinal) ? AttributeKind.Statements : AttributeKind.Template);
+                switch (kind)
+                {
+                    case AttributeKind.Statements:
+                        return "{ " + trimmed + " }";
+                    case AttributeKind.Expression:
+                        return IsSafeBare(trimmed) || IsWholeString(trimmed) ? trimmed : "(" + trimmed + ")";
+                    case AttributeKind.ExpressionList:
+                        return IsSafeBare(trimmed) || IsWholeString(trimmed) ? trimmed : "[" + trimmed + "]";
+                    case AttributeKind.Bool:
+                        if (CodeArguments.IsBoolWord(trimmed.ToLowerInvariant()))
+                        {
+                            return trimmed.ToLowerInvariant() is "yes" or "y" or "true" or "1" or "on" ? "true" : "false";
+                        }
+                        // { not $ready }: a condition worked out when it is read is written as the condition.
+                        return trimmed.Length > 2 && trimmed[0] == '{' && trimmed[trimmed.Length - 1] == '}' && IsSafeBare(trimmed.Substring(1, trimmed.Length - 2).Trim())
+                            ? trimmed.Substring(1, trimmed.Length - 2).Trim()
+                            : Quote(value);
+                    case AttributeKind.Template:
+                    case AttributeKind.Text:
+                    case AttributeKind.Path:
+                    case AttributeKind.Selector:
+                        if (info?.IsName == true && IsSafeBare(trimmed))
+                        {
+                            return trimmed;
+                        }
+                        return IsNumber(trimmed) ? trimmed : Quote(value);
+                    default:
+                        if (CodeArguments.IsList(kind, info) && !IsSafeBare(trimmed))
+                        {
+                            return "[" + trimmed + "]";
+                        }
+                        return FormatValue(value);
+                }
+            }
+
+            private static bool IsNumber(string value) =>
+                double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _);
+
+            /// <summary>True when the value is one "double quoted" string and nothing else.</summary>
+            private static bool IsWholeString(string value) =>
+                value.Length >= 2 && value[0] == '"' && !value.Contains('\n') && Quotes.Close(value, 0, value.Length) == value.Length - 1;
 
             /// <summary>Writes a value bare when the parser would read it back unchanged, else in double quotes.</summary>
             private static string FormatValue(string value)

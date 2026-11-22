@@ -224,7 +224,7 @@ namespace KScript.Testing
                 Scope scope = run.Scope.Child();
                 scope.Declare(each, items[i]);
                 if (indexName != null) scope.Declare(indexName, (double)i);
-                string name = nameAttr?.Value == null ? $"#{i + 1}" : run.Interpreter.Interpolate(nameAttr.Value, scope, run.Module, bareReferences: false);
+                string name = nameAttr?.Value == null ? $"#{i + 1}" : run.Interpreter.Interpolate(nameAttr.Value, scope, run.Module, bareReferences: true);
                 Add(scope, name);
             }
             return null;

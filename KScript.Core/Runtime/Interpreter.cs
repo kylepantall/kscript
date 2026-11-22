@@ -305,6 +305,7 @@ namespace KScript.Runtime
             if ((info.Context & ElementContext.Script) == 0 && def.Handler == null)
                 throw Located(new KScriptException($"<{info.Name}> only works in web pages served by kscript serve, not in scripts.", "Syntax"), module, e.NameSpan.Start);
 
+            NormaliseArguments(module, e, info);
             CheckAttributes(module, e, info);
 
             if (info.MustBeInside != null && info.MustBeInside.Count > 0 && !e.Ancestors().Any(a => info.MustBeInside.Contains(BareName(a.Name))
@@ -357,6 +358,17 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>Reads .kscript arguments by the one rule (see <see cref="CodeArguments"/>): quotes are strings, the rest is code.</summary>
+        internal void NormaliseArguments(Module module, MarkupElement e, ElementInfo info)
+        {
+            if (e.Attributes.Count == 0) return;
+            CodeArguments.Normalise(e, info);
+            foreach (MarkupAttribute a in e.Attributes)
+            {
+                if (a.FormError != null) throw Located(new KScriptException(a.FormError, "Syntax"), module, a.Span.Start);
+            }
+        }
+
         private static string BareName(string name) => name.StartsWith("KScript.", StringComparison.Ordinal) ? name.Substring(8) : name;
 
         private void CheckStatements(Module module, MarkupElement parent)
@@ -403,7 +415,7 @@ namespace KScript.Runtime
                         GetParse(module, a.Value, ParseMode.List, check: true);
                         break;
                     case AttributeKind.Template:
-                        GetTemplate(module, a.Value, bareReferences: false, check: true);
+                        GetTemplate(module, a.Value, bareReferences: true, check: true);
                         break;
                     case AttributeKind.Enum:
                         if (spec.Options.Count > 0 && !spec.Options.Contains(a.Value.Value.Trim()) && !a.Value.Value.Contains('{'))
@@ -787,6 +799,7 @@ namespace KScript.Runtime
             ElementDefinition def = ResolveElement(module, e);
             if (def.Handler == null)
                 throw Located(new KScriptException($"<{def.Name}> only works in web pages served by kscript serve.", "Syntax"), module, e.Span.Start);
+            NormaliseArguments(module, e, def.Info);
             try
             {
                 return def.Handler(new ElementRun(this, module, e, def, scope, chain));

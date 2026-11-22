@@ -496,7 +496,7 @@ namespace KScript
                     return 2;
                 }
                 IEnumerable<string> paths = args.Skip(1).Where((a, i) => !a.StartsWith("--", StringComparison.Ordinal) && !(formatAt > 0 && i + 1 == formatAt + 1));
-                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: args.Contains("--warnaserror"), json: format == "json");
+                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: args.Contains("--warnaserror"), json: format == "json", fix: args.Contains("--fix"));
             }
 
             if (args.Length > 0 && args[0] == "watch")

@@ -137,6 +137,24 @@ namespace KScript.Syntax
         /// <summary>A script in a project that declares more than one type, model, enum or error type: each goes in its own file.</summary>
         public const string OneTypePerFile = "KS6008";
 
+        /// <summary>Text given to a .kscript argument as a bare word; text goes in quotes: <c>title: "Report"</c>.</summary>
+        public const string QuoteText = "KS6009";
+
+        /// <summary>An assignment or lambda parameter written with <c>$</c>; names are declared bare: <c>total = 3</c>, <c>fn(n) =&gt; $n * 2</c>.</summary>
+        public const string BareDeclaration = "KS6010";
+
+        /// <summary>yes/no (or on/off) in a .kscript file; booleans are <c>true</c> and <c>false</c>.</summary>
+        public const string BoolWords = "KS6011";
+
+        /// <summary>A second spelling the parser accepts: <c>else if</c>, <c>key = value</c> in arguments, <c>catch A, B</c>, <c>lt</c>/<c>gt</c> for comparisons in .kscript.</summary>
+        public const string OneSpelling = "KS6012";
+
+        /// <summary>A name that doesn't follow the naming rules: snake_case for functions, variables, fields and arguments; PascalCase for types.</summary>
+        public const string NamingStyle = "KS6013";
+
+        /// <summary>A type name written with <c>$</c> (<c>$Repo</c>), or an optional field marked on its type (<c>age: int?</c>) rather than its name.</summary>
+        public const string TypeForm = "KS6014";
+
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>
             "https://github.com/kylepantall/kscript/blob/master/docs/errors.md#" + (code ?? string.Empty).ToLowerInvariant();

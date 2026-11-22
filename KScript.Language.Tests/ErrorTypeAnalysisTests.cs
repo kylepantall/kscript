@@ -182,7 +182,7 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("error A", "<error name=\"A\" />")]
-        [InlineData("error A(status: 404, message: No {$id}) extends NotFound {\n  id: int\n}", "<error name=\"A\" status=\"404\" message=\"No {$id}\" extends=\"NotFound\">\n    <field name=\"id\" type=\"int\" />\n  </error>")]
+        [InlineData("error A(status: 404, message: \"No {$id}\") extends NotFound {\n  id: int\n}", "<error name=\"A\" status=\"404\" message=\"No {$id}\" extends=\"NotFound\">\n    <field name=\"id\" type=\"int\" />\n  </error>")]
         [InlineData("error A extends NotFound", "<error name=\"A\" extends=\"NotFound\" />")]
         [InlineData("error A {\n  // why\n  id: int\n}", "<error name=\"A\">\n    <!-- why -->\n    <field name=\"id\" type=\"int\" />\n  </error>")]
         public void ConvertsBothWays(string code, string xml)

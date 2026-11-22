@@ -294,3 +294,27 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 ## KS6008
 
 **A second type in one file.** In a project, each type, model, enum and error type goes in its own file (`types/`, `models/`, `errors/`, or `requests/` for request bodies) and is imported where it is used. The message names the file to move it to. See [One type per file](projects.md#where-files-go-the-recommended-layout).
+
+## KS6009
+
+**Text written as a bare word.** In a `.kscript` argument list, quotes make text and everything else is code, so text goes in quotes: `Section(title: "Results")`, `Document(to: 'paper.pdf')`. A bare word is a name: a variable to fill (`to: answer`), a function, a type or one of a fixed set of words (`align: right`). `kscript check --fix` adds the quotes.
+
+## KS6010
+
+**A name declared with `$`.** `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`.
+
+## KS6011
+
+**yes/no where true/false is meant.** Booleans are `true` and `false` everywhere in `.kscript`: `Section(numbered: false)`. A flag on its own (`Section(numbered)`) means true.
+
+## KS6012
+
+**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`). Logic stays as words: `and`, `or`, `not`.
+
+## KS6013
+
+**A name that breaks the naming rules.** Functions, variables, fields and arguments are `snake_case`; types, models, enums and error types are `PascalCase`.
+
+## KS6014
+
+**A type written the long way.** A type is named bare, without `$`: `@json($text, as: Repo)`, `Repo($data)`. An optional field is marked on its name, `age?: int`, not on its type.

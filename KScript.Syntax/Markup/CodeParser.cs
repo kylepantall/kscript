@@ -1572,6 +1572,7 @@ namespace KScript.Syntax.Markup
                     {
                         (DecodedText value, TextSpan span) = ReadString();
                         AddAttribute(e, name, value, TextSpan.FromBounds(nameStart, span.End), nameSpan, '"');
+                        e.Attributes[e.Attributes.Count - 1].IsArgument = true;
                     }
                     else
                     {
@@ -1581,6 +1582,7 @@ namespace KScript.Syntax.Markup
                             Error(new TextSpan(pos, 0), DiagnosticCodes.InvalidAttribute, $"Write a value for {name}.");
                         }
                         AddAttribute(e, name, DecodedText.Plain(text.Substring(s, end - s), s), TextSpan.FromBounds(nameStart, end), nameSpan, '\0');
+                        e.Attributes[e.Attributes.Count - 1].IsArgument = true;
                     }
                 }
                 else
@@ -1927,7 +1929,7 @@ namespace KScript.Syntax.Markup
             int start = pos++;
             while (pos < text.Length && text[pos] != quote)
             {
-                if (text[pos] == '\\' && pos + 1 < text.Length)
+                if (Quotes.IsEscape(text, pos, text.Length, quote))
                 {
                     pos++;
                 }
@@ -2118,7 +2120,7 @@ namespace KScript.Syntax.Markup
                 char c = text[i];
                 if (quote != '\0')
                 {
-                    if (c == '\\')
+                    if (Quotes.IsEscape(text, i, text.Length, quote))
                     {
                         i++;
                     }

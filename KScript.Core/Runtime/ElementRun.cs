@@ -80,13 +80,13 @@ namespace KScript.Runtime
             return Interpreter.EvaluateList(a.Value, Scope, Module);
         }
 
-        /// <summary>The attribute with its <c>{ }</c> values filled in.</summary>
+        /// <summary>The attribute with its <c>{ }</c> values and bare <c>$name</c> references filled in, as element text is.</summary>
         public string Template(string attribute, string fallback = null)
         {
             MarkupAttribute a = Element.GetAttribute(attribute);
             if (a == null) return fallback;
             if (a.Value == null) return string.Empty;
-            return Interpreter.Interpolate(a.Value, Scope, Module, bareReferences: false);
+            return Interpreter.Interpolate(a.Value, Scope, Module, bareReferences: true);
         }
 
         public string RequiredTemplate(string attribute) => Template(attribute) ?? throw Missing(attribute);

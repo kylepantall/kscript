@@ -17,7 +17,7 @@ KScript.Document(
   subtitle: "A note on Conway's Game of Life",
   date: "20 November 2026",
   keywords: "cellular automata, Game of Life",
-  to: [paper.pdf, paper.docx, paper.tex]
+  to: ['paper.pdf', 'paper.docx', 'paper.tex']
 ) {
   Author(
     affiliation: "Department of Computing, Example University",
@@ -30,7 +30,7 @@ KScript.Document(
     generations, moved one cell diagonally, so its speed is \( c/4 \). We \
     compare it with other small patterns and give the rule as a formula."
 
-  Section(title: Introduction, id: intro) {
+  Section(title: "Introduction", id: "intro") {
     Paragraph "The Game of Life [@gardner1970] is a cellular automaton on a \
       square grid. Each cell is alive or dead, and the next generation depends \
       only on the eight neighbours of each cell.^[The grid is usually taken to \
@@ -42,11 +42,11 @@ KScript.Document(
       well-known patterns."
   }
 
-  Section(title: The rule, id: rule) {
+  Section(title: "The rule", id: "rule") {
     Paragraph "Let \( N_t(x) \) be the number of live neighbours of \
       cell \( x \) at time \( t \). A cell is alive at time \( t + 1 \) when"
 
-    Math(id: eq-rule) "s_{t+1}(x) = \begin{cases} 1 & \text{if } N_t(x) = \
+    Math(id: "eq-rule") "s_{t+1}(x) = \begin{cases} 1 & \text{if } N_t(x) = \
       3, \\\\ 1 & \text{if } s_t(x) = 1 \text{ and } N_t(x) = 2, \\\\ 0 \
       & \text{otherwise.} \end{cases}"
 
@@ -54,21 +54,21 @@ KScript.Document(
       neighbour count is a sum over the Moore neighbourhood \( \mathcal{M}(x) \
       = \{ y \in \mathbb{Z}^2 : 0 < \lVert y - x \rVert_\infty \le 1 \} \):"
 
-    Math(id: eq-count) "N_t(x) = \sum_{y \in \mathcal{M}(x)} s_t(y)"
+    Math(id: "eq-count") "N_t(x) = \sum_{y \in \mathcal{M}(x)} s_t(y)"
   }
 
-  Section(title: Gliders) {
+  Section(title: "Gliders") {
     Figure(
       src: "glider.png",
       caption: "A glider over four generations: after \( p = 4 \) steps it has moved one cell down and to the right.",
-      id: fig-glider,
+      id: "fig-glider",
       width: 0.8
     )
 
     Paragraph "A pattern with period \( p \) that moves \( (\Delta x, \Delta \
       y) \) cells has speed"
 
-    Math(id: eq-speed) "v = \frac{\max(|\Delta x|, |\Delta y|)}{p} \, c"
+    Math(id: "eq-speed") "v = \frac{\max(|\Delta x|, |\Delta y|)}{p} \, c"
 
     Paragraph "where \( c \) is one cell per generation, the fastest any \
       signal can travel. For the glider, \( \Delta x = \Delta y = 1 \) \
@@ -76,7 +76,7 @@ KScript.Document(
 
     Table(
       caption: "Some small patterns and their periods.",
-      id: tab-patterns,
+      id: "tab-patterns",
       data: $patterns,
       columns: {
         Pattern: 'name',
@@ -87,14 +87,14 @@ KScript.Document(
       align: "lrrr"
     )
 
-    Section(title: Population) {
+    Section(title: "Population") {
       Paragraph "The population of a glider is always 5. Across all phases the \
         mean density in its \( 3 \times 3 \) bounding box \
         is \( \tfrac{5}{9} \approx 0.56 \)."
     }
   }
 
-  Section(title: Conclusion) {
+  Section(title: "Conclusion") {
     List {
       Item "Gliders are the smallest moving pattern, with **5 cells**."
       Item "Their speed, \( c/4 \), is the fastest possible for a diagonal \

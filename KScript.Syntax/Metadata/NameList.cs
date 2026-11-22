@@ -22,11 +22,20 @@ namespace KScript.Metadata
                     i++;
                 }
                 int start = i;
-                while (i < text.Length && text[i] != ',' && text[i] != '[' && text[i] != ']')
+                char quote = '\0';
+                while (i < text.Length && (quote != '\0' || (text[i] != ',' && text[i] != '[' && text[i] != ']')))
                 {
+                    if (quote != '\0') { if (text[i] == quote) quote = '\0'; }
+                    else if (text[i] == '\'' || text[i] == '"') quote = text[i];
                     i++;
                 }
                 string name = text.Substring(start, i - start).TrimEnd();
+                if (name.Length >= 2 && (name[0] == '\'' || name[0] == '"') && name[name.Length - 1] == name[0])
+                {
+                    // ['paper.pdf', 'paper.docx']: text in a list is quoted, and the name is what is inside.
+                    name = name.Substring(1, name.Length - 2);
+                    start++;
+                }
                 if (name.Length > 0) yield return (name, start);
             }
         }

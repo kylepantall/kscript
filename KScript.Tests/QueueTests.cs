@@ -1137,7 +1137,7 @@ public sealed class QueueTests : StorageFixture
         Assert.Contains("<job name=\"Hello\" queue=\"mail\" tries=\"2\" description=\"Says hello.\">", xml);
         Assert.Contains("<dispatch value=\"Hello(who: 'Joan')\" />", xml);
         string back = ScriptConverter.ToCode(MarkupParser.Parse(new SourceText(xml), DocumentKind.Script, "x.ks.xml")).Text;
-        Assert.Contains("job Hello(queue: mail, tries: 2) {", back);
+        Assert.Contains("job Hello(queue: \"mail\", tries: 2) {", back);
         Assert.Contains("dispatch Hello(who: 'Joan')", back);
         Assert.Contains("Hello(who: 'Ann')->run()", back);
 
