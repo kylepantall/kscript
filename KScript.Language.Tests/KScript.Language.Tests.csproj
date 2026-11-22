@@ -30,8 +30,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\samples\kscript2\**\*" LinkBase="samples" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\samples\code-format\**\*" LinkBase="samples\code-format" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\samples\xml\**\*" LinkBase="samples" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\samples\scripts\**\*" LinkBase="samples\scripts" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

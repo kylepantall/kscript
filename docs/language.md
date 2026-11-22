@@ -471,7 +471,7 @@ key = $config->require('api.key') // stops with a clear message when it's missin
 **`config`** reads the settings again with other options. Without `into`, it changes `$config`:
 
 ```kscript
-config(env: production, prefix: SHOP_, files: ['settings', 'secrets.yaml?', '.env'], root: conf, defaults: { server: { port: 8080 } }, require: "database.host, api.key")
+config(env: "production", prefix: "SHOP_", files: ['settings', 'secrets.yaml?', '.env'], root: "conf", defaults: { server: { port: 8080 } }, require: "database.host, api.key")
 config(files: ['themes/dark.json'], into: theme) // a separate set of settings in $theme
 ```
 
@@ -485,7 +485,7 @@ Every script has a logger. Entries at `info` and above go to the terminal (stder
 
 ```kscript
 log "Import started"
-log(level: warn, category: payments, fields: { order: $order.id }) "Card declined for {$customer.name}"
+log(level: warn, category: "payments", fields: { order: $order.id }) "Card declined for {$customer.name}"
 $log->info('Saved', { id: $id, size: $bytes })
 
 db = $log->named('db')->with({ host: $config.database.host })
@@ -542,7 +542,7 @@ cart:
 ```
 
 ```kscript
-locale(set: fr)
+locale(set: "fr")
 echo "{ @t('hello', { name: $user.name }) }" // Bonjour, Ann !
 echo "{ @t('cart.items', { count: $cart->count() }) }" // 3 articles
 echo "{ @format_currency($total, 'EUR') } { @format_date(@today(), 'long') }" // 9,50 € 20 novembre 2026
@@ -621,7 +621,7 @@ import KScript.Terminal
 
 people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 9 }]
 heading "Report"
-detail(name: People) "{ $people->count() }"
+detail(name: "People") "{ $people->count() }"
 task(name: "Adding up") {
   total = 1 + 2
 }
@@ -659,7 +659,7 @@ echo "{ @llm('Write a haiku about XML.') }"
 // A prompt written as a template, with a system prompt.
 customer = { name: 'Ann' }
 message = 'My order is late arrived.'
-llm(into: reply, system: You answer customer emails politely and briefly.) "{$customer.name} wrote: {$message}"
+llm(into: reply, system: "You answer customer emails politely and briefly.") "{$customer.name} wrote: {$message}"
 
 // Structured output: the answer is a map with these fields.
 report = 'The login page spins forever on Safari.'

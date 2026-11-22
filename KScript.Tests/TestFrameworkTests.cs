@@ -438,11 +438,10 @@ public class TestFrameworkTests
     [Fact]
     public void TheSampleTestsPass()
     {
-        string samples = ScriptRunner.RepoFile("samples", "kscript2");
-        List<string> files = TestRunner.Discover(new[] { samples });
-        Assert.NotEmpty(files);
-        foreach (string f in files)
+        foreach (string samples in new[] { ScriptRunner.RepoFile("samples", "scripts"), ScriptRunner.RepoFile("samples", "xml") })
+        foreach (string f in TestRunner.Discover(new[] { samples }).DefaultIfEmpty(null))
         {
+            Assert.True(f != null, samples + " has no tests.");
             TestFileResult r = TestRunner.RunFile(f, new TestRunSettings { BaseDirectory = samples });
             Assert.Null(r.Error);
             Assert.NotEmpty(r.Tests);

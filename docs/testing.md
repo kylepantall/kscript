@@ -7,8 +7,8 @@ KScript has a test framework built in. Tests are KScript files whose names end i
 kscript {
   import "../lib/strings.kscript"
 
-  describe(name: slugify) {
-    test(name: lower-cases and joins words with dashes) {
+  describe(name: "slugify") {
+    test(name: "lower-cases and joins words with dashes") {
       expect(value: @slugify('Hello World'), equals: 'hello-world')
     }
 
@@ -73,17 +73,17 @@ What a test prints with `echo` is kept, and shown under the test only when it fa
 | `timeout: 30` | On a `test`: fail it if it runs longer than this many seconds. |
 
 ```kscript
-describe(name: a shopping cart) {
+describe(name: "a shopping cart") {
   cart = []
   before_each {
     cart = ['apple']
   }
 
-  test(name: starts with one item) {
+  test(name: "starts with one item") {
     expect(value: $cart, count: 1)
   }
 
-  test(name: adds items) {
+  test(name: "adds items") {
     cart = $cart->push('pear')
     expect(value: $cart, equals: ['apple', 'pear'])
   }
@@ -121,7 +121,7 @@ Expected $order.total eq 30 to be true.
 `expect_error { }` fails unless its body stops with an error. `type` checks the error type (an error type that extends it counts too), `contains` checks the message, and `as` keeps the error (`type`, `message`, `line`, `file`, `status`, `cause` and its fields) for more checks:
 
 ```kscript
-expect_error(type: Validation, contains: positive, as: err) {
+expect_error(type: Validation, contains: "positive", as: err) {
   @set_age(-1)
 }
 expect(value: $err.line, type: number)
@@ -158,7 +158,7 @@ expect(value: $out, contains: 'Welcome, Joan')
 `@run_script(path, { args, input })` runs another script on its own, as `kscript path args…` would, and returns `{ output, code, error }`: what it printed, its exit code (3 when it stopped with an error), and the error or `null`. The path is relative to the test file. The script gets the project's packages, but not KScript.Test.
 
 ```kscript
-test(name: hello.kscript greets the name it is given) {
+test(name: "hello.kscript greets the name it is given") {
   run = @run_script('../scripts/hello.kscript', options: { args: ['Ellie'] })
   expect(value: $run.code, equals: 0)
   expect(value: $run.output, equals: 'Hello, Ellie!')

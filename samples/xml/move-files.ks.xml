@@ -4,16 +4,16 @@
 
   <input into="old_dir">Move files from: </input>
   <input into="new_dir">Move files to: </input>
-  <input into="file_types">File types (comma separated): </input>
+  <input into="file_types">File types (comma separated, such as txt, pdf): </input>
 
   <let
     name="types"
-    value="$file_types->split(',')->map(fn(t) => $t->trim())" />
+    value="$file_types->split(',')->map(fn(t) => $t->trim()->trim_start('.'))" />
   <for
     each="file"
     in="@files($old_dir) |> filter(fn(f) => $types->contains($f.extension))">
     <let name="target" value="@join_path(base: $new_dir, $file.name)" />
     <do>@move($file, $target)</do>
-    <echo>Moved {$file} to {$target}</echo>
+    <echo>Moved {$file.name} to {$target}</echo>
   </for>
 </kscript>

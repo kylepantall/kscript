@@ -17,7 +17,7 @@ public class ScriptFileTests
     [Fact]
     public void FindOldestPerson()
     {
-        Assert.Equal("Joan is the oldest at 82 years old.\n", RunFile(ScriptRunner.RepoFile("samples", "kscript2", "find-oldest-person.ks.xml")));
+        Assert.Equal("Joan is the oldest at 82 years old.\nJoan again.\n", RunFile(ScriptRunner.RepoFile("samples", "xml", "oldest.ks.xml")));
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class ScriptFileTests
             File.WriteAllText(Path.Combine(from, "a.txt"), "a");
             File.WriteAllText(Path.Combine(from, "b.pdf"), "b");
             File.WriteAllText(Path.Combine(from, "c.log"), "c");
-            string output = RunFile(ScriptRunner.RepoFile("samples", "kscript2", "file-move-script.ks.xml"), $"{from}\n{to}\ntxt, .pdf\n");
+            string output = RunFile(ScriptRunner.RepoFile("samples", "xml", "move-files.ks.xml"), $"{from}\n{to}\ntxt, .pdf\n");
             Assert.Contains("Moved a.txt", output);
             Assert.Contains("Moved b.pdf", output);
             Assert.True(File.Exists(Path.Combine(to, "a.txt")));
@@ -50,13 +50,13 @@ public class ScriptFileTests
     [InlineData("imports.ks.xml", "hello-world")]
     public void Samples(string file, string expected)
     {
-        Assert.Contains(expected, RunFile(ScriptRunner.RepoFile("samples", "kscript2", file)));
+        Assert.Contains(expected, RunFile(ScriptRunner.RepoFile("samples", "xml", file)));
     }
 
     [Fact]
     public void Tour()
     {
-        string output = RunFile(ScriptRunner.RepoFile("samples", "kscript2", "tour.ks.xml"));
+        string output = RunFile(ScriptRunner.RepoFile("samples", "xml", "tour.ks.xml"));
         Assert.Contains("Hello, Kyle! Total: 10.", output);
         Assert.Contains("Validation: Age must be positive, got -1", output);
         Assert.EndsWith("guest true\n", output);

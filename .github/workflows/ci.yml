@@ -104,16 +104,16 @@ jobs:
         run: dotnet test KScript.sln --configuration Release --no-build --verbosity normal
 
       - name: Run sample script
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll samples/kscript2/oldest.ks.xml
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll samples/scripts/oldest.kscript
 
       - name: Check KScript 2 samples
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data --warnings-as-errors
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data --warnings-as-errors
 
       - name: Check KScript formatting
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data samples/code-format samples/types "Example Sites/team"
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data samples/types "Example Sites/team"
 
       - name: Run KScript tests
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab samples/queue-app samples/data
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data
 
       - name: Check a new project (kscript make project)
         shell: bash
@@ -370,10 +370,10 @@ jobs:
           printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.ks.xml
           "$K" smoke.ks.xml | tee smoke.out
           grep -q "kscript ok: 3" smoke.out
-          "$K" samples/kscript2/oldest.ks.xml
-          "$K" check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data --warnings-as-errors
-          "$K" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data "Example Sites/team"
-          "$K" test samples/kscript2 samples/life-lab samples/queue-app samples/data
+          "$K" samples/scripts/oldest.kscript
+          "$K" check samples/scripts samples/xml samples/life-lab samples/http-app samples/storage samples/data --warnings-as-errors
+          "$K" fmt --check samples/scripts samples/xml samples/life-lab samples/http-app samples/storage samples/data "Example Sites/team"
+          "$K" test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data
           # KScript.Data's SQLite library ships beside kscript, like the UI's.
           (cd samples/data && "$K" shop.kscript | grep -q "Paid orders: 1")
           (cd samples/queue-app && export KSCRIPT_STORAGE_ROOT="$RUNNER_TEMP/kscript-queue" && "$K" signup.kscript && "$K" worker --stop-when-empty | tee "$RUNNER_TEMP/worker.out" && "$K" queue status)

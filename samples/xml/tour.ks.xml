@@ -97,7 +97,7 @@
   <try>
     <let name="data" value="@read_text($path) |> json()" />
     <echo>$data</echo>
-    <catch as="err" when="$err.type eq 'FileNotFound'">
+    <catch type="FileNotFound">
       <echo>No file at {$path}, using defaults.</echo>
     </catch>
     <catch as="err">
@@ -112,7 +112,7 @@
     <if $age lt 0>
       <throw type="Validation" message="Age must be positive, got {$age}" />
     </if>
-    <catch as="err" when="$err.type eq 'Validation'">
+    <catch type="Validation" as="err">
       <echo>{$err.type}: {$err.message}</echo>
     </catch>
   </try>

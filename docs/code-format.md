@@ -25,7 +25,7 @@ for p in $people {
 }
 ```
 
-Samples: `samples/code-format/` (rewrites of `samples/kscript2/`) and `samples/life-lab/desktop.kscript`.
+Samples: every folder under `samples/` is written this way. `samples/xml/` has the scripts of `samples/scripts/` in the XML form, to compare the two side by side.
 
 ## Assignment
 
@@ -65,7 +65,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `fn greet(who: string, hi = 'Hello') { }` | `<fn name="greet" params="who: string, hi = 'Hello'">` |
 | `fn double(x: int) => $x * 2` | `<fn name="double" params="x: int" value="$x * 2" />` |
 | `return $x`, `exit 1` | `<return value="$x" />`, `<exit code="1" />` |
-| `try { } catch err when test { } catch { } finally { }` | `<try>` with `<catch as when>` and `<finally>` inside |
+| `try { } catch NotFound as err { } catch err { } finally { }` | `<try>` with `<catch type as>` and `<finally>` inside (`when test` adds a test to a catch) |
 | `throw Validation "Bad {$x}"` | `<throw type="Validation">Bad {$x}</throw>` |
 | `import KScript.Math as math` | `<import package="KScript.Math" as="math" />` |
 | `import "lib/s.kscript" as s` | `<import path="lib/s.kscript" as="s" />` |

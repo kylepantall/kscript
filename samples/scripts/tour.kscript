@@ -86,7 +86,7 @@ path = 'data.json'
 try {
   data = @read_text($path) |> json()
   echo $data
-} catch err when $err.type == 'FileNotFound' {
+} catch FileNotFound {
   echo "No file at {$path}, using defaults."
 } catch err {
   echo "Failed: {$err.message} (line {$err.line})"
@@ -98,7 +98,7 @@ try {
   if $age < 0 {
     throw Validation "Age must be positive, got {$age}"
   }
-} catch err when $err.type == 'Validation' {
+} catch Validation as err {
   echo "{$err.type}: {$err.message}"
 }
 

@@ -3,7 +3,7 @@
 import KScript.IO
 import "types/repo.kscript"
 
-repos = @read_json('../kscript2/data/repos.json', as: Repo)
+repos = @read_json('data/repos.json', as: Repo)
 for repo in $repos {
   echo "$repo.label by $repo.owner.login, licence: { $repo.license ?? 'none' }"
 }

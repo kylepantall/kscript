@@ -1,0 +1,175 @@
+// Life Lab in the terminal.
+//
+//   kscript life.kscript                      interactive: step, play, pick
+// patterns, edit cells
+//   kscript life.kscript glider 60            play a pattern for 60
+// generations, then stop
+//   kscript life.kscript my-pattern.cells 200 the same with a pattern file in
+// the plaintext .cells format
+//
+// The rules live in lib/life.kscript, shared with the browser and Mac versions.
+import KScript.Terminal
+import KScript.IO
+import "lib/life.kscript"
+
+// Two characters per cell keeps the board roughly square in most terminal
+// fonts.
+board_w = @min(40, ((@terminal_width() - 4) / 2)->floor())
+board_h = 20
+frame_time = 70ms
+
+fn draw(world: map, title = '') {
+  if @is_terminal() {
+    clear
+  }
+  s = @summary($world)
+  echo "{ @bold('Life Lab') } { @dim('·') } { $world.pattern } \
+    { $title != '' ? @dim('· ' + $title) : '' }"
+  echo "{ $world.grid->map(fn(row) => '  ' + $row->chars()->map(fn(c) => $c == $alive_cell ? @color('██', color: 'green') : @dim('· '))->join(''))->join(@char_of(10)) }"
+  echo "  Generation { @bold($s.generation) }   Alive { $s.population } \
+    ({ $s.density }%)   Born { $s.births }   Died { $s.deaths }"
+  echo "  \
+    { @color($s.status, color: $s.status == 'Extinct' ? 'red' : $s.status == 'Evolving' ? 'cyan' : 'yellow') }   { @dim($s.size + ', edges ' + $s.edges) }"
+}
+
+fn play(world: map, generations: int) {
+  // Animates at a terminal; when the output is redirected only the last frame
+  // is printed.
+  w = $world
+  for i in 0..$generations {
+    w = @advance($w, generations: 1)
+    if @is_terminal() {
+      @draw($w, 'playing ' + ($i + 1) + '/' + $generations)
+      wait(duration: $frame_time)
+    }
+    if @population($w.grid) == 0 {
+      break
+    }
+  }
+  return $w
+}
+
+fn load_pattern(name_or_path: string, wrap = true) {
+  if $patterns->has($name_or_path) {
+    return @pattern_world(
+      $name_or_path,
+      width: $board_w,
+      height: $board_h,
+      wrap: $wrap
+    )
+  }
+  if not @exists($name_or_path) {
+    throw Pattern "'{$name_or_path}' isn't a pattern name or a file. Patterns: \
+      { $patterns->keys()->join(', ') }."
+  }
+  rows = @parse_cells(@read_text($name_or_path))
+  return @new_world(
+    @place(
+      @blank(
+        width: @max($board_w, @width($rows) + 2),
+        height: @max($board_h, @height($rows) + 2)
+      ),
+      rows: $rows
+    ),
+    wrap: $wrap,
+    pattern: @file($name_or_path).name
+  )
+}
+
+// kscript life.kscript <pattern> [generations]: play and stop.
+if $args->count() > 0 {
+  world = @load_pattern($args[0])
+  world = @play($world, generations: ($args[1] ?? '100')->to_int(default: 100))
+  @draw($world, 'done')
+  exit
+}
+
+// Interactive
+world = @pattern_world('glider', width: $board_w, height: $board_h)
+actions = {
+  'Step one generation': 'step',
+  'Play 25 generations': 'play25',
+  'Play 100 generations': 'play100',
+  'Choose a pattern': 'pattern',
+  'Random soup': 'random',
+  'Flip a cell': 'edit',
+  'Load a .cells file': 'file',
+  'Switch edges (wrap / walls)': 'edges',
+  'Clear the board': 'clear',
+  'Quit': 'quit'
+}
+
+while true {
+  @draw($world)
+  echo
+  menu(into: action, options: $actions) "What next?"
+  match $action {
+    'step' => {
+      world = @advance($world, generations: 1)
+    }
+    'play25' => {
+      world = @play($world, generations: 25)
+    }
+    'play100' => {
+      world = @play($world, generations: 100)
+    }
+    'pattern' => {
+      menu(into: name, options: $patterns->keys()) "Which pattern?"
+      echo "{ @dim($patterns[$name].about) }"
+      world = @pattern_world(
+        $name,
+        width: $board_w,
+        height: $board_h,
+        wrap: $world.wrap
+      )
+    }
+    'random' => {
+      input(into: density, type: number, default: 30) "How full, in percent? \
+        [30] "
+      world = @new_world(
+        @random_grid(
+          width: $board_w,
+          height: $board_h,
+          density: $density->clamp(min: 1, max: 100)
+        ),
+        wrap: $world.wrap,
+        pattern: 'random ' + $density + '%'
+      )
+    }
+    'edit' => {
+      input(into: where) "Cell to flip, as column row (from 1, e.g. 5 3): "
+      xy = $where
+        ->trim()
+        ->split(' ')
+        ->reject(fn(p) => $p == '')
+        ->map(fn(p) => $p->to_int(default: 0) - 1)
+      if not ($xy->count() == 2 and $xy[0] >= 0 and $xy[1] >= 0 and $xy[0] < @width($world.grid) and $xy[1] < @height($world.grid)) {
+        echo "{ @color('That cell is off the board.', color: 'red') }"
+        wait(duration: 1s)
+        continue
+      }
+      world = @edit_world(
+        $world,
+        grid: @toggle($world.grid, x: $xy[0], y: $xy[1])
+      )
+    }
+    'file' => {
+      input(into: path) "Pattern file: "
+      try {
+        world = @load_pattern($path->trim(), wrap: $world.wrap)
+      } catch err {
+        echo "{ @color($err.message, color: 'red') }"
+        wait(duration: 1.5s)
+      }
+    }
+    'edges' => world = $world->merge({ wrap: not $world.wrap })
+    'clear' => {
+      world = @new_world(
+        @blank(width: @width($world.grid), height: @height($world.grid)),
+        wrap: $world.wrap
+      )
+    }
+    'quit' => break
+  }
+}
+echo "Bye!"

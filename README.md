@@ -140,7 +140,7 @@ After `import KScript.UI`, a `Window { }` block opens a native window on macOS, 
 ```kscript
 import KScript.UI
 
-Window(title: Counter, width: 320, height: 200) {
+Window(title: "Counter", width: 320, height: 200) {
   count = 0
   Text(size: 32) "{$count}"
   Button(variant: primary, on_click: count += 1) "Add one"
@@ -179,7 +179,7 @@ The editor extension shows errors as you type and gives completion, hover docs, 
 Tests are KScript too:
 
 ```kscript
-test(name: greets by name) {
+test(name: "greets by name") {
   expect(value: @greeting('Joan'), equals: 'Hello, Joan!')
 }
 ```
@@ -209,7 +209,7 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/kylepantall/kscript/master/install.ps1 | iex
 ```
 
-Then save the first example above as `hello.kscript`, run `kscript hello.kscript`, and run `kscript ide install` to set up your editor. [`samples/kscript2/`](samples/kscript2) and [`Example Sites/team`](Example%20Sites/team) have more to read and run.
+Then save the first example above as `hello.kscript`, run `kscript hello.kscript`, and run `kscript ide install` to set up your editor. [`samples/scripts/`](samples/scripts) and [`Example Sites/team`](Example%20Sites/team) have more to read and run, and [`samples/xml/`](samples/xml) has the same scripts in the XML form.
 
 ## Documentation
 

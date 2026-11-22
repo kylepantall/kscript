@@ -58,7 +58,7 @@ public class DesktopSampleTests : IDisposable
         try
         {
             new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(new StringWriter(), ""), options: new KScript.Runtime.InterpreterOptions { Timeout = TimeSpan.FromSeconds(60) })
-                .RunFile(RepoFile("samples", "life-lab", "desktop.ks.xml"));
+                .RunFile(RepoFile("samples", "life-lab", "desktop.kscript"));
         }
         finally
         {

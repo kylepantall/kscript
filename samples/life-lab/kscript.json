@@ -1,7 +1,7 @@
 {
   "name": "life-lab",
   "serve": { "root": ".", "port": 8080 },
-  "app": { "main": "desktop.ks.xml", "name": "Life Lab", "id": "app.kscript.lifelab" },
+  "app": { "main": "desktop.kscript", "name": "Life Lab", "id": "app.kscript.lifelab" },
   // The README quotes KScript elements in prose, and dist/ holds built apps.
   "lint": { "exclude": ["README.md", "dist"] }
 }

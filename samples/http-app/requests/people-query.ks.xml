@@ -1,4 +1,0 @@
-<kscript>
-  <!--- Filters for the list of people. -->
-  <type name="PeopleQuery" fields="role?: string" />
-</kscript>

@@ -10,7 +10,7 @@ Codes are grouped by what they are about: `KS1` the shape of the file, `KS2` val
 
 **Something is written where it can't go.** A quote, bracket or comment was opened and never closed, or two statements share a line.
 
-```kscript
+```kscript wrong
 echo "Hello          // wrong: the text never ends
 echo "Hello"         // right
 ```
@@ -45,7 +45,7 @@ for i in 0..3 {
 
 **A value isn't written correctly.** The message says what was expected. Common causes are a line that ends with an operator, a bracket that is never closed, and `&&`, `||` or `!` (KScript writes `and`, `or` and `not`).
 
-```kscript
+```kscript wrong
 total = 5 +          // wrong: nothing after the +
 total = 5 + 1        // right
 ```
@@ -54,7 +54,7 @@ total = 5 + 1        // right
 
 **`=` is used where a value is expected.** To compare, write `==`. To give a variable a value, put the assignment on a line of its own.
 
-```kscript
+```kscript wrong
 if $count = 1 { }    // wrong
 if $count == 1 { }   // right
 ```
@@ -77,7 +77,7 @@ name = $other        // right: another variable
 
 **Single quotes keep text as written.** `"Double quotes"` fill in `$name` and `{ }`. `'Single quotes'` never do, so a variable named inside them is not filled in. The quick fix changes the quotes.
 
-```kscript
+```kscript wrong
 name = 'Joan'
 greeting = 'Hello $name'         // warning: holds the text "Hello $name"
 greeting = "Hello $name"         // right: Hello Joan
@@ -86,7 +86,7 @@ label = 'Costs $5'               // fine: $5 is not a variable
 
 The same code warns when SQL text is filled in before it reaches `@sql`, because the values are then pasted into the SQL instead of being sent as parameters:
 
-```kscript
+```kscript wrong
 query = "select * from users where id = {$id}"   // filled in here
 rows = @sql($query)                              // warning: nothing left to send as a parameter
 rows = @sql("select * from users where id = {$id}")   // right: {$id} is a parameter
@@ -212,7 +212,7 @@ echo "Hello $name"   // right
 
 The same code warns about arithmetic and arguments that can only fail when the script runs:
 
-```kscript
+```kscript wrong
 name = 'Joan'
 total = $name - 1            // warning: '-' needs a number here, but $name holds the text 'Joan'
 total = [1, 2] + 3           // warning: + joins two lists. Use ->push(3)
@@ -243,7 +243,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 A map written in the code is checked too. Reading a field a map doesn't have gives nothing, so a near miss of one it does have is almost always a typo:
 
-```kscript
+```kscript wrong
 person = { name: 'Joan', age: 82 }
 echo $person.nmae            // warning: Did you mean name?
 echo $person.email ?? '-'    // fine: not close to a field, so it may be optional

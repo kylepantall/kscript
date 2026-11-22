@@ -5,7 +5,7 @@ A script that imports KScript.UI and holds a `Window { }` block (`<KScript.Windo
 ```kscript
 import KScript.UI
 
-Window(title: Counter, width: 320, height: 200) {
+Window(title: "Counter", width: 320, height: 200) {
   count = 0
 
   Text(size: 32) "{$count}"
