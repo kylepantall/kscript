@@ -26,6 +26,12 @@ namespace KScript.Runtime
 
         public string Source => (Negated ? "not " : string.Empty) + Name;
 
+        /// <summary>
+        /// Makes the word's value as the declared type whose pattern fits it (<c>@f(passkey_abc)</c>), for a parameter
+        /// it isn't a flag, enum value or raw text of; null when no type fits. See <see cref="BareWordTypes"/>.
+        /// </summary>
+        public Func<object> Typed { get; init; }
+
         public override string ToString() => Source;
     }
 
@@ -129,10 +135,26 @@ namespace KScript.Runtime
         {
             BareWord bare = call.Args.OfType<BareWord>().FirstOrDefault() ?? call.Named.Values.OfType<BareWord>().FirstOrDefault()
                 ?? call.Args.Concat(call.Named.Values).Select(a => a is LatePositional l ? l.Value : a).OfType<BareList>().Select(l => l.FirstWord).FirstOrDefault();
-            if (bare != null) throw NotAValue(call, bare, null);
+            if (bare != null && bare.Typed == null) throw NotAValue(call, bare, null);
+            if (bare != null) call = Typed(call);
             if (!call.Args.Any(a => a is LatePositional)) return call;
             return new CallContext(call.Interpreter, call.Name, call.Args.Select(a => a is LatePositional l ? l.Value : a).ToList(), call.Named,
                 call.Scope, call.Module, call.IsMethod, call.Skipped);
+        }
+
+        /// <summary>The call with each bare word that fits a declared type made into its value; any other bare word fails.</summary>
+        private static CallContext Typed(CallContext call)
+        {
+            object Value(object a) => a switch
+            {
+                BareWord { Typed: not null } word => word.Typed(),
+                BareWord word => throw NotAValue(call, word, null),
+                BareList list => list.Items.Select(Value).ToList(),
+                LatePositional late => new LatePositional(Value(late.Value)),
+                _ => a,
+            };
+            return new CallContext(call.Interpreter, call.Name, call.Args.Select(Value).ToList(),
+                call.Named.ToDictionary(kv => kv.Key, kv => Value(kv.Value), StringComparer.Ordinal), call.Scope, call.Module, call.IsMethod, call.Skipped);
         }
 
         private static IEnumerable<Signature> Ordered(CallableInfo info, CallContext call)
@@ -186,6 +208,10 @@ namespace KScript.Runtime
                     named.Add(new KeyValuePair<string, object>(bare.Name, !bare.Negated));
                     flags.Add(bare.Name);
                 }
+                else if (bare.Typed != null && slot?.IsEnum != true)
+                {
+                    positional.Add(bare.Typed());
+                }
                 else
                 {
                     error = NotAValue(call, bare, slot, slots);
@@ -203,6 +229,11 @@ namespace KScript.Runtime
                     if (resolved == null && keepBare && (index < 0 ? variadic : slots[index].Values == null || slots[index].Values.Count == 0))
                     {
                         named.Add(new KeyValuePair<string, object>(pair.Key, bare));
+                        continue;
+                    }
+                    if (resolved == null && bare.Typed != null && (index < 0 || !slots[index].IsEnum))
+                    {
+                        named.Add(new KeyValuePair<string, object>(pair.Key, bare.Typed()));
                         continue;
                     }
                     if (resolved == null)
@@ -273,6 +304,7 @@ namespace KScript.Runtime
                 if (a is BareWord bare2)
                 {
                     value = !bare2.Negated ? EnumValue(target, bare2.Name) : null;
+                    if (value == null && bare2.Typed != null && target?.IsEnum != true) value = bare2.Typed();
                     if (value == null)
                     {
                         error = NotAValue(call, bare2, target, slots);
@@ -311,6 +343,11 @@ namespace KScript.Runtime
                     string value = slot?.IsEnumList == true && !word.Negated
                         ? slot.ItemValues.FirstOrDefault(v => string.Equals(v, word.Name.Trim(), StringComparison.OrdinalIgnoreCase))
                         : null;
+                    if (value == null && slot?.IsEnumList != true && word.Typed != null)
+                    {
+                        items.Add(word.Typed());
+                        continue;
+                    }
                     if (value == null)
                     {
                         error = slot?.IsEnumList == true

@@ -267,7 +267,20 @@ Some values need no quotes, the same way a regex needs none in JavaScript.
 - **Handles** are written as `@joan` only where a handle is expected: a `handle` variable or parameter, a `not:` or `one_of:` list on a handle type, or next to a handle in `==`. Everywhere else, `@joan` still names the function `joan`.
 - **Words** need no quotes where the type is read from text. That covers an enum (`color: Color = red`), a type with a `pattern` (`size: Size = 1920x1080`), a refinement of text (`slug: Slug = my-post`) and the native types: `domain = example.com`, `ip = 10.0.0.1`, `cidr = 10.0.0.0/8`, `timezone = Europe/London`, `semver = 1.4.2`, `duration = 1h30m`, `color = red`, `country = GB` and the rest. Method and function arguments of those types work the same way: `$brand->contrast_ratio(white)`, `@allow(10.0.0.0/8)`, `@release(1.4.2-beta.1)`.
 
-Quoted text always works too: `who: handle = '@joan'`.
+- **Words of your own types** need no declared type either. A word that isn't a variable, function or type is read as the one type of yours, built on text, whose own `pattern` matches all of it, as written (before `normalize`): `key = passkey_login` makes a `PasskeySessionKey` below. The type's other rules then check it as usual, so `passkey_x` fails because it is too short, and doesn't fail because it's an unknown name. This works for values, list items and function arguments. When two of your types match the same word, KScript asks you to declare which one you mean (KS2006). Built-in types still need a declared type, because their values overlap: `GB` is a country and a locale, and any `a.b` looks like a domain.
+
+Quoted text always works too: `who: handle = '@joan'`, `key = 'passkey_login' as PasskeySessionKey`.
+
+```kscript
+type PasskeySessionKey with [string] {
+  min: 12
+  normalize: $value->trim()
+  pattern: /^passkey_[a-z]+$/
+}
+
+key = passkey_login
+echo $key             // passkey_login, checked as a PasskeySessionKey
+```
 
 ```kscript
 enum Color { red, green, blue }
@@ -472,7 +485,7 @@ The target can also be a built-in type (`$text as int`), a type with local rules
 
 ### Your own native types
 
-`kscript make native` writes a refinement type to `natives/` that works like a built-in one. Every script in the project can use it without an import, the same way the `extensions/` folder works. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, a call of the type and request bodies), and the editor checks the values written in code:
+`kscript make native` writes a refinement type to `natives/` that works like a built-in one. Every script in the project can use it without an import, the same way the `extensions/` folder works. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, a call of the type and request bodies), and the editor checks the values written in code. A type with a `pattern`, such as `Sku` below, needs no declared type at all: `item = ABC-1234` is a `Sku`.
 
 ```sh
 kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/" --normalize "$value->trim()->upper()"

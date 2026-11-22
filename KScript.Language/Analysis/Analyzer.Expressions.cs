@@ -22,6 +22,10 @@ namespace KScript.Language.Analysis
         {
             switch (node)
             {
+                case BinaryNode or MemberNode when ReadBareWord(node, region, scope):
+                    // my-post, corp.example.com: words read as the declared type whose pattern fits them.
+                    return;
+
                 case null:
                 case ErrorNode _:
                     return;
@@ -308,6 +312,11 @@ namespace KScript.Language.Analysis
         private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context)
         {
             if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceDeclaredType(id, region, scope) || ReferenceBareErrorType(id, region, scope))
+            {
+                return;
+            }
+
+            if (ReadBareWord(id, region, scope))
             {
                 return;
             }

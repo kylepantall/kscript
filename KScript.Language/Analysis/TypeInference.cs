@@ -29,6 +29,12 @@ namespace KScript.Language.Analysis
         /// <summary>The shape of an expression's value, as far as it can be told from the source.</summary>
         public TypeShape Infer(ExprNode node, ExpressionRegion region)
         {
+            // passkey_abc, read as the declared type whose pattern fits it.
+            if (node is IdentifierNode or BinaryNode or MemberNode && result != null && region != null
+                && result.BareWordTypes.TryGetValue(region.Source.ToSource(node.Span), out string bareType))
+            {
+                return TypeNamed(bareType, region.Source.ToSource(node.Span.Start)) ?? TypeShape.Unknown;
+            }
             switch (node)
             {
                 case CastNode cast:
