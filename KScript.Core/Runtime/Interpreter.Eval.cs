@@ -529,6 +529,7 @@ namespace KScript.Runtime
                 case Record record:
                     try
                     {
+                        if (record.Type.Tag is IRecordKind kind && kind.TryGetMember(this, record, name, out object loaded)) return loaded;
                         return record.Get(name);
                     }
                     catch (KScriptException ex)
@@ -904,6 +905,13 @@ namespace KScript.Runtime
                 DeclareFunction(methodElement, methodScope, record.Type.Module);
                 methodScope.TryGet(name, out object fn);
                 return Call((ICallable)fn, args, named, scope, ctx.Module);
+            }
+
+            // Methods the record's kind adds, such as a model record's relations: $user->posts().
+            if (target is Record kindRecord && kindRecord.Type.Tag is IRecordKind kind && kind.HasMethod(kindRecord, name)
+                && kind.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), kindRecord, name, out object added))
+            {
+                return added;
             }
 
             // A package's methods for its own objects come first, so their arguments are bound by name (and flags) like commands'.

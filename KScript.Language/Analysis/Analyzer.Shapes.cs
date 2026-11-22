@@ -103,6 +103,7 @@ namespace KScript.Language.Analysis
                 if (IsModelElement(e))
                 {
                     FillModelFields(e, shape);
+                    FillRelations(e, shape);
                 }
             }
             foreach (MarkupElement fn in e.ChildElements.Where(c => IsKScriptElementName(c, "fn")))
@@ -128,7 +129,74 @@ namespace KScript.Language.Analysis
                 }
                 result.Symbols.Add(method);
                 result.References.Add(new SymbolReference(method, span, true, true));
+                if (IsModelElement(e) && method.Parameters.Count > 0 && method.Parameters[0].Name == "query")
+                {
+                    // A scope: $User->admins() runs it on a query of the model, which it is given as query.
+                    var scope = new Symbol { Name = fnName, Kind = SymbolKind.Function, DeclarationSpan = span, DeclaringElement = fn, Description = fn.Documentation,
+                        ReturnShape = new TypeShape(KType.Query) { Name = shape.Name, Instance = shape } };
+                    scope.Parameters.AddRange(method.Parameters.Skip(1));
+                    shape.Scopes[fnName] = scope;
+                    continue;
+                }
                 shape.Methods[fnName] = method;
+            }
+        }
+
+        /// <summary>A model field's type as written, and whether it may be left out.</summary>
+        private IEnumerable<(string Name, string Type, bool Optional)> ModelFieldTypes(MarkupElement e)
+        {
+            if (e.GetAttribute("fields")?.Value is DecodedText inline)
+            {
+                foreach ((string part, int _) in SplitTopLevel(inline.Value))
+                {
+                    int eq = part.IndexOf('=');
+                    string head = eq >= 0 ? part.Substring(0, eq) : part;
+                    int colon = head.IndexOf(':');
+                    if (colon < 0)
+                    {
+                        continue;
+                    }
+                    string name = head.Substring(0, colon).Trim();
+                    string type = head.Substring(colon + 1).Trim();
+                    yield return (name.TrimEnd('?').TrimEnd(), type, eq >= 0 || name.EndsWith("?", StringComparison.Ordinal) || type.EndsWith("?", StringComparison.Ordinal));
+                }
+            }
+            foreach (MarkupElement field in e.ChildElements.Where(c => IsKScriptElementName(c, "field")))
+            {
+                string name = field.GetAttributeValue("name")?.Trim();
+                string type = field.GetAttributeValue("type")?.Trim();
+                if (string.IsNullOrEmpty(name) || type == null || field.GetAttribute("value") != null)
+                {
+                    continue;
+                }
+                yield return (name.TrimEnd('?').TrimEnd(), type, field.GetAttribute("default") != null || name.EndsWith("?", StringComparison.Ordinal) || type.EndsWith("?", StringComparison.Ordinal));
+            }
+        }
+
+        /// <summary>
+        /// The relations of a model, as KScript.Data works them out: each field whose type is a model, with that
+        /// model's element and whether this model holds the link column (belongs-to).
+        /// </summary>
+        private IEnumerable<(string Name, MarkupElement Target, bool List, bool BelongsTo)> ModelRelations(MarkupElement e)
+        {
+            foreach ((string name, string type, bool optional) in ModelFieldTypes(e))
+            {
+                string bare = TypeInference.WithoutTypeArguments(type).TrimEnd('?').TrimEnd();
+                bool list = bare.EndsWith("[]", StringComparison.Ordinal);
+                MarkupElement target = TypeElementNamed(list ? bare.Substring(0, bare.Length - 2).TrimEnd() : bare);
+                if (target == null || !IsModelElement(target))
+                {
+                    continue;
+                }
+                bool belongsTo = false;
+                if (!list && !type.Contains("by:", StringComparison.Ordinal))
+                {
+                    string self = e.GetAttributeValue("name")?.Trim();
+                    var backs = ModelFieldTypes(target).Where(f => !(target == e && f.Name == name)
+                        && TypeInference.WithoutTypeArguments(f.Type).TrimEnd('?').TrimEnd() == self).ToList();
+                    belongsTo = !(backs.Count == 1 && optional && !backs[0].Optional);
+                }
+                yield return (name, target, list, belongsTo);
             }
         }
 
@@ -157,6 +225,44 @@ namespace KScript.Language.Analysis
             if (IsYes(e.GetAttributeValue("soft_deletes")))
             {
                 shape.Fields["deleted_at"] = new FieldInfo("deleted_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was deleted, or null.");
+            }
+        }
+
+        /// <summary>
+        /// What a model's relations add: a belongs-to relation's column (author_id), a list relation's count field
+        /// for ->with_count() (posts_count), and a method for each relation that is a query of it (->posts()).
+        /// </summary>
+        private void FillRelations(MarkupElement e, TypeShape shape)
+        {
+            foreach ((string name, MarkupElement target, bool list, bool belongsTo) in ModelRelations(e).ToList())
+            {
+                // A model from another file has no shape here, so its queries' records aren't known.
+                declaredTypes.TryGetValue(target, out TypeShape targetShape);
+                string targetName = target.GetAttributeValue("name")?.Trim();
+                if (belongsTo)
+                {
+                    string key = target.GetAttributeValue("key")?.Trim() ?? "id";
+                    string column = name + "_" + key;
+                    if (!shape.Fields.ContainsKey(column))
+                    {
+                        TypeShape keyShape = key == "id" ? new TypeShape(KType.Number) { Declared = true }
+                            : ModelFieldTypes(target).Where(f => f.Name == key).Select(f => TypeNamed(f.Type, 0)).FirstOrDefault() ?? TypeShape.Unknown;
+                        shape.Fields[column] = new FieldInfo(column, keyShape, null, $"The {key} of the {name} (a {targetName}).");
+                    }
+                }
+                if (list && !shape.Fields.ContainsKey(name + "_count"))
+                {
+                    shape.Fields[name + "_count"] = new FieldInfo(name + "_count", new TypeShape(KType.Number) { Declared = true }, null, $"How many {name} there are, on records read with ->with_count({name}).");
+                }
+                shape.Methods[name] = new Symbol
+                {
+                    Name = name,
+                    Kind = SymbolKind.Function,
+                    DeclaringElement = e,
+                    Description = $"The {name} relation as a query of {targetName} records, to filter, count or add to: ->{name}()->where(...), ->{name}()->create(...)"
+                        + (list ? $", ->{name}()->attach(...) for a many to many relation." : "."),
+                    ReturnShape = new TypeShape(KType.Query) { Name = targetName, Instance = targetShape },
+                };
             }
         }
 

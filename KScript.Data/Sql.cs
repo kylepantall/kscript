@@ -13,13 +13,17 @@ namespace KScript.Data
     /// <summary>A column of the query's table.</summary>
     internal sealed class SqlColumn : SqlExpr
     {
-        public SqlColumn(string name, Column column = null)
+        public SqlColumn(string name, Column column = null, string table = null)
         {
             Name = name;
             Column = column;
+            Table = table;
         }
 
         public string Name { get; }
+
+        /// <summary>The table or alias the column is read from, written before it (<c>"r1"."author_id"</c>), or null for the query's own table.</summary>
+        public string Table { get; }
 
         /// <summary>The model's column, when the query is on a model: values compared with it are converted to its type.</summary>
         public Column Column { get; }
@@ -130,6 +134,39 @@ namespace KScript.Data
         public SqlExpr Otherwise { get; }
     }
 
+    /// <summary>
+    /// A query inside a query, on another table: <c>(SELECT COUNT(*) FROM "posts" AS "r1" WHERE ...)</c>. Relations use
+    /// it to count, test and read related rows. <see cref="Joins"/> are inner joins after the first table, such as a
+    /// pivot table.
+    /// </summary>
+    internal sealed class SqlSubquery : SqlExpr
+    {
+        public SqlSubquery(string select, string table, string alias, SqlExpr where, IReadOnlyList<(string Table, string Alias, SqlExpr On)> joins = null, int? limit = null)
+        {
+            Select = select;
+            Table = table;
+            Alias = alias;
+            Where = where;
+            Joins = joins ?? Array.Empty<(string, string, SqlExpr)>();
+            Limit = limit;
+        }
+
+        /// <summary>What it reads: <c>1</c>, <c>COUNT(*)</c>, or an expression written by <see cref="SelectExpr"/>.</summary>
+        public string Select { get; }
+
+        /// <summary>A column or expression it reads instead of <see cref="Select"/>.</summary>
+        public SqlExpr SelectExpr { get; init; }
+
+        /// <summary>The column it reads, when it reads one (<c>$p.author.email</c>): values compared with it are converted to its type.</summary>
+        public Column ValueColumn { get; init; }
+
+        public string Table { get; }
+        public string Alias { get; }
+        public SqlExpr Where { get; }
+        public IReadOnlyList<(string Table, string Alias, SqlExpr On)> Joins { get; }
+        public int? Limit { get; }
+    }
+
     /// <summary>A statement ready to run: its SQL and its parameters in order.</summary>
     internal sealed class SqlStatement
     {
@@ -179,7 +216,29 @@ namespace KScript.Data
             switch (e)
             {
                 case SqlColumn c:
+                    if (c.Table != null) Name(c.Table).Append(".");
                     Name(c.Name);
+                    break;
+                case SqlSubquery q:
+                    sb.Append("(SELECT ");
+                    if (q.SelectExpr != null) Expr(q.SelectExpr);
+                    else sb.Append(q.Select);
+                    sb.Append(" FROM ");
+                    Name(q.Table);
+                    if (q.Alias != null) sb.Append(" AS ").Append(Dialect.Quote(q.Alias));
+                    foreach ((string table, string alias, SqlExpr on) in q.Joins)
+                    {
+                        sb.Append(" INNER JOIN ");
+                        Name(table).Append(" AS ").Name(alias).Append(" ON ");
+                        Expr(on, nested: true);
+                    }
+                    if (q.Where != null)
+                    {
+                        sb.Append(" WHERE ");
+                        Expr(q.Where);
+                    }
+                    sb.Append(Dialect.Limit(q.Limit, null));
+                    sb.Append(')');
                     break;
                 case SqlValue v:
                     Value(Rows.ForColumn(v.Value, v.Column, Dialect));
@@ -225,7 +284,7 @@ namespace KScript.Data
                     break;
                 case SqlUnary u:
                     if (nested) sb.Append('(');
-                    sb.Append(u.Op == "NOT" ? "NOT " : u.Op);
+                    sb.Append(u.Op is "NOT" or "EXISTS" ? u.Op + " " : u.Op);
                     Expr(u.Operand, nested: true);
                     if (nested) sb.Append(')');
                     break;

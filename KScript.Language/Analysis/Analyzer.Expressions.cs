@@ -540,7 +540,7 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            if (own != null || receiver.Methods.TryGetValue(name, out own))
+            if (own != null || receiver.Methods.TryGetValue(name, out own) || TypeInference.ScopeOf(receiver, name) is Symbol scope && (own = scope) != null)
             {
                 // A method the record's <type> declares with <fn>.
                 result.References.Add(new SymbolReference(own, nameSpan, false, false));

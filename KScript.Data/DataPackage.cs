@@ -208,6 +208,70 @@ namespace KScript.Data
             new("restore", "", "For models with soft_deletes: brings back the deleted records that match. Returns how many.", KType.Number, (q, c) => q.Restore(c)),
             new("insert", "rows", "Adds rows: a map, or a list of maps. On a model each one is checked like ->create(). Returns how many were added.", KType.Number, (q, c) => q.Insert(c, c.Arg(0))),
             new("sql", "", "The SQL the query runs and its parameters, without running it: { sql, params }.", KType.Map, (q, c) => q.Describe()),
+            new("with", "relations...", "Loads relations with the records, one query per relation rather than one per record: `->with(author, tags)`, `->with('posts.tags')`, or `->with(posts: fn($q) => $q->where(published: true))` to load only some.", KType.Query,
+                (q, c) => Relations(c, "with").Aggregate(q, (acc, r) => acc.Loading(r.Path, r.Constrain)), Bare: true),
+            new("with_count", "relations...", "Counts a list relation for each record, as a field named after it: `->with_count(posts)` gives each user posts_count. `->with_count(posts: fn($q) => $q->where(published: true))` counts only some.", KType.Query,
+                (q, c) => Relations(c, "with_count").Aggregate(q, (acc, r) => acc.Counting(r.Path, r.Constrain)), Bare: true),
+        };
+
+        /// <summary>The relations given to ->with(), ->with_count() and ->load(): names, lists of names, and names with a function that changes their query.</summary>
+        private static List<(string Path, ICallable Constrain)> Relations(CallContext c, string method)
+        {
+            var list = new List<(string, ICallable)>();
+            foreach (object a in Flatten(c.Args)) list.Add((Word(a, $"->{method}()"), null));
+            foreach (KeyValuePair<string, object> kv in c.Named)
+            {
+                ICallable fn = kv.Value as ICallable ?? (kv.Value == null ? null : throw new KScriptException($"->{method}({kv.Key}: ...) takes a function that changes the relation's query: {kv.Key}: fn($q) => $q->where(...).", "Argument"));
+                list.Add((kv.Key, fn));
+            }
+            if (list.Count == 0) throw new KScriptException($"->{method}() needs a relation, such as ->{method}(author) or ->{method}(posts, tags).", "Argument");
+            return list;
+        }
+
+        /// <summary>The record and relation of <c>$user->posts()</c>, for the methods that add to a relation.</summary>
+        private static Relation RelationOf(Query q, CallContext c)
+        {
+            if (q.Relation != null) return q.Relation;
+            throw new KScriptException($"{c.Display} works on a relation of one record, such as $post->tags(){c.Display.Substring(0, c.Display.Length - 2)}(...), not on {(q.Model != null ? "a query of " + q.Model.Name : "the table " + q.Table)}.", "Type");
+        }
+
+        private static readonly QueryMethod[] RelationMethods =
+        {
+            new("create", "values...", "Adds a record to the relation: `$user->posts()->create(title: 'Hi')` sets the post's author to the user. For a many to many relation it saves the record and links it.", KType.Record,
+                (q, c) =>
+                {
+                    Relation r = RelationOf(q, c);
+                    Dictionary<string, object> values = ValuesOf(c, "create", allowEmpty: true);
+                    switch (r.Kind)
+                    {
+                        case RelationKind.HasOne:
+                        case RelationKind.HasMany:
+                        {
+                            object key = r.OwnerValue(q.Parent) ?? throw new KScriptException($"This {r.Owner.Name} hasn't been saved, so ->{r.Name}()->create() has nothing to link to. Save it first.", "Value");
+                            values[r.ForeignKey] = key;
+                            if (r.Target.ForeignKeyOf(r.ForeignKey) is Relation back) values.Remove(back.Name);
+                            Record made = Records.Create(c, r.Target, values, fillable: false);
+                            q.Parent.Remove(r.Name);
+                            return made;
+                        }
+                        case RelationKind.ManyToMany:
+                        {
+                            Record made = Records.Create(c, r.Target, values);
+                            r.Attach(c, q.Parent, made);
+                            return made;
+                        }
+                        default:
+                            throw new KScriptException($"{r.Where} {r.Describe()}, so ->create() can't add to it. Create the {r.Target.Name} and set its fields instead.", "Type");
+                    }
+                }, Bare: true),
+            new("attach", "records", "Links records through a many to many relation's pivot table: `$post->tags()->attach([$a, $b])` or keys, `->attach([1, 2])`. Links already there are kept. Returns how many were added.", KType.Number,
+                (q, c) => RelationOf(q, c).Attach(c, q.Parent, c.Arg(0))),
+            new("detach", "records?", "Unlinks records from a many to many relation, or every record when none are given. Returns how many links were removed.", KType.Number,
+                (q, c) => RelationOf(q, c).Detach(c, q.Parent, c.Arg(0), all: !c.Has(0))),
+            new("sync", "records", "Links exactly these records through a many to many relation, unlinking the rest: `$post->tags()->sync($form.tag_ids)`. Returns { attached, detached }, the keys added and removed.", KType.Map,
+                (q, c) => RelationOf(q, c).Sync(c, q.Parent, c.Arg(0))),
+            new("toggle", "records", "Links the records given that aren't linked and unlinks the ones that are. Returns { attached, detached }.", KType.Map,
+                (q, c) => RelationOf(q, c).Sync(c, q.Parent, c.Arg(0), toggle: true)),
         };
 
         private static string DefaultTimeColumn(Query q) =>
@@ -239,6 +303,10 @@ namespace KScript.Data
             {
                 p.Method(KType.Query, m.Name, m.Params, m.Description, m.Returns, (t, c) => m.Run(QueryOf(t, c), c)).Info.KeepsBareWords = m.Bare;
                 p.Method(KType.Model, m.Name, m.Params, m.Description, m.Returns, (t, c) => m.Run(QueryOf(t, c), c)).Info.KeepsBareWords = m.Bare;
+            }
+            foreach (QueryMethod m in RelationMethods)
+            {
+                p.Method(KType.Query, m.Name, m.Params, m.Description, m.Returns, (t, c) => m.Run(QueryOf(t, c), c)).Info.KeepsBareWords = m.Bare;
             }
             foreach (QueryMethod m in ModelMethods)
             {
@@ -280,6 +348,13 @@ namespace KScript.Data
                     Record r = RecordOf(t, c);
                     return Records.Dirty(ModelInfo.Of(r), r).Cast<object>().ToList();
                 });
+            p.Method(KType.Record, "load", "relations...", "Loads relations onto the record now (again, if they were loaded): `$post->load(author, tags)`. Returns the record.", KType.Record,
+                (t, c) =>
+                {
+                    Record r = RecordOf(t, c);
+                    Data.Relation.LoadPaths(c, ModelInfo.Of(r), new[] { r }, Relations(c, "load"));
+                    return r;
+                }).Info.KeepsBareWords = true;
             p.Method(KType.Record, "is_saved", "", "yes if the record is in the database: it was read from it or has been saved.", KType.Bool,
                 (t, c) => Records.State(RecordOf(t, c))?.Exists == true);
 
@@ -447,7 +522,7 @@ namespace KScript.Data
                     string table = ModelInfo.Of(c.Arg(0))?.Table ?? Word(c.Arg(0), "->has_table()");
                     return DatabaseOf(t, c).Tables(c.Interpreter).Contains(table);
                 }).Info.KeepsBareWords = true;
-            p.Method(KType.Database, "create_table", "model", "Makes a model's table and indexes, if the database doesn't have them yet. Good for scripts and tests; projects use migrations.", KType.Bool,
+            p.Method(KType.Database, "create_table", "model", "Makes a model's table and indexes, if the database doesn't have them yet, and the pivot tables of its many to many relations whose other table is there. Make the tables a model links to first. Good for scripts and tests; projects use migrations.", KType.Bool,
                 (t, c) =>
                 {
                     ModelInfo model = ModelInfo.Of(c.Arg(0)) ?? throw new KScriptException($"->create_table() needs a model, such as User, but got {Values.Describe(c.Arg(0))}.", "Argument");
@@ -456,6 +531,16 @@ namespace KScript.Data
                     foreach (string statement in db.Dialect.CreateTable(model, ifMissing: true))
                     {
                         db.Execute(c.Interpreter, new SqlStatement(statement, Array.Empty<object>()), model.Table);
+                    }
+                    // A pivot table is made with the second of its two tables, so both are there for its foreign keys.
+                    List<string> tables = db.Tables(c.Interpreter);
+                    foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.ManyToMany && tables.Contains(r.Target.Table) && !tables.Contains(r.Pivot)))
+                    {
+                        foreach (string statement in db.Dialect.CreatePivot(r, ifMissing: true))
+                        {
+                            db.Execute(c.Interpreter, new SqlStatement(statement, Array.Empty<object>()), r.Pivot);
+                        }
+                        tables.Add(r.Pivot);
                     }
                     return !existed;
                 });

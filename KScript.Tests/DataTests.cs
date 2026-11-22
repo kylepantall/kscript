@@ -587,7 +587,7 @@ public sealed class DataQueryTests : DataFixture
     {
         Assert.Contains("lambda", Fails(Users + "fn adult(u) => $u.age > 18\n$User->where(@adult)->get()").Message);
         Assert.Contains("one parameter", Fails(Users + "$User->where(fn($a, $b) => true)->get()").Message);
-        Assert.Contains("only the row's own columns", Fails(Users + "$User->where(fn($u) => $u.name.length > 1)->get()").Message);
+        Assert.Contains("only the row's columns can be read", Fails(Users + "$User->where(fn($u) => $u.name.length > 1)->get()").Message);
         Assert.Contains("not the whole row", Fails(Users + "$User->where(fn($u) => $u == null)->get()").Message);
         Assert.Contains("can't run in the database", Fails(Users + "$User->where(fn($u) => [$u.name][0] == 'x')->get()").Message);
         Assert.Contains("worked out from other fields", Fails(Users + "$User->where(fn($u) => $u.label == 'x')->get()").Message);
@@ -619,7 +619,7 @@ public sealed class DataQueryTests : DataFixture
         Assert.Contains("whole number", Fails(Users + "$User->offset(-1)").Message);
         Assert.Contains("values to set", Fails(Users + "$User->where(name: 'Ada')->update()").Message);
         Assert.Contains("map of values", Fails(Users + "$User->where(name: 'Ada')->update(42)").Message);
-        Assert.Contains("no method", Fails(Users + "@db(users)->create(name: 'x')").Message);
+        Assert.Contains("relation of one record", Fails(Users + "@db(users)->create(name: 'x')").Message);
         Assert.Contains("model or a query", Fails(Users + "$User->where->call('x')").Message.Length > 0 ? "model or a query" : "");
         Assert.Contains("isn't a table name", Fails(Users + "@db('bad name')").Message);
         Assert.Contains("isn't a table name", Fails(Users + "$db->table('bad name')").Message);
@@ -1097,7 +1097,6 @@ public sealed class DataCoverageTests : DataFixture
     [Fact]
     public void ModelsThatCantBeTables()
     {
-        Assert.Contains("relations", Fails("model Team {\n  name: string\n}\nmodel Member {\n  team: Team\n}\n$db->create_table($Member)").Message);
         Assert.Contains("must be an int", Fails("model Bad {\n  key: tags\n  tags: string[]\n}\n$db->create_table($Bad)").Message);
 
     }

@@ -9,4 +9,5 @@ model Product {
   price: number(min: 0)
   stock: int = 0
   tags: string[] = []
+  orders: Order[]
 }

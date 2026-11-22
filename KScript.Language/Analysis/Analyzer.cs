@@ -85,6 +85,7 @@ namespace KScript.Language.Analysis
             AnalyzeFrontMatter(root);
             HoistFunctions(root);
             HoistProjectNatives(root);
+            HoistProjectModels(root);
             ApplyKnownTypes(root);
             HoistTypes(root);
             HoistExtensions(root);
@@ -413,6 +414,47 @@ namespace KScript.Language.Analysis
                         (new ExternalLocation(full, other.GetPosition(span.Start), other.GetPosition(span.End)), e.Documentation ?? $"A native type of this project, from {where}"));
                     root.Declare(symbol, 0);
                 }
+            }
+        }
+
+        /// <summary>
+        /// The models this file's models name without importing them, found in the project's models folder as the
+        /// script does when it runs: <c>posts: Post[]</c> in models/user.kscript finds models/post.kscript.
+        /// </summary>
+        private void HoistProjectModels(Scope root)
+        {
+            MarkupElement owner = result.Markup.RootElements.FirstOrDefault();
+            List<MarkupElement> models = result.Markup.DescendantElements().Where(IsModelElement).ToList();
+            if (owner == null || models.Count == 0)
+            {
+                return;
+            }
+            List<string> modelFiles = null;
+            string self = result.Path != null ? System.IO.Path.GetFullPath(result.Path) : null;
+            var named = models.SelectMany(ModelFieldTypes).Select(f => TypeInference.WithoutTypeArguments(f.Type).TrimEnd('?').TrimEnd().Replace("[]", string.Empty).Trim())
+                .Where(n => n.Length > 0 && Lexer.IsIdentStart(n[0]) && char.IsUpper(n[0]) && TypeElementIn(result.Markup, n) == null && !result.Symbols.Any(s => s.Name == n))
+                .Distinct(StringComparer.Ordinal);
+            foreach (string name in named)
+            {
+                modelFiles ??= ProjectFiles((config, d, f, l, ds) => config.ModelFiles(d, f, l, ds));
+                string full = KScript.Projects.ProjectConfig.ModelFileFor(modelFiles, name);
+                string text = full != null && !string.Equals(full, self, StringComparison.Ordinal) ? files.ReadText(full) : null;
+                if (text == null)
+                {
+                    continue;
+                }
+                SourceText other = new SourceText(text);
+                MarkupElement model = MarkupParser.Parse(other, MarkupParser.KindFromPath(full), full).DescendantElements()
+                    .FirstOrDefault(e => e.Name == "model" && e.GetAttributeValue("name")?.Trim() == name);
+                if (model == null)
+                {
+                    continue;
+                }
+                TextSpan span = model.GetAttribute("name").Value.SourceSpan;
+                string where = ProjectRelative(full);
+                Symbol symbol = ImportedConstant(name, owner.NameSpan, owner, full, where,
+                    (new ExternalLocation(full, other.GetPosition(span.Start), other.GetPosition(span.End)), model.Documentation ?? $"A model of this project, from {where}"));
+                root.Declare(symbol, 0);
             }
         }
 

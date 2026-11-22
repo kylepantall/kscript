@@ -261,3 +261,6 @@ __pycache__/
 *.pyc
 # Editor settings
 .vscode/
+
+# Databases the samples and tests make when they run
+samples/**/data/*.sqlite

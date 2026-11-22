@@ -518,6 +518,30 @@ namespace KScript.Projects
             Func<string, IEnumerable<string>> listFiles = null, Func<string, IEnumerable<string>> listDirectories = null) =>
             FilesIn(Natives ?? new List<string> { DefaultNativesFolder }, directoryExists, fileExists, listFiles, listDirectories);
 
+        /// <summary>
+        /// The scripts in the models folder (paths.models), full paths in a stable order. KScript.Data finds a model
+        /// that another model names there, so two models that link to each other don't have to import each other.
+        /// </summary>
+        public List<string> ModelFiles(Func<string, bool> directoryExists = null, Func<string, bool> fileExists = null,
+            Func<string, IEnumerable<string>> listFiles = null, Func<string, IEnumerable<string>> listDirectories = null) =>
+            FilesIn(new List<string> { PathFor("models") }, directoryExists, fileExists, listFiles, listDirectories);
+
+        /// <summary>
+        /// The model file a model's name points to, by the file's name (blog-post.kscript, blog_post.ks.xml and
+        /// BlogPost.kscript are all BlogPost), or null.
+        /// </summary>
+        public static string ModelFileFor(IEnumerable<string> files, string model)
+        {
+            static string Plain(string s) => new string(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+            string wanted = Plain(model);
+            return files.FirstOrDefault(f =>
+            {
+                string name = Path.GetFileName(f);
+                string suffix = ScriptSuffixes.FirstOrDefault(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase));
+                return suffix != null && !TestSettings.IsTestFileName(name) && Plain(name.Substring(0, name.Length - suffix.Length)) == wanted;
+            });
+        }
+
         private static readonly string[] ScriptSuffixes = { ".kscript", ".ks.xml", ".ks" };
         private static readonly string[] SkippedFolders = { "node_modules", ".git", "_templates", "bin", "obj" };
 

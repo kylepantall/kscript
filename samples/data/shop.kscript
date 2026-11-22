@@ -1,4 +1,4 @@
-// A small shop on KScript.Data: models, queries, a transaction and raw SQL.
+// A small shop on KScript.Data: models, relations, queries, a transaction and raw SQL.
 // Run it with: kscript shop.kscript
 import KScript.Data
 import "models/product.kscript"
@@ -22,7 +22,7 @@ fn place(sku: string, customer: email, quantity: int) {
     }
     $product.stock = $product.stock - $quantity
     $product->save()
-    return $Order->create(product_id: $product.id, customer: $customer, quantity: $quantity)
+    return $product->orders()->create(customer: $customer, quantity: $quantity)
   }
 }
 
@@ -45,6 +45,14 @@ for p in $Product->where(fn($p) => $p.price < $cheap and $p.sku->starts_with('MU
 echo "Open orders: { $Order->where(status: open)->count() }"
 echo "Paid orders: { $Order->where(status: paid)->count() }"
 echo "Stock left: { $Product->sum(stock) }"
+
+echo 'Orders by product:'
+for p in $Product->with_count(orders)->order_by(name)->get() {
+  echo "- { $p.name }: { $p.orders_count }"
+}
+for o in $Order->with(product)->where(fn($o) => $o.product.price > 10)->get() {
+  echo "{ $o.customer } ordered a { $o.product.name }"
+}
 
 low = 5
 echo 'Low on stock:'
