@@ -17,6 +17,13 @@ namespace KScript.Runtime
         public static IReadOnlyList<NativeType> BuiltIn { get; } = new NativeType[]
         {
             new DurationType(),
+            new PhoneType(),
+            new CountryType(),
+            new CurrencyType(),
+            new LocaleType(),
+            new IbanType(),
+            new CardType(),
+            new MoneyType(),
         };
 
         static NativeTypeRegistry()
@@ -77,7 +84,9 @@ namespace KScript.Runtime
         {
             if (TypeOf(value) == type) return value;
             NativeType native = Get(type);
-            return native != null && value is string or ISemanticText or double ? native.Coerce(value) : null;
+            // Text is parsed, but a value of another native type is never read as this one: $phone + 1 isn't a duration.
+            bool text = value is string or double || (value is ISemanticText t && NativeTypes.Get(t.TypeName) == null);
+            return native != null && text ? native.Coerce(value) : null;
         }
 
         private static bool Involves(object a, object b) => Of(a) != null || Of(b) != null;

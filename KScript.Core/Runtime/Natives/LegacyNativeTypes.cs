@@ -61,14 +61,6 @@ namespace KScript.Runtime
                 Searchable));
 
             // People and places.
-            Add(new NativeTypeInfo("phone", "A phone number in E.164: + then the country code and number, 8 to 15 digits. Spaces, dots, dashes and brackets are dropped.", "+447700900123",
-                Searchable) { Options = new[] { "countries" } });
-            Add(new NativeTypeInfo("country", "An ISO 3166 country code. Two-letter, three-letter and English names are read; it is kept as two capitals, such as GB.", "GB",
-                Searchable));
-            Add(new NativeTypeInfo("currency", "An ISO 4217 currency code, kept in capitals: GBP, USD, EUR.", "GBP",
-                Searchable));
-            Add(new NativeTypeInfo("locale", "A language tag (BCP 47) such as en, en-GB or pt-BR, in its usual case.", "en-GB",
-                With("split")));
             Add(new NativeTypeInfo("timezone", "An IANA time zone such as Europe/London or America/New_York, or UTC.", "Europe/London",
                 With("split")));
 
@@ -77,12 +69,6 @@ namespace KScript.Runtime
                 Searchable));
             Add(new NativeTypeInfo("color", "A colour: #rgb, #rrggbb, #rrggbbaa, rgb(...) or a CSS name. Kept as lowercase #rrggbb (#rrggbbaa with alpha).", "#ff8800",
                 With("upper")));
-
-            // Money.
-            Add(new NativeTypeInfo("iban", "An international bank account number, checked with its mod-97 digits. Kept in capitals without spaces.", "GB82WEST12345698765432",
-                Searchable) { Article = "an" });
-            Add(new NativeTypeInfo("card", "A payment card number, checked with the Luhn digit. It prints masked apart from the last four digits.", "'4242 4242 4242 4242'",
-                Array.Empty<string>()) { Secret = true });
                 }
     }
 }

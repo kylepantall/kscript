@@ -125,15 +125,9 @@ namespace KScript.Runtime
                 Add("base64", new NativeParser(Base64));
                 Add("jwt", new NativeParser(Jwt));
                 Add("json", new NativeParser(Json));
-                Add("phone", new NativeParser(Phone, PhoneOptions));
-                Add("country", new NativeParser(Country));
-                Add("currency", new NativeParser(Currency));
-                Add("locale", new NativeParser(Locale));
                 Add("timezone", new NativeParser(TimeZone));
                 Add("cron", new NativeParser(Cron));
                 Add("color", new NativeParser(Color));
-                Add("iban", new NativeParser(Iban));
-                Add("card", new NativeParser(Card));
             }
 
             private static List<string> Texts(object value) =>
@@ -558,94 +552,6 @@ namespace KScript.Runtime
 
             // ---- people and places ------------------------------------------------------------------------------
 
-            private static (object, string) Phone(string s)
-            {
-                string t = s.Trim();
-                if (t.StartsWith("00", StringComparison.Ordinal)) t = "+" + t.Substring(2);
-                if (!t.StartsWith('+')) return No("it needs + and the country code, as in +447700900123");
-                // +44 (0)7700 ...: the (0) is the trunk prefix dialled at home, not part of the number.
-                string digits = new string(t.Substring(1).Replace("(0)", string.Empty).Where(c => !(c is ' ' or '-' or '.' or '(' or ')')).ToArray());
-                char bad = digits.FirstOrDefault(c => !char.IsAsciiDigit(c));
-                if (bad != default) return No($"'{bad}' can't be used in a phone number");
-                if (digits.Length < 8 || digits.Length > 15) return No("it must have 8 to 15 digits after the +");
-                if (digits[0] == '0') return No("a country code can't start with 0");
-                string code = CountryCodes.CallingCode(digits);
-                if (code == null) return No($"+{digits.Substring(0, Math.Min(3, digits.Length))} isn't a country calling code");
-                return Ok(new NativeText("phone", "+" + digits, new Dictionary<string, object>
-                {
-                    ["country_code"] = code,
-                    ["national"] = digits.Substring(code.Length),
-                }));
-            }
-
-            private static IEnumerable<string> PhoneOptions(object value, IReadOnlyDictionary<string, object> options)
-            {
-                if (value is NativeText phone && options.TryGetValue("countries", out object c))
-                {
-                    List<string> codes = Texts(c).Select(x => x.TrimStart('+')).ToList();
-                    if (!codes.Contains((string)phone.Part("country_code"))) yield return $"must be a +{string.Join(" or +", codes)} number";
-                }
-            }
-
-            private static (object, string) Country(string s)
-            {
-                string t = s.Trim();
-                if (t.Length == 0) return No("it is empty");
-                RegionInfo region = CountryCodes.Find(t);
-                if (region == null)
-                {
-                    string close = CountryCodes.Closest(t);
-                    return No("it isn't an ISO 3166 country code or an English country name" + (close != null ? $". Did you mean {close}?" : string.Empty));
-                }
-                return Ok(new NativeText("country", region.TwoLetterISORegionName, new Dictionary<string, object>
-                {
-                    ["name"] = region.EnglishName,
-                    ["alpha3"] = region.ThreeLetterISORegionName,
-                    ["currency"] = region.ISOCurrencySymbol,
-                }));
-            }
-
-            private static (object, string) Currency(string s)
-            {
-                string t = s.Trim().ToUpperInvariant();
-                if (t.Length != 3 || !t.All(char.IsAsciiLetter)) return No("it must be a three-letter ISO 4217 code, such as GBP");
-                CountryCodes.CurrencyInfo info = CountryCodes.Currency(t);
-                if (info == null) return No("it isn't an ISO 4217 currency code");
-                return Ok(new NativeText("currency", t, new Dictionary<string, object>
-                {
-                    ["name"] = info.Name,
-                    ["symbol"] = info.Symbol,
-                    ["digits"] = (double)info.Digits,
-                }));
-            }
-
-            private static (object, string) Locale(string s)
-            {
-                string t = s.Trim().Replace('_', '-');
-                if (t.Length == 0) return No("it is empty");
-                string[] parts = t.Split('-');
-                if (parts[0].Length is < 2 or > 3 || !parts[0].All(char.IsAsciiLetter)) return No("it must start with a two- or three-letter language code, as in en or en-GB");
-                CultureInfo culture;
-                try
-                {
-                    culture = CultureInfo.GetCultureInfo(t, predefinedOnly: true);
-                }
-                catch (CultureNotFoundException)
-                {
-                    return No("it isn't a known language tag");
-                }
-                string tag = string.Join("-", parts.Select((p, i) => i == 0 ? p.ToLowerInvariant() : p.Length == 2 ? p.ToUpperInvariant() : p.Length == 4 ? char.ToUpperInvariant(p[0]) + p.Substring(1).ToLowerInvariant() : p.ToLowerInvariant()));
-                string region = parts.Skip(1).FirstOrDefault(p => p.Length == 2 || (p.Length == 3 && p.All(char.IsAsciiDigit)))?.ToUpperInvariant() ?? string.Empty;
-                return Ok(new NativeText("locale", tag, new Dictionary<string, object>
-                {
-                    ["language"] = parts[0].ToLowerInvariant(),
-                    ["region"] = region,
-                    ["name"] = culture.EnglishName,
-                    ["native_name"] = culture.NativeName,
-                    ["culture"] = culture,
-                }));
-            }
-
             private static (object, string) TimeZone(string s)
             {
                 string t = s.Trim();
@@ -835,63 +741,6 @@ namespace KScript.Runtime
                 ["orchid"] = "#da70d6", ["tan"] = "#d2b48c", ["chocolate"] = "#d2691e", ["skyblue"] = "#87ceeb", ["steelblue"] = "#4682b4",
                 ["slategray"] = "#708090", ["darkgray"] = "#a9a9a9", ["lightgray"] = "#d3d3d3", ["transparent"] = "#00000000",
             };
-
-            // ---- money --------------------------------------------------------------------------------------------
-
-            private static (object, string) Iban(string s)
-            {
-                string t = new string(s.Where(c => !char.IsWhiteSpace(c) && c != '-').ToArray()).ToUpperInvariant();
-                if (t.Length < 15 || t.Length > 34) return No("it must be 15 to 34 letters and digits");
-                if (!char.IsAsciiLetter(t[0]) || !char.IsAsciiLetter(t[1]) || !char.IsAsciiDigit(t[2]) || !char.IsAsciiDigit(t[3])) return No("it must start with a country code and two check digits, as in GB82");
-                if (t.Any(c => !char.IsAsciiLetterOrDigit(c))) return No("it can only use letters and digits");
-                if (CountryCodes.Find(t.Substring(0, 2)) == null) return No($"{t.Substring(0, 2)} isn't a country code");
-                string moved = t.Substring(4) + t.Substring(0, 4);
-                int remainder = 0;
-                foreach (char c in moved)
-                {
-                    string digits = char.IsAsciiDigit(c) ? c.ToString() : (c - 'A' + 10).ToString(CultureInfo.InvariantCulture);
-                    foreach (char d in digits) remainder = (remainder * 10 + (d - '0')) % 97;
-                }
-                if (remainder != 1) return No("its check digits don't match: check it for a typing mistake");
-                return Ok(new NativeText("iban", t, new Dictionary<string, object>
-                {
-                    ["country"] = t.Substring(0, 2),
-                    ["bban"] = t.Substring(4),
-                    ["formatted"] = string.Join(" ", Enumerable.Range(0, (t.Length + 3) / 4).Select(i => t.Substring(i * 4, Math.Min(4, t.Length - i * 4)))),
-                }));
-            }
-
-            private static (object, string) Card(string s)
-            {
-                string t = new string(s.Where(c => !(c is ' ' or '-')).ToArray());
-                if (t.Length == 0) return No("it is empty");
-                if (!t.All(char.IsAsciiDigit)) return No("it can only use digits, spaces and -");
-                if (t.Length < 12 || t.Length > 19) return No("it must have 12 to 19 digits");
-                int sum = 0;
-                for (int i = 0; i < t.Length; i++)
-                {
-                    int d = t[t.Length - 1 - i] - '0';
-                    if (i % 2 == 1) { d *= 2; if (d > 9) d -= 9; }
-                    sum += d;
-                }
-                if (sum % 10 != 0) return No("its check digit doesn't match: check it for a typing mistake");
-                string last4 = t.Substring(t.Length - 4);
-                return Ok(new NativeText("card", t, new Dictionary<string, object> { ["last4"] = last4, ["brand"] = CardBrand(t) }, "•••• " + last4));
-            }
-
-            private static string CardBrand(string n)
-            {
-                int Prefix(int digits) => int.Parse(n.AsSpan(0, digits), CultureInfo.InvariantCulture);
-                if (n[0] == '4') return "visa";
-                if (Prefix(2) is >= 51 and <= 55 || Prefix(4) is >= 2221 and <= 2720) return "mastercard";
-                if (Prefix(2) is 34 or 37) return "amex";
-                if (Prefix(4) == 6011 || Prefix(2) == 65 || Prefix(3) is >= 644 and <= 649) return "discover";
-                if (Prefix(2) == 35) return "jcb";
-                if (Prefix(2) is 36 or 38 or 39 || Prefix(3) is >= 300 and <= 305) return "diners";
-                if (Prefix(2) == 62) return "unionpay";
-                if (Prefix(2) is 50 or >= 56 and <= 69) return "maestro";
-                return "unknown";
-            }
         }
 
         // Methods use these.

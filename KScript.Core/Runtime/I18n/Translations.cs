@@ -347,15 +347,18 @@ namespace KScript.Runtime
             ["DKK"] = ("kr.", 2), ["PLN"] = ("zł", 2), ["BRL"] = ("R$", 2), ["MXN"] = ("MX$", 2), ["RUB"] = ("₽", 2), ["TRY"] = ("₺", 2),
         };
 
-        /// <summary>An amount of money in a currency (ISO code such as EUR), written for the locale: €1,234.50 or 1 234,50 €.</summary>
-        public static string Currency(double amount, string code, string locale)
+        /// <summary>
+        /// An amount of money in a currency (ISO code such as EUR), written for the locale: €1,234.50 or 1 234,50 €.
+        /// <paramref name="decimals"/> overrides the currency's usual decimal places.
+        /// </summary>
+        public static string Currency(double amount, string code, string locale, int? decimals = null)
         {
             if (string.IsNullOrWhiteSpace(code) || code.Trim().Length != 3 || !code.Trim().All(char.IsLetter))
                 throw new KScriptException($"'{code}' isn't a currency code. Use three letters, such as EUR, USD or GBP.", "Argument");
             var format = (NumberFormatInfo)Culture(locale).NumberFormat.Clone();
-            (string symbol, int decimals) = Currencies.TryGetValue(code.Trim(), out var known) ? known : (code.Trim().ToUpperInvariant(), 2);
+            (string symbol, int usual) = Currencies.TryGetValue(code.Trim(), out var known) ? known : (code.Trim().ToUpperInvariant(), 2);
             format.CurrencySymbol = symbol;
-            format.CurrencyDecimalDigits = decimals;
+            format.CurrencyDecimalDigits = decimals ?? usual;
             return amount.ToString("C", format);
         }
 
