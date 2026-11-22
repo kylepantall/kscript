@@ -230,14 +230,17 @@ namespace KScript.Data
             type.RecordKind = "record";
             type.Tag = model;
             type.Hidden = model.Hidden.Count > 0 ? model.Hidden : null;
-            tables[model.Table] = type.Name;
+            tables[model.Table] = model;
             return type;
         }
 
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> tables = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ModelInfo> tables = new System.Collections.Concurrent.ConcurrentDictionary<string, ModelInfo>(StringComparer.Ordinal);
 
         /// <summary>The model a table was last declared for, so errors can say "A User" rather than "A row in users".</summary>
-        internal static string NameOfTable(string table) => tables.TryGetValue(table, out string name) ? name : null;
+        internal static string NameOfTable(string table) => OfTable(table)?.Name;
+
+        /// <summary>The model a table was last declared for, or null.</summary>
+        internal static ModelInfo OfTable(string table) => table != null && tables.TryGetValue(table, out ModelInfo model) ? model : null;
 
         private static void AddOwn(RecordType type, string name, string description, ElementRun run)
         {

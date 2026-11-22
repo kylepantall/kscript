@@ -7,8 +7,6 @@ using KScript.Metadata;
 using KScript.Projects;
 using KScript.Runtime;
 
-using Microsoft.Data.Sqlite;
-
 namespace KScript.Data
 {
     /// <summary>
@@ -28,6 +26,9 @@ namespace KScript.Data
 
         /// <summary>The file of a SQLite database, or null.</summary>
         public string File { get; init; }
+
+        /// <summary>True for a SQLite database in memory, which lasts while one connection to it is open.</summary>
+        public bool Memory { get; init; }
 
         public const string DefaultName = "main";
 
@@ -71,7 +72,7 @@ namespace KScript.Data
             if (url != null)
             {
                 int colon = url.IndexOf(':');
-                if (colon <= 0) throw new KScriptException($"The url of the '{name}' database connection should start with the database, such as sqlite:data/app.sqlite, not '{url}'.", "Config");
+                if (colon <= 0) throw new KScriptException($"The url of the '{name}' database connection should start with the database, such as sqlite:data/app.sqlite or postgres://user:password@localhost/app, not '{url}'.", "Config");
                 driver = url.Substring(0, colon).ToLowerInvariant();
                 file = url.Substring(colon + 1);
                 if (file.StartsWith("//", StringComparison.Ordinal)) file = file.Substring(2);
@@ -84,13 +85,47 @@ namespace KScript.Data
                     return Sqlite(name, string.IsNullOrWhiteSpace(file) ? DefaultFile : file.Trim(), root);
                 case "postgres":
                 case "postgresql":
+                case "pgsql":
+                    return Server(name, PostgresDialect.Instance, url != null ? ServerAddress.Parse(name, file, 5432) : ServerAddress.From(name, options, 5432));
                 case "mysql":
+                    return Server(name, MySqlDialect.MySql, url != null ? ServerAddress.Parse(name, file, 3306) : ServerAddress.From(name, options, 3306));
                 case "mariadb":
-                    throw new KScriptException($"The '{name}' database connection uses {driver}, which this version of KScript.Data can't connect to yet: it supports SQLite. Use a url such as sqlite:data/app.sqlite for now.", "Config");
+                    return Server(name, MySqlDialect.MariaDb, url != null ? ServerAddress.Parse(name, file, 3306) : ServerAddress.From(name, options, 3306));
                 default:
-                    throw new KScriptException($"'{driver}' isn't a database KScript.Data knows. Use sqlite, with a url such as sqlite:data/app.sqlite.", "Config");
+                    string close = Values.Closest(driver, new[] { "sqlite", "postgres", "mysql", "mariadb" });
+                    throw new KScriptException($"'{driver}' isn't a database KScript.Data knows." + (close != null ? $" Did you mean {close}?" : string.Empty)
+                        + " Use sqlite, postgres, mysql or mariadb, with a url such as sqlite:data/app.sqlite or postgres://user:password@localhost/app.", "Config");
             }
         }
+
+        /// <summary>A database on a server: Postgres, MySQL or MariaDB.</summary>
+        private static DatabaseSettings Server(string name, Dialect dialect, ServerAddress address)
+        {
+            var parts = new List<(string, string)>();
+            bool mysql = dialect is MySqlDialect;
+            parts.Add((mysql ? "Server" : "Host", address.Host));
+            parts.Add(("Port", address.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            if (address.Database != null) parts.Add(("Database", address.Database));
+            if (address.User != null) parts.Add((mysql ? "User ID" : "Username", address.User));
+            if (address.Password != null) parts.Add(("Password", address.Password));
+            foreach (KeyValuePair<string, string> option in address.Options)
+            {
+                parts.RemoveAll(p => string.Equals(p.Item1, option.Key, StringComparison.OrdinalIgnoreCase));
+                parts.Add((option.Key, option.Value));
+            }
+            return new DatabaseSettings
+            {
+                Name = name,
+                Dialect = dialect,
+                ConnectionString = string.Join(";", parts.Select(p => p.Item1 + "=" + ConnectionValue(p.Item2))),
+                Where = (address.User != null ? address.User + "@" : string.Empty) + address.Host + ":" + address.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + (address.Database != null ? "/" + address.Database : string.Empty),
+            };
+        }
+
+        /// <summary>A value in a connection string: quoted when it has a ; or a quote in it, or spaces at its ends.</summary>
+        internal static string ConnectionValue(string value) =>
+            value.IndexOfAny(new[] { ';', '"', '\'', '=' }) >= 0 || value.Trim() != value ? "\"" + value.Replace("\"", "\"\"") + "\"" : value;
 
         private static DatabaseSettings Sqlite(string name, string file, string root)
         {
@@ -104,6 +139,7 @@ namespace KScript.Data
                     Dialect = SqliteDialect.Instance,
                     ConnectionString = "Data Source=" + memory + ";Mode=Memory;Cache=Shared",
                     Where = "memory",
+                    Memory = true,
                 };
             }
             string path = Path.GetFullPath(Path.IsPathRooted(file) ? file : Path.Combine(root, file));
@@ -234,7 +270,7 @@ namespace KScript.Data
             {
                 if (Settings.File != null) Directory.CreateDirectory(Path.GetDirectoryName(Settings.File));
                 DbConnection connection = Dialect.Open(Settings);
-                if (Settings.File == null && keeper == null)
+                if (Settings.Memory && keeper == null)
                 {
                     lock (Open)
                     {
@@ -243,9 +279,10 @@ namespace KScript.Data
                 }
                 return connection;
             }
-            catch (Exception ex) when (ex is DbException || ex is IOException || ex is UnauthorizedAccessException)
+            catch (Exception ex) when (ex is DbException || ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException || ex is TimeoutException)
             {
-                throw new KScriptException($"Can't open the {Dialect.Name} database '{Name}' ({Settings.Where}): {ex.Message}", "ConnectionError", ex);
+                string message = ex is Npgsql.PostgresException pg ? pg.MessageText : ex.Message;
+                throw new KScriptException($"Can't open the {Dialect.Name} database '{Name}' ({Settings.Where}): {message.TrimEnd('.')}.", "ConnectionError", ex);
             }
         }
 
@@ -345,6 +382,9 @@ namespace KScript.Data
             public DbConnection Connection;
             public DbTransaction Transaction;
             public int Depth;
+
+            /// <summary>True once a commit has been tried: the transaction is over, whether it worked or not.</summary>
+            public bool Finished;
         }
 
         private TransactionState Current(Interpreter interpreter) =>
@@ -376,8 +416,7 @@ namespace KScript.Data
             }
         }
 
-        private static bool IsBusy(KScriptException ex) =>
-            ex.InnerException is SqliteException s && (s.SqliteErrorCode == 5 || s.SqliteErrorCode == 6);
+        private bool IsBusy(KScriptException ex) => ex.InnerException != null && Dialect.IsBusy(ex.InnerException);
 
         private T Once<T>(Interpreter interpreter, Func<T> work, IsolationLevel isolation)
         {
@@ -428,7 +467,8 @@ namespace KScript.Data
                 }
                 catch
                 {
-                    state.Transaction.Rollback();
+                    // A commit that failed has ended the transaction already (Postgres rolls it back itself).
+                    if (!state.Finished) state.Transaction.Rollback();
                     throw;
                 }
             }
@@ -442,6 +482,7 @@ namespace KScript.Data
 
         private void Commit(TransactionState state)
         {
+            state.Finished = true;
             try
             {
                 state.Transaction.Commit();
@@ -466,7 +507,30 @@ namespace KScript.Data
                 db.keeper = null;
             }
             Open.Clear();
-            SqliteConnection.ClearAllPools();
+            SqliteDialect.Instance.ClearPools();
+            PostgresDialect.Instance.ClearPools();
+            MySqlDialect.MySql.ClearPools();
         }
+
+        /// <summary>
+        /// Inserts a row and gives the value of its <paramref name="key"/> column: from RETURNING where the database has
+        /// it, or else the number the database gave it (or the value the row was given).
+        /// </summary>
+        public object Insert(Interpreter interpreter, string table, List<(string Name, SqlExpr Value)> values, Column key)
+        {
+            if (Dialect.Returning) return Rows(interpreter, Query.InsertStatement(Dialect, table, values, key.Name), table)[0].Values.First();
+            return With(interpreter, table, (connection, transaction) =>
+            {
+                using (DbCommand insert = Command(connection, transaction, Query.InsertStatement(Dialect, table, values, null)))
+                {
+                    insert.ExecuteNonQuery();
+                }
+                if (!key.AutoIncrement) return KeyValue(values.First(v => v.Name == key.Name).Value);
+                using DbCommand last = Command(connection, transaction, new SqlStatement("SELECT LAST_INSERT_ID()", Array.Empty<object>()));
+                return last.ExecuteScalar();
+            });
+        }
+
+        private object KeyValue(SqlExpr value) => value is SqlValue v ? KScript.Data.Rows.ForColumn(v.Value, v.Column, Dialect) : null;
     }
 }

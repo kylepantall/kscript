@@ -122,8 +122,7 @@ namespace KScript.Data
                 values.Add((c.Name, new SqlValue(value, c)));
             }
             Column key = model.KeyColumn;
-            List<Dictionary<string, object>> rows = db.Rows(call.Interpreter, Query.InsertStatement(db.Dialect, model.Table, values, key.Name), model.Table);
-            record[key.Name] = Rows.FromDb(rows[0].Values.First(), key);
+            record[key.Name] = Rows.FromDb(db.Insert(call.Interpreter, model.Table, values, key), key);
             Remember(record);
         }
 
