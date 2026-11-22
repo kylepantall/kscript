@@ -74,7 +74,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.True(code == 0, err);
         Assert.Contains("Created routes/web.kscript", output);
         Assert.Contains("Created controllers/users.kscript", output);
-        Assert.Contains("Get(path: \"/users\", to: @users.index)", output);
+        Assert.Contains("Get(path: /users, to: @users.index)", output);
         Assert.Contains("open /users", output);
 
         Assert.Equal(0, Make(app, "route", "users/{id}", "--where", "id: int").Code);
@@ -90,9 +90,9 @@ public sealed class MakeGeneratorTests : IDisposable
             "import \"../controllers/users.kscript\" as users\n" +
             "\n" +
             "Routes {\n" +
-            "  Get(path: \"/users\", to: @users.index)\n" +
-            "  Get(path: \"/users/{id}\", to: @users.show, where: \"id: int\")\n" +
-            "  Post(path: \"/users\", to: @users.store)\n" +
+            "  Get(path: /users, to: @users.index)\n" +
+            "  Get(path: /users/{id}, to: @users.show, where: \"id: int\")\n" +
+            "  Post(path: /users, to: @users.store)\n" +
             "}\n", Read(app, "routes/web.kscript"));
 
         string controller = Read(app, "controllers/users.kscript");
@@ -129,30 +129,30 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Contains("Added to routes/api.kscript", output);
         string api = Read(app, "routes/api.kscript");
         Assert.Contains("import KScript.Http\nimport \"../controllers/hello.kscript\" as hello\nimport \"../controllers/people.kscript\" as people\n\nRoutes {\n", api);
-        Assert.Contains("  Get(path: \"/hello\", to: @hello.show)\n  Resource(path: \"/people\", to: people)\n}", api);
+        Assert.Contains("  Get(path: /hello, to: @hello.show)\n  Resource(path: /people, to: people)\n}", api);
         foreach (string action in new[] { "index", "show", "store", "update", "destroy" })
             Assert.Contains($"fn {action}(", Read(app, "controllers/people.kscript"));
 
         (code, output, err) = Make(app, "route", "about", "--view", "about");
         Assert.True(code == 0, err);
         Assert.Contains("Created views/about.html", output);
-        Assert.Contains("Get(path: \"/about\", view: \"about\")", Read(app, "routes/web.kscript"));
+        Assert.Contains("Get(path: /about, view: \"about\")", Read(app, "routes/web.kscript"));
 
         (code, _, err) = Make(app, "route", "reports/export", "--to", "reports.export", "--name", "reports.export");
         Assert.True(code == 0, err);
-        Assert.Contains("Get(path: \"/reports/export\", to: @reports.export, name: \"reports.export\")", Read(app, "routes/web.kscript"));
+        Assert.Contains("Get(path: /reports/export, to: @reports.export, name: \"reports.export\")", Read(app, "routes/web.kscript"));
         Assert.Contains("fn export() {", Read(app, "controllers/reports.kscript"));
 
         // A page-style [slug] works too, and the controller's function takes the parameter by its name.
         Assert.Equal(0, Make(app, "route", "posts/[slug]").Code);
-        Assert.Contains("Get(path: \"/posts/{slug}\", to: @posts.show)", Read(app, "routes/web.kscript"));
+        Assert.Contains("Get(path: /posts/{slug}, to: @posts.show)", Read(app, "routes/web.kscript"));
         Assert.Contains("fn show(slug: string) {\n  // TODO: Find the one asked for, and answer 404 when there is none:\n  // @abort(404)\n  return { slug: $slug }", Read(app, "controllers/posts.kscript"));
 
         // An admin/users controller doesn't take the users name from another import.
         Assert.Equal(0, Make(app, "route", "users").Code);
         Assert.Equal(0, Make(app, "route", "admin/users", "--method", "delete", "--controller", "admin/users").Code);
         Assert.Contains("import \"../controllers/admin/users.kscript\" as admin_users", Read(app, "routes/web.kscript"));
-        Assert.Contains("Delete(path: \"/admin/users\", to: @admin_users.destroy)", Read(app, "routes/web.kscript"));
+        Assert.Contains("Delete(path: /admin/users, to: @admin_users.destroy)", Read(app, "routes/web.kscript"));
 
         AssertNoErrors(app);
         Assert.Equal(201, Request(app, "POST", "/api/people", "{\"name\": \"Ann\"}").Status);
@@ -211,7 +211,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Equal("kscript {\n  fn index() => 'home'\n}\n", Read(site.Root, "controllers/home.kscript"));
 
         Assert.Equal(0, Make(site.Root, "route", "about", "--controller", "home", "--action", "about").Code);
-        Assert.Equal("import KScript.Http\nimport \"../controllers/home.kscript\" as home\n\nRoutes {\n  Get(path: \"/\", to: @home.index)\n  Get(path: \"/about\", to: @home.about)\n}\n", Read(site.Root, "routes/web.kscript"));
+        Assert.Equal("import KScript.Http\nimport \"../controllers/home.kscript\" as home\n\nRoutes {\n  Get(path: \"/\", to: @home.index)\n  Get(path: /about, to: @home.about)\n}\n", Read(site.Root, "routes/web.kscript"));
         // A controller written as a kscript { } block gets the function inside the block.
         Assert.Equal("kscript {\n  fn index() => 'home'\n\n  /// About.\n  fn about() {\n    // TODO: Answer the route.\n    return { action: 'about' }\n  }\n}\n", Read(site.Root, "controllers/home.kscript"));
 
@@ -219,7 +219,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.True(code == 0, err);
         Assert.Contains("Created routes/v1.kscript", output);
         Assert.Contains("open /api/status", output);
-        Assert.Contains("import KScript.Http\nimport \"../controllers/status.kscript\" as status\n\nRoutes {\n  Get(path: \"/status\", to: @status.index)", Read(site.Root, "routes/v1.kscript"));
+        Assert.Contains("import KScript.Http\nimport \"../controllers/status.kscript\" as status\n\nRoutes {\n  Get(path: /status, to: @status.index)", Read(site.Root, "routes/v1.kscript"));
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public sealed class MakeGeneratorTests : IDisposable
 
         var (code, output, err) = Make(app, "route", "users");
         Assert.True(code == 0, err);
-        Assert.Contains("Get(path: \"/users\", to: @users.index, middleware: log)", Read(app, "routes/web.kscript"));
+        Assert.Contains("Get(path: /users, to: @users.index, middleware: log)", Read(app, "routes/web.kscript"));
     }
 
     [Fact]

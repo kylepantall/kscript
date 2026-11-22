@@ -93,6 +93,40 @@ namespace KScript.Runtime
             p.Field("slug", "words", L, "The words: ['my', 'first', 'post'].", (t, _) => new List<object>((List<object>)Part(t, "words")));
             p.Command("slugify", "text: string", "Turns text into a slug: 'Hello, World!' gives hello-world. Accents are dropped.", "slug",
                 c => Native("slug", NativeParsers.Slugify(c.Str(0))), "@slugify('Crème Brûlée recipes!')");
+            // slash_path
+            static List<string> Segments(object t) => ((List<object>)Part(t, "segments")).Cast<string>().ToList();
+            static NativeText SlashPathOf(object value) =>
+                value is NativeText path && path.TypeName == "slash_path" ? path : (NativeText)Native("slash_path", Values.ToStr(value));
+            p.Field("slash_path", "segments", L, "The names in order: ['My Apps', 'Notes'] for /My Apps/Notes.", (t, _) => Segments(t).Cast<object>().ToList());
+            p.Field("slash_path", "name", S, "The last name: Notes in /My Apps/Notes, or '' for /.", (t, _) => Segments(t).LastOrDefault() ?? string.Empty);
+            p.Field("slash_path", "parent", "slash_path", "The path one up: /My Apps for /My Apps/Notes, / for /My Apps, and null for /.", (t, _) =>
+            {
+                List<string> parts = Segments(t);
+                return parts.Count == 0 ? null : NativeParsers.SlashPath(parts.Take(parts.Count - 1).ToList());
+            });
+            p.Field("slash_path", "depth", N, "How many names it has: 2 for /My Apps/Notes, 0 for /.", (t, _) => (double)Segments(t).Count);
+            p.Field("slash_path", "is_root", B, "True for / itself.", (t, _) => Segments(t).Count == 0);
+            p.Method("slash_path", "join", "more: string", "The path with more names added on the end and tidied: /docs joined with 'guides/../start' is /docs/start. A / at the start of more is ignored.", "slash_path", (t, c) =>
+                Native("slash_path", T(t).Text + "/" + Values.ToStr(c.Arg(0))));
+            p.Method("slash_path", "is_within", "other: slash_path", "True when it is the other path or under it: /docs/guides/start is within /docs. Names are compared exactly, case included.", B, (t, c) =>
+            {
+                List<string> mine = Segments(t), theirs = Segments(SlashPathOf(c.Arg(0)));
+                return theirs.Count <= mine.Count && theirs.SequenceEqual(mine.Take(theirs.Count), StringComparer.Ordinal);
+            });
+
+            // date_format
+            static string Pattern(object t) => NativeParsers.DotNetDateFormat(T(t));
+            p.Field("date_format", "tokens", L, "Its parts in order: ['dd', '-', 'MM', '-', 'yyyy'].", (t, _) => new List<object>((List<object>)Part(t, "tokens")));
+            p.Field("date_format", "has_date", B, "True when it shows a day, month, year or era.", (t, _) => Part(t, "has_date"));
+            p.Field("date_format", "has_time", B, "True when it shows an hour, minute, second or AM/PM.", (t, _) => Part(t, "has_time"));
+            p.Field("date_format", "example", S, "A date written this way, to show what it looks like: 07-03-2026 for dd-MM-yyyy (Saturday 7 March 2026, 14:05:09).", (t, _) =>
+                new DateTime(2026, 3, 7, 14, 5, 9, 123).ToString(Pattern(t), CultureInfo.InvariantCulture));
+            p.Method("date_format", "format", "date: date", "The date written this way: 07-03-2026.", S, (t, c) =>
+                c.Arg(0) is DateTime when ? when.ToString(Pattern(t), CultureInfo.InvariantCulture) : throw new KScriptException($"->format() needs a date, but got {Values.Describe(c.Arg(0))}.", "Type"));
+            p.Method("date_format", "parse", "text: string", "Reads text written this way as a date: dd-MM-yyyy reads '07-03-2026'.", KType.Date, (t, c) =>
+                DateTime.TryParseExact(c.Str(0).Trim(), Pattern(t), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime read)
+                    ? read : throw new KScriptException($"'{c.Str(0)}' isn't a date written {T(t).Text}, such as {new DateTime(2026, 3, 7, 14, 5, 9).ToString(Pattern(t), CultureInfo.InvariantCulture)}.", "Format"));
+
             p.Field("semver", "major", N, "The first number: 1 in 1.4.2.", (t, _) => Part(t, "major"));
             p.Field("semver", "minor", N, "The second number: 4 in 1.4.2.", (t, _) => Part(t, "minor"));
             p.Field("semver", "patch", N, "The third number: 2 in 1.4.2.", (t, _) => Part(t, "patch"));
@@ -266,6 +300,19 @@ namespace KScript.Runtime
                 ("cidr.prefix", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x.prefix }</echo>"),
                 ("cidr.size", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x.size }</echo>"),
                 ("slug.words", "<let name=\"x\" type=\"slug\" value=\"'my-first-post'\" />\n<echo>{ $x.words }</echo>"),
+                ("slash_path.segments", "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.segments }</echo>"),
+                ("slash_path.name", "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.name }</echo>"),
+                ("slash_path.parent", "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.parent }</echo>"),
+                ("slash_path.depth", "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.depth }</echo>"),
+                ("slash_path.is_root", "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.is_root }</echo>"),
+                ("slash_path->join", "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x->join('../Tomorrow') }</echo>"),
+                ("slash_path->is_within", "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x->is_within('/My Apps') }</echo>"),
+                ("date_format.tokens", "<let name=\"x\" type=\"date_format\" value=\"'dd MMM yyyy, HH:mm'\" />\n<echo>{ $x.tokens }</echo>"),
+                ("date_format.has_date", "<let name=\"x\" type=\"date_format\" value=\"'dd MMM yyyy, HH:mm'\" />\n<echo>{ $x.has_date }</echo>"),
+                ("date_format.has_time", "<let name=\"x\" type=\"date_format\" value=\"'dd MMM yyyy, HH:mm'\" />\n<echo>{ $x.has_time }</echo>"),
+                ("date_format.example", "<let name=\"x\" type=\"date_format\" value=\"'dd MMM yyyy, HH:mm'\" />\n<echo>{ $x.example }</echo>"),
+                ("date_format->format", "<let name=\"x\" type=\"date_format\" value=\"'dd MMM yyyy, HH:mm'\" />\n<echo>{ $x->format('2026-11-22T16:30:00'->to_date()) }</echo>"),
+                ("date_format->parse", "<let name=\"x\" type=\"date_format\" value=\"'dd MMM yyyy, HH:mm'\" />\n<echo>{ $x->parse('22 Nov 2026, 16:30')->format('yyyy-MM-dd') }</echo>"),
                 ("semver.major", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x.major }</echo>"),
                 ("semver.minor", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x.minor }</echo>"),
                 ("semver.patch", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x.patch }</echo>"),

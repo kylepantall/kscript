@@ -437,7 +437,7 @@
     "typeName": {
       "patterns": [
         {
-          "match": "(?<![\\w$@.-])(string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex|url|domain|ip|cidr|mac|port|slug|semver|mime|hex|base64|jwt|json|phone|country|currency|locale|timezone|duration|cron|color|iban|card)(?![\\w-])",
+          "match": "(?<![\\w$@.-])(string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex|url|domain|ip|cidr|mac|port|slug|slash_path|semver|mime|hex|base64|jwt|json|phone|country|currency|locale|timezone|duration|date_format|cron|color|iban|card)(?![\\w-])",
           "name": "support.type.builtin.kscript"
         },
         {
@@ -447,7 +447,7 @@
       ]
     },
     "typeAnnotation": {
-      "match": "(?<=[\\w?])\\s*(:)\\s*(?!(?:not|true|false|null|yes|no)\\b)((?:string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex|url|domain|ip|cidr|mac|port|slug|semver|mime|hex|base64|jwt|json|phone|country|currency|locale|timezone|duration|cron|color|iban|card)(?![\\w-])|[A-Z]\\w*)(?=\\s*(?:\\(|\\[\\]|\\?|=|,|\\)|$|from\\b|=>|;|\\}|//))",
+      "match": "(?<=[\\w?])\\s*(:)\\s*(?!(?:not|true|false|null|yes|no)\\b)((?:string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex|url|domain|ip|cidr|mac|port|slug|slash_path|semver|mime|hex|base64|jwt|json|phone|country|currency|locale|timezone|duration|date_format|cron|color|iban|card)(?![\\w-])|[A-Z]\\w*)(?=\\s*(?:\\(|\\[\\]|\\?|=|,|\\)|$|from\\b|=>|;|\\}|//))",
       "captures": {
         "1": {
           "name": "punctuation.separator.type.kscript"
@@ -477,6 +477,10 @@
         {
           "match": "(?<![\\w)\\]$'\"])/(?![\\s/*])(?:\\\\.|\\[(?:\\\\.|[^\\]\\\\\\n])*\\]|[^/\\\\\\n\\[])+/[imsx]*(?!\\w)",
           "name": "string.regexp.kscript"
+        },
+        {
+          "match": "(?<![\\w)\\]$'\"./])/(?:\\{[A-Za-z_]\\w*[?*]?\\}|(?:[\\w.~%]|-(?!>))+)(?:/(?:\\{[A-Za-z_]\\w*[?*]?\\}|(?:[\\w.~%]|-(?!>))+))*(?:/(?![/*]))?(?![\\w])",
+          "name": "string.unquoted.path.kscript"
         },
         {
           "match": "(?<![\\w$@.])(?i:https?|wss?|ftp)://[^\\s'\",()\\[\\]{};<>`]+?(?=[.!?:]*(?:[\\s'\",()\\[\\]{};<>`]|->|$))",

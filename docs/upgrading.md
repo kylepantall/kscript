@@ -77,7 +77,7 @@ An action is a command, so its result can be used in an expression.
 | the `stylesheet` statement | `@stylesheet(path, vars?)`, which returns the CSS: `@write_text('site.css', @stylesheet('theme.ks.css'))` (KScript.Style) |
 | the `dispatch` statement | the job's own method: `SendWelcome(user_id: 7)->dispatch()`, with `delay:`, `at:`, `queue:` or `connection:` (KScript.Queue) |
 | the `download` statement | `@download(url, to)`, which returns the path of the file it saved (KScript.Net) |
-| the `redirect` statement | `return @redirect('/thanks')` in a controller (KScript.Http); `<respond redirect="/thanks" />` in a page |
+| the `redirect` statement | `return @redirect(/thanks)` in a controller (KScript.Http); `<respond redirect="/thanks" />` in a page |
 
 ## Arguments
 

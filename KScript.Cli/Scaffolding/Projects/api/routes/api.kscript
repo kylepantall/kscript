@@ -13,7 +13,7 @@ import "../controllers/notes{{ ext }}" as notes
 
 Routes(middleware: [cors, request_id]) {
   /// Says the API is up.
-  Get(path: "/health") {
+  Get(path: /health) {
     return { ok: true, app: $config.app.name }
   }
 {{#if auth}}
@@ -21,16 +21,16 @@ Routes(middleware: [cors, request_id]) {
   // Sign up, then trade an email and password for a token. Send it as
   // Authorization: Bearer <token>.
   Group(middleware: "throttle:10") {
-    Post(path: "/register", to: @accounts.sign_up)
-    Post(path: "/tokens", to: @accounts.issue_token)
+    Post(path: /register, to: @accounts.sign_up)
+    Post(path: /tokens, to: @accounts.issue_token)
   }
   Group(middleware: auth) {
-    Get(path: "/me", to: @accounts.profile)
-    Delete(path: "/me", to: @accounts.close_account)
-    Resource(path: "/notes", to: notes{{#if cache}}, middleware: etag{{/if}})
+    Get(path: /me, to: @accounts.profile)
+    Delete(path: /me, to: @accounts.close_account)
+    Resource(path: /notes, to: notes{{#if cache}}, middleware: etag{{/if}})
   }
 {{else}}
 
-  Resource(path: "/notes", to: notes{{#if cache}}, middleware: etag{{/if}})
+  Resource(path: /notes, to: notes{{#if cache}}, middleware: etag{{/if}})
 {{/if}}
 }

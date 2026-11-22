@@ -160,6 +160,11 @@ namespace KScript.Syntax.Markup
                 }
                 yield break;
             }
+            if (attr.Quote == '\0' && a.Type == "slash_path" && Lexer.SlashPathEnd(text, 0, text.Length) == text.Length)
+            {
+                // A path is a value of its own, quoted or not: path: /people/{id}.
+                yield break;
+            }
             if (attr.Quote == '\0' && CodeArguments.IsText(a.Kind) && !a.IsName && !attr.CodeValue && !attr.QuotedValue && !IsPlainValue(text))
             {
                 string quoted = ScriptConverter.Quote(text);

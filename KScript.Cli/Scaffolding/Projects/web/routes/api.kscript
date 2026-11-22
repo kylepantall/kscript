@@ -8,8 +8,8 @@ import KScript.Http
 import "../controllers/tasks{{ ext }}" as tasks
 
 Routes(middleware: cors) {
-  Get(path: "/health") {
+  Get(path: /health) {
     return { ok: true }
   }
-  Resource(path: "/tasks", to: tasks)
+  Resource(path: /tasks, to: tasks)
 }

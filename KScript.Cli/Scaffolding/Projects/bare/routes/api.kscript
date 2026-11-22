@@ -7,5 +7,5 @@ import KScript.Http
 import "../controllers/hello{{ ext }}" as hello
 
 Routes {
-  Get(path: "/hello", to: @hello.show)
+  Get(path: /hello, to: @hello.show)
 }

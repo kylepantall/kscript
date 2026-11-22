@@ -61,7 +61,7 @@ fn sign_in(form: map) {
 
 fn sign_out() {
   @logout()
-  return @redirect('/')
+  return @redirect(/)
 }
 ```
 
@@ -99,12 +99,12 @@ import "controllers/accounts.kscript" as accounts
 
 Routes {
   Group(middleware: guest) {
-    Get(path: "/login", to: @accounts.show_login, name: "login")
-    Post(path: "/login", to: @accounts.sign_in)
+    Get(path: /login, to: @accounts.show_login, name: "login")
+    Post(path: /login, to: @accounts.sign_in)
   }
   Group(middleware: auth) {
-    Get(path: "/account", to: @accounts.account)
-    Post(path: "/logout", to: @accounts.sign_out)
+    Get(path: /account, to: @accounts.account)
+    Post(path: /logout, to: @accounts.sign_out)
   }
 }
 ```
@@ -214,7 +214,7 @@ fn send_reset(form: map, request: map) {
     log "Password reset link for {$form.email}: {$link}"
   }
   $session->flash('status', 'If that email has an account, a link is on its way.')
-  return @redirect('/forgot-password')
+  return @redirect(/forgot-password)
 }
 ```
 

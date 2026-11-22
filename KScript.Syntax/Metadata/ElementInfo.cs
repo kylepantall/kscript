@@ -19,7 +19,8 @@ namespace KScript.Metadata
 
         /// <summary>
         /// The type of value an expression attribute takes, when it has one: <c>duration</c> for a length of time
-        /// (<c>timeout: 30s</c>). Null when any value fits.
+        /// (<c>timeout: 30s</c>), or <c>slash_path</c> for a text argument that is a path (<c>path: /people/{id}</c>),
+        /// which may be written with or without quotes. Null when any value fits.
         /// </summary>
         public string Type { get; init; }
 
