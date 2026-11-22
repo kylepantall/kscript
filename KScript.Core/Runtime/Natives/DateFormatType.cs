@@ -41,18 +41,21 @@ namespace KScript.Runtime
             const string S = KType.String, B = KType.Bool, L = KType.List;
             static object Part(object t, string name) => ((NativeText)t).Part(name);
             static string Pattern(object t) => DotNet((NativeText)t);
-            m.Field("tokens", L, "Its parts in order: ['dd', '-', 'MM', '-', 'yyyy'].", (t, _) => new List<object>((List<object>)Part(t, "tokens")), "<let name=\\\"x\\\" type=\\\"date_format\\\" value=\\\"'dd MMM yyyy, HH:mm'\\\" />\\n<echo>{ $x.tokens }</echo>");
-            m.Field("has_date", B, "True when it shows a day, month, year or era.", (t, _) => Part(t, "has_date"), "<let name=\\\"x\\\" type=\\\"date_format\\\" value=\\\"'dd MMM yyyy, HH:mm'\\\" />\\n<echo>{ $x.has_date }</echo>");
-            m.Field("has_time", B, "True when it shows an hour, minute, second or AM/PM.", (t, _) => Part(t, "has_time"), "<let name=\\\"x\\\" type=\\\"date_format\\\" value=\\\"'dd MMM yyyy, HH:mm'\\\" />\\n<echo>{ $x.has_time }</echo>");
+            const string Let = "<let name=\"x\" type=\"date_format\" value=\"'dd MMM yyyy, HH:mm'\" />\n";
+            const string FormatExample = Let + "<echo>{ $x->format('2026-11-22T16:30:00'->to_date()) }</echo>";
+            const string ParseExample = Let + "<echo>{ $x->parse('22 Nov 2026, 16:30')->format('yyyy-MM-dd') }</echo>";
+            m.Field("tokens", L, "Its parts in order: ['dd', '-', 'MM', '-', 'yyyy'].", (t, _) => new List<object>((List<object>)Part(t, "tokens")), Let + "<echo>{ $x.tokens }</echo>");
+            m.Field("has_date", B, "True when it shows a day, month, year or era.", (t, _) => Part(t, "has_date"), Let + "<echo>{ $x.has_date }</echo>");
+            m.Field("has_time", B, "True when it shows an hour, minute, second or AM/PM.", (t, _) => Part(t, "has_time"), Let + "<echo>{ $x.has_time }</echo>");
             m.Field("example", S, "A date written this way, to show what it looks like: 07-03-2026 for dd-MM-yyyy (Saturday 7 March 2026, 14:05:09).", (t, _) =>
-                new DateTime(2026, 3, 7, 14, 5, 9, 123).ToString(Pattern(t), CultureInfo.InvariantCulture), "<let name=\\\"x\\\" type=\\\"date_format\\\" value=\\\"'dd MMM yyyy, HH:mm'\\\" />\\n<echo>{ $x.example }</echo>");
+                new DateTime(2026, 3, 7, 14, 5, 9, 123).ToString(Pattern(t), CultureInfo.InvariantCulture), Let + "<echo>{ $x.example }</echo>");
             m.Method("format", "date: date", "The date written this way: 07-03-2026.", S, (t, c) =>
                 c.Arg(0) is DateTime when ? when.ToString(Pattern(t), CultureInfo.InvariantCulture) : throw new KScriptException($"->format() needs a date, but got {Values.Describe(c.Arg(0))}.", "Type"),
-                "<let name=\\\"x\\\" type=\\\"date_format\\\" value=\\\"'dd MMM yyyy, HH:mm'\\\" />\\n<echo>{ $x->format('2026-11-22T16:30:00'->to_date()) }</echo>");
+                FormatExample);
             m.Method("parse", "text: string", "Reads text written this way as a date: dd-MM-yyyy reads '07-03-2026'.", KType.Date, (t, c) =>
                 DateTime.TryParseExact(c.Str(0).Trim(), Pattern(t), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime read)
                     ? read : throw new KScriptException($"'{c.Str(0)}' isn't a date written {((NativeText)t).Text}, such as {new DateTime(2026, 3, 7, 14, 5, 9).ToString(Pattern(t), CultureInfo.InvariantCulture)}.", "Format"),
-                "<let name=\\\"x\\\" type=\\\"date_format\\\" value=\\\"'dd MMM yyyy, HH:mm'\\\" />\\n<echo>{ $x->parse('22 Nov 2026, 16:30')->format('yyyy-MM-dd') }</echo>");
+                ParseExample);
         }
 
         /// <summary>What each letter of a date format means, and the longest run of it that means something.</summary>

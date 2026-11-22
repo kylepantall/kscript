@@ -40,22 +40,22 @@ namespace KScript.Runtime
         protected override void DeclareMembers(NativeMembers m)
         {
             const string S = KType.String, N = KType.Number, B = KType.Bool, L = KType.List;
-            m.Field("segments", L, "The names in order: ['My Apps', 'Notes'] for /My Apps/Notes.", (t, _) => Segments(t).Cast<object>().ToList(), "<let name=\\\"x\\\" type=\\\"slash_path\\\" value=\\\"'/My Apps/Notes/Today'\\\" />\\n<echo>{ $x.segments }</echo>");
-            m.Field("name", S, "The last name: Notes in /My Apps/Notes, or '' for /.", (t, _) => Segments(t).LastOrDefault() ?? string.Empty, "<let name=\\\"x\\\" type=\\\"slash_path\\\" value=\\\"'/My Apps/Notes/Today'\\\" />\\n<echo>{ $x.name }</echo>");
+            m.Field("segments", L, "The names in order: ['My Apps', 'Notes'] for /My Apps/Notes.", (t, _) => Segments(t).Cast<object>().ToList(), "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.segments }</echo>");
+            m.Field("name", S, "The last name: Notes in /My Apps/Notes, or '' for /.", (t, _) => Segments(t).LastOrDefault() ?? string.Empty, "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.name }</echo>");
             m.Field("parent", "slash_path", "The path one up: /My Apps for /My Apps/Notes, / for /My Apps, and null for /.", (t, _) =>
             {
                 List<string> parts = Segments(t);
                 return parts.Count == 0 ? null : Of(parts.Take(parts.Count - 1).ToList());
-            }, "<let name=\\\"x\\\" type=\\\"slash_path\\\" value=\\\"'/My Apps/Notes/Today'\\\" />\\n<echo>{ $x.parent }</echo>");
-            m.Field("depth", N, "How many names it has: 2 for /My Apps/Notes, 0 for /.", (t, _) => (double)Segments(t).Count, "<let name=\\\"x\\\" type=\\\"slash_path\\\" value=\\\"'/My Apps/Notes/Today'\\\" />\\n<echo>{ $x.depth }</echo>");
-            m.Field("is_root", B, "True for / itself.", (t, _) => Segments(t).Count == 0, "<let name=\\\"x\\\" type=\\\"slash_path\\\" value=\\\"'/My Apps/Notes/Today'\\\" />\\n<echo>{ $x.is_root }</echo>");
+            }, "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.parent }</echo>");
+            m.Field("depth", N, "How many names it has: 2 for /My Apps/Notes, 0 for /.", (t, _) => (double)Segments(t).Count, "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.depth }</echo>");
+            m.Field("is_root", B, "True for / itself.", (t, _) => Segments(t).Count == 0, "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x.is_root }</echo>");
             m.Method("join", "more: string", "The path with more names added on the end and tidied: /docs joined with 'guides/../start' is /docs/start. A / at the start of more is ignored.", "slash_path", (t, c) =>
-                Join(t, Values.ToStr(c.Arg(0))), "<let name=\\\"x\\\" type=\\\"slash_path\\\" value=\\\"'/My Apps/Notes/Today'\\\" />\\n<echo>{ $x->join('../Tomorrow') }</echo>");
+                Join(t, Values.ToStr(c.Arg(0))), "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x->join('../Tomorrow') }</echo>");
             m.Method("is_within", "other: slash_path", "True when it is the other path or under it: /docs/guides/start is within /docs. Names are compared exactly, case included.", B, (t, c) =>
             {
                 List<string> mine = Segments(t), theirs = Segments(Coerce(c.Arg(0)) ?? throw new KScriptException($"is_within needs a slash_path, such as /docs, not {Values.Describe(c.Arg(0))}.", "Type"));
                 return theirs.Count <= mine.Count && theirs.SequenceEqual(mine.Take(theirs.Count), StringComparer.Ordinal);
-            }, "<let name=\\\"x\\\" type=\\\"slash_path\\\" value=\\\"'/My Apps/Notes/Today'\\\" />\\n<echo>{ $x->is_within('/My Apps') }</echo>");
+            }, "<let name=\"x\" type=\"slash_path\" value=\"'/My Apps/Notes/Today'\" />\n<echo>{ $x->is_within('/My Apps') }</echo>");
         }
 
         private static List<string> Segments(object t) => ((List<object>)((NativeText)t).Part("segments")).Cast<string>().ToList();
