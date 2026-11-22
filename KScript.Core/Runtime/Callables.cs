@@ -219,7 +219,8 @@ namespace KScript.Runtime
                 }
                 catch (KScriptException ex)
                 {
-                    throw new KScriptException(ex.Message.Replace($"Unknown type '{t.Name}'.", $"Unknown type '{t.Name}' for a parameter of @{Name}()."), ex.Type);
+                    (string was, string now) = ($"Unknown type '{t.Name}'.", $"Unknown type '{t.Name}' for a parameter of @{Name}().");
+                    throw new KScriptException(new Wording(ex.Words.Xml.Replace(was, now), ex.Words.Code.Replace(was, now)), ex.Type);
                 }
                 if (declared is EnumType e) enums[p.Name] = e;
             }
@@ -367,7 +368,7 @@ namespace KScript.Runtime
         /// <summary>Calls a function value with these arguments.</summary>
         public object Call(ICallable fn, params object[] args) => Interpreter.Call(fn, args, null, Scope, Module);
 
-        public KScriptException Error(string message, string type = "Error") => new KScriptException(message, type);
+        public KScriptException Error(KScript.Syntax.Wording message, string type = "Error") => new KScriptException(message, type);
     }
 
     /// <summary>

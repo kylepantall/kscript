@@ -86,6 +86,23 @@ The first text says why and the second is what to use instead, as written in a s
 
 The guides in `docs/` and the README are written by hand, so a test keeps them honest: `DocsTests.Every_example_in_the_guides_and_readme_matches_the_code` checks every `kscript` and `xml` example with the analyzer. It fails if an example uses an element, attribute, command, method or parameter that no longer exists, passes the wrong number of arguments, or uses something deprecated.
 
+## Writing an error message
+
+A script is a `.kscript` file or an XML one, and a message is written once for both. Write it in XML terms, as an interpolated string given straight to the error:
+
+```csharp
+throw run.Error($"<{run.Name}> needs a {name} attribute, such as <{run.Name} {name}=\"5\" />.", name, "Syntax");
+```
+
+The compiler turns that string into a `Wording` (`KScript.Syntax/Text/Wording.cs`). An XML script gets it as written. A `.kscript` file gets it in its own terms: tags become statements as the converter writes them, `name="value"` becomes `name: value`, and "element" and "attribute" become "statement" and "argument". Only the words in the source are changed. The values put into the holes are left alone, and so is any plain string, such as a message a script wrote itself.
+
+- `new KScriptException($"...")`, `run.Error($"...")`, `c.Error($"...")` and the analyzer's `Report(..., $"...")` all take a `Wording`.
+- A message joined with `+` or picked with `?:` is a plain string, so wrap each part that has XML wording: `Wording.Of($"Unknown element <{name}>.") + (close != null ? Wording.Of($" Did you mean <{close}>?") : null)`.
+- `Wording.Prose(text)` rewords text that was written elsewhere, such as an attribute's description. `Wording.Snippet(xml)` converts a line of XML script. `new Wording(xml, code)` gives each form its own sentence when rewording wouldn't say it well.
+- To pass an error's message on, use `ex.Words`, not `ex.Message`.
+
+`DiagnosticConventionTests` holds the guards: it runs a list of failing scripts as `.kscript` and fails if a message shows a tag, `name="value"`, "attribute" or "element", and it scans the source for messages with XML wording that are plain strings. The same file checks that every error type the runtime raises is declared in `ErrorTypes.cs` and listed in [the language guide](language.md#errors), and that every diagnostic code is reported somewhere and documented in [errors.md](errors.md) in numeric order.
+
 ## Syntax highlighting on GitHub
 
 GitHub highlights code with [Linguist](https://github.com/github-linguist/linguist), which only knows the languages that have been added to it. A repository can't bring its own grammar, so until KScript is in Linguist:

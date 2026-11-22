@@ -38,7 +38,7 @@ namespace KScript.Runtime
             }, run =>
             {
                 string message = run.Has("message") ? run.Template("message") : run.Text();
-                LogLevel level = run.Has("level") ? LogLevels.Parse(run.Raw("level"), "<log level>") : LogLevel.Info;
+                LogLevel level = run.Has("level") ? LogLevels.Parse(run.Raw("level"), run.Module.ArgumentHint("log", "level")) : LogLevel.Info;
                 object fields = run.Has("fields") ? run.Eval("fields") : null;
                 int line = run.Module.Source.GetPosition(run.Element.Span.Start).Line + 1;
                 new LoggerValue(run.Interpreter, run.Module, run.Has("category") ? run.Template("category") : null).Log(level, message, fields, line);
@@ -86,11 +86,11 @@ namespace KScript.Runtime
                 }
                 try
                 {
-                    hub.Add(options, run.Interpreter, run.Module, "<log-provider>");
+                    hub.Add(options, run.Interpreter, run.Module, run.Module.ElementHint("log-provider"));
                 }
                 catch (KScriptException ex) when (ex.Offset == null)
                 {
-                    throw run.Error(ex.Message, null, ex.Type);
+                    throw run.Error(ex.Words, null, ex.Type);
                 }
                 return null;
             });

@@ -60,7 +60,7 @@ namespace KScript.Http
         /// <summary>The page engine's state for this request, for @view().</summary>
         public PageContext Page => page ??= new PageContext(App.SiteRoot, Request);
 
-        public Frame Top => frames.Count > 0 ? frames[^1] : throw new KScriptException("Routes must be inside <KScript.Routes>.", "Http");
+        public Frame Top => frames.Count > 0 ? frames[^1] : throw new KScriptException($"Routes must be inside <KScript.Routes>.", "Http");
 
         public void Push(string prefix, string middleware, string namePrefix, bool? api)
         {
@@ -111,7 +111,7 @@ namespace KScript.Http
             }
             catch (KScriptException ex)
             {
-                throw run.Error(ex.Message, route.Name != null ? "name" : null, "Http");
+                throw run.Error(ex.Words, route.Name != null ? "name" : null, "Http");
             }
         }
 

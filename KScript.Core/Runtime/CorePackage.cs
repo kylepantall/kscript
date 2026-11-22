@@ -150,7 +150,7 @@ namespace KScript.Runtime
                 new A("description", K.Text, "What the field holds, shown on hover and completion."))
             {
                 MustBeInside = new[] { "type", "error", "model", "job" },
-            }, run => throw run.Error("<field> must be directly inside <type>, <error>, <model> or <job>.", null, "Syntax"));
+            }, run => throw run.Error($"<field> must be directly inside <type>, <error>, <model> or <job>.", null, "Syntax"));
 
             p.Element(new ElementInfo("validate", "A rule a <type> checks: the test must be true. In a type made from one other type, the value is `$value`. In a type with fields, each field is a variable (`$end > $start`). Every rule that fails is reported, with its message.", ContentKind.Empty,
                 new A("test", K.Expression, "What must be true: `$value % 5 == 0`, `$end > $start`.", true),
@@ -158,14 +158,14 @@ namespace KScript.Runtime
             {
                 MustBeInside = new[] { "type", "model" },
                 Example = "<type name=\"Even\" with=\"int\">\n  <validate test=\"$value % 2 == 0\" message=\"must be even\" />\n</type>\n<echo>{ $Even->from(4) }</echo>",
-            }, run => throw run.Error("<validate> must be directly inside <type>.", null, "Syntax"));
+            }, run => throw run.Error($"<validate> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("normalize", "Cleans up a value before a <type>'s rules check it, such as trimming or lower-casing. The value is `$value`; the result is converted to the type again.", ContentKind.Empty,
                 new A("value", K.Expression, "The cleaned-up value: `$value->trim()->lower()`.", true))
             {
                 MustBeInside = new[] { "type" },
                 Example = "<type name=\"Slug\" with=\"string\" pattern=\"^[a-z0-9-]+$\">\n  <normalize value=\"$value->trim()->lower()\" />\n</type>\n<echo>{ $Slug->from(' Hello-World ') }</echo>",
-            }, run => throw run.Error("<normalize> must be directly inside <type>.", null, "Syntax"));
+            }, run => throw run.Error($"<normalize> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("set", "Changes an existing variable. Fails if the variable was never declared (a typo guard) or is const. Without `name`, the text is assignment statements.",
                 ContentKind.Expression,
@@ -210,7 +210,7 @@ namespace KScript.Runtime
                 MustFollow = new[] { "if", "elif" },
             }, run =>
             {
-                if (run.Chain == null) throw run.Error("<elif> must come right after an <if> or <elif>.", null, "Syntax");
+                if (run.Chain == null) throw run.Error($"<elif> must come right after an <if> or <elif>.", null, "Syntax");
                 if (run.Chain == true) return true;
                 bool ok = Values.Truthy(run.Eval("test"));
                 if (ok) run.RunChildren();
@@ -222,7 +222,7 @@ namespace KScript.Runtime
                 MustFollow = new[] { "if", "elif", "for" },
             }, run =>
             {
-                if (run.Chain == null) throw run.Error("<else> must come right after an <if>, <elif> or <for>.", null, "Syntax");
+                if (run.Chain == null) throw run.Error($"<else> must come right after an <if>, <elif> or <for>.", null, "Syntax");
                 if (run.Chain == false) run.RunChildren();
                 return null;
             });
@@ -268,12 +268,12 @@ namespace KScript.Runtime
                 new A("when", K.Expression, "A condition."))
             {
                 MustBeInside = new[] { "match" },
-            }, run => throw run.Error("<case> must be directly inside <match>.", null, "Syntax"));
+            }, run => throw run.Error($"<case> must be directly inside <match>.", null, "Syntax"));
 
             p.Element(new ElementInfo("default", "The branch of <match> that runs when no case matched.", ContentKind.Statements)
             {
                 MustBeInside = new[] { "match" },
-            }, run => throw run.Error("<default> must be directly inside <match>.", null, "Syntax"));
+            }, run => throw run.Error($"<default> must be directly inside <match>.", null, "Syntax"));
 
             p.Element(new ElementInfo("extend", "Adds methods to a type: a built-in one such as date, string or list, a package's (file, response), or a <type>. Each <fn> inside becomes a method, with the value it is called on as $this: `extend date { fn json() => $this->to_json() }` makes `@today()->json()` work. Scripts that import the file get the methods too, and in a project every file in the extensions folder applies everywhere.",
                 ContentKind.Statements,
@@ -364,7 +364,7 @@ namespace KScript.Runtime
                 Example = "<import package=\"KScript.Terminal\" />\n<import package=\"KScript.Math\" as=\"math\" />\n<import src=\"lib/strings.ks.xml\" as=\"str\" />",
             }, run =>
             {
-                if (!run.Has("package") && !run.Has("src")) throw run.Error("<import> needs package=\"...\" (such as KScript.Terminal) or src=\"...\" (a script file).", null, "Syntax");
+                if (!run.Has("package") && !run.Has("src")) throw run.Error($"<import> needs package=\"...\" (such as KScript.Terminal) or src=\"...\" (a script file).", null, "Syntax");
                 if (run.Has("src")) run.Interpreter.ImportScript(run.Element, run.Scope, run.Module);
                 return null;
             });
@@ -404,7 +404,7 @@ namespace KScript.Runtime
                 new A("value", K.Expression, "The value as an expression, instead of text."))
             {
                 MustBeInside = new[] { "marray", "item" },
-            }, run => throw run.Error("<item> must be inside <marray>.", null, "Syntax"), ownsContent: true);
+            }, run => throw run.Error($"<item> must be inside <marray>.", null, "Syntax"), ownsContent: true);
         }
 
         private static bool? Assign(ElementRun run, bool declare)
@@ -493,7 +493,7 @@ namespace KScript.Runtime
         private static bool? For(ElementRun run)
         {
             string[] names = run.RequiredRaw("each").Split(',').Select(n => n.Trim().TrimStart('$')).Where(n => n.Length > 0).ToArray();
-            if (names.Length == 0 || names.Length > 2) throw run.Error("each=\"...\" names the loop variable (each=\"item\"), or a key and value for a map (each=\"key, value\").", "each", "Syntax");
+            if (names.Length == 0 || names.Length > 2) throw run.Error($"each=\"...\" names the loop variable (each=\"item\"), or a key and value for a map (each=\"key, value\").", "each", "Syntax");
             string indexName = run.VariableName("index", required: false);
             object source = run.Eval("in");
 
@@ -569,7 +569,7 @@ namespace KScript.Runtime
                     }
                     else
                     {
-                        throw new KScriptException("<case> needs is=\"...\" or when=\"...\".", "Syntax") { Offset = c.Span.Start, OffsetModule = run.Module };
+                        throw new KScriptException($"<case> needs is=\"...\" or when=\"...\".", "Syntax") { Offset = c.Span.Start, OffsetModule = run.Module };
                     }
                 }
                 else
@@ -599,7 +599,7 @@ namespace KScript.Runtime
                 if (member is CommandDefinition d) return new NativeFunction(d.Name, call => run.Interpreter.InvokeCommand(d, call));
             }
             string close = Values.Closest(name, run.Scope.Names().Where(n => run.Scope.TryGet(n, out object f) && f is ICallable));
-            throw run.Error($"There is no function called {name}." + (close != null ? $" Did you mean {close}?" : " Declare it with <fn name=\"" + name + "\">."), "fn", "Name");
+            throw run.Error(Wording.Of($"There is no function called {name}.") + (close != null ? $" Did you mean {close}?" : Wording.Of($" Declare it with <fn name=\"{name}\">.")), "fn", "Name");
         }
 
         private static bool? Call(ElementRun run)
@@ -616,6 +616,11 @@ namespace KScript.Runtime
             List<MarkupElement> catches = run.ChildElements.Where(e => e.Name == "catch").ToList();
             List<MarkupElement> finallies = run.ChildElements.Where(e => e.Name == "finally").ToList();
             List<MarkupNode> body = run.Element.Children.Where(n => !(n is MarkupElement e && (e.Name == "catch" || e.Name == "finally"))).ToList();
+            foreach (MarkupElement c in catches)
+            {
+                // A catch of a renamed type would never match: say so before anything runs.
+                if (c.GetAttributeValue("type") is string named) RefuseRenamed(run, c, named);
+            }
 
             try
             {
@@ -664,7 +669,7 @@ namespace KScript.Runtime
             if (run.Has("value"))
             {
                 if (run.Has("type") || run.Has("message") || run.HasContent)
-                    throw run.Error("<throw value> throws the error it is given. Put its type and message there: value=\"Validation('Too short')\".", "value", "Syntax");
+                    throw run.Error($"<throw value> throws the error it is given. Put its type and message there: value=\"Validation('Too short')\".", "value", "Syntax");
                 throw ThrownValue(run, run.Eval("value"));
             }
             string message = run.Has("message") ? run.Template("message") : run.Text();
@@ -674,6 +679,7 @@ namespace KScript.Runtime
             ErrorType type = ErrorTypes.Find(typeName ?? ErrorTypes.Root, run.Scope);
             if (type == null)
             {
+                if (ErrorTypes.RenamedMessage(typeName) is string renamed) throw run.Error(renamed, "type", "Retired");
                 // An error type nobody declared still works, as a kind of Error (the editor warns about it).
                 KScriptException adhoc = run.Error(string.IsNullOrWhiteSpace(message) ? typeName : message, null, typeName);
                 if (cause != null) adhoc = WithCause(adhoc, cause, run);
@@ -688,7 +694,7 @@ namespace KScript.Runtime
             }
             catch (KScriptException ex) when (ex.Declared == null)
             {
-                throw run.Error(ex.Message, "type", ex.Type);
+                throw run.Error(ex.Words, "type", ex.Type);
             }
         }
 
@@ -696,7 +702,7 @@ namespace KScript.Runtime
         {
             KScriptException inner = cause is ErrorValue e ? e.Exception : cause is Dictionary<string, object> map ? ErrorTypes.FromMap(map)
                 : throw run.Error($"cause is the error that led to this one, such as $err in a catch, not {Values.Describe(cause)}.", "cause", "Argument");
-            var wrapped = new KScriptException(ex.Message, ex.Type, inner) { Offset = ex.Offset, OffsetModule = ex.OffsetModule };
+            var wrapped = new KScriptException(ex.Words, ex.Type, inner) { Offset = ex.Offset, OffsetModule = ex.OffsetModule };
             foreach (var kv in ex.Fields) wrapped.Fields[kv.Key] = kv.Value;
             return wrapped;
         }
@@ -709,7 +715,8 @@ namespace KScript.Runtime
                 : throw run.Error($"{t.Name} has fields, so throw it with them: {t.Name}({string.Join(", ", t.Fields.Fields.Where(f => !f.Optional).Select(f => f.Name + ": ..."))}).", "value", "Argument"),
             Dictionary<string, object> map when map.ContainsKey("message") => Located(run, ErrorTypes.FromMap(map)),
             string text => run.Error(text),
-            _ => throw run.Error($"<throw value> needs an error, such as NotFound(id: 42) or a caught $err, not {Values.Describe(value)}.", "value", "Type"),
+            _ => throw run.Error(new Wording($"<throw value> needs an error, such as NotFound(id: 42) or a caught $err, not {Values.Describe(value)}.",
+                    $"throw needs an error, such as NotFound(id: 42) or a caught $err, not {Values.Describe(value)}."), "value", "Type"),
         };
 
         private static KScriptException Located(ElementRun run, KScriptException ex)
@@ -720,6 +727,15 @@ namespace KScript.Runtime
         }
 
         /// <summary>The names in a catch's type: <c>NotFound</c>, <c>IO, Network</c> or <c>[IO, Network]</c>.</summary>
+        private static void RefuseRenamed(ElementRun run, MarkupElement element, string types)
+        {
+            foreach (string name in ErrorNames(types))
+            {
+                if (ErrorTypes.RenamedMessage(name) is string message && ErrorTypes.Find(name, run.Scope) == null)
+                    throw Interpreter.Located(new KScriptException(message, "Retired"), run.Module, element.Span.Start);
+            }
+        }
+
         internal static IEnumerable<string> ErrorNames(string text) =>
             text.Trim().TrimStart('[').TrimEnd(']').Split(',', '|').Select(t => t.Trim()).Where(t => t.Length > 0);
 
@@ -766,7 +782,7 @@ namespace KScript.Runtime
                 var map = new Dictionary<string, object>();
                 foreach (MarkupElement c in children)
                 {
-                    string key = c.GetAttributeValue("key") ?? throw new KScriptException("Every <item> in a map needs a key, or none of them should have one (for a list).", "Syntax") { Offset = c.Span.Start, OffsetModule = run.Module };
+                    string key = c.GetAttributeValue("key") ?? throw new KScriptException($"Every <item> in a map needs a key, or none of them should have one (for a list).", "Syntax") { Offset = c.Span.Start, OffsetModule = run.Module };
                     map[key] = ItemValue(run, c);
                 }
                 return map;

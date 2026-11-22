@@ -35,7 +35,7 @@ namespace KScript.Data
         }
 
         private KScriptException Cannot(ExprNode node, string why) =>
-            new KScriptException($"The condition {Text(node)} can't run in the database: {why}", "QueryError");
+            new KScriptException($"The condition {Text(node)} can't run in the database: {why}", "Query");
 
         /// <summary>The part of the lambda as written, such as '$u.name->reverse()'.</summary>
         private string Text(ExprNode node)

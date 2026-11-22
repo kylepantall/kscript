@@ -80,6 +80,9 @@ namespace KScript.Runtime
         /// <summary>An element as this file writes it: <c>Row</c> in .kscript, <c>&lt;Row&gt;</c> in XML.</summary>
         public string ElementHint(string name) => IsCode ? name : $"<{name}>";
 
+        /// <summary>An element's argument as this file names it in a message: <c>llm tools:</c> in .kscript, <c>&lt;llm tools&gt;</c> in XML.</summary>
+        public string ArgumentHint(string element, string argument) => IsCode ? $"{element} {argument}:" : $"<{element} {argument}>";
+
         /// <summary>The root element: &lt;kscript&gt;, or a package element such as &lt;KScript.Window&gt;.</summary>
         public MarkupElement Root { get; internal set; }
 

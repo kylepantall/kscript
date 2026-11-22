@@ -282,13 +282,13 @@ namespace KScript.Data
             catch (Exception ex) when (ex is DbException || ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidOperationException || ex is TimeoutException)
             {
                 string message = ex is Npgsql.PostgresException pg ? pg.MessageText : ex.Message;
-                throw new KScriptException($"Can't open the {Dialect.Name} database '{Name}' ({Settings.Where}): {message.TrimEnd('.')}.", "ConnectionError", ex);
+                throw new KScriptException($"Can't open the {Dialect.Name} database '{Name}' ({Settings.Where}): {message.TrimEnd('.')}.", "Connection", ex);
             }
         }
 
         /// <summary>
         /// Runs work with a connection: the script's open transaction's, or a new one that is closed afterwards.
-        /// Database errors become KScript errors (UniqueViolation, ForeignKeyViolation, QueryError).
+        /// Database errors become KScript errors (UniqueViolation, ForeignKeyViolation, Query).
         /// </summary>
         public T With<T>(Interpreter interpreter, string table, Func<DbConnection, DbTransaction, T> work)
         {
@@ -300,7 +300,7 @@ namespace KScript.Data
             }
             catch (DbException ex)
             {
-                throw Dialect.Translate(ex, table) ?? new KScriptException(ex.Message, "QueryError", ex);
+                throw Dialect.Translate(ex, table) ?? new KScriptException(ex.Message, "Query", ex);
             }
             finally
             {

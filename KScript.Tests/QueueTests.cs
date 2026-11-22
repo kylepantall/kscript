@@ -1042,8 +1042,8 @@ public sealed class QueueTests : StorageFixture
     public void AWorkerWaitsOutABusyDatabase()
     {
         Assert.True(QueueRuntime.StoreBusy(new IOException("busy")));
-        Assert.True(QueueRuntime.StoreBusy(new KScriptException("down", "ConnectionError")));
-        Assert.True(QueueRuntime.StoreBusy(new KScriptException("locked", "QueryError", new Microsoft.Data.Sqlite.SqliteException("database is locked", 5))));
+        Assert.True(QueueRuntime.StoreBusy(new KScriptException("down", "Connection")));
+        Assert.True(QueueRuntime.StoreBusy(new KScriptException("locked", "Query", new Microsoft.Data.Sqlite.SqliteException("database is locked", 5))));
         Assert.False(QueueRuntime.StoreBusy(new KScriptException("bad", "Validation")));
     }
 

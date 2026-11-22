@@ -181,7 +181,7 @@ namespace KScript.Language.Tests
                   echo $e.message
                 } catch UniqueViolation {
                   echo 'taken'
-                } catch QueryError {
+                } catch Query {
                   echo 'query'
                 }
                 """);

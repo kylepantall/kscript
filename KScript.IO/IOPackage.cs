@@ -177,7 +177,7 @@ namespace KScript.IO
                 Example = "<write to=\"'log.txt'\" append=\"yes\">{ @now() }: done</write>",
             }, run =>
             {
-                run.Interpreter.Host.CheckWrite("<write>");
+                run.Interpreter.Host.CheckWrite(run.Module.ElementHint("write"));
                 string path = PathOf(run, "to");
                 object value = run.Has("value") ? run.Eval("value") : null;
                 string text = run.Has("value") ? value is Dictionary<string, object> or List<object> ? Values.ToJson(value, indented: true) : Values.ToStr(value) : run.Text();
@@ -210,7 +210,7 @@ namespace KScript.IO
                 Context = ElementContext.Script,
             }, run =>
             {
-                run.Interpreter.Host.CheckWrite("<delete>");
+                run.Interpreter.Host.CheckWrite(run.Module.ElementHint("delete"));
                 string path = PathOf(run, "path");
                 if (File.Exists(path)) File.Delete(path);
                 else if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
@@ -223,7 +223,7 @@ namespace KScript.IO
                 Context = ElementContext.Script,
             }, run =>
             {
-                run.Interpreter.Host.CheckWrite("<mkdir>");
+                run.Interpreter.Host.CheckWrite(run.Module.ElementHint("mkdir"));
                 Directory.CreateDirectory(PathOf(run, "path"));
                 return null;
             });

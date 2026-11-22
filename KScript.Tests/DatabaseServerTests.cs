@@ -258,7 +258,7 @@ public sealed class DatabaseServerTests : DataFixture
         Assert.Equal("A row already has that value.", pg.Translate(Error("23505"), null).Message);
         Assert.Equal("ForeignKeyViolation", pg.Translate(Error("23503"), "users").Type);
         KScriptException other = pg.Translate(Error("42P01"), null);
-        Assert.Equal("QueryError", other.Type);
+        Assert.Equal("Query", other.Type);
         Assert.Equal("The database refused the query: it broke", other.Message);
         Assert.Null(pg.Translate(new InvalidOperationException("no"), null));
 
@@ -301,12 +301,12 @@ public sealed class DatabaseServerTests : DataFixture
         {
             FileOf("config.yaml", $"database:\n  connections:\n    main:\n      url: \"{url}\"\n");
             KScriptException e = Fails("echo $db->tables()");
-            Assert.Equal("ConnectionError", e.Type);
+            Assert.Equal("Connection", e.Type);
             Assert.StartsWith("Can't open the ", e.Message);
             Assert.Contains("database 'main' (nobody@127.0.0.1:1/none)", e.Message);
         }
         FileOf("config.yaml", "database:\n  connections:\n    main:\n      url: \"postgres://localhost/x?NoSuchOption=1\"\n");
-        Assert.Equal("ConnectionError", Fails("echo $db->tables()").Type);
+        Assert.Equal("Connection", Fails("echo $db->tables()").Type);
     }
 
     // ---- on a server ------------------------------------------------------------------------------------------------
@@ -324,7 +324,7 @@ public sealed class DatabaseServerTests : DataFixture
         Assert.Equal(3, db.InTransaction(interpreter, () =>
         {
             calls++;
-            if (calls < 3) throw new KScriptException("deadlock", "QueryError", inner);
+            if (calls < 3) throw new KScriptException("deadlock", "Query", inner);
             return 3;
         }, retries: 2));
     }

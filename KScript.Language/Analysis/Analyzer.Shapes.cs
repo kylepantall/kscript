@@ -318,7 +318,7 @@ namespace KScript.Language.Analysis
             bool hasFields = seen.Count > 0 || e.GetAttribute("sample") != null || e.GetAttribute("with") != null;
             if (!hasFields)
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "<type> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<type> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.");
             }
             string sample = e.GetAttributeValue("sample")?.Trim();
             if (!string.IsNullOrEmpty(sample) && ResolvePath(sample) is string full && files.FileExists(full) && result.JsonFileShape(sample) == null)
@@ -419,7 +419,7 @@ namespace KScript.Language.Analysis
                 if (!parsed.Success)
                 {
                     Report(value.ToSource(new TextSpan(start, part.Length)), DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax,
-                        $"The default of '{head.Trim()}' isn't a valid expression: {parsed.Errors[0].Message}");
+                        $"The default of '{head.Trim()}' isn't a valid expression: {parsed.Errors[0].Words}");
                 }
             }
             int colon = head.IndexOf(':');

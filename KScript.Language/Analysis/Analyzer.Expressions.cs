@@ -294,6 +294,10 @@ namespace KScript.Language.Analysis
             CallableInfo command = catalog.GetCommand(c.Name);
             if (command != null)
             {
+                if (command.Planned)
+                {
+                    Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.PlannedFeature, $"@{command.Name}() is planned but not built yet, so it can't run.");
+                }
                 RequirePackage(command.Package, full, $"@{command.Name}()");
                 ReportDeprecatedCall(command, $"@{command.Name}", nameSpan, count >= 0 ? c.Arguments : null, piped, region);
                 if (command.KeepsBareWords)

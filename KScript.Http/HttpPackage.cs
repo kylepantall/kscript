@@ -1,5 +1,6 @@
 using KScript.Metadata;
 using KScript.Runtime;
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 
 using A = KScript.Metadata.AttributeInfo;
@@ -230,7 +231,7 @@ namespace KScript.Http
             }
             catch (KScriptException ex)
             {
-                throw run.Error(ex.Message, "path", "Http");
+                throw run.Error(ex.Words, "path", "Http");
             }
 
             var middleware = ctx.MiddlewareFor(run).ToList();
@@ -282,7 +283,7 @@ namespace KScript.Http
                 }
                 catch (KScriptException ex)
                 {
-                    throw run.Error(ex.Message, "cache", "Http");
+                    throw run.Error(ex.Words, "cache", "Http");
                 }
             }
             if (run.Flag("etag")) middleware.Add(new MiddlewareRef("etag", null, null));
@@ -357,7 +358,7 @@ namespace KScript.Http
                 if (!run.Module.TryGetAlias(alias, out ImportNamespace ns))
                 {
                     string close = Values.Closest(alias, run.Module.AliasNames);
-                    throw run.Error($"Nothing is imported as '{alias}'. Import the controller with <import src=\"controllers/{alias}.ks.xml\" as=\"{alias}\" />." + (close != null ? $" Did you mean {close}?" : string.Empty), attribute, "Http");
+                    throw run.Error(Wording.Of($"Nothing is imported as '{alias}'. Import the controller with <import src=\"controllers/{alias}{ScriptFiles.Code}\" as=\"{alias}\" />.") + (close != null ? $" Did you mean {close}?" : string.Empty), attribute, "Http");
                 }
                 if (ns.TryGet(member, out object found))
                 {
@@ -373,7 +374,7 @@ namespace KScript.Http
             if (run.Module.Commands.TryGetValue(name, out CommandDefinition command))
                 return Command(run.Interpreter, command);
             string near = Values.Closest(name, run.Scope.Names().Where(n => run.Scope.TryGet(n, out object f) && f is ICallable));
-            throw run.Error($"No function named '{name}'. Declare it with <fn name=\"{name}\"> or import a controller (<import src=\"...\" as=\"people\" /> then people.{name})."
+            throw run.Error(Wording.Of($"No function named '{name}'. Declare it with <fn name=\"{name}\"> or import a controller (<import src=\"...\" as=\"people\" /> then people.{name}).")
                 + (near != null ? $" Did you mean {near}?" : string.Empty), attribute, "Http");
         }
 

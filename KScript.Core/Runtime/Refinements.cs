@@ -127,13 +127,13 @@ namespace KScript.Runtime
             switch (e.Name)
             {
                 case "validate":
-                    DecodedText test = e.GetAttribute("test")?.Value ?? throw run.Error("<validate> needs a test: test=\"$value > 0\".", null, "Syntax");
+                    DecodedText test = e.GetAttribute("test")?.Value ?? throw run.Error($"<validate> needs a test: test=\"$value > 0\".", null, "Syntax");
                     Validators.Add(new Validator(test, e.GetAttributeValue("message")));
                     return true;
                 case "normalize":
-                    if (!allowNormalize) throw run.Error("<normalize> only goes in a type made with with=\"...\" from one other type, such as <type name=\"Slug\" with=\"string\">.", null, "Syntax");
-                    if (Normalize != null) throw run.Error("A type can only have one <normalize>.", null, "Syntax");
-                    Normalize = e.GetAttribute("value")?.Value ?? throw run.Error("<normalize> needs a value: value=\"$value->lower()\".", null, "Syntax");
+                    if (!allowNormalize) throw run.Error($"<normalize> only goes in a type made with with=\"...\" from one other type, such as <type name=\"Slug\" with=\"string\">.", null, "Syntax");
+                    if (Normalize != null) throw run.Error($"A type can only have one <normalize>.", null, "Syntax");
+                    Normalize = e.GetAttribute("value")?.Value ?? throw run.Error($"<normalize> needs a value: value=\"$value->lower()\".", null, "Syntax");
                     return true;
                 default:
                     return false;

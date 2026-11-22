@@ -139,9 +139,9 @@ namespace KScript.Net
             {
                 string url = Values.ToStr(run.Eval("url"));
                 string to = run.Host.ResolvePath(Values.ToStr(run.Eval("to")), run.Module.Directory);
-                run.Host.CheckWrite("<download>");
+                run.Host.CheckWrite(run.Module.ElementHint("download"));
                 if (File.Exists(to) && !run.Flag("overwrite", true)) return null;
-                CheckUrl(url, run.Error);
+                CheckUrl(url, (m, a, t) => run.Error(m, a, t));
                 using HttpResponseMessage response = Client.Value.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, run.Interpreter.Options.Cancellation).GetAwaiter().GetResult();
                 if (!response.IsSuccessStatusCode)
                     throw run.Error($"{url} answered {(int)response.StatusCode} {response.ReasonPhrase}.", "url", "Network");

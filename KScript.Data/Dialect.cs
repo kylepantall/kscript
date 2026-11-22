@@ -189,7 +189,7 @@ namespace KScript.Data
 
         /// <summary>
         /// The KScript error a database error is: a clash with a unique index is UniqueViolation (409 in a route), a broken
-        /// reference ForeignKeyViolation, and anything else QueryError. Null for errors that aren't the database's.
+        /// reference ForeignKeyViolation, and anything else Query. Null for errors that aren't the database's.
         /// </summary>
         public abstract KScriptException Translate(Exception error, string table);
 
@@ -215,7 +215,7 @@ namespace KScript.Data
         }
 
         protected static KScriptException QueryError(Exception e, string message) =>
-            new KScriptException("The database refused the query: " + message, "QueryError", e);
+            new KScriptException("The database refused the query: " + message, "Query", e);
 
         /// <summary>
         /// The fields of the index or key a database named in an error: a unique index KScript.Data made

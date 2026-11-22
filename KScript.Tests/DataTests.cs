@@ -718,7 +718,7 @@ public sealed class DataSqlTests : DataFixture
     public void BadSqlIsAQueryError()
     {
         KScriptException e = Fails("@sql('select * from nowhere')");
-        Assert.Equal("QueryError", e.Type);
+        Assert.Equal("Query", e.Type);
         Assert.Contains("nowhere", e.Message);
         Assert.Contains("{ without its }", Fails("@sql('select {1')").Message);
         Assert.Contains("empty { }", Fails("@sql('select { }')").Message);
@@ -787,7 +787,7 @@ public sealed class DataErrorTests : DataFixture
     public void EnumAndNotNullChecksInTheDatabase()
     {
         KScriptException e = Fails(Users + "$db->sql(\"insert into users (name, email, role, active, tags, created_at, updated_at) values ('x', 'x@x.org', 'boss', 1, '[]', '', '')\")");
-        Assert.Equal("QueryError", e.Type);
+        Assert.Equal("Query", e.Type);
     }
 
     [Fact]
@@ -796,8 +796,8 @@ public sealed class DataErrorTests : DataFixture
         Assert.Equal("NotFound", ErrorTypes.BuiltIn["ModelNotFound"].Parent.Name);
         Assert.Equal(409, ErrorTypes.BuiltIn["UniqueViolation"].Status);
         Assert.Equal(409, ErrorTypes.BuiltIn["ForeignKeyViolation"].Status);
-        Assert.Equal(503, ErrorTypes.BuiltIn["ConnectionError"].Status);
-        Assert.NotNull(ErrorTypes.BuiltIn["QueryError"]);
+        Assert.Equal(503, ErrorTypes.BuiltIn["Connection"].Status);
+        Assert.NotNull(ErrorTypes.BuiltIn["Query"]);
     }
 }
 
@@ -910,7 +910,7 @@ public sealed class DataTransactionTests : DataFixture
         FileOf("app.kscript", "1");
         var interpreter = new Interpreter(host);
         Database db = Database.For(host, Project, null);
-        var busy = new KScriptException("database is locked", "QueryError", new Microsoft.Data.Sqlite.SqliteException("database is locked", 5));
+        var busy = new KScriptException("database is locked", "Query", new Microsoft.Data.Sqlite.SqliteException("database is locked", 5));
         Assert.Equal(3, db.InTransaction(interpreter, () =>
         {
             calls++;
@@ -1013,7 +1013,7 @@ public sealed class DataConnectionTests : DataFixture
         File.WriteAllText(Path.Combine(Project, "blocked"), "a file, not a folder");
         FileOf("config.yaml", "database:\n  connections:\n    main:\n      url: sqlite:blocked/app.sqlite\n");
         KScriptException e = Fails("echo $db->tables()");
-        Assert.Equal("ConnectionError", e.Type);
+        Assert.Equal("Connection", e.Type);
     }
 
     [Fact]

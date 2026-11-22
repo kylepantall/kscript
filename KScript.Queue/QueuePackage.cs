@@ -206,7 +206,7 @@ namespace KScript.Queueing
             }
             catch (KScriptException ex)
             {
-                throw run.Error(ex.Message, attribute, "Syntax");
+                throw run.Error(ex.Words, attribute, "Syntax");
             }
         }
 

@@ -129,7 +129,7 @@ namespace KScript.Testing
         {
             TestSession session = TestSession.Of(run.Host);
             if (session == null)
-                throw run.Error($"<{run.Name}> only works in a test file run by kscript test. Run: kscript test {(run.Module.Path != null ? Path.GetFileName(run.Module.Path) : "<file>")}", null, "Syntax");
+                throw run.Error($"<{run.Name}> only works in a test file run by kscript test. Run: kscript test {(run.Module.Path != null ? Path.GetFileName(run.Module.Path) : "your-file.test.kscript")}", null, "Syntax");
             if (session.Running != null)
                 throw run.Error($"<{run.Name}> can't be inside a test. Put it at the top of the file or in a <describe>.", null, "Syntax");
             return session;
@@ -202,14 +202,14 @@ namespace KScript.Testing
 
             if (!run.Has("each"))
             {
-                if (run.Has("in") || run.Has("index")) throw run.Error("in=\"...\" and index=\"...\" go with each=\"item\".", run.Has("in") ? "in" : "index", "Syntax");
+                if (run.Has("in") || run.Has("index")) throw run.Error($"in=\"...\" and index=\"...\" go with each=\"item\".", run.Has("in") ? "in" : "index", "Syntax");
                 Add(run.Scope, run.RequiredTemplate("name"));
                 return null;
             }
 
             string each = run.VariableName("each");
             string indexName = run.VariableName("index", required: false);
-            if (!run.Has("in")) throw run.Error("<test each> needs in=\"...\": the items to run the test with.", "each", "Syntax");
+            if (!run.Has("in")) throw run.Error($"<test each> needs in=\"...\": the items to run the test with.", "each", "Syntax");
             object source = run.Eval("in");
             List<object> items = source switch
             {
@@ -234,7 +234,7 @@ namespace KScript.Testing
 
         #region Checks
 
-        private static KScriptException Failure(ElementRun run, string message, string attribute = null) =>
+        private static KScriptException Failure(ElementRun run, Wording message, string attribute = null) =>
             run.Error(run.Template("message") is string custom && custom.Length > 0 ? custom : message, attribute, AssertionType);
 
         private static readonly HashSet<string> Comparisons = new HashSet<string>(StringComparer.Ordinal) { "==", "!=", "===", "!==", "<", "<=", ">", ">=", "in" };
@@ -283,8 +283,8 @@ namespace KScript.Testing
             string[] given = Matchers.Where(run.Has).ToArray();
             if (given.Length != 1)
                 throw run.Error(given.Length == 0
-                    ? $"<expect> needs one check, such as equals=\"5\". Checks: {string.Join(", ", Matchers)}."
-                    : $"<expect> takes one check, but has {string.Join(" and ", given)}. Write one <expect> for each.", given.Length > 1 ? given[1] : null, "Syntax");
+                    ? Wording.Of($"<expect> needs one check, such as equals=\"5\". Checks: {string.Join(", ", Matchers)}.")
+                    : Wording.Of($"<expect> takes one check, but has {string.Join(" and ", given)}. Write one <expect> for each."), given.Length > 1 ? given[1] : null, "Syntax");
             string matcher = given[0];
             if (matcher == "throws") return ExpectThrows(run);
             object actual = run.Eval("value");
@@ -345,7 +345,7 @@ namespace KScript.Testing
                 }
                 case "count":
                 {
-                    double expected = Values.ToNumber(run.Eval("count"), "<expect count>");
+                    double expected = Values.ToNumber(run.Eval("count"), run.Module.ArgumentHint("expect", "count"));
                     int? count = actual switch
                     {
                         List<object> l => l.Count,

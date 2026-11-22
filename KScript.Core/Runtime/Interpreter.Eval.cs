@@ -143,7 +143,7 @@ namespace KScript.Runtime
 
         #region Evaluation
 
-        private KScriptException Fail(ExprNode node, EvalContext ctx, string message, string type = "Error")
+        private KScriptException Fail(ExprNode node, EvalContext ctx, Wording message, string type = "Error")
         {
             return new KScriptException(message, type) { Offset = node == null ? null : ctx.ToSource(node.Span.Start), OffsetModule = ctx.Module };
         }
@@ -294,7 +294,7 @@ namespace KScript.Runtime
                 }
 
                 case AssignmentNode assignment:
-                    throw Fail(assignment, ctx, "Assignment isn't allowed here. Use == (or ===) to compare; assign with <let>, <set> or <do>.", "Syntax");
+                    throw Fail(assignment, ctx, $"Assignment isn't allowed here. Use == (or ===) to compare; assign with <let>, <set> or <do>.", "Syntax");
 
                 case ErrorNode:
                     throw Fail(node, ctx, "This expression has a syntax error.", "Syntax");
@@ -308,10 +308,10 @@ namespace KScript.Runtime
             return string.IsNullOrEmpty(source) ? string.Empty : $" in '{source}'";
         }
 
-        private static string UndefinedMessage(string name, Scope scope)
+        private static Wording UndefinedMessage(string name, Scope scope)
         {
             string close = Values.Closest(name, scope.Names());
-            return $"${name} is not defined." + (close != null ? $" Did you mean ${close}?" : $" Declare it with <let name=\"{name}\" value=\"...\" />.");
+            return Wording.Of($"${name} is not defined.") + (close != null ? $" Did you mean ${close}?" : Wording.Of($" Declare it with <let name=\"{name}\" value=\"...\" />."));
         }
 
         private bool Matches(object subject, ExprNode pattern, Scope scope, EvalContext ctx)
@@ -533,7 +533,7 @@ namespace KScript.Runtime
                     }
                     catch (KScriptException ex)
                     {
-                        throw Fail(node, ctx, ex.Message, ex.Type);
+                        throw Fail(node, ctx, ex.Words, ex.Type);
                     }
                 case Dictionary<string, object> map:
                     return map.TryGetValue(name, out object v) ? v : null;
@@ -666,7 +666,7 @@ namespace KScript.Runtime
             }
             catch (KScriptException ex)
             {
-                throw Fail(node, ctx, ex.Message, ex.Type);
+                throw Fail(node, ctx, ex.Words, ex.Type);
             }
         }
 
@@ -710,7 +710,7 @@ namespace KScript.Runtime
                 if (module == null || !module.Aliases.TryGetValue(alias, out ImportNamespace ns))
                 {
                     string close = module == null ? null : Values.Closest(alias, module.Aliases.Keys);
-                    throw Fail(node, ctx, $"@{name}: nothing is imported as '{alias}'." + (close != null ? $" Did you mean {close}?" : $" Import it with <import package=\"...\" as=\"{alias}\" /> or <import src=\"...\" as=\"{alias}\" />."), "Name");
+                    throw Fail(node, ctx, Wording.Of($"@{name}: nothing is imported as '{alias}'.") + (close != null ? $" Did you mean {close}?" : Wording.Of($" Import it with <import package=\"...\" as=\"{alias}\" /> or <import src=\"...\" as=\"{alias}\" />.")), "Name");
                 }
                 if (ns.TryGet(member, out object found))
                 {
@@ -789,7 +789,7 @@ namespace KScript.Runtime
                         }
                         catch (KScriptException ex)
                         {
-                            throw Fail(call, ctx, ex.Message, ex.Type);
+                            throw Fail(call, ctx, ex.Words, ex.Type);
                         }
                     }
                     if (piped && Extensions.TryFind(pipedValue, id.Name, ctx.Module, out ExtensionMethod extension))

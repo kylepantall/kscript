@@ -52,8 +52,8 @@ namespace KScript.Style
             {
                 string src = run.Host.ResolvePath(run.Template("src"), run.Module.Directory);
                 string to = run.Has("to") ? run.Host.ResolvePath(run.Template("to"), run.Module.Directory) : Stylesheets.OutputPath(src);
-                run.Host.CheckWrite("<stylesheet>");
-                string css = Stylesheets.Compile(src, Vars(run.Has("vars") ? run.Eval("vars") : null, "<stylesheet vars>"), Sandbox(run.Host));
+                run.Host.CheckWrite(run.Module.ElementHint("stylesheet"));
+                string css = Stylesheets.Compile(src, Vars(run.Has("vars") ? run.Eval("vars") : null, run.Module.ArgumentHint("stylesheet", "vars")), Sandbox(run.Host));
                 Directory.CreateDirectory(Path.GetDirectoryName(to));
                 File.WriteAllText(to, css);
                 return null;
