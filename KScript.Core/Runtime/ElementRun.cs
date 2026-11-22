@@ -97,7 +97,24 @@ namespace KScript.Runtime
             string raw = Raw(attribute);
             if (raw == null) return fallback;
             if (raw.Contains('{')) return Values.Truthy(Interpreter.InterpolateValue(Element.GetAttribute(attribute).Value, Scope, Module));
-            return Values.ParseBool(raw) ?? throw Error($"{attribute}=\"{raw}\" should be yes or no.", attribute);
+            return Values.ParseBool(raw) ?? throw Error($"{attribute}=\"{raw}\" should be true or false.", attribute);
+        }
+
+        /// <summary>
+        /// A length of time, in seconds: a duration (<c>30s</c>, <c>500ms</c>, <c>1h30m</c>), text that reads as one, or
+        /// a plain number of seconds. Null when the attribute isn't there.
+        /// </summary>
+        public double? Seconds(string attribute)
+        {
+            if (!Has(attribute)) return null;
+            try
+            {
+                return Duration.Seconds(Eval(attribute), attribute);
+            }
+            catch (KScriptException ex) when (ex.Type == "Argument")
+            {
+                throw Error(ex.Message, attribute, "Argument");
+            }
         }
 
         /// <summary>A number attribute written as an expression.</summary>

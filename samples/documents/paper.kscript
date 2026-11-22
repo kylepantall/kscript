@@ -77,14 +77,14 @@ KScript.Document(
     Table(
       caption: "Some small patterns and their periods.",
       id: "tab-patterns",
-      data: $patterns,
+      rows: $patterns,
       columns: {
         Pattern: 'name',
         Period: 'period',
         Speed: 'speed',
         Cells: 'cells'
       },
-      align: "lrrr"
+      align: ['left', 'right', 'right', 'right']
     )
 
     Section(title: "Population") {

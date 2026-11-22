@@ -209,9 +209,6 @@ namespace KScript.Runtime
                 case "new":
                     result = Create(call.Interpreter, call.Args, call.Named).ToValue();
                     return true;
-                case "fields":
-                    result = FieldList();
-                    return true;
                 default:
                     result = null;
                     return false;
@@ -229,7 +226,15 @@ namespace KScript.Runtime
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
             ("new", "fields...", "Makes an error of this type without throwing it: $NotFound->new(id: 42). Throw it later with throw $e.", "error"),
-            ("fields", "", "The error's fields (its own and the ones it inherits): name, type, optional and description.", "list"),
+        };
+
+        internal static readonly (string Name, string Type, string Description)[] ValueFields =
+        {
+            ("name", "string", "The error type's name."),
+            ("extends", "string", "The error type it extends, or null."),
+            ("status", "number", "The HTTP status errors of this type carry, such as 404, or null."),
+            ("description", "string", "What the error type is for, or null."),
+            ("fields", "list", "The error's fields (its own and the ones it inherits): name, type, optional and description."),
         };
     }
 

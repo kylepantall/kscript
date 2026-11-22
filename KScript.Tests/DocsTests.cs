@@ -418,7 +418,7 @@ public sealed class DocsTests
         Assert.NotNull(loop.Error);
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30));
 
-        PlaygroundResult wait = Playground.Run("<wait seconds=\"10\" />", timeout: TimeSpan.FromMilliseconds(300));
+        PlaygroundResult wait = Playground.Run("<wait duration=\"10s\" />", timeout: TimeSpan.FromMilliseconds(300));
         Assert.NotNull(wait.Error);
 
         PlaygroundResult big = Playground.Run("<for each=\"i\" in=\"0..2000\"><echo>{ 'x'->repeat(60) }</echo></for>");

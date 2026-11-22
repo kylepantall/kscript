@@ -622,8 +622,8 @@ namespace KScript.Runtime
                     result = new LoggerValue(Interpreter, Module, Category == null ? category : Category + "." + category, Fields);
                     return true;
                 }
-                case "enabled":
-                    result = Hub.IsEnabled(LogLevels.Parse(call.Need(0), "$log->enabled()"), Category);
+                case "is_enabled":
+                    result = Hub.IsEnabled(LogLevels.Parse(call.Need(0), "$log->is_enabled()"), Category);
                     return true;
                 case "entries":
                     result = Hub.Entries().Select(e => (object)e.ToMap()).ToList();

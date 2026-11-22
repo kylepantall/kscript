@@ -90,6 +90,82 @@ public class SyntaxConventionTests
         Assert.Empty(problems);
     }
 
+    public static IEnumerable<object[]> XmlFiles()
+    {
+        string root = ScriptRunner.RepoFile();
+        foreach (string folder in new[] { "samples", Path.Combine("KScript.Cli", "Scaffolding"), "Example Scripts" })
+        {
+            string full = Path.Combine(root, folder);
+            if (!Directory.Exists(full))
+            {
+                continue;
+            }
+            foreach (string file in Directory.EnumerateFiles(full, "*.xml", SearchOption.AllDirectories).OrderBy(f => f, StringComparer.Ordinal))
+            {
+                if (File.ReadAllText(file).Contains("<kscript", StringComparison.Ordinal))
+                {
+                    yield return new object[] { Path.GetRelativePath(root, file).Replace('\\', '/') };
+                }
+            }
+        }
+    }
+
+    /// <summary>The XML samples declare names bare too: <c>&lt;do&gt;total += 1&lt;/do&gt;</c> and <c>fn(n) =&gt; $n</c>.</summary>
+    [Theory]
+    [MemberData(nameof(XmlFiles))]
+    public void XmlSamplesDeclareNamesBare(string file)
+    {
+        string text = File.ReadAllText(ScriptRunner.RepoFile(file));
+        Assert.Empty(Problems(text, ScriptRunner.RepoFile(file)).Select(p => $"{file}{p}"));
+    }
+
+    /// <summary>Every example the catalog shows on hover, in the docs and to agents, by what it is the example of.</summary>
+    private static IEnumerable<(string Key, string Example)> CatalogExamples()
+    {
+        foreach (KScriptPackage package in PackageRegistry.Default.LoadAll())
+        {
+            foreach (ElementDefinition e in package.Elements.Values)
+            {
+                yield return ($"{package.Name} <{e.Info.Name}>", e.Info.Example);
+            }
+            foreach (CommandDefinition c in package.Commands.Values)
+            {
+                yield return ($"{package.Name} @{c.Info.Name}", c.Info.Example);
+            }
+            foreach (MethodDefinition m in package.Methods)
+            {
+                yield return ($"{package.Name} {m.Info.ReceiverType}->{m.Info.Name}", m.Info.Example);
+            }
+            foreach (ValueFieldDefinition f in package.Fields)
+            {
+                yield return ($"{package.Name} field {f.Info.Name}", f.Info.Example);
+            }
+        }
+    }
+
+    [Fact]
+    public void CatalogExamplesDeclareNamesBare()
+    {
+        var problems = new List<string>();
+        int count = 0;
+        foreach ((string key, string example) in CatalogExamples())
+        {
+            if (string.IsNullOrWhiteSpace(example))
+            {
+                continue;
+            }
+            count++;
+
+            // An example is a few elements or one expression.
+            string script = example.TrimStart().StartsWith('<') ? $"<kscript>\n{example}\n</kscript>" : $"<kscript><echo>{{ {example} }}</echo></kscript>";
+            problems.AddRange(Analyzer.Analyze(script, "example.ks.xml").Diagnostics
+                .Where(d => d.Code == DiagnosticCodes.BareDeclaration)
+                .Select(d => $"{key}: {d.Message} In: {example}"));
+        }
+        Assert.True(count > 500, $"expected the catalog's examples to be found, saw {count}");
+        Assert.Empty(problems.Distinct());
+    }
+
     /// <summary>KS6010 and KS6012, and the arms of a match written the old way (case, when, default blocks).</summary>
     private static IEnumerable<string> Problems(string code, string path, int firstLine = 0)
     {

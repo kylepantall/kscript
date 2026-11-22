@@ -498,6 +498,10 @@ namespace KScript.Syntax
                     Advance();
                     return new LiteralNode { Kind = LiteralKind.Url, Value = t.Text, Span = t.Span };
 
+                case TokenKind.Duration:
+                    Advance();
+                    return new LiteralNode { Kind = LiteralKind.Duration, Value = t.Text, Span = t.Span };
+
                 case TokenKind.Variable:
                     Advance();
                     return new VariableNode { Name = t.Text, Span = t.Span };

@@ -53,7 +53,7 @@ namespace KScript.Language.Tests
         {
             AssertClean(Open(Welcome + """
                 dispatch Welcome(user_id: 1, email: 'a@example.com')
-                Welcome(user_id: 2, email: 'b@example.com', name: 'Bo')->dispatch(delay: '5m', queue: 'later')
+                Welcome(user_id: 2, email: 'b@example.com', name: 'Bo')->dispatch(delay: 5m, queue: 'later')
                 job = Welcome(user_id: 3, email: 'c@example.com')
                 $job->run()
                 echo $job.email

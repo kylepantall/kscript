@@ -378,12 +378,6 @@ namespace KScript.Runtime
                 case "schema":
                     result = Shapes.Schema(this);
                     return true;
-                case "fields":
-                    result = FieldList();
-                    return true;
-                case "name":
-                    result = Name;
-                    return true;
                 default:
                     result = null;
                     return false;
@@ -404,10 +398,15 @@ namespace KScript.Runtime
         {
             ("from", "data", "Checks the data (a map, a list of maps, or JSON text) and returns it as this type. Fails with every problem it finds.", "any"),
             ("check", "data", "The problems that stop the data fitting this type, as { path, field, message } maps. Empty when it fits.", "list"),
-            ("is", "value", "yes if the value is a record of this type, or of a type built on it with with [...]. Given a type, yes if that type is this one or is built on it.", "bool"),
+            ("is", "value", "True when the value is a record of this type, or of a type built on it with with [...]. Given a type, true when that type is this one or is built on it.", "bool"),
             ("schema", "", "The type as a JSON Schema map.", "map"),
-            ("fields", "", "The type's fields: name, type, optional, from, computed and description.", "list"),
-            ("name", "", "The type's name.", "string"),
+        };
+
+        internal static readonly (string Name, string Type, string Description)[] ValueFields =
+        {
+            ("name", "string", "The type's name."),
+            ("description", "string", "What the type is for, or null."),
+            ("fields", "list", "The type's fields: name, type, optional, from, computed and description."),
         };
     }
 

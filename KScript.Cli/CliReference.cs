@@ -102,7 +102,7 @@ namespace KScript
                     O("--sleep t", "How long to wait when the queues are empty (default 1s)."),
                 },
                 "kscript worker\nkscript worker --queue high,default --concurrency 4\nkscript worker --stop-when-empty", "queues") { Group = "queue", Details = "Settings come from the queue section of kscript.json." },
-            new CliCommand("queue", "kscript queue status|list [queue]|failed|retry <id>|forget <id>|clear [queue] [--all] [--connection name] [--format json]",
+            new CliCommand("queue", "kscript queue status|list [queue]|failed|retry <id>|delete <id>|clear [queue] [--all] [--connection name] [--format json]",
                 "Look after the queues: what is waiting, what failed and why, and run failed jobs again.",
                 new[]
                 {
@@ -110,7 +110,7 @@ namespace KScript
                     O("list [queue]", "The waiting jobs with their fields."),
                     O("failed", "The failed jobs with their errors."),
                     O("retry <id> | --all", "Put failed jobs back on their queues, with their tries reset."),
-                    O("forget <id> | --all", "Delete failed jobs."),
+                    O("delete <id> | --all", "Delete failed jobs."),
                     O("clear [queue]", "Remove the waiting jobs of a queue (or of every queue)."),
                     O("--connection, -c name", "The connection to look at (default queue.default)."),
                     O("--format json", "Print JSON instead of a table."),

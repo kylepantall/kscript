@@ -15,12 +15,12 @@ namespace KScript.Language.Tests
         [InlineData("<afor from=\"a\" to=\"b\"></afor>", DiagnosticCodes.RetiredElement, "afor", "<for each")]
         [InlineData("<Echo>hi</Echo>", DiagnosticCodes.UnknownElement, "Echo", "Did you mean <echo>?")]
         [InlineData("<echo colour=\"red\">hi</echo>", DiagnosticCodes.UnknownAttribute, "colour", null)]
-        [InlineData("<wait secnds=\"1\" />", DiagnosticCodes.UnknownAttribute, "secnds", "Did you mean 'seconds'?")]
+        [InlineData("<exit cde=\"1\" />", DiagnosticCodes.UnknownAttribute, "cde", "Did you mean 'code'?")]
         [InlineData("<for each=\"i\" in=\"0..3\" index=\"n\"><echo>$i</echo></for>", DiagnosticCodes.RetiredAttribute, "index", "'index' is now at.")]
         [InlineData("<if condition=\"yes\"></if>", DiagnosticCodes.RetiredAttribute, "condition", "Use test=")]
         [InlineData("<for in=\"0..3\"></for>", DiagnosticCodes.MissingAttribute, "for", "'each'")]
         [InlineData("<echo format=\"html\">x</echo>", DiagnosticCodes.InvalidAttributeValue, "html", "text, json, markdown")]
-        [InlineData("<let name=\"c\" value=\"1\" const=\"maybe\" />", DiagnosticCodes.InvalidAttributeValue, "maybe", "yes or no")]
+        [InlineData("<let name=\"c\" value=\"1\" const=\"maybe\" />", DiagnosticCodes.InvalidAttributeValue, "maybe", "true or false")]
         [InlineData("<elif test=\"true\"></elif>", DiagnosticCodes.MisplacedElement, "elif", "straight after <if>")]
         [InlineData("<let name=\"a\" value=\"1\" /><else></else>", DiagnosticCodes.MisplacedElement, "else", null)]
         [InlineData("<while test=\"false\"></while><else></else>", DiagnosticCodes.MisplacedElement, "else", "<for>")]
@@ -122,7 +122,7 @@ namespace KScript.Language.Tests
         [InlineData("<if test=\"$args->count() gt 0 and 1 &lt; 2\"></if>")]
         [InlineData("<if test=\"'3' == 3 and '3' !== 3\"></if>")]
         [InlineData("<echo><![CDATA[ raw < text ]]></echo>")]
-        [InlineData("<import package=\"KScript.IO\" /><let name=\"f\" value=\"@files('.')\" /><for each=\"x\" in=\"$f\"><echo>{ $x->extension() }</echo></for>")]
+        [InlineData("<import package=\"KScript.IO\" /><let name=\"f\" value=\"@files('.')\" /><for each=\"x\" in=\"$f\"><echo>{ $x.extension }</echo></for>")]
         [InlineData("<let name=\"x\" value=\"'a'\" /><echo format=\"markdown\">**$x**</echo>")]
         [InlineData("<render target=\"#out\"><li class=\"{ 1 }\">x</li><input type=\"text\"></input></render>")]
         public void AcceptsValidKScript(string body) => AssertClean(Analyze(Script(body)));
@@ -185,7 +185,7 @@ namespace KScript.Language.Tests
                 "<echo format=\"markdwn\">x</echo>",
                 "<def id=\"x\">1</def>",
                 "<for each=\"i\" in=\"0..2\" index=\"n\"></for>",
-                "<wait secnds=\"1\" />",
+                "<wait duraton=\"1s\" />",
                 "<let name=\"x\" value=\"1\" /><echo>{ x }</echo>",
                 "<fn name=\"f\" params=\"x\" value=\"$x\" /><echo>{ f(1) }</echo>",
                 "<echo>@join_pth('a')</echo>",

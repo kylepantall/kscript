@@ -7,19 +7,12 @@ namespace KScript.Runtime
 {
     public sealed partial class CorePackage
     {
-        /// <summary>Settings: $config, @config(), &lt;config&gt;, and YAML and .env text.</summary>
+        /// <summary>Settings: $config, &lt;config&gt;, and YAML and .env text.</summary>
         private static void RegisterConfig(PackageBuilder p)
         {
             p.Variable("config", KType.Config,
                 "The script's settings, from config.json, config.yaml and .env (plus staging.yaml, .env.staging and so on for the environment): $config.database.host.",
                 (i, m) => ConfigValue.For(i.Host, m.Directory));
-
-            p.Command("config", "path?, default?", "A setting by path, such as @config('database.port', 5432), or every setting without a path.", KType.Any, c =>
-            {
-                ConfigValue config = ConfigValue.For(c.Host, c.Module?.Directory ?? c.Host.WorkingDirectory);
-                if (!c.Has(0, "path")) return config.Values;
-                return ConfigLoader.TryGet(config.Values, Values.ToStr(c.Arg(0, "path")), out object v) && v != null ? v : c.Arg(1, "default");
-            }, "<let name=\"port\" value=\"@config('server.port', 8080)\" />");
 
             p.Element(new ElementInfo("config",
                 "Reads the script's settings with other options: an environment, other files, a prefix for environment variables, defaults and required settings. Without `into`, it changes $config.",
@@ -30,7 +23,7 @@ namespace KScript.Runtime
                 new A("root", K.Path, "The folder the files are in. Default: the script's folder."),
                 new A("defaults", K.Expression, "A map of settings used when no file sets them."),
                 new A("require", K.Text, "Settings that must be set, comma separated, such as `database.host, api.key`."),
-                new A("user", K.Bool, "yes also reads the person's own settings: config.json (or .yaml) in the app's config folder (see KScript.Storage), layered over the other files."),
+                new A("user", K.Bool, "true also reads the person's own settings: config.json (or .yaml) in the app's config folder (see KScript.Storage), layered over the other files."),
                 new A("export_env", K.Bool, "no stops values in .env files becoming environment variables (they always do for @env() unless this is no)."),
                 new A("into", K.DeclareVariable, "Store the settings in this variable instead of changing $config."))
             {

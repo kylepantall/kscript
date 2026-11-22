@@ -219,8 +219,8 @@ public sealed class McpTests : IDisposable
         Assert.Contains("`$args`", docs.Page("/reference/variables", "kscript"));
 
         string withFields = docs.Catalog.Methods.Where(m => !m.Planned).Select(m => m.ReceiverType).First(t => docs.Catalog.FieldsOf(t).Count > 0);
-        Assert.Contains("Fields: ", docs.Page("/reference/methods/" + withFields, "kscript"));
-        Assert.DoesNotContain("Fields: ", docs.Page("/reference/methods/string", "kscript"));
+        Assert.Contains("## Fields", docs.Page("/reference/methods/" + withFields, "kscript"));
+        Assert.DoesNotContain("## Fields", docs.Page("/reference/methods/string", "kscript"));
 
         string cli = docs.Page("/cli", "kscript");
         Assert.Contains("## kscript mcp", cli);

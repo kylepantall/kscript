@@ -5,17 +5,17 @@ using KScript.Runtime;
 
 namespace KScript.Queueing
 {
-    /// <summary>Lengths of time in job options and dispatch arguments: seconds, or text such as '30s', '5m', '1h', '2d'.</summary>
+    /// <summary>Lengths of time in job options and dispatch arguments: durations such as 30s, 5m, 1h, 2d (a plain number is seconds).</summary>
     internal static class Durations
     {
-        /// <summary>Seconds in a number or in text such as '90', '30s', '5m'. Throws for anything else.</summary>
+        /// <summary>Seconds in a duration, in text such as '30s', or in a plain number. Throws for anything else.</summary>
         public static double Seconds(object value, string what)
         {
-            if (value is double d && d >= 0 && !double.IsNaN(d) && !double.IsInfinity(d)) return d;
-            string text = Unquote(Values.ToStr(value));
-            if (text == "0") return 0;
-            if (ProjectConfig.Seconds(text) is double seconds) return seconds;
-            throw new KScriptException($"{what} should be a length of time: seconds (30) or text such as '30s', '5m', '1h' or '2d', not '{Values.ToStr(value)}'.", "Argument");
+            // One reader for every length of time (KScript.Runtime.Duration): 30s, 1h30m, text that reads as one, or seconds.
+            object given = value is string quoted ? Unquote(quoted) : value;
+            double seconds = Duration.Seconds(given, what);
+            if (seconds < 0) throw new KScriptException($"{what} should be a length of time of 0 or more, such as 30s or 5m, not {Values.ToStr(value)}.", "Argument");
+            return seconds;
         }
 
         /// <summary>A short way to write seconds: 45s, 10m, 2h, 3d.</summary>

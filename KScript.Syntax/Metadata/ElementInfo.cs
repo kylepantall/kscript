@@ -17,6 +17,12 @@ namespace KScript.Metadata
         public bool Required { get; }
         public IReadOnlyList<string> Options { get; }
 
+        /// <summary>
+        /// The type of value an expression attribute takes, when it has one: <c>duration</c> for a length of time
+        /// (<c>timeout: 30s</c>). Null when any value fits.
+        /// </summary>
+        public string Type { get; init; }
+
         /// <summary>Another attribute that can stand in for this one when it is required (<c>value</c> or element text).</summary>
         public bool SatisfiedByContent { get; init; }
 

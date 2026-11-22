@@ -50,7 +50,7 @@ public sealed class LoggingTests : IDisposable
             "<log>skipped</log><log level=\"error\" category=\"pay\" fields=\"{ id: 7 }\">Declined</log>" +
             "<let name=\"db\" value=\"$log->named('db')->with({ host: 'x' })\" /><do>$db->debug('Query'); $db->named('noisy')->error('never'); $db->named('slow')->trace('no')</do>" +
             "<for each=\"e\" in=\"$log->entries()\"><echo>{$e.level} {$e.category} {$e.message} { @to_json($e.fields) } {$e.script} {$e.line ?? '-'}</echo></for>" +
-            "<echo>{ $log->enabled('info') } { $db->enabled('debug') } { $db.category } { $db.fields.host } {$log} {$db}</echo>");
+            "<echo>{ $log->is_enabled('info') } { $db->is_enabled('debug') } { $db.category } { $db.fields.host } {$log} {$db}</echo>");
         Assert.Equal("error pay Declined {\"id\":7} job.ks.xml 1\ndebug db Query {\"host\":\"x\"} job.ks.xml -\nfalse true db x logger logger (db)\n", output);
         Assert.Equal("", error);
     }

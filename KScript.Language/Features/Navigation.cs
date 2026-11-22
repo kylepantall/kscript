@@ -79,6 +79,8 @@ namespace KScript.Language.Features
         private static string ShortKind(AttributeInfo a) => a.Kind switch
         {
             AttributeKind.Enum when a.Options.Count > 0 => string.Join("|", a.Options),
+            // A value of one type, such as a length of time: wait(duration: duration).
+            AttributeKind.Expression when a.Type != null => a.Type,
             AttributeKind.Expression => "any",
             AttributeKind.Template => "text",
             AttributeKind.Bool => "bool",

@@ -13,7 +13,7 @@ to: {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Queue it: import "{{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}", then dispatch {{ pascal }}(...). Run the queue with kscript worker (kscript queue failed lists failures).
 ---
 /// {{ title }}.
-job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {{ tries }}, {{/if}}{{#if backoff}}backoff: "{{ backoff }}", {{/if}}timeout: "{{#if timeout}}{{ timeout }}{{else}}60s{{/if}}") {
+job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {{ tries }}, {{/if}}{{#if backoff}}backoff: "{{ backoff }}", {{/if}}timeout: {{#if timeout}}{{ timeout }}{{else}}60s{{/if}}) {
 {{#if fields}}
 {{#each fields}}
   {{ item | trim }}

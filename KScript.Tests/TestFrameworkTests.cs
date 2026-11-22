@@ -245,7 +245,7 @@ public class TestFrameworkTests
     public void SlowTestsTimeOut()
     {
         TestFileResult file = RunTests("""
-            <test name="forever" timeout="0.2"><while test="true"><do>@assert(true)</do></while></test>
+            <test name="forever" timeout="0.2s"><while test="true"><do>@assert(true)</do></while></test>
             <test name="next one still runs"><assert test="true" /></test>
             """);
         Assert.Equal(TestOutcome.Failed, file.Tests[0].Outcome);

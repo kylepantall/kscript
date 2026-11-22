@@ -114,7 +114,7 @@ public sealed class BuiltInTests : IDisposable
     {
         Assert.Equal("x\n", Body("<kscript><echo>x</echo></kscript>"));
         Assert.Equal(string.Empty, Run("<KScript.fn name=\"f\" value=\"4\" />"));
-        Assert.Equal("done\n", Body("<wait ms=\"1\" /><wait seconds=\"0.001\" /><wait ms=\"0\" /><echo>done</echo>"));
+        Assert.Equal("done\n", Body("<wait duration=\"1ms\" /><wait duration=\"0.001\" /><wait duration=\"0s\" /><echo>done</echo>"));
         Assert.Contains("needs a name and value", Fails("<set />").Message);
         Assert.Equal("[]012ab0:x1:yk=123\n", Body(
             "<let name=\"out\" value=\"''\" />" +

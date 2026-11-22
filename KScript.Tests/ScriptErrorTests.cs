@@ -68,7 +68,7 @@ public sealed class ScriptErrorTests : IDisposable
     [InlineData("<kscript><import package=\"KScript.Web\" /><live id=\"x\" /></kscript>", "Context", "<live> only works in pages served by kscript serve")]
     [InlineData("<kscript><break>x</break></kscript>", "Syntax", "<break> has no content; write it as <break ... />.")]
     [InlineData("<kscript><echo format=\"weird\">x</echo></kscript>", "Syntax", "format=\"weird\" isn't one of: text, json, markdown.")]
-    [InlineData("<kscript><echo newline=\"maybe\">x</echo></kscript>", "Syntax", "newline=\"maybe\" should be yes or no.")]
+    [InlineData("<kscript><echo newline=\"maybe\">x</echo></kscript>", "Syntax", "newline=\"maybe\" should be true or false.")]
     [InlineData("<kscript><if><echo>x</echo></if></kscript>", "Syntax", "<if> needs a test attribute")]
     [InlineData("<kscript><import path=\"lib.ks.xml\" names=\"nope\" /></kscript>", "Import", "lib.ks.xml doesn't export 'nope'. Scripts export")]
     [InlineData("<kscript><import path=\"lib.ks.xml\" names=\"helpr\" /></kscript>", "Import", "Did you mean helper?")]

@@ -24,7 +24,7 @@ public sealed class AuthPackageTests : IDisposable
 
         fn t_reg(json) => @register($json.email, $json.password, name: $json.name ?? 'Joan')
         fn t_attempt(json) => { user: @attempt($json.email, $json.password, remember: $json.remember ?? false, session: $json.session ?? true) }
-        fn t_me() => { user: @user(), signed: @signed_in(), id: @user()?.id }
+        fn t_me() => { user: @user(), signed: @is_signed_in(), id: @user()?.id }
         fn t_login_copy(json) => @login({ id: 'x1', email: 'own@example.com', name: $json.name }, remember: true)
         fn t_login_bad() => @login('')
         fn t_logout(json) {
@@ -32,19 +32,19 @@ public sealed class AuthPackageTests : IDisposable
           return { ok: true }
         }
         fn t_put(json) {
-          $session->put('a', $json.v)
+          $session->set('a', $json.v)
           $session->flash('f', 'once')
-          return { a: $session->get('a'), missing: $session->get('nope', 'dflt'), has: $session->has('a'), all: $session->all(), token: $session->token() }
+          return { a: $session->get('a'), missing: $session->get('nope', 'dflt'), has: $session->has('a'), all: $session->all(), token: $session.token }
         }
         fn t_peek() => { a: $session->get('a'), f: $session->get('f', 'gone'), all: $session->all() }
-        fn t_forget() => { gone: $session->forget('a'), again: $session->forget('a') }
+        fn t_forget() => { gone: $session->remove('a'), again: $session->remove('a') }
         fn t_regen() {
           $session->regenerate()
           $session->regenerate()
           return { ok: true }
         }
-        fn t_private_key() => $session->put('_user', 1)
-        fn t_keep_password(json) => $session->put('p', [{ secret: $Secret->from($json).password }])
+        fn t_private_key() => $session->set('_user', 1)
+        fn t_keep_password(json) => $session->set('p', [{ secret: $Secret->from($json).password }])
         fn t_users(json) {
           u = @users()
           joan = $u->find_email('JOAN@example.com')
@@ -378,7 +378,7 @@ public sealed class AuthPackageTests : IDisposable
         string token = Values.ToStr(Map(Post(b, "/token", $$"""{ "id": "{{id}}", "expires": "1h" }"""))["token"]);
         Assert.StartsWith("ks_", token);
         Assert.StartsWith("ks_", Post(b, "/token-bare", $$"""{ "id": "{{id}}" }""").Body.Trim('"'));
-        Assert.Contains("isn't a length of time", Post(b, "/token", $$"""{ "id": "{{id}}", "expires": "soon" }""").Body);
+        Assert.Contains("should be a length of time", Post(b, "/token", $$"""{ "id": "{{id}}", "expires": "soon" }""").Body);
         Assert.Equal(404, Post(b, "/token-nobody").Status);
 
         var bearer = new Dictionary<string, object> { ["authorization"] = "Bearer " + token };
@@ -548,7 +548,7 @@ public sealed class AuthPackageTests : IDisposable
         string output = ScriptRunner.Run("""
             import KScript.Auth
             echo @user() ?? 'nobody'
-            echo @signed_in()
+            echo @is_signed_in()
             echo @users()->count()
             try {
               $session->get('a')

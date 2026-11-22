@@ -34,7 +34,7 @@ match $command {
     // notes were read.
     views = @cache(file)->increment('views')
     echo "{ $config->get('greeting', 'Your notes') } ({ $views } views, in \
-      { $data->path() })"
+      { $data.path })"
     for note in $notes {
       echo "- { $note.text }"
     }

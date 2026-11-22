@@ -634,7 +634,7 @@ public class HttpAppTests
                 <let name="r" value="@response('hi', type: 'text/plain')->with_status(202)->with_header('X-A', 1)" />
                 <return value="$r" />
               </Get>
-              <Get path="/b"><return value="@response('x')->status() + @response([1])->type()" /></Get>
+              <Get path="/b"><return value="@response('x').status + @response([1]).type" /></Get>
               <Get path="/c"><return value="null" /></Get>
               <Get path="/d"><return value="fn() => 1" /></Get>
             </KScript.Routes>

@@ -47,7 +47,7 @@ namespace KScript.Http
                 new A("prefix", K.Text, "A path in front of every route in the file, such as /v1."),
                 Middleware("Middleware for every route in the file, comma separated: built-ins (log, cors, auth, throttle:30) or <fn>s taking ($request, $next)."),
                 new A("name", K.Text, "Put in front of every route name, such as admin."),
-                new A("api", K.Bool, "yes: errors and missing routes are answered with JSON (api.* files are API files already)."))
+                new A("api", K.Bool, "true: errors and missing routes are answered with JSON (api.* files are API files already)."))
             {
                 Context = ElementContext.Script,
                 Example = "<KScript.Routes>\n  <import path=\"controllers/people.ks.xml\" as=\"people\" />\n  <Middleware use=\"log\" />\n  <Get path=\"/\" view=\"home.html\" />\n  <Get path=\"/people/{id}\" to=\"people.show\" name=\"people.show\" />\n</KScript.Routes>",
@@ -169,6 +169,8 @@ namespace KScript.Http
                     return ctx.Table.Url(c.Str(0), values);
                 }, "<a href=\"{@route('people.show', id: $p.id)}\">");
 
+            foreach (var f in HttpResponse.Fields)
+                p.Field(KType.HttpResponse, f.Name, f.Type, f.Description);
             foreach (var m in HttpResponse.Methods)
                 p.Method(KType.HttpResponse, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((HttpResponse)t).TryCallMethod(c, m.Name, out object r) ? r : null);
 
@@ -187,7 +189,7 @@ namespace KScript.Http
             new A("name", K.Text, "A name for the route, for @route('name', ...)."),
             Middleware("Middleware for this route, comma separated."),
             new A("where", K.Text, "Rules for the parameters: where=\"id: int, slug: slug\". Rules: number, int, alpha, alnum, slug, uuid or a regular expression.") { Literal = true },
-            new A("etag", K.Bool, "yes tags GET answers with an ETag (a hash of the body) and answers If-None-Match with 304 Not Modified when the client already has that version."),
+            new A("etag", K.Bool, "true tags GET answers with an ETag (a hash of the body) and answers If-None-Match with 304 Not Modified when the client already has that version."),
             new A("cache", K.Text, "The Cache-Control header for GET answers: public, max-age=300, or just a number of seconds (300 is public for 5 minutes), private, no-store...") { Literal = true },
         };
 

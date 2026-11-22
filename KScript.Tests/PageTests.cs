@@ -511,7 +511,7 @@ public class PageLiveTests
     [Fact]
     public void On_tick_handlers_carry_their_interval()
     {
-        string html = PageRenderer.RenderString("<live id=\"t\"><state name=\"n\" value=\"0\" /><state name=\"ms\" value=\"'250'\" /><span on-tick=\"n += 1\" every=\"{$ms}\"></span></live>").Body;
+        string html = PageRenderer.RenderString("<live id=\"t\"><state name=\"n\" value=\"0\" /><state name=\"gap\" value=\"'250ms'\" /><span on-tick=\"n += 1\" every=\"{$gap}\"></span></live>").Body;
         Assert.Contains("<span data-ks-on-tick=\"0\" data-ks-every=\"250\"></span>", html);
     }
 
@@ -578,7 +578,7 @@ public class PageRuntimeTests
     [Fact]
     public void Files_are_read_from_the_site_folder()
     {
-        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', pattern: '*.md')->map(fn(f) => $f->name())->join(', ') } { @exists('posts/a.md') }"));
+        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', pattern: '*.md')->map(fn(f) => $f.name)->join(', ') } { @exists('posts/a.md') }"));
         Assert.Equal("a.md, b.md true", site.Render("posts/index.html").Body);
     }
 

@@ -5,7 +5,7 @@ using KScript.Runtime;
 
 namespace KScript.Tests;
 
-/// <summary>$config, @config(), &lt;config&gt;, YAML and .env. Tests in one class run one at a time, so the environment variables they set don't collide.</summary>
+/// <summary>$config, &lt;config&gt;, YAML and .env. Tests in one class run one at a time, so the environment variables they set don't collide.</summary>
 public sealed class ConfigTests : IDisposable
 {
     private readonly string dir = Path.Combine(Path.GetTempPath(), "kscript-config-" + Guid.NewGuid().ToString("N"));
@@ -127,7 +127,7 @@ public sealed class ConfigTests : IDisposable
         FileOf("settings/app.yaml", "name: Shop\n");
         FileOf("settings/app.production.yaml", "name: Shop (live)\n");
         string output = Run("<config root=\"settings\" files=\"app, secrets.json?\" env=\"production\" defaults=\"{ name: 'x', port: 80 }\" require=\"name\" />" +
-            "<echo>{$config.name} {$config.port} {@config('port')} {@config('missing', 'd')} {@config()->count()}</echo>");
+            "<echo>{$config.name} {$config.port} {$config->get('port')} {$config->get('missing', 'd')} {$config->all()->count()}</echo>");
         Assert.Equal("Shop (live) 80 80 d 2\n", output);
     }
 

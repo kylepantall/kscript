@@ -155,6 +155,9 @@ namespace KScript.Syntax
         /// <summary>A type name written with <c>$</c> (<c>$Repo</c>), or an optional field marked on its type (<c>age: int?</c>) rather than its name.</summary>
         public const string TypeForm = "KS6014";
 
+        /// <summary>A length of time written without its unit (<c>timeout: 30</c>) or in quotes (<c>ttl: '10m'</c>); a duration is <c>30s</c>.</summary>
+        public const string DurationUnit = "KS6018";
+
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>
             "https://github.com/kylepantall/kscript/blob/master/docs/errors.md#" + (code ?? string.Empty).ToLowerInvariant();

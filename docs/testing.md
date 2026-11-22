@@ -219,7 +219,7 @@ import KScript.Net
 
 test(name: "a note is saved") {
   added = @api('/api/notes', options: { method: 'POST', body: { title: 'Ship it' } })
-  expect(value: $added->status(), equals: 201)
+  expect(value: $added.status, equals: 201)
   expect(value: @api('/api/notes/' + $added->json().id)->json().title, equals: 'Ship it')
 }
 ```

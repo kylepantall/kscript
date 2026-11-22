@@ -737,7 +737,7 @@ namespace KScript.Language.Features
             AttributeKind.Path => "file path",
             AttributeKind.Selector => "CSS selector",
             AttributeKind.Enum => "one of a set",
-            AttributeKind.Bool => "yes/no",
+            AttributeKind.Bool => "true/false",
             _ => "text",
         };
 
@@ -1006,7 +1006,13 @@ namespace KScript.Language.Features
             {
                 return MethodItems(analysis, receiver, replace);
             }
-            return receiver.Fields.Values.Select(f => new CompletionItem
+            return FieldItems(receiver, replace);
+        }
+
+        /// <summary>The fields of a value: a map's keys or a record's fields, and the ones its type has (<c>$response.status</c>).</summary>
+        private List<CompletionItem> FieldItems(TypeShape shape, TextSpan replace)
+        {
+            List<CompletionItem> items = shape.Fields.Values.Select(f => new CompletionItem
             {
                 Label = f.Name,
                 Kind = CompletionKind.Field,
@@ -1014,6 +1020,22 @@ namespace KScript.Language.Features
                 Documentation = f.Description,
                 ReplaceSpan = replace,
             }).ToList();
+            foreach (string type in new[] { shape.Kind, shape.Type })
+            {
+                foreach (ValueFieldInfo f in Catalog.FieldsOf(type).Values.OrderBy(f => f.Name, StringComparer.Ordinal))
+                {
+                    if (shape.Fields.ContainsKey(f.Name) || items.Any(i => i.Label == f.Name)) continue;
+                    items.Add(new CompletionItem
+                    {
+                        Label = f.Name,
+                        Kind = CompletionKind.Field,
+                        Detail = f.Type ?? KType.Any,
+                        Documentation = f.Description,
+                        ReplaceSpan = replace,
+                    });
+                }
+            }
+            return items;
         }
 
         /// <summary>Fields after <c>.</c>: keys of a map literal, an import's functions, or a built-in value's fields.</summary>
@@ -1047,15 +1069,7 @@ namespace KScript.Language.Features
                 return new List<CompletionItem>();
             }
 
-            TypeShape shape = InferAt(analysis, region, target);
-            return shape.Fields.Values.Select(f => new CompletionItem
-            {
-                Label = f.Name,
-                Kind = CompletionKind.Field,
-                Detail = f.Shape.Display(),
-                Documentation = f.Description,
-                ReplaceSpan = replace,
-            }).ToList();
+            return FieldItems(InferAt(analysis, region, target), replace);
         }
 
         #endregion

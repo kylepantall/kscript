@@ -27,7 +27,7 @@ namespace KScript.Terminal
                 new A("into", K.DeclareVariable, "The variable that receives the answer.", true),
                 new A("type", K.Enum, "Convert the answer: string (the default), int, number, bool, email, handle, uuid or password. A password is never echoed back.", false, "string", "int", "number", "float", "bool", "email", "handle", "uuid", "password"),
                 new A("default", K.Expression, "The value used when the answer is empty (or input has ended)."),
-                new A("secret", K.Bool, "yes hides what is typed. type=\"password\" hides it too and keeps the answer as a password."),
+                new A("secret", K.Bool, "true hides what is typed. type=\"password\" hides it too and keeps the answer as a password."),
                 new A("error", K.Template, "What to say when the answer doesn't fit the type."))
             {
                 Context = ElementContext.Script,
@@ -107,7 +107,7 @@ namespace KScript.Terminal
                 catch (IOException) { return 80d; }
             });
 
-            p.Command("is_terminal", "", "yes when a person is at a terminal, no when input or output is redirected (a pipe, a file, a test). Use it to skip animations and prompts.", KType.Bool,
+            p.Command("is_terminal", "", "True when a person is at a terminal, false when input or output is redirected (a pipe, a file, a test). Use it to skip animations and prompts.", KType.Bool,
                 c => c.Host.IsInteractive, "<if @is_terminal()><clear /></if>");
 
             RegisterOutput(p);
@@ -212,41 +212,21 @@ namespace KScript.Terminal
                 return null;
             });
 
-            p.Element(new ElementInfo("table", "Prints a list of maps (or of lists) as a table with borders, like kscript queue status.", ContentKind.Empty,
-                new A("rows", K.Expression, "The rows: a list of maps, or a list of lists.", true),
-                new A("columns", K.Expression, "The keys to show, in order: a list or comma-separated names. Defaults to the first row's keys."),
-                new A("headers", K.Expression, "The header of each column (defaults to the column names)."),
-                new A("align", K.Expression, "left or right for each column, such as ['left', 'right']. Numbers line up right by default."))
+            p.Element(new ElementInfo("table", "Prints a list of maps (or of lists) as a table with borders, like kscript queue status. It takes the same rows, columns, align and header as a document's Table.", ContentKind.Empty,
+                new A("rows", K.Expression, "The rows: a list of maps (each a row), or a list of lists (the first is the heading row).", true),
+                new A("columns", K.Expression, "Which values of each map to show, in order: a list of keys ['name', 'age'], or a map from heading to key { Name: 'name' }. Defaults to the first row's keys."),
+                new A("align", K.Expression, "left, center or right for each column, such as ['left', 'right']. Numbers line up right by default."),
+                new A("header", K.Bool, "false: no heading row."))
             {
                 Context = ElementContext.Script,
-                Example = "<table rows=\"[{ name: 'Joan', age: 82 }, { name: 'Sam', age: 9 }]\" />",
+                Example = "<table rows=\"[{ name: 'Joan', age: 82 }, { name: 'Sam', age: 9 }]\" columns=\"{ Name: 'name', Age: 'age' }\" />",
             }, run =>
             {
-                object rowsValue = run.Eval("rows");
-                if (rowsValue is not List<object> rows) throw run.Error($"rows needs a list, but got {Values.Describe(rowsValue)}.", "rows", "Type");
-                List<string> Names(string attribute) => run.Has(attribute)
-                    ? run.Eval(attribute) switch
-                    {
-                        List<object> l => l.Select(Values.ToStr).ToList(),
-                        object o => Values.ToStr(o).Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToList(),
-                        _ => null,
-                    }
-                    : null;
-                List<string> columns = Names("columns")
-                    ?? (rows.FirstOrDefault() is Dictionary<string, object> first ? first.Keys.ToList()
-                        : Enumerable.Range(1, rows.Select(r => r is List<object> l ? l.Count : 1).DefaultIfEmpty(0).Max()).Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToList());
-                List<string> headers = Names("headers") ?? columns;
-                List<object[]> cells = rows.Select(r => columns.Select((c, i) => r switch
-                {
-                    Dictionary<string, object> m => m.TryGetValue(c, out object v) ? v : null,
-                    List<object> l => i < l.Count ? l[i] : null,
-                    _ => i == 0 ? r : null,
-                }).ToArray()).ToList();
-                List<string> alignNames = Names("align");
-                var align = columns.Select((c, i) =>
-                    alignNames != null && i < alignNames.Count ? (alignNames[i].Equals("right", StringComparison.OrdinalIgnoreCase) ? CliAlign.Right : CliAlign.Left)
-                    : cells.Count > 0 && cells.All(row => row[i] is double || row[i] == null) && cells.Any(row => row[i] is double) ? CliAlign.Right : CliAlign.Left).ToList();
-                Write(run, o => o.Table(headers, cells.Select(row => (IReadOnlyList<string>)row.Select(v => v == null ? string.Empty : Values.ToStr(v)).ToList()), align));
+                TableArguments table = TableArguments.Read(run.Eval("rows"), run.Has("columns") ? run.Eval("columns") : null, run.Has("align") ? run.Eval("align") : null,
+                    run.Flag("header", true), (message, argument) => run.Error(message, argument, "Argument"));
+                List<CliAlign> align = Enumerable.Range(0, table.ColumnCount)
+                    .Select(i => table.AlignOf(i) switch { "right" => CliAlign.Right, "center" => CliAlign.Center, _ => CliAlign.Left }).ToList();
+                Write(run, o => o.Table(table.Headings, table.Cells.Select(row => (IReadOnlyList<string>)row.Select(v => v == null ? string.Empty : Values.ToStr(v)).ToList()), align));
                 return null;
             });
         }

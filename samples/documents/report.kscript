@@ -36,13 +36,13 @@ KScript.Document(
     Table(
       caption: "Visitors and sign-ups by quarter.",
       id: "tab-growth",
-      data: $quarters,
+      rows: $quarters,
       columns: {
         Quarter: 'quarter',
         Visitors: 'visitors',
         'Sign-ups': 'signups'
       },
-      align: "lrr"
+      align: ['left', 'right', 'right']
     )
 
     Paragraph "The conversion rate is the share of visitors who sign up:"

@@ -33,7 +33,7 @@ for i in 0..3 {
 
 ## KS1004
 
-**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(seconds: 2)`.
+**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(duration: 2s)`.
 
 ## KS1005
 
@@ -231,7 +231,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 ## KS5008
 
-**A named argument is given twice, or a word is used as a flag on a parameter that isn't yes/no.** Give each argument once, and give other parameters a value: `name: value`.
+**A named argument is given twice, or a word is used as a flag on a parameter that isn't true/false.** Give each argument once, and give other parameters a value: `name: value`.
 
 ## KS5009
 
@@ -318,3 +318,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 ## KS6014
 
 **A type written the long way.** A type is named bare, without `$`: `@json($text, as: Repo)`, `Repo($data)`. An optional field is marked on its name, `age?: int`, not on its type.
+
+## KS6018
+
+**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so the fix adds `s`.

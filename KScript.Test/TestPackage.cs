@@ -29,13 +29,13 @@ namespace KScript.Testing
 
         protected override void Register(PackageBuilder p)
         {
-            var skip = new A("skip", K.Template, "Skip it: skip=\"yes\", or a reason such as skip=\"needs a network\".");
-            var only = new A("only", K.Bool, "yes runs only the tests marked only in this file, while you work on them.");
+            var skip = new A("skip", K.Template, "Skip it: skip=\"true\", or a reason such as skip=\"needs a network\".");
+            var only = new A("only", K.Bool, "true runs only the tests marked only in this file, while you work on them.");
 
             p.Element(new ElementInfo("test", "A test. Its body runs on its own when kscript test runs the file, and it passes if nothing in it fails. Inside a <for> loop it is one test per item.", ContentKind.Statements,
                 new A("name", K.Template, "What the test checks, shown in the results. In a <for> loop, `{ }` can use the loop's variables.", true),
                 skip, only,
-                new A("timeout", K.Expression, "Fail the test if it runs longer than this many seconds (the default is 10, or test.timeout in kscript.json)."))
+                new A("timeout", K.Expression, "Fail the test if it runs longer than this: 30s, 2m (the default is 10s, or test.timeout in kscript.json). A plain number is seconds.") { Type = Duration.TypeName })
             {
                 Context = ElementContext.Script,
                 Example = "<fn name=\"add\" params=\"a, b\" value=\"$a + $b\" />\n<test name=\"adds two numbers\">\n  <expect value=\"@add(2, 3)\" equals=\"5\" />\n</test>\n<for each=\"n\" in=\"[1, 2, 3]\">\n  <test name=\"doubles {$n}\">\n    <expect value=\"@add($n, $n)\" equals=\"$n * 2\" />\n  </test>\n</for>",
@@ -179,7 +179,7 @@ namespace KScript.Testing
             TestGroup group = session.Current;
             string skip = SkipReason(run) ?? group.Skip;
             bool only = run.Flag("only") || group.Only;
-            double? timeout = run.Has("timeout") ? run.Number("timeout", 0) : null;
+            double? timeout = run.Seconds("timeout");
             int line = run.Module.PositionOf(run.Element.Span.Start).Line;
             List<string> groups = group.Chain().Where(g => g.Name != null).Select(g => g.Name).ToList();
 

@@ -48,7 +48,7 @@ namespace KScript.Metadata
         /// <summary>One of a fixed set of words (see the attribute's options).</summary>
         Enum,
 
-        /// <summary>yes/no (also true/false).</summary>
+        /// <summary>true/false (yes/no is still read in XML attributes).</summary>
         Bool,
 
         /// <summary>Plain text.</summary>

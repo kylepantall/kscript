@@ -17,7 +17,7 @@
     name="world"
     value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
   <let name="playing" value="false" />
-  <let name="speed" value="150" />
+  <let name="speed" value="0.15" />
   <let name="pattern" value="'glider_gun'" />
   <let name="soup" value="30" />
   <let name="wrap" value="true" />
@@ -44,7 +44,7 @@
     <Button on_click="world = @advance($world, generations: 50)">+50</Button>
     <Spacer size="8" />
     <Text color="#94a3b8">Speed</Text>
-    <Select bind="speed" options="{ Slow: 400, Normal: 150, Fast: 40 }" />
+    <Select bind="speed" options="{ Slow: 0.4, Normal: 0.15, Fast: 0.04 }" />
     <Text color="#94a3b8">Pattern</Text>
     <Select
       bind="pattern"

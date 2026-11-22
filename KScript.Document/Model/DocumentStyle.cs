@@ -200,7 +200,7 @@ namespace KScript.Documents
         }
 
         public static bool Bool(string text, string name) =>
-            Values.ParseBool(text) ?? throw new KScriptException($"{name}: '{text}' should be yes or no.", "Argument");
+            Values.ParseBool(text) ?? throw new KScriptException($"{name}: '{text}' should be true or false.", "Argument");
 
         public static (double Width, double Height) Paper(string name) => name.ToLowerInvariant().Replace(" ", string.Empty) switch
         {

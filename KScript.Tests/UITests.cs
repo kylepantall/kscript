@@ -127,14 +127,14 @@ public class UITests
         const string xml = """
             <KScript.Window>
               <let name="frame" value="0" />
-              <Timer every="50" when="$frame lt 3" on_tick="frame += 1" />
+              <Timer every="50ms" when="$frame lt 3" on_tick="frame += 1" />
               <Text>{$frame}</Text>
             </KScript.Window>
             """;
         RunWindow(xml, s =>
         {
             UINode timer = s.FindAll("Timer")[0];
-            Assert.Equal(50d, timer.Number("every"));
+            Assert.Equal(0.05, KScript.Runtime.Duration.Seconds(timer.Prop("every"), "every"));
             while (s.FindAll("Timer")[0].Flag("when")) s.Fire(s.FindAll("Timer")[0], "on_tick");
             Assert.Equal("3", s.FindAll("Text")[0].Text);
         });

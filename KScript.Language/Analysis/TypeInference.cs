@@ -41,6 +41,7 @@ namespace KScript.Language.Analysis
                         LiteralKind.Email => KType.Email,
                         LiteralKind.Uuid => KType.Uuid,
                         LiteralKind.Url => "url",
+                        LiteralKind.Duration => "duration",
                         _ => KType.Null,
                     });
 
@@ -106,7 +107,11 @@ namespace KScript.Language.Analysis
                 case MemberNode member:
                 {
                     TypeShape target = Infer(member.Target, region);
-                    return target.Fields.TryGetValue(member.Name, out FieldInfo f) ? f.Shape : TypeShape.Unknown;
+                    if (target.Fields.TryGetValue(member.Name, out FieldInfo f)) return f.Shape;
+                    // A field the value's type has: $response.status, $date.year.
+                    return (catalog.GetField(target.Kind, member.Name) ?? catalog.GetField(target.Type, member.Name)) is ValueFieldInfo builtIn && builtIn.Type is not (null or KType.Any)
+                        ? new TypeShape(builtIn.Type) { Declared = true }
+                        : TypeShape.Unknown;
                 }
 
                 case IndexNode index:

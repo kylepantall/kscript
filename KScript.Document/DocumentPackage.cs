@@ -46,7 +46,7 @@ namespace KScript.Documents
                 new A("to", K.Template, "Where to save it, by extension: paper.pdf, paper.tex, paper.docx, paper.md or paper.html. Save several with a list: [paper.pdf, paper.docx].") { NameList = true },
                 new A("into", K.DeclareVariable, "A variable that receives the document, for ->save(), ->pages() or ->markdown() later."),
                 new A("paper", K.Template, "Paper size: a4 (the default), a3, a5, b5, letter, legal, or a size such as 15cm x 20cm."),
-                new A("landscape", K.Bool, "yes turns the paper sideways."),
+                new A("landscape", K.Bool, "true turns the paper sideways."),
                 new A("margin", K.Template, "Margins: one size (2.5cm), or top/right/bottom/left like CSS ('2cm 2.5cm')."),
                 new A("font", K.Enum, "Body text: serif (Times), sans (Helvetica) or mono (Courier).", false, "serif", "sans", "mono"),
                 new A("heading_font", K.Enum, "Headings: serif, sans or mono.", false, "serif", "sans", "mono"),
@@ -55,8 +55,8 @@ namespace KScript.Documents
                 new A("align", K.Enum, "Body text: justify, left, center or right.", false, "justify", "left", "center", "right"),
                 new A("accent", K.Template, "The colour of headings and the title page: #rrggbb or a name such as navy."),
                 new A("numbered", K.Bool, "no leaves sections without numbers."),
-                new A("title_page", K.Bool, "yes puts the title, authors, date and abstract on a page of their own."),
-                new A("chapters", K.Bool, "yes starts each top-level section on a new page."),
+                new A("title_page", K.Bool, "true puts the title, authors, date and abstract on a page of their own."),
+                new A("chapters", K.Bool, "true starts each top-level section on a new page."),
                 new A("citations", K.Enum, "numeric ([1]) or author-year ((Conway, 1970)).", false, "numeric", "author-year"),
                 new A("header", K.Template, "The page header: 'left | centre | right', with [page], [pages], [title], [author] and [date]."),
                 new A("footer", K.Template, "The page footer, like header. The default shows the page number."),
@@ -80,11 +80,11 @@ namespace KScript.Documents
                 "Section(title: Methods, id: methods) {\n  Paragraph \"We ran each pattern for 1000 generations.\"\n}",
                 new A("title", K.Template, "The heading. It may hold **bold**, *italic* and \\( maths \\).", true), Id,
                 new A("numbered", K.Bool, "no leaves this section without a number."),
-                new A("new_page", K.Bool, "yes starts it on a new page.")), DocumentElements.Section);
+                new A("new_page", K.Bool, "true starts it on a new page.")), DocumentElements.Section);
             p.Element(Info("Paragraph", "A paragraph. Its text may hold **bold**, *italic*, `code`, [links](https://...), \\( maths \\), [@key] citations, [#id] cross-references and ^[footnotes]. A blank line starts a new paragraph.", ContentKind.Template,
                 "Paragraph \"Gliders travel diagonally [@gardner1970], as Figure [#fig-glider] shows.^[Every four generations.]\"",
                 Id, new A("align", K.Enum, "left, center, right or justify (the document's setting is the default).", false, "left", "center", "right", "justify"),
-                new A("lines", K.Bool, "yes keeps the line breaks in the text, as in an address or a poem.")), DocumentElements.Paragraph);
+                new A("lines", K.Bool, "true keeps the line breaks in the text, as in an address or a poem.")), DocumentElements.Paragraph);
             p.Element(Info("Markdown", "Markdown, from its text or a file: # headings become sections, with paragraphs, lists, tables, code, quotes, images and maths (\\[ \\] in scripts, also $ $ and $$ $$ in files).", ContentKind.Template,
                 "Markdown(path: \"chapters/results.md\")",
                 new A("path", K.Path, "A Markdown file, relative to the script.")), DocumentElements.Markdown);
@@ -99,18 +99,18 @@ namespace KScript.Documents
                 LiteralText = TextLiterals.Maths,
                 Example = "Item \"Gliders move by **one cell** diagonally.\"",
             }, DocumentElements.Item);
-            p.Element(Info("Table", "A table: from data:, or from Tr rows inside it. Tables with a caption are numbered.", ContentKind.Statements,
-                "Table(caption: \"Patterns\", data: $patterns, columns: { Pattern: 'name', Period: 'period' }, align: \"lr\")",
+            p.Element(Info("Table", "A table: from rows:, or from Tr rows inside it. Tables with a caption are numbered. It takes the same rows, columns, align and header as the terminal's table.", ContentKind.Statements,
+                "Table(caption: \"Patterns\", rows: $patterns, columns: { Pattern: 'name', Period: 'period' }, align: ['left', 'right'])",
                 new A("caption", K.Template, "The caption, shown above the table as 'Table 1: ...'."), Id,
-                new A("data", K.Expression, "Rows: a list of maps (each a row) or a list of lists."),
-                new A("columns", K.Expression, "Which values of each map to show: a list of keys ['name', 'age'], or a map from heading to key { Name: 'name' }."),
-                new A("align", K.Template, "Column alignment, one letter a column: l, c or r, such as lrr."),
+                new A("rows", K.Expression, "The rows: a list of maps (each a row), or a list of lists (the first is the heading row)."),
+                new A("columns", K.Expression, "Which values of each map to show, in order: a list of keys ['name', 'age'], or a map from heading to key { Name: 'name' }. Defaults to the first row's keys."),
+                new A("align", K.Expression, "left, center or right for each column, such as ['left', 'right']. Numbers line up right by default."),
                 new A("widths", K.Expression, "Relative column widths for a table across the page, such as [3, 1, 1]."),
                 new A("rules", K.Enum, "booktabs, grid or none (the document's setting is the default).", false, "booktabs", "grid", "none"),
-                new A("header", K.Bool, "no: the first row of data: isn't a heading row."),
+                new A("header", K.Bool, "false: no heading row."),
                 new A("size", K.Expression, "Text size relative to the body, such as 0.9.")), DocumentElements.Table);
             p.Element(new ElementInfo("Tr", "A table row: cells separated by |, each like a Paragraph's text. \\| is a | inside a cell.", ContentKind.Template,
-                new A("header", K.Bool, "yes makes it a heading row, repeated at the top of each page."))
+                new A("header", K.Bool, "true makes it a heading row, repeated at the top of each page."))
             {
                 Context = ElementContext.Script,
                 MustBeInside = new[] { "Table" },
@@ -190,6 +190,8 @@ namespace KScript.Documents
                 new A("notes", K.Template, "Payment details or terms, under the table."),
                 new A("title", K.Template, "The heading (default Invoice).")), DocumentElements.Invoice);
 
+            foreach (var f in DocumentValue.Fields)
+                p.Field(KType.Document, f.Name, f.Type, f.Description);
             foreach (var m in DocumentValue.Methods)
                 p.Method(KType.Document, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((DocumentValue)t).Invoke(c, m.Name));
 

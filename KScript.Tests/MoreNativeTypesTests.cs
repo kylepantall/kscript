@@ -100,34 +100,34 @@ public class MoreNativeTypesTests
     }
 
     [Theory]
-    [InlineData("u: url = 'https://example.com:8443/docs?page=2&q=tea#intro'\necho \"{ $u->scheme() } { $u->host() } { $u->port() } { $u->path() } { $u->query().q } { $u->fragment() } { $u->origin() }\"",
+    [InlineData("u: url = 'https://example.com:8443/docs?page=2&q=tea#intro'\necho \"{ $u.scheme } { $u.host } { $u.port } { $u.path } { $u.query.q } { $u.fragment } { $u.origin }\"",
         "https example.com 8443 /docs tea intro https://example.com:8443")]
-    [InlineData("u: url = 'https://example.com/docs/intro'\necho \"{ $u->join('../blog') } { $u->with_query({ page: 2 }) } { $u->port() }\"",
+    [InlineData("u: url = 'https://example.com/docs/intro'\necho \"{ $u->join('../blog') } { $u->with_query({ page: 2 }) } { $u.port }\"",
         "https://example.com/blog https://example.com/docs/intro?page=2 443")]
-    [InlineData("d: domain = 'api.example.co.uk'\necho \"{ $d->tld() } { $d->labels()->length() } { $d->is_subdomain_of('example.co.uk') } { $d->is_subdomain_of('other.com') }\"", "uk 4 true false")]
-    [InlineData("ip: ip = '10.1.2.3'\necho \"{ $ip->version() } { $ip->in('10.0.0.0/8') } { $ip->private() } { $ip->loopback() }\"", "4 true true false")]
-    [InlineData("ip: ip = '::1'\necho \"{ $ip->version() } { $ip->loopback() }\"", "6 true")]
-    [InlineData("b: cidr = '192.168.0.0/24'\necho \"{ $b->contains('192.168.0.77') } { $b->contains('192.168.1.1') } { $b->network() } { $b->prefix() } { $b->size() }\"", "true false 192.168.0.0 24 256")]
-    [InlineData("echo \"{ @slugify('Crème Brûlée, recipes!') } { @slugify('Crème Brûlée')->words() }\"", "creme-brulee-recipes creme, brulee")]
-    [InlineData("v: semver = '1.4.2'\necho \"{ $v->major() } { $v->compare('1.10.0') } { $v->satisfies('^1.2.0') } { $v->satisfies('~1.3') } { $v->satisfies('>=1.0.0 <1.4.0 || 1.4.x') } { $v->bump('major') }\"", "1 -1 true false true 2.0.0")]
-    [InlineData("v: semver = '1.0.0-beta.2'\necho \"{ $v->compare('1.0.0') } { $v->compare('1.0.0-beta.10') } { $v->prerelease() } { $v->bump('patch') }\"", "-1 -1 beta.2 1.0.0")]
-    [InlineData("m: mime = 'application/vnd.api+json; charset=utf-8'\necho \"{ $m->main_type() } { $m->subtype() } { $m->essence() } { $m->params().charset } { $m->is('application/*') } { $m->is('text/*') }\"", "application vnd.api+json application/vnd.api+json utf-8 true false")]
-    [InlineData("h: hex = 'ff80'\necho \"{ $h->bytes() } { $h->to_number() } { $h->upper() }\"", "2 65408 FF80")]
-    [InlineData("b = @base64('hello world')\necho \"$b { $b->decode() } { $b->bytes() } { @base64('??>', url: true) }\"", "aGVsbG8gd29ybGQ= hello world 11 Pz8-")]
+    [InlineData("d: domain = 'api.example.co.uk'\necho \"{ $d.tld } { $d.labels->length() } { $d->is_subdomain_of('example.co.uk') } { $d->is_subdomain_of('other.com') }\"", "uk 4 true false")]
+    [InlineData("ip: ip = '10.1.2.3'\necho \"{ $ip.version } { $ip->in('10.0.0.0/8') } { $ip.is_private } { $ip.is_loopback }\"", "4 true true false")]
+    [InlineData("ip: ip = '::1'\necho \"{ $ip.version } { $ip.is_loopback }\"", "6 true")]
+    [InlineData("b: cidr = '192.168.0.0/24'\necho \"{ $b->contains('192.168.0.77') } { $b->contains('192.168.1.1') } { $b.network } { $b.prefix } { $b.size }\"", "true false 192.168.0.0 24 256")]
+    [InlineData("echo \"{ @slugify('Crème Brûlée, recipes!') } { @slugify('Crème Brûlée').words }\"", "creme-brulee-recipes creme, brulee")]
+    [InlineData("v: semver = '1.4.2'\necho \"{ $v.major } { $v->compare('1.10.0') } { $v->satisfies('^1.2.0') } { $v->satisfies('~1.3') } { $v->satisfies('>=1.0.0 <1.4.0 || 1.4.x') } { $v->bump('major') }\"", "1 -1 true false true 2.0.0")]
+    [InlineData("v: semver = '1.0.0-beta.2'\necho \"{ $v->compare('1.0.0') } { $v->compare('1.0.0-beta.10') } { $v.prerelease } { $v->bump('patch') }\"", "-1 -1 beta.2 1.0.0")]
+    [InlineData("m: mime = 'application/vnd.api+json; charset=utf-8'\necho \"{ $m.main_type } { $m.subtype } { $m.essence } { $m.params.charset } { $m->is('application/*') } { $m->is('text/*') }\"", "application vnd.api+json application/vnd.api+json utf-8 true false")]
+    [InlineData("h: hex = 'ff80'\necho \"{ $h.bytes } { $h->to_number() } { $h->upper() }\"", "2 65408 FF80")]
+    [InlineData("b = @base64('hello world')\necho \"$b { $b->decode() } { $b.bytes } { @base64('??>', url: true) }\"", "aGVsbG8gd29ybGQ= hello world 11 Pz8-")]
     [InlineData("j: json = '{ \"a\": [1, 2] }'\necho \"{ $j->parse().a[1] }\"", "2")]
-    [InlineData("p: phone = '+44 7700 900123'\necho \"{ $p->country_code() } { $p->national() } { $p->tel() }\"", "44 7700900123 tel:+447700900123")]
-    [InlineData("c: country = 'de'\necho \"{ $c->name() } { $c->alpha3() } { $c->currency() } { $c->flag() }\"", "Germany DEU EUR 🇩🇪")]
-    [InlineData("c: currency = 'GBP'\necho \"{ $c->name() } { $c->symbol() } { $c->digits() } { $c->format(1234.5) }\"", "British Pound £ 2 £1,234.50")]
-    [InlineData("l: locale = 'fr-FR'\necho \"{ $l->language() } { $l->region() } { $l->name() }\"", "fr FR French (France)")]
+    [InlineData("p: phone = '+44 7700 900123'\necho \"{ $p.country_code } { $p.national } { $p->tel() }\"", "44 7700900123 tel:+447700900123")]
+    [InlineData("c: country = 'de'\necho \"{ $c.name } { $c.alpha3 } { $c.currency } { $c.flag }\"", "Germany DEU EUR 🇩🇪")]
+    [InlineData("c: currency = 'GBP'\necho \"{ $c.name } { $c.symbol } { $c.digits } { $c->format(1234.5) }\"", "British Pound £ 2 £1,234.50")]
+    [InlineData("l: locale = 'fr-FR'\necho \"{ $l.language } { $l.region } { $l.name }\"", "fr FR French (France)")]
     [InlineData("l: locale = 'de-DE'\necho \"{ $l->format(1234.5) }\"", "1.234,5")]
-    [InlineData("z: timezone = 'Europe/London'\necho \"{ $z->offset('2026-07-01'->to_date()) } { $z->offset('2026-01-01'->to_date()) } { $z->dst('2026-07-01'->to_date()) } { $z->convert('2026-07-01T12:00:00Z'->to_date())->format('HH:mm') }\"", "+01:00 +00:00 true 13:00")]
-    [InlineData("d: duration = '1h30m'\necho \"{ $d->seconds() } { $d->minutes() } { $d->hours() } { $d->iso() } { $d->plus('45m') } { $d->after('2026-11-21T09:00:00'->to_date())->format('HH:mm') } { $d->before('2026-11-21T09:00:00'->to_date())->format('HH:mm') }\"", "5400 90 1.5 PT1H30M 2h15m 10:30 07:30")]
+    [InlineData("z: timezone = 'Europe/London'\necho \"{ $z->offset('2026-07-01'->to_date()) } { $z->offset('2026-01-01'->to_date()) } { $z->is_dst('2026-07-01'->to_date()) } { $z->convert('2026-07-01T12:00:00Z'->to_date())->format('HH:mm') }\"", "+01:00 +00:00 true 13:00")]
+    [InlineData("d: duration = '1h30m'\necho \"{ $d.seconds } { $d.minutes } { $d.hours } { $d->iso() } { $d->plus('45m') } { $d->after('2026-11-21T09:00:00'->to_date())->format('HH:mm') } { $d->before('2026-11-21T09:00:00'->to_date())->format('HH:mm') }\"", "5400 90 1.5 PT1H30M 2h15m 10:30 07:30")]
     [InlineData("c: cron = '0 9 * * mon-fri'\necho \"{ $c->next('2026-11-21T10:00:00'->to_date())->format('ddd HH:mm') } { $c->next_times(2, '2026-11-23T10:00:00'->to_date())->map(fn(t) => $t->format('ddd')) }\"", "Mon 09:00 Tue, Wed")]
     [InlineData("c: cron = '@hourly'\necho \"{ $c->next('2026-11-21T10:20:00'->to_date())->format('HH:mm') }\"", "11:00")]
-    [InlineData("c: color = '#ff8800'\necho \"{ $c->rgb().g } { $c->mix('#0000ff') } { $c->lighten(0.5) } { $c->darken() } { $c->luminance() } { $c->contrast('white') }\"", "136 #804480 #ffc480 #cc6d00 0.3887 2.39")]
+    [InlineData("c: color = '#ff8800'\necho \"{ $c->rgb().g } { $c->mix('#0000ff') } { $c->lighten(0.5) } { $c->darken() } { $c.luminance } { $c->contrast('white') }\"", "136 #804480 #ffc480 #cc6d00 0.3887 2.39")]
     [InlineData("c: color = 'rgb(255 0 0 / 0.5)'\necho \"$c { $c->hex() } { $c->css() } { $c->rgb().a }\"", "#ff000080 #ff0000 rgb(255 0 0 / 0.5) 0.5")]
-    [InlineData("i: iban = 'GB82WEST12345698765432'\necho \"{ $i->country() } { $i->country()->name() } { $i->formatted() } { $i->bban() }\"", "GB United Kingdom GB82 WEST 1234 5698 7654 32 WEST12345698765432")]
-    [InlineData("c: card = '5555 5555 5555 4444'\necho \"$c { $c->last4() } { $c->brand() } { $c->reveal() } { { card: $c }->to_json() }\"", "•••• 4444 4444 mastercard 5555555555554444 {\"card\":\"•••• 4444\"}")]
+    [InlineData("i: iban = 'GB82WEST12345698765432'\necho \"{ $i.country } { $i.country.name } { $i->formatted() } { $i.bban }\"", "GB United Kingdom GB82 WEST 1234 5698 7654 32 WEST12345698765432")]
+    [InlineData("c: card = '5555 5555 5555 4444'\necho \"$c { $c.last4 } { $c.brand } { $c->reveal() } { { card: $c }->to_json() }\"", "•••• 4444 4444 mastercard 5555555555554444 {\"card\":\"•••• 4444\"}")]
     public void EachTypeHasMethodsOfItsOwn(string code, string expected)
     {
         Assert.Equal(expected, Code(code));
@@ -137,8 +137,8 @@ public class MoreNativeTypesTests
     public void JwtClaimsCanBeRead()
     {
         string token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig";
-        Assert.Equal("HS256 joan true 2023", Code($"t: jwt = '{token}'\necho \"{{ $t->header().alg }} {{ $t->claims().sub }} {{ $t->expired() }} {{ $t->expires()->format('yyyy') }}\""));
-        Assert.Equal("null false", Code("t: jwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.'\necho \"{ $t->expires() ?? 'null' } { $t->expired() }\""));
+        Assert.Equal("HS256 joan true 2023", Code($"t: jwt = '{token}'\necho \"{{ $t.header.alg }} {{ $t.claims.sub }} {{ $t.is_expired }} {{ $t.expires->format('yyyy') }}\""));
+        Assert.Equal("null false", Code("t: jwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.'\necho \"{ $t.expires ?? 'null' } { $t.is_expired }\""));
     }
 
     [Fact]
@@ -154,25 +154,25 @@ public class MoreNativeTypesTests
     }
 
     [Theory]
-    [InlineData("u: url = https://example.com/docs?page=2\necho $u->query().page", "2")]
-    [InlineData("u = https://example.com/docs // the docs\necho \"{ $u->type() } { $u->path() }\"", "url /docs")]
-    [InlineData("echo https://example.com/a->host()", "example.com")]
-    [InlineData("urls = [https://a.example, https://b.example]\necho $urls->map(fn(u) => $u->host())", "a.example, b.example")]
-    [InlineData("d: domain = example.com\necho $d->tld()", "com")]
-    [InlineData("ip: ip = 192.168.0.1\necho $ip->private()", "true")]
-    [InlineData("b: cidr = 10.0.0.0/8\necho $b->prefix()", "8")]
+    [InlineData("u: url = https://example.com/docs?page=2\necho $u.query.page", "2")]
+    [InlineData("u = https://example.com/docs // the docs\necho \"{ $u->type() } { $u.path }\"", "url /docs")]
+    [InlineData("echo (https://example.com/a).host", "example.com")]
+    [InlineData("urls = [https://a.example, https://b.example]\necho $urls->map(fn(u) => $u.host)", "a.example, b.example")]
+    [InlineData("d: domain = example.com\necho $d.tld", "com")]
+    [InlineData("ip: ip = 192.168.0.1\necho $ip.is_private", "true")]
+    [InlineData("b: cidr = 10.0.0.0/8\necho $b.prefix", "8")]
     [InlineData("z: timezone = Europe/London\necho $z", "Europe/London")]
     [InlineData("z: timezone = America/New_York\necho $z", "America/New_York")]
-    [InlineData("v: semver = 1.4.2\necho $v->minor()", "4")]
-    [InlineData("v: semver = 1.4.2-beta.1\necho $v->prerelease()", "beta.1")]
-    [InlineData("c: country = GB\necho $c->name()", "United Kingdom")]
-    [InlineData("c: currency = EUR\necho $c->symbol()", "€")]
-    [InlineData("l: locale = en-GB\necho $l->region()", "GB")]
-    [InlineData("d: duration = 1h30m\necho $d->minutes()", "90")]
+    [InlineData("v: semver = 1.4.2\necho $v.minor", "4")]
+    [InlineData("v: semver = 1.4.2-beta.1\necho $v.prerelease", "beta.1")]
+    [InlineData("c: country = GB\necho $c.name", "United Kingdom")]
+    [InlineData("c: currency = EUR\necho $c.symbol", "€")]
+    [InlineData("l: locale = en-GB\necho $l.region", "GB")]
+    [InlineData("d: duration = 1h30m\necho $d.minutes", "90")]
     [InlineData("c: color = red\necho \"$c { $c->contrast(white) }\"", "#ff0000 4")]
-    [InlineData("m: mime = text/html\necho $m->subtype()", "html")]
-    [InlineData("s: slug = my-post\necho $s->words()", "my, post")]
-    [InlineData("fn host(u: url) => $u->host()\necho @host(https://example.com/x)", "example.com")]
+    [InlineData("m: mime = text/html\necho $m.subtype", "html")]
+    [InlineData("s: slug = my-post\necho $s.words", "my, post")]
+    [InlineData("fn host(u: url) => $u.host\necho @host(https://example.com/x)", "example.com")]
     public void ValuesCanBeWrittenWithoutQuotes(string code, string expected)
     {
         Assert.Equal(expected, Code(code));
@@ -181,8 +181,8 @@ public class MoreNativeTypesTests
     [Fact]
     public void UrlsWithoutQuotesWorkInXmlAndInText()
     {
-        Assert.Equal("example.com\n", ScriptRunner.RunBody("<let name=\"u\" type=\"url\" value=\"https://example.com/docs\" /><echo>{ $u->host() }</echo>"));
-        Assert.Equal("example.com\n", ScriptRunner.RunBody("<echo>{ https://example.com/docs->host() }</echo>"));
+        Assert.Equal("example.com\n", ScriptRunner.RunBody("<let name=\"u\" type=\"url\" value=\"https://example.com/docs\" /><echo>{ $u.host }</echo>"));
+        Assert.Equal("example.com\n", ScriptRunner.RunBody("<echo>{ (https://example.com/docs).host }</echo>"));
         // In text, a URL is only text: the // isn't a comment and nothing is evaluated.
         Assert.Equal("See https://example.com/docs.", Code("echo \"See https://example.com/docs.\""));
         Assert.Equal("See https://example.com", Code("echo 'See https://example.com' // a comment"));
@@ -204,8 +204,8 @@ public class MoreNativeTypesTests
     [Fact]
     public void RefinementsBuildOnNativeTypes()
     {
-        Assert.Equal("https://docs.example.com/x", Code("type CompanySite with [url] {\n  validate: $value->host()->ends_with('example.com'), 'Use a company site'\n}\ns: CompanySite = https://docs.example.com/x\necho $s"));
-        Assert.Contains("Use a company site", Fails("type CompanySite with [url] {\n  validate: $value->host()->ends_with('example.com'), 'Use a company site'\n}\ns: CompanySite = https://elsewhere.org\necho $s"));
+        Assert.Equal("https://docs.example.com/x", Code("type CompanySite with [url] {\n  validate: $value.host->ends_with('example.com'), 'Use a company site'\n}\ns: CompanySite = https://docs.example.com/x\necho $s"));
+        Assert.Contains("Use a company site", Fails("type CompanySite with [url] {\n  validate: $value.host->ends_with('example.com'), 'Use a company site'\n}\ns: CompanySite = https://elsewhere.org\necho $s"));
         Assert.Equal("GB", Code("type Market with [country] { one_of: [GB, IE] }\nm: Market = 'gbr'\necho $m"));
         Assert.Contains("must be one of GB", Fails("type Market with [country] { one_of: [GB, IE] }\nm: Market = FR\necho $m"));
     }
@@ -222,7 +222,7 @@ public class MoreNativeTypesTests
     [Fact]
     public void ValuesTurnIntoNativeTypesForJsonAndArguments()
     {
-        Assert.Equal("example.com", Code("type Link { href: url }\nl = $Link->from({ href: 'https://example.com' })\necho $l.href->host()"));
+        Assert.Equal("example.com", Code("type Link { href: url }\nl = $Link->from({ href: 'https://example.com' })\necho $l.href.host"));
         Assert.Contains("$.href: needs a url", Fails("type Link { href: url }\nl = $Link->from({ href: 'nope' })\necho 1"));
         Assert.Equal("\"https://example.com/\"", Code("u: url = 'https://example.com/'\necho $u->to_json()"));
     }
@@ -309,8 +309,8 @@ public class MoreNativeTypesTests
         string dir = Project("{ \"name\": \"p\" }",
             ("natives/sku.kscript", "/// A stock code.\ntype Sku with [string] {\n  normalize: $value->trim()->upper()\n  pattern: /^[A-Z]{3}-\\d{4}$/\n}\n"),
             ("natives/money/tier.kscript", "enum Tier { gold, silver }\n"),
-            ("natives/site.ks.xml", "<kscript><type name=\"Site\" with=\"url\"><validate test=\"$value->host()->ends_with('example.com')\" message=\"Use a company site\" /></type></kscript>"),
-            ("scripts/main.kscript", "sku: Sku = abc-1234\ntier: Tier = gold\nsite: Site = https://www.example.com\nfn shop(s: Sku) => 'shop ' + $s\necho \"$sku $tier { @shop('xyz-0001') } { $site->host() }\"\n"),
+            ("natives/site.ks.xml", "<kscript><type name=\"Site\" with=\"url\"><validate test=\"$value.host->ends_with('example.com')\" message=\"Use a company site\" /></type></kscript>"),
+            ("scripts/main.kscript", "sku: Sku = abc-1234\ntier: Tier = gold\nsite: Site = https://www.example.com\nfn shop(s: Sku) => 'shop ' + $s\necho \"$sku $tier { @shop('xyz-0001') } { $site.host }\"\n"),
             ("scripts/own.kscript", "enum Tier { bronze }\nt: Tier = bronze\necho $t\n"));
         Assert.Equal("ABC-1234 gold shop XYZ-0001 www.example.com\n", RunFile(Path.Combine(dir, "scripts", "main.kscript")));
         // A script's own type of the same name wins.

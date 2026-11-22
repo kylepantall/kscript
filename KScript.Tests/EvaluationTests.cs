@@ -41,7 +41,7 @@ public sealed class EvaluationTests : IDisposable
     [InlineData("<let name=\"l\" value=\"[1]\" /><do>$l += 2; $l[2] = 5; $l[-1] += 1; $l[0] *= 7</do><echo>{ $l }</echo>", "7, 2, 6\n")]
     [InlineData("<echo>{ 'abc' |> to_upper() } { 'abc' |> @to_upper() } { 'abc' |> upper() }</echo>", "ABC ABC ABC\n")]
     [InlineData("<let name=\"f\" value=\"fn(x) => $x * 2\" /><fn name=\"g\" params=\"x\" value=\"$x * 3\" /><echo>{ 3 |> $f } { 2 |> g() } { g(4) } { to_upper('x') }</echo>", "6 6 12 X\n")]
-    [InlineData("<import package=\"KScript.IO\" /><echo>{ @file('a.txt') |> stem() } { @file('a.txt') |> name() }</echo>", "a a.txt\n")]
+    [InlineData("<import package=\"KScript.IO\" /><echo>{ @file('a.txt').stem } { @file('a.txt') |> read_text() }</echo>", "a a\n")]
     [InlineData("<echo>{ '5'->round() } { { a: fn() => 1 }.a() }</echo>", "5 1\n")]
     public void Expressions_give_values(string body, string expected)
     {
@@ -126,7 +126,7 @@ public sealed class EvaluationTests : IDisposable
     public void Package_commands_and_objects_work_as_values()
     {
         Assert.Equal("3 a.txt\n", Run("<import package=\"KScript.Math\" as=\"m\" /><import package=\"KScript.IO\" /><let name=\"f\" value=\"m.sqrt\" /><echo>{ $f(9) } { @file('a.txt')['name'] }</echo>"));
-        Assert.Equal("claude-x\n", Run("<import package=\"KScript.AI\" /><echo>{ @chat('s', { model: 'claude-x' }) |> model() }</echo>"));
+        Assert.Equal("claude-x\n", Run("<import package=\"KScript.AI\" /><echo>{ @chat('s', { model: 'claude-x' }).model }</echo>"));
         Assert.Equal("x", Run("<let name=\"nl\" value=\"false\" /><echo newline=\"{ $nl }\">x</echo>"));
         Assert.Equal("x\n", Run("<echo newline=\"{ 'y' }{ 'es' }\">x</echo>"));
     }

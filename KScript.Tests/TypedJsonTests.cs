@@ -43,8 +43,8 @@ public class TypedJsonTests
     [InlineData("@type($Repo->from(" + Good + ").owner)", "User")]
     [InlineData("@type($Repo)", "type")]
     [InlineData("$Repo", "Repo")]
-    [InlineData("$Repo.name + ' ' + $Repo->name() + ' ' + $Repo.description", "Repo Repo A repository.")]
-    [InlineData("$Repo.fields->count() + $Repo->fields()->count()", "16")]
+    [InlineData("$Repo.name + ' ' + $Repo.name + ' ' + $Repo.description", "Repo Repo A repository.")]
+    [InlineData("$Repo.fields->count() + $Repo.fields->count()", "16")]
     [InlineData("$Repo.fields[1].from + ' ' + $Repo.fields[1].type + ' ' + $Repo.fields[5].type + ' ' + $Repo.fields[7].computed", "stargazers_count int string? true")]
     [InlineData("$Repo->from([" + Good + ", " + Good + "])->count()", "2")]
     [InlineData("$Repo->from([" + Good + "])[0].stars", "12")]
@@ -253,10 +253,10 @@ public class TypedJsonTests
             string script = Path.Combine(dir, "t.ks.xml");
             File.WriteAllText(script, "<kscript>"
                 + "<type name=\"Repo\" path=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /><field name=\"name\" type=\"string\" description=\"Mine.\" /></type>"
-                + "<echo>{ $Repo->fields()[0].description }</echo>"
+                + "<echo>{ $Repo.fields[0].description }</echo>"
                 + "<type name=\"Item\" path=\"list.json\" />"
-                + "<echo>{ $Repo->fields()->map(fn(f) => $f.name + ':' + $f.type + ($f.optional ? '?' : ''))->join(' ') }</echo>"
-                + "<echo>{ $Item->fields()->map(fn(f) => $f.name + ($f.optional ? '?' : ''))->join(' ') }</echo>"
+                + "<echo>{ $Repo.fields->map(fn(f) => $f.name + ':' + $f.type + ($f.optional ? '?' : ''))->join(' ') }</echo>"
+                + "<echo>{ $Item.fields->map(fn(f) => $f.name + ($f.optional ? '?' : ''))->join(' ') }</echo>"
                 + "<let name=\"r\" value=\"$Repo->from({ name: 'k', stargazers_count: 5, stars: 9, private: true, owner: { login: 'k' }, topics: [], mixed: [], empty: [], nums: [], flags: [], 'avatar-url': 'y', '2x': 1, items: [{ id: 3 }], deep: { a: { b: { c: { d: { e: { f: { g: { h: { i: 1 } } } } } } } } }, lists: [] })\" />"
                 + "<echo>{ $r.stars } { $r.avatar_url } { $r.items[0].note ?? '-' } { $Item->from({ id: 1 }).tag ?? '-' }</echo>"
                 + "</kscript>");
@@ -319,7 +319,7 @@ public class TypedJsonTests
     [InlineData("<type name=\"T\"><echo>x</echo></type>", "<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <echo>.")]
     [InlineData("<type name=\"T\"><field type=\"int\" /></type>", "<field> needs a name")]
     [InlineData("<type name=\"T\"><field name=\"a\" from=\"a..b\" /></type>", "from=\"a..b\" on the field 'a' isn't a path")]
-    [InlineData("<type name=\"T\"><field name=\"a\" optional=\"maybe\" /></type>", "optional=\"maybe\" should be yes or no.")]
+    [InlineData("<type name=\"T\"><field name=\"a\" optional=\"maybe\" /></type>", "optional=\"maybe\" should be true or false.")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" from=\"b\" /></type>", "it can't also have from or default")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" default=\"2\" /></type>", "it can't also have from or default")]
     [InlineData("<field name=\"a\" />", "<field> must be inside <type>, <error>, <model> or <job>.")]

@@ -19,7 +19,7 @@ KScript.Window(title: Counter, width: 320, height: 200) {
 - Variables, `fn` functions and `import`s directly inside `KScript.Window` run once and hold the window's state.
 - Everything else is the layout. After every `on_click`, `on_change`, `on_enter` or `on_tick`, the layout is drawn again from the variables. `if`, `for` and `{ }` work as they do anywhere else. Controls stay the same object from one draw to the next, so typing and focus aren't lost.
 - `bind: name` ties a `TextBox`, `CheckBox`, `Select` or `Slider` to a state variable. `$event.value` holds the new value in `on_change`.
-- `Timer(every: 100, when: $playing, on_tick: …)` runs on a timer while `when` is true.
+- `Timer(every: 100ms, when: $playing, on_tick: …)` runs on a timer while `when` is true.
 - If a handler fails, the error is shown at the top of the window and the window carries on.
 - `KScript.Window` can also go in the middle of a script. The script waits while the window is open, then carries on with the window's changes.
 

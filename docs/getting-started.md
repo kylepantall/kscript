@@ -22,7 +22,7 @@ A script runs from top to bottom, one statement per line. `//` starts a comment.
 
 ## Variables
 
-`name = value` declares a variable, and assigning to it again changes it. Values are numbers, text, yes/no, lists, maps and functions. Read a variable with `$name`. In text, `$name` and `{ }` put a value in.
+`name = value` declares a variable, and assigning to it again changes it. Values are numbers, text, true/false, lists, maps and functions. Read a variable with `$name`. In text, `$name` and `{ }` put a value in.
 
 ```kscript try
 name = 'Joan'

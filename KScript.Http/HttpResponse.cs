@@ -57,7 +57,7 @@ namespace KScript.Http
                 "body" => Body,
                 "type" => ContentType,
                 "headers" => Headers,
-                "ok" => Status >= 200 && Status < 300,
+                "is_ok" => Status >= 200 && Status < 300,
                 _ => null,
             };
             return value != null;
@@ -67,11 +67,6 @@ namespace KScript.Http
         {
             switch (name)
             {
-                case "status": result = (double)Status; return true;
-                case "body": case "text": result = Body; return true;
-                case "type": result = ContentType; return true;
-                case "headers": result = Headers; return true;
-                case "ok": result = Status >= 200 && Status < 300; return true;
                 case "header":
                     result = Headers.TryGetValue(call.Str(0), out object h) ? h : null;
                     return true;
@@ -105,19 +100,23 @@ namespace KScript.Http
             }
         }
 
+        internal static readonly (string Name, string Type, string Description)[] Fields =
+        {
+            ("status", KType.Number, "The HTTP status code, such as 200 or 404."),
+            ("body", KType.String, "The body as text."),
+            ("type", KType.String, "The Content-Type."),
+            ("headers", KType.Map, "The headers as a map."),
+            ("is_ok", KType.Bool, "True when the status is 2xx."),
+        };
+
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("status", "", "The HTTP status code, such as 200 or 404.", KType.Number),
-            ("body", "", "The body as text.", KType.String),
-            ("type", "", "The Content-Type.", KType.String),
-            ("headers", "", "The headers as a map.", KType.Map),
             ("header", "name", "One header (or null).", KType.String),
-            ("ok", "", "True for a 2xx status.", KType.Bool),
             ("json", "", "The body read as JSON.", KType.Any),
             ("with_status", "code", "Changes the status code and returns the response.", KType.HttpResponse),
             ("with_header", "name, value", "Sets a header and returns the response: $next($request)->with_header('X-Frame-Options', 'DENY').", KType.HttpResponse),
             ("with_type", "type", "Changes the Content-Type and returns the response.", KType.HttpResponse),
-            ("with_etag", "value?, weak?: bool", "Sets the ETag: a hash of the value, or of the body without one. Add the etag middleware (or etag=\"yes\") to answer If-None-Match with 304.", KType.HttpResponse),
+            ("with_etag", "value?, weak?: bool", "Sets the ETag: a hash of the value, or of the body without one. Add the etag middleware (or etag=\"true\") to answer If-None-Match with 304.", KType.HttpResponse),
             ("with_cache", "directives", "Sets Cache-Control: ->with_cache('public, max-age=300'), or a number of seconds: ->with_cache(300).", KType.HttpResponse),
         };
     }
