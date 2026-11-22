@@ -309,7 +309,7 @@ namespace KScript.Runtime
             }, run => throw new ReturnSignal(run.Eval("value", null)));
 
             p.Element(new ElementInfo("call", "Calls a function for its effect, optionally keeping the result.", ContentKind.Empty,
-                new A("fn", K.FunctionReference, "The function (or command) to call.", true),
+                new A("fn", K.FunctionReference, "The function (or command) to call: `@greet` (in XML, fn=\"greet\").", true),
                 new A("args", K.ExpressionList, "Arguments, comma separated."),
                 new A("into", K.DeclareVariable, "A variable for the result."))
             {
@@ -317,7 +317,7 @@ namespace KScript.Runtime
             }, Call);
 
             p.Element(new ElementInfo("spawn", "Runs a function in the background. The script waits for it before it ends.", ContentKind.Empty,
-                new A("fn", K.FunctionReference, "The function to run.", true),
+                new A("fn", K.FunctionReference, "The function to run: `@count_to` (in XML, fn=\"count_to\").", true),
                 new A("args", K.ExpressionList, "Arguments, comma separated."))
             {
                 Example = "<fn name=\"count_to\" params=\"n\"><echo>Counted to { @range(1, $n + 1)->last() }</echo></fn>\n<spawn fn=\"count_to\" args=\"1000\" />\n<echo>Started counting</echo>",

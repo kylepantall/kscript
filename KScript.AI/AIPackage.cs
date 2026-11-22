@@ -136,7 +136,7 @@ namespace KScript.AI
                 new A("into", K.DeclareVariable, "The variable that receives the answer.", true),
                 new A("system", K.Template, "The system prompt."),
                 new A("schema", K.Expression, "Ask for structured output: a map describing the fields, such as `{ category: 'bug|feature', urgency: 'int 1-5' }`. The answer is then a map."),
-                new A("tools", K.FunctionReferences, "<fn> functions the model may call: [lookup, weather]."),
+                new A("tools", K.FunctionReferences, "<fn> functions the model may call: `[@lookup, @weather]` (in XML, tools=\"lookup, weather\")."),
                 new A("model", K.Text, "The model to use (default: claude-opus-5-5, or KSCRIPT_AI_MODEL)."),
                 new A("max_tokens", K.Expression, "The longest answer, in tokens (default 16000)."))
             {

@@ -196,7 +196,7 @@ namespace KScript.Language.Catalog
         private void AddPlanned()
         {
             AddPlannedElement(new ElementInfo("render", "Replaces the content of a page element. Non-KScript elements inside are output as HTML, with `{ }` values escaped.", ContentKind.Markup,
-                new A("into", K.Selector, "The element to fill, as a CSS selector.", true),
+                new A("target", K.Selector, "The element to fill, as a CSS selector.", true),
                 new A("raw", K.Bool, "yes outputs values without HTML escaping.")));
             AddPlannedElement(new ElementInfo("on", "Runs its body when a DOM event fires (browser). `$event` holds the event.", ContentKind.Statements,
                 new A("event", K.Text, "The event name, such as click or input.", true),

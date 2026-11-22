@@ -49,7 +49,7 @@ namespace KScript.Runtime
                 "Adds somewhere for log entries to go: the console, a file, memory (for tests), a function, or a type a package adds (KScript.Net adds http). Usually set in config under logging.providers instead.",
                 ContentKind.Empty,
                 new A("type", K.Text, "console, file, memory, or a type from an imported package such as http. Leave it out when using fn."),
-                new A("fn", K.FunctionReference, "A function called with each entry (a map of time, level, category, message, fields, script and line)."),
+                new A("fn", K.FunctionReference, "A function called with each entry (a map of time, level, category, message, fields, script and line): `@alert` (in XML, fn=\"alert\")."),
                 new A("level", K.Enum, "The lowest level this provider writes (default: all that logging lets through).", false, LogLevels.Names),
                 new A("format", K.Enum, "text or json (console and file).", false, "text", "json"),
                 new A("path", K.Template, "The file to append to (file)."),

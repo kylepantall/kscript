@@ -124,7 +124,7 @@ namespace KScript.Language.Tests
         [InlineData("<echo><![CDATA[ raw < text ]]></echo>")]
         [InlineData("<import package=\"KScript.IO\" /><let name=\"f\" value=\"@files('.')\" /><for each=\"x\" in=\"$f\"><echo>{ $x->extension() }</echo></for>")]
         [InlineData("<let name=\"x\" value=\"'a'\" /><echo format=\"markdown\">**$x**</echo>")]
-        [InlineData("<render into=\"#out\"><li class=\"{ 1 }\">x</li><input type=\"text\"></input></render>")]
+        [InlineData("<render target=\"#out\"><li class=\"{ 1 }\">x</li><input type=\"text\"></input></render>")]
         public void AcceptsValidKScript(string body) => AssertClean(Analyze(Script(body)));
 
         [Fact]

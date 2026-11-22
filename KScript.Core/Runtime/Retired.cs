@@ -123,7 +123,7 @@ namespace KScript.Runtime
         /// <c>for item at i</c>. An element of <c>*</c> means every element that has the new name. Names that only
         /// swapped a hyphen for an underscore (<c>max-tokens</c>) need no row: see <see cref="Attribute"/>.
         /// </summary>
-        private static readonly (string Element, string Old, string New, string Instead)[] RenamedAttributes =
+        public static readonly (string Element, string Old, string New, string Instead)[] RenamedAttributes =
         {
             ("input", "to", "into", null),
             ("picker", "to", "into", null),

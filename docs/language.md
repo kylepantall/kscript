@@ -575,6 +575,27 @@ import slugify from "lib/strings.kscript"
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. A statement written with the `KScript.` prefix, such as `KScript.input`, imports the package that has it without an `import`. A project can import packages for every script in `kscript.json` (below).
 
+### Names of statements and arguments
+
+Statements and their arguments follow one set of rules in every package, and `kscript check` and the test suite hold the built-in ones to them:
+
+| Rule | Examples |
+| --- | --- |
+| A statement that does something, or declares something, is a lower `snake_case` word. | `input`, `table`, `before_each`, `expect_error`, `log_provider` |
+| A statement that describes a thing in a tree (a window, a route table, a document) is `PascalCase`. Only KScript.UI, KScript.Http and KScript.Document have these. | `Button`, `Routes`, `Get`, `Section` |
+| Arguments are `snake_case`. No name has a hyphen. | `max_tokens`, `must_exist`, `on_click`, `new_page` |
+| `into:` is the variable that receives a result. | `input(into: name)`, `llm(into: reply)`, `capture(into: out)` |
+| `to:` is where something goes: a file, a URL, a controller. It never names a variable. | `move(from: $f, to: $target)`, `Get(path: "/", to: @home)` |
+| `path:` is the file a statement reads or acts on. | `stylesheet(path: "theme.ks.css", to: "site.css")`, `delete(path: 'old.css')`, `<layout path="_layout.html">` |
+| `at` is a position, as in `for item at i in $list`. | `menu(into: choice, at: i)` |
+| A function is named as `@name`, as it is in an expression. | `spawn(fn: @job)`, `llm(tools: [@order_status])`, `Get(to: @people.show)` |
+
+Three kinds of name are not functions and stay bare: a controller (`Resource(to: people)` is the name a script is imported as), the names in a middleware list (`[log, throttle:30, my_check]`, where built-ins, groups and functions share one list), and a variable or type being declared. In XML the same arguments are attributes with the same names, and a function is written without the `@` (`<spawn fn="job" />`); `kscript convert` adds and removes it.
+
+In a page, `on-click` and the other handlers sit on HTML tags (`<button on-click="count += 1">`), so they keep HTML's hyphen. On KScript's own elements, such as `Button`, the argument is `on_click`.
+
+A name from before these rules is an error that says the new one (`'to' is now into.`), and `kscript check --fix` renames it. Letting a statement be assigned (`name = input "Name? "`) is not part of the language yet.
+
 ### Terminal output
 
 KScript.Terminal prints the same way the `kscript` commands do, so a script's output looks like the rest of the tool. Colours are only used at a terminal: piped output, files and tests get the same text without them, and `NO_COLOR`, `FORCE_COLOR`, `--ansi` and `--no-ansi` work as they do for `kscript` itself.

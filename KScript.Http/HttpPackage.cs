@@ -180,7 +180,7 @@ namespace KScript.Http
         private static A[] RouteAttributes() => new[]
         {
             new A("path", K.Text, "The path, with {name} parameters: /people/{id}. {name?} is optional and {name*} takes the rest of the path.", true) { Literal = true },
-            new A("to", K.FunctionReference, "The controller: a <fn> (show) or a function of an imported script (people.show). Its parameters are filled by name: path parameters, request, json, query, form, input, headers."),
+            new A("to", K.FunctionReference, "The controller: a <fn> (`@show`) or a function of an imported script (`@people.show`); in XML, to=\"people.show\". Its parameters are filled by name: path parameters, request, json, query, form, input, headers."),
             new A("view", K.Text, "Answer with this view instead, from the views folder, with the path parameters as variables."),
             new A("redirect", K.Text, "Answer with a redirect to this address instead."),
             new A("status", K.Expression, "The redirect's status code, 302 by default."),
