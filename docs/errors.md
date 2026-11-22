@@ -317,4 +317,10 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6014
 
-**A type written the long way.** A type is named bare, without `$`: `@json($text, as: Repo)`, `Repo($data)`. An optional field is marked on its name, `age?: int`, not on its type.
+**A type written the long way.** Each of these has one form, and `kscript check --fix` rewrites the other:
+
+- A type, model, enum, error or job is named bare, without `$`: `@json($text, as: Repo)`, `User->create(name: 'Joan')`. `$` reads a variable.
+- An optional field is marked on its name, `age?: int`, not on its type (`age: int?`). `T?` stays for a parameter that may be null: `fn show(repo: Repo?)`.
+- A model's options go in its brackets, `model User(timestamps, unique: [email]) { }`, not as lines of its block. The block holds fields, `validate` and `fn`.
+
+Calling the name makes a value of every kind of type: `Repo($data)`, `Repo(name: 'x')`, `Age(7)`, `Size('small')`, `NotFound(id: 42)`, `SendWelcome(user_id: 7)`. `->from()` and `->new()` are gone, and using one is an error (KS5003) whose fix writes the call.

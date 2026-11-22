@@ -1,9 +1,10 @@
 // The JSON API, served by kscript serve under /api (see docs/http.md). kscript
 // routes lists the routes.
-KScript.Routes {
-  import KScript.Auth
-  import "../controllers/accounts.kscript" as accounts
+import KScript.Http
+import KScript.Auth
+import "../controllers/accounts.kscript" as accounts
 
+Routes {
   // API tokens (kscript make auth --api): POST an email and password for a
   // token, then send it as Authorization: Bearer.
   Post(path: "/tokens", to: accounts.issue_token)

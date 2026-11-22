@@ -1,15 +1,16 @@
 // Life Lab as a desktop app, in the .kscript format: kscript desktop.kscript
 // opens it in a window. The rules come from lib/life.ks.xml, the same script
 // the terminal and browser versions use.
-KScript.Window(
+import KScript.UI
+import "lib/life.ks.xml"
+
+Window(
   title: "Life Lab",
   width: 760,
   height: 720,
   theme: dark,
   background: "#0f172a"
 ) {
-  import "lib/life.ks.xml"
-
   cols = 40
   rows = 24
   world = @pattern_world('glider_gun', $cols, $rows)

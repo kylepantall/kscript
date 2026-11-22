@@ -192,10 +192,10 @@ enum Size { small, medium, large }
 const max_items = 10
 fn pack(size: Size, gift: bool = false) => 'Packing ' + $size
 
-echo "{ @pack(large) } { @pack(size: small, gift) } { $Size.medium }"
+echo "{ @pack(large) } { @pack(size: small, gift) } { Size.medium }"
 ```
 
-A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. A list of an enum takes an array of bare values too: with `fn pack_all(sizes: Size[])`, write `@pack_all([large, small])`. Anywhere else, a bare word in an array is an error, because names of variables start with `$` (`[$max_items, 3]`) and functions are passed with `@` (`[@twice]`). Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `$Size` itself is a map from each name to itself, so `'large' in $Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
+A parameter typed with an enum only takes its values (`'large'` or bare `large`), and the editor suggests them. A list of an enum takes an array of bare values too: with `fn pack_all(sizes: Size[])`, write `@pack_all([large, small])`. Anywhere else, a bare word in an array is an error, because names of variables start with `$` (`[$max_items, 3]`) and functions are passed with `@` (`[@twice]`). Built-in commands have enum parameters too: `@known_folder(downloads)` takes `home`, `desktop`, `documents`, `downloads`, `music`, `pictures`, `videos`, `appdata` or `temp`. `Size` itself is a map from each name to itself, so `'large' in Size` checks a value. Top-level `<const>` and `<enum>` declarations are exported to scripts that import the file.
 
 ## Typed data
 
@@ -215,11 +215,11 @@ type Repo {
   owner: User
 }
 
-repo = $Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })
+repo = Repo({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })
 echo "$repo.name has $repo.stars stars, owned by $repo.owner.login"
 ```
 
-`stars: int from stargazers_count` reads the field from a key with another name, and `owner: User` is another type, so the nested data is checked and turned into a `User` record too. `$Repo->from(data)` maps a map, a list of maps or JSON text.
+`stars: int from stargazers_count` reads the field from a key with another name, and `owner: User` is another type, so the nested data is checked and turned into a `User` record too. `Repo(data)` maps a map, a list of maps or JSON text.
 
 ### Field lines
 
@@ -245,8 +245,8 @@ type Repo {
 
 | Part | What it does |
 | --- | --- |
-| `: type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`, `email`, `password`, `handle`, `uuid`, `regex`), an `enum`, another `type`, `T[]` for a list, `T?` to allow null. Rules can follow in brackets: `string(min: 1)`. Without it the field takes any value. |
-| `?` after the name | The value can be missing or null. |
+| `: type` | A built-in (`string`, `int`, `float`, `number`, `bool`, `date`, `list`, `map`, `fn`, `any`, `email`, `password`, `handle`, `uuid`, `regex`), an `enum`, another `type`, `T[]` for a list. Rules can follow in brackets: `string(min: 1)`. Without it the field takes any value. |
+| `?` after the name | The value can be missing or null. This is the one way to mark an optional field, in a `type`, a `model`, an `error` and a `job`: `license?: string`, not `license: string?` (KS6014, with a quick fix). `T?` is for a type that isn't a field's own, such as a parameter that may be null: `fn show(repo: Repo?)`. |
 | `from path` | Where to read the value when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`. Nested data comes out flat. Quote a path that has spaces. |
 | `= default` | The value when the data has none. The field is then optional. |
 | `=> value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
@@ -261,17 +261,17 @@ In XML, a type is `<type name="Repo">` with a `<field name="stars" type="int" fr
 ### Where data meets a type
 
 ```kscript
-repo = @api($url)->check()->json(as: $Repo) // KScript.Net
-repos = @read_json('repos.json', as: $Repo) // KScript.IO; a list maps item by item
-user = @json($text, as: $User)
-user = $User->from($data) // a map, a list or JSON text
+repo = @api($url)->check()->json(as: Repo) // KScript.Net
+repos = @read_json('repos.json', as: Repo) // KScript.IO; a list maps item by item
+user = @json($text, as: User)
+user = User($data) // a map, a list or JSON text
 repo: Repo = $data // also on const and plain assignment
 fn show(repo: Repo, tags: string[]) {
   // …
 }
 ```
 
-`as:` takes the type as a value (`as: $Repo`) or as text (`as: 'Repo[]'`). `@type($repo)` is `'Repo'`. A record still works everywhere a map does, but reading or setting a field the type doesn't have is an error, and setting a field converts the value to the field's type.
+`as:` takes the type as a value (`as: Repo`) or as text (`as: 'Repo[]'`). `@type($repo)` is `'Repo'`. A record still works everywhere a map does, but reading or setting a field the type doesn't have is an error, and setting a field converts the value to the field's type.
 
 When the data doesn't fit, mapping fails with one `Shape` error that lists every problem with its JSON path:
 
@@ -281,7 +281,7 @@ The response from https://api.github.com/... doesn't fit Repo (2 problems):
   $.visibility: must be a Visibility (public, private, internal), but got the string 'secret'.
 ```
 
-In a `catch`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo->fields()` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
+In a `catch`, `$err.problems` is a list of `{ path, field, message }` maps. `Repo->check($data)` returns that list without throwing (empty when the data fits), `Repo->fields()` lists the fields, and `Repo->schema()` describes the type as JSON Schema.
 
 ## Values and methods
 
@@ -400,7 +400,7 @@ try {
 - **Throwing.** `throw PersonNotFound(id: 42)` makes the error and throws it. Its arguments are its fields, by name, plus `message:` (instead of the type's message) and `cause:` (the error that led to this one). A field without a default must be given, and the editor flags missing and unknown fields. `throw Validation "Too short"` still works for a type with no fields, and `throw Validation(field: 'name', message: 'Too short')` adds fields to a built-in one.
 - **Catching.** `catch NotFound` catches `PersonNotFound` too, because it extends `NotFound`. In the catch, `$e.id` reads a field, and the editor completes the fields of the types the catch names. Every error has `type`, `message`, `line`, `column`, `file`, `status` and `cause`. `$e->is(NotFound)` checks the type in code, and `$e->chain()` lists it: `['PersonNotFound', 'NotFound', 'Error']`.
 - **Rethrowing and wrapping.** A bare `throw` inside a catch rethrows the error it is handling, unchanged. `throw $e` does the same with a saved error. To add context, wrap it: `throw ConfigBroken(path: $path, cause: $e)`, then `$err.cause.message` reads the original.
-- **Making one without throwing.** `$OutOfStock->new(item: 'tea')` gives the error as a value, to return or throw later.
+- **Making one without throwing.** `OutOfStock(item: 'tea')` gives the error as a value, to return or throw later.
 - **Status.** `status` is the HTTP status a [KScript.Http route](http.md#errors-and-status-codes) answers with when nothing catches the error. A type inherits it, and its fields and message, from the type it extends.
 - **Exports.** Top-level error types are exported, like functions and types, so `import "errors/payment-failed.kscript"` brings them in. `kscript make error PaymentFailed --status 402 --extends Validation --fields "order: int"` writes one to `errors/`.
 
@@ -565,15 +565,15 @@ import slugify from "lib/strings.kscript"
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
 | `KScript.AI` | `@llm(prompt, options)`, `llm(to, system, schema, tools)`, `@chat(system)` with `->ask()` `->history()` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
 | `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast`, `@css_var`, `@css_vars`; `stylesheet(src, to, vars)` (see [Stylesheets](stylesheets.md)). |
-| `KScript.Http` | Routes, controllers and middleware for `kscript serve`: a `KScript.Routes { }` file holds `Get` `Post` `Put` `Patch` `Delete` `Any` `Route` `Resource` `Group` `Middleware`. Controllers use `@view`, `@response`, `@redirect`, `@abort` and `@route`. See [Routes, controllers and middleware](http.md). |
+| `KScript.Http` | Routes, controllers and middleware for `kscript serve`: a `Routes { }` file holds `Get` `Post` `Put` `Patch` `Delete` `Any` `Route` `Resource` `Group` `Middleware`. Controllers use `@view`, `@response`, `@redirect`, `@abort` and `@route`. See [Routes, controllers and middleware](http.md). |
 | `KScript.Storage` | The app's own folders, in the right place on each platform: `@storage(config)` (also `data`, `cache`, `state`, `logs`) with `->read` `->read_json` `->write` `->write_json` `->append` `->list` `->delete` `->folder` `->path`, plus `@app_name()` and `@app_folders()`. See [App folders](storage.md). |
 | `KScript.Cache` | `$cache` (in memory) and `@cache(file)` with `->get` `->put` `->remember(key, fn, ttl: '10m')` `->has` `->forget` `->increment` `->ttl` `->keys` `->flush`. See [Caching](cache.md). |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: `@register`, `@attempt`, `@login`, `@logout`, `@user()`, `@signed_in()`, `$session` (`->get` `->put` `->flash` …), `@users()`, `@csrf_field()`, `@reset_token`, `@reset_password`, `@api_token`, and the `auth` and `guest` middleware. See [Sign-in](auth.md). |
-| `KScript.Document` | `KScript.Document(template: paper, to: "paper.pdf") { }` with `Section`, `Paragraph`, `List`, `Table`, `Figure`, `Math`, `Bibliography` and more; `Letter` and `Invoice`; `->save` `->pages` `->words` `->markdown` `->latex` `->html`. See [Documents](documents.md). |
-| `KScript.UI` | Desktop windows: a `KScript.Window { }` block opens one. `Column` `Row` `Grid` `Text` `Button` `TextBox` `CheckBox` `Select` `Slider` `Box` `Spacer` `Timer`, `@close_window()`. See [Desktop apps](desktop.md). |
+| `KScript.Document` | `Document(template: paper, to: "paper.pdf") { }` with `Section`, `Paragraph`, `List`, `Table`, `Figure`, `Math`, `Bibliography` and more; `Letter` and `Invoice`; `->save` `->pages` `->words` `->markdown` `->latex` `->html`. See [Documents](documents.md). |
+| `KScript.UI` | Desktop windows: a `Window { }` block opens one. `Column` `Row` `Grid` `Text` `Button` `TextBox` `CheckBox` `Select` `Slider` `Box` `Spacer` `Timer`, `@close_window()`. See [Desktop apps](desktop.md). |
 | `KScript.Test` | `test`, `describe`, `before-each`, `after-each`, `expect`, `assert`, `expect-error`, `capture`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](testing.md)). |
 
-Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. A statement written with the `KScript.` prefix, such as `KScript.input`, imports the package that has it without an `import`. A project can import packages for every script in `kscript.json` (below).
+Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. A package is named only in an `import`: a statement is never written with the `KScript.` prefix (`input`, not `KScript.input`), and nothing is imported silently, `job` and `dispatch` included (`import KScript.Queue`). A project can import packages for every script in `kscript.json` (below).
 
 ### Terminal output
 

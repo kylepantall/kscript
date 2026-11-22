@@ -135,7 +135,7 @@ repo = ```<Repo>
   `markdown`), `latex` (or `tex`), `yaml` (or `yml`) or `xml`. It changes nothing at run time; editors use it to
   highlight the block. Any other word is an error, so a typo such as ```` ```textc ```` is caught.
 - A type in angle brackets parses the block: `` ```<json> `` is the parsed JSON, and `` ```<Repo> `` maps it onto a
-  `type`, with the same checks (and `Shape` errors) as `->json(as: $Repo)`.
+  `type`, with the same checks (and `Shape` errors) as `->json(as: Repo)`.
 - As an element's text (after `echo`, `Paragraph`, `Math`, ...) a block is the same as `"text"`: `{ }` interpolates
   where the element interpolates, and `Math` keeps its braces. In an expression it is a string, like `'single quotes'`.
   No escapes apply inside a block.
@@ -159,9 +159,12 @@ repo = ```<Repo>
   The XML form writes the same list as text, `use="secure_headers, json_only"`, and `kscript convert` turns one into
   the other. The old string form (`use: "a, b"`) still works in `.kscript`, with a KS6006 hint to use the array.
 - Expressions are kept as written, so raw `<` and `>` work (`lt` and `gt` still do).
-- The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. A file whose only
-  statement is `kscript { }` or a `KScript.*` element (such as `KScript.Window(...) { }`) uses that element as the
-  root. `import` goes at that top level, not inside another block.
+- The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. `import` goes at that top
+  level, not inside another block.
+- A package is named only in `import KScript.UI`. A statement is never written with the `KScript.` prefix: write
+  `import KScript.UI` and then `Window(...) { }`, not `KScript.Window(...) { }` (which is an error that says so). An
+  XML file names the package in its root tag instead, `<KScript.Window>`, and `kscript convert` turns one into the
+  other.
 - `//` and `/* */` are comments. Either can go on its own lines, at the end of a line, or inside an expression
   that spans lines (`[1, /* first */ 2]`). `kscript convert` keeps them; XML has one kind of comment, so they come
   back from XML as `//` lines.

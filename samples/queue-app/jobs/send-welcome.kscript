@@ -1,3 +1,5 @@
+import KScript.Queue
+
 /// Sends the welcome email to someone who just signed up.
 job SendWelcome(
   queue: "mail",

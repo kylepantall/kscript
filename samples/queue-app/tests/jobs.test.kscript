@@ -7,9 +7,9 @@ kscript {
     test(name: "signing up queues a welcome email") {
       queue = @fake_queue()
       dispatch SendWelcome(user_id: 7, email: 'joan@example.com')
-      expect(value: $queue->count($SendWelcome), equals: 1)
+      expect(value: $queue->count(SendWelcome), equals: 1)
       expect(
-        value: $queue->pushed($SendWelcome)[0].email,
+        value: $queue->pushed(SendWelcome)[0].email,
         equals: 'joan@example.com'
       )
       expect(value: $queue->dispatches()[0].queue, equals: 'mail')

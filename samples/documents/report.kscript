@@ -11,7 +11,7 @@ quarters = [
 ]
 total = $quarters->map(fn($q) => $q.signups)->sum()
 
-KScript.Document(
+Document(
   template: report,
   title: "Annual Report 2026",
   subtitle: "Life Lab: a year in numbers",

@@ -17,9 +17,9 @@ fn sign_up(form: Signup) {
   return { handle: $form.handle, email: $form.email, stored: $stored->starts_with('$argon2id$') }
 }
 
-echo @sign_up($Signup->from({ handle: '@Joan_S', email: ' Joan@Example.COM ', password: 'correct horse battery staple' }))
+echo @sign_up(Signup({ handle: '@Joan_S', email: ' Joan@Example.COM ', password: 'correct horse battery staple' }))
 try {
-  @sign_up($Signup->from({ handle: '@a--b', email: 'joan@', password: 'short' }))
+  @sign_up(Signup({ handle: '@a--b', email: 'joan@', password: 'short' }))
 } catch err {
   echo $err.message
 }

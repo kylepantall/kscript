@@ -1,3 +1,5 @@
+import KScript.Queue
+
 /// Takes the payment for an order.
 job ChargeCard(queue: "high", tries: 3, fail_on: [Validation]) {
   order_id: int

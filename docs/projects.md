@@ -47,7 +47,7 @@ kscript make project my-api --bare --api         # just the API: routes/api.kscr
 kscript make project my-app --bare --desktop     # a script plus an empty KScript.Window desktop app
 ```
 
-`--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `routes/api.kscript` (a `KScript.Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.
+`--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `routes/api.kscript` (a `Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.
 
 ### An API: --template api
 

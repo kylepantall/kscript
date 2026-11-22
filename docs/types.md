@@ -293,6 +293,8 @@ try {
 
 A value is converted to the base type first, then normalized, then checked against the rules. One that fails reports every rule it broke. Rules on a field work the same way: `title: string(min: 1)`.
 
+Calling a type makes a value of it, checked the same way: `Age(42)`, `Slug(' Hello-World ')`. Every declared type works like this (`Repo($data)`, `Size('small')`), and its name is always written bare, without `$`.
+
 ### Your own native types
 
 `kscript make native` writes a refinement type to `natives/` that works like a built-in one. Every script in the project can use it without an import, the same way the `extensions/` folder works. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, `->from()` and request bodies), and the editor checks the values written in code:
@@ -355,11 +357,11 @@ type Admin with [User, Auditable] {
 
 fn welcome(user: User) => 'Welcome ' + $user.name
 
-admin = $Admin->from({ name: 'Joan', email: 'joan@example.com', created: '2026-01-05' })
-echo "{ @welcome($admin) } { $User->is($admin) } { $admin.level }"
+admin = Admin({ name: 'Joan', email: 'joan@example.com', created: '2026-01-05' })
+echo "{ @welcome($admin) } { User->is($admin) } { $admin.level }"
 ```
 
-When two bases have a field with the same name but different types, the joined type must declare that field itself. The same goes for a method two bases both have: declare it in the joined type to choose. In the editor, the lightbulb on a joined type offers to override each method it gets from its bases, and writes the stub. `$User->is($admin)` says whether a value is a User, and `$User->is($Admin)` whether a type is built on User. A `validate:` rule in a type with fields sees the fields as `$name`, `$email` and so on.
+When two bases have a field with the same name but different types, the joined type must declare that field itself. The same goes for a method two bases both have: declare it in the joined type to choose. In the editor, the lightbulb on a joined type offers to override each method it gets from its bases, and writes the stub. `User->is($admin)` says whether a value is a User, and `User->is(Admin)` whether a type is built on User. A `validate:` rule in a type with fields sees the fields as `$name`, `$email` and so on.
 
 ## Types read from text
 
