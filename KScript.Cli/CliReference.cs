@@ -193,7 +193,7 @@ namespace KScript
                     O("--runtime file", "A kscript release binary or archive for the target, instead of downloading one."),
                 },
                 "kscript compile hello.kscript\nkscript compile --target all", "compile") { Group = "build", Details = "It holds the script, its imports and files, and only the packages it uses: a terminal script, a KScript.Window desktop app, or a kscript serve site.\nWith no script, kscript.json names it: { \"app\": { \"main\": \"app.kscript\", \"name\": \"My App\", \"icon\": \"icon.png\" } }. A project without app.main but with pages compiles to a program that serves the site." },
-            new CliCommand("make", "kscript make project [folder] [--template web|api|fullstack|bare] [--db sqlite] [--auth] [--docker]\nkscript make <type> <name> [--key value]\nkscript make auth [--api]\nkscript make --list",
+            new CliCommand("make", "kscript make project [folder] [--template web|api|fullstack|bare] [--db sqlite] [--auth] [--docker]\nkscript make <type> <name> [--key value]\nkscript make auth [--passkeys] [--origin URL] [--rp-id DOMAIN] [--api]\nkscript make --list",
                 "Start a new project, or generate a file: a route (added to the routes file), controller, request, middleware, view, page, component, stylesheet, type, enum, window, config, test and more. kscript make --list shows them all, with their options.",
                 new[]
                 {

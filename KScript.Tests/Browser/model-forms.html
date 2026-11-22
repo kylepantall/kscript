@@ -1,0 +1,133 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>KScript model form browser regression</title>
+<!-- Open this file in a browser. The runtime uses real form controls, events and timers;
+     only the network is held so that responses can arrive in a reproducible order. -->
+<div id="fixture"></div>
+<pre id="result">Running</pre>
+<script src="../../KScript.Web/Pages/model-forms.js"></script>
+<script src="../../KScript.Web/Pages/live.js"></script>
+<script>
+(async function () {
+  const fixture = document.querySelector("#fixture");
+  const result = document.querySelector("#result");
+  const markup = (key = "1", autosave = true) => `<div data-ks-live="editor"><button data-ks-on-click="0">Refresh</button>
+    <form method="post" action="/_forms/profile" data-ks-model-form ${autosave ? 'data-ks-autosave="15"' : ''}>
+      <input type="hidden" name="_key" value="${key}"><input type="hidden" name="_token" value="session">
+      <textarea name="bio" required>Original</textarea><input type="checkbox" name="listed" checked>
+      <button type="submit">Save</button><span role="status" data-ks-save-status></span>
+    </form></div>`;
+  const field = name => fixture.querySelector('[name="' + name + '"]');
+  const status = () => fixture.querySelector("[role=status]").textContent;
+  const pause = () => new Promise(resolve => setTimeout(resolve, 40));
+  const live = [], saves = [];
+  window.fetch = (url, options) => new Promise(resolve => {
+    const request = { options, finish: (body, status = 200) => resolve(new Response(body, {
+      status, headers: { "Content-Type": "text/plain" }
+    })) };
+    if (options.headers["X-KScript-Model-Form"] === "save") saves.push(request);
+    else live.push(request);
+  });
+  function expect(value, message) { if (!value) throw Error(message); }
+  function type(text) {
+    const input = field("bio");
+    input.focus();
+    input.value = text;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  function refresh() { fixture.querySelector("[data-ks-on-click]").click(); }
+  function submit() { fixture.querySelector("form").requestSubmit(); }
+  try {
+    fixture.innerHTML = markup();
+    refresh();
+    await pause();
+    type("First");
+    submit();
+    submit();
+    expect(saves.length === 1, "Save flushes debounce and coalesces duplicate submits");
+    expect(saves[0].options.body.get("_token") === "session" && saves[0].options.body.get("bio") === "First" &&
+      !saves[0].options.body.has("listed"), "Only edited fields and binding metadata are submitted");
+    type("New draft");
+    field("bio").setSelectionRange(2, 6);
+    await pause();
+    expect(saves.length === 1, "No parallel save");
+    live[0].finish(markup());
+    await pause();
+    expect(field("bio").value === "New draft" && document.activeElement === field("bio") &&
+      field("bio").selectionStart === 2 && field("bio").selectionEnd === 6, "Live redraw preserves draft, focus and caret");
+    saves[0].finish(null, 204);
+    await pause();
+    expect(saves.length === 2 && saves[1].options.body.get("bio") === "New draft", "Newest edit follows first save");
+    saves[1].finish("Bio is too long.", 422);
+    await pause();
+    expect(status() === "Bio is too long." && field("bio").value === "New draft", "Validation keeps the draft");
+    submit();
+    saves[2].finish(null, 204);
+    await pause();
+    expect(status() === "Saved", "Manual retry succeeds");
+    field("listed").click();
+    await pause();
+    expect(saves[3].options.body.get("listed") === "false", "Unchecked boolean is saved");
+    saves[3].finish(null, 204);
+    await pause();
+    type("");
+    await pause();
+    expect(saves.length === 4, "Native constraints prevent autosave");
+    field("bio").dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    type("Composing");
+    refresh();
+    await pause();
+    live[1].finish(markup());
+    await pause();
+    expect(saves.length === 4 && field("bio").value === "Composing", "Redraw waits for IME composition");
+    field("bio").dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+    await pause();
+    expect(saves[4].options.body.get("bio") === "Composing", "Composition commits the completed value");
+    saves[4].finish(null, 204);
+    await pause();
+    fixture.innerHTML = markup("1", false);
+    type("Manual draft");
+    await pause();
+    expect(saves.length === 5, "Manual form waits for Save");
+    submit();
+    expect(saves.length === 6, "Live block delegates manual Save to model form");
+    saves[5].finish(null, 204);
+    await pause();
+    refresh();
+    await pause();
+    type("Private draft");
+    live[2].finish(markup("2", false));
+    await pause();
+    expect(field("_key").value === "2" && field("bio").value === "Original", "Drafts never move to another record");
+    fixture.firstElementChild.removeAttribute("data-ks-live");
+    const native = new SubmitEvent("submit", { bubbles: true, cancelable: true });
+    fixture.querySelector("form").dispatchEvent(native);
+    expect(!native.defaultPrevented, "Standalone manual form retains native submission");
+    fixture.innerHTML = markup("1", false);
+    const publish = document.createElement("button");
+    publish.name = "status"; publish.value = "published";
+    fixture.querySelector("form").append(publish);
+    type("Concurrent submit");
+    submit();
+    publish.click();
+    saves[6].finish(null, 204);
+    await pause();
+    expect(saves[7].options.body.get("status") === "published", "A named action queued during a save keeps its submitted value");
+    saves[7].finish(null, 204);
+    await pause();
+    type("Keep on expiry");
+    refresh();
+    await pause();
+    live[3].finish("expired", 409);
+    await pause();
+    expect(status().includes("Copy your draft") && field("bio").value === "Keep on expiry", "Expired page preserves unsaved draft");
+    refresh();
+    await pause();
+    expect(live.length === 4, "Expired live state stops replaying");
+    result.textContent = "PASS";
+  } catch (error) {
+    result.textContent = "FAIL: " + error.stack;
+    throw error;
+  }
+}());
+</script>

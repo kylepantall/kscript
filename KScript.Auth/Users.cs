@@ -4,9 +4,8 @@ using KScript.Runtime;
 namespace KScript.Auth
 {
     /// <summary>
-    /// The app's users, kept as JSON files in its data folder: <c>@users()->find($id)</c>. A user is a map with an
-    /// id, an email, created_at and any fields given to <c>@register()</c>. The password hash is kept beside them and
-    /// never handed out.
+    /// The users available through <c>@users()</c>. Password accounts live in the site's configured user store.
+    /// Passkey-only profiles share a transaction with their credentials and expose the same stable id to scripts.
     /// </summary>
     public sealed class UserStore : IKObject
     {
@@ -30,7 +29,7 @@ namespace KScript.Auth
 
         public bool TryGetMember(string name, out object value)
         {
-            value = name == "count" ? (double)App.Users.Count() : null;
+            value = name == "count" ? (double)Count() : null;
             return value != null;
         }
 
@@ -50,8 +49,11 @@ namespace KScript.Auth
             return user;
         }
 
-        public Dictionary<string, object> Record(string id) =>
-            string.IsNullOrEmpty(id) || !IsId(id) ? null : App.Users.Get(id);
+        public Dictionary<string, object> Record(string id)
+        {
+            if (PasskeyStore.IsUserId(id)) return App.PasskeyStore.User(id);
+            return string.IsNullOrEmpty(id) || !IsId(id) ? null : App.Users.Get(id);
+        }
 
         private static bool IsId(string id) => id.Length <= 128 && id.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
 
@@ -64,7 +66,8 @@ namespace KScript.Auth
         public Dictionary<string, object> RecordByEmail(string email)
         {
             if (string.IsNullOrWhiteSpace(email)) return null;
-            return App.Users.FindBy("email", email.Trim());
+            var record = App.Users.FindBy("email", email.Trim());
+            return record != null && !PasskeyStore.IsUserId(AuthApp.Text(record.GetValueOrDefault("id"))) ? record : null;
         }
 
         /// <summary>An email for the store: checked and normalised by the email type (with the project's rules).</summary>
@@ -184,6 +187,9 @@ namespace KScript.Auth
         {
             lock (Gate)
             {
+                bool passkeyOnly = PasskeyStore.IsUserId(id);
+                if (passkeyOnly && fields.ContainsKey("email"))
+                    throw Invalid("email", "This account uses passkeys and has no sign-in email.");
                 Dictionary<string, object> record = Need(id);
                 foreach (var kv in fields)
                 {
@@ -203,13 +209,16 @@ namespace KScript.Auth
                     AddField(record, kv.Key, kv.Value);
                 }
                 record["updated_at"] = AuthApp.Stamp();
-                App.Users.Put(id, record);
+                if (!passkeyOnly) App.Users.Put(id, record);
+                else if (!App.PasskeyStore.UpdateUser(id, record)) throw new KScriptException("The account has ended.", "NotFound");
                 return Show(record);
             }
         }
 
         public Dictionary<string, object> SetPassword(CallContext c, string id, object password)
         {
+            if (PasskeyStore.IsUserId(id))
+                throw Invalid("password", "This account signs in with a passkey.");
             PasswordValue secret = Password(c, password);
             lock (Gate)
             {
@@ -225,7 +234,8 @@ namespace KScript.Auth
         public bool Delete(string id)
         {
             if (Record(id) == null) return false;
-            App.Users.Delete(id);
+            if (!PasskeyStore.IsUserId(id)) App.Users.Delete(id);
+            App.PasskeyStore.ForgetUser(id);
             Forget(App.Sessions, id);
             Forget(App.Tokens, id);
             Forget(App.Resets, id);
@@ -247,8 +257,10 @@ namespace KScript.Auth
         private Dictionary<string, object> Need(string id) =>
             Record(id) ?? throw new KScriptException($"There is no user with the id '{id}'.", "NotFound");
 
+        private int Count() => App.Users.Count() + App.PasskeyStore.UserCount();
+
         public List<object> All() =>
-            App.Users.All().Select(kv => kv.Value)
+            App.Users.All().Select(kv => kv.Value).Concat(App.PasskeyStore.Users())
                 .OrderBy(u => AuthApp.Text(u.GetValueOrDefault("created_at")), StringComparer.Ordinal)
                 .ThenBy(u => AuthApp.Text(u.GetValueOrDefault("email")), StringComparer.OrdinalIgnoreCase)
                 .Select(u => (object)Show(u))
@@ -281,7 +293,7 @@ namespace KScript.Auth
             "find" => Find(IdOf(c.Arg(0), "->find()")),
             "find_email" => Show(RecordByEmail(c.Arg(0) is ISemanticText t ? t.Text : c.Str(0))),
             "all" => All(),
-            "count" => (double)App.Users.Count(),
+            "count" => (double)Count(),
             "verify" => Verify(c.Arg(0), c.Arg(1)),
             "update" => Update(c, IdOf(c.Arg(0), "->update()"), Fields(c, 1)),
             "set_password" => SetPassword(c, IdOf(c.Arg(0), "->set_password()"), c.Arg(1)),

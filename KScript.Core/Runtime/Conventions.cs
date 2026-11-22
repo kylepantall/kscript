@@ -79,7 +79,7 @@ namespace KScript.Runtime
         /// <summary>Actions that do something and say whether they did: the name is the action, not a question.</summary>
         public static readonly IReadOnlySet<string> ActionsThatReport = new HashSet<string>(StringComparer.Ordinal)
         {
-            "set", "remove", "delete", "force_delete", "add", "save", "restore", "retry", "drop_table", "create_table", "revoke_token", "send", "copy", "move",
+            "set", "remove", "delete", "force_delete", "add", "save", "restore", "retry", "drop_table", "create_table", "revoke_token", "revoke_passkey", "send", "copy", "move",
             "confirm", "assert", "to_bool", "attempt", "login", "logout", "release", "acquire",
         };
 

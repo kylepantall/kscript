@@ -264,3 +264,4 @@ __pycache__/
 
 # Databases the samples and tests make when they run
 samples/**/data/*.sqlite
+samples/auth-app/_data/

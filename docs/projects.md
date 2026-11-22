@@ -90,6 +90,26 @@ The api and fullstack templates take the same options:
 
 Options can be written `--db postgres` or `--db=postgres`, and a yes/no option takes `yes`/`no` (`--cache no`) but never the folder name, so `kscript make project --docker shop` makes `shop`.
 
+### Adding Docker to an existing site
+
+Run `kscript make docker` anywhere in a project. It adds `Dockerfile`, `compose.yaml` and `.dockerignore` beside `kscript.json`. Preview the files with `--dry-run`. If any output already exists, the command stops before writing. Use `--force` to replace those files. The same kit is available when creating a bare site.
+
+```sh
+kscript make project portal --bare --web --api --port 4820 --docker -n
+cd portal
+docker compose up --build
+```
+
+Open `http://localhost:4820`. The container serves the project's configured `serve.root` and uses `serve.port`. If you change the port, regenerate the kit or update the published port, `EXPOSE` and health check together.
+
+Compose 2.17+ and BuildKit build KScript for Linux ARM64 or AMD64 from the released CLI's Git revision, using pinned multi-architecture .NET base images. A development build requires a source checkout. For a modified or unpublished KScript build, set `KSCRIPT_SOURCE` to its checkout.
+
+```sh
+KSCRIPT_SOURCE=/absolute/path/to/kscript docker compose up --build
+```
+
+The app runs as an unprivileged user with a read-only application directory. Compose keeps KScript.Storage, authentication state and project-relative SQLite files in the `app-state` volume at `/var/lib/kscript`. The volume survives container replacement. `KSCRIPT_PROJECT_DATA_ROOT` places configured relative auth and SQLite paths under that folder. For an absolute path or a separate database server, configure the corresponding mount or connection for your deployment. Restart `kscript serve` when changing storage paths so it refreshes the private files excluded from public serving. Secrets can be supplied as runtime environment variables. The generated `.dockerignore` excludes dotfiles, common credential files, local databases and runtime state. Add any project-specific secret filenames before building.
+
 ### The setup wizard
 
 `kscript make project` at a terminal with no options asks for everything instead: the folder (unless you gave one), the kind of project, and each of that template's options, with its default ready for Enter. Give any option, or `-n` (`--no-interaction`), and nothing is asked: what you didn't give takes its default, which is what scripts and CI want. When the input or output isn't a terminal, nothing is asked either.

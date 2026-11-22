@@ -1,0 +1,7 @@
+import KScript.Data
+
+/// The signed-in account's profile.
+model Profile(unique: [user_id]) {
+  user_id: string
+  bio: string(max: 160) = ''
+}

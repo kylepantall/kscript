@@ -16,6 +16,21 @@ namespace KScript.Runtime
         /// <summary>When set, every app's folders are under this folder instead (<c>&lt;root&gt;/&lt;app&gt;/&lt;kind&gt;</c>): handy for tests and portable installs.</summary>
         public const string RootVariable = "KSCRIPT_STORAGE_ROOT";
 
+        /// <summary>Resolves a configured SQLite or auth data path, optionally under a private deployment volume.</summary>
+        public static string ProjectDataPath(string project, string path)
+        {
+            if (Path.IsPathFullyQualified(path)) return Path.GetFullPath(path);
+            string folder = Environment.GetEnvironmentVariable("KSCRIPT_PROJECT_DATA_ROOT");
+            if (string.IsNullOrEmpty(folder)) return Path.GetFullPath(Path.Combine(project, path));
+            if (!Path.IsPathFullyQualified(folder))
+                throw new KScriptException("KSCRIPT_PROJECT_DATA_ROOT needs an absolute folder path.", "Config");
+            string absolute = Path.GetFullPath(path, folder);
+            string relative = Path.GetRelativePath(folder, absolute);
+            if (relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative))
+                throw new KScriptException($"The project data path '{path}' leaves KSCRIPT_PROJECT_DATA_ROOT.", "Config");
+            return absolute;
+        }
+
         /// <summary>The platform this process runs on: macos, windows or linux (other systems use the Linux folders).</summary>
         public static string CurrentPlatform => OperatingSystem.IsMacOS() ? "macos" : OperatingSystem.IsWindows() ? "windows" : "linux";
 

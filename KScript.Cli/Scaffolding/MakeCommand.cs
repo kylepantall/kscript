@@ -83,7 +83,7 @@ namespace KScript.Scaffolding
                 if (value == null)
                 {
                     // --flag on its own (or followed by another option) is true.
-                    bool takes = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal)
+                    bool takes = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal) && args[i + 1] is not ("-n" or "-h")
                         && (!flags.Contains(key) || args[i + 1].ToLowerInvariant() is "true" or "false" or "yes" or "no");
                     value = takes ? args[++i] : "true";
                     if (flags.Contains(key) && value.ToLowerInvariant() is "yes") value = "true";
@@ -124,6 +124,24 @@ namespace KScript.Scaffolding
                     return Fail(error, $"The folder '{root}' does not exist.");
                 }
 
+                if (string.Equals(type, "docker", StringComparison.OrdinalIgnoreCase))
+                {
+                    const string description = "Add Dockerfile, compose.yaml and .dockerignore for a Linux ARM64 or AMD64 web app.";
+                    if (help)
+                    {
+                        output.WriteLine(DockerMaker.Help);
+                        output.WriteLine(description);
+                        output.WriteLine(DockerMaker.SourceHint);
+                        return 0;
+                    }
+                    if (positional.Count != 1 || options.Count != 0) return Fail(error, DockerMaker.Help);
+                    var cli = new CliOutput(output);
+                    foreach (string path in DockerMaker.Make(root, force, dryRun))
+                        cli.Info($"{(dryRun ? "Would create" : "Created")} {cli.Style.Bold(path)}");
+                    NextSteps(cli, new[] { "docker compose up --build", DockerMaker.SourceHint });
+                    return 0;
+                }
+
                 if (options.ContainsKey("list") && positional.Count == 0)
                 {
                     PrintDirectory(root, output);
@@ -131,7 +149,12 @@ namespace KScript.Scaffolding
                 }
                 if (help && positional.Count == 1 && !string.Equals(type, "templates", StringComparison.OrdinalIgnoreCase))
                 {
-                    PrintType(Scaffolder.FindTemplate(root, type), output);
+                    if (string.Equals(type, "auth", StringComparison.OrdinalIgnoreCase))
+                    {
+                        output.WriteLine("kscript make auth [--passkeys] [--origin URL] [--rp-id DOMAIN] [--api] [--syntax kscript|xml] [--force] [--dry-run]");
+                        output.WriteLine("--passkeys creates passwordless registration and sign-in. The origin defaults to localhost on the project's serve port. The RP ID defaults to its hostname.");
+                    }
+                    else PrintType(Scaffolder.FindTemplate(root, type), output);
                     return 0;
                 }
                 if (help || positional.Count == 0)
@@ -164,7 +187,7 @@ namespace KScript.Scaffolding
 
                 if (string.Equals(type, "auth", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (positional.Count > 1) return Fail(error, $"kscript make auth takes no name (unexpected '{positional[1]}'). Options: --api, --syntax, --force, --dry-run.");
+                    if (positional.Count > 1) return Fail(error, $"kscript make auth takes no name (unexpected '{positional[1]}'). Options: --passkeys, --origin, --rp-id, --api, --syntax, --force, --dry-run.");
                     AuthResult made = AuthMaker.Make(root, options, force, dryRun);
                     var cli = new CliOutput(output);
                     foreach (var (action, path) in made.Files)
@@ -473,7 +496,8 @@ namespace KScript.Scaffolding
             var projects = new (string, string)[]
             {
                 ("project <folder>", "Start a new web app, with a desktop app unless --no-desktop (--bare for a bare project)"),
-                ("auth", "Sign-in pages, routes and a controller (KScript.Auth); --api adds token routes"),
+                ("auth", "Sign-in pages, routes and a controller. Use --passkeys for passwordless accounts or --api for token routes"),
+                ("docker", "Add Docker and Compose to an existing KScript project"),
                 ("templates [type…]", "Copy the built-in templates to _templates/ to customise them"),
                 ("templates project", "Copy the project template to customise new projects (--global for all)"),
             };

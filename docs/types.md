@@ -437,6 +437,8 @@ try {
 }
 ```
 
+Write each rule on its own line, or separate rules on one line with a semicolon. A comma after a rule value, such as `min: 8,`, is a syntax error. A `validate` rule accepts a comma between its test and its message.
+
 | Rule | What it checks |
 | --- | --- |
 | `min`, `max` | A number's value, or the length of text or a list. |
@@ -449,6 +451,24 @@ try {
 A value is converted to the base type first, then normalized, then checked against the rules. One that fails reports every rule it broke. Rules on a field work the same way: `title: string(min: 1)`.
 
 Calling a type makes a value of it, checked the same way: `Age(42)`, `Slug(' Hello-World ')`. Every declared type works like this (`Repo($data)`, `Size('small')`), and its name is always written bare, without `$`.
+
+### Checked conversions with `as`
+
+Use `expression as Type` when you need a typed value inside an expression. KScript evaluates the expression once, then applies the same conversion, normalization and validation as a typed assignment. A failed check raises an error at the cast.
+
+```kscript
+type PasskeySessionKey with [string] {
+  min: 8
+  normalize: $value->trim()
+  pattern: /^passkey_[a-zA-Z]+$/
+}
+
+kind = 'login'
+session_key = "passkey_{$kind}" as PasskeySessionKey
+echo $session_key  // passkey_login
+```
+
+The target can also be a built-in type (`$text as int`), a type with local rules (`$name as string(min: 2)`), or a list (`$rows as Repo[]`). An optional target such as `PasskeySessionKey?` accepts null and validates every non-null value. Parenthesize an arithmetic expression to convert its result, as in `($a + $b) as int`.
 
 ### Your own native types
 

@@ -5,11 +5,28 @@ to: {{ paths.views }}/auth/account.html
 <layout path="{{ layout }}" title="Your account">
   <h1>Your account</h1>
   <if test="$session->has('status')"><p class="status">{ $session->get('status') }</p></if>
+{{#if passkeys}}
+  <p>Signed in as <strong>{ $data.user.name }</strong></p>
+  <p>Account ID <code>{ $data.user.id }</code></p>
+{{else}}
   <p>Signed in as <strong>{ $data.user.name ?? $data.user.email }</strong> ({ $data.user.email }).</p>
+{{/if}}
   <form method="post" action="/logout">
     {! @csrf_field() }
     <button>Sign out</button>
   </form>
+
+  <if test="@has_passkeys()">
+    <h2>Passkeys</h2>
+    <button type="button" passkey="register" passkey-redirect="/account">Add a passkey</button>
+    <let name="keys" value="@passkeys()" />
+    <for each="key" in="$keys">
+      <form method="post" action="/account/passkeys/{ $key.id }/delete">
+        {! @csrf_field() }
+        <span>Added { $key.created_at }</span> {{#if passkeys}}<if test="$keys->count() > 1"><button>Remove passkey</button></if>{{else}}<button>Remove passkey</button>{{/if}}
+      </form>
+    </for>
+  </if>
 
   <h2>API tokens</h2>
   <p>Programs send a token as <code>Authorization: Bearer &lt;token&gt;</code> to act as you.</p>

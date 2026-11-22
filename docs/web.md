@@ -50,6 +50,52 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
 - **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
 
+## Model forms
+
+A component can save edits directly to a [KScript.Data model](data.md). Declare the writable fields and the ownership rule once in the web routes. For example, a `Profile` model in `models/profile.kscript` holds a `user_id` and a `bio`. Its `bio` field can declare a length limit such as `string(max: 500)`.
+
+```kscript
+import KScript.Http
+
+Routes {
+  ModelUpdate(name: edit_profile, model: Profile, owner: user_id, fields: [bio])
+}
+```
+
+Generate the reusable editor after declaring the binding.
+
+```sh
+kscript make component ProfileEditor --model-update edit_profile --fields bio
+```
+
+Pass the owned row as `<profile-editor record="{$profile}" />`. The generated form has a Save button. Add `--autosave` to the command to save after typing pauses. For a component with its own interactive state, start with `kscript make component OrderDetails --live`.
+
+A protected GET controller loads the signed-in user's row and passes it to the page. Render `<profile-editor profile="{$data.profile}" />` to reuse the component below from `_components/profile-editor.html`. Its stable live ID identifies the record when the user requests a redraw.
+
+```html
+<live id="profile-{$profile.id}">
+  <state name="automatic" value="false" />
+  <state name="preview" value="false" />
+  <label><input type="checkbox" bind="automatic"> Save as I type</label>
+
+  <form model-update="edit_profile" key="{$profile.id}" autosave="{$automatic}">
+    <label>Bio <input name="bio" value="{$profile.bio}"></label>
+    <button>Save profile</button>
+  </form>
+
+  <button type="button" on-click="preview = not $preview">
+    {$preview ? 'Hide saved bio' : 'Show saved bio'}
+  </button>
+  <if test="$preview"><p>Saved bio: {$profile.bio}</p></if>
+</live>
+```
+
+**Save on click.** Omit `autosave` for a manual editor. Typing leaves the database untouched until the user chooses Save. In a live block, Save updates the model in place and a status message confirms the write. A standalone form uses a native POST and redirects back to the page. Native submission also works with JavaScript disabled.
+
+**Save while typing.** Add `autosave` for a 500 ms pause, or choose a delay such as `autosave="750ms"`. The example binds this setting to a checkbox. Save submits pending edits immediately in either mode. The runtime sends edited fields, waits for each save to finish, and keeps the draft when validation fails. Live redraws preserve matching editable controls and their caret. Opening the saved bio preview runs the page's protected GET controller again and reads the stored value.
+
+KScript generates the POST handler and includes a CSRF token. Every save checks the session and token, matches the row's `user_id` against the signed-in user's ID, and validates the submitted fields against the model and the binding's allowlist. Use `owner: id` when the row's key is the account ID. Add route middleware to `ModelUpdate` for project-specific permissions. Apply ownership when reading the row as well. Keep custom SQLite files outside the public site or in an underscore-prefixed folder. The [auth sample](../samples/auth-app/README.md) includes this editor and its migration.
+
 ## Docs while you work: --with-docs
 
 `kscript serve --with-docs` also serves these docs on localhost, next to the site, with a page about your project at `/project`:
@@ -97,10 +143,12 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 </live>
 ```
 
-- `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server keeps nothing between requests.
+- `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server can restore the component from the browser's next request.
 - `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn(i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
 - `on-tick="…" every="200ms"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if $playing><span on-tick="frame += 1" every="100"></span></if>`.
 - `bind="name"` ties an input to a state variable both ways and redraws the block as you type.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
+
+When you use `kscript serve`, a live component posts back to the GET URL that rendered it. For a controller view, each interaction runs the original route and its middleware again. KScript binds the component state and actions to the current session, URL and component ID. It checks that a submitted field or action is still rendered before using it. Use a unique ID per instance when rendering a component in a loop, for example `id="profile-{$profile.id}"`. Keep render expressions free of side effects because the server may evaluate them more than once. Put persistent changes in an authorized action or model binding. State and action arguments travel in the HTML and are readable by the browser.
 
 See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter, and [`samples/life-lab`](../samples/life-lab) for a game whose rules are a KScript script shared with a terminal version and a desktop app.

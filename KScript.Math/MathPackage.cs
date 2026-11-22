@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 using KScript.Metadata;
 using KScript.Runtime;
 
@@ -81,6 +83,8 @@ namespace KScript.Mathematics
                 if (low > high) throw c.Error($"@random() needs low ({low}) to be at most high ({high}).", "Argument");
                 return (double)Rng.NextInt64(low, high + 1);
             }, "<let name=\"roll\" value=\"@random(1, 6)\" />");
+            p.Command("random_bytes", "count: number, format?: string", "Generates 1 to 65536 bytes with the operating system's cryptographic random generator. Returns lowercase hex by default, or unpadded base64url.",
+                KType.String, RandomBytes, "@random_bytes(16, format: 'hex')->count()");
             p.Command("random_seed", "seed", "Makes @random(), @pick() and @shuffle() repeat the same sequence, for tests.", KType.Null, c =>
             {
                 seeded = new Random(c.Int(0));
@@ -157,6 +161,20 @@ namespace KScript.Mathematics
 
         private static void One(PackageBuilder p, string name, string description, Func<double, double> f, string example = null) =>
             p.Command(name, "number", description, KType.Number, c => f(c.Num(0)), example);
+
+        private static string RandomBytes(CallContext c)
+        {
+            double count = c.Num(0);
+            if (count < 1 || count > 65536 || count != M.Truncate(count))
+                throw c.Error("@random_bytes() needs a whole byte count from 1 to 65536.", "Argument");
+            string format = c.Str(1, "hex");
+            if (format is not ("hex" or "base64url"))
+                throw c.Error("@random_bytes() format must be 'hex' or 'base64url'.", "Argument");
+
+            byte[] bytes = RandomNumberGenerator.GetBytes((int)count);
+            return format == "hex" ? Convert.ToHexString(bytes).ToLowerInvariant()
+                : Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        }
 
         private static long Gcd(long a, long b)
         {

@@ -56,6 +56,14 @@ namespace KScript.Pages
 
         public Interpreter Interpreter { get; }
 
+        // Model forms need the framework's session helper even in a component with no imports.
+        private Module authModule;
+        internal string CsrfToken()
+        {
+            authModule ??= Interpreter.CreateModule(null, new[] { "KScript.Auth" });
+            return (string)Evaluate("@csrf_token()", authModule.Globals, authModule);
+        }
+
         /// <summary>The module of a page, layout or component file: the packages and scripts it imports.</summary>
         public Module ModuleFor(string file, string fullPath)
         {

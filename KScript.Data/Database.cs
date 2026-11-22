@@ -64,7 +64,31 @@ namespace KScript.Data
             return FromOptions(wanted, options, root);
         }
 
-        internal static DatabaseSettings FromOptions(string name, Dictionary<string, object> options, string root)
+        internal static IEnumerable<string> LocalFiles(string folder)
+        {
+            string root = ProjectFolder(folder);
+            // Also keep a previous default database private after an app changes or relocates its connection.
+            yield return Path.Combine(root, DefaultFile);
+            yield return AppFolders.ProjectDataPath(root, DefaultFile);
+            var config = ConfigValue.For(KScriptHost.ForText(new StringWriter()), folder).Values.GetValueOrDefault("database") as Dictionary<string, object>;
+            var connections = config?.GetValueOrDefault("connections") as Dictionary<string, object>;
+            if (connections == null || connections.Count == 0)
+                connections = new() { [DefaultName] = new Dictionary<string, object> { ["url"] = Environment.GetEnvironmentVariable("DATABASE_URL") } };
+
+            foreach (var (name, value) in connections)
+            {
+                if (value is not Dictionary<string, object> options) continue;
+                // Server connections remain lazy. Looking up private paths never opens a database.
+                var (driver, address, _) = Location(name, options);
+                if (driver is not ("sqlite" or "sqlite3")) continue;
+                string file = string.IsNullOrWhiteSpace(address) ? DefaultFile : address.Trim();
+                if (file == ":memory:") continue;
+                yield return Path.GetFullPath(file, root);
+                yield return AppFolders.ProjectDataPath(root, file);
+            }
+        }
+
+        private static (string Driver, string Address, string Url) Location(string name, Dictionary<string, object> options)
         {
             string url = Text(options, "url");
             string driver = Text(options, "driver")?.ToLowerInvariant();
@@ -77,7 +101,12 @@ namespace KScript.Data
                 file = url.Substring(colon + 1);
                 if (file.StartsWith("//", StringComparison.Ordinal)) file = file.Substring(2);
             }
-            driver ??= "sqlite";
+            return (driver ?? "sqlite", file, url);
+        }
+
+        internal static DatabaseSettings FromOptions(string name, Dictionary<string, object> options, string root)
+        {
+            var (driver, file, url) = Location(name, options);
             switch (driver)
             {
                 case "sqlite":
@@ -142,7 +171,7 @@ namespace KScript.Data
                     Memory = true,
                 };
             }
-            string path = Path.GetFullPath(Path.IsPathRooted(file) ? file : Path.Combine(root, file));
+            string path = AppFolders.ProjectDataPath(root, file);
             return new DatabaseSettings
             {
                 Name = name,

@@ -252,3 +252,15 @@ test('single quotes have no escapes; double quotes have only \\" and \\\\', asyn
   const escapes = tokens.filter((t) => /string\.quoted\.double\.kscript/.test(t.scopes) && /constant\.character\.escape\.kscript/.test(t.scopes)).map((t) => t.text);
   assert.deepStrictEqual(escapes, ['\\\\', '\\"']);
 });
+
+test('casts highlight the type and preserve import aliases and named arguments', async () => {
+  const tokens = tokenize(await load(), [
+    'import "lib.kscript" as lib',
+    'items = $raw as Product[]',
+    'items = @json($raw, as: Product)',
+  ].join('\n'));
+  assert.match(scopeOf(tokens, 'as'), /keyword\.control\.import\.kscript/);
+  assert.match(scopeOf(tokens, 'as', 1), /keyword\.operator\.word\.kscript/);
+  assert.match(scopeOf(tokens, 'Product'), /entity\.name\.type\.kscript/);
+  assert.doesNotMatch(scopeOf(tokens, 'as', 2), /keyword\.operator\.word\.kscript/);
+});

@@ -57,8 +57,17 @@ namespace KScript.Http
 
         private PageContext page;
 
+        public LiveEvent Live { get; set; }
+
         /// <summary>The page engine's state for this request, for @view().</summary>
-        public PageContext Page => page ??= new PageContext(App.SiteRoot, Request);
+        public PageContext Page => page ??= new PageContext(App.SiteRoot, Request)
+        {
+            Live = Live,
+            RoutedLiveProof = Values.ToStr(Request.GetValueOrDefault("method")) == "GET"
+                ? () => PageLive.Sign(new Dictionary<string, object>(), LiveProofScope) : null,
+        };
+
+        internal string LiveProofScope => "GET\0" + App.SiteRoot + "\0" + Values.ToStr(Request["url"]) + "\0" + Auth.CsrfToken;
 
         public Frame Top => frames.Count > 0 ? frames[^1] : throw new KScriptException($"Routes must be inside <KScript.Routes>.", "Http");
 

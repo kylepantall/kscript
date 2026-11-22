@@ -142,6 +142,19 @@ namespace KScript.Http
                 Example = "<KScript.Routes>\n  <import path=\"controllers/people.ks.xml\" as=\"people\" />\n  <Resource path=\"/people\" to=\"people\" middleware=\"auth\" />\n</KScript.Routes>",
             }, AddResource);
 
+            p.Element(new ElementInfo("ModelUpdate", "Lets a named HTML model form edit selected fields of a record owned by the signed-in user.", ContentKind.Empty,
+                new A("name", K.Text, "The binding name used by <form model-update>.", true) { IsName = true },
+                new A("model", K.Text, "The model in the project's models folder.", true) { IsName = true },
+                new A("owner", K.Text, "The column holding the authenticated user's ID.", true) { IsName = true },
+                new A("fields", K.Text, "Writable model fields, for example [title, body].", true) { NameList = true },
+                Middleware("Additional authorization or other middleware for this binding."))
+            {
+                Context = ElementContext.Script,
+                MustBeInside = new[] { "Routes", "Group" },
+                InsideAnyAncestor = true,
+                Example = "<KScript.Routes><ModelUpdate name=\"edit_note\" model=\"Note\" owner=\"user_id\" fields=\"title, body\" /></KScript.Routes>",
+            }, ModelFormBinding.Declare);
+
             p.Command("view", "name, data...",
                 "Renders a page from the views folder (or the site folder) with its layout, giving it the named values as variables: @view('people/show.html', person: $p). The extension may be left off.",
                 KType.HttpResponse, View, "<return value=\"@view('people/show', person: $person)\" />");

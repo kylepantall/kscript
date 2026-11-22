@@ -316,6 +316,17 @@ namespace KScript.Runtime
                 case PipeNode pipe:
                     return EvaluatePipe(pipe, scope, ctx);
 
+                case CastNode cast:
+                {
+                    object input = Evaluate(cast.Value, scope, ctx);
+                    TypeRef type = TypeRef.Parse(cast.TypeName)
+                        ?? throw Fail(cast, ctx, $"'{cast.TypeName}' isn't a valid cast type.", "Type");
+                    // Validate the target even when a null or an empty list has no values to convert.
+                    if (!Values.IsDeclarable(type.Name)) Shapes.Resolve(type, scope, ctx.Module);
+                    if (type.Args != null) type.Refined(scope, ctx.Module);
+                    return Shapes.Convert(this, input, type, "The value", scope, ctx.Module);
+                }
+
                 case UnaryNode unary:
                 {
                     object operand = Evaluate(unary.Operand, scope, ctx);
@@ -616,6 +627,10 @@ namespace KScript.Runtime
         #endregion
 
         #region Members and indexes
+
+        internal object GetMember(object target, string name, Module module) =>
+            target == null ? throw new KScriptException($"Can't read .{name} of null.", "Null")
+                : GetMember(target, name, null, new EvalContext(module, null));
 
         private object GetMember(object target, string name, ExprNode node, EvalContext ctx)
         {

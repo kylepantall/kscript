@@ -170,6 +170,16 @@ namespace KScript.Syntax
         public override IEnumerable<ExprNode> Children => new[] { Target, Index };
     }
 
+    /// <summary><c>value as Type</c>, using the same target type as a typed declaration.</summary>
+    public sealed class CastNode : ExprNode
+    {
+        public ExprNode Value { get; internal set; }
+        public string TypeName { get; internal set; }
+        public TextSpan TypeSpan { get; internal set; }
+        public TextSpan OperatorSpan { get; internal set; }
+        public override IEnumerable<ExprNode> Children => new[] { Value };
+    }
+
     public sealed class UnaryNode : ExprNode
     {
         /// <summary><c>-</c>, <c>+</c> or <c>not</c>.</summary>

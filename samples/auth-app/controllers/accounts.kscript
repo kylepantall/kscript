@@ -3,7 +3,9 @@
 // sessions and tokens, and checks the CSRF token every form sends with {! @csrf_field() } (see the Sign-in guide).
 import KScript.Http
 import KScript.Auth
+import KScript.Data
 import "../requests/sign-up.kscript"
+import "../models/profile.kscript"
 
 /// GET /login
 fn show_login() => @view('auth/login', data: {})
@@ -82,6 +84,25 @@ fn reset(form: map) {
 
 /// GET /account
 fn account() => @view('auth/account', data: { user: @user(), tokens: @api_tokens(@user()) })
+
+/// Loads the signed-in user's profile for the editor component.
+fn show_profile() {
+  user_id = @user().id
+  entry = null
+  try {
+    entry = Profile->first_or_create({ user_id: $user_id })
+  } catch UniqueViolation {
+    // Another request just created this user's profile.
+    entry = Profile->where(user_id: $user_id)->first_or_fail()
+  }
+  return @view('auth/profile', data: { profile: $entry })
+}
+
+/// Removes a passkey belonging to the current session's user.
+fn delete_passkey(id: string) {
+  @revoke_passkey($id)
+  return @redirect('/account')
+}
 
 /// POST /account/tokens: makes an API token, shown once.
 fn make_token(form: map) {

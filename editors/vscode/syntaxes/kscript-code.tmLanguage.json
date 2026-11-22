@@ -103,8 +103,22 @@
       }
     },
     "import": {
-      "match": "\\b(import|from)\\b",
-      "name": "keyword.control.import.kscript"
+      "begin": "(?<![\\w$@.-])(import)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.import.kscript"
+        }
+      },
+      "end": "(?=;|$)",
+      "patterns": [
+        {
+          "match": "(?<![\\w$@.-])(from|as)(?![\\w-])",
+          "name": "keyword.control.import.kscript"
+        },
+        {
+          "include": "#expression"
+        }
+      ]
     },
     "declaration": {
       "patterns": [
@@ -146,10 +160,6 @@
           "comment": "The arm of a match that takes anything: _ => ... or _ when $n > 9 => ...",
           "match": "(?<![\\w$@.-])_(?=\\s*(?:=>|when(?![\\w-])))",
           "name": "keyword.control.flow.kscript"
-        },
-        {
-          "match": "(?<![\\w$@.-])(as)(?![\\w-])",
-          "name": "keyword.control.import.kscript"
         }
       ]
     },
@@ -239,6 +249,9 @@
           "include": "#constants"
         },
         {
+          "include": "#cast"
+        },
+        {
           "include": "#operators"
         },
         {
@@ -307,6 +320,9 @@
         },
         {
           "include": "#constants"
+        },
+        {
+          "include": "#cast"
         },
         {
           "include": "#operators"
@@ -767,6 +783,17 @@
           ]
         }
       ]
+    },
+    "cast": {
+      "match": "(?<![\\w$@.-])(as)[ \\t]+([A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "keyword.operator.word.kscript"
+        },
+        "2": {
+          "name": "entity.name.type.kscript"
+        }
+      }
     }
   }
 }

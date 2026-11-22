@@ -216,6 +216,15 @@ namespace KScript.Language.Tests
         private static DocumentAnalysis Native(string code) => WithNativeTypes.Analyze(code, "/tmp/natives/app.kscript");
 
         [Fact]
+        public void ACastUsesAnImportedTypeAndNavigatesToItsDefinition()
+        {
+            (string text, int offset) = WithCaret("import \"types/sku.kscript\"\ns = 'ABC-1234' as Sk‸u\necho $s");
+            DocumentAnalysis analysis = Native(text);
+            AssertClean(analysis);
+            Assert.EndsWith("types/sku.kscript", Assert.Single(WithNativeTypes.GetDefinition(analysis, offset)).Path.Replace('\\', '/'));
+        }
+
+        [Fact]
         public void ImportedNativeTypesReadRawValuesAndCheckLiterals()
         {
             AssertClean(Native("""

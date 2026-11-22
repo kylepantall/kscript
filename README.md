@@ -127,7 +127,7 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Storage` | Settings, data, caches and logs in the right folders on macOS, Windows and Linux |
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
 | `KScript.Data` | Models with relations, a query builder whose conditions are lambdas, transactions, safe raw SQL, and migrations written from the models by `kscript db diff`, on SQLite, Postgres, MySQL and MariaDB |
-| `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
+| `KScript.Auth` | Accounts, passwords, passkeys, sessions, CSRF protection and API tokens. See [passkey sign-in](docs/auth.md#passkeys) and [model forms](docs/web.md#model-forms). |
 | `KScript.Queue` | Background jobs: `job`, `->dispatch()`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
 | `KScript.Document` | Papers, reports, letters and invoices with LaTeX maths, tables, figures and citations, saved as PDF, Word, LaTeX, Markdown or HTML |
 

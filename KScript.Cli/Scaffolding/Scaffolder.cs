@@ -141,7 +141,22 @@ namespace KScript.Scaffolding
             ApplyDefaults(header, values);
 
             if (string.Equals(template.Type, "component", StringComparison.OrdinalIgnoreCase))
+            {
                 CheckComponentName(values["kebab"], request.Name);
+                if (template.BuiltIn && StubTemplate.IsSet(values.GetValueOrDefault("model_update")))
+                {
+                    static bool Identifier(string name) => !string.IsNullOrEmpty(name) && Syntax.Lexer.IsIdentStart(name[0]) && name.All(Syntax.Lexer.IsIdentChar);
+                    if (!Identifier(values["model_update"]) || values["model_update"] == "true")
+                        throw new StubException("--model-update needs a binding name, such as edit_profile.");
+                    string fields = values.GetValueOrDefault("fields");
+                    if (string.IsNullOrWhiteSpace(fields) || fields == "true" || fields.Split(',').Any(f => !Identifier(f.Trim())))
+                        throw new StubException("Use --fields to choose the model fields, e.g. --fields bio,website.");
+                    string delay = values.GetValueOrDefault("autosave");
+                    if (StubTemplate.IsSet(delay) && !string.Equals(delay, "true", StringComparison.OrdinalIgnoreCase) &&
+                        (!Runtime.Duration.TrySeconds(delay, out double seconds) || seconds < 0 || seconds * 1000 > int.MaxValue))
+                        throw new StubException("--autosave needs a delay such as 500ms, or use the flag by itself.");
+                }
+            }
             else if (values["kebab"].Length == 0)
                 throw new StubException($"'{request.Name}' has no letters or digits to make a file name from.");
 
