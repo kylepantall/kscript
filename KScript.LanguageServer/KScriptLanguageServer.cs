@@ -26,6 +26,7 @@ namespace KScript.LanguageServer
         private readonly LanguageService service;
         private bool initialized;
         private bool shutdownRequested;
+        private Task diagnosticsDelay;
 
         // kscript.json files by path, re-parsed when their text or the text of a standard they use changes.
         private readonly Dictionary<string, (string Text, ProjectConfig Config, Dictionary<string, string> Standards)> projectConfigs =
@@ -52,7 +53,20 @@ namespace KScript.LanguageServer
                 JsonObject message;
                 try
                 {
-                    message = await connection.ReadAsync(cancellation).ConfigureAwait(false);
+                    Task<JsonObject> read = connection.ReadAsync(cancellation);
+                    if (diagnosticsDelay != null && await Task.WhenAny(read, diagnosticsDelay).ConfigureAwait(false) == diagnosticsDelay)
+                    {
+                        // Only the message loop touches the workspace. Keep the pending read while publishing.
+                        try
+                        {
+                            PublishDiagnostics();
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"Error publishing diagnostics: {ex}");
+                        }
+                    }
+                    message = await read.ConfigureAwait(false);
                 }
                 catch (System.Text.Json.JsonException)
                 {
@@ -145,6 +159,7 @@ namespace KScript.LanguageServer
                     return null;
                 case "shutdown":
                     shutdownRequested = true;
+                    diagnosticsDelay = null;
                     return null;
 
                 case "textDocument/didOpen":
@@ -165,7 +180,10 @@ namespace KScript.LanguageServer
                             doc.Text = ApplyChange(doc.Text, change);
                         }
                         doc.Version = p["textDocument"]["version"]?.GetValue<int>() ?? doc.Version;
-                        RefreshAll();
+                        // Imports can affect other open files. Requests need fresh analysis immediately,
+                        // but diagnostics for several edits can share one pass after typing pauses.
+                        InvalidateAnalyses();
+                        diagnosticsDelay = Task.Delay(150);
                     }
                     return null;
                 }
@@ -403,9 +421,24 @@ namespace KScript.LanguageServer
         /// <summary>Re-analyzes every open document (imports and components may depend on the one that changed) and publishes diagnostics.</summary>
         private void RefreshAll()
         {
-            foreach (OpenDocument doc in workspace.Documents.ToList())
+            InvalidateAnalyses();
+            PublishDiagnostics();
+        }
+
+        private void InvalidateAnalyses()
+        {
+            foreach (OpenDocument doc in workspace.Documents)
             {
-                doc.Analysis = Analyze(doc);
+                doc.Analysis = null;
+            }
+        }
+
+        private void PublishDiagnostics()
+        {
+            diagnosticsDelay = null;
+            foreach (OpenDocument doc in workspace.Documents)
+            {
+                doc.Analysis ??= Analyze(doc);
                 JsonArray diagnostics = new JsonArray();
                 foreach (Diagnostic d in doc.Analysis.Diagnostics)
                 {
