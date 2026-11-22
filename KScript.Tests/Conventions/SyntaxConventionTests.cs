@@ -374,7 +374,7 @@ public class SyntaxConventionTests
             echo [1, 3, 4, 12, 7]->map(fn(n) => @name($n))->join(', ')
             echo [1, 2, 5, 6]->map(fn(n) => @lines($n))->join(', ')
             """;
-        Assert.Empty(Analyzer.Analyze(code, "test.kscript").Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.DoesNotContain(Analyzer.Analyze(code, "test.kscript").Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
         Assert.Equal("one, two or three, four, big, other\none, few, some, many\n", Run(code));
     }
 

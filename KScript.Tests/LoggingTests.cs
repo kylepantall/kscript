@@ -170,7 +170,7 @@ public sealed class LoggingTests : IDisposable
     }
 
     [Fact]
-    public void Http_provider_from_KScript_Net_posts_batches_as_json()
+    public async Task Http_provider_from_KScript_Net_posts_batches_as_json()
     {
         int port = FreePort();
         using var listener = new HttpListener();
@@ -196,7 +196,7 @@ public sealed class LoggingTests : IDisposable
         Assert.Equal("", error);
         var (_, error2, _) = RunWith("<import package=\"KScript.Net\" />" +
             $"<log_provider type=\"http\" url=\"http://localhost:{port}/logs\" replace=\"yes\" /><log>lost</log>");
-        serve.Wait(TimeSpan.FromSeconds(10));
+        await serve.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.Equal(new[] { "one", "two" }, JsonDocument.Parse(bodies[0]).RootElement.EnumerateArray().Select(e => e.GetProperty("message").GetString()));
         Assert.Equal("three", JsonDocument.Parse(bodies[1]).RootElement[0].GetProperty("message").GetString());

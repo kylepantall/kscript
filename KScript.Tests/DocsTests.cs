@@ -480,9 +480,9 @@ public sealed class DocsTests
     }
 
     [Fact]
-    public void The_run_api_only_answers_the_docs_pages()
+    public async Task The_run_api_only_answers_the_docs_pages()
     {
-        Assert.Null(DocsCommand.HandleApiAsync(Request("GET", "/guide/language"), 4180).GetAwaiter().GetResult());
+        Assert.Null(await DocsCommand.HandleApiAsync(Request("GET", "/guide/language"), 4180));
         Assert.Equal(404, Api(Request("POST", "/api/other", "{}")).Status);
         Assert.Equal(405, Api(Request("GET", "/api/run")).Status);
         Assert.Equal(403, Api(Request("POST", "/api/run", "{\"code\":\"\"}", header: false)).Status);
@@ -651,7 +651,7 @@ public sealed class DocsTests
     }
 
     [Fact]
-    public void Kscript_docs_serves_the_site_until_stopped()
+    public async Task Kscript_docs_serves_the_site_until_stopped()
     {
         using var stop = new CancellationTokenSource();
         var output = new StringWriter();
@@ -662,33 +662,32 @@ public sealed class DocsTests
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
         var deadline = DateTime.UtcNow.AddSeconds(60);
-        while (opened == null && DateTime.UtcNow < deadline && !server.IsCompleted) Thread.Sleep(50);
+        while (opened == null && DateTime.UtcNow < deadline && !server.IsCompleted) await Task.Delay(50);
         Assert.Equal($"http://localhost:{port}/?q=string%20replace", opened);
         Assert.Contains("KScript docs: http://localhost:", output.ToString());
 
-        HttpResponseMessage home = http.GetAsync("/").Result;
+        HttpResponseMessage home = await http.GetAsync("/");
         Assert.Equal(HttpStatusCode.OK, home.StatusCode);
-        string homePage = home.Content.ReadAsStringAsync().Result;
+        string homePage = await home.Content.ReadAsStringAsync();
         Assert.Contains("<title>KScript docs</title>", homePage);
         Assert.Contains("data-default-format=\"xml\"", homePage);
-        Assert.Contains("The KScript language", http.GetStringAsync("/guide/language").Result);
-        Assert.Contains("string methods", http.GetStringAsync("/reference/methods/string/").Result);
-        Assert.Contains("--accent", http.GetStringAsync("/assets/docs.css").Result);
-        Assert.StartsWith("[", http.GetStringAsync("/assets/search.json").Result);
+        Assert.Contains("The KScript language", await http.GetStringAsync("/guide/language"));
+        Assert.Contains("string methods", await http.GetStringAsync("/reference/methods/string/"));
+        Assert.Contains("--accent", await http.GetStringAsync("/assets/docs.css"));
+        Assert.StartsWith("[", await http.GetStringAsync("/assets/search.json"));
 
-        HttpResponseMessage missing = http.GetAsync("/no/such/page").Result;
+        HttpResponseMessage missing = await http.GetAsync("/no/such/page");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
-        Assert.Contains("Page not found", missing.Content.ReadAsStringAsync().Result);
-        Assert.Equal(HttpStatusCode.NotFound, http.GetAsync("/routes.ks.xml").Result.StatusCode);
+        Assert.Contains("Page not found", await missing.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync("/routes.ks.xml")).StatusCode);
 
         var run = new HttpRequestMessage(HttpMethod.Post, "/api/run") { Content = new StringContent("{\"code\":\"<echo>docs</echo>\"}", Encoding.UTF8, "application/json") };
         run.Headers.Add(DocsCommand.RunHeader, "1");
-        Assert.Contains("\"output\":\"docs\\n\"", http.SendAsync(run).Result.Content.ReadAsStringAsync().Result);
+        Assert.Contains("\"output\":\"docs\\n\"", await (await http.SendAsync(run)).Content.ReadAsStringAsync());
 
         stop.Cancel();
-        Assert.True(server.Wait(TimeSpan.FromSeconds(30)));
-        Assert.Equal(0, server.Result);
-        Assert.Empty(Directory.GetDirectories(Path.GetTempPath(), "kscript-docs-*").Where(d => !before.Contains(d) && !d.Contains("-test-")));
+        Assert.Equal(0, await server.WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.DoesNotContain(Directory.GetDirectories(Path.GetTempPath(), "kscript-docs-*"), d => !before.Contains(d) && !d.Contains("-test-"));
     }
 
     /// <summary>

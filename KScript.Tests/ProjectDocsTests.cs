@@ -232,7 +232,7 @@ public sealed class ProjectDocsTests : IDisposable
     }
 
     [Fact]
-    public void The_docs_run_next_to_the_site_until_it_stops()
+    public async Task The_docs_run_next_to_the_site_until_it_stops()
     {
         WriteProject();
         int sitePort = TestServer.FreePort();
@@ -251,15 +251,15 @@ public sealed class ProjectDocsTests : IDisposable
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://localhost:{docsPort}") };
         var deadline = DateTime.UtcNow.AddSeconds(60);
-        while (!Printed().Contains("Docs for shop") && DateTime.UtcNow < deadline && !server.IsCompleted) Thread.Sleep(50);
+        while (!Printed().Contains("Docs for shop") && DateTime.UtcNow < deadline && !server.IsCompleted) await Task.Delay(50);
         Assert.Contains($"Docs for shop: http://localhost:{docsPort}/project", Printed());
-        string page = http.GetStringAsync("/project").Result;
+        string page = await http.GetStringAsync("/project");
         Assert.Contains("data-default-format=\"xml\"", page);
         Assert.Contains("fn-slugify", page);
-        Assert.Contains("@slugify", http.GetStringAsync("/assets/search.json").Result);
+        Assert.Contains("@slugify", await http.GetStringAsync("/assets/search.json"));
 
         stop.Cancel();
-        Assert.Equal(0, server.Result);
+        Assert.Equal(0, await server);
     }
 
     [Fact]
@@ -310,31 +310,31 @@ public sealed class ProjectDocsTests : IDisposable
     }
 
     [Fact]
-    public void A_docs_port_in_use_leaves_the_site_running_without_docs()
+    public async Task A_docs_port_in_use_leaves_the_site_running_without_docs()
     {
         using var busy = new TcpListener(IPAddress.Loopback, 0);
         busy.Start();
         int port = ((IPEndPoint)busy.LocalEndpoint).Port;
         var error = new StringWriter();
-        Assert.Equal(1, DocsCommand.ServeProjectAsync(dir, null, port, 8080, TextWriter.Null, error, CancellationToken.None).Result);
+        Assert.Equal(1, await DocsCommand.ServeProjectAsync(dir, null, port, 8080, TextWriter.Null, error, CancellationToken.None));
         Assert.Contains($"Docs: port {port} is in use", error.ToString());
 
         // The site's own port isn't free for the docs either.
         error = new StringWriter();
-        Assert.Equal(1, DocsCommand.ServeProjectAsync(dir, null, 9123, 9123, TextWriter.Null, error, CancellationToken.None).Result);
+        Assert.Equal(1, await DocsCommand.ServeProjectAsync(dir, null, 9123, 9123, TextWriter.Null, error, CancellationToken.None));
         Assert.Contains("Docs: port 9123 is in use", error.ToString());
     }
 
     [Fact]
-    public void Docs_pick_another_port_when_the_site_has_theirs()
+    public async Task Docs_pick_another_port_when_the_site_has_theirs()
     {
         using var stop = new CancellationTokenSource();
         stop.Cancel();
-        Assert.Equal(0, DocsCommand.ServeProjectAsync(dir, null, null, DocsCommand.DefaultPort, TextWriter.Null, TextWriter.Null, stop.Token).Result);
+        Assert.Equal(0, await DocsCommand.ServeProjectAsync(dir, null, null, DocsCommand.DefaultPort, TextWriter.Null, TextWriter.Null, stop.Token));
     }
 
     [Fact]
-    public void Docs_report_a_temp_folder_they_cant_write_to()
+    public async Task Docs_report_a_temp_folder_they_cant_write_to()
     {
         string notAFolder = Write("temp-is-a-file", "x");
         string[] names = { "TMPDIR", "TMP", "TEMP" };
@@ -344,7 +344,7 @@ public sealed class ProjectDocsTests : IDisposable
         try
         {
             foreach (string name in names) Environment.SetEnvironmentVariable(name, notAFolder);
-            code = DocsCommand.ServeProjectAsync(dir, null, null, 8080, TextWriter.Null, error, CancellationToken.None).Result;
+            code = await DocsCommand.ServeProjectAsync(dir, null, null, 8080, TextWriter.Null, error, CancellationToken.None);
         }
         finally
         {
