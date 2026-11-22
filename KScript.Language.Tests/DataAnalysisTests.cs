@@ -359,5 +359,136 @@ namespace KScript.Language.Tests
                 """);
             TestHelpers.AssertClean(a);
         }
+
+        private const string Shop = """
+            import KScript.Data
+
+            model Author {
+              name: string
+              posts: Post[]
+            }
+
+            model Post {
+              soft_deletes: yes
+              title: string
+              views: int = 0
+              author: Author
+            }
+
+            """;
+
+        private static List<string> Labels(string textWithCaret)
+        {
+            int offset = textWithCaret.IndexOf('‸', StringComparison.Ordinal);
+            string text = textWithCaret.Remove(offset, 1);
+            return Service.GetCompletions(Service.Analyze(text, Path.Combine(Folder, "app.kscript")), offset).Select(i => i.Label).ToList();
+        }
+
+        [Fact]
+        public void ColumnsAreCheckedAndCompleted()
+        {
+            DocumentAnalysis a = Code(Shop + """
+                echo $Post->where(titel: 'x', views: 1)->order_by(veiws, title: desc)->with(autor, author.posts)->get()
+                echo $Post->where(fn($p) => $p.titel == 'x')->pluck(title)
+                echo $Author->create(nme: 'Joan')
+                echo $Post->fake_many(2, count: 3)
+                echo $Post->latest(xyz)->first()
+                """);
+            string[] messages = a.Diagnostics.Where(d => d.Code is "KS5013" or "KS5010").Select(d => d.Code + " " + d.Message).ToArray();
+            Assert.Contains("KS5013 Post has no field 'titel'. Did you mean title?", messages);
+            Assert.Contains("KS5013 Post has no field 'veiws'. Did you mean views?", messages);
+            Assert.Contains("KS5013 Post has no relation 'autor'. Did you mean author?", messages);
+            Assert.Contains("KS5010 Post has no field 'titel'. Did you mean title?", messages);
+            Assert.Contains("KS5013 Author has no field 'nme'. Did you mean name?", messages);
+            Assert.Contains(messages, m => m.StartsWith("KS5013 Post has no field 'xyz'. Its fields are: ", StringComparison.Ordinal));
+            Assert.Equal(6, messages.Length);
+            Assert.Contains(a.Diagnostics, d => d.Code == "KS5013" && d.Fixes?.Count > 0);
+
+            List<string> where = Labels(Shop + "echo $Post->where(‸)");
+            Assert.Equal(new[] { "author_id:", "deleted_at:", "id:", "title:", "views:" }, where.Take(5).OrderBy(l => l, StringComparer.Ordinal));
+            Assert.DoesNotContain("title:", Labels(Shop + "echo $Post->where(title: 'x', ‸)"));
+            Assert.Contains("views", Labels(Shop + "echo $Post->order_by(‸)"));
+            Assert.Equal("author", Labels(Shop + "echo $Post->with(‸)")[0]);
+            Assert.Contains("title", Labels(Shop + "echo $Post->where(fn($p) => $p.‸)"));
+            Assert.DoesNotContain("title:", Labels(Shop + "echo $Post->paginate(‸)"));
+            Assert.DoesNotContain("title:", Labels("echo [1]->map(‸)"));
+        }
+
+        [Fact]
+        public void HoverShowsAQuerysSql()
+        {
+            string Sql(string chain, string at)
+            {
+                string text = Shop + chain + "\n";
+                DocumentAnalysis a = Service.Analyze(text, Path.Combine(Folder, "app.kscript"));
+                string markdown = Service.GetHover(a, text.LastIndexOf(at, StringComparison.Ordinal) + 3).Markdown;
+                int start = markdown.IndexOf("```sql\n", StringComparison.Ordinal);
+                return start < 0 ? null : markdown.Substring(start + 7, markdown.IndexOf("\n```", start + 7, StringComparison.Ordinal) - start - 7);
+            }
+
+            Assert.Equal("SELECT * FROM posts\nWHERE title = ? AND views IN (…) AND deleted_at IS NULL\nORDER BY views, title DESC\nLIMIT ? OFFSET ?",
+                Sql("echo $Post->where(title: 'x', views: [1])->order_by(views, title: desc)->limit(2)->offset(4)->get()", "->get"));
+            Assert.Equal("SELECT * FROM posts\nWHERE ((title LIKE ? OR views > ?) AND NOT (author_id IS NULL) OR UPPER(title) <> ?) AND deleted_at IS NULL\nORDER BY id DESC\nLIMIT 1",
+                Sql("echo $Post->where(fn($p) => ($p.title->starts_with('A') or $p.views > 3) and not ($p.author_id == null) or $p.title->upper() != $x)->latest()->first()", "->first"));
+            Assert.Equal("SELECT DISTINCT COUNT(*) FROM posts\nWHERE (author_id IS NOT NULL OR …) AND deleted_at IS NOT NULL",
+                Sql("echo $Post->where(fn($p) => $p.author_id != null)->or_where(fn($a, $b) => 1)->only_trashed()->distinct()->count()", "->count"));
+            Assert.Equal("SELECT title FROM authors\nWHERE NOT (name IS NULL AND …) AND id = ?\nLIMIT 1\n-- then one query for posts.author",
+                Sql("echo $Author->select(title)->where_not(name: null, fn($a) => $a.name->trim())->with(posts.author)->find(1)", "->find"));
+            Assert.Equal("SELECT SUM(views) FROM posts\nORDER BY id ASC",
+                Sql("echo $Post->with_trashed()->oldest()->sum(views)", "->sum"));
+            Assert.Equal("SELECT 1 FROM authors\nLIMIT 1", Sql("echo $Author->exists()", "->exists"));
+            Assert.Equal("SELECT MAX(…) FROM authors", Sql("echo $Author->select($x)->max()", "->max"));
+            Assert.Equal("SELECT name FROM authors\nWHERE …", Sql("echo $Author->where()->pluck('name')", "->pluck"));
+            Assert.Null(Sql("p = $Post->first()\necho $p->posts()->count()", "->count"));
+            Assert.Null(Sql("echo [1, 2]->count()", "->count"));
+            Assert.Null(Sql("echo $db->tables()", "->tables"));
+            Assert.Equal("SELECT * FROM posts\nWHERE … AND deleted_at IS NULL", Sql("echo $Post->where(fn($p) => [1])->get()", "->get"));
+        }
+
+        [Fact]
+        public void AModelTheMigrationsDontMakeIsFlagged()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "kscript-drift-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(root, "models"));
+                Directory.CreateDirectory(Path.Combine(root, "database", "migrations"));
+                File.WriteAllText(Path.Combine(root, "kscript.json"), "{ \"name\": \"drift\" }");
+                const string model = "import KScript.Data\n\nmodel Note {\n  body: string\n}\n";
+                string path = Path.Combine(root, "models", "note.kscript");
+                File.WriteAllText(path, model);
+                DocumentAnalysis Check(string text) => Analyzer.Analyze(text, path, DiskFileSystem.Instance);
+
+                // No migrations yet: nothing to compare with.
+                Assert.DoesNotContain(Check(model).Diagnostics, d => d.Code == "KS5014");
+
+                string migration = Path.Combine(root, "database", "migrations", "2026_01_01_000000_notes.kscript");
+                File.WriteAllText(migration, "KScript.Migration {\n  CreateTable(name: notes) {\n    Field(name: id, type: int, key, auto)\n  }\n}\n");
+                Diagnostic drift = Assert.Single(Check(model).Diagnostics, d => d.Code == "KS5014");
+                Assert.Equal("The migrations don't make Note's table as it is now: it needs a migration to add field notes.body. Run kscript db diff to write it.", drift.Message);
+                Assert.Equal("Note", model.Substring(drift.Span.Start, drift.Span.Length));
+
+                // The same files give the same answer without running them again; a changed one is read again.
+                Assert.Single(Check(model).Diagnostics, d => d.Code == "KS5014");
+                File.WriteAllText(migration, "KScript.Migration {\n  CreateTable(name: notes) {\n    Field(name: id, type: int, key, auto)\n    Field(name: body, type: string)\n  }\n}\n");
+                File.SetLastWriteTimeUtc(migration, DateTime.UtcNow.AddMinutes(1));
+                Assert.DoesNotContain(Check(model).Diagnostics, d => d.Code == "KS5014");
+
+                // Two changes, a migration that can't run, and a file that isn't in a project.
+                File.WriteAllText(migration, "KScript.Migration {\n  CreateTable(name: notes) {\n    Field(name: id, type: int, key, auto)\n    Field(name: old, type: string)\n  }\n}\n");
+                File.SetLastWriteTimeUtc(migration, DateTime.UtcNow.AddMinutes(2));
+                Assert.Contains("and 1 more change", Assert.Single(Check(model).Diagnostics, d => d.Code == "KS5014").Message);
+                File.WriteAllText(migration, "KScript.Migration {\n  DropTable(name: nope)\n}\n");
+                File.SetLastWriteTimeUtc(migration, DateTime.UtcNow.AddMinutes(3));
+                Assert.DoesNotContain(Check(model).Diagnostics, d => d.Code == "KS5014");
+                File.WriteAllText(Path.Combine(root, "kscript.json"), "{ \"name\": ");
+                Assert.DoesNotContain(Check(model).Diagnostics, d => d.Code == "KS5014");
+                Assert.Empty(KScript.Data.Migrations.Drift.Of(Path.GetTempPath()));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 }

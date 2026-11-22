@@ -648,6 +648,58 @@ namespace KScript.Data
             return true;
         }
 
+        /// <summary>
+        /// Route model binding: <c>fn show(post: Post)</c> on <c>/posts/{post}</c> is given the post whose key is in the
+        /// path, or answers 404 (ModelNotFound) when there is none, or when the text can't be a key at all.
+        /// </summary>
+        public bool TryFind(CallContext call, RecordType type, object key, out object record)
+        {
+            object id = key;
+            if (KeyColumn.Kind == ColumnKind.Integer)
+            {
+                if (!long.TryParse(Convert.ToString(key, System.Globalization.CultureInfo.InvariantCulture), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long n))
+                    throw Records.NotFound(this, Table, key);
+                id = (double)n;
+            }
+            record = new Query(Database.For(call, this), Table, this).ById(id).FirstOrFail(call, key);
+            return true;
+        }
+
+        /// <summary>
+        /// OpenAPI: the key and the timestamps are filled in by the database, so they are read-only; relations are only
+        /// in a record's JSON once loaded (<c>->with(author)</c>), so they are never required.
+        /// </summary>
+        public void DescribeSchema(RecordType type, Dictionary<string, object> schema)
+        {
+            var properties = (Dictionary<string, object>)schema["properties"];
+            foreach (string generated in new[] { Key, "created_at", "updated_at", "deleted_at" })
+            {
+                if (properties.TryGetValue(generated, out object p) && p is Dictionary<string, object> property) property["readOnly"] = true;
+            }
+            foreach (Relation r in Relations.Values)
+            {
+                if (!properties.TryGetValue(r.Name, out object p) || p is not Dictionary<string, object> property) continue;
+                // A $ref can't have siblings in OpenAPI 3.0, so a single record is wrapped.
+                if (property.ContainsKey("$ref")) properties[r.Name] = property = new Dictionary<string, object> { ["allOf"] = new List<object> { property } };
+                property["description"] = $"Only there when the query loads it: ->with({r.Name}).";
+                if (schema.TryGetValue("required", out object req) && req is List<object> required) required.Remove(r.Name);
+            }
+        }
+
+        /// <summary>The model's fields once its relations are worked out (so author_id is there), each relation with its model.</summary>
+        public IEnumerable<(FieldDefinition Field, RecordType Links)> SchemaFields(RecordType type)
+        {
+            IReadOnlyDictionary<string, Relation> relations = Relations;
+            return Type.Fields.Select(f => (f, relations.TryGetValue(f.Name, out Relation r) ? r.Target.Type : null)).ToList();
+        }
+
+        /// <summary>A model in a path is named by its key: an integer for the usual id.</summary>
+        public Dictionary<string, object> KeySchema(RecordType type) => new Dictionary<string, object>
+        {
+            ["type"] = KeyColumn.Kind == ColumnKind.Integer ? "integer" : "string",
+            ["description"] = $"The {Key} of the {Name}.",
+        };
+
         /// <summary>Keeps a belongs-to relation and its column together: setting author sets author_id, and setting author_id forgets the author loaded before.</summary>
         public void FieldSet(Record record, string name, object value)
         {

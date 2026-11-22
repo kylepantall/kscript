@@ -82,7 +82,7 @@ namespace KScript.Docs
         {
             var sb = new StringBuilder();
             sb.Append("<h1>Playground</h1><p class=\"lead\">Write any KScript and run it. Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (<kbd>⌘</kbd>+<kbd>Enter</kbd> on a Mac) to run.</p>");
-            sb.Append($"<p>Scripts here can use KScript.Core, {string.Join(", ", Playground.Packages.Take(Playground.Packages.Count - 1))} and {Playground.Packages.Last()}. Each run has its own empty folder to read and write files in, which is deleted afterwards, and stops after {Playground.DefaultTimeout.TotalSeconds:0} seconds. Anything you type into <em>Input</em> is what {Html.Dual("<code>&lt;input&gt;</code>", "<code>input</code>")} and the other prompts read.</p>");
+            sb.Append($"<p>Scripts here can use KScript.Core, {string.Join(", ", Playground.Packages.Take(Playground.Packages.Count - 1))} and {Playground.Packages.Last()}. Each run has its own empty folder to read and write files in, which is deleted afterwards, and stops after {Playground.DefaultTimeout.TotalSeconds:0} seconds. KScript.Data gets an empty SQLite database in memory, also gone afterwards, so make its tables with <code>$db->create_table()</code>. Anything you type into <em>Input</em> is what {Html.Dual("<code>&lt;input&gt;</code>", "<code>input</code>")} and the other prompts read.</p>");
             sb.Append("<div class=\"playground\">").Append(Html.Try(HelloExample, title: "playground")).Append("</div>");
             Add(new DocPage { Path = "/playground", Title = "Playground", Section = "Start here", Description = "Write and run KScript in the browser.", Body = sb.ToString() });
         }

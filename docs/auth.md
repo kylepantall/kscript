@@ -160,7 +160,7 @@ Keys starting with `_` are kept by KScript.Auth, so they can't be set. The cooki
 
 ## Users
 
-`@users()` is the app's users. They are kept as JSON files in the app's data folder (see [App folders](storage.md)), or in `http.auth.folder`.
+`@users()` is the app's users. They are kept as JSON files in the app's data folder (see [App folders](storage.md)), or in `http.auth.folder`, or in a model (see [Users in a model](#users-in-a-model)).
 
 | Method | What it does |
 | --- | --- |
@@ -174,6 +174,32 @@ Keys starting with `_` are kept by KScript.Auth, so they can't be set. The cooki
 | `->delete(id)` | Deletes a user with their sessions, API tokens and reset tokens. |
 
 Users from a database of your own work too: `@login({ id: $row.id, email: $row.email })` signs in any map with an `id`, and the session keeps a copy of it.
+
+### Users in a model
+
+To keep the users in the app's database, name a [KScript.Data](data.md) model in `http.auth.users`:
+
+```json
+{ "http": { "auth": { "users": "User" } } }
+```
+
+The model is the one in the models folder (`models/user.kscript`). It needs an email field and a password field, and any other fields you give `@register` or `->update`:
+
+```kscript
+import KScript.Data
+
+model User {
+  timestamps: yes
+  unique: [email]
+  hidden: [password]
+  email: email
+  password: password
+  name: string
+  posts: Post[]
+}
+```
+
+Then a user is a row of the `users` table, and `@user()`, `@register` and `@users()` give you the model's record, so its relations and methods work: `@user().posts`. The password field holds the hash KScript.Auth makes; `hidden: [password]` keeps it out of JSON. Ids are the model's keys. Sessions, API tokens and reset tokens are still files in the app's state folder.
 
 ## Password resets
 
@@ -242,6 +268,7 @@ Every setting has a safe default, so set only what you want to change. Times are
 | `home` | `/` | Where `guest` sends people who are, and `@intended()`'s default. |
 | `sessions` | `file` | `file` keeps sessions in the app's state folder, so they last across restarts. `memory` keeps them until kscript stops. |
 | `folder` | the app folders | A folder, relative to the site, for users, sessions and tokens. |
+| `users` | files | A KScript.Data model in the models folder, such as `User`, that holds the users. See [Users in a model](#users-in-a-model). |
 | `lifetime` | `2h` | How long a session lasts after the last request. |
 | `remember` | `30d` | How long a "remember me" sign-in lasts. |
 | `cookie` | `ks_session` | The session cookie's name. |

@@ -224,6 +224,27 @@ namespace KScript.Data.Migrations
         });
 
         /// <summary>
+        /// Brings a new, empty database (a test file's) to the project's schema: its migrations, or the tables of its
+        /// models when it has no migrations.
+        /// </summary>
+        public void Build()
+        {
+            if (Files().Count > 0)
+            {
+                Migrate();
+                return;
+            }
+            List<ModelInfo> models = Models();
+            if (models.Count == 0) return;
+            List<Step> steps = Differ.Diff(new Schema(), Schema.FromModels(models));
+            Connected((connection, _) =>
+            {
+                Run(connection, new MigrationFile { Name = "the models", Plan = new MigrationPlan() }, steps, new Schema(), false, record: _ => { });
+                return steps.Count;
+            });
+        }
+
+        /// <summary>
         /// Undoes the last batch, or the last <paramref name="steps"/> migrations: each with its Down block, or by
         /// undoing its steps from last to first. Gives the ones it undid.
         /// </summary>

@@ -108,6 +108,16 @@ namespace KScript.Data
         public static Record Create(CallContext call, ModelInfo model, Dictionary<string, object> values, bool fillable = true)
         {
             Dictionary<string, object> fill = (fillable ? Fillable(model, values) : values).ToDictionary(kv => kv.Key, kv => kv.Value is BareWord w ? w.Name : kv.Value, StringComparer.Ordinal);
+            // A belongs-to record given (author: $user) is its key: the model it is may be one this model's file
+            // doesn't import (it was loaded from the models folder), so its type can't be checked by name here.
+            foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.BelongsTo))
+            {
+                if (fill.GetValueOrDefault(r.Name) is not Record target) continue;
+                if (target.Type.Name != r.Target.Name)
+                    throw new KScriptException($"{model.Name}.{r.Name} needs a {r.Target.Name}, but got a {target.Type.Name}.", "Type");
+                fill[r.ForeignKey] = ModelInfo.KeyOfTarget(r, target);
+                fill.Remove(r.Name);
+            }
             var record = (Record)Shapes.MapAs(call.Interpreter, fill, model.Type, $"The {model.Name}");
             Link(model, record);
             Insert(call, model, record);
@@ -136,7 +146,7 @@ namespace KScript.Data
         }
 
         /// <summary>A record made with <c>$User->from()</c>, or a new one, as a row of the table.</summary>
-        private static void Insert(CallContext call, ModelInfo model, Record record)
+        internal static void Insert(CallContext call, ModelInfo model, Record record)
         {
             foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.BelongsTo && !r.Optional))
             {

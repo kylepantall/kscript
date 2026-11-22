@@ -393,6 +393,10 @@ namespace KScript.Language.Analysis
                 }
             }
             TypeShape instance = declaredTypes.TryGetValue(e, out TypeShape declared) ? declared : null;
+            if (IsKScriptElementName(e, "model"))
+            {
+                CheckDrift(e);
+            }
             bool refined = instance != null && instance.Type != KType.Map;
             foreach (MarkupElement child in e.ChildElements)
             {
