@@ -133,7 +133,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
 
@@ -182,11 +182,11 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Visual Studio Marketplace
         if: env.VSCE_PAT != ''
-        run: npx --yes @vscode/vsce@3 publish --packagePath kscript-vscode.vsix --skip-duplicate
+        run: npx --yes @vscode/vsce@4 publish --packagePath kscript-vscode.vsix --skip-duplicate
 
       - name: Open VSX
         if: env.OVSX_PAT != ''

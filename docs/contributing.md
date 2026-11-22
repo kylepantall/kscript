@@ -50,12 +50,12 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 
 Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/scripts/oldest.kscript`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
 
-- **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
+- **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine. The solution is built once, in the `Build and test (linux)` job, and the other Linux jobs (the project templates, the VS Code extension and the database servers) download that build instead of compiling their own.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
 
 ### Native AOT
 
-A CI job also publishes kscript with Native AOT on Linux (`-p:PublishAot=true`) and runs scripts, `kscript serve`, `kscript docs`, `kscript mcp` and the language server with it. Releases still ship the single-file build; the job keeps the AOT build working so it stays an option. It fails on any new trim or AOT warning, so:
+A CI job also publishes kscript with Native AOT on each platform (`-p:PublishAot=true`) and runs scripts, `kscript serve`, `kscript docs`, `kscript mcp` and the language server with it. The same job publishes the single-file runtime that `kscript compile` makes programs from, and compiles a script, Life Lab and a site with it. Releases still ship the single-file build; the job keeps the AOT build working so it stays an option. It fails on any new trim or AOT warning, so:
 
 - Write JSON with `JsonNode`/`JsonObject` or a source-generated `JsonSerializerContext` (see `OpenApiJsonContext`), not `JsonSerializer.Serialize(object)`. Add to a `JsonArray` with `array.Add((JsonNode)value)`: the generic `Add<T>` isn't AOT-safe.
 - A new built-in package needs a `DynamicDependency` on `PackageRegistry.Get` as well as its line in `PackageRegistry.BuiltIn`; `NativeAotTests` checks the two lists match.

@@ -23,54 +23,19 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
-  # Every kscript make project template, with the option mixes in .github/scripts/check-templates.sh, made and
-  # checked, formatted, tested and served. It skips the unit tests, so it fails within minutes when a change to the
-  # language, the formatter or a package breaks a template.
-  templates:
-    name: Project templates
+  # The one Release build of the solution on Linux, then the unit tests and the sample checks with it. It runs on
+  # home-ci (home-ci-linux, via runner-warden); pull requests from forks build on a GitHub-hosted runner so untrusted
+  # code never executes on home-ci.
+  #
+  # Right after the build it uploads kscript and the test assemblies for the other Linux jobs (the project templates,
+  # the VS Code extension and the databases), so they don't compile their own. They run on GitHub-hosted runners,
+  # which download it in seconds (home-ci took over two minutes). They run it in their own checkout, where the tests
+  # find the repository by KScript.sln as they do after a local build. Windows and macOS build their own below.
+  build-linux:
+    name: Build and test (linux)
     if: github.event.action != 'closed'
-    timeout-minutes: 15
+    timeout-minutes: 25
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON('["home-ci-linux"]') }}
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-dotnet@v5
-        env:
-          DOTNET_INSTALL_DIR: ${{ runner.environment == 'self-hosted' && format('{0}/dotnet', runner.tool_cache) || '' }}
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Build kscript
-        run: dotnet build KScriptApp --configuration Release
-
-      - name: Make, check, test and serve every template
-        run: .github/scripts/check-templates.sh "dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
-
-  test:
-    name: Build and test (${{ matrix.name }})
-    if: github.event.action != 'closed'
-    # The Linux job runs on home-ci (home-ci-linux, via runner-warden). Windows and macOS run on
-    # GitHub-hosted runners, which are free for this public repo and faster than queueing for a
-    # Windows machine at home.
-    # Pull requests from forks always fall back to a GitHub-hosted runner so
-    # untrusted code never executes on home-ci.
-    timeout-minutes: 20
-    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON(matrix.runner) || matrix.hosted }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: linux
-            self-hosted: true
-            runner: '"home-ci-linux"'
-            hosted: ubuntu-latest
-          - name: windows
-            self-hosted: false
-            hosted: windows-latest
-          - name: macos
-            self-hosted: false
-            hosted: macos-latest
-
     steps:
       - uses: actions/checkout@v5
 
@@ -79,14 +44,97 @@ jobs:
       # installs into the runner's tool cache (kept between jobs) instead.
       - uses: actions/setup-dotnet@v5
         env:
-          DOTNET_INSTALL_DIR: ${{ matrix.self-hosted && format('{0}/dotnet', runner.tool_cache) || '' }}
+          DOTNET_INSTALL_DIR: ${{ runner.environment == 'self-hosted' && format('{0}/dotnet', runner.tool_cache) || '' }}
+        with:
+          dotnet-version: 8.0.x
+
+      # A fork's build runs on a GitHub-hosted runner, which starts empty. home-ci keeps its own package folder.
+      - uses: actions/cache@v5
+        if: runner.environment == 'github-hosted'
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.job }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ github.job }}-
+            nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build KScript.sln --configuration Release
+
+      # Only what the other jobs run: kscript and KScript.Tests, without the native libraries for other platforms. One
+      # tar keeps file modes and uploads as one file instead of thousands.
+      - name: Pack the build
+        run: |
+          tar -cf "$RUNNER_TEMP/kscript-linux-release.tar" \
+            --exclude='*/runtimes/win*' --exclude='*/runtimes/osx*' --exclude='*/runtimes/maccatalyst*' \
+            --exclude='*/runtimes/ios*' --exclude='*/runtimes/tvos*' --exclude='*/runtimes/android*' \
+            --exclude='*/runtimes/browser*' --exclude='*/runtimes/linux-arm*' --exclude='*/runtimes/linux-musl*' \
+            --exclude='*/runtimes/linux-x86' --exclude='*/runtimes/linux-bionic*' \
+            KScriptApp/bin/Release/net8.0 KScript.Tests/bin/Release/net8.0
+          ls -lh "$RUNNER_TEMP/kscript-linux-release.tar"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: kscript-linux-release
+          path: ${{ runner.temp }}/kscript-linux-release.tar
+          retention-days: 1
+
+      - name: Test
+        run: dotnet test KScript.sln --configuration Release --no-build --verbosity normal
+
+      - name: Check the samples and new projects
+        run: .github/scripts/check-samples.sh "dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
+
+  # Every kscript make project template, with the option mixes in .github/scripts/check-templates.sh, made and
+  # checked, formatted, tested and served. It skips the unit tests, so it fails within minutes when a change to the
+  # language, the formatter or a package breaks a template.
+  templates:
+    name: Project templates
+    needs: build-linux
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: kscript-linux-release
+          path: ${{ runner.temp }}
+
+      - name: Unpack the Linux build
+        run: tar -xf "$RUNNER_TEMP/kscript-linux-release.tar"
+
+      - name: Make, check, test and serve every template
+        run: .github/scripts/check-templates.sh "dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
+
+  # Windows and macOS build their own: a Linux build can't stand in for them. They run on GitHub-hosted runners,
+  # which are free for this public repo and faster than queueing for a Windows machine at home.
+  test:
+    name: Build and test (${{ matrix.name }})
+    if: github.event.action != 'closed'
+    timeout-minutes: 20
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows, os: windows-latest }
+          - { name: macos,   os: macos-latest }
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
       # GitHub-hosted runners start empty, so keep the NuGet packages between runs (restore on Windows took
-      # ~40 s without them). home-ci keeps its own package folder between jobs.
+      # ~40 s without them).
       - uses: actions/cache@v5
-        if: runner.environment == 'github-hosted'
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.job }}-${{ hashFiles('**/*.csproj') }}
@@ -103,76 +151,15 @@ jobs:
       - name: Test
         run: dotnet test KScript.sln --configuration Release --no-build --verbosity normal
 
-      - name: Run sample script
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll samples/scripts/oldest.kscript
-
-      - name: Check KScript 2 samples
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data --warnings-as-errors
-
-      - name: Check KScript formatting
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data samples/types "Example Sites/team"
-
-      - name: Run KScript tests
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data
-
-      - name: Run the data sample's migrations and seeder
+      - name: Check the samples and new projects
         shell: bash
-        run: |
-          K="dotnet KScriptApp/bin/Release/net8.0/KScript.dll"
-          $K db migrate --seed --project samples/data --no-ansi < /dev/null
-          # The migrations make the tables the models want, so there is nothing to write.
-          diff=$($K db diff --pretend --project samples/data --no-ansi < /dev/null)
-          echo "$diff"
-          grep -q "Nothing to write" <<< "$diff"
-
-      - name: Check a new project (kscript make project)
-        shell: bash
-        run: |
-          k="dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
-          cd "$RUNNER_TEMP"
-          $k make project new-app
-          $k check new-app --warnings-as-errors
-          $k fmt --check new-app
-          $k test new-app
-          $k agents --check new-app
-          $k make project xml-app --syntax xml
-          $k check xml-app --warnings-as-errors
-          $k fmt --check xml-app
-          $k test xml-app
-          $k agents --check xml-app
-          $k make project bare-tool --bare
-          $k check bare-tool --warnings-as-errors
-          $k test bare-tool
-          $k agents --check bare-tool
-          $k bare-tool/main.kscript
-          $k make project bare-app --bare --web --api --desktop
-          $k check bare-app --warnings-as-errors
-          $k fmt --check bare-app
-          $k test bare-app
-          $k agents --check bare-app
-          # The generators: routes add themselves to routes/, and everything they make checks and formats cleanly.
-          cd bare-app
-          $k make route users
-          $k make route "users/{id}" --where "id: int"
-          $k make route users --method post
-          $k make route people --resource --api
-          $k make route about --view about
-          $k make request NewPerson --fields "name: string, age?: int"
-          $k make middleware secure-headers
-          $k make type Repo --fields "name: string, stars: int"
-          $k make enum Size --values small,medium,large
-          $k make error PaymentFailed --status 402 --extends Validation --fields "order: int, reason?: string"
-          $k make css theme
-          $k check .
-          $k fmt --check .
-          $k routes .
-          $k test .
+        run: .github/scripts/check-samples.sh "dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
 
   # KScript.Data's and the database queue's tests, run again on each database server KScript.Data supports. The
   # servers are service containers, so this runs on GitHub-hosted Linux, which has Docker.
   databases:
     name: Databases (${{ matrix.name }})
-    if: github.event.action != 'closed'
+    needs: build-linux
     timeout-minutes: 20
     runs-on: ubuntu-latest
     strategy:
@@ -211,147 +198,40 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - uses: actions/cache@v5
+      - uses: actions/download-artifact@v7
         with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ github.job }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-${{ github.job }}-
-            nuget-${{ runner.os }}-
+          name: kscript-linux-release
+          path: ${{ runner.temp }}
 
-      - name: Build
-        run: dotnet build KScript.Tests --configuration Release
+      - name: Unpack the Linux build
+        run: tar -xf "$RUNNER_TEMP/kscript-linux-release.tar"
 
       - name: Test on ${{ matrix.name }}
         env:
           KSCRIPT_TEST_DATABASE_URL: ${{ matrix.url }}
         run: >-
-          dotnet test KScript.Tests --configuration Release --no-build --verbosity normal
+          dotnet test KScript.Tests/bin/Release/net8.0/KScript.Tests.dll --logger "console;verbosity=normal"
           --filter "FullyQualifiedName~KScript.Tests.Data|FullyQualifiedName~KScript.Tests.DatabaseServer|FullyQualifiedName~KScript.Tests.QueueTests"
 
-  compile:
-    name: kscript compile (${{ matrix.name }})
-    if: github.event.action != 'closed'
-    # Builds a release-style kscript for the runner, compiles a terminal script, Life Lab and a site with it,
-    # and runs what it can. Programs for other platforms come out byte-for-byte the same wherever they are
-    # compiled, so each platform checks its own.
-    timeout-minutes: 20
-    runs-on: ${{ (matrix.self-hosted && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && fromJSON(matrix.runner) || matrix.hosted }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { name: linux,   rid: linux-x64, target: linux-x64, self-hosted: true,  runner: '"home-ci-linux"',   hosted: ubuntu-latest,  ext: '' }
-          - { name: windows, rid: win-x64,   target: win-x64,   self-hosted: false, hosted: windows-latest, ext: '.exe' }
-          - { name: macos,   rid: osx-arm64, target: mac-arm64, self-hosted: false, hosted: macos-latest,   ext: '' }
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-dotnet@v5
-        env:
-          DOTNET_INSTALL_DIR: ${{ matrix.self-hosted && format('{0}/dotnet', runner.tool_cache) || '' }}
-        with:
-          dotnet-version: 8.0.x
-
-      # GitHub-hosted runners start empty, so keep the NuGet packages between runs (restore on Windows took
-      # ~40 s without them). home-ci keeps its own package folder between jobs.
-      - uses: actions/cache@v5
-        if: runner.environment == 'github-hosted'
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ github.job }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-${{ github.job }}-
-            nuget-${{ runner.os }}-
-
-      - name: Publish a single-file kscript
-        run: |
-          # Built like release.yml: compressed, except on macOS (see the note there).
-          COMPRESS=true
-          if [[ "${{ matrix.rid }}" == osx-* ]]; then COMPRESS=false; fi
-          dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained \
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=$COMPRESS \
-            -p:DebugType=none -p:Version=0.0.0-ci --output publish
-
-      - name: Compile and run a terminal program
-        run: |
-          mkdir -p "$RUNNER_TEMP/hello"
-          printf '<kscript>\n  <import package="KScript.Math" />\n  <echo>compiled ok: {@sqrt(9)} {$args->join(",")}</echo>\n</kscript>\n' > "$RUNNER_TEMP/hello/hello.ks.xml"
-          ./publish/KScript${{ matrix.ext }} compile "$RUNNER_TEMP/hello/hello.ks.xml"
-          program="$RUNNER_TEMP/hello/dist/${{ matrix.target }}/hello${{ matrix.ext }}"
-          ls -l "$program" publish/
-          "$program" a b | tee out.txt
-          grep -q "compiled ok: 3 a,b" out.txt
-          if [ "${{ matrix.name }}" = macos ]; then codesign --verify --verbose "$program"; fi
-
-      - name: Compile Life Lab (desktop app)
-        run: |
-          ./publish/KScript${{ matrix.ext }} compile samples/life-lab --out "$RUNNER_TEMP/life-lab"
-          ls -lR "$RUNNER_TEMP/life-lab"
-          case "${{ matrix.name }}" in
-            macos) codesign --verify --deep --verbose "$RUNNER_TEMP/life-lab/mac-arm64/Life Lab.app" ;;
-            windows) test -f "$RUNNER_TEMP/life-lab/win-x64/Life Lab.exe" ;;
-            linux) test -x "$RUNNER_TEMP/life-lab/linux-x64/Life-Lab" && test -f "$RUNNER_TEMP/life-lab/linux-x64/Life-Lab.desktop" ;;
-          esac
-
-      - name: Compile and serve a site
-        timeout-minutes: 5
-        run: |
-          ./publish/KScript${{ matrix.ext }} compile "Example Sites/team" --out "$RUNNER_TEMP/site"
-          "$RUNNER_TEMP/site/${{ matrix.target }}/team${{ matrix.ext }}" --port 8097 --host 127.0.0.1 > site.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf --max-time 5 http://127.0.0.1:8097/ > page.html && break; sleep 1; done
-          curl -sf --max-time 10 http://127.0.0.1:8097/site.css > site.css || true
-          kill %1 || true
-          cat site.log
-          grep -q "Team" page.html
-          test -s site.css
-
-      - name: Serve kscript docs (pages, static files and the run API)
-        # Every request has a time limit, so a server that stops answering fails this step in seconds (with its
-        # log printed) instead of holding the runner until the job times out.
-        timeout-minutes: 5
-        run: |
-          ./publish/KScript${{ matrix.ext }} docs --no-open --port 8098 > docs.log 2>&1 &
-          server=$!
-          get() { curl -sf --max-time 10 "$@"; }
-          for i in $(seq 1 30); do curl -sf --max-time 5 http://localhost:8098/ > docs.html && break; sleep 1; done
-          get http://localhost:8098/assets/docs.css > docs.css || true
-          get http://localhost:8098/assets/docs.js > docs.js || true
-          # A browser asks for many files at once, and cancels some: do the same, several rounds.
-          for round in 1 2 3 4 5; do
-            pids=()
-            for f in docs.css docs.js favicon.svg search.json docs.css docs.js; do
-              curl -s -o /dev/null --max-time 10 "http://localhost:8098/assets/$f" & pids+=($!)
-              curl -s -o /dev/null --max-time 0.01 "http://localhost:8098/assets/$f" & pids+=($!)
-            done
-            wait "${pids[@]}" 2>/dev/null || true
-          done
-          get http://localhost:8098/assets/favicon.svg > favicon.svg || true
-          get -X POST http://localhost:8098/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
-            -d '{"code":"<echo>docs ok</echo>"}' > run.json || true
-          kill $server || true
-          cat docs.log
-          grep -q "KScript" docs.html
-          test -s docs.css && test -s docs.js && test -s favicon.svg
-          grep -q "docs ok" run.json
-
   native-aot:
-    name: Native AOT (${{ matrix.name }})
+    name: Native AOT and kscript compile (${{ matrix.name }})
+    if: github.event.action != 'closed'
     timeout-minutes: 30
     # kscript releases are Native AOT builds. This publishes one per OS, fails on any new trim or AOT warning, and runs
     # the commands that matter with it: scripts, check/fmt/test, openapi, serve, docs, MCP, KScript.AI (against a
     # stand-in API), kscript compile and the language server.
+    #
+    # It also publishes the single-file runtime that programs are made from, as release.yml does, and compiles a
+    # terminal script, Life Lab and a site with it, and runs what it can. Programs for other platforms come out
+    # byte-for-byte the same wherever they are compiled, so each platform checks its own.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: linux,   os: ubuntu-latest,  rid: linux-x64, ext: '' }
-          - { name: macos,   os: macos-latest,   rid: osx-arm64, ext: '' }
-          - { name: windows, os: windows-latest, rid: win-x64,   ext: '.exe' }
+          - { name: linux,   os: ubuntu-latest,  rid: linux-x64, target: linux-x64, ext: '' }
+          - { name: macos,   os: macos-latest,   rid: osx-arm64, target: mac-arm64, ext: '' }
+          - { name: windows, os: windows-latest, rid: win-x64,   target: win-x64,   ext: '.exe' }
     defaults:
       run:
         shell: bash
@@ -408,17 +288,81 @@ jobs:
           grep -q "bug 4" ai.out
           grep -q "tool said shipped" ai.out
 
-      - name: Compile a program with a single-file runtime
+      - name: Publish the single-file runtime
         run: |
+          # Built like release.yml: compressed, except on macOS (see the note there).
+          COMPRESS=true
+          if [[ "${{ matrix.rid }}" == osx-* ]]; then COMPRESS=false; fi
           dotnet publish KScriptApp/KScriptApp.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained \
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=false \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=$COMPRESS \
             -p:DebugType=none -p:Version=0.0.0-aot --output runtime > /dev/null
+          ls -l runtime
+          echo "RUNTIME=$PWD/runtime/KScript${{ matrix.ext }}" >> "$GITHUB_ENV"
+
+      - name: Compile and run a terminal program
+        run: |
           mkdir -p "$RUNNER_TEMP/hello"
-          cp smoke.ks.xml "$RUNNER_TEMP/hello/hello.ks.xml"
-          "$K" compile "$RUNNER_TEMP/hello/hello.ks.xml" --runtime "runtime/KScript${{ matrix.ext }}" --out "$RUNNER_TEMP/out"
-          ls -R "$RUNNER_TEMP/out"
-          program="$(find "$RUNNER_TEMP/out" -type f -name "hello${{ matrix.ext }}" | head -1)"
-          "$program" | grep -q "kscript ok: 3"
+          printf '<kscript>\n  <import package="KScript.Math" />\n  <echo>compiled ok: {@sqrt(9)} {$args->join(",")}</echo>\n</kscript>\n' > "$RUNNER_TEMP/hello/hello.ks.xml"
+          "$K" compile "$RUNNER_TEMP/hello/hello.ks.xml" --runtime "$RUNTIME"
+          program="$RUNNER_TEMP/hello/dist/${{ matrix.target }}/hello${{ matrix.ext }}"
+          ls -l "$program"
+          "$program" a b | tee out.txt
+          grep -q "compiled ok: 3 a,b" out.txt
+          if [ "${{ matrix.name }}" = macos ]; then codesign --verify --verbose "$program"; fi
+          # The single-file runtime compiles programs too, from itself.
+          "$RUNTIME" compile "$RUNNER_TEMP/hello/hello.ks.xml" --out "$RUNNER_TEMP/hello-self"
+          "$RUNNER_TEMP/hello-self/${{ matrix.target }}/hello${{ matrix.ext }}" a b | grep -q "compiled ok: 3 a,b"
+
+      - name: Compile Life Lab (desktop app)
+        run: |
+          "$K" compile samples/life-lab --runtime "$RUNTIME" --out "$RUNNER_TEMP/life-lab"
+          ls -lR "$RUNNER_TEMP/life-lab"
+          case "${{ matrix.name }}" in
+            macos) codesign --verify --deep --verbose "$RUNNER_TEMP/life-lab/mac-arm64/Life Lab.app" ;;
+            windows) test -f "$RUNNER_TEMP/life-lab/win-x64/Life Lab.exe" ;;
+            linux) test -x "$RUNNER_TEMP/life-lab/linux-x64/Life-Lab" && test -f "$RUNNER_TEMP/life-lab/linux-x64/Life-Lab.desktop" ;;
+          esac
+
+      - name: Compile and serve a site
+        timeout-minutes: 5
+        run: |
+          "$K" compile "Example Sites/team" --runtime "$RUNTIME" --out "$RUNNER_TEMP/site"
+          "$RUNNER_TEMP/site/${{ matrix.target }}/team${{ matrix.ext }}" --port 8097 --host 127.0.0.1 > site.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf --max-time 5 http://127.0.0.1:8097/ > page.html && break; sleep 1; done
+          curl -sf --max-time 10 http://127.0.0.1:8097/site.css > site.css || true
+          kill %1 || true
+          cat site.log
+          grep -q "Team" page.html
+          test -s site.css
+
+      - name: Serve kscript docs from the single-file runtime (pages, static files and the run API)
+        # Every request has a time limit, so a server that stops answering fails this step in seconds (with its
+        # log printed) instead of holding the runner until the job times out.
+        timeout-minutes: 5
+        run: |
+          "$RUNTIME" docs --no-open --port 8099 > docs.log 2>&1 &
+          server=$!
+          get() { curl -sf --max-time 10 "$@"; }
+          for i in $(seq 1 30); do curl -sf --max-time 5 http://localhost:8099/ > docs.html && break; sleep 1; done
+          get http://localhost:8099/assets/docs.css > docs.css || true
+          get http://localhost:8099/assets/docs.js > docs.js || true
+          # A browser asks for many files at once, and cancels some: do the same, several rounds.
+          for round in 1 2 3 4 5; do
+            pids=()
+            for f in docs.css docs.js favicon.svg search.json docs.css docs.js; do
+              curl -s -o /dev/null --max-time 10 "http://localhost:8099/assets/$f" & pids+=($!)
+              curl -s -o /dev/null --max-time 0.01 "http://localhost:8099/assets/$f" & pids+=($!)
+            done
+            wait "${pids[@]}" 2>/dev/null || true
+          done
+          get http://localhost:8099/assets/favicon.svg > favicon.svg || true
+          get -X POST http://localhost:8099/api/run -H "X-KScript-Docs: 1" -H "Content-Type: application/json" \
+            -d '{"code":"<echo>docs ok</echo>"}' > run.json || true
+          kill $server || true
+          cat docs.log
+          grep -q "KScript" docs.html
+          test -s docs.css && test -s docs.js && test -s favicon.svg
+          grep -q "docs ok" run.json
 
       - name: Serve a site, the docs and MCP
         timeout-minutes: 5
@@ -437,7 +381,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
 
@@ -450,7 +394,7 @@ jobs:
 
   vscode:
     name: VS Code extension
-    if: github.event.action != 'closed'
+    needs: build-linux
     timeout-minutes: 20
     runs-on: ubuntu-latest
     defaults:
@@ -465,13 +409,18 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
 
-      - name: Build kscript
+      - uses: actions/download-artifact@v7
+        with:
+          name: kscript-linux-release
+          path: ${{ runner.temp }}
+
+      - name: Unpack the Linux build
         working-directory: .
-        run: dotnet build KScriptApp/KScriptApp.csproj --configuration Release
+        run: tar -xf "$RUNNER_TEMP/kscript-linux-release.tar"
 
       - name: Install
         run: npm ci
