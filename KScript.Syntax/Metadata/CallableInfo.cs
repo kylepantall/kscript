@@ -121,6 +121,13 @@ namespace KScript.Metadata
         public string ReturnType { get; init; } = KType.Any;
 
         /// <summary>
+        /// The result's shape, written like a type, when its fields are known: <c>{ id: string, email: email }</c> or
+        /// <c>list&lt;{ id: string, name: string }&gt;</c>. The editor uses it for completion and hover after the call
+        /// (<c>@user().</c>, a loop over <c>@api_tokens()</c>). Null when only <see cref="ReturnType"/> is known.
+        /// </summary>
+        public string ReturnShape { get; set; }
+
+        /// <summary>
         /// True when names the signature doesn't list, and words without quotes, mean something to the call itself, as
         /// columns and values do in <c>User->where(role: admin)</c>: they reach it as they are instead of being an error.
         /// </summary>

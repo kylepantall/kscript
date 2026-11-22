@@ -125,7 +125,7 @@ namespace KScript.Language.Analysis
         public static IEnumerable<string> FilesUnder(string folder, IFileSystem files) => ProjectFiles(folder, recursive: true, files ?? DiskFileSystem.Instance);
 
         /// <summary>The folder holding the nearest kscript.json at or above <paramref name="folder"/>, or null.</summary>
-        private static string ProjectRoot(string folder, IFileSystem files)
+        internal static string ProjectRoot(string folder, IFileSystem files)
         {
             for (string dir = folder; !string.IsNullOrEmpty(dir); dir = Path.GetDirectoryName(dir))
             {

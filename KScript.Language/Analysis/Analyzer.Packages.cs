@@ -8,11 +8,15 @@ namespace KScript.Language.Analysis
     /// Packages: which ones a script imports (KScript.Core always, the packages listed in kscript.json,
     /// <c>&lt;import package&gt;</c>, and the owners of <c>&lt;KScript.X&gt;</c> elements), and the
     /// "add an import" errors for elements, commands, methods and variables of a package that isn't imported.
-    /// Pages don't import packages, so none of this applies to them.
+    /// Pages don't need imports, so the errors don't apply to them, but a page's &lt;import package&gt; gives it the
+    /// package's variables.
     /// </summary>
     public sealed partial class Analyzer
     {
         private readonly HashSet<string> importedPackages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The packages a page names in its own &lt;import package&gt; elements.</summary>
+        private readonly HashSet<string> pageImports = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private bool ChecksImports => Kind == DocumentKind.Script;
 
@@ -35,6 +39,17 @@ namespace KScript.Language.Analysis
             ImportPackage("KScript.Core");
             if (!ChecksImports)
             {
+                // A page's <import package="KScript.Auth" /> gives it the package's variables ($session), and its
+                // commands and methods are known without one.
+                foreach (MarkupElement e in result.Markup.DescendantElements())
+                {
+                    if (e.Name == "import" && e.GetAttribute("package") is MarkupAttribute pagePackage && pagePackage.Value != null)
+                    {
+                        HoistPackageImport(e, pagePackage, root);
+                        pageImports.Add(catalog.FindPackage(pagePackage.ValueText.Trim()) ?? string.Empty);
+                    }
+                }
+                result.ImportedPackages = importedPackages.ToList();
                 return;
             }
 

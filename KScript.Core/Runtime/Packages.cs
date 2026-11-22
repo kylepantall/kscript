@@ -273,6 +273,20 @@ namespace KScript.Runtime
             }
 
             /// <summary>
+            /// Describes the fields of what commands and methods registered above return, keyed like
+            /// <see cref="Examples"/>: <c>("@user", "{ id: string, email: email }")</c> or
+            /// <c>("@api_tokens", "list&lt;{ id: string, name: string }&gt;")</c>. The editor offers those fields after
+            /// the call, in loops over it and in the views it is passed to. A key that names nothing is an error here.
+            /// </summary>
+            public void ResultShapes(params (string Key, string Shape)[] shapes)
+            {
+                foreach (var (key, shape) in shapes)
+                {
+                    Find(key, "a result shape").ReturnShape = shape;
+                }
+            }
+
+            /// <summary>
             /// Adds notes for coding agents to commands, methods and elements registered above, keyed like
             /// <see cref="Examples"/> (<c>"@read_json"</c>, <c>"list->map"</c>) or <c>"&lt;each&gt;"</c> for an element.
             /// <c>kscript agents</c> writes them into AGENTS.md and .kscript/agents. Keep each note to one short line:
