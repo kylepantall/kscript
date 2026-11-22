@@ -205,7 +205,7 @@ namespace KScript.Documents
                 ("document->pages", "<echo>{ $doc->pages() } pages</echo>"),
                 ("document->markdown", "<echo>{ $doc->markdown() }</echo>"),
                 ("document->latex", "<do>@write_file('paper.tex', $doc->latex())</do>"),
-                ("document->html", "<echo>{ $doc->html()->length() }</echo>"),
+                ("document->html", "<echo>{ $doc->html()->count() }</echo>"),
                 ("document->words", "<echo>{ $doc->words() } words</echo>"));
         }
     }

@@ -370,11 +370,11 @@ namespace KScript.Language.Tests
         {
             Assert.Equal("Nothing from KScript.Math is used.", Find(Imports("<import package=\"KScript.Math\" />"), DiagnosticCodes.UnusedImport, "KScript.Math").Message);
             Assert.Equal(new[] { "KS6005:KScript.Math" }, Unused(Imports("<import package=\"KScript.Math\" as=\"m\" />")));
-            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><echo>{ @pow(2, 3) }</echo>")));
+            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><echo>{ @sqrt(4) }</echo>")));
             Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><echo>{ 4->sqrt() }</echo>")));
             Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><echo>{ $pi }</echo>")));
-            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" as=\"m\" /><echo>{ @m.pow(2, 3) }</echo>")));
-            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><call fn=\"pow\" args=\"2, 3\" />")));
+            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" as=\"m\" /><echo>{ @m.hypot(3, 4) }</echo>")));
+            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><call fn=\"hypot\" args=\"3, 4\" />")));
             Assert.Empty(Unused(Imports("<import package=\"KScript.Terminal\" /><input into=\"name\">Name? </input><echo>$name</echo>")));
             Assert.Empty(Unused(Imports("<import package=\"KScript.Core\" /><import package=\"KScript.Nope\" />")));
             Assert.Empty(Unused(Check("<import package=\"KScript.Math\" />", "page.html")));

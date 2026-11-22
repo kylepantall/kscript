@@ -495,7 +495,7 @@ namespace KScript.Language.Agents
               _ => echo "$count open"
             }
             try {
-              @write_json('done.json', $tasks->where(fn(t) => $t.done))
+              @write_json('done.json', $tasks->filter(fn(t) => $t.done))
             } catch err when $err.type == 'IO' {
               throw Validation "Could not save: { $err.message }"
             }

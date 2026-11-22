@@ -839,9 +839,6 @@ namespace KScript.Syntax.Markup
                             Line(indent, "}");
                             return;
                         }
-                    case "dispatch" when Only("value") && Attr("value") != null && !e.Children.Any(c => !(c is MarkupText t && t.IsWhitespace)):
-                        Line(indent, "dispatch " + Reindent(Attr("value").Trim(), Pad(indent)));
-                        return;
                     case "job" when Attr("name") is string jobName && IsName(jobName.Trim()) && !jobName.Contains('.')
                         && e.Children.All(n => IsFieldLine(n) || n is MarkupElement { Name: "fn" }):
                         {

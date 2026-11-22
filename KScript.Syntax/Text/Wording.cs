@@ -137,6 +137,8 @@ namespace KScript.Syntax
         private static readonly Regex Element = new Regex(
             "<(?<name>[A-Za-z][\\w.\\-]*)(?:\\s+[\\w:\\-]+=\"[^\"]*\")*\\s*>[^<>" + Open + "]+</\\k<name>>", RegexOptions.Compiled);
 
+        private static readonly Regex XmlAside = new Regex(@"\s*\(in (?:an )?XML\b[^()]*\)", RegexOptions.Compiled);
+
         private static readonly Regex Attribute = new Regex("(?<name>[\\w:\\-" + Open + Close + "]+)(?:=(?:\"(?<value>[^\"]*)\"|'(?<value>[^']*)'))?", RegexOptions.Compiled);
 
         // attr="value" on its own, outside a tag.
@@ -154,8 +156,10 @@ namespace KScript.Syntax
                 return Open.ToString() + "k" + (done.Count - 1) + Close;
             }
 
+            // "(in XML, <for each="n">...)" is an aside for XML scripts: a .kscript file doesn't need it.
+            string written = XmlAside.Replace(template.ToString(), string.Empty);
             // A whole element with text in it (<llm to="answer">What is KScript?</llm>) is one statement.
-            string text = Element.Replace(template.ToString(), m => WholeAsCode(Fill(m.Value, true)) is string whole ? Keep(whole) : m.Value);
+            string text = Element.Replace(written, m => WholeAsCode(Fill(m.Value, true)) is string whole ? Keep(whole) : m.Value);
             text = Tag.Replace(text, m => Keep(TagAsCode(m)));
             text = Pair.Replace(text, m => Keep(Fill(m.Groups["name"].Value, true) + ": " + ValueAsCode(Fill(m.Groups["value"].Value, true))));
             text = Words.Replace(text, m =>

@@ -10,7 +10,7 @@ using KScript.Runtime;
 
 namespace KScript.Pages
 {
-    /// <summary>What a page produced: usually HTML, or a response set by &lt;respond&gt; / &lt;redirect&gt;.</summary>
+    /// <summary>What a page produced: usually HTML, or a response set by &lt;respond&gt;.</summary>
     public sealed class PageResult
     {
         public int Status { get; set; } = 200;
@@ -25,7 +25,7 @@ namespace KScript.Pages
         public string FilePath { get; set; }
     }
 
-    /// <summary>Thrown by &lt;respond&gt; and &lt;redirect&gt; to stop rendering and send a specific response.</summary>
+    /// <summary>Thrown by &lt;respond&gt; to stop rendering and send a specific response.</summary>
     internal sealed class PageResponseSignal : Exception
     {
         public PageResponseSignal(PageResult result) : base("response") { Result = result; }
@@ -413,7 +413,13 @@ namespace KScript.Pages
                 {
                     var result = new PageResult();
                     if (el.Attr("status") is string status) result.Status = (int)Values.ToNumber(Eval(status, scope, state), "<respond status>");
-                    if (el.Attr("json") is string json)
+                    if (el.Attr("redirect") is string redirect)
+                    {
+                        if (el.Attr("status") == null) result.Status = 302;
+                        result.Body = string.Empty;
+                        result.Headers["Location"] = Interpolate(redirect, scope, state, EscapeMode.None);
+                    }
+                    else if (el.Attr("json") is string json)
                     {
                         result.ContentType = "application/json; charset=utf-8";
                         result.Body = Values.ToJson(Eval(json, scope, state), indented: true);
@@ -429,16 +435,11 @@ namespace KScript.Pages
                         result.Headers[a.Name.Substring(7)] = Interpolate(a.Value ?? string.Empty, scope, state, EscapeMode.None);
                     throw new PageResponseSignal(result);
                 }
-
-                case "redirect":
-                {
-                    string to = el.Attr("to") ?? throw new PageException("<redirect> needs a to attribute, e.g. <redirect to=\"/thanks\" />.");
-                    var result = new PageResult { Status = 302, Body = string.Empty };
-                    if (el.Attr("status") is string status) result.Status = (int)Values.ToNumber(Eval(status, scope, state), "<redirect status>");
-                    result.Headers["Location"] = Interpolate(to, scope, state, EscapeMode.None);
-                    throw new PageResponseSignal(result);
-                }
             }
+
+            // One way to end a request from a page: <respond>. The old element says so instead of becoming HTML.
+            if (el.Name == "redirect" && el.Attr("to") is string oldTo)
+                throw new PageException($"<redirect> was removed. Use <respond redirect=\"{oldTo}\" />.");
 
             if (PageElementNames.CanBeComponent(el.Name) && TryComponent(el, scope, sb, state)) return;
 

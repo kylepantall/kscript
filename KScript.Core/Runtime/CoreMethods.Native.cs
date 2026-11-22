@@ -134,19 +134,12 @@ namespace KScript.Runtime
             });
             p.Method("base64", "decode", "", "The text it holds (read as UTF-8).", S, (t, c) => Encoding.UTF8.GetString(NativeParsers.Base64Bytes(T(t).Text)));
             p.Field("base64", "bytes", N, "How many bytes it holds.", (t, _) => (double)NativeParsers.Base64Bytes(T(t).Text).Length);
-            p.Command("base64", "text: string, url?: bool", "Encodes text as base64. With url: true, it is URL-safe base64 without padding.", "base64", c =>
-            {
-                string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(c.Str(0)));
-                if (Values.Truthy(c.Arg(1, "url"))) b64 = b64.TrimEnd('=').Replace('+', '-').Replace('/', '_');
-                return Native("base64", b64);
-            }, "@base64('hello')->decode()");
             p.Field("jwt", "header", M, "The token's header: { alg, typ, ... }.", (t, _) => Part(t, "header"));
             p.Field("jwt", "claims", M, "The token's claims: { sub, exp, ... }. The signature isn't checked, so don't trust them for sign-in.", (t, _) => Part(t, "claims"));
             p.Field("jwt", "expires", KType.Date, "When the token expires (its exp claim), or null if it doesn't say.", (t, _) =>
                 ((Dictionary<string, object>)Part(t, "claims")).TryGetValue("exp", out object exp) && exp is double seconds ? DateTimeOffset.FromUnixTimeSeconds((long)seconds).LocalDateTime : null);
             p.Field("jwt", "is_expired", B, "True when its exp claim is in the past.", (t, _) =>
                 ((Dictionary<string, object>)Part(t, "claims")).TryGetValue("exp", out object exp) && exp is double seconds && DateTimeOffset.FromUnixTimeSeconds((long)seconds) < DateTimeOffset.UtcNow);
-            p.Method("json", "parse", "", "The value the JSON holds: a map, a list, text, a number, true/false or null.", KType.Any, (t, c) => Part(t, "value"));
 
             // phone, country, currency, locale, timezone
             p.Field("phone", "country_code", S, "The country calling code without +: 44 for a UK number.", (t, _) => Part(t, "country_code"));
@@ -236,7 +229,7 @@ namespace KScript.Runtime
                 return NativeParsers.ColorOf(Ch(t, "r") * w, Ch(t, "g") * w, Ch(t, "b") * w, Ch(t, "a"));
             });
             p.Field("color", "luminance", N, "How light it looks, from 0 (black) to 1 (white), as WCAG measures it.", (t, _) => Luminance(T(t)));
-            p.Method("color", "contrast", "other: color", "The WCAG contrast ratio with the other colour, from 1 to 21. Text needs 4.5 or more.", N, (t, c) =>
+            p.Method("color", "contrast_ratio", "other: color", "The WCAG contrast ratio with the other colour, from 1 to 21. Text needs 4.5 or more.", N, (t, c) =>
             {
                 double a = Luminance(T(t)), b = Luminance((NativeText)(c.Arg(0) is NativeText n && n.TypeName == "color" ? n : Native("color", c.Str(0))));
                 return Math.Round((Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05), 2);
@@ -293,7 +286,6 @@ namespace KScript.Runtime
                 ("jwt.claims", "<let name=\"x\" type=\"jwt\" value=\"'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig'\" />\n<echo>{ $x.claims }</echo>"),
                 ("jwt.expires", "<let name=\"x\" type=\"jwt\" value=\"'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig'\" />\n<echo>{ $x.expires }</echo>"),
                 ("jwt.is_expired", "<let name=\"x\" type=\"jwt\" value=\"'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig'\" />\n<echo>{ $x.is_expired }</echo>"),
-                ("json->parse", "<let name=\"x\" type=\"json\" value=\"'{ &quot;a&quot;: [1, 2] }'\" />\n<echo>{ $x->parse().a }</echo>"),
                 ("phone.country_code", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x.country_code }</echo>"),
                 ("phone.national", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x.national }</echo>"),
                 ("phone->tel", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x->tel() }</echo>"),
@@ -331,13 +323,13 @@ namespace KScript.Runtime
                 ("color->lighten", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->lighten(0.5) }</echo>"),
                 ("color->darken", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->darken() }</echo>"),
                 ("color.luminance", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x.luminance }</echo>"),
-                ("color->contrast", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->contrast('white') }</echo>"),
+                ("color->contrast_ratio", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->contrast_ratio('white') }</echo>"),
                 ("iban.country", "<let name=\"x\" type=\"iban\" value=\"'GB82 WEST 1234 5698 7654 32'\" />\n<echo>{ $x.country }</echo>"),
                 ("iban->formatted", "<let name=\"x\" type=\"iban\" value=\"'GB82 WEST 1234 5698 7654 32'\" />\n<echo>{ $x->formatted() }</echo>"),
                 ("iban.bban", "<let name=\"x\" type=\"iban\" value=\"'GB82 WEST 1234 5698 7654 32'\" />\n<echo>{ $x.bban }</echo>"),
                 ("card.last4", "<let name=\"x\" type=\"card\" value=\"'4242 4242 4242 4242'\" />\n<echo>{ $x.last4 }</echo>"),
                 ("card.brand", "<let name=\"x\" type=\"card\" value=\"'4242 4242 4242 4242'\" />\n<echo>{ $x.brand }</echo>"),
-                ("card->reveal", "<let name=\"x\" type=\"card\" value=\"'4242 4242 4242 4242'\" />\n<echo>{ $x->reveal()->length() }</echo>"));
+                ("card->reveal", "<let name=\"x\" type=\"card\" value=\"'4242 4242 4242 4242'\" />\n<echo>{ $x->reveal()->count() }</echo>"));
         }
 
         private static double Luminance(NativeText color)

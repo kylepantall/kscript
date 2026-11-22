@@ -67,8 +67,6 @@ namespace KScript.Runtime
             p.Method(KType.Config, "sources", "", "The files the settings came from, in order: a list of { name, path, kind }.", KType.List, ConfigMethod("sources"));
             p.Method(KType.Config, "reload", "", "Reads the files again.", KType.Config, ConfigMethod("reload"));
 
-            p.Command("yaml", "text", "Parses YAML text into a value.", KType.Any, c => Yaml.Parse(c.Str(0)), "@yaml('name: Ann').name");
-            p.Command("to_yaml", "value", "A value as YAML text.", KType.String, c => Yaml.Write(c.Arg(0)));
             p.Command("parse_env", "text", "Parses .env text (NAME=value lines) into a map. ${NAME} uses earlier lines or the environment.", KType.Map, c =>
             {
                 var map = new Dictionary<string, object>();

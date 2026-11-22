@@ -14,7 +14,7 @@ public class StdlibBehaviourTests
     private static string Fails(string code) => Assert.Throws<KScriptException>(() => Code(code)).Message;
 
     [Theory]
-    [InlineData("d = @date('2026-11-19 14:30')\necho \"{ $d.year } { $d.month } { $d.hour }\"", "2026 11 14")]
+    [InlineData("d = '2026-11-19 14:30'->to_date()\necho \"{ $d.year } { $d.month } { $d.hour }\"", "2026 11 14")]
     [InlineData("u: url = 'https://example.com:8443/docs?a=1'\necho \"{ $u.host } { $u.port } { $u.path }\"", "example.com 8443 /docs")]
     [InlineData("a: ip = '10.0.0.1'\necho \"{ $a.is_private } { $a.is_loopback } { $a.version }\"", "true false 4")]
     [InlineData("d = 1h30m\necho \"{ $d.minutes } { $d.seconds }\"", "90 5400")]
@@ -23,7 +23,7 @@ public class StdlibBehaviourTests
     [Fact]
     public void Calling_a_field_says_to_drop_the_brackets()
     {
-        string message = Fails("d = @date('2026-11-19')\necho $d->year()");
+        string message = Fails("d = '2026-11-19'->to_date()\necho $d->year()");
         Assert.Contains("year is a field", message);
         Assert.Contains(".year", message);
     }
@@ -31,7 +31,7 @@ public class StdlibBehaviourTests
     [Fact]
     public void Reading_a_method_as_a_field_says_to_call_it()
     {
-        string message = Fails("d = @date('2026-11-19')\necho $d.format");
+        string message = Fails("d = '2026-11-19'->to_date()\necho $d.format");
         Assert.Contains("format is a method", message);
         Assert.Contains("->format(", message);
     }
@@ -64,7 +64,7 @@ public class StdlibBehaviourTests
     [InlineData("1w", "1w", 604800)]
     public void A_duration_is_written_as_a_number_and_a_unit(string written, string shown, double seconds)
     {
-        Assert.Equal($"duration {shown} {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}", Code($"d = {written}\necho \"{{ @type($d) }} $d {{ $d.seconds }}\""));
+        Assert.Equal($"duration {shown} {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}", Code($"d = {written}\necho \"{{ $d->type() }} $d {{ $d.seconds }}\""));
     }
 
     [Theory]
@@ -94,7 +94,7 @@ public class StdlibBehaviourTests
     [Fact]
     public void A_cache_keeps_values_for_a_duration_and_says_how_long_is_left()
     {
-        Assert.Equal("1 true duration", Code("import KScript.Cache\necho \"{ $cache->set('behaviour-a', 1, ttl: 5m) } { $cache->has('behaviour-a') } { @type($cache->ttl('behaviour-a')) }\""));
+        Assert.Equal("1 true duration", Code("import KScript.Cache\necho \"{ $cache->set('behaviour-a', 1, ttl: 5m) } { $cache->has('behaviour-a') } { $cache->ttl('behaviour-a')->type() }\""));
         Assert.Equal("true false 0", Code("import KScript.Cache\n$cache->set('behaviour-b', 1)\necho \"{ $cache->remove('behaviour-b') } { $cache->has('behaviour-b') } { [$cache->clear(), $cache->clear()][1] }\""));
     }
 

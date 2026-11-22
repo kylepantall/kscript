@@ -257,7 +257,6 @@ namespace KScript.Syntax.Markup
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
                 case "error" when StartsDeclaration(5): ParseError(parent, start, doc); return;
                 case "job" when StartsDeclaration(3): ParseJob(parent, start, doc); return;
-                case "dispatch" when StartsDispatch(): ParseDispatch(parent, start); return;
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
@@ -1141,30 +1140,6 @@ namespace KScript.Syntax.Markup
                 pos = save;
                 e.StartTagSpan = TextSpan.FromBounds(start, pos);
             }
-            Finish(e, start);
-        }
-
-        /// <summary>True at <c>dispatch SendWelcome(...)</c> or <c>dispatch $job</c>; <c>dispatch(value: ...)</c> stays an element.</summary>
-        private bool StartsDispatch()
-        {
-            int p = pos + 8;
-            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t'))
-            {
-                return false;
-            }
-            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
-            {
-                p++;
-            }
-            return p < text.Length && (Lexer.IsIdentStart(text[p]) || text[p] is '$' or '@');
-        }
-
-        /// <summary><c>dispatch SendWelcome(user_id: 1)</c>: a &lt;dispatch value="..."&gt; that queues the job.</summary>
-        private void ParseDispatch(MarkupElement parent, int start)
-        {
-            MarkupElement e = Begin(parent, "dispatch", start);
-            SkipSpaces();
-            AddExpressionAttribute(e, "value", Stop.Line);
             Finish(e, start);
         }
 

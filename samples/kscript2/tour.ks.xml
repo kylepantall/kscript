@@ -34,7 +34,7 @@
   <let name="by_age" value="fn(a, b) => $a.age - $b.age" />
   <let name="sorted" value="$people->sort($by_age)" />
   <echo>Youngest: {$sorted[0].name}</echo>
-  <echo>{ $names |> @to_lower() |> @greet(greeting: 'Hi') }</echo>
+  <echo>{ $names |> lower() |> @greet(greeting: 'Hi') }</echo>
 
   <!-- Loops -->
   <for each="i" in="0..10">
@@ -95,7 +95,7 @@
   <!-- Errors -->
   <let name="path" value="'data.json'" />
   <try>
-    <let name="data" value="@read_text($path) |> @json()" />
+    <let name="data" value="@read_text($path) |> json()" />
     <echo>$data</echo>
     <catch as="err" when="$err.type eq 'FileNotFound'">
       <echo>No file at {$path}, using defaults.</echo>

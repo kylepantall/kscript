@@ -38,7 +38,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 | `<my-card user="{$u}">`, `<hero>` | A component: `_components/my-card.html`, with `<slot />` for its children. Any element that isn't an HTML or KScript element can be a component. Components only see their own attributes. |
 | `<include path="_part.html">` | Insert another template here. |
 | `<markdown>` | Render Markdown, with `{ }` values escaped. |
-| `<respond status json type header-x>` / `<redirect to>` | Send a different response, e.g. JSON or a 404. |
+| `<respond status json redirect type header-x>` | Send a different response, e.g. JSON, a 404, or a redirect (`<respond redirect="/thanks" />`). |
 
 - **Expressions**: `+ - * / %`, `== !=` (loose: `'3' == 3`), `=== !==` (strict: type and value), `lt le gt ge` (or `> >=`), `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]`, `->method()`, `|>` and `fn(x) => …`. Use the words `lt`, `le`, `and`, `or` in attributes, since XML can't hold a raw `<` or `&&` there.
 - **Escaping**: `{ value }` is HTML-escaped (Markdown-escaped in `.md` pages); `{! value }` outputs trusted HTML; `{{` and `}}` are literal braces. An attribute that is exactly `{ value }` is left out when the value is `false` or `null`, so `checked="{$done}"` just works.

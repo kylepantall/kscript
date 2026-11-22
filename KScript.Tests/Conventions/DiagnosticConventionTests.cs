@@ -301,8 +301,8 @@ public sealed class DiagnosticConventionTests
         ("<expect value=\"1\" />", new[] { "KScript.Test" }),
         ("<test name=\"t\" in=\"[1]\"><echo>x</echo></test>", new[] { "KScript.Test" }),
         ("<expect value=\"1\" equals=\"1\" />", new[] { "KScript.Test" }),
-        ("<llm to=\"a\"></llm>", new[] { "KScript.AI" }),
-        ("<llm to=\"a\" tools=\"nope\">hi</llm>", new[] { "KScript.AI" }),
+        ("<llm into=\"a\"></llm>", new[] { "KScript.AI" }),
+        ("<llm into=\"a\" tools=\"nope\">hi</llm>", new[] { "KScript.AI" }),
         ("<get path=\"/\"><echo>x</echo></get>", new[] { "KScript.Http" }),
         ("<route path=\"/\" />", new[] { "KScript.Http" }),
         ("<job name=\"SendMail\" />", new[] { "KScript.Queue" }),
@@ -393,9 +393,9 @@ public sealed class DiagnosticConventionTests
         KScriptException code = Assert.Throws<KScriptException>(() => RunCode("echo $nope\n"));
         Assert.Equal("$nope is not defined. Declare it with nope = ....", code.Message);
 
-        Assert.Equal("<llm> needs a prompt: write it inside the element, such as <llm to=\"answer\">What is KScript?</llm>.", ScriptRunner.Fails("<llm to=\"a\"></llm>", "KScript.AI").Message);
-        Assert.Equal("llm needs a prompt: write it inside the statement, such as llm(to: answer) \"What is KScript?\".",
-            Assert.Throws<KScriptException>(() => RunCode(AsCode("<llm to=\"a\"></llm>", new[] { "KScript.AI" }))).Message);
+        Assert.Equal("<llm> needs a prompt: write it inside the element, such as <llm into=\"answer\">What is KScript?</llm>.", ScriptRunner.Fails("<llm into=\"a\"></llm>", "KScript.AI").Message);
+        Assert.Equal("llm needs a prompt: write it inside the statement, such as llm(into: answer) \"What is KScript?\".",
+            Assert.Throws<KScriptException>(() => RunCode(AsCode("<llm into=\"a\"></llm>", new[] { "KScript.AI" }))).Message);
 
         Assert.Equal("Unknown element <echoo>. Did you mean <echo>?", ScriptRunner.Fails("<echoo>x</echoo>").Message);
         Assert.Equal("Unknown statement echoo. Did you mean echo?", Assert.Throws<KScriptException>(() => RunCode(AsCode("<echoo>x</echoo>", null))).Message);
@@ -426,6 +426,8 @@ public sealed class DiagnosticConventionTests
         // Text written elsewhere in XML terms, and a line of XML script.
         Assert.Equal("The message, instead of the statement's text.", Wording.Prose("The message, instead of the element's text.").Code);
         Assert.Equal("echo \"Hello\"", Wording.Snippet("<echo>Hello</echo>").Code);
+        // An aside for XML scripts is left out of a .kscript file's message.
+        Assert.Equal("Write a for loop round the test.", Wording.Prose("Write a for loop round the test (in XML, <for each=\"n\" in=\"$list\">).").Code);
     }
 
     // ---- the source: a message with XML wording must be one the runtime can reword ----
@@ -445,7 +447,7 @@ public sealed class DiagnosticConventionTests
     private static bool OnlyXml(string path) =>
         path.StartsWith("KScript.Web/Pages/", StringComparison.Ordinal) || path.StartsWith("KScriptApp/", StringComparison.Ordinal)
         || path.StartsWith("KScript.Cli/", StringComparison.Ordinal) || path.StartsWith("KScript.Docs/", StringComparison.Ordinal)
-        || path.StartsWith("KScript.LanguageServer/", StringComparison.Ordinal)
+        || path.StartsWith("KScript.LanguageServer/", StringComparison.Ordinal) || path.EndsWith("Command.cs", StringComparison.Ordinal)
         || path.EndsWith("/MarkupParser.cs", StringComparison.Ordinal) || path.EndsWith("/XmlFormatter.cs", StringComparison.Ordinal)
         || path.EndsWith("/Retired.cs", StringComparison.Ordinal) || path.EndsWith("/Wording.cs", StringComparison.Ordinal)
         // ```<Type> is how a .kscript text block names its type: its own syntax, not a tag.

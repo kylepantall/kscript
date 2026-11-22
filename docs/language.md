@@ -78,7 +78,7 @@ match $choice {
 
 Each arm of a `match` is `pattern => result`. The pattern is one value or several (`2, 3 =>`), or `_` for anything, and a `when` test can follow it (`_ when $it > 9 =>`). The result is one statement on the same line, or a `{ }` block of them. A match used as a value writes its arms the same way, with a value as each result: `label = match $choice { 1 => 'one', 2, 3 => 'a few', _ => 'many' }`. Arms are separated by a new line or a comma, and the first arm that fits is taken. In XML the arms are `<case is="2, 3">`, `<case when="…">` and `<default>`.
 
-In XML, `<if>`, `<elif>`, `<while>`, `<match>` and `<assert>` take their expression straight in the start tag: `<if $user.is_logged_in>` is short for `<if test="$user.is_logged_in">`, and `<match $choice>` for `<match value="$choice">`. Both forms work in scripts and pages; use the long one when the tag has other attributes (`<assert test="…" message="…" />`). Inside the tag, `<`, `>` and quotes need no escaping, so `<if $n > 3>` and `<if $name == "Joan">` work. A `>` ends the tag unless it has a space on both sides with more of the condition after it, so write `$n > 3`, not `$n>3`. `kscript convert` and the editor's `<if>` snippet use the short form.
+In XML, `<if>`, `<elif>`, `<while>` and `<match>` take their expression straight in the start tag: `<if $user.is_logged_in>` is short for `<if test="$user.is_logged_in">`, and `<match $choice>` for `<match value="$choice">`. Both forms work in scripts and pages; use the long one when the tag has other attributes. Inside the tag, `<`, `>` and quotes need no escaping, so `<if $n > 3>` and `<if $name == "Joan">` work. A `>` ends the tag unless it has a space on both sides with more of the condition after it, so write `$n > 3`, not `$n>3`. `kscript convert` and the editor's `<if>` snippet use the short form.
 
 Shorthand tags make a `.ks.xml` file KScript markup rather than strict XML: KScript's own parser, formatter and editor support read it, but generic XML tools such as `xmllint` will reject it. Stick to `test="…"` if a file has to stay valid XML.
 
@@ -261,7 +261,7 @@ In XML, a type is `<type name="Repo">` with a `<field name="stars" type="int" fr
 ```kscript
 repo = @api($url)->check()->json(as: Repo) // KScript.Net
 repos = @read_json('repos.json', as: Repo) // KScript.IO; a list maps item by item
-user = @json($text, as: User)
+user = $text->json(as: User)
 user = User($data) // a map, a list or JSON text
 repo: Repo = $data // also on const and plain assignment
 fn show(repo: Repo, tags: string[]) {
@@ -269,7 +269,7 @@ fn show(repo: Repo, tags: string[]) {
 }
 ```
 
-`as:` takes the type as a value (`as: Repo`) or as text (`as: 'Repo[]'`). `@type($repo)` is `'Repo'`. A record still works everywhere a map does, but reading or setting a field the type doesn't have is an error, and setting a field converts the value to the field's type.
+`as:` takes the type as a value (`as: Repo`) or as text (`as: 'Repo[]'`). `$repo->type()` is `'Repo'`. A record still works everywhere a map does, but reading or setting a field the type doesn't have is an error, and setting a field converts the value to the field's type.
 
 When the data doesn't fit, mapping fails with one `Shape` error that lists every problem with its JSON path:
 
@@ -297,7 +297,7 @@ A plain fact about a value is a field, read with a dot and no brackets, the same
 ```kscript
 import KScript.IO
 
-day = @date('2026-11-19')
+day = '2026-11-19'->to_date()
 file = @file('notes.txt')
 echo "{ $day.year } { $day.weekday } { $file.name } { $file.size }"
 ```
@@ -306,7 +306,7 @@ So `$response.status`, `$file.size`, `$url.host` and `$e.status` are fields, and
 
 A length of time is a duration: a number and a unit with no quotes, such as `500ms`, `30s`, `10m`, `2h`, `1d` or `1w`, joined for more (`1h30m`). Everything that takes a length of time takes one: `wait(duration: 500ms)`, `@api($url, timeout: 30s)`, `$cache->set(key, value, ttl: 10m)`. A plain number is always seconds.
 
-The editor completes the fields and methods for each type and shows what they do. `@json(text)` and `$value->to_json()` convert to and from JSON.
+The editor completes the fields and methods for each type and shows what they do. `$text->json()` and `$value->to_json()` convert to and from JSON.
 
 ### Adding methods to a type: extend
 
@@ -327,7 +327,7 @@ extend string {
   fn slug() => $this->lower()->trim()->replace(' ', '-')
 }
 
-echo "{ @date('2026-11-21')->json() } { @date('2026-11-21')->is_weekend() }"
+echo "{ '2026-11-21'->to_date()->json() } { '2026-11-21'->to_date()->is_weekend() }"
 echo "{ ['a', 'b', 'c']->second() } { 'Hello World'->slug() } { 'Hello World' |> slug() }"
 ```
 
@@ -475,7 +475,7 @@ config(env: production, prefix: SHOP_, files: ['settings', 'secrets.yaml?', '.en
 config(files: ['themes/dark.json'], into: theme) // a separate set of settings in $theme
 ```
 
-`files` lists the base files (a name without an extension means .json, .yaml and .yml, and a name ending in `?` may be missing). `$config->environment()` gives the environment, `$config->sources()` lists the files that were read, `$config->all()` gives every setting as a map, and `$config->reload()` reads them again. `@yaml(text)`, `@to_yaml(value)` and `@parse_env(text)` work on text, and KScript.IO adds `@read_yaml(path)`, `@read_env(path)` and `@write_yaml(path, value)`.
+`files` lists the base files (a name without an extension means .json, .yaml and .yml, and a name ending in `?` may be missing). `$config->environment()` gives the environment, `$config->sources()` lists the files that were read, `$config->all()` gives every setting as a map, and `$config->reload()` reads them again. `$text->yaml()`, `$value->to_yaml()` and `@parse_env(text)` work on text, and KScript.IO adds `@read_yaml(path)`, `@read_env(path)` and `@write_yaml(path, value)`.
 
 Pages served by `kscript serve` read settings from the site folder. They never change environment variables, and `kscript serve` never serves `config.*` files or any `.yaml`, `.yml` or `.env` file. Keep secrets in `.env` or in YAML, because a JSON file named after an environment (such as `staging.json`) is served like any other file.
 
@@ -491,7 +491,7 @@ $log->info('Saved', { id: $id, size: $bytes })
 db = $log->named('db')->with({ host: $config.database.host })
 $db->debug('Connected') // category db, with a host field
 if $log->is_enabled('debug') {
-  $log->debug(@to_json($everything))
+  $log->debug($everything->to_json())
 }
 
 try {
@@ -573,21 +573,21 @@ import slugify from "lib/strings.kscript"
 
 | Package | What it adds |
 | --- | --- |
-| `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, colour: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, headers, align)` (see [Terminal output](#terminal-output)) |
-| `KScript.Math` | `@sqrt` `@pow` `@round(x, digits: 2)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
-| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have the fields `.name` `.extension` `.size` `.modified`… and methods such as `->read_text()`. |
-| `KScript.Net` | `@api(url, options: { method, headers, body, timeout })` (a path such as `'/api/notes'` asks the project's own routes, see [Calling your own API](http.md#calling-your-own-api)) returning a response (`.status` `.is_ok` `->json()` `.text` `->check()`), `download(url, to)`, `@url_encode`, `@query_string` |
+| `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, color: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, headers, align)` (see [Terminal output](#terminal-output)) |
+| `KScript.Math` | `@sqrt` `@round(x, digits: 2)` `@clamp(x, min: 0, max: 10)` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
+| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `@move(from, to)` `@copy(from, to)` `@delete(path)` `@create_folder(path)`. File values have the fields `.name` `.extension` `.size` `.modified`… and methods such as `->read_text()`. |
+| `KScript.Net` | `@api(url, options: { method, headers, body, timeout })` (a path such as `'/api/notes'` asks the project's own routes, see [Calling your own API](http.md#calling-your-own-api)) returning a response (`.status` `.is_ok` `->json()` `.text` `->check()`), `@download(url, to)`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
-| `KScript.AI` | `@llm(prompt, options)`, `llm(into, system, schema, tools)`, `@chat(system)` with `->ask()` `.history` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
-| `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast`, `@css_var`, `@css_vars`; `stylesheet(src, to, vars)` (see [Stylesheets](stylesheets.md)). |
+| `KScript.AI` | `@llm(prompt, system, schema, tools, model, max_tokens)`, `llm(into, system, schema, tools, model, max_tokens)`, `@chat(system)` with `->ask()` `.history` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
+| `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast_color`, `@css_var`, `@css_vars`; `@stylesheet(path, vars)` (see [Stylesheets](stylesheets.md)). |
 | `KScript.Http` | Routes, controllers and middleware for `kscript serve`: a `Routes { }` file holds `Get` `Post` `Put` `Patch` `Delete` `Any` `Route` `Resource` `Group` `Middleware`. Controllers use `@view`, `@response`, `@redirect`, `@abort` and `@route`. See [Routes, controllers and middleware](http.md). |
 | `KScript.Storage` | The app's own folders, in the right place on each platform: `@storage(config)` (also `data`, `cache`, `state`, `logs`) with `->read` `->read_json` `->write` `->write_json` `->append` `->list` `->delete` `->folder` `->path_of`, plus `@app_name()` and `@app_folders()`. See [App folders](storage.md). |
 | `KScript.Cache` | `$cache` (in memory) and `@cache(file)` with `->get` `->set` `->remember(key, fn, ttl: 10m)` `->has` `->remove` `->increment` `->ttl` `->keys` `->clear`. See [Caching](cache.md). |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: `@register`, `@attempt`, `@login`, `@logout`, `@user()`, `@is_signed_in()`, `$session` (`->get` `->set` `->flash` …), `@users()`, `@csrf_field()`, `@reset_token`, `@reset_password`, `@api_token`, and the `auth` and `guest` middleware. See [Sign-in](auth.md). |
 | `KScript.Document` | `Document(template: paper, to: "paper.pdf") { }` with `Section`, `Paragraph`, `List`, `Table`, `Figure`, `Math`, `Bibliography` and more; `Letter` and `Invoice`; `->save` `->pages` `->words` `->markdown` `->latex` `->html`. See [Documents](documents.md). |
 | `KScript.UI` | Desktop windows: a `Window { }` block opens one. `Column` `Row` `Grid` `Text` `Button` `TextBox` `CheckBox` `Select` `Slider` `Box` `Spacer` `Timer`, `@close_window()`. See [Desktop apps](desktop.md). |
-| `KScript.Test` | `test`, `describe`, `before_each`, `after_each`, `expect`, `assert`, `expect_error`, `capture`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](testing.md)). |
+| `KScript.Test` | `test`, `describe`, `before_each`, `after_each`, `expect`, `expect_error`, `capture`, `@assert`, `@fail`, `@run_script`. Test files import it on their own (see [Testing scripts](testing.md)). |
 
 Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. A package is named only in an `import`: a statement is never written with the `KScript.` prefix (`input`, not `KScript.input`), and nothing is imported silently, `job` and `dispatch` included (`import KScript.Queue`). A project can import packages for every script in `kscript.json` (below).
 
@@ -601,8 +601,8 @@ Statements and their arguments follow one set of rules in every package, and `ks
 | A statement that describes a thing in a tree (a window, a route table, a document) is `PascalCase`. Only KScript.UI, KScript.Http and KScript.Document have these. | `Button`, `Routes`, `Get`, `Section` |
 | Arguments are `snake_case`. No name has a hyphen. | `max_tokens`, `must_exist`, `on_click`, `new_page` |
 | `into:` is the variable that receives a result. | `input(into: name)`, `llm(into: reply)`, `capture(into: out)` |
-| `to:` is where something goes: a file, a URL, a controller. It never names a variable. | `move(from: $f, to: $target)`, `Get(path: "/", to: @home)` |
-| `path:` is the file a statement reads or acts on. | `stylesheet(path: "theme.ks.css", to: "site.css")`, `delete(path: 'old.css')`, `<layout path="_layout.html">` |
+| `to:` is where something goes: a file, a URL, a controller. It never names a variable. | `Get(path: "/", to: @home)`, `Post(path: "/notes", to: @notes.add)` |
+| `path:` is the file a statement reads or acts on. | `import(path: "lib.kscript")`, `<include path="_nav.html">`, `<layout path="_layout.html">` |
 | `at` is a position, as in `for item at i in $list`. | `menu(into: choice, at: i)` |
 | A function is named as `@name`, as it is in an expression. | `spawn(fn: @job)`, `llm(tools: [@order_status])`, `Get(to: @people.show)` |
 
@@ -621,7 +621,7 @@ import KScript.Terminal
 
 people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 9 }]
 heading "Report"
-detail(name: People) "{ $people->length() }"
+detail(name: People) "{ $people->count() }"
 task(name: "Adding up") {
   total = 1 + 2
 }
@@ -677,7 +677,7 @@ echo "{ $chat->ask('What is a prime number?') }"
 echo "{ $chat->ask('Is 91 one?') }"
 ```
 
-- **`@llm(prompt, options)`**: `options` is a model name, or a map with `model`, `system`, `schema`, `tools` (a list such as `[@order_status]`) and `max_tokens` (16,000 by default).
+- **`llm` and `@llm(prompt, ...)`** ask the same question with the same options: `system`, `schema`, `tools` (a list such as `[@order_status]`), `model` and `max_tokens` (16,000 by default). The one difference is where the prompt comes from and where the answer goes: the `llm` statement takes the prompt as its text and stores the answer in `to:`, and `@llm()` takes the prompt as a value and returns the answer, so it fits inside an expression. `@llm()` takes its options by name: `@llm($prompt, system: 'Be brief.', max_tokens: 500)`.
 - **Schemas**: each field is required. `'string'`, `'number'`, `'int'`, `'bool'` and `'date'` name a type, `'int 1-5'` gives a range, `'a|b|c'` lists the choices, a map is a nested object, `['string']` is a list, and any other text describes a string field.
 - **Tools** are `fn` functions. Their `params` (with types such as `id: int`) and `description` tell the model how to call them. If a tool fails, the model is told the error and can carry on.
 - **Errors** have the type `AI`, so a `try` with `catch e` can check `$e.type` and handle a missing key, a refusal, or an answer cut off by `max_tokens`. When Claude's safety checks decline a request, the API first retries it on a fallback model.

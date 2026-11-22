@@ -276,7 +276,7 @@ namespace KScript.Runtime
             }
 
             if (Retired.RenamedElement(name) is RetiredInfo renamed)
-                throw Located(new KScriptException(renamed.Message(module.ElementHint(name)), "Retired"), module, e.NameSpan.Start);
+                throw Located(new KScriptException(Wording.Prose(renamed.Message(module.ElementHint(name))), "Retired"), module, e.NameSpan.Start);
             if (Retired.Elements.TryGetValue(name, out RetiredInfo retired))
                 throw Located(new KScriptException(Wording.Prose(retired.Message($"<{name}>")), "Retired"), module, e.NameSpan.Start);
 
@@ -399,7 +399,7 @@ namespace KScript.Runtime
                 if (spec == null)
                 {
                     if (Retired.RenamedAttribute(info, a.Name) is RetiredInfo renamed)
-                        throw Located(new KScriptException(renamed.Message($"{module.ElementHint(info.Name)}: '{a.Name}'"), "Retired"), module, a.NameSpan.Start);
+                        throw Located(new KScriptException(Wording.Prose(renamed.Message($"{module.ElementHint(info.Name)}: '{a.Name}'")), "Retired"), module, a.NameSpan.Start);
                     if (info.AllowsExtraAttributes || a.Name.StartsWith("on-", StringComparison.Ordinal) && info.Content == ContentKind.Markup) continue;
                     if (Retired.Attributes.TryGetValue(a.Name, out RetiredInfo r))
                         throw Located(new KScriptException(Wording.Prose(r.Message($"{a.Name}=\"...\"")), "Retired"), module, a.NameSpan.Start);

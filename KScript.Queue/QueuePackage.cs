@@ -19,7 +19,7 @@ namespace KScript.Queueing
 
         protected override void Register(PackageBuilder p)
         {
-            p.Element(new ElementInfo("job", "Declares a job: work to do later, on a queue, by `kscript worker`. Its fields are the data it needs, typed like a <type>'s; `fn handle()` does the work and sees the fields as variables. `dispatch SendWelcome(user_id: 7)` queues one. An error in handle is retried after its backoff until its tries run out; then `fn failed(err)` runs and the job is kept with the failed jobs (`kscript queue failed`).",
+            p.Element(new ElementInfo("job", "Declares a job: work to do later, on a queue, by `kscript worker`. Its fields are the data it needs, typed like a <type>'s; `fn handle()` does the work and sees the fields as variables. `SendWelcome(user_id: 7)->dispatch()` queues one. An error in handle is retried after its backoff until its tries run out; then `fn failed(err)` runs and the job is kept with the failed jobs (`kscript queue failed`).",
                 ContentKind.Statements,
                 new A("name", K.DeclareVariable, "The job's name, starting with a capital letter: SendWelcome, BuildReport.", true),
                 new A("queue", K.Text, "The queue it goes on, unless the dispatch names one. Defaults to default."),
@@ -41,35 +41,6 @@ namespace KScript.Queueing
             {
                 JobType type = DeclareJob(run);
                 run.Scope.Declare(type.Name, type, isConst: true);
-                return null;
-            });
-
-            p.Element(new ElementInfo("dispatch", "Queues a job, with its own options: `dispatch SendWelcome(user_id: 7)`. For a delay or another queue, use `SendWelcome(user_id: 7)->dispatch(delay: 10m, queue: high)`, or the attributes here.",
-                ContentKind.Empty,
-                new A("value", K.Expression, "The job (or chain) to queue: SendWelcome(user_id: 7).", true),
-                new A("delay", K.Expression, "How long to wait before it may run, such as 10m. A plain number is seconds.") { Type = Duration.TypeName },
-                new A("at", K.Expression, "When it may run: a date."),
-                new A("queue", K.Text, "The queue, instead of the job's own."),
-                new A("connection", K.Text, "The connection, instead of the job's own."),
-                new A("into", K.DeclareVariable, "A variable that gets what was queued: { id, job, queue, connection, available_at }."))
-            {
-                Example = "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<do>@fake_queue()</do>\n<dispatch value=\"Hello(who: 'Joan')\" delay=\"5m\" />",
-            }, run =>
-            {
-                object value = run.Eval("value");
-                var options = new DispatchOptions();
-                if (run.Has("delay")) options.Delay = Durations.Seconds(run.Eval("delay"), "delay");
-                if (run.Has("at")) options.At = run.Eval("at") is DateTime at ? at.ToUniversalTime() : throw run.Error("at should be a date.", "at", "Argument");
-                if (run.Raw("queue") is string queue) options.Queue = Durations.Unquote(queue);
-                if (run.Raw("connection") is string connection) options.Connection = Durations.Unquote(connection);
-                IReadOnlyList<JobValue> jobs = value switch
-                {
-                    JobValue job => new[] { job },
-                    ChainValue chain => chain.Jobs,
-                    _ => throw run.Error($"dispatch needs a job, such as dispatch SendWelcome(user_id: 7), not {Values.Describe(value)}.", "value", "Type"),
-                };
-                object queued = Dispatcher.Dispatch(run.Interpreter, run.Module, jobs, options);
-                if (run.Has("into")) run.Scope.Declare(run.VariableName("into"), queued);
                 return null;
             });
 
@@ -116,7 +87,8 @@ namespace KScript.Queueing
             Method(p, KType.Queue, "retry", "id: string", "Puts a failed job back on its queue, with its tries reset. True when there was one with that id.", KType.Bool);
             Method(p, KType.FakeQueue, "pushed", "job?", "The jobs dispatched so far, or only those of one job type: pushed(SendWelcome).", KType.List);
             Method(p, KType.FakeQueue, "dispatches", "job?", "What each dispatch asked for: job, queue, connection, delay, available_at.", KType.List);
-            Method(p, KType.FakeQueue, "count", "job?", "How many jobs were dispatched, or how many of one job type.", KType.Number);
+            Method(p, KType.FakeQueue, "count", "", "How many jobs were dispatched.", KType.Number);
+            Method(p, KType.FakeQueue, "count_of", "match", "How many jobs of one job type were dispatched: count_of(SendWelcome).", KType.Number);
             Method(p, KType.FakeQueue, "run_all", "", "Runs the dispatched jobs in order (and any they dispatch), then forgets them. Returns how many ran.", KType.Number);
             Method(p, KType.FakeQueue, "clear", "", "Forgets the dispatched jobs.", KType.Number);
 
@@ -125,7 +97,7 @@ namespace KScript.Queueing
                 ("@queue", "<echo>{ @queue('mail', connection: 'memory')->size() } waiting</echo>"),
                 ("@release_job", "<job name=\"Poll\">\n  <fn name=\"handle\">\n    <do>@release_job(after: 30s)</do>\n  </fn>\n</job>\n<do>Poll()->run()</do>"),
                 ("@fail_job", "<job name=\"Check\" fields=\"n: int\">\n  <fn name=\"handle\">\n    <if test=\"$n lt 0\"><do>@fail_job('n must not be negative')</do></if>\n  </fn>\n</job>\n<try>\n  <do>Check(n: -1)->run()</do>\n  <catch as=\"err\"><echo>{ $err.message }</echo></catch>\n</try>"),
-                ("@fake_queue", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" />\n<echo>{ $q->count() } queued</echo>\n<do>$q->run_all()</do>"),
+                ("@fake_queue", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<do>Hello(who: 'Joan')->dispatch()</do>\n<echo>{ $q->count() } queued</echo>\n<do>$q->run_all()</do>"),
                 ("job->dispatch", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<do>@fake_queue()</do>\n<let name=\"queued\" value=\"Hello(who: 'Joan')->dispatch(delay: 10m, queue: 'high')\" />\n<echo>{ $queued.queue }</echo>"),
                 ("job->run", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<do>Hello(who: 'Joan')->run()</do>"),
                 ("chain->dispatch", "<job name=\"Step\" fields=\"n: int\">\n  <fn name=\"handle\"><echo>Step { $n }</echo></fn>\n</job>\n<do>@fake_queue()</do>\n<do>@chain([Step(n: 1), Step(n: 2)])->dispatch()</do>"),
@@ -135,10 +107,11 @@ namespace KScript.Queueing
                 ("queue->failed", "<echo>{ @queue('default', connection: 'memory')->failed()->count() }</echo>"),
                 ("queue->clear", "<echo>{ @queue('default', connection: 'memory')->clear() } removed</echo>"),
                 ("queue->retry", "<echo>{ @queue('default', connection: 'memory')->retry('no-such-id') }</echo>"),
-                ("fake_queue->pushed", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" />\n<echo>{ $q->pushed(Hello)[0].who }</echo>"),
-                ("fake_queue->dispatches", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" delay=\"60s\" />\n<echo>{ $q->dispatches()[0].delay }</echo>"),
-                ("fake_queue->count", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" />\n<echo>{ $q->count(Hello) }</echo>"),
-                ("fake_queue->run_all", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" />\n<echo>{ $q->run_all() } ran</echo>"),
+                ("fake_queue->pushed", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<do>Hello(who: 'Joan')->dispatch()</do>\n<echo>{ $q->pushed(Hello)[0].who }</echo>"),
+                ("fake_queue->dispatches", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<do>Hello(who: 'Joan')->dispatch(delay: 60s)</do>\n<echo>{ $q->dispatches()[0].delay }</echo>"),
+                ("fake_queue->count", "<let name=\"q\" value=\"@fake_queue()\" />\n<echo>{ $q->count() }</echo>"),
+                ("fake_queue->count_of", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<do>Hello(who: 'Joan')->dispatch()</do>\n<echo>{ $q->count_of(Hello) }</echo>"),
+                ("fake_queue->run_all", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<do>Hello(who: 'Joan')->dispatch()</do>\n<echo>{ $q->run_all() } ran</echo>"),
                 ("fake_queue->clear", "<let name=\"q\" value=\"@fake_queue()\" />\n<echo>{ $q->clear() }</echo>"));
         }
 

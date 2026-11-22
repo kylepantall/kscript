@@ -64,8 +64,8 @@ public class ExpressionTests
     [InlineData("{ a: 1 }->merge({ b: 2 })->to_json()", "{\"a\":1,\"b\":2}")]
     [InlineData("3.14159->round(digits: 2)", "3.14")]
     [InlineData("1234567->format(pattern: 'N0')", "1,234,567")]
-    [InlineData("@json('{\"a\": [1, 2]}').a[1]", "2")]
-    [InlineData("@type([])", "list")]
+    [InlineData("'{\"a\": [1, 2]}'->json().a[1]", "2")]
+    [InlineData("[]->type()", "list")]
     [InlineData("@max(3, 9, 2)", "9")]
     [InlineData("@range(3)->join(',')", "0,1,2")]
     public void Methods(string expression, string expected)
@@ -83,7 +83,7 @@ public class ExpressionTests
     [Fact]
     public void DatesHaveMethods()
     {
-        Assert.Equal("2026-01-31", Eval("@date('2026-01-30')->add_days(1)->format(pattern: 'yyyy-MM-dd')"));
+        Assert.Equal("2026-01-31", Eval("'2026-01-30'->to_date()->add_days(1)->format(pattern: 'yyyy-MM-dd')"));
     }
 
     [Fact]

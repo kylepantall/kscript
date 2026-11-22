@@ -33,7 +33,7 @@ names = $people
 by_age = fn(a, b) => $a.age - $b.age
 sorted = $people->sort($by_age)
 echo "Youngest: {$sorted[0].name}"
-echo $names |> @to_lower() |> @greet('Hi')
+echo $names |> lower() |> @greet('Hi')
 
 // Loops
 for i in 0..10 {
@@ -84,7 +84,7 @@ echo "{ 'Kyle' |> @greet('Hi') } { @double(4) }"
 // Errors
 path = 'data.json'
 try {
-  data = @read_text($path) |> @json()
+  data = @read_text($path) |> json()
   echo $data
 } catch err when $err.type == 'FileNotFound' {
   echo "No file at {$path}, using defaults."

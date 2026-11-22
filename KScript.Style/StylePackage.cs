@@ -38,32 +38,14 @@ namespace KScript.Style
                 return null;
             }, ownsContent: true);
 
-            p.Variable("vars", KType.Map, "Values given to the stylesheet: <stylesheet vars=\"{ ... }\">, @stylesheet(path, vars) or kscript css --var name=value.", (i, m) =>
+            p.Variable("vars", KType.Map, "Values given to the stylesheet: @stylesheet(path, vars) or kscript css --var name=value.", (i, m) =>
                 i.Host.Items.TryGetValue(VarsKey, out object v) ? v : new Dictionary<string, object>());
-
-            p.Element(new ElementInfo("stylesheet", "Compiles a stylesheet written in KScript (.ks.css, .ks.scss or .ks.sass) and writes the CSS (or Sass) to a file.", ContentKind.Empty,
-                new A("path", K.Template, "The stylesheet, such as theme.ks.css.", true),
-                new A("to", K.Template, "The file to write. Default: next to path without .ks (theme.css)."),
-                new A("vars", K.Expression, "A map of values the stylesheet reads as $vars."))
-            {
-                Context = ElementContext.Script,
-                Example = "<stylesheet path=\"theme.ks.css\" to=\"public/theme.css\" vars=\"{ brand: '#3355ff' }\" />",
-            }, run =>
-            {
-                string src = run.Host.ResolvePath(run.Template("path"), run.Module.Directory);
-                string to = run.Has("to") ? run.Host.ResolvePath(run.Template("to"), run.Module.Directory) : Stylesheets.OutputPath(src);
-                run.Host.CheckWrite(run.Module.ElementHint("stylesheet"));
-                string css = Stylesheets.Compile(src, Vars(run.Has("vars") ? run.Eval("vars") : null, run.Module.ArgumentHint("stylesheet", "vars")), Sandbox(run.Host));
-                Directory.CreateDirectory(Path.GetDirectoryName(to));
-                File.WriteAllText(to, css);
-                return null;
-            });
 
             p.Command("stylesheet", "path, vars?", "Compiles a stylesheet written in KScript and returns the CSS (or Sass).", KType.String, c =>
             {
                 string src = c.Host.ResolvePath(c.Str(0), c.Module?.Directory ?? c.Host.WorkingDirectory);
                 return Stylesheets.Compile(src, Vars(c.Arg(1, "vars"), "@stylesheet() vars"), Sandbox(c.Host));
-            }, "<let name=\"css\" value=\"@stylesheet('theme.ks.css', { dark: true })\" />");
+            }, "<do>@write_text('public/theme.css', @stylesheet('theme.ks.css', { brand: '#3355ff' }))</do>");
 
             // Screen widths.
             p.Command("up", "width", "A media query for screens at least this wide: @up(768) or @up('md') is (min-width: 768px).", KType.String,
@@ -80,30 +62,30 @@ namespace KScript.Style
                 KType.String, Fluid, "h1 { font-size: {@fluid(28, 48)}; }");
 
             // Colours.
-            p.Command("lighten", "colour, amount", "A lighter colour: amount is 0 to 1 (or a percentage such as '10%') of lightness added.", KType.String,
+            p.Command("lighten", "color, amount", "A lighter colour: amount is 0 to 1 (or a percentage such as '10%') of lightness added.", KType.String,
                 c => Adjust(c, +1));
-            p.Command("darken", "colour, amount", "A darker colour: amount is 0 to 1 (or '10%') of lightness taken away.", KType.String,
+            p.Command("darken", "color, amount", "A darker colour: amount is 0 to 1 (or '10%') of lightness taken away.", KType.String,
                 c => Adjust(c, -1));
-            p.Command("mix", "a, b, weight?", "A mix of two colours. weight is how much of a (0 to 1, default 0.5).", KType.String, c =>
+            p.Command("mix", "color, other, amount?", "The colour part way to the other: amount is how far (0 to 1, default 0.5, which is halfway).", KType.String, c =>
             {
                 Rgba a = Colors.Parse(c.Arg(0), "@mix()"), b = Colors.Parse(c.Arg(1), "@mix()");
-                double w = c.Has(2) ? Amount(c.Arg(2), "@mix() weight") : 0.5;
+                double w = 1 - (c.Has(2) ? Amount(c.Arg(2), "@mix() amount") : 0.5);
                 return Colors.ToCss(new Rgba(a.R * w + b.R * (1 - w), a.G * w + b.G * (1 - w), a.B * w + b.B * (1 - w), a.A * w + b.A * (1 - w)));
             });
-            p.Command("alpha", "colour, opacity", "The colour see-through: opacity from 0 to 1 (or '50%').", KType.String, c =>
+            p.Command("alpha", "color, opacity", "The colour see-through: opacity from 0 to 1 (or '50%').", KType.String, c =>
             {
                 Rgba a = Colors.Parse(c.Arg(0), "@alpha()");
                 return Colors.ToCss(a with { A = Amount(c.Arg(1), "@alpha() opacity") });
             });
-            p.Command("contrast", "colour, dark?, light?",
+            p.Command("contrast_color", "color, dark?, light?",
                 "The text colour that reads best on a background: dark (default #000000) on light colours, light (default #ffffff) on dark ones.",
                 KType.String, c =>
                 {
-                    Rgba bg = Colors.Parse(c.Arg(0), "@contrast()");
+                    Rgba bg = Colors.Parse(c.Arg(0), "@contrast_color()");
                     string dark = c.Str(1, "#000000"), light = c.Str(2, "#ffffff");
                     double Ratio(string fg)
                     {
-                        double l1 = bg.Luminance(), l2 = Colors.Parse(fg, "@contrast()").Luminance();
+                        double l1 = bg.Luminance(), l2 = Colors.Parse(fg, "@contrast_color()").Luminance();
                         return (Math.Max(l1, l2) + 0.05) / (Math.Min(l1, l2) + 0.05);
                     }
                     return Ratio(dark) >= Ratio(light) ? dark : light;

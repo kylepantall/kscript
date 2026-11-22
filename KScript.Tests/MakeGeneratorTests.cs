@@ -299,7 +299,7 @@ public sealed class MakeGeneratorTests : IDisposable
             Read(app, "extensions/date.kscript"));
         Assert.Equal(0, Make(app, "extension", "text/string").Code);
         Assert.Contains("extend string {\n  // TODO: Add methods, e.g. fn json() => $this->to_json()\n}", Read(app, "extensions/text/string.kscript"));
-        File.WriteAllText(Path.Combine(app, "try.kscript"), "echo \"{ @date('2026-11-21')->json() == @date('2026-11-21') }\"\n");
+        File.WriteAllText(Path.Combine(app, "try.kscript"), "echo \"{ '2026-11-21'->to_date()->json() == '2026-11-21'->to_date() }\"\n");
         AssertNoErrors(app);
         var o = new StringWriter { NewLine = "\n" };
         new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(o, string.Empty)).RunFile(Path.Combine(app, "try.kscript"));

@@ -104,7 +104,7 @@ public class MoreNativeTypesTests
         "https example.com 8443 /docs tea intro https://example.com:8443")]
     [InlineData("u: url = 'https://example.com/docs/intro'\necho \"{ $u->join('../blog') } { $u->with_query({ page: 2 }) } { $u.port }\"",
         "https://example.com/blog https://example.com/docs/intro?page=2 443")]
-    [InlineData("d: domain = 'api.example.co.uk'\necho \"{ $d.tld } { $d.labels->length() } { $d->is_subdomain_of('example.co.uk') } { $d->is_subdomain_of('other.com') }\"", "uk 4 true false")]
+    [InlineData("d: domain = 'api.example.co.uk'\necho \"{ $d.tld } { $d.labels->count() } { $d->is_subdomain_of('example.co.uk') } { $d->is_subdomain_of('other.com') }\"", "uk 4 true false")]
     [InlineData("ip: ip = '10.1.2.3'\necho \"{ $ip.version } { $ip->in('10.0.0.0/8') } { $ip.is_private } { $ip.is_loopback }\"", "4 true true false")]
     [InlineData("ip: ip = '::1'\necho \"{ $ip.version } { $ip.is_loopback }\"", "6 true")]
     [InlineData("b: cidr = '192.168.0.0/24'\necho \"{ $b->contains('192.168.0.77') } { $b->contains('192.168.1.1') } { $b.network } { $b.prefix } { $b.size }\"", "true false 192.168.0.0 24 256")]
@@ -113,8 +113,8 @@ public class MoreNativeTypesTests
     [InlineData("v: semver = '1.0.0-beta.2'\necho \"{ $v->compare('1.0.0') } { $v->compare('1.0.0-beta.10') } { $v.prerelease } { $v->bump('patch') }\"", "-1 -1 beta.2 1.0.0")]
     [InlineData("m: mime = 'application/vnd.api+json; charset=utf-8'\necho \"{ $m.main_type } { $m.subtype } { $m.essence } { $m.params.charset } { $m->is('application/*') } { $m->is('text/*') }\"", "application vnd.api+json application/vnd.api+json utf-8 true false")]
     [InlineData("h: hex = 'ff80'\necho \"{ $h.bytes } { $h->to_number() } { $h->upper() }\"", "2 65408 FF80")]
-    [InlineData("b = @base64('hello world')\necho \"$b { $b->decode() } { $b.bytes } { @base64('??>', url: true) }\"", "aGVsbG8gd29ybGQ= hello world 11 Pz8-")]
-    [InlineData("j: json = '{ \"a\": [1, 2] }'\necho \"{ $j->parse().a[1] }\"", "2")]
+    [InlineData("b = 'hello world'->to_base64()\necho \"$b { $b->decode() } { $b.bytes } { '??>'->to_base64(url: true) }\"", "aGVsbG8gd29ybGQ= hello world 11 Pz8-")]
+    [InlineData("j: json = '{ \"a\": [1, 2] }'\necho \"{ $j->json().a[1] }\"", "2")]
     [InlineData("p: phone = '+44 7700 900123'\necho \"{ $p.country_code } { $p.national } { $p->tel() }\"", "44 7700900123 tel:+447700900123")]
     [InlineData("c: country = 'de'\necho \"{ $c.name } { $c.alpha3 } { $c.currency } { $c.flag }\"", "Germany DEU EUR 🇩🇪")]
     [InlineData("c: currency = 'GBP'\necho \"{ $c.name } { $c.symbol } { $c.digits } { $c->format(1234.5) }\"", "British Pound £ 2 £1,234.50")]
@@ -124,7 +124,7 @@ public class MoreNativeTypesTests
     [InlineData("d: duration = '1h30m'\necho \"{ $d.seconds } { $d.minutes } { $d.hours } { $d->iso() } { $d->plus('45m') } { $d->after('2026-11-21T09:00:00'->to_date())->format('HH:mm') } { $d->before('2026-11-21T09:00:00'->to_date())->format('HH:mm') }\"", "5400 90 1.5 PT1H30M 2h15m 10:30 07:30")]
     [InlineData("c: cron = '0 9 * * mon-fri'\necho \"{ $c->next('2026-11-21T10:00:00'->to_date())->format('ddd HH:mm') } { $c->next_times(2, '2026-11-23T10:00:00'->to_date())->map(fn(t) => $t->format('ddd')) }\"", "Mon 09:00 Tue, Wed")]
     [InlineData("c: cron = '@hourly'\necho \"{ $c->next('2026-11-21T10:20:00'->to_date())->format('HH:mm') }\"", "11:00")]
-    [InlineData("c: color = '#ff8800'\necho \"{ $c->rgb().g } { $c->mix('#0000ff') } { $c->lighten(0.5) } { $c->darken() } { $c.luminance } { $c->contrast('white') }\"", "136 #804480 #ffc480 #cc6d00 0.3887 2.39")]
+    [InlineData("c: color = '#ff8800'\necho \"{ $c->rgb().g } { $c->mix('#0000ff') } { $c->lighten(0.5) } { $c->darken() } { $c.luminance } { $c->contrast_ratio('white') }\"", "136 #804480 #ffc480 #cc6d00 0.3887 2.39")]
     [InlineData("c: color = 'rgb(255 0 0 / 0.5)'\necho \"$c { $c->hex() } { $c->css() } { $c->rgb().a }\"", "#ff000080 #ff0000 rgb(255 0 0 / 0.5) 0.5")]
     [InlineData("i: iban = 'GB82WEST12345698765432'\necho \"{ $i.country } { $i.country.name } { $i->formatted() } { $i.bban }\"", "GB United Kingdom GB82 WEST 1234 5698 7654 32 WEST12345698765432")]
     [InlineData("c: card = '5555 5555 5555 4444'\necho \"$c { $c.last4 } { $c.brand } { $c->reveal() } { { card: $c }->to_json() }\"", "•••• 4444 4444 mastercard 5555555555554444 {\"card\":\"•••• 4444\"}")]
@@ -149,7 +149,7 @@ public class MoreNativeTypesTests
         Assert.Contains("->to_date()", Fails("u: url = 'https://example.com'\necho $u->to_date()"));
         Assert.Equal("https://example.com/x", Code("u: url = 'https://example.com/x'\necho $u->to_string()"));
         // A card or a port keeps no string methods at all.
-        Assert.Contains("->length()", Fails("c: card = '4242424242424242'\necho $c->length()"));
+        Assert.Contains("->count()", Fails("c: card = '4242424242424242'\necho $c->count()"));
         Assert.Equal("8081", Code("p: port = 8080\necho $p + 1"));
     }
 
@@ -169,7 +169,7 @@ public class MoreNativeTypesTests
     [InlineData("c: currency = EUR\necho $c.symbol", "€")]
     [InlineData("l: locale = en-GB\necho $l.region", "GB")]
     [InlineData("d: duration = 1h30m\necho $d.minutes", "90")]
-    [InlineData("c: color = red\necho \"$c { $c->contrast(white) }\"", "#ff0000 4")]
+    [InlineData("c: color = red\necho \"$c { $c->contrast_ratio(white) }\"", "#ff0000 4")]
     [InlineData("m: mime = text/html\necho $m.subtype", "html")]
     [InlineData("s: slug = my-post\necho $s.words", "my, post")]
     [InlineData("fn host(u: url) => $u.host\necho @host(https://example.com/x)", "example.com")]

@@ -322,6 +322,9 @@ namespace KScript.Runtime
         /// <summary>The parameter names of the signature the arguments were bound to, when known (for error messages).</summary>
         public IReadOnlyList<string> ParameterNames { get; init; }
 
+        /// <summary>Where a command was called, as written in the script, or null when that isn't known (a command passed as a value).</summary>
+        public CallSite Site { get; internal set; }
+
         public int Count => Args.Count;
         public KScriptHost Host => Interpreter.Host;
 

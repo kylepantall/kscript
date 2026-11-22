@@ -211,9 +211,11 @@ namespace KScript.Data
                 case "lower":
                 case "upper":
                 case "trim":
-                case "length":
                     Count(0);
                     return new SqlCall(call.Name.ToUpperInvariant(), target);
+                case "count":
+                    Count(0);
+                    return new SqlCall("LENGTH", target);
                 case "matches":
                 case "test":
                 {
@@ -222,7 +224,7 @@ namespace KScript.Data
                     return new SqlMatch(target, regex);
                 }
                 default:
-                    throw Cannot(call, $"->{call.Name}() has no SQL form. Use ->contains(), ->starts_with(), ->ends_with(), ->lower(), ->upper(), ->trim(), ->length() or ->matches().");
+                    throw Cannot(call, $"->{call.Name}() has no SQL form. Use ->contains(), ->starts_with(), ->ends_with(), ->lower(), ->upper(), ->trim(), ->count() or ->matches().");
             }
         }
 

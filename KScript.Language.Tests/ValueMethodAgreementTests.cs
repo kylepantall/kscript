@@ -49,7 +49,7 @@ namespace KScript.Language.Tests
             Assert.Contains("to_string", offered);
             Assert.Contains("to_json", offered);
             Assert.All(offered, name => Assert.True(runs.Contains(name), $"->{name}() is offered on a {type}, which has no such method at run time."));
-            foreach (string text in new[] { "json", "upper", "length", "split", "to_date" })
+            foreach (string text in new[] { "json", "upper", "count", "split", "to_date" })
             {
                 Assert.DoesNotContain(text, offered);
             }
@@ -98,7 +98,7 @@ namespace KScript.Language.Tests
         [InlineData("echo @today()->to_json()")]
         [InlineData("echo @today()->to_string()->upper()")]
         [InlineData("echo @today()->format('d MMMM yyyy')")]
-        [InlineData("n = 5\necho $n->to_string()->length()")]
+        [InlineData("n = 5\necho $n->to_string()->count()")]
         public void Methods_the_interpreter_runs_are_clean(string code) => AssertClean(Analyze(code, "types.kscript"));
     }
 }

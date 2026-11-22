@@ -928,7 +928,7 @@ namespace KScript.Language.Analysis
                 {
                     fixes.Add(RenameElementFix(e, retired.Rename, retired.Renamed));
                 }
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredElement, retired.Message(IsCode ? e.Name : $"<{e.Name}>"), fixes);
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredElement, Wording.Prose(retired.Message(IsCode ? e.Name : $"<{e.Name}>")), fixes);
                 return;
             }
 
@@ -1005,7 +1005,7 @@ namespace KScript.Language.Analysis
                 if (retired != null)
                 {
                     Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredAttribute,
-                        retired.Renamed ? retired.Message($"'{attr.Name}'") : $"The '{attr.Name}' attribute was removed in KScript 2. {retired.Replacement}",
+                        retired.Renamed ? Wording.Prose(retired.Message($"'{attr.Name}'")) : Wording.Of($"The '{attr.Name}' attribute was removed in KScript 2. {Wording.Prose(retired.Replacement)}"),
                         retired.Rename != null && info.GetAttribute(retired.Rename) != null && e.GetAttribute(retired.Rename) == null
                             ? new[] { new QuickFix((retired.Renamed ? Fixer.RenameTitle : "Change to ") + retired.Rename, new TextChange(attr.NameSpan, retired.Rename)) }
                             : null);
@@ -1027,7 +1027,7 @@ namespace KScript.Language.Analysis
             {
                 if (e.GetAttribute(a.Name) == null && !RequiredSatisfiedOtherwise(e, info, a))
                 {
-                    Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<{e.Name}> needs the '{a.Name}' attribute: {a.Description}");
+                    Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<{e.Name}> needs the '{a.Name}' attribute: {Wording.Prose(a.Description)}");
                 }
             }
         }

@@ -192,7 +192,7 @@ echo "Hello $name"   // right
 
 ## KS5001
 
-**A command that doesn't exist is called.** Commands start with `@`, including your own functions: `@greet('World')`. Some things are methods in KScript and not commands: the length of a list is `$list->length()`.
+**A command that doesn't exist is called.** Commands start with `@`, including your own functions: `@greet('World')`. Some things are methods in KScript and not commands: the length of a list is `$list->count()`.
 
 ## KS5002
 
@@ -321,7 +321,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 **A type written the long way.** Each of these has one form, and `kscript check --fix` rewrites the other:
 
-- A type, model, enum, error or job is named bare, without `$`: `@json($text, as: Repo)`, `User->create(name: 'Joan')`. `$` reads a variable.
+- A type, model, enum, error or job is named bare, without `$`: `$text->json(as: Repo)`, `User->create(name: 'Joan')`. `$` reads a variable.
 - An optional field is marked on its name, `age?: int`, not on its type (`age: int?`). `T?` stays for a parameter that may be null: `fn show(repo: Repo?)`.
 - A model's options go in its brackets, `model User(timestamps, unique: [email]) { }`, not as lines of its block. The block holds fields, `validate` and `fn`.
 

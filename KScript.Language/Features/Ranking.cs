@@ -17,7 +17,7 @@ namespace KScript.Language.Features
         /// <summary>The methods reached for first on each type of value.</summary>
         internal static readonly Dictionary<string, string[]> Methods = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            [KType.String] = new[] { "length", "upper", "lower", "trim", "contains", "replace", "split", "starts_with", "ends_with", "slice" },
+            [KType.String] = new[] { "count", "upper", "lower", "trim", "contains", "replace", "split", "starts_with", "ends_with", "slice" },
             [KType.List] = new[] { "count", "map", "filter", "first", "last", "join", "sort", "push", "contains", "each" },
             [KType.Map] = new[] { "keys", "values", "has", "get", "set", "merge" },
             [KType.Number] = new[] { "round", "format", "abs", "floor", "ceil" },

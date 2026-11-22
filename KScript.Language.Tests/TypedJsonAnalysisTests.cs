@@ -81,11 +81,11 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("<let name=\"r\" value=\"Repo({})\" />", "Repo")]
         [InlineData("<let name=\"r\" value=\"Repo([{}])\" />", "list<Repo>")]
-        [InlineData("<let name=\"r\" value=\"@json('{}', as: Repo)\" />", "Repo")]
-        [InlineData("<let name=\"r\" value=\"@json('{}', Repo)\" />", "Repo")]
-        [InlineData("<let name=\"r\" value=\"@json('{}', as: Repo)\" />", "Repo")]
-        [InlineData("<let name=\"r\" value=\"@json('[]', as: 'Repo[]')\" />", "list<Repo>")]
-        [InlineData("<let name=\"r\" value=\"@json('[]', as: 'int[][]?')\" />", "list<list<number>>")]
+        [InlineData("<let name=\"r\" value=\"'{}'->json(as: Repo)\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"'{}'->json(Repo)\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"'{}' |> json(as: Repo)\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"'[]'->json(as: 'Repo[]')\" />", "list<Repo>")]
+        [InlineData("<let name=\"r\" value=\"'[]'->json(as: 'int[][]?')\" />", "list<list<number>>")]
         [InlineData("<let name=\"r\" value=\"'{}'->json(as: User)\" />", "User")]
         [InlineData("<let name=\"r\" value=\"'{}'->json(as: 'Nope')\" />", "any")]
         [InlineData("<let name=\"r\" value=\"'{}'->json()\" />", "any")]
@@ -115,7 +115,7 @@ namespace KScript.Language.Tests
             Assert.Equal("list<User>", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json('users.json', as: User)\" />"), "r"));
             Assert.Equal("User", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json($path, as: User)\" />"), "r"));
             Assert.Equal("list<{ login: string, id: number }>", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json('users.json')\" />"), "r"));
-            Assert.Equal("User", Show(Open(Types + "<let name=\"r\" value=\"'{}' |> @json(as: User)\" />"), "r"));
+            Assert.Equal("User", Show(Open(Types + "<let name=\"r\" value=\"'{}' |> json(as: User)\" />"), "r"));
         }
 
         [Fact]
@@ -138,7 +138,7 @@ namespace KScript.Language.Tests
             Assert.Contains("number", types);
             Assert.Contains("Repo", Labels(Types + "<type name=\"T\"><field name=\"a\" type=\"‸\" /></type>"));
             Assert.Contains("Repo", Labels(Types + "<echo>{ '{}'->json(as: ‸) }</echo>"));
-            Assert.Contains("User", Labels(Types + "<echo>{ @json('{}', ‸) }</echo>"));
+            Assert.Contains("User", Labels(Types + "<echo>{ '{}'->json(‸) }</echo>"));
         }
 
         [Fact]
@@ -159,7 +159,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void BareTypeNamesAreValues()
         {
-            AssertClean(Open(Types + "<let name=\"t\" value=\"Repo\" />\n<echo>{ '{}'->json(User) } { @json('{}', as: Repo) }</echo>"));
+            AssertClean(Open(Types + "<let name=\"t\" value=\"Repo\" />\n<echo>{ '{}'->json(User) } { '{}'->json(as: Repo) }</echo>"));
             AssertSingle(Open(Types + "<let name=\"t\" value=\"Nope\" />"), DiagnosticCodes.UndefinedVariable);
             AssertSingle(Open(Types + "<let name=\"t\" value=\"nope\" />"), DiagnosticCodes.BareIdentifier);
         }

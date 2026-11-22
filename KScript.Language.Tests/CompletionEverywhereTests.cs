@@ -214,7 +214,7 @@ namespace KScript.Language.Tests
             Assert.StartsWith("**after_each**", code.Documentation, StringComparison.Ordinal);
             Assert.Contains("in its file or `describe`, even", code.Documentation, StringComparison.Ordinal);
             Assert.Contains("```kscript\nafter_each {\n  cart = []\n}\n```", code.Documentation, StringComparison.Ordinal);
-            Assert.Contains("| Argument |", Assert.Single(Complete("import KScript.IO\n‸", Code), i => i.Label == "write").Documentation, StringComparison.Ordinal);
+            Assert.Contains("| Argument |", Assert.Single(Complete("import KScript.Terminal\n‸", Code), i => i.Label == "input").Documentation, StringComparison.Ordinal);
 
             CompletionItem xml = Assert.Single(Complete("<kscript>\n<import package=\"KScript.Test\" />\n<‸\n</kscript>", Xml), i => i.Label == "after_each");
             Assert.StartsWith("**<after_each>**", xml.Documentation, StringComparison.Ordinal);

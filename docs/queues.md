@@ -1,6 +1,6 @@
 # Queues and jobs: KScript.Queue
 
-A job is a piece of work you hand off to run later, away from the script or request that asked for it: sending an email, resizing a picture, calling a slow API. `dispatch` puts a job on a queue and returns at once. `kscript worker` takes jobs off the queue and runs them, tries again when one fails, and keeps the ones that keep failing so you can see why.
+A job is a piece of work you hand off to run later, away from the script or request that asked for it: sending an email, resizing a picture, calling a slow API. `->dispatch()` puts a job on a queue and returns at once. `kscript worker` takes jobs off the queue and runs them, tries again when one fails, and keeps the ones that keep failing so you can see why.
 
 ```kscript
 import KScript.Queue
@@ -26,7 +26,7 @@ Save it as `jobs/send-welcome.kscript` (`kscript make job SendWelcome` writes on
 import KScript.Queue
 import "jobs/send-welcome.kscript"
 
-dispatch SendWelcome(user_id: 7, email: 'joan@example.com')
+SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
 ```
 
 And in another terminal:
@@ -35,7 +35,7 @@ And in another terminal:
 kscript worker
 ```
 
-`job`, `dispatch` and the commands below (`@chain`, `@queue`, `@fake_queue`, `@release_job`, `@fail_job`) are part of KScript.Queue, so the file that declares a job and the file that dispatches it both start with `import KScript.Queue`. Nothing is imported silently: without the import, `kscript check` says `job is part of KScript.Queue. Add import KScript.Queue` and the editor offers to add it.
+`job`, `->dispatch()` and the commands below (`@chain`, `@queue`, `@fake_queue`, `@release_job`, `@fail_job`) are part of KScript.Queue, so the file that declares a job and the file that dispatches it both start with `import KScript.Queue`. Nothing is imported silently: without the import, `kscript check` says `job is part of KScript.Queue. Add import KScript.Queue` and the editor offers to add it.
 
 ## Declaring a job
 
@@ -76,7 +76,7 @@ Times are durations, written as a number and a unit with no quotes: `500ms`, `30
 import KScript.Queue
 import "jobs/send-welcome.kscript"
 
-dispatch SendWelcome(user_id: 7, email: 'joan@example.com')
+SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
 
 queued = SendWelcome(user_id: 8, email: 'ann@example.com')->dispatch(delay: 10m, queue: 'low')
 echo "Queued {$queued.id} on {$queued.queue}"
@@ -84,8 +84,8 @@ echo "Queued {$queued.id} on {$queued.queue}"
 SendWelcome(user_id: 9, email: 'bo@example.com')->run()
 ```
 
-- `dispatch Job(...)` queues the job with its own options.
-- `->dispatch(delay:, at:, queue:, connection:)` queues it with others, and returns what was queued: `id`, `job`, `queue`, `connection` and `available_at`. `delay` is a duration (`10m`); `at` is a date. It returns `null` for a unique job that is already queued.
+- `Job(...)->dispatch()` queues the job with its own options.
+- `->dispatch(delay:, at:, queue:, connection:)` queues it with others. Both return what was queued: `id`, `job`, `queue`, `connection` and `available_at`. `delay` is a duration (`10m`); `at` is a date. It returns `null` for a unique job that is already queued.
 - `->run()` runs `handle` here and now, with no queue and no retries. Errors reach the caller.
 
 A job's fields are given by name and checked against its declaration, both by the editor and when it runs.
@@ -152,7 +152,7 @@ A connection is where jobs wait. `kscript.json` names them under `queue`:
 | `file` | One JSON file per job in the app's data folder (see [App folders](storage.md)), or in `path`. Workers claim a job by moving its file, so several workers, even in different processes, never run the same job twice. | Most apps. It is the default. |
 | `database` | Rows in the project's database (see [Data](data.md#connections)), or in the database `connection` names. | Apps that already have a database, and workers on several machines that share it. |
 | `memory` | In memory, in this process only. | `kscript serve --with-worker`, which runs a worker inside the server. |
-| `sync` | Nowhere: `dispatch` runs the job straight away and its errors reach the caller. | Tests and scripts where waiting isn't worth it. |
+| `sync` | Nowhere: `->dispatch()` runs the job straight away and its errors reach the caller. | Tests and scripts where waiting isn't worth it. |
 
 ### The database driver
 
@@ -206,13 +206,13 @@ import KScript.Queue
 import "jobs/send-welcome.kscript"
 
 queue = @fake_queue()
-dispatch SendWelcome(user_id: 7, email: 'joan@example.com')
+SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
 
-echo "{$queue->count(SendWelcome)} welcome email queued for user {$queue->pushed(SendWelcome)[0].user_id}"
+echo "{$queue->count()} welcome email queued for user {$queue->pushed(SendWelcome)[0].user_id}"
 $queue->run_all()
 ```
 
-`->pushed(Job)` lists the dispatched jobs, `->dispatches()` what each dispatch asked for (queue, connection, delay), `->count(Job)` counts them, `->run_all()` runs them here, and `->clear()` forgets them.
+`->pushed(Job)` lists the dispatched jobs, `->dispatches()` what each dispatch asked for (queue, connection, delay), `->count()` counts them (`->count_of(Job)` those of one job), `->run_all()` runs them here, and `->clear()` forgets them.
 
 ## Errors
 

@@ -79,7 +79,7 @@ test('the body of <echo format="json"> is JSON', async () => {
 
 test('shorthand conditions are coloured as expressions inside the start tag', async () => {
   const grammar = await load();
-  const tokens = tokenize(grammar, '<kscript>\n  <if $user.is_logged_in and $n > 3>\n    <echo>hi</echo>\n  </if>\n  <while $list->count() gt 0><break /></while>\n  <assert $total eq 30 />\n</kscript>');
+  const tokens = tokenize(grammar, '<kscript>\n  <if $user.is_logged_in and $n > 3>\n    <echo>hi</echo>\n  </if>\n  <while $list->count() gt 0><break /></while>\n  <match $total></match>\n</kscript>');
   assert.match(scopeOf(tokens, 'if'), /keyword\.control\.flow\.kscript/);
   assert.match(scopeOf(tokens, '$user'), /meta\.embedded\.expression\.kscript .*variable\.other\.kscript/);
   assert.match(scopeOf(tokens, 'and'), /keyword\.operator\.word\.kscript/);

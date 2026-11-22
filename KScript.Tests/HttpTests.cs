@@ -604,7 +604,7 @@ public class HttpAppTests
         using var site = Site(null, ("api.ks.xml", """
             <KScript.Routes>
               <type name="NewPerson" fields="name: string, age?: int" />
-              <fn name="store" params="json: NewPerson" value="{ name: $json.name, type: @type($json) }" />
+              <fn name="store" params="json: NewPerson" value="{ name: $json.name, type: $json->type() }" />
               <fn name="show" params="id: int" value="{ id: $id }" />
               <fn name="search" params="query: Search" value="$query.page" />
               <type name="Search" fields="page: int" />

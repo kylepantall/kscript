@@ -12,7 +12,7 @@ namespace KScript.Language.Tests
         [InlineData("<echo>{ @sqrt(2) }</echo>", "KScript.Math", "@sqrt")]
         [InlineData("<echo>{ $pi }</echo>", "KScript.Math", "pi")]
         [InlineData("<echo>{ [1, 2]->median() }</echo>", "KScript.Math", "median")]
-        [InlineData("<move from=\"'a'\" to=\"'b'\" />", "KScript.IO", "move")]
+        [InlineData("<do>@download('https://example.com/a', 'a')</do>", "KScript.Net", "@download")]
         [InlineData("<let name=\"r\" value=\"@api('https://example.com')\" />", "KScript.Net", "@api")]
         public void PackageFeaturesNeedAnImport(string body, string package, string marked)
         {
@@ -37,7 +37,7 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("<import package=\"KScript.Terminal\" /><input into=\"x\">?</input><echo>$x</echo>")]
         [InlineData("<import package=\"Math\" /><echo>{ @sqrt(2) } { $pi }</echo>")]
-        [InlineData("<import package=\"KScript.Math\" as=\"math\" /><echo>{ @math.sqrt(2) } { math.pow(2, 3) }</echo>")]
+        [InlineData("<import package=\"KScript.Math\" as=\"math\" /><echo>{ @math.sqrt(2) } { math.hypot(3, 4) }</echo>")]
         [InlineData("<import package=\"KScript.Terminal\" /><echo format=\"markdown\">**hi**</echo>")]
         public void ImportsBringPackagesIn(string body)
         {

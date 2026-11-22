@@ -116,7 +116,7 @@ public class CodeFormatTests
             }
             echo $count
             label: string = 42
-            echo $label->length()
+            echo $label->count()
             """;
         Assert.Equal("5\n2\n", Run(code));
         Assert.Contains("const", Assert.Throws<KScriptException>(() => Run("const k = 1\nk = 2")).Message);

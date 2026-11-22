@@ -35,7 +35,7 @@ public class TestCommandTests
     {
         using var site = new TempSite(
             ("kscript.json", "{ \"name\": \"demo\" }"),
-            ("tests/a.test.ks.xml", "<kscript><test name=\"ok\"><assert test=\"true\" /></test></kscript>"),
+            ("tests/a.test.ks.xml", "<kscript><test name=\"ok\"><do>@assert(true)</do></test></kscript>"),
             ("tests/empty.test.ks.xml", "<kscript></kscript>"));
 
         var (code, output, _) = Command(site.Root, "--timeout", "5");
@@ -101,9 +101,9 @@ public class TestCommandTests
     [Fact]
     public void Checks_explain_their_failures()
     {
-        Assert.Equal("@assert() got false, which isn't true.", Fails("<do>@assert(false)</do>"));
+        Assert.Equal("Expected false to be true.", Fails("<do>@assert(false)</do>"));
         Assert.Equal("custom", Fails("<do>@assert(0, 'custom')</do>"));
-        Assert.Contains("fails: ", Fails("<let name=\"m\" value=\"{}\" /><assert test=\"false and $m.a.b\" />"));
+        Assert.Contains("fails: ", Fails("<let name=\"m\" value=\"{}\" /><do>@assert(false and $m.a.b)</do>"));
         Assert.Contains("isn't a valid regular expression", Fails("<expect value=\"'a'\" matches=\"'['\" />"));
         Assert.Contains("which has no count", Fails("<expect value=\"5\" count=\"1\" />"));
         Assert.Contains("checks a list, text or a map, but 5 is 5", Fails("<expect value=\"5\" contains=\"1\" />"));
@@ -111,7 +111,7 @@ public class TestCommandTests
         Assert.Equal("Expected [1] to equal ['1'], but it was [1].", Fails("<expect value=\"[1]\" equals=\"['1']\" />"));
         Assert.Equal("Expected { a: 1 } to equal { a: '1' }, but it was { a: 1 }.", Fails("<expect value=\"{ a: 1 }\" equals=\"{ a: '1' }\" />"));
         Assert.Contains("fn f", Fails("<expect value=\"@f\" equals=\"1\" />"));
-        Assert.Contains("2026-01-02", Fails("<expect value=\"@date('2026-01-02')\" equals=\"1\" />"));
+        Assert.Contains("2026-01-02", Fails("<expect value=\"'2026-01-02'->to_date()\" equals=\"1\" />"));
         Assert.Contains("takes its options as a map", Fails("<do>@run_script('child.ks.xml', 5)</do>"));
     }
 

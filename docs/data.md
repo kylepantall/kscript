@@ -141,7 +141,7 @@ echo Order->where(fn(o) => $o.customer->starts_with('A'))->latest()->first().tot
 
 `->where()` takes a lambda whose parameter is the row: `$o.total` is a column. The rest of the lambda (variables, function calls, literals) is worked out first and sent to the database as a parameter, so a value can never change the SQL.
 
-These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->length()` and `->matches(regex)`. `$o.x == null` is `IS NULL`. Anything else is a `Query` that says which part can't run in the database, rather than a query that quietly does something else.
+These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something else.
 
 Names and values are a shorter way to write equality: `->where(status: 'paid', customer: 'Ada')`. A list means any of them (`status: [open, paid]`), and `null` means the column is empty. Enum words don't need quotes: `->where(role: admin)`.
 
@@ -163,7 +163,7 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 | `->first()`, `->find(id)` | One record, or null. |
 | `->first_or_fail()`, `->find_or_fail(id)` | One record, or a `ModelNotFound` error, which a route answers with 404. |
 | `->count()`, `->exists()` | How many rows match, and whether any do. |
-| `->sum(col)`, `->avg(col)`, `->min(col)`, `->max(col)` | Totals over the rows that match. |
+| `->sum(col)`, `->average(col)`, `->min(col)`, `->max(col)` | Totals over the rows that match. |
 | `->pluck(col)`, `->value(col)` | One column of every row, or of the first. |
 | `->paginate(per_page, page)` | One page: `{ items, page, per_page, total, last_page, from, to, has_more }`. `page` may be text, such as `$query.page`. |
 | `->chunk(size, fn(rows, n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
@@ -208,7 +208,7 @@ try {
 echo Account->pluck(balance)
 ```
 
-`@transaction(fn() => ...)` does the same for a function and returns what it returns. A transaction inside another is a savepoint, so only its own changes are undone. `retries: 3` tries again when the database is busy.
+`$db->transaction(fn() => ...)` does the same for a function and returns what it returns. A transaction inside another is a savepoint, so only its own changes are undone. `retries: 3` tries again when the database is busy.
 
 ## Raw SQL
 

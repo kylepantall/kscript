@@ -142,9 +142,9 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("len", "KScript has no @len. Use the length method: $list->length().")]
-        [InlineData("strlen", "KScript has no @strlen. Use the length method: $text->length().")]
-        [InlineData("typeof", "KScript has no @typeof. Use @type($value), or $value->type().")]
+        [InlineData("len", "KScript has no @len. Use the count method: $list->count().")]
+        [InlineData("strlen", "KScript has no @strlen. Use the count method: $text->count().")]
+        [InlineData("typeof", "KScript has no @typeof. Use the type method: $value->type().")]
         public void CommandsOfOtherLanguagesNameTheMethod(string name, string message)
         {
             Diagnostic d = Assert.Single(Errors($"nums = [1, 2]\necho @{name}($nums)\n"));
@@ -155,7 +155,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void AFunctionOfYourOwnWithThatNameIsNotAHabit()
         {
-            Assert.Empty(Errors("fn len(list) => $list->length()\necho @len([1, 2])\n"));
+            Assert.Empty(Errors("fn len(list) => $list->count()\necho @len([1, 2])\n"));
         }
 
         [Fact]

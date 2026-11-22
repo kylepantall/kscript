@@ -310,12 +310,14 @@ public class PageSiteTests
     }
 
     [Fact]
-    public void Respond_and_redirect_set_the_response()
+    public void Respond_sets_the_response_or_redirects()
     {
         using var site = new TempSite(
             ("api.html", "<respond json=\"{ ok: true, n: 2 }\" />"),
             ("missing.html", "<p>before</p><respond status=\"404\">Not here</respond><p>after</p>"),
-            ("go.html", "<redirect to=\"/thanks?n={1 + 1}\" />"));
+            ("go.html", "<respond redirect=\"/thanks?n={1 + 1}\" />"),
+            ("moved.html", "<respond redirect=\"/new\" status=\"301\" />"),
+            ("old.html", "<redirect to=\"/thanks\" />"));
 
         var api = site.Render("api.html");
         Assert.Equal("application/json; charset=utf-8", api.ContentType);
@@ -328,6 +330,8 @@ public class PageSiteTests
         var go = site.Render("go.html");
         Assert.Equal(302, go.Status);
         Assert.Equal("/thanks?n=2", go.Headers["Location"]);
+        Assert.Equal(301, site.Render("moved.html").Status);
+        Assert.Contains("<respond redirect=\"/thanks\" />", Assert.ThrowsAny<Exception>(() => site.Render("old.html")).Message);
     }
 
     [Fact]

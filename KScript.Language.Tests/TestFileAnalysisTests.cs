@@ -14,7 +14,7 @@ namespace KScript.Language.Tests
               <for each="case" at="i" in="[{ n: 1 }]">
                 <test name="has {$case.n} items">
                   <expect value="$cart" count="$case.n" />
-                  <assert test="$i ge 0" />
+                  <do>@assert($i ge 0)</do>
                 </test>
               </for>
               <test name="errors">

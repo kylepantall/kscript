@@ -190,6 +190,7 @@ namespace KScript.Queueing
             switch (name)
             {
                 case "dispatch":
+                    Dispatcher.NeedsImport(call, "->dispatch()");
                     result = Dispatcher.Dispatch(call, new[] { this }, DispatchOptions.From(call, 0));
                     return true;
                 case "run":
@@ -229,6 +230,7 @@ namespace KScript.Queueing
             switch (name)
             {
                 case "dispatch":
+                    Dispatcher.NeedsImport(call, "->dispatch()");
                     result = Dispatcher.Dispatch(call, Jobs, DispatchOptions.From(call, 0));
                     return true;
                 case "run":

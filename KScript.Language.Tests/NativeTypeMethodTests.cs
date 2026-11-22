@@ -30,9 +30,9 @@ namespace KScript.Language.Tests
             { KType.Uuid, $"echo {Uuid}->‸", "to_json" },
             { KType.Uuid, $"u: uuid = {Uuid}\necho $u->‸", "to_json" },
             { KType.Uuid, $"u = {Uuid}\necho $u->‸", "to_json" },
-            { KType.Email, "echo joan@example.com->‸", "length" },
-            { KType.Email, "e: email = joan@example.com\necho $e->‸", "length" },
-            { KType.Handle, "h: handle = @joan\necho $h->‸", "length" },
+            { KType.Email, "echo joan@example.com->‸", "count" },
+            { KType.Email, "e: email = joan@example.com\necho $e->‸", "count" },
+            { KType.Handle, "h: handle = @joan\necho $h->‸", "count" },
             { KType.Regex, "echo /ab+/i->‸", "test" },
             { KType.Regex, "r: regex = /ab+/\necho $r->‸", "match" },
         };
@@ -94,8 +94,8 @@ namespace KScript.Language.Tests
         [InlineData("u: uuid = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\necho $u->starts_with('3f')")]
         [InlineData("echo joan@example.com->lower()")]
         [InlineData("e: email = joan@example.com\necho $e->split('@')")]
-        [InlineData("h: handle = @joan\necho $h->length()")]
-        [InlineData("r: regex = /ab+/\necho $r->length()")]
+        [InlineData("h: handle = @joan\necho $h->count()")]
+        [InlineData("r: regex = /ab+/\necho $r->count()")]
         [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->to_string()->to_date()")]
         public void String_methods_that_make_sense_are_clean(string code) => AssertClean(Analyze(code, "types.kscript"));
 

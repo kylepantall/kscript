@@ -134,7 +134,7 @@ public sealed class TypeConventionTests
 
     /// <summary>The checks above find what they look for: each long form is reported, so a clean run means something.</summary>
     [Theory]
-    [InlineData("type Repo {\n  name: string\n}\necho @json('{}', as: $Repo)\n", "Write Repo, without $")]
+    [InlineData("type Repo {\n  name: string\n}\necho '{}'->json(as: $Repo)\n", "Write Repo, without $")]
     [InlineData("type Repo {\n  license: string?\n}\n", "license?: string")]
     [InlineData("import KScript.Data\n\nmodel User {\n  timestamps: yes\n  name: string\n}\n", "model User(timestamps)")]
     public void The_long_forms_are_reported(string code, string message)

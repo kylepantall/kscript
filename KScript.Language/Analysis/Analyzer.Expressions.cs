@@ -336,7 +336,7 @@ namespace KScript.Language.Analysis
             RetiredInfo retired = catalog.GetRetiredCommand(c.Name);
             if (retired != null)
             {
-                Report(full, DiagnosticSeverity.Error, DiagnosticCodes.RetiredCommand, $"@{c.Name} was removed in KScript 2. {retired.Replacement}");
+                Report(full, DiagnosticSeverity.Error, DiagnosticCodes.RetiredCommand, $"@{c.Name} was removed in KScript 2. {Wording.Prose(retired.Replacement)}");
                 return;
             }
 
@@ -505,7 +505,7 @@ namespace KScript.Language.Analysis
 
                 default:
                     Report(region.Source.ToSource(pipe.Right.Span), DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax,
-                        "A pipe needs a method, function, command or lambda on its right, as in |> upper() or |> @json().");
+                        "A pipe needs a method, function, command or lambda on its right, as in |> upper() or |> json().");
                     return;
             }
         }
@@ -624,7 +624,7 @@ namespace KScript.Language.Analysis
             {
                 KeepBareWords(args);
             }
-            if (ChecksImports && !IsJobValue(receiver) && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
+            if (ChecksImports && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
             {
                 RequirePackage(applicable[0].Package, nameSpan, $"{arrow}{name}()");
                 return;
@@ -671,7 +671,7 @@ namespace KScript.Language.Analysis
             QuickFix fix = retired.Rename == null ? null
                 : retired.Rename.StartsWith('.') ? (CallToField(nameSpan, retired.Rename.Substring(1)) is TextChange toField ? new QuickFix($"Change to {retired.Rename}", toField) : null)
                 : new QuickFix($"Change to {retired.Rename}", new TextChange(nameSpan, retired.Rename));
-            Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod, $"->{name}() is no longer part of KScript. {retired.Replacement}", fix != null ? new[] { fix } : null);
+            Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod, $"->{name}() is no longer part of KScript. {Wording.Prose(retired.Replacement)}", fix != null ? new[] { fix } : null);
             return true;
         }
 

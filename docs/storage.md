@@ -78,7 +78,7 @@ import KScript.Storage
 drafts = @storage(data)->folder('drafts')
 $drafts->write('letter.md', '# Dear Joan')
 for name in $drafts->list('*.md') {
-  echo "$name: { $drafts->read($name)->length() } characters"
+  echo "$name: { $drafts->read($name)->count() } characters"
 }
 $drafts->delete('letter.md')
 ```

@@ -49,7 +49,7 @@ public sealed class LoggingTests : IDisposable
         var (output, error, _) = RunWith(
             "<log>skipped</log><log level=\"error\" category=\"pay\" fields=\"{ id: 7 }\">Declined</log>" +
             "<let name=\"db\" value=\"$log->named('db')->with({ host: 'x' })\" /><do>$db->debug('Query'); $db->named('noisy')->error('never'); $db->named('slow')->trace('no')</do>" +
-            "<for each=\"e\" in=\"$log->entries()\"><echo>{$e.level} {$e.category} {$e.message} { @to_json($e.fields) } {$e.script} {$e.line ?? '-'}</echo></for>" +
+            "<for each=\"e\" in=\"$log->entries()\"><echo>{$e.level} {$e.category} {$e.message} { $e.fields->to_json() } {$e.script} {$e.line ?? '-'}</echo></for>" +
             "<echo>{ $log->is_enabled('info') } { $db->is_enabled('debug') } { $db.category } { $db.fields.host } {$log} {$db}</echo>");
         Assert.Equal("error pay Declined {\"id\":7} job.ks.xml 1\ndebug db Query {\"host\":\"x\"} job.ks.xml -\nfalse true db x logger logger (db)\n", output);
         Assert.Equal("", error);
@@ -95,7 +95,7 @@ public sealed class LoggingTests : IDisposable
     {
         string error = Errors("<log_provider type=\"console\" replace=\"yes\" time=\"\" /><do>$log->debug('d'); $log->info('i'); $log->warn('w'); $log->error('e')</do><config defaults=\"{}\" />", h => h.Logs.Level = LogLevel.Debug, interactive: true);
         Assert.Equal("\u001b[90mDEBUG d\u001b[0m\n\u001b[36mINFO  i\u001b[0m\n\u001b[33mWARN  w\u001b[0m\n\u001b[31mERROR e\u001b[0m\n", error);
-        Assert.Equal("12:30 INFO  plain\n", Errors("<log_provider type=\"console\" replace=\"yes\" colour=\"no\" time=\"HH:mm\" /><log>plain</log>", interactive: true));
+        Assert.Equal("12:30 INFO  plain\n", Errors("<log_provider type=\"console\" replace=\"yes\" color=\"no\" time=\"HH:mm\" /><log>plain</log>", interactive: true));
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class LoggingTests : IDisposable
         Assert.Contains("roll should be never or daily", Fails("<log>x</log>").Message);
         FileOf("config.yaml", "logging:\n  providers:\n    - type: memory\n      level: loud\n");
         Assert.Contains("logging.providers[0] level: 'loud' isn't a log level", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: console\n      colour: off\n      stream: stdout\n    - type: console\n      colour: true\n      stream: stdout\n");
+        FileOf("config.yaml", "logging:\n  providers:\n    - type: console\n      color: off\n      stream: stdout\n    - type: console\n      color: true\n      stream: stdout\n");
         Assert.Equal("12:30:15 INFO  x\n\u001b[36m12:30:15 INFO  x\u001b[0m\n", RunWith("<log>x</log>").Output);
         File.Delete(Path.Combine(dir, "config.yaml"));
         Assert.Contains("there is no function called nope", Fails("<log_provider fn=\"nope\" />").Message);

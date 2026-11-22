@@ -61,7 +61,7 @@ public sealed class ClaudeModelTests : IDisposable
     public void Sends_the_prompt_system_schema_and_fallbacks()
     {
         Answer(Text("{\"city\": \"Paris\"}"));
-        string output = Run("<echo>{ @llm('Capital of France?', { system: 'Be brief.', schema: { city: 'string' }, max_tokens: 50 }).city }</echo>");
+        string output = Run("<echo>{ @llm('Capital of France?', system: 'Be brief.', schema: { city: 'string' }, max_tokens: 50).city }</echo>");
         Assert.Equal("Paris\n", output);
 
         var (method, path, _, headers) = server.Requests[0];

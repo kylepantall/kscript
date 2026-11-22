@@ -12,14 +12,14 @@ namespace KScript.Testing
 {
     /// <summary>
     /// KScript.Test: tests for scripts, run with <c>kscript test</c>. Test files (<c>name.test.ks.xml</c>) import it
-    /// without an &lt;import&gt;. &lt;test&gt; and &lt;describe&gt; declare tests; &lt;assert&gt;, &lt;expect&gt; and
+    /// without an &lt;import&gt;. &lt;test&gt; and &lt;describe&gt; declare tests; @assert(), &lt;expect&gt; and
     /// &lt;expect_error&gt; check results; &lt;capture&gt; and <c>@run_script()</c> collect what a script prints.
     /// </summary>
     public sealed class TestPackage : KScriptPackage
     {
         public override string Name => "KScript.Test";
 
-        public override string Description => "Tests run by kscript test: <test>, <describe>, <expect>, <assert>, <expect_error> and <capture>.";
+        public override string Description => "Tests run by kscript test: <test>, <describe>, <expect>, <expect_error>, <capture> and @assert().";
 
         /// <summary>The error type of a failed check, as <c>&lt;catch when="$err.type eq 'Assertion'"&gt;</c> sees it.</summary>
         public const string AssertionType = "Assertion";
@@ -61,14 +61,6 @@ namespace KScript.Testing
                 Example = "<after_each>\n  <set name=\"cart\" value=\"[]\" />\n</after_each>",
             }, run => Hook(run, before: false));
 
-            p.Element(new ElementInfo("assert", "Fails the test unless the condition is true. A failed comparison shows the value of each side.", ContentKind.Empty,
-                new A("test", K.Expression, "The condition, for example `$total == 30` or `$names->contains('Joan')`.", true),
-                new A("message", K.Template, "What to say when it fails, instead of the condition and its values."))
-            {
-                Context = ElementContext.Script,
-                Example = "<assert $order.total eq 30 />\n<assert test=\"$items->count() gt 0\" message=\"The cart should not be empty\" />",
-            }, Assert);
-
             p.Element(new ElementInfo("expect", "Checks a value and fails the test if the check doesn't hold. Give the value and one check, such as equals=\"5\".", ContentKind.Empty,
                 new A("value", K.Expression, "The value to check.", true),
                 new A("equals", K.Expression, "It equals this (== for text and numbers, item by item for lists and maps)."),
@@ -83,7 +75,7 @@ namespace KScript.Testing
                 new A("message", K.Template, "What to say when it fails, instead of the usual message."))
             {
                 Context = ElementContext.Script,
-                Example = "<expect value=\"2 + 3\" equals=\"5\" />\n<expect value=\"$names\" contains=\"'Joan'\" />\n<expect value=\"$id\" matches=\"'^[a-z0-9-]+$'\" />\n<expect value=\"@json('nope')\" throws=\"Json\" />",
+                Example = "<expect value=\"2 + 3\" equals=\"5\" />\n<expect value=\"$names\" contains=\"'Joan'\" />\n<expect value=\"$id\" matches=\"'^[a-z0-9-]+$'\" />\n<expect value=\"'nope'->json()\" throws=\"Json\" />",
             }, Expect);
 
             p.Element(new ElementInfo("expect_error", "Fails the test unless its body stops with an error. `type` and `contains` check which error; `as` keeps it for more checks.", ContentKind.Statements,
@@ -106,11 +98,11 @@ namespace KScript.Testing
             p.Command("fail", "message?", "Fails the test now.", KType.Null, c =>
                 throw new KScriptException(c.Has(0) ? c.Str(0) : "@fail() was called.", AssertionType));
 
-            p.Command("assert", "condition, message?", "Fails the test unless the condition is true. Works anywhere an expression does, such as in a lambda.", KType.Bool, c =>
+            p.Command("assert", "condition, message?", "Fails the test unless the condition is true. A failed comparison shows the value of each side. message is what to say instead.", KType.Bool, c =>
             {
                 if (Values.Truthy(c.Arg(0))) return true;
-                throw new KScriptException(c.Has(1) ? c.Str(1) : $"@assert() got {Show(c.Arg(0))}, which isn't true.", AssertionType);
-            });
+                throw new KScriptException(c.Has(1) && c.Arg(1) != null ? c.Str(1) : ExplainFalse(c), AssertionType);
+            }, "<do>@assert(2 + 3 eq 5)</do>\n<do>@assert([1, 2]->count() gt 0, 'The cart should not be empty')</do>");
 
             p.Command(new CallableInfo(CallableKind.Command, "run_script", "Runs another script on its own and returns what happened: { output, code, error }. `output` is what it printed, `code` its exit code (3 when it stopped with an error) and `error` the error, or null.",
                 new[] { Signature.Parse("path, options?") })
@@ -211,34 +203,26 @@ namespace KScript.Testing
 
         private static readonly HashSet<string> Comparisons = new HashSet<string>(StringComparer.Ordinal) { "==", "!=", "===", "!==", "<", "<=", ">", ">=", "in" };
 
-        private static bool? Assert(ElementRun run)
+        /// <summary>"Expected $total eq 30 to be true.", then the value of each side of a comparison.</summary>
+        private static string ExplainFalse(CallContext c)
         {
-            if (Values.Truthy(run.Eval("test"))) return null;
-            throw Failure(run, ExplainFalse(run, "test"), "test");
-        }
-
-        /// <summary>"Expected $total eq 30 to be true, but $total is 25." A comparison shows both sides.</summary>
-        private static string ExplainFalse(ElementRun run, string attribute)
-        {
-            DecodedText text = run.Element.GetAttribute(attribute).Value;
-            string source = text.Value.Trim();
+            ExprNode condition = c.Site?.Argument(0);
+            string source = c.Site?.TextOf(condition);
+            if (source == null) return $"@assert() got {Show(c.Arg(0))}, which isn't true.";
             var lines = new List<string> { $"Expected {source} to be true." };
-            ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
-            if (!parsed.Success || parsed.Root == null) return lines[0];
 
-            var ctx = new EvalContext(run.Module, text);
-            IEnumerable<ExprNode> sides = parsed.Root is BinaryNode b && Comparisons.Contains(b.Operator) ? new[] { b.Left, b.Right }
-                : parsed.Root is UnaryNode u ? new[] { u.Operand }
-                : parsed.Root is BinaryNode logical && (logical.Operator == "and" || logical.Operator == "&&" || logical.Operator == "or" || logical.Operator == "||") ? new[] { logical.Left, logical.Right }
-                : new[] { parsed.Root };
+            IEnumerable<ExprNode> sides = condition is BinaryNode b && Comparisons.Contains(b.Operator) ? new[] { b.Left, b.Right }
+                : condition is UnaryNode u ? new[] { u.Operand }
+                : condition is BinaryNode logical && (logical.Operator == "and" || logical.Operator == "&&" || logical.Operator == "or" || logical.Operator == "||") ? new[] { logical.Left, logical.Right }
+                : new[] { condition };
             foreach (ExprNode side in sides)
             {
                 if (side == null || side is LiteralNode) continue;
-                string what = text.Value.Substring(side.Span.Start, side.Span.Length).Trim();
+                string what = c.Site.TextOf(side);
                 object value;
                 try
                 {
-                    value = run.Interpreter.Evaluate(side, run.Scope, ctx);
+                    value = c.Interpreter.Evaluate(side, c.Scope, c.Site.Source);
                 }
                 catch (KScriptException ex)
                 {
