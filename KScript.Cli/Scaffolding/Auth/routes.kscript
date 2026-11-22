@@ -7,18 +7,18 @@ import "{{ controller_import }}" as accounts
 // Signing in and out (kscript make auth). auth sends guests to /login; guest
 // sends people who are signed in home.
 Group(middleware: guest) {
-  Get(path: "/login", to: @accounts.show_login, name: "login")
-  Post(path: "/login", to: @accounts.sign_in)
-  Get(path: "/register", to: @accounts.show_register, name: "register")
-  Post(path: "/register", to: @accounts.sign_up)
-  Get(path: "/forgot-password", to: @accounts.show_forgot, name: "password.forgot")
-  Post(path: "/forgot-password", to: @accounts.send_reset)
-  Get(path: "/reset-password/{token}", to: @accounts.show_reset, name: "password.reset")
-  Post(path: "/reset-password", to: @accounts.reset)
+  Get(path: /login, to: @accounts.show_login, name: "login")
+  Post(path: /login, to: @accounts.sign_in)
+  Get(path: /register, to: @accounts.show_register, name: "register")
+  Post(path: /register, to: @accounts.sign_up)
+  Get(path: /forgot-password, to: @accounts.show_forgot, name: "password.forgot")
+  Post(path: /forgot-password, to: @accounts.send_reset)
+  Get(path: /reset-password/{token}, to: @accounts.show_reset, name: "password.reset")
+  Post(path: /reset-password, to: @accounts.reset)
 }
 Group(middleware: auth) {
-  Get(path: "/account", to: @accounts.account, name: "account")
-  Post(path: "/logout", to: @accounts.sign_out, name: "logout")
-  Post(path: "/account/tokens", to: @accounts.make_token)
-  Post(path: "/account/tokens/{id}/delete", to: @accounts.delete_token)
+  Get(path: /account, to: @accounts.account, name: "account")
+  Post(path: /logout, to: @accounts.sign_out, name: "logout")
+  Post(path: /account/tokens, to: @accounts.make_token)
+  Post(path: /account/tokens/{id}/delete, to: @accounts.delete_token)
 }

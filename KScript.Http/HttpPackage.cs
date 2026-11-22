@@ -45,7 +45,7 @@ namespace KScript.Http
         protected override void Register(PackageBuilder p)
         {
             p.Element(new ElementInfo("Routes", "A route file: maps HTTP methods and paths to controllers, views and redirects. kscript serve loads routes.ks.xml (or routes.kscript) and api.ks.xml (under /api, with JSON errors). Its <import>, <fn> and <let> children run on every request before the route is matched.", ContentKind.Statements,
-                new A("prefix", K.Text, "A path in front of every route in the file, such as /v1."),
+                new A("prefix", K.Text, "A path in front of every route in the file, such as /v1.") { Type = "slash_path" },
                 Middleware("Middleware for every route in the file, comma separated: built-ins (log, cors, auth, throttle:30) or <fn>s taking ($request, $next)."),
                 new A("name", K.Text, "Put in front of every route name, such as admin."),
                 new A("api", K.Bool, "true: errors and missing routes are answered with JSON (api.* files are API files already)."))
@@ -91,7 +91,7 @@ namespace KScript.Http
             });
 
             p.Element(new ElementInfo("Group", "Routes that share a path prefix, middleware or a name prefix.", ContentKind.Statements,
-                new A("prefix", K.Text, "A path in front of every route inside, such as /admin."),
+                new A("prefix", K.Text, "A path in front of every route inside, such as /admin.") { Type = "slash_path" },
                 Middleware("Middleware for every route inside, comma separated."),
                 new A("name", K.Text, "Put in front of every route name inside, such as admin."))
             {
@@ -128,7 +128,7 @@ namespace KScript.Http
             });
 
             p.Element(new ElementInfo("Resource", "The usual routes of a JSON resource, answered by the functions a controller script exports: index (GET path), store (POST path), show (GET path/{id}), update (PUT and PATCH path/{id}) and destroy (DELETE path/{id}). Functions the controller doesn't have get no route.", ContentKind.Empty,
-                new A("path", K.Text, "The resource's path, such as /people.", true) { Literal = true },
+                new A("path", K.Text, "The resource's path, such as /people.", true) { Literal = true, Type = "slash_path" },
                 new A("to", K.Text, "The controller: the name a script is imported as (<import path=\"...\" as=\"people\" />).", true) { IsName = true },
                 new A("only", K.Text, "Only these actions: [index, show].") { NameList = true },
                 new A("except", K.Text, "All actions but these: [destroy].") { NameList = true },
@@ -182,7 +182,7 @@ namespace KScript.Http
 
         private static A[] RouteAttributes() => new[]
         {
-            new A("path", K.Text, "The path, with {name} parameters: /people/{id}. {name?} is optional and {name*} takes the rest of the path.", true) { Literal = true },
+            new A("path", K.Text, "The path, with {name} parameters: /people/{id}. {name?} is optional and {name*} takes the rest of the path.", true) { Literal = true, Type = "slash_path" },
             new A("to", K.FunctionReference, "The controller: a <fn> (`@show`) or a function of an imported script (`@people.show`); in XML, to=\"people.show\". Its parameters are filled by name: path parameters, request, json, query, form, input, headers."),
             new A("view", K.Text, "Answer with this view instead, from the views folder, with the path parameters as variables."),
             new A("redirect", K.Text, "Answer with a redirect to this address instead."),

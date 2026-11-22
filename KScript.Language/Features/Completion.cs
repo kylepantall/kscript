@@ -72,6 +72,10 @@ namespace KScript.Language.Features
             {
                 return new List<CompletionItem>();
             }
+            if (DateFormatCompletions(analysis, offset) is List<CompletionItem> dateFormat)
+            {
+                return dateFormat;
+            }
 
             if (analysis.Kind == DocumentKind.Markdown && analysis.Markup.FrontMatter is FrontMatter fm && offset <= fm.Span.End && offset > 3)
             {

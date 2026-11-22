@@ -602,7 +602,7 @@ Statements and their arguments follow one set of rules in every package, and `ks
 | A statement that describes a thing in a tree (a window, a route table, a document) is `PascalCase`. Only KScript.UI, KScript.Http and KScript.Document have these. | `Button`, `Routes`, `Get`, `Section` |
 | Arguments are `snake_case`. No name has a hyphen. | `max_tokens`, `must_exist`, `on_click`, `new_page` |
 | `into:` is the variable that receives a result. | `input(into: name)`, `llm(into: reply)`, `capture(into: out)` |
-| `to:` is where something goes: a file, a URL, a controller. It never names a variable. | `Get(path: "/", to: @home)`, `Post(path: "/notes", to: @notes.add)` |
+| `to:` is where something goes: a file, a URL, a controller. It never names a variable. | `Get(path: /, to: @home)`, `Post(path: /notes, to: @notes.add)` |
 | `path:` is the file a statement reads or acts on. | `import(path: "lib.kscript")`, `<include path="_nav.html">`, `<layout path="_layout.html">` |
 | `at` is a position, as in `for item at i in $list`. | `menu(into: choice, at: i)` |
 | A function is named as `@name`, as it is in an expression. | `spawn(fn: @job)`, `llm(tools: [@order_status])`, `Get(to: @people.show)` |

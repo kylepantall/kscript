@@ -41,7 +41,10 @@ namespace KScript.Metadata
         /// <summary>The package that adds it: null for the language's own types.</summary>
         public string Package { get; set; }
 
-        /// <summary>How a raw (unquoted) value is read where the type is expected: "word" (most types) or "handle" (@name).</summary>
+        /// <summary>
+        /// How a raw (unquoted) value is read where the type is expected: "word" (most types), "handle" (@name) or
+        /// "slash" (slash_path: anything starting with /, spaces and a closing / included, is the text as written).
+        /// </summary>
         public string RawKind { get; init; } = "word";
 
         /// <summary>Its values print masked (a card number, a password), so they never show up in logs or JSON.</summary>

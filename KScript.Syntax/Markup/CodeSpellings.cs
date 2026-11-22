@@ -98,7 +98,7 @@ namespace KScript.Syntax.Markup
 
         private static bool EndsValue(Token t) => t.Kind switch
         {
-            TokenKind.Number or TokenKind.String or TokenKind.Variable or TokenKind.Regex or TokenKind.Email or TokenKind.Uuid or TokenKind.Url => true,
+            TokenKind.Number or TokenKind.String or TokenKind.Variable or TokenKind.Regex or TokenKind.Email or TokenKind.Uuid or TokenKind.Url or TokenKind.SlashPath => true,
             TokenKind.Identifier => !Lexer.Keywords.Contains(t.Text) || t.Text is "true" or "false" or "null",
             TokenKind.Punctuation => t.Text is ")" or "]" or "}",
             _ => false,
@@ -106,7 +106,7 @@ namespace KScript.Syntax.Markup
 
         private static bool StartsValue(Token t) => t.Kind switch
         {
-            TokenKind.Number or TokenKind.String or TokenKind.Variable or TokenKind.Command or TokenKind.Regex or TokenKind.Email or TokenKind.Uuid or TokenKind.Url => true,
+            TokenKind.Number or TokenKind.String or TokenKind.Variable or TokenKind.Command or TokenKind.Regex or TokenKind.Email or TokenKind.Uuid or TokenKind.Url or TokenKind.SlashPath => true,
             TokenKind.Identifier => !Lexer.Keywords.Contains(t.Text) || t.Text is "true" or "false" or "null" or "not" or "fn" or "match",
             TokenKind.Punctuation => t.Text is "(" or "[" or "{" or "-" or "+",
             _ => false,

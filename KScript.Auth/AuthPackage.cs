@@ -165,6 +165,16 @@ namespace KScript.Auth
                 KType.Bool, c => Revoke(App(c), c.Str(0), c.Has(1, "user") && c.Arg(1, "user") != null ? UserStore.IdOf(c.Arg(1, "user"), "@revoke_token()") : null),
                 "<do>@revoke_token($id)</do>");
 
+            // A user has the fields they registered with too (name: ...), so these are the ones every user has.
+            const string user = "{ id: string, email: email, created_at: string, updated_at: string }";
+            p.ResultShapes(
+                ("@user", user),
+                ("@attempt", user),
+                ("@register", user),
+                ("@login", user),
+                ("@reset_password", user),
+                ("@api_tokens", "list<{ id: string, name: string, created_at: string, last_used_at: string, expires_at: string }>"));
+
             p.Examples(
                 ("session->get", "<echo>{ $session->get('cart', default: []) }</echo>"),
                 ("session->has", "<if test=\"$session->has('cart')\"><echo>You have a cart</echo></if>"),

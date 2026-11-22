@@ -43,6 +43,7 @@ A native value is still text, and it compares equal to the same text once tidied
 | `cidr` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `mac` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `slug` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `upper`, `replace`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `slash_path` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `lower`, `upper`, `replace`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `semver` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `mime` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `hex` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
@@ -55,6 +56,7 @@ A native value is still text, and it compares equal to the same text once tidied
 | `locale` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `timezone` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `duration` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `date_format` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `cron` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `color` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `iban` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
@@ -128,6 +130,7 @@ echo "$pay { $pay.brand }"
 | Type | What it holds | Tidied | Methods |
 | --- | --- | --- | --- |
 | `slug` | Lowercase words joined by `-`, for URLs. `@slugify(text)` makes one. | | `.words` |
+| `slash_path` | Names joined by `/`: a page, menu or category path such as `/docs/getting-started` or `/My Apps/Notes`. It isn't a file: files are read with `@file(path)`. See [slash paths](#slash-paths). | It always starts with `/` (`home` is `/home`). Spaces around each name, empty parts (`//`), `.` and a trailing `/` are dropped; `..` goes up one. Case is kept. | `.segments`, `.name`, `.parent`, `.depth`, `.is_root`, `->join(more)`, `->is_within(other)` |
 | `semver` | A semantic version such as `1.4.2` or `2.0.0-beta.1`. | A leading `v` is dropped. | `.major`, `.minor`, `.patch`, `.prerelease`, `->compare(other)`, `->satisfies(range)`, `->bump(part)` |
 | `mime` | A media type such as `application/json; charset=utf-8`. | The type is lowercased. | `.main_type`, `.subtype`, `.essence`, `.params`, `->is('text/*')` |
 | `hex` | Hexadecimal digits, such as a hash. | Lowercased; `0x` is dropped. | `.bytes`, `->to_number()` |
@@ -150,6 +153,7 @@ echo "$pay { $pay.brand }"
 | Type | What it holds | Tidied | Methods |
 | --- | --- | --- | --- |
 | `duration` | A length of time: `1h30m`, `90s`, `2d`, ISO 8601 such as `PT1H30M`, or a number of seconds. | The short form: `90m` is `1h30m`. | `.seconds`, `.minutes`, `.hours`, `.ms`, `->iso()`, `->after(time?)`, `->before(time?)`, `->plus(other)` |
+| `date_format` | How a date is written: `dd-MM-yyyy`, `d MMMM yyyy` or `HH:mm`. Every letter must mean something, so `YYYY-DD` fails with a hint. See [date formats](#date-formats). | | `.tokens`, `.has_date`, `.has_time`, `.example`, `->format(date)`, `->parse(text)` |
 | `cron` | A cron schedule of five fields, or `@daily`, `@hourly` and the like. | Lowercased. | `->next(after?)`, `->next_times(count, after?)` |
 | `color` | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb(...)` or a CSS colour name. | `#rrggbb`, or `#rrggbbaa` with transparency. | `->rgb()`, `->hex()`, `->css()`, `->mix(other, amount?)`, `->lighten(amount?)`, `->darken(amount?)`, `.luminance`, `->contrast_ratio(other)` |
 
@@ -259,8 +263,9 @@ Some values need no quotes, the same way a regex needs none in JavaScript.
 
 - **Durations** are literals anywhere: `30s`, `500ms`, `1h30m`. See [lengths of time](language.md#values-and-methods).
 - **Emails, URLs, UUIDs and regexes** are literals anywhere: `joan@example.com`, `https://example.com/docs`, `3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f`, `/^[a-z]+$/i`. The editor checks them as you type. A URL starts with `http://`, `https://`, `ftp://`, `ws://` or `wss://`, so its `//` is never a comment, and it ends at a space, a comma, a bracket or `->`.
+- **Slash paths** are literals anywhere when each name is letters, digits, `_`, `-`, `.`, `~` or `%`: `/docs/getting-started`, `/v1/users/12`. A slash path that is also a regex, such as `/blog/` or `/a/i`, is a regex where no type is declared, and a slash path where one is. A path with spaces in its names, such as `/My Apps/Notes`, needs quotes, except as the whole value of a declared `slash_path` (`menu: slash_path = /My Apps/Notes`). `$name` and `{ expression }` inside one are filled in, as they are in double quotes.
 - **Handles** are written as `@joan` only where a handle is expected: a `handle` variable or parameter, a `not:` or `one_of:` list on a handle type, or next to a handle in `==`. Everywhere else, `@joan` still names the function `joan`.
-- **Words** need no quotes where the type is read from text. That covers an enum (`color: Color = red`), a type with a `pattern` (`size: Size = 1920x1080`), a refinement of text (`slug: Slug = my-post`) and the native types: `domain = example.com`, `ip = 10.0.0.1`, `cidr = 10.0.0.0/8`, `timezone = Europe/London`, `semver = 1.4.2`, `duration = 1h30m`, `color = red`, `country = GB` and the rest. Method arguments of those types work the same way: `$brand->contrast_ratio(white)`.
+- **Words** need no quotes where the type is read from text. That covers an enum (`color: Color = red`), a type with a `pattern` (`size: Size = 1920x1080`), a refinement of text (`slug: Slug = my-post`) and the native types: `domain = example.com`, `ip = 10.0.0.1`, `cidr = 10.0.0.0/8`, `timezone = Europe/London`, `semver = 1.4.2`, `duration = 1h30m`, `color = red`, `country = GB` and the rest. Method and function arguments of those types work the same way: `$brand->contrast_ratio(white)`, `@allow(10.0.0.0/8)`, `@release(1.4.2-beta.1)`.
 
 Quoted text always works too: `who: handle = '@joan'`.
 
@@ -273,6 +278,77 @@ me: handle = @joan
 echo @paint(green, @joan)
 echo "{ $me == @joan }"
 ```
+
+## Slash paths
+
+A `slash_path` is a list of names joined by `/`: where a page sits on a site, a menu or category path, a route segment or a key in a tree. It reads like a URL path, but it never touches the disk. A file or folder is a `path:` argument and `@file(path)`, so the type has its own name.
+
+```kscript
+menu: slash_path = /My Applications/Something
+site: slash_path = /my-website
+echo "{ $menu.name } { $menu.parent } { $menu.depth } { $menu.segments }"
+echo "{ $site.parent.is_root } { $site->join('blog/../about') }"
+
+docs = /docs/guides/start
+echo "{ $docs->is_within(/docs) } { $docs.parent.name }"
+
+fn open(page: slash_path) => "Opening $page"
+echo @open(/help/contact)
+```
+
+A bare slash path fills in values the way double quotes do: `$name` and `{ expression }` are worked out, and a name in braces, such as `{id}`, stays as written because it is a route parameter. A value with `/` in it adds more names. Text becomes a slash path wherever one is expected:
+
+```kscript
+id = 42
+section = 'Guides'
+echo /people/$id/edit
+echo /docs/{ $section->lower() }/start
+echo /people/{id}
+
+note = { path: 'home' }
+where: slash_path = $note.path
+echo $where
+```
+
+A route's `path:` is a slash path too, so `Get(path: /people/{id})` and `Get(path: "/people/{id}")` are the same route. A route never fills in values: `{id}` there is matched against the URL. The project templates write route paths without quotes.
+
+The value is tidied when it is made: `' / My  Apps // Notes / '` becomes `/My Apps/Notes`, `/docs/./guides/../start` becomes `/docs/start`, and `/blog/` becomes `/blog`. A slash path always starts with `/`, so text without one gets it: `'home'` and `'home/'` are both `/home`, and `/` on its own (or `''`) is the top. Case is kept, so `/Docs` and `/docs` are different paths. `..` can't go above `/`, and `\` isn't a separator, so `'C:\Apps'` fails with the reason.
+
+| Field or method | What it gives |
+| --- | --- |
+| `.segments` | The names in order: `['My Applications', 'Something']`. `/` has none. |
+| `.name` | The last name: `Something`, or `''` for `/`. |
+| `.parent` | The path one up, as a `slash_path`: `/My Applications`, then `/`. It is null for `/`. |
+| `.depth` | How many names it has: `2`. |
+| `.is_root` | True for `/` itself. |
+| `->join(more)` | More names on the end, tidied: `/docs->join('guides/../start')` is `/docs/start`. A `/` at the start of `more` is ignored. |
+| `->is_within(other)` | True when it is the other path or under it. Names are compared exactly. |
+
+The editor checks slash paths written in code (KS5012), suggests their fields and methods, and colours `/docs/start` as a value.
+
+## Date formats
+
+A `date_format` says how a date is written. It is checked when it is made, so a slip such as `YYYY` (years are `yyyy`) or `DD` (days are `dd`) fails where it is written, not as odd output later. `->format()` on a date and `->to_date()` on text take one, quoted or not:
+
+```kscript
+uk: date_format = dd-MM-yyyy
+day = '2026-11-22T16:30:00'->to_date()
+echo "{ $day->format($uk) } { $day->format(yyyy-MM-dd) } { $day->format('d MMMM yyyy, HH:mm') }"
+echo "{ '22-11-2026'->to_date(dd-MM-yyyy)->format(dddd) } { $uk.example } { $uk.has_time }"
+```
+
+| Letters | Mean |
+| --- | --- |
+| `d`, `dd`, `ddd`, `dddd` | The day: `7`, `07`, `Sat`, `Saturday` |
+| `M`, `MM`, `MMM`, `MMMM` | The month: `3`, `03`, `Mar`, `March` |
+| `yy`, `yyyy` | The year: `26`, `2026` |
+| `H`, `HH`, `h`, `hh`, `tt` | The hour on a 24-hour clock, on a 12-hour clock, and `AM` or `PM` |
+| `m`, `mm`, `s`, `ss`, `fff` | Minutes, seconds and milliseconds |
+| `zzz`, `K` | The offset from UTC (`+01:00`) and the time zone (`Z` for UTC) |
+
+Anything else that is a letter goes in quotes, such as `'at' HH:mm`, apart from `T` and `Z`, which stand for themselves in ISO 8601 (`yyyy-MM-ddTHH:mm:ssZ`). Spaces and punctuation are kept as written. A format of one letter is a standard .NET format: `o` is the round-trip ISO 8601 form, and `d` on its own is the short date. A format without quotes can't hold spaces or a `:` when it is an argument; write `'d MMMM yyyy'` and `'HH:mm'` there, or declare it first (`at: date_format = d MMMM yyyy, HH:mm`).
+
+`.tokens` lists its parts (`['dd', '-', 'MM', '-', 'yyyy']`), `.example` shows Saturday 7 March 2026 at 14:05:09 written that way, and `->parse(text)` reads text written that way. The editor suggests the letters as you type a date format.
 
 ## Passwords
 

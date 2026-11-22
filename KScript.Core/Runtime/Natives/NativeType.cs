@@ -136,7 +136,7 @@ namespace KScript.Runtime
         public NativeTypeInfo Info => info ??= new NativeTypeInfo(Name, Description, Example, StringMethods)
         {
             Package = Package,
-            RawKind = RawText == RawText.Handle ? "handle" : "word",
+            RawKind = RawText switch { RawText.Handle => "handle", RawText.Slash => "slash", _ => "word" },
             Secret = Secret,
             Options = Options,
             JsonFormat = JsonFormat,
@@ -169,6 +169,9 @@ namespace KScript.Runtime
 
         /// <summary>An @name: @joan.</summary>
         Handle,
+
+        /// <summary>Anything starting with /, spaces and a closing / included: /My Apps/Notes.</summary>
+        Slash,
     }
 
     /// <summary>What == means for a native type's values.</summary>

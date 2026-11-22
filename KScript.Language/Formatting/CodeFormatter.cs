@@ -205,6 +205,13 @@ namespace KScript.Language.Formatting
                             s.States[i + 1] = State.BlockComment;
                             i++;
                         }
+                        else if (c == '/' && PathCanStart(text, i) && KScript.Syntax.Lexer.SlashPathLiteralEnd(text, i, text.Length) is int pathEnd && pathEnd > 0
+                            && text.IndexOf('{', i, pathEnd - i) >= 0)
+                        {
+                            // A slash path with route parameters (/people/{id}) is one value: its braces aren't a block.
+                            for (int j = i; j < pathEnd; j++) s.States[j] = State.Double;
+                            i = pathEnd - 1;
+                        }
                         else if (c == '\'' || c == '"')
                         {
                             state = c == '\'' ? State.Single : State.Double;
@@ -933,6 +940,14 @@ namespace KScript.Language.Formatting
         }
 
         private static bool ClosesString(Scan s, int i) => i + 1 >= s.Text.Length || s.States[i + 1] == State.Code || s.States[i + 1] == State.LineComment || s.States[i + 1] == State.BlockComment;
+
+        /// <summary>True when a value can start at the / at <paramref name="i"/>: after (, [, {, a comma, : or =, or at the start of a line.</summary>
+        private static bool PathCanStart(string text, int i)
+        {
+            int p = i - 1;
+            while (p >= 0 && text[p] is ' ' or '\t') p--;
+            return p < 0 || text[p] is '(' or '[' or '{' or ',' or ':' or '=' or '\n';
+        }
 
         private static bool IsCommentOpen(Scan s, int i) => s.Text[i] == '/' && Peek(s.Text, i + 1) == '*' && (i == 0 || s.States[i - 1] != State.BlockComment || (i >= 2 && s.Text[i - 2] == '*' && s.Text[i - 1] == '/'));
 

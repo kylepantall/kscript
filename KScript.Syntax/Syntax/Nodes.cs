@@ -51,6 +51,9 @@ namespace KScript.Syntax
 
         /// <summary>A length of time written without quotes: <c>30s</c>, <c>500ms</c>, <c>1h30m</c>.</summary>
         Duration,
+
+        /// <summary><c>/docs/getting-started</c>, a slash path written without quotes.</summary>
+        SlashPath,
     }
 
     public sealed class LiteralNode : ExprNode

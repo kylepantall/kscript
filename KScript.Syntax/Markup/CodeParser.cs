@@ -1961,6 +1961,12 @@ namespace KScript.Syntax.Markup
                 {
                     break;
                 }
+                if (c == '/' && RegexCanStart(start) && Lexer.SlashPathLiteralEnd(text, pos, text.Length) is int pathEnd && pathEnd > 0)
+                {
+                    // A slash path literal (/people/{id}): its braces are its own, and /team, ... isn't a regex.
+                    pos = pathEnd;
+                    continue;
+                }
                 if (c == '/' && Peek(1) != '/' && Peek(1) != '*' && RegexCanStart(start) && SkipRegex())
                 {
                     // A regex literal: its brackets and quotes are its own.
