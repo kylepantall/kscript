@@ -25,7 +25,7 @@ namespace KScript.Language.Features
         /// <summary>True for a describe group.</summary>
         public bool IsGroup { get; }
 
-        /// <summary>True when the name is filled in for each item (<c>each: case</c>), so one test here runs as several.</summary>
+        /// <summary>True for a test inside a <c>for</c> loop, where its name is filled in for each item, so one test here runs as several.</summary>
         public bool IsTemplate { get; init; }
 
         public TextSpan Span { get; }
@@ -75,11 +75,17 @@ namespace KScript.Language.Features
             return tests;
         }
 
-        private static void CollectTests(MarkupElement parent, string prefix, List<TestItem> into)
+        private static void CollectTests(MarkupElement parent, string prefix, List<TestItem> into, bool inLoop = false)
         {
             foreach (MarkupElement e in parent.ChildElements)
             {
                 bool group = e.Name == "describe";
+                if (e.Name == "for")
+                {
+                    // for case in $cases { test(name: "… {$case.x}") { } }: one test per item.
+                    CollectTests(e, prefix, into, inLoop: true);
+                    continue;
+                }
                 if (!group && e.Name != "test")
                 {
                     continue;
@@ -93,12 +99,12 @@ namespace KScript.Language.Features
                 string fullName = prefix.Length > 0 ? prefix + " › " + name : name;
                 TestItem item = new TestItem(name, fullName, group, e.Span, nameAttr.Value?.SourceSpan ?? e.NameSpan)
                 {
-                    IsTemplate = !group && e.GetAttribute("each") != null,
+                    IsTemplate = !group && inLoop,
                 };
                 into.Add(item);
                 if (group)
                 {
-                    CollectTests(e, fullName, item.Children);
+                    CollectTests(e, fullName, item.Children, inLoop);
                 }
             }
         }

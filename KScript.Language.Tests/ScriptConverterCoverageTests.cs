@@ -25,7 +25,7 @@ namespace KScript.Language.Tests
                 "  <if test=\"true\"><let name=\"y\" value=\"2\" /></if>",
                 "  <echo value=\"$y\" />",
                 "  <match value=\"$y\"><!-- c --><case is=\"1\"><echo>one</echo></case></match>",
-                "  <call fn=\"greet\" args=\"'x'\" to=\"r\" />",
+                "  <call fn=\"greet\" args=\"'x'\" into=\"r\" />",
                 "  <do />",
                 "  <do>x = = 1</do>",
                 "  <if test=\"$x\"></if>",

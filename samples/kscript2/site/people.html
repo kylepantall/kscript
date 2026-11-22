@@ -1,7 +1,7 @@
 <!doctype html>
 <let name="people" value="@read_json('data/people.json')" />
 <let name="min" value="$request.query.min_age ?? 0" />
-<layout src="_layout.html" title="People">
+<layout path="_layout.html" title="People">
   <h1>People over {$min}</h1>
   <if $people->any(fn(p) => $p.age ge $min)>
     <ul>

@@ -71,7 +71,7 @@ namespace KScript.Pages
         public void Import(Module module, PageElement import, Scope scope, PageContext ctx, string file)
         {
             string package = import.Attr("package");
-            string src = import.Attr("src");
+            string src = import.Attr("path");
             string alias = import.Attr("as")?.Trim();
             Run(module, () =>
             {
@@ -83,11 +83,11 @@ namespace KScript.Pages
                 {
                     string folder = Path.GetDirectoryName(file.Replace('\\', '/')) ?? string.Empty;
                     string path = src.StartsWith("/", StringComparison.Ordinal) ? src : Path.Combine(folder, src).Replace('\\', '/');
-                    Interpreter.ImportScript(module, ctx.ResolveSitePath(path, "<import src>"), scope, alias, import.Attr("names"));
+                    Interpreter.ImportScript(module, ctx.ResolveSitePath(path, "<import path>"), scope, alias, import.Attr("names"));
                 }
                 else
                 {
-                    throw new PageException("<import> needs a package or src, e.g. <import package=\"KScript.Math\" as=\"math\" /> or <import src=\"lib/text.ks.xml\" />.");
+                    throw new PageException(import.HasAttr("src") ? "<import src> was renamed: write <import path=\"lib/text.ks.xml\" />." : "<import> needs a package or path, e.g. <import package=\"KScript.Math\" as=\"math\" /> or <import path=\"lib/text.ks.xml\" />.");
                 }
                 return null;
             });

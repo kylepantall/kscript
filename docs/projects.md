@@ -219,10 +219,10 @@ kscript make project my-app --template ../starters/api   # any folder
 `kscript make <type> <name>` creates a file where the project keeps that kind of file, makes any folder it needs, and writes scripts in the project's format. [kscript make commands](/cli/make) lists every type with its options and examples, and so does `kscript make --list`; `kscript make <type> --help` shows one.
 
 ```sh
-kscript make route users                              # adds Get(path: "/users", to: users.index) to routes/web.kscript,
+kscript make route users                              # adds Get(path: "/users", to: @users.index) to routes/web.kscript,
                                                       # and makes controllers/users.kscript with index()
-kscript make route "users/{id}" --where "id: int"     # Get(…, to: users.show), and adds show(id) to the controller
-kscript make route users --method post --api          # Post(…, to: users.store) in routes/api.kscript, served under /api
+kscript make route "users/{id}" --where "id: int"     # Get(…, to: @users.show), and adds show(id) to the controller
+kscript make route users --method post --api          # Post(…, to: @users.store) in routes/api.kscript, served under /api
 kscript make route people --resource --api            # Resource(path: "/people", to: people), with all five functions
 kscript make route about --view about                 # Get(path: "/about", view: "about"), and views/about.html
 kscript make controller people --resource             # controllers/people.kscript: index, show, store, update, destroy

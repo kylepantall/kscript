@@ -8,7 +8,7 @@ test(name: "the list is null when nobody is signed in, so the page asks them to 
 {{else}}
 
 describe(name: "notes client") {
-  before-each {
+  before_each {
     for note in @list_notes() {
       @delete_note($note.id)
     }
@@ -36,7 +36,9 @@ counts = [
   { done: 2, text: '0 notes left' },
 ]
 
-test(name: "'{$case.text}' when {$case.done} of 2 are done", each: case, in: $counts) {
-  notes = [{ done: $case.done >= 1 }, { done: $case.done >= 2 }]
-  expect(value: @notes_left($notes), equals: $case.text)
+for case in $counts {
+  test(name: "'{$case.text}' when {$case.done} of 2 are done") {
+    notes = [{ done: $case.done >= 1 }, { done: $case.done >= 2 }]
+    expect(value: @notes_left($notes), equals: $case.text)
+  }
 }

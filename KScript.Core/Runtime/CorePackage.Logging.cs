@@ -7,10 +7,10 @@ namespace KScript.Runtime
 {
     public sealed partial class CorePackage
     {
-        /// <summary>The attributes of &lt;log-provider&gt; that are passed to the provider as options.</summary>
+        /// <summary>The attributes of &lt;log_provider&gt; that are passed to the provider as options.</summary>
         private static readonly string[] ProviderOptions = { "type", "name", "level", "format", "path", "roll", "stream", "colour", "time", "url", "batch" };
 
-        /// <summary>Logging: $log, &lt;log&gt; and &lt;log-provider&gt;.</summary>
+        /// <summary>Logging: $log, &lt;log&gt; and &lt;log_provider&gt;.</summary>
         private static void RegisterLogging(PackageBuilder p)
         {
             p.Variable("log", KType.Logger,
@@ -45,11 +45,11 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("log-provider",
+            p.Element(new ElementInfo("log_provider",
                 "Adds somewhere for log entries to go: the console, a file, memory (for tests), a function, or a type a package adds (KScript.Net adds http). Usually set in config under logging.providers instead.",
                 ContentKind.Empty,
                 new A("type", K.Text, "console, file, memory, or a type from an imported package such as http. Leave it out when using fn."),
-                new A("fn", K.FunctionReference, "A function called with each entry (a map of time, level, category, message, fields, script and line)."),
+                new A("fn", K.FunctionReference, "A function called with each entry (a map of time, level, category, message, fields, script and line): `@alert` (in XML, fn=\"alert\")."),
                 new A("level", K.Enum, "The lowest level this provider writes (default: all that logging lets through).", false, LogLevels.Names),
                 new A("format", K.Enum, "text or json (console and file).", false, "text", "json"),
                 new A("path", K.Template, "The file to append to (file)."),
@@ -64,7 +64,7 @@ namespace KScript.Runtime
                 new A("replace", K.Bool, "yes removes the providers already set up, including the default console one."))
             {
                 Context = ElementContext.Script,
-                Example = "<log-provider type=\"file\" path=\"logs/app.log\" format=\"json\" level=\"debug\" />\n<fn name=\"alert\" params=\"entry\"><echo>ALERT: {$entry.message}</echo></fn>\n<log-provider fn=\"alert\" level=\"error\" />",
+                Example = "<log_provider type=\"file\" path=\"logs/app.log\" format=\"json\" level=\"debug\" />\n<fn name=\"alert\" params=\"entry\"><echo>ALERT: {$entry.message}</echo></fn>\n<log_provider fn=\"alert\" level=\"error\" />",
             }, run =>
             {
                 LogHub hub = run.Host.Logs;
@@ -86,7 +86,7 @@ namespace KScript.Runtime
                 }
                 try
                 {
-                    hub.Add(options, run.Interpreter, run.Module, "<log-provider>");
+                    hub.Add(options, run.Interpreter, run.Module, "<log_provider>");
                 }
                 catch (KScriptException ex) when (ex.Offset == null)
                 {

@@ -1,9 +1,9 @@
 import KScript.Terminal
 import KScript.IO
 
-input(to: old_dir) "Move files from: "
-input(to: new_dir) "Move files to: "
-input(to: file_types) "File types (comma separated): "
+input(into: old_dir) "Move files from: "
+input(into: new_dir) "Move files to: "
+input(into: file_types) "File types (comma separated): "
 
 types = $file_types->split(',')->map(fn(t) => $t->trim())
 for file in @files($old_dir) |> filter(fn(f) =>

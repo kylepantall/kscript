@@ -32,7 +32,7 @@ KScript.Document(
     }
   }
 
-  Section(title: "Growth", new-page) {
+  Section(title: "Growth", new_page) {
     Table(
       caption: "Visitors and sign-ups by quarter.",
       id: "tab-growth",
@@ -57,7 +57,7 @@ KScript.Document(
     }
   }
 
-  Section(title: "Next year", new-page) {
+  Section(title: "Next year", new_page) {
     Markdown "
       We plan three things for next year:
 

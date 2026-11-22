@@ -198,8 +198,8 @@ namespace KScript.Runtime
                 ("config->all", "<config defaults=\"{ server: { port: 8080 } }\" />\n<echo>{ $config->all() }</echo>"),
                 ("config->sources", "$config->sources()->count() >= 0"),
                 ("config->reload", "$config->reload()->get('server.port', 8080)"),
-                ("logger->trace", "<log-provider type=\"console\" level=\"trace\" />\n<do>$log->trace('Looking up the user', { id: 7 })</do>"),
-                ("logger->debug", "<log-provider type=\"console\" level=\"debug\" />\n<do>$log->debug('Cache miss', { key: 'user:7' })</do>"),
+                ("logger->trace", "<log_provider type=\"console\" level=\"trace\" />\n<do>$log->trace('Looking up the user', { id: 7 })</do>"),
+                ("logger->debug", "<log_provider type=\"console\" level=\"debug\" />\n<do>$log->debug('Cache miss', { key: 'user:7' })</do>"),
                 ("logger->info", "<do>$log->info('Order placed', { order: 42, total: 30 })</do>"),
                 ("logger->warn", "<do>$log->warn('Disk is nearly full', { free: '2 GB' })</do>"),
                 ("logger->error", "<do>$log->error('Payment failed', { order: 42 })</do>"),
@@ -208,7 +208,7 @@ namespace KScript.Runtime
                 ("logger->with", "<do>$log->with({ request: 'abc123' })->info('Handled')</do>"),
                 ("logger->named", "<do>$log->named('payments')->info('Charged the card')</do>"),
                 ("logger->enabled", "$log->enabled('debug')"),
-                ("logger->entries", "<log-provider type=\"memory\" />\n<do>$log->info('One'); $log->warn('Two')</do>\n<echo>{ $log->entries()->map(fn(e) => $e.level + ': ' + $e.message) }</echo>"),
+                ("logger->entries", "<log_provider type=\"memory\" />\n<do>$log->info('One'); $log->warn('Two')</do>\n<echo>{ $log->entries()->map(fn(e) => $e.level + ': ' + $e.message) }</echo>"),
                 ("logger->flush", "<do>$log->info('Saved'); $log->flush()</do>"),
 
                 // Commands

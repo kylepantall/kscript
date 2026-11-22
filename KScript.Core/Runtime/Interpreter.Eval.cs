@@ -714,7 +714,7 @@ namespace KScript.Runtime
                 if (module == null || !module.Aliases.TryGetValue(alias, out ImportNamespace ns))
                 {
                     string close = module == null ? null : Values.Closest(alias, module.Aliases.Keys);
-                    throw Fail(node, ctx, $"@{name}: nothing is imported as '{alias}'." + (close != null ? $" Did you mean {close}?" : $" Import it with <import package=\"...\" as=\"{alias}\" /> or <import src=\"...\" as=\"{alias}\" />."), "Name");
+                    throw Fail(node, ctx, $"@{name}: nothing is imported as '{alias}'." + (close != null ? $" Did you mean {close}?" : $" Import it with <import package=\"...\" as=\"{alias}\" /> or <import path=\"...\" as=\"{alias}\" />."), "Name");
                 }
                 if (ns.TryGet(member, out object found))
                 {

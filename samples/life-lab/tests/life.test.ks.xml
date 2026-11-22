@@ -1,6 +1,6 @@
 <kscript>
   <!-- Tests for the shared rules. Run with: kscript test samples/life-lab -->
-  <import src="../lib/life.ks.xml" />
+  <import path="../lib/life.ks.xml" />
 
   <describe name="grids">
     <test name="blank grids are empty">
@@ -43,9 +43,9 @@
     </test>
 
     <test name="an empty pattern is an error">
-      <expect-error type="Pattern">
+      <expect_error type="Pattern">
         <call fn="parse_cells" args="'!just a comment'" />
-      </expect-error>
+      </expect_error>
     </test>
 
     <test name="every built-in pattern fits a 40 by 24 board">
@@ -63,16 +63,17 @@
       <expect value="@neighbours($g, x: 0, y: 0, wrap: true)" equals="1" />
     </test>
 
-    <test
-      name="next_state: {$c.alive ? 'live' : 'dead'} cell with {$c.n} neighbours"
+    <for
       each="c"
       in="[
         { alive: true, n: 1, next: false }, { alive: true, n: 2, next: true }, { alive: true, n: 3, next: true },
         { alive: true, n: 4, next: false }, { alive: false, n: 3, next: true }, { alive: false, n: 2, next: false }]">
-      <expect
-        value="@next_state(alive: $c.alive, neighbours: $c.n)"
-        equals="$c.next" />
-    </test>
+      <test name="next_state: {$c.alive ? 'live' : 'dead'} cell with {$c.n} neighbours">
+        <expect
+          value="@next_state(alive: $c.alive, neighbours: $c.n)"
+          equals="$c.next" />
+      </test>
+    </for>
 
     <test name="a blinker flips between a row and a column">
       <let name="row" value="['.....', '.....', '.OOO.', '.....', '.....']" />

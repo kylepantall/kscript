@@ -360,7 +360,7 @@ public sealed class DocsTests
         Assert.Equal("hi\n", Playground.Run("<kscript>\n  <echo>hi</echo>\n</kscript>").Output);
         Assert.Equal("hi\n", Playground.Run("<!-- a comment -->\n<kscript><echo>hi</echo></kscript>").Output);
         Assert.Equal("6\n", Playground.Run("x = 2\necho \"{ $x * 3 }\"", "kscript").Output);
-        Assert.EndsWith("Joan\n", Playground.Run("<import package=\"KScript.Terminal\" />\n<input to=\"n\">Name? </input>\n<echo>$n</echo>", input: "Joan\n").Output);
+        Assert.EndsWith("Joan\n", Playground.Run("<import package=\"KScript.Terminal\" />\n<input into=\"n\">Name? </input>\n<echo>$n</echo>", input: "Joan\n").Output);
 
         Assert.True(Playground.IsWholeScript("<?xml version=\"1.0\"?><kscript/>"));
         Assert.True(Playground.IsWholeScript("<KScript.Window/>"));

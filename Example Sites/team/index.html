@@ -1,7 +1,7 @@
 <let name="people" value="@read_json('data/people.json')" />
 <let name="oldest" value="$people->max_by(fn(p) => $p.age)" />
 
-<layout src="_layout.html" title="Home">
+<layout path="_layout.html" title="Home">
   <h1>Welcome</h1>
   <p>There are {$people->count()} people on the team. The oldest is {$oldest.name} at {$oldest.age}.</p>
   <person-card person="{$oldest}">

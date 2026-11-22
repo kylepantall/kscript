@@ -50,7 +50,7 @@ namespace KScript.Http
                 new A("api", K.Bool, "yes: errors and missing routes are answered with JSON (api.* files are API files already)."))
             {
                 Context = ElementContext.Script,
-                Example = "<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n  <Middleware use=\"log\" />\n  <Get path=\"/\" view=\"home.html\" />\n  <Get path=\"/people/{id}\" to=\"people.show\" name=\"people.show\" />\n</KScript.Routes>",
+                Example = "<KScript.Routes>\n  <import path=\"controllers/people.ks.xml\" as=\"people\" />\n  <Middleware use=\"log\" />\n  <Get path=\"/\" view=\"home.html\" />\n  <Get path=\"/people/{id}\" to=\"people.show\" name=\"people.show\" />\n</KScript.Routes>",
             }, RunRoutes);
 
             foreach (var (element, method) in MethodElements)
@@ -128,7 +128,7 @@ namespace KScript.Http
 
             p.Element(new ElementInfo("Resource", "The usual routes of a JSON resource, answered by the functions a controller script exports: index (GET path), store (POST path), show (GET path/{id}), update (PUT and PATCH path/{id}) and destroy (DELETE path/{id}). Functions the controller doesn't have get no route.", ContentKind.Empty,
                 new A("path", K.Text, "The resource's path, such as /people.", true) { Literal = true },
-                new A("to", K.Text, "The controller: the name a script is imported as (<import src=\"...\" as=\"people\" />).", true) { IsName = true },
+                new A("to", K.Text, "The controller: the name a script is imported as (<import path=\"...\" as=\"people\" />).", true) { IsName = true },
                 new A("only", K.Text, "Only these actions: [index, show].") { NameList = true },
                 new A("except", K.Text, "All actions but these: [destroy].") { NameList = true },
                 new A("name", K.Text, "The route name prefix (people gives people.index, people.show...). The default is the controller's name."),
@@ -138,7 +138,7 @@ namespace KScript.Http
                 Context = ElementContext.Script,
                 MustBeInside = new[] { "Routes", "Group" },
                     InsideAnyAncestor = true,
-                Example = "<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n  <Resource path=\"/people\" to=\"people\" middleware=\"auth\" />\n</KScript.Routes>",
+                Example = "<KScript.Routes>\n  <import path=\"controllers/people.ks.xml\" as=\"people\" />\n  <Resource path=\"/people\" to=\"people\" middleware=\"auth\" />\n</KScript.Routes>",
             }, AddResource);
 
             p.Command("view", "name, data...",
@@ -180,7 +180,7 @@ namespace KScript.Http
         private static A[] RouteAttributes() => new[]
         {
             new A("path", K.Text, "The path, with {name} parameters: /people/{id}. {name?} is optional and {name*} takes the rest of the path.", true) { Literal = true },
-            new A("to", K.FunctionReference, "The controller: a <fn> (show) or a function of an imported script (people.show). Its parameters are filled by name: path parameters, request, json, query, form, input, headers."),
+            new A("to", K.FunctionReference, "The controller: a <fn> (`@show`) or a function of an imported script (`@people.show`); in XML, to=\"people.show\". Its parameters are filled by name: path parameters, request, json, query, form, input, headers."),
             new A("view", K.Text, "Answer with this view instead, from the views folder, with the path parameters as variables."),
             new A("redirect", K.Text, "Answer with a redirect to this address instead."),
             new A("status", K.Expression, "The redirect's status code, 302 by default."),
@@ -213,7 +213,7 @@ namespace KScript.Http
         private static bool? AddRoute(ElementRun run, IReadOnlyList<string> methods)
         {
             RequestContext ctx = Context(run);
-            string to = run.Raw("to")?.Trim();
+            string to = run.Raw("to")?.Trim().TrimStart('@');
             string view = run.Raw("view")?.Trim();
             string redirect = run.Raw("redirect")?.Trim();
             bool inline = run.Element.ChildElements.Any() || run.Element.Children.OfType<MarkupText>().Any(t => !t.IsWhitespace);
@@ -302,7 +302,7 @@ namespace KScript.Http
             RequestContext ctx = Context(run);
             string to = run.RequiredRaw("to").Trim();
             if (!run.Module.TryGetAlias(to, out ImportNamespace controller) || controller.Module == null)
-                throw run.Error($"<Resource to=\"{to}\"> names a controller script imported with as=\"{to}\": <import src=\"controllers/{to}.ks.xml\" as=\"{to}\" />.", "to", "Http");
+                throw run.Error($"<Resource to=\"{to}\"> names a controller script imported with as=\"{to}\": <import path=\"controllers/{to}.ks.xml\" as=\"{to}\" />.", "to", "Http");
             HashSet<string> only = Names(run.Raw("only")), except = Names(run.Raw("except"));
             foreach (string action in only.Concat(except).Where(a => !ResourceActions.Any(r => r.Action == a)))
                 throw run.Error($"'{action}' isn't a resource action. Actions: {string.Join(", ", ResourceActions.Select(r => r.Action))}.", only.Contains(action) ? "only" : "except", "Http");
@@ -357,7 +357,7 @@ namespace KScript.Http
                 if (!run.Module.TryGetAlias(alias, out ImportNamespace ns))
                 {
                     string close = Values.Closest(alias, run.Module.AliasNames);
-                    throw run.Error($"Nothing is imported as '{alias}'. Import the controller with <import src=\"controllers/{alias}.ks.xml\" as=\"{alias}\" />." + (close != null ? $" Did you mean {close}?" : string.Empty), attribute, "Http");
+                    throw run.Error($"Nothing is imported as '{alias}'. Import the controller with <import path=\"controllers/{alias}.ks.xml\" as=\"{alias}\" />." + (close != null ? $" Did you mean {close}?" : string.Empty), attribute, "Http");
                 }
                 if (ns.TryGet(member, out object found))
                 {
@@ -373,7 +373,7 @@ namespace KScript.Http
             if (run.Module.Commands.TryGetValue(name, out CommandDefinition command))
                 return Command(run.Interpreter, command);
             string near = Values.Closest(name, run.Scope.Names().Where(n => run.Scope.TryGet(n, out object f) && f is ICallable));
-            throw run.Error($"No function named '{name}'. Declare it with <fn name=\"{name}\"> or import a controller (<import src=\"...\" as=\"people\" /> then people.{name})."
+            throw run.Error($"No function named '{name}'. Declare it with <fn name=\"{name}\"> or import a controller (<import path=\"...\" as=\"people\" /> then people.{name})."
                 + (near != null ? $" Did you mean {near}?" : string.Empty), attribute, "Http");
         }
 

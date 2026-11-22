@@ -41,7 +41,7 @@ namespace KScript.Runtime
         /// <summary>The attribute's text, or an error saying it is needed.</summary>
         public string RequiredRaw(string attribute) => Raw(attribute) ?? throw Missing(attribute);
 
-        /// <summary>A variable name written in an attribute (name="count", to="answer"), without a leading $.</summary>
+        /// <summary>A variable name written in an attribute (name="count", into="answer"), without a leading $.</summary>
         public string VariableName(string attribute, bool required = true)
         {
             string raw = required ? RequiredRaw(attribute) : Raw(attribute);

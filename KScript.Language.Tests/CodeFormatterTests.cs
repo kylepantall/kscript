@@ -510,7 +510,7 @@ namespace KScript.Language.Tests
             string call = Lines("@f('a fairly long string that does not fit in forty columns')");
             Assert.Equal(call, Fmt(call, narrow));
             // A string that starts past the width can't be helped by a break.
-            string late = Lines("Button(on-click: \"world = @new_world(1, 2, 3); playing = false\") \"Random soup\"");
+            string late = Lines("Button(on_click: \"world = @new_world(1, 2, 3); playing = false\") \"Random soup\"");
             Assert.Equal(late, Fmt(late, narrow));
             // Text in { } is never split.
             string braces = Lines("echo \"{ $a + $b + $c + $d + $e + $f + $g + $h + $i + $j }\"");

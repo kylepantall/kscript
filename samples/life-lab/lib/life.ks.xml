@@ -116,8 +116,8 @@
       name="y0"
       value="$top ?? ((@height($grid) - @height($rows)) / 2)->floor()" />
     <let name="out" value="$grid" />
-    <for each="row" index="dy" in="$rows">
-      <for each="c" index="dx" in="$row->chars()">
+    <for each="row" at="dy" in="$rows">
+      <for each="c" at="dx" in="$row->chars()">
         <let name="x" value="$x0 + $dx" />
         <let name="y" value="$y0 + $dy" />
         <if $c eq $alive_cell and $x ge 0 and $y ge 0 and $x lt @width($grid) and $y lt @height($grid)>

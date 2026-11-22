@@ -10,7 +10,7 @@
   -->
   <import package="KScript.Terminal" />
   <import package="KScript.IO" />
-  <import src="lib/life.ks.xml" />
+  <import path="lib/life.ks.xml" />
 
   <!-- Two characters per cell keeps the board roughly square in most terminal fonts. -->
   <let
@@ -89,7 +89,7 @@
   <while true>
     <call fn="draw" args="$world" />
     <echo />
-    <menu to="action" options="$actions">What next?</menu>
+    <menu into="action" options="$actions">What next?</menu>
     <match $action>
       <case is="'step'">
         <set name="world" value="@advance($world, generations: 1)" />
@@ -101,20 +101,20 @@
         <set name="world" value="@play($world, generations: 100)" />
       </case>
       <case is="'pattern'">
-        <menu to="name" options="$patterns->keys()">Which pattern?</menu>
+        <menu into="name" options="$patterns->keys()">Which pattern?</menu>
         <echo>{ @dim($patterns[$name].about) }</echo>
         <set
           name="world"
           value="@pattern_world($name, width: $board_w, height: $board_h, wrap: $world.wrap)" />
       </case>
       <case is="'random'">
-        <input to="density" type="number" default="30">How full, in percent? [30] </input>
+        <input into="density" type="number" default="30">How full, in percent? [30] </input>
         <set
           name="world"
           value="@new_world(@random_grid(width: $board_w, height: $board_h, density: $density->clamp(min: 1, max: 100)), wrap: $world.wrap, pattern: 'random ' + $density + '%')" />
       </case>
       <case is="'edit'">
-        <input to="where">Cell to flip, as column row (from 1, e.g. 5 3): </input>
+        <input into="where">Cell to flip, as column row (from 1, e.g. 5 3): </input>
         <let
           name="xy"
           value="$where->trim()->split(' ')->reject(fn(p) => $p eq '')->map(fn(p) => $p->to_int(default: 0) - 1)" />
@@ -128,7 +128,7 @@
           value="@edit_world($world, grid: @toggle($world.grid, x: $xy[0], y: $xy[1]))" />
       </case>
       <case is="'file'">
-        <input to="path">Pattern file: </input>
+        <input into="path">Pattern file: </input>
         <try>
           <set
             name="world"

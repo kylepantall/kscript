@@ -350,7 +350,7 @@ namespace KScript.Language.Analysis
                 Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
                     $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode
                         ? $"import KScript.Name as {aliasName} or import \"...\" as {aliasName}."
-                        : $"<import package=\"...\" as=\"{aliasName}\" /> or <import src=\"...\" as=\"{aliasName}\" />."),
+                        : $"<import package=\"...\" as=\"{aliasName}\" /> or <import path=\"...\" as=\"{aliasName}\" />."),
                     SuggestFix(aliasSpan, aliasName, aliases, n => n));
                 return;
             }

@@ -39,7 +39,7 @@ public class CodeFormatTests
         try
         {
             File.WriteAllText(Path.Combine(dir, "lib.kscript"), "fn shout(s) => $s->upper() + '!'\nconst greeting = 'hi'");
-            File.WriteAllText(Path.Combine(dir, "main.ks.xml"), "<kscript><import src=\"lib.kscript\" /><echo>{ @shout($greeting) }</echo></kscript>");
+            File.WriteAllText(Path.Combine(dir, "main.ks.xml"), "<kscript><import path=\"lib.kscript\" /><echo>{ @shout($greeting) }</echo></kscript>");
             Assert.Equal("HI!\n", RunFile(Path.Combine(dir, "main.ks.xml")));
         }
         finally

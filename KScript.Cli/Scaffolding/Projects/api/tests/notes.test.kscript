@@ -20,12 +20,12 @@ fn notes_api(path: string, method: string = 'GET', body = null{{#if auth}}, as =
 
 describe(name: "notes") {
 {{#if auth}}
-  // Each test signs up someone new (in before-each), so no test sees another's
+  // Each test signs up someone new (in before_each), so no test sees another's
   // notes.
   me = {}
 
 {{/if}}
-  before-each {
+  before_each {
 {{#if auth}}
     me = @sign_up()
 {{else}}
@@ -36,7 +36,7 @@ describe(name: "notes") {
   }
 {{#if auth}}
 
-  after-each {
+  after_each {
     @api('/api/me', options: { method: 'DELETE', headers: $me })
   }
 {{/if}}

@@ -83,6 +83,9 @@ namespace KScript.Language.Catalog
 
         public RetiredInfo GetRetiredAttribute(string name) => name != null && retiredAttributes.TryGetValue(name, out RetiredInfo r) ? r : null;
 
+        /// <summary>An attribute the element no longer has: one that was renamed on it (to: is now into:), else a retired v1 attribute.</summary>
+        public RetiredInfo GetRetiredAttribute(ElementInfo element, string name) => Retired.RenamedAttribute(element, name) ?? GetRetiredAttribute(name);
+
         public CallableInfo GetCommand(string name) => name != null && commands.TryGetValue(name, out CallableInfo c) ? c : null;
 
         public RetiredInfo GetRetiredCommand(string name) => name != null && retiredCommands.TryGetValue(name, out RetiredInfo r) ? r : null;
@@ -175,6 +178,10 @@ namespace KScript.Language.Catalog
             {
                 if (!elements.ContainsKey(kv.Key)) retiredElements[kv.Key] = kv.Value;
             }
+            foreach (var kv in Retired.RenamedElements)
+            {
+                if (!elements.ContainsKey(kv.Key)) retiredElements[kv.Key] = kv.Value;
+            }
             foreach (var kv in Retired.Attributes) retiredAttributes[kv.Key] = kv.Value;
             foreach (var kv in Retired.Commands)
             {
@@ -189,7 +196,7 @@ namespace KScript.Language.Catalog
         private void AddPlanned()
         {
             AddPlannedElement(new ElementInfo("render", "Replaces the content of a page element. Non-KScript elements inside are output as HTML, with `{ }` values escaped.", ContentKind.Markup,
-                new A("into", K.Selector, "The element to fill, as a CSS selector.", true),
+                new A("target", K.Selector, "The element to fill, as a CSS selector.", true),
                 new A("raw", K.Bool, "yes outputs values without HTML escaping.")));
             AddPlannedElement(new ElementInfo("on", "Runs its body when a DOM event fires (browser). `$event` holds the event.", ContentKind.Statements,
                 new A("event", K.Text, "The event name, such as click or input.", true),

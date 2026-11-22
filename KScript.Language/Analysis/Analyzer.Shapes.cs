@@ -163,7 +163,7 @@ namespace KScript.Language.Analysis
         /// <summary>The fields of a type: from its sample file, then its fields attribute, then its &lt;field&gt; elements.</summary>
         private void FillFields(MarkupElement e, TypeShape shape)
         {
-            string sample = e.GetAttributeValue("sample")?.Trim();
+            string sample = e.GetAttributeValue("path")?.Trim();
             if (!string.IsNullOrEmpty(sample) && result.JsonFileShape(sample) is TypeShape json)
             {
                 TypeShape map = json.Type == KType.List ? json.Element : json;
@@ -315,15 +315,15 @@ namespace KScript.Language.Analysis
                     Report(TrimmedSpan(nameAttr.Value), DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"The field '{name}' is listed twice.");
                 }
             }
-            bool hasFields = seen.Count > 0 || e.GetAttribute("sample") != null || e.GetAttribute("with") != null;
+            bool hasFields = seen.Count > 0 || e.GetAttribute("path") != null || e.GetAttribute("with") != null;
             if (!hasFields)
             {
                 Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "<type> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.");
             }
-            string sample = e.GetAttributeValue("sample")?.Trim();
+            string sample = e.GetAttributeValue("path")?.Trim();
             if (!string.IsNullOrEmpty(sample) && ResolvePath(sample) is string full && files.FileExists(full) && result.JsonFileShape(sample) == null)
             {
-                Report(TrimmedSpan(e.GetAttribute("sample").Value), DiagnosticSeverity.Warning, DiagnosticCodes.InvalidAttributeValue, $"'{sample}' isn't a JSON file the editor can read, so the type's fields from it aren't known.");
+                Report(TrimmedSpan(e.GetAttribute("path").Value), DiagnosticSeverity.Warning, DiagnosticCodes.InvalidAttributeValue, $"'{sample}' isn't a JSON file the editor can read, so the type's fields from it aren't known.");
             }
             CheckWithNames(e);
             CheckInheritedMembers(e);

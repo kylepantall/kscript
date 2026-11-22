@@ -19,12 +19,12 @@ fn notes_api(path: string, method: string = 'GET', body = null{{#if auth}}, as =
 
 describe(name: "api") {
 {{#if auth}}
-  // Each test gets a user of its own (in before-each), so no test sees
+  // Each test gets a user of its own (in before_each), so no test sees
   // another's notes.
   me = {}
 
 {{/if}}
-  before-each {
+  before_each {
 {{#if auth}}
     me = @test_user()
 {{else}}
@@ -35,7 +35,7 @@ describe(name: "api") {
   }
 {{#if auth}}
 
-  after-each {
+  after_each {
     @users()->delete($me.id)
   }
 {{/if}}

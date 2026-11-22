@@ -377,12 +377,12 @@ namespace KScript.Pages
 
                 case "layout":
                 {
-                    string src = el.Attr("src") ?? throw new PageException("<layout> needs a src attribute, e.g. <layout src=\"_layout.html\">.");
+                    string src = el.Attr("path") ?? throw new PageException(el.HasAttr("src") ? "<layout src> was renamed: write <layout path=\"_layout.html\">." : "<layout> needs a path attribute, e.g. <layout path=\"_layout.html\">.");
                     var inner = scope.Child();
                     var body = new StringBuilder();
                     RenderNodes(el.Children, inner, body, state);
                     var layoutScope = scope.Child();
-                    foreach (var a in el.Attributes.Where(a => a.Name != "src")) layoutScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
+                    foreach (var a in el.Attributes.Where(a => a.Name != "path")) layoutScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
                     AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), layoutScope, body.ToString()), state);
                     return;
                 }
@@ -394,9 +394,9 @@ namespace KScript.Pages
 
                 case "include":
                 {
-                    string src = el.Attr("src") ?? throw new PageException("<include> needs a src attribute.");
+                    string src = el.Attr("path") ?? throw new PageException(el.HasAttr("src") ? "<include src> was renamed: write <include path=\"...\" />." : "<include> needs a path attribute.");
                     var incScope = scope.Child();
-                    foreach (var a in el.Attributes.Where(a => a.Name != "src")) incScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
+                    foreach (var a in el.Attributes.Where(a => a.Name != "path")) incScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
                     AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), incScope, null), state);
                     return;
                 }
@@ -594,7 +594,7 @@ namespace KScript.Pages
         {
             string each = el.Attr("each") ?? throw new PageException("<for> needs each and in attributes, e.g. <for each=\"p\" in=\"$people\">.");
             string inExpr = el.Attr("in") ?? throw new PageException("<for> needs an in attribute, e.g. <for each=\"p\" in=\"$people\">.");
-            string indexName = el.Attr("index");
+            string indexName = el.Attr("at");
             var names = each.Split(',').Select(n => n.Trim().TrimStart('$')).ToArray();
 
             object source = Eval(inExpr, scope, state);

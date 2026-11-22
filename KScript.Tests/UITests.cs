@@ -42,8 +42,8 @@ public class UITests
           <Column gap="8">
             <Text size="24">{ @label($count) }</Text>
             <Row>
-              <Button variant="primary" on-click="count += 1">Add one</Button>
-              <Button on-click="count = 0" disabled="$count eq 0">Reset</Button>
+              <Button variant="primary" on_click="count += 1">Add one</Button>
+              <Button on_click="count = 0" disabled="$count eq 0">Reset</Button>
             </Row>
           </Column>
         </KScript.Window>
@@ -74,8 +74,8 @@ public class UITests
               <let name="items" value="['a', 'b', 'c']" />
               <let name="show" value="false" />
               <Grid columns="2">
-                <for each="item" index="i" in="$items">
-                  <Box width="10" height="10" background="{ $i eq 0 ? 'red' : 'blue' }" on-click="items = $items->remove_at($i)" />
+                <for each="item" at="i" in="$items">
+                  <Box width="10" height="10" background="{ $i eq 0 ? 'red' : 'blue' }" on_click="items = $items->remove_at($i)" />
                 </for>
               </Grid>
               <if test="$show"><Text>Shown</Text></if>
@@ -90,7 +90,7 @@ public class UITests
             Assert.Empty(s.FindAll("Text"));
             s.SetBound(s.FindAll("CheckBox")[0], true);
             Assert.Single(s.FindAll("Text"));
-            s.Fire(s.FindAll("Box")[1], "on-click");
+            s.Fire(s.FindAll("Box")[1], "on_click");
             Assert.Equal(2, s.FindAll("Box").Count);
         });
     }
@@ -102,7 +102,7 @@ public class UITests
             <KScript.Window>
               <let name="name" value="''" />
               <let name="log" value="[]" />
-              <TextBox bind="name" on-change="log = $log->push($event.value)" on-enter="name = 'done'" />
+              <TextBox bind="name" on_change="log = $log->push($event.value)" on_enter="name = 'done'" />
               <Text>Hello {$name}</Text>
               <Select bind="speed" options="{ Slow: 400, Fast: 40 }" />
               <let name="speed" value="400" />
@@ -115,7 +115,7 @@ public class UITests
             s.SetBound(box, "Kyle");
             Assert.Equal("Hello Kyle", s.FindAll("Text")[0].Text);
             Assert.Equal("Kyle", s.FindAll("TextBox")[0].Prop("value"));
-            s.Fire(s.FindAll("TextBox")[0], "on-enter");
+            s.Fire(s.FindAll("TextBox")[0], "on_enter");
             Assert.Equal("Hello done", s.FindAll("Text")[0].Text);
             Assert.Equal(400d, Values.ToNumber(s.FindAll("Select")[0].Prop("value"), "speed"));
         });
@@ -127,7 +127,7 @@ public class UITests
         const string xml = """
             <KScript.Window>
               <let name="frame" value="0" />
-              <Timer every="50" when="$frame lt 3" on-tick="frame += 1" />
+              <Timer every="50" when="$frame lt 3" on_tick="frame += 1" />
               <Text>{$frame}</Text>
             </KScript.Window>
             """;
@@ -135,7 +135,7 @@ public class UITests
         {
             UINode timer = s.FindAll("Timer")[0];
             Assert.Equal(50d, timer.Number("every"));
-            while (s.FindAll("Timer")[0].Flag("when")) s.Fire(s.FindAll("Timer")[0], "on-tick");
+            while (s.FindAll("Timer")[0].Flag("when")) s.Fire(s.FindAll("Timer")[0], "on_tick");
             Assert.Equal("3", s.FindAll("Text")[0].Text);
         });
     }
@@ -146,8 +146,8 @@ public class UITests
         const string xml = """
             <KScript.Window>
               <let name="n" value="1" />
-              <Button on-click="n = $n / $missing">Break</Button>
-              <Button on-click="n += 1">Fix</Button>
+              <Button on_click="n = $n / $missing">Break</Button>
+              <Button on_click="n += 1">Fix</Button>
               <Text>{$n}</Text>
             </KScript.Window>
             """;
@@ -169,7 +169,7 @@ public class UITests
               <import package="KScript.UI" />
               <let name="answer" value="0" />
               <KScript.Window>
-                <Button on-click="answer = 42">Answer</Button>
+                <Button on_click="answer = 42">Answer</Button>
               </KScript.Window>
               <echo>answer: $answer</echo>
             </kscript>
@@ -206,12 +206,12 @@ public class UIDesktopTests
               <Column gap="6">
                 <Text weight="bold">{ $on->filter(fn(x) => $x)->count() } on</Text>
                 <Grid columns="2" gap="2">
-                  <for each="v" index="i" in="$on">
-                    <Box width="20" height="20" background="{ $v ? '#22c55e' : '#1e293b' }" on-click="on = $on->map(fn(x, j) => $j eq $i ? not $x : $x)" />
+                  <for each="v" at="i" in="$on">
+                    <Box width="20" height="20" background="{ $v ? '#22c55e' : '#1e293b' }" on_click="on = $on->map(fn(x, j) => $j eq $i ? not $x : $x)" />
                   </for>
                 </Grid>
                 <TextBox bind="name" placeholder="Name" />
-                <Button variant="primary" on-click="on = [true, true, true, true]">All</Button>
+                <Button variant="primary" on_click="on = [true, true, true, true]">All</Button>
               </Column>
             </KScript.Window>
             """;

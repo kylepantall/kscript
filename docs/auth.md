@@ -98,12 +98,12 @@ KScript.Routes {
   import "controllers/accounts.kscript" as accounts
 
   Group(middleware: guest) {
-    Get(path: "/login", to: accounts.show_login, name: "login")
-    Post(path: "/login", to: accounts.sign_in)
+    Get(path: "/login", to: @accounts.show_login, name: "login")
+    Post(path: "/login", to: @accounts.sign_in)
   }
   Group(middleware: auth) {
-    Get(path: "/account", to: accounts.account)
-    Post(path: "/logout", to: accounts.sign_out)
+    Get(path: "/account", to: @accounts.account)
+    Post(path: "/logout", to: @accounts.sign_out)
   }
 }
 ```

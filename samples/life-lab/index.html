@@ -1,4 +1,4 @@
-<import src="lib/life.ks.xml" />
+<import path="lib/life.ks.xml" />
 <let name="cols" value="40" />
 <let name="rows" value="24" />
 <!DOCTYPE html>
@@ -85,8 +85,8 @@
             class="board"
             style="--cols: {$cols}"
             on-click="world = @flip($world, where: $event.value)">
-            <for each="row" index="y" in="$world.grid">
-              <for each="c" index="x" in="$row">
+            <for each="row" at="y" in="$world.grid">
+              <for each="c" at="x" in="$row">
                 <button
                   class="{ $c eq 'O' ? 'cell on' : 'cell' }"
                   value="{$x},{$y}"></button>

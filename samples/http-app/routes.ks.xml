@@ -1,7 +1,7 @@
 <!-- Web routes: pages that controllers render with data. kscript serve loads this file first. -->
 <KScript.Routes>
-  <import src="controllers/people.ks.xml" as="people" />
-  <import src="middleware/security.ks.xml" />
+  <import path="controllers/people.ks.xml" as="people" />
+  <import path="middleware/security.ks.xml" />
 
   <Middleware use="secure_headers" />
 

@@ -334,7 +334,7 @@ namespace KScript.Docs
             AttributeKind.VariableReference => "a variable's name",
             AttributeKind.Parameters => "parameters",
             AttributeKind.DeclareFunction => "a function name",
-            AttributeKind.FunctionReference => "a function",
+            AttributeKind.FunctionReference => "a function: <code>@name</code>",
             AttributeKind.FunctionReferences => "a list of functions: <code>[a, b]</code>",
             AttributeKind.Path => "a file path",
             AttributeKind.Selector => "a CSS selector",

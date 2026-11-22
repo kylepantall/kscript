@@ -500,6 +500,12 @@ namespace KScript.Language.Features
                             items.Add(new CompletionItem { Label = import.Name + "." + field.Name, Kind = CompletionKind.Function, Detail = field.Description, ReplaceSpan = replace });
                         }
                     }
+                    if (analysis.Markup.Syntax == SourceSyntax.Code && CodeArguments.TakesFunctions(ElementInfo.BareName(cursor.TagElement.Name), a)
+                        && !(wordStart > 0 && before[wordStart - 1] == '@'))
+                    {
+                        // In .kscript a function is named as @name: fn: @send, to: @people.show.
+                        items = items.Select(i => new CompletionItem { Label = i.Label, Kind = i.Kind, Detail = i.Detail, InsertText = "@" + i.Label, ReplaceSpan = i.ReplaceSpan }).ToList();
+                    }
                     items.AddRange(a.Options.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, Detail = "built-in middleware", ReplaceSpan = replace }));
                     return items;
                 }
@@ -524,7 +530,7 @@ namespace KScript.Language.Features
             }
         }
 
-        /// <summary>The error types for a catch, throw, extends or expect-error: declared ones first, then the built-ins.</summary>
+        /// <summary>The error types for a catch, throw, extends or expect_error: declared ones first, then the built-ins.</summary>
         private static List<CompletionItem> ErrorTypeCompletions(DocumentAnalysis analysis, int offset, TextSpan replace)
         {
             List<CompletionItem> items = analysis.Symbols.Where(s => s.Shape.Type == KType.ErrorType).GroupBy(s => s.Name).Select(g => new CompletionItem

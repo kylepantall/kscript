@@ -79,7 +79,7 @@ namespace KScript.Language.Features
             if (cursor.InAttributeValue && cursor.TagElement.Name == "import" && cursor.Attribute.Name == "names")
             {
                 string typed = cursor.Attribute.Value.Value.Substring(0, Math.Max(0, cursor.Attribute.Value.FromSource(offset)));
-                return ImportNameCompletions(analysis, cursor.TagElement.GetAttributeValue("src"), TextSpan.FromBounds(WordStart(text, offset), offset), typed.Split(','));
+                return ImportNameCompletions(analysis, cursor.TagElement.GetAttributeValue("path"), TextSpan.FromBounds(WordStart(text, offset), offset), typed.Split(','));
             }
             int lineStart = text.LastIndexOf('\n', Math.Max(0, offset - 1)) + 1;
             int lineEnd = text.IndexOf('\n', offset) is int nl && nl >= 0 ? nl : text.Length;

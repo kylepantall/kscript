@@ -79,8 +79,8 @@ public sealed class ConfigTests : IDisposable
     {
         FileOf("staging.yaml", "theme: dark\n");
         FileOf(".env.stage", "REGION=eu\n");
-        Assert.Equal("dark\n", Run("<config env=\"staging\" export-env=\"no\" /><echo>{$config.theme}</echo>"));
-        Assert.Equal("eu\n", Run("<config env=\"stage\" export-env=\"no\" /><echo>{$config.region}</echo>"));
+        Assert.Equal("dark\n", Run("<config env=\"staging\" export_env=\"no\" /><echo>{$config.theme}</echo>"));
+        Assert.Equal("eu\n", Run("<config env=\"stage\" export_env=\"no\" /><echo>{$config.region}</echo>"));
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class ConfigTests : IDisposable
     {
         FileOf("config.yaml", "who: main\n");
         FileOf("other.yaml", "who: other\n");
-        Assert.Equal("other main\n", Run("<config files=\"other.yaml\" to=\"o\" /><echo>{$o.who} {$config.who}</echo>"));
+        Assert.Equal("other main\n", Run("<config files=\"other.yaml\" into=\"o\" /><echo>{$o.who} {$config.who}</echo>"));
     }
 
     [Fact]
