@@ -69,7 +69,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.Equal(new[]
         {
             ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config/config.test.yaml", "config/config.yaml",
-            "controllers/accounts.kscript", "controllers/notes.kscript", "kscript.json", "lib/cache.kscript", "middleware/request_id.kscript",
+            "controllers/accounts.kscript", "controllers/notes.kscript", "kscript.json", "lib/cache.kscript", "middleware/request-id.kscript",
             "models/note.kscript", "requests/note-input.kscript", "requests/sign-in.kscript", "requests/sign-up.kscript", "routes/api.kscript", "tests/accounts.test.kscript", "tests/api.test.kscript", "tests/notes.test.kscript",
         }, Files(root));
         // Each type has its own file, and the controllers import them.
@@ -189,8 +189,8 @@ public sealed class ProjectTemplateApiTests : IDisposable
         {
             ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_components/site-nav.html", "_layout.html",
             "config/config.test.yaml", "config/config.yaml", "controllers/notes.kscript", "index.html", "kscript.json", "lib/cache.kscript",
-            "lib/notes_client.kscript", "models/note.kscript", "notes.html", "requests/note-input.kscript", "routes/api.kscript", "site.css", "tests/api.test.kscript",
-            "tests/notes_client.test.kscript",
+            "lib/notes-client.kscript", "models/note.kscript", "notes.html", "requests/note-input.kscript", "routes/api.kscript", "site.css", "tests/api.test.kscript",
+            "tests/notes-client.test.kscript",
         }, Files(root));
         Assert.Contains("and its API under /api", output);
         var (tested, report) = Test(root);

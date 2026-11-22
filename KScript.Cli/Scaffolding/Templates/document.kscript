@@ -14,22 +14,22 @@ KScript.Document(
   template: {{ template ?? paper }},
   title: "{{ title }}",
   author: "Your Name",
-  to: [{{ kebab }}.pdf, {{ kebab }}.docx]
+  to: ["{{ kebab }}.pdf", "{{ kebab }}.docx"]
 ) {
   Abstract "One paragraph on what this document is about."
 
-  Section(title: Introduction, id: intro) {
+  Section(title: "Introduction", id: "intro") {
     Paragraph "Text can be **bold** or *italic*, hold maths such as \( e^{i\pi} + 1 = 0 \), \
       and footnotes.^[Like this one.]"
   }
 
-  Section(title: Results) {
-    Math(id: eq-main) "\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i"
+  Section(title: "Results") {
+    Math(id: "eq-main") "\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i"
 
     Paragraph "Equation [#eq-main] is the mean. Section [#intro] has the background."
 
     Table(caption: "Results.", align: "lr") {
-      Tr(header: yes) "Measure | Value"
+      Tr(header: true) "Measure | Value"
       Tr "Mean | 4.2"
       Tr "Count | 12"
     }

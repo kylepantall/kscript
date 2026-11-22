@@ -67,14 +67,14 @@ kscript test       # 12 tests, against a database in memory
 | `controllers/accounts.kscript` | Sign-up, tokens and closing an account, with [KScript.Auth](auth.md). |
 | `models/note.kscript` | The `Note` [model](data.md), whose table is made the first time it is used. |
 | `requests/note-input.kscript`, `requests/sign-up.kscript`, `requests/sign-in.kscript` | The typed request bodies, one [type](types.md) per file, that the controllers import. |
-| `middleware/request_id.kscript` | The app's own middleware: every response gets an `X-Request-Id` header. |
+| `middleware/request-id.kscript` | The app's own middleware: every response gets an `X-Request-Id` header. |
 | `lib/cache.kscript` | The app's [cache](cache.md), whose store and time limit come from `config/config.yaml`. |
 | `config/config.yaml`, `config/config.test.yaml` | Settings: the database (`${DATABASE_URL:-sqlite:data/app.sqlite}`) and cache. `kscript test` lays `config.test.yaml` over them (see `test.env` below), so tests get an empty database in memory. |
 | `tests/` | Tests that call the API the way a client would, with `@api('/api/notes')` (see [Calling your own API](http.md#calling-your-own-api)). |
 
 ### A web app with its API: --template fullstack
 
-`kscript make project notes --template fullstack` makes a website whose pages get their data from the app's own JSON API. `notes.html` is a [live](web.md#reactive-pages-with-live-no-javascript) page that lists, adds, ticks and deletes notes through `lib/notes_client.kscript`, which calls `@api('/api/notes')`. Pages and other clients (a phone app, a script) share one set of rules: `routes/api.kscript`, `controllers/notes.kscript` and `models/note.kscript`, as in the api template. The tests check the API and the client.
+`kscript make project notes --template fullstack` makes a website whose pages get their data from the app's own JSON API. `notes.html` is a [live](web.md#reactive-pages-with-live-no-javascript) page that lists, adds, ticks and deletes notes through `lib/notes-client.kscript`, which calls `@api('/api/notes')`. Pages and other clients (a phone app, a script) share one set of rules: `routes/api.kscript`, `controllers/notes.kscript` and `models/note.kscript`, as in the api template. The tests check the API and the client.
 
 ### Database, sign-in, cache and Docker
 

@@ -13,7 +13,7 @@ hint: Turn it on in a script that imports it: log-provider(fn: {{ snake }}, leve
 import KScript.IO
 
 /// Gets each entry at {{ level ?? warn }} or above.
-fn {{ snake }}(entry) {
+fn {{ snake }}(entry: map) {
   // TODO: Send the entry where you need it. This writes it to a file.
   // Paths are relative to this script: {{ up }}logs is the project's logs
   // folder.

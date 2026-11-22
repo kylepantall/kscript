@@ -5,7 +5,7 @@ KScript.Routes(middleware: [cors, request_id]) {
 {{#if auth}}
   import KScript.Auth
 {{/if}}
-  import "../middleware/request_id{{ ext }}"
+  import "../middleware/request-id{{ ext }}"
 {{#if auth}}
   import "../controllers/accounts{{ ext }}" as accounts
 {{/if}}
