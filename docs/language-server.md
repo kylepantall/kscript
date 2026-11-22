@@ -87,7 +87,13 @@ interpreter and the analyzer report them from there. Parts of the KScript 2 prop
 package wins.
 
 A script imports KScript.Core, the packages in the nearest `kscript.json`, the ones named in `<import package>`, and
-the owner of any `<KScript.X>` element. Pages need no imports.
+the owner of any `<KScript.X>` element. Pages need no imports, but a page's `<import package>` gives it the package's
+variables (`$session` from KScript.Auth).
+
+A KScript.Http view (`views/auth/account.html`) is typed from the scripts that render it: `Analysis/ViewInputs.cs` finds
+each `@view('auth/account', ...)` in the project's scripts and declares the values it passes, with their shapes, as the
+view's variables. A package says what fields a command's result has with `ResultShapes` (`("@api_tokens", "list<{ id:
+string, name: string }>")`), read by `Analysis/ShapeText.cs`, so a loop over `$data.tokens` knows each token's fields.
 
 Completion only offers what the file can use: built-ins and items from the packages it imports, at the top level, inside
 functions and after `->`. Using an item from a package that isn't imported is KS3009, with a quick fix that adds the import.
