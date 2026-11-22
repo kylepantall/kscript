@@ -132,6 +132,11 @@ namespace KScript.Language.Analysis
         /// </summary>
         private static TypeShape[] LambdaParameterShapes(string method, TypeShape receiver)
         {
+            // $User->where(fn($u) => $u.age >= 18): $u is one of the model's records.
+            if (method is "where" or "or_where" or "where_not" && DataColumns.RecordOf(receiver) is TypeShape record)
+            {
+                return new[] { record };
+            }
             if (receiver.Type != KType.List || receiver.Element == null || receiver.Element.Type == KType.Any)
             {
                 return null;
@@ -611,6 +616,10 @@ namespace KScript.Language.Analysis
             if (applicable.Any(m => m.KeepsBareWords) && args != null)
             {
                 KeepBareWords(args);
+            }
+            if (applicable.Any(m => m.Package == "KScript.Data"))
+            {
+                CheckColumns(name, receiver, args, region);
             }
             if (ChecksImports && !IsJobValue(receiver) && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
             {

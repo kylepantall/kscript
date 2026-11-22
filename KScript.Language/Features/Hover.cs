@@ -134,7 +134,7 @@ namespace KScript.Language.Features
                 }
 
                 case MethodCallNode m when m.NameSpan.Contains(index):
-                    return MethodHover(analysis, region, m.Name, m.Target, m.NameSpan);
+                    return MethodHover(analysis, region, m.Name, m.Target, m.NameSpan, m);
 
                 // In |> upper(), the node under the cursor is the identifier, not the call around it.
                 case IdentifierNode id2:
@@ -183,7 +183,7 @@ namespace KScript.Language.Features
             return null;
         }
 
-        private HoverResult MethodHover(DocumentAnalysis analysis, ExpressionRegion region, string name, ExprNode target, TextSpan nameSpan)
+        private HoverResult MethodHover(DocumentAnalysis analysis, ExpressionRegion region, string name, ExprNode target, TextSpan nameSpan, MethodCallNode call = null)
         {
             TypeShape receiver = InferAt(analysis, region, target);
             Symbol fn = analysis.RootScope.Lookup(name, int.MaxValue);
@@ -196,7 +196,14 @@ namespace KScript.Language.Features
                 return new HoverResult(SymbolMarkdown(analysis, extension), region.Source.ToSource(nameSpan));
             }
             CallableInfo method = Catalog.GetMethods(name, receiver.Type).FirstOrDefault();
-            return method != null ? new HoverResult(CallableMarkdown(method, receiver) + HoverExtras(method, analysis), region.Source.ToSource(nameSpan)) : null;
+            if (method == null)
+            {
+                return null;
+            }
+            // A KScript.Data query chain: the SQL it sends.
+            string sql = call != null && method.Package == "KScript.Data" ? QuerySql.Sketch(call, n => InferAt(analysis, region, n)) : null;
+            string extra = sql != null ? "\n\nThe SQL, roughly (? are the values):\n```sql\n" + sql + "\n```" : string.Empty;
+            return new HoverResult(CallableMarkdown(method, receiver) + extra + HoverExtras(method, analysis), region.Source.ToSource(nameSpan));
         }
 
         #region Markdown

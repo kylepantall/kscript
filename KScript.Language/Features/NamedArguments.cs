@@ -152,6 +152,7 @@ namespace KScript.Language.Features
 
             var items = new List<CompletionItem>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            items.AddRange(ColumnCompletions(analysis, region, node, named, replace));
 
             // Bare values of the enum parameter this argument lands on: @known_folder(‸) offers downloads, home...
             bool afterNamed = others.Any(a => a.Name != null && a.Span.End <= wordStart);
@@ -227,6 +228,44 @@ namespace KScript.Language.Features
                         SortText = (signature.DeprecatedParameters.Contains(name) ? "09" : "00") + i.ToString("D2"),
                     });
                 }
+            }
+            return items;
+        }
+
+        /// <summary>
+        /// The model's columns in a KScript.Data call: <c>$User->where(‸)</c> offers <c>name:</c>, <c>->order_by(‸)</c>
+        /// offers <c>name</c>, and <c>->with(‸)</c> the relations.
+        /// </summary>
+        private List<CompletionItem> ColumnCompletions(DocumentAnalysis analysis, ExpressionRegion region, ExprNode node, HashSet<string> named, TextSpan replace)
+        {
+            var items = new List<CompletionItem>();
+            if (node is not MethodCallNode m || DataColumns.RecordOf(InferAt(analysis, region, m.Target)) is not TypeShape record)
+            {
+                return items;
+            }
+            bool bare = DataColumns.Bare.Contains(m.Name) || DataColumns.Relations.Contains(m.Name);
+            bool asNamed = DataColumns.Named.Contains(m.Name) && !bare;
+            if (!bare && !asNamed)
+            {
+                return items;
+            }
+            foreach (FieldInfo field in record.Fields.Values)
+            {
+                if (named.Contains(field.Name) || DataColumns.Relations.Contains(m.Name) != DataColumns.IsRelation(field))
+                {
+                    continue;
+                }
+                items.Add(new CompletionItem
+                {
+                    Label = asNamed ? field.Name + ":" : field.Name,
+                    Kind = CompletionKind.Field,
+                    Detail = field.Shape?.ToString(),
+                    Documentation = (field.Description != null ? field.Description + "\n\n" : string.Empty) + $"A {(DataColumns.IsRelation(field) ? "relation" : "field")} of {record.Name}.",
+                    InsertText = asNamed ? field.Name + ": " : field.Name,
+                    FilterText = field.Name,
+                    ReplaceSpan = replace,
+                    SortText = "000" + field.Name,
+                });
             }
             return items;
         }
