@@ -166,7 +166,7 @@ public sealed class DataIntegrationTests : DataFixture
             fn sign_in(json) => { user: @attempt($json.email, $json.password) }
             fn me() {
               me = @user()
-              return { name: $me.name, posts: $me.posts->count(), json: @json($me) }
+              return { name: $me.name, posts: $me.posts->count(), json: $me->to_json() }
             }
             fn people(json) {
               u = @users()

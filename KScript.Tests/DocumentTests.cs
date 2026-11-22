@@ -193,20 +193,20 @@ public sealed class DocumentScriptTests : DocumentFixture
         string output = Run(@"
 import KScript.Document
 rows = [{ name: 'Ada', score: 9.5, team: { city: 'London' } }, { name: 'Alan', score: 12, team: { city: 'Manchester' } }]
-Document(template: paper, title: ""Kitchen Sink"", subtitle: ""All of it"", author: ""Ada Lovelace; Alan Turing"", date: ""1 May 2026"", keywords: ""one, two"", header: ""[title] | [author] | [date]"", footer: "" | Page [page] of [pages] | "", into: doc, to: ""out/sink.pdf, out/sink.docx"") {
+Document(template: paper, title: ""Kitchen Sink"", subtitle: ""All of it"", author: ""Ada Lovelace; Alan Turing"", date: ""1 May 2026"", keywords: ['one', 'two'], header: ""[title] | [author] | [date]"", footer: "" | Page [page] of [pages] | "", into: doc, to: ""out/sink.pdf, out/sink.docx"") {
   Author(affiliation: ""Analytical Engines"", email: ""ada@example.org"") ""Ada King""
   Abstract ""First paragraph of the abstract.
 
   Second paragraph with \( \alpha \).""
   Contents(depth: 2)
-  Section(title: ""Intro with \( x \)"", id: intro) {
-    Paragraph(id: p1) ""**Bold**, *italic*, __strong__, _em_, `code`, [a link](https://example.org), \( \frac{a}{b} \), [@gardner1970], [@berlekamp1982; @erdos], see [#methods] and [#eq-one] and [#tab-data] and [#fig-one] and [#p1].^[A *note*.] -- and --- dashes.""
+  Section(title: ""Intro with \( x \)"", id: ""intro"") {
+    Paragraph(id: ""p1"") ""**Bold**, *italic*, __strong__, _em_, `code`, [a link](https://example.org), \( \frac{a}{b} \), [@gardner1970], [@berlekamp1982; @erdos], see [#methods] and [#eq-one] and [#tab-data] and [#fig-one] and [#p1].^[A *note*.] -- and --- dashes.""
     Paragraph(align: center) ""Centred.""
     Paragraph(align: right) ""Right.""
     Paragraph(align: left) ""Left.""
     Paragraph(lines: true) ""Line one
 Line two""
-    Section(title: Methods, id: methods, numbered: false) {
+    Section(title: ""Methods"", id: ""methods"", numbered: false) {
       List(style: number, start: 3) {
         Item ""Three""
         List(style: letter) {
@@ -220,22 +220,22 @@ Line two""
       List {
         Item ""Bullet with **bold**""
       }
-      Section(title: Deeper) {
-        Section(title: Deeper still) {
+      Section(title: ""Deeper"") {
+        Section(title: ""Deeper still"") {
           Paragraph ""Level four.""
         }
       }
     }
   }
-  Section(title: Results, new_page: true) {
-    Math(id: eq-one) ""E = mc^2""
+  Section(title: ""Results"", new_page: true) {
+    Math(id: ""eq-one"") ""E = mc^2""
     Math(numbered: false) ""\int_0^1 x \, dx = \tfrac{1}{2}""
-    Code(language: python) ""def f(x):
+    Code(language: ""python"") ""def f(x):
     return x * 2  # { not interpolated }""
     Quote(by: ""Someone"") ""A quotation.
 
 Two paragraphs.""
-    Table(caption: ""Data from maps."", id: tab-data, rows: $rows, columns: { Name: 'name', Score: 'score', City: 'team.city', Missing: 'nope' })
+    Table(caption: ""Data from maps."", id: ""tab-data"", rows: $rows, columns: { Name: 'name', Score: 'score', City: 'team.city', Missing: 'nope' })
     Table(rows: [[1, 2], [3, 4]], header: false, rules: grid, widths: [2, 1], size: 0.9)
     Table(rows: $rows, columns: ['name', 'score'], rules: none, align: ['left', 'center'])
     Table(rows: [['a', 'b'], ['c', 'd']])
@@ -245,7 +245,7 @@ Two paragraphs.""
       Tr ""1 \| one | 2 | 3""
       Tr ""wide cell that keeps going and going and going and going and going and going | x | y""
     }
-    Figure(path: ""fig.png"", caption: ""A figure."", id: fig-one, width: '50%')
+    Figure(path: ""fig.png"", caption: ""A figure."", id: ""fig-one"", width: '50%')
     Figure(path: ""photo.jpg"", width: 0.3)
     Markdown(path: ""ch/intro.md"")
     Markdown ""
@@ -259,7 +259,7 @@ Two paragraphs.""
     Paragraph ""After the break.""
   }
   Bibliography(path: ""refs.bib"", title: ""Sources"") {
-    Source(id: extra, type: book, author: ""Jane Doe"", title: ""Uncited"", year: 2000)
+    Source(id: ""extra"", type: ""book"", author: ""Jane Doe"", title: ""Uncited"", year: 2000)
   }
 }
 echo ""{ $doc.title } | { $doc.sections } | { $doc->pages() } | { $doc->words() } | { $doc->type() } | { $doc }""
@@ -317,20 +317,20 @@ echo $doc->html()->count() > 0
     public void Report_letter_and_invoice_templates()
     {
         Run(@"
-Document(template: report, title: ""Report"", author: ""Team"", citations: author-year, to: ""report.pdf, report.docx, report.tex, report.md, report.html"") {
+Document(template: report, title: ""Report"", author: ""Team"", citations: author-year, to: ['report.pdf', 'report.docx', 'report.tex', 'report.md', 'report.html']) {
   Contents
-  Section(title: One) {
+  Section(title: ""One"") {
     Paragraph ""See [@a] and [@a; @b].""
   }
-  Section(title: Two) {
+  Section(title: ""Two"") {
     Paragraph ""Two.""
   }
   Bibliography {
-    Source(id: a, author: ""Zed Last and Amy First"", title: ""Alpha"", year: 2001, journal: ""J"")
-    Source(id: b, author: ""Bee"", title: ""Beta"", year: 1999, publisher: ""P"", url: ""https://b.example"")
+    Source(id: ""a"", author: ""Zed Last and Amy First"", title: ""Alpha"", year: 2001, journal: ""J"")
+    Source(id: ""b"", author: ""Bee"", title: ""Beta"", year: 1999, publisher: ""P"", url: ""https://b.example"")
   }
 }
-Document(template: letter, to: ""letter.pdf, letter.docx"") {
+Document(template: letter, to: ['letter.pdf', 'letter.docx']) {
   Letter(from: ""Me\n1 Street"", to: ""You"", subject: ""Hello"", opening: ""Dear you,"", closing: ""Yours,"", signature: ""Me"") {
     Paragraph ""Body.""
   }
@@ -338,10 +338,10 @@ Document(template: letter, to: ""letter.pdf, letter.docx"") {
     Paragraph ""Only the date.""
   }
 }
-Document(template: invoice, to: ""invoice.pdf, invoice.docx, invoice.html"") {
-  Invoice(number: 7, title: ""Bill"", from: ""Us"", to: ""Them"", due: ""Soon"", tax: 10, tax_name: ""Sales tax"", paid: 50, notes: ""Thanks"", currency: USD, items: [{ description: 'A', qty: 2, unit_price: 10 }, { item: 'B', amount: 5 }, { name: 'C', rate: 1.5, quantity: 3 }, { description: 'Free' }])
-  Invoice(items: [{ description: 'Yen', price: 1000 }], currency: JPY)
-  Invoice(items: [{ description: 'Other', price: -3 }], currency: XYZ)
+Document(template: invoice, to: ['invoice.pdf', 'invoice.docx', 'invoice.html']) {
+  Invoice(number: 7, title: ""Bill"", from: ""Us"", to: ""Them"", due: ""Soon"", tax: 10, tax_name: ""Sales tax"", paid: 50, notes: ""Thanks"", currency: ""USD"", items: [{ description: 'A', qty: 2, unit_price: 10 }, { item: 'B', amount: 5 }, { name: 'C', rate: 1.5, quantity: 3 }, { description: 'Free' }])
+  Invoice(items: [{ description: 'Yen', price: 1000 }], currency: ""JPY"")
+  Invoice(items: [{ description: 'Other', price: -3 }], currency: ""XYZ"")
   Invoice(items: [{ description: 'Odd', price: 3 }], currency: ""Ð"")
 }
 ");
@@ -364,28 +364,28 @@ Document(template: invoice, to: ""invoice.pdf, invoice.docx, invoice.html"") {
     public void Style_options_change_the_page()
     {
         Run(@"
-Document(paper: letter, landscape: true, margin: ""1in 2cm 30mm 40pt"", font: sans, heading_font: mono, size: 12, line_height: 1.5, align: left, accent: navy, numbered: false, title_page: true, chapters: true, citations: numeric, header: ""Left"", footer: """", rules: grid, language: ""en-GB"", title: ""Styled"", to: ""styled.pdf, styled.docx, styled.html, styled.tex"") {
+Document(paper: ""letter"", landscape: true, margin: ""1in 2cm 30mm 40pt"", font: sans, heading_font: mono, size: 12, line_height: 1.5, align: left, accent: ""navy"", numbered: false, title_page: true, chapters: true, citations: numeric, header: ""Left"", footer: """", rules: grid, language: ""en-GB"", title: ""Styled"", to: ['styled.pdf', 'styled.docx', 'styled.html', 'styled.tex']) {
   Abstract ""On the title page.""
-  Section(title: A) {
+  Section(title: ""A"") {
     Paragraph ""Text.""
   }
-  Section(title: B) {
+  Section(title: ""B"") {
     Paragraph ""More.""
   }
 }
-Document(paper: ""15cm x 20cm"", margin: ""1cm 2cm"", accent: ""#336699"", font: mono, to: ""custom.pdf, custom.tex"") {
+Document(paper: ""15cm x 20cm"", margin: ""1cm 2cm"", accent: ""#336699"", font: mono, to: ['custom.pdf', 'custom.tex']) {
   Paragraph ""Custom paper.""
 }
-Document(paper: a5, margin: ""1cm 2cm 3cm"", to: ""a5.pdf"") {
+Document(paper: ""a5"", margin: ""1cm 2cm 3cm"", to: ""a5.pdf"") {
   Paragraph ""A5.""
 }
-Document(paper: a3, to: ""a3.pdf"") {
+Document(paper: ""a3"", to: ""a3.pdf"") {
   Paragraph ""A3.""
 }
-Document(paper: b5, to: ""b5.pdf"") {
+Document(paper: ""b5"", to: ""b5.pdf"") {
   Paragraph ""B5.""
 }
-Document(paper: legal, to: ""legal.pdf"") {
+Document(paper: ""legal"", to: ""legal.pdf"") {
   Paragraph ""Legal.""
 }
 ");
@@ -402,7 +402,7 @@ Document(paper: legal, to: ""legal.pdf"") {
         Run(@"
 import KScript.Document
 name = 'list'
-Document(title: ""Bare"", to: [bare.pdf, bare.md]) {
+Document(title: ""Bare"", to: ['bare.pdf', 'bare.md']) {
   Paragraph ""Bare names.""
 }
 Document(title: ""Quoted"", to: [""quoted.tex"", 'quoted.html']) {
@@ -430,7 +430,7 @@ Document(title: ""Values"", to: [""{ $name }.docx""]) {
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", accent: \"#zz\") {\n}", "accent: '#zz' isn't a colour")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"[#nowhere]\"\n}", "nowhere")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"[@nobody]\"\n}", "nobody")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph(id: x) \"a\"\n  Paragraph(id: x) \"b\"\n}", "Two parts of the document have id: x")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph(id: 'x') \"a\"\n  Paragraph(id: 'x') \"b\"\n}", "Two parts of the document have id: x")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Math \"\\frac{1}\"\n}", "In the maths")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"\\( \\nosuch \\)\"\n}", "nosuch")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Figure(path: \"missing.png\")\n}", "missing.png")]

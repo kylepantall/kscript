@@ -296,9 +296,9 @@ namespace KScript.Data
                     return Records.Create(c, q.Model, values);
                 }),
             new("query", "", "A query on the model with no conditions yet, to build on.", KType.Query, (q, c) => q),
-            new("fake", "values...", "Saves a record with made-up values for the fields that need one, and these values: `$User->fake(role: 'admin')`. Optional fields and fields with defaults are left to the model, and a required relation gets a fake record too. For tests and seeders.", KType.Record,
+            new("fake", "values...", "Saves a record with made-up values for the fields that need one, and these values: `User->fake(role: 'admin')`. Optional fields and fields with defaults are left to the model, and a required relation gets a fake record too. For tests and seeders.", KType.Record,
                 (q, c) => Fakes.Make(c, q.Model, ValuesOf(c, "fake", allowEmpty: true)), Bare: true),
-            new("fake_many", "count: number, values...", "Saves count fake records, each with these values, and returns them: `$Post->fake_many(3, author: $joan)`.", KType.List,
+            new("fake_many", "count: number, values...", "Saves count fake records, each with these values, and returns them: `Post->fake_many(3, author: $joan)`.", KType.List,
                 (q, c) =>
                 {
                     int count = Count(c.Arg(0, "count"), "->fake_many()'s count");

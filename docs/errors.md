@@ -263,7 +263,7 @@ A built-in type that was renamed is an error, with a fix that writes the new nam
 
 ## KS5013
 
-**A column the model doesn't have**, named in a [KScript.Data](data.md) query, `->create()` or `->update()`: `$User->where(nmae: 'Joan')` or `->order_by(agee)`. The message suggests the closest field.
+**A column the model doesn't have**, named in a [KScript.Data](data.md) query, `->create()` or `->update()`: `User->where(nmae: 'Joan')` or `->order_by(agee)`. The message suggests the closest field.
 
 ## KS5014
 
@@ -323,7 +323,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6013
 
-**A name that breaks the naming rules.** Functions, variables, fields and arguments are `snake_case`; types, models, enums and error types are `PascalCase`.
+**A name that breaks the naming rules.** Functions, variables, fields and arguments are `snake_case`; types, models, enums and error types are `PascalCase`. The editor renames a variable everywhere the file uses it with the quick fix; a function, a parameter, a field or a type has no quick fix, because other files and callers may name it, so use the editor's rename. `kscript check --fix` leaves names alone.
 
 ## KS6014
 

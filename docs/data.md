@@ -459,15 +459,17 @@ A migration it writes looks like this:
 
 ```kscript
 // Written by kscript db diff from the models.
-KScript.Migration {
-  CreateTable(name: users) {
-    Field(name: id, type: int, key, auto)
-    Field(name: name, type: string, max: 80)
-    Field(name: email, type: email)
-    Field(name: role, type: enum, values: [member, admin], default: 'member')
+import KScript.Data
+
+Migration {
+  CreateTable(name: 'users') {
+    Field(name: 'id', type: int, key, auto)
+    Field(name: 'name', type: string, max: 80)
+    Field(name: 'email', type: email)
+    Field(name: 'role', type: enum, values: [member, admin], default: 'member')
     Index(columns: [email], unique)
   }
-  AddField(table: posts, name: views, type: int, default: 0)
+  AddField(table: 'posts', name: 'views', type: int, default: 0)
 }
 ```
 
@@ -501,7 +503,7 @@ kscript db migrate            # runs what hasn't run, as one batch
 kscript db migrate --pretend  # prints the SQL instead
 kscript db rollback           # undoes the last batch
 kscript db rollback --steps 2 # undoes the last two migrations
-kscript db status             # what has run, and what the models want that no migration makes (--format json too)
+kscript db status             # what has run, and what the models want that no migration makes (--output json too)
 kscript db fresh              # drops every table and runs every migration again
 ```
 
@@ -521,7 +523,7 @@ A seeder is a script in `database/seeders` (`paths.seeders`) that fills the data
 import KScript.Data
 import "../../models/user.kscript"
 
-$User->create(name: 'Ada', email: 'ada@example.com')
+User->create(name: 'Ada', email: 'ada@example.com')
 ```
 
 `kscript db seed` runs every seeder in name order, and `kscript db seed users` runs one. `kscript db migrate --seed` and `kscript db fresh --seed` run them after migrating.
@@ -538,13 +540,13 @@ import KScript.Data
 import "../models/post.kscript"
 
 test(name: "a post starts with no views") {
-  post = $Post->fake(title: 'Hello')
+  post = Post->fake(title: 'Hello')
   expect(value: $post.views, equals: 0)
-  expect(value: $Post->count(), equals: 1)
+  expect(value: Post->count(), equals: 1)
 }
 
 test(name: "each test starts empty") {
-  expect(value: $Post->count(), equals: 0)
+  expect(value: Post->count(), equals: 0)
 }
 ```
 
@@ -552,11 +554,11 @@ test(name: "each test starts empty") {
 
 ### Fakes
 
-`$Model->fake(fields...)` saves a record with made-up values for the fields you don't give, and `->fake_many(count, fields...)` saves several. The values fit each field's type and limits (a `string(min: 3, max: 12)` is 3 to 12 characters, an `email` ends in `@example.com`, an enum is its first value), and a required relation gets a fake record of its own:
+`Model->fake(fields...)` saves a record with made-up values for the fields you don't give, and `->fake_many(count, fields...)` saves several. The values fit each field's type and limits (a `string(min: 3, max: 12)` is 3 to 12 characters, an `email` ends in `@example.com`, an enum is its first value), and a required relation gets a fake record of its own:
 
 ```kscript
-joan = $Author->fake(name: 'Joan')
-posts = $Post->fake_many(3, author: $joan)
+joan = Author->fake(name: 'Joan')
+posts = Post->fake_many(3, author: $joan)
 ```
 
 ### Counting queries
@@ -565,8 +567,8 @@ posts = $Post->fake_many(3, author: $joan)
 
 ```kscript
 test(name: "the post list loads authors at once") {
-  $Post->fake_many(10)
-  $Post->with(author)->get()
+  Post->fake_many(10)
+  Post->with(author)->get()
   expect(value: @queries(), count_at_most: 2)
 }
 ```
@@ -579,7 +581,7 @@ test(name: "the post list loads authors at once") {
 
 ## In the editor
 
-The language server knows each model's fields. It completes them in `->where(`, `->order_by(`, `->create(` and the rest, and relations in `->with(`; a field the model doesn't have is `KS5013` (see [errors](errors.md)). A `where` lambda's parameter is the model's record, so `fn($p) => $p.` completes its fields too.
+The language server knows each model's fields. It completes them in `->where(`, `->order_by(`, `->create(` and the rest, and relations in `->with(`; a field the model doesn't have is `KS5013` (see [errors](errors.md)). A `where` lambda's parameter is the model's record, so `fn(p) => $p.` completes its fields too.
 
 Hover over a query method to see the SQL the chain sends, roughly, with `?` for the values:
 

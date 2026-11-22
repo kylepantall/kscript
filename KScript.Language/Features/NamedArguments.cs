@@ -233,7 +233,7 @@ namespace KScript.Language.Features
         }
 
         /// <summary>
-        /// The model's columns in a KScript.Data call: <c>$User->where(‸)</c> offers <c>name:</c>, <c>->order_by(‸)</c>
+        /// The model's columns in a KScript.Data call: <c>User->where(‸)</c> offers <c>name:</c>, <c>->order_by(‸)</c>
         /// offers <c>name</c>, and <c>->with(‸)</c> the relations.
         /// </summary>
         private List<CompletionItem> ColumnCompletions(DocumentAnalysis analysis, ExpressionRegion region, ExprNode node, HashSet<string> named, TextSpan replace)

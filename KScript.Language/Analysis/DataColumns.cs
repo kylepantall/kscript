@@ -4,7 +4,7 @@ namespace KScript.Language.Analysis
 {
     /// <summary>
     /// Which arguments of KScript.Data's query, create and update methods name a model's columns, for the editor:
-    /// <c>$User->where(name: 'Joan')</c> names one in an argument's name, <c>->order_by(name)</c> as a bare word, and
+    /// <c>User->where(name: 'Joan')</c> names one in an argument's name, <c>->order_by(name)</c> as a bare word, and
     /// <c>->with(posts)</c> names a relation.
     /// </summary>
     internal static class DataColumns

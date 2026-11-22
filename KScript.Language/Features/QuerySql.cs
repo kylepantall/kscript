@@ -7,7 +7,7 @@ using KScript.Syntax;
 namespace KScript.Language.Features
 {
     /// <summary>
-    /// The SQL a KScript.Data query chain sends, worked out from the code for hover: <c>$User->where(age: 3)->get()</c>
+    /// The SQL a KScript.Data query chain sends, worked out from the code for hover: <c>User->where(age: 3)->get()</c>
     /// is <c>SELECT * FROM users WHERE age = ?</c>. Values are <c>?</c>, since they are only known when it runs, and
     /// a condition the sketch can't follow is <c>…</c>.
     /// </summary>

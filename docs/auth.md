@@ -189,10 +189,7 @@ The model is the one in the models folder (`models/user.kscript`). It needs an e
 ```kscript
 import KScript.Data
 
-model User {
-  timestamps: yes
-  unique: [email]
-  hidden: [password]
+model User(timestamps, unique: [email], hidden: [password]) {
   email: email
   password: password
   name: string

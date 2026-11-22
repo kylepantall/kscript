@@ -428,7 +428,7 @@ The built-in error types, which KScript itself raises, form a tree that `catch` 
 | `Network` | `Error` | Requests. `Timeout` extends it, and `$e.status` is the response's status. |
 | `Import`, `Config`, `Input`, `Limit`, `Context`, `Platform`, `Cancelled`, `Retired`, `Http`, `AI`, `UI`, `Reference`, `Assertion`, `Internal` | `Error` | Imports, settings, input, limits such as recursion, the wrong place, the OS, a stopped script, retired features, KScript.Http apps, language models, desktop windows, a document's references, failed test checks, a fault in KScript itself. |
 | `Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409), `TooManyRequests` (429) | `Error` | For your own code to throw or extend. The number is the HTTP status. |
-| `Query`, `Connection` (503) | `Error` | [KScript.Data](data.md#errors): a query the database refused, a database that can't be opened. `ModelNotFound` extends `NotFound`; `UniqueViolation` and `ForeignKeyViolation` extend `Conflict`. |
+| `Query`, `Connection` (503) | `Error` | [KScript.Data](data.md#errors): a query the database refused, a database that can't be opened. `Migration`: a migration that can't be read or run, or a `kscript db` command that can't go ahead. `ModelNotFound` extends `NotFound`; `UniqueViolation` and `ForeignKeyViolation` extend `Conflict`. |
 | `JobFailed` | `Error` | [KScript.Queue](queues.md): a job that used up its tries. `JobTimeout` extends `Timeout`. |
 
 No type's name ends in `Error`: they are all errors. (`QueryError` and `ConnectionError` are now `Query` and `Connection`, and `catch QueryError` says so.)

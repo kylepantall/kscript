@@ -69,7 +69,7 @@ public sealed class DataTestingTests : DataFixture
             test(name: 'two') {
               expect(value: Post->count(), equals: 0)
               expect(value: @queries(), count: 1)
-              @transaction(fn() => Author->fake())
+              $db->transaction(fn() => Author->fake())
               expect(value: Author->count(), equals: 1)
             }
 

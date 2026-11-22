@@ -97,7 +97,7 @@ fn store(json: NewPerson) {
 A path parameter typed as a [KScript.Data](data.md) model is the record with that key, so the controller gets the post itself. A key with no record, or one that isn't a key, gets `404`, and OpenAPI shows the key's type:
 
 ```kscript
-// routes: Get(path: /posts/{post}, to: posts.show)
+// routes: Get(path: "/posts/{post}", to: @posts.show)
 fn show(post: Post) => $post
 ```
 

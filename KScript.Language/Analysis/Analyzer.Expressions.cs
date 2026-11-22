@@ -137,7 +137,7 @@ namespace KScript.Language.Analysis
         /// </summary>
         private static TypeShape[] LambdaParameterShapes(string method, TypeShape receiver)
         {
-            // $User->where(fn($u) => $u.age >= 18): $u is one of the model's records.
+            // User->where(fn(u) => u.age >= 18): u is one of the model's records.
             if (method is "where" or "or_where" or "where_not" && DataColumns.RecordOf(receiver) is TypeShape record)
             {
                 return new[] { record };

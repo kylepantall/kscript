@@ -133,8 +133,8 @@ public sealed class MigrationTests : DataFixture
         Assert.Contains("Field(name: 'author_id', type: int, references: 'users')", text);
         Assert.Contains("Key(columns: [post_id, tag_id])", text);
         // Tables come after the ones they point to.
-        Assert.True(text.IndexOf("name: users", StringComparison.Ordinal) < text.IndexOf("name: posts", StringComparison.Ordinal));
-        Assert.True(text.IndexOf("name: tags", StringComparison.Ordinal) < text.IndexOf("name: post_tag", StringComparison.Ordinal));
+        Assert.True(text.IndexOf("name: 'users'", StringComparison.Ordinal) < text.IndexOf("name: 'posts'", StringComparison.Ordinal));
+        Assert.True(text.IndexOf("name: 'tags'", StringComparison.Ordinal) < text.IndexOf("name: 'post_tag'", StringComparison.Ordinal));
 
         string status = Ok("status");
         Assert.Contains("2026_11_22_100000_create_tags_users_posts_and_more", status);
@@ -170,7 +170,7 @@ public sealed class MigrationTests : DataFixture
 
         Models(user: User.Replace("  name: string(max: 80)\n", "  name: string(max: 120)\n  bio?: string\n  score: number = 1.5\n")
             .Replace("enum Role { member, admin }", "enum Role { member, editor, admin }")
-            .Replace("  unique: [email]\n", "  unique: [email]\n  index: [[name, active]]\n"),
+            .Replace("unique: [email])", "unique: [email], index: [[name, active]])"),
             post: Post.Replace("  views: int = 0\n", string.Empty));
         string status = Ok("status");
         Assert.Contains("The models want 6 changes", status);
@@ -357,7 +357,8 @@ public sealed class MigrationTests : DataFixture
             import KScript.Data
             import "../../models/user.kscript"
 
-            User->create(name: 'Ada', email: "ada{User->count()}@example.com")
+            n = User->count()
+            User->create(name: 'Ada', email: "ada{ $n }@example.com")
             echo 'seeded users'
             """);
         FileOf("database/seeders/zz-empty.kscript", "echo 'empty seeder'\n");
@@ -405,7 +406,7 @@ public sealed class MigrationTests : DataFixture
         var ended = DbWith(string.Empty, "rollback");
         Assert.Contains("The input ended before the question was answered", ended.Error);
         FileOf("kscript.json", "{ nope");
-        Assert.Equal(1, Db("status").Code);
+        Assert.Equal(2, Db("status").Code);
     }
 
     [Fact]
@@ -416,7 +417,7 @@ public sealed class MigrationTests : DataFixture
         Assert.Contains("Nothing to roll back", Ok("rollback"));
         Assert.Contains("Did you mean db migrate?", Failed("migrat"));
         Assert.Contains("--steps needs a number", Failed("rollback", "--steps", "x"));
-        Assert.Equal(1, Db().Code);
+        Assert.Equal(2, Db().Code);
         Assert.Contains("Usage: kscript db", Ok("--help"));
 
         void Bad(string body, string message)
@@ -457,7 +458,7 @@ public sealed class MigrationTests : DataFixture
         Bad(Teams + "DropIndex(table: 'teams', columns: [name], unique)", "has no unique index on (name) to drop");
         Bad("Field(name: 'a', type: int)", "Field");
         Bad("CreateTable(name: 'x') {\n  CreateTable(name: 'y') {\n  }\n}", "can't be inside another");
-        Bad(Teams + "AddField(table: 'teams', name: 'a', type: nope)", "type=\"nope\" isn't one of: string, int");
+        Bad(Teams + "AddField(table: 'teams', name: 'a', type: nope)", "type: nope isn't one of: string, int");
         Bad(Teams + "AddField(table: 'teams', name: 'a', type: enum)", "An enum column needs its values");
         Bad(Teams + "AddField(table: 'teams', name: 'a', type: string, max: 0)", "max should be a number");
         Bad(Teams + "AddField(table: 'teams', name: 'a', type: string, default: [1])", "A default is text, a number, true or false");
@@ -537,7 +538,7 @@ public sealed class MigrationTests : DataFixture
     [Fact]
     public void TheSchemaOfModelsAndTheWriter()
     {
-        Assert.Equal("posts", MigrationWriter.Name("posts"));
+        Assert.Equal("'posts'", MigrationWriter.Name("posts"));
         Assert.Equal("'two words'", MigrationWriter.Name("two words"));
         Assert.Equal("\"it's\"", MigrationWriter.Literal("it's"));
         Assert.Equal("'x'", MigrationWriter.Literal("x"));
@@ -675,7 +676,7 @@ public sealed class MigrationTests : DataFixture
     [Fact]
     public void ANullDefaultIsntADatabaseDefault()
     {
-        Models(user: User.Replace("  active: bool = true\n", "  active: bool = true\n  nick: string? = null\n"));
+        Models(user: User.Replace("  active: bool = true\n", "  active: bool = true\n  nick?: string = null\n"));
         Ok("diff");
         Assert.Contains("Field(name: 'nick', type: string, optional)\n", Migration("create"));
     }
