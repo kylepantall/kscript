@@ -22,6 +22,16 @@ public class ProjectConfigTests
     }
 
     [Fact]
+    public void TestDatabaseIsMemoryOrConfig()
+    {
+        Assert.Equal("memory", Parse("{}").Test.Database);
+        Assert.Equal("config", Parse("{ \"test\": { \"database\": \" config \" } }").Test.Database);
+        var bad = Parse("{ \"test\": { \"database\": 3 } }");
+        Assert.Equal("memory", bad.Test.Database);
+        Assert.Contains("test.database should be memory or config.", bad.Warnings);
+    }
+
+    [Fact]
     public void ReadsEverySectionAndAllowsCommentsAndTrailingCommas()
     {
         var c = Parse("""
@@ -154,7 +164,7 @@ public class ProjectConfigTests
         Assert.Equal(props.GetProperty("config").GetProperty("properties").GetProperty("files").GetProperty("default").EnumerateArray().Select(e => e.GetString()), KScript.Runtime.ConfigOptions.DefaultFiles);
         Assert.Equal("docs,docs_port,host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warnings_as_errors", Keys(props.GetProperty("lint").GetProperty("properties")));
-        Assert.Equal("env,exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
+        Assert.Equal("database,env,exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
         Assert.Equal("enabled,end_of_line,exclude,include,indent,max_blank_lines,preserve,print_width,rules,tab_width", Keys(props.GetProperty("format").GetProperty("properties")));
 
         // Every key the schema allows is one ProjectConfig reads.

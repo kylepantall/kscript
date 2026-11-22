@@ -30,7 +30,7 @@ namespace KScript.Auth
 
         public bool TryGetMember(string name, out object value)
         {
-            value = name == "count" ? (double)App.Users.All().Count() : null;
+            value = name == "count" ? (double)App.Users.Count() : null;
             return value != null;
         }
 
@@ -55,15 +55,16 @@ namespace KScript.Auth
 
         private static bool IsId(string id) => id.Length <= 128 && id.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
 
-        public Dictionary<string, object> Find(string id) => Public(Record(id));
+        public Dictionary<string, object> Find(string id) => Show(Record(id));
+
+        /// <summary>A record as scripts see it: without its password hash, or the model's record for users kept in a model.</summary>
+        public Dictionary<string, object> Show(Dictionary<string, object> record) => record == null ? null : App.Users.Present(record, Public(record));
 
         /// <summary>The record with this email (case doesn't matter), or null.</summary>
         public Dictionary<string, object> RecordByEmail(string email)
         {
             if (string.IsNullOrWhiteSpace(email)) return null;
-            string wanted = email.Trim();
-            return App.Users.All().Select(kv => kv.Value)
-                .FirstOrDefault(r => string.Equals(AuthApp.Text(r.TryGetValue("email", out object e) ? e : null), wanted, StringComparison.OrdinalIgnoreCase));
+            return App.Users.FindBy("email", email.Trim());
         }
 
         /// <summary>An email for the store: checked and normalised by the email type (with the project's rules).</summary>
@@ -124,14 +125,13 @@ namespace KScript.Auth
             lock (Gate)
             {
                 if (RecordByEmail(address) != null) throw Invalid("email", $"Someone has already signed up with {address}.");
-                string id = UuidValue.New(4).Text;
-                var record = new Dictionary<string, object>(StringComparer.Ordinal) { ["id"] = id, ["email"] = address };
+                var record = new Dictionary<string, object>(StringComparer.Ordinal) { ["email"] = address };
                 foreach (var kv in fields ?? new Dictionary<string, object>()) AddField(record, kv.Key, kv.Value);
                 record["created_at"] = AuthApp.Stamp();
                 record["updated_at"] = record["created_at"];
                 record[HashField] = hash;
-                App.Users.Put(id, record);
-                return Public(record);
+                App.Users.Add(record);
+                return Show(record);
             }
         }
 
@@ -167,7 +167,7 @@ namespace KScript.Auth
                 record[HashField] = secret.Hash(null);
                 App.Users.Put(AuthApp.Text(record["id"]), record);
             }
-            return Public(record);
+            return Show(record);
         }
 
         private static string DummyHash()
@@ -204,7 +204,7 @@ namespace KScript.Auth
                 }
                 record["updated_at"] = AuthApp.Stamp();
                 App.Users.Put(id, record);
-                return Public(record);
+                return Show(record);
             }
         }
 
@@ -217,7 +217,7 @@ namespace KScript.Auth
                 record[HashField] = secret.Hash(secret.Algorithm);
                 record["updated_at"] = AuthApp.Stamp();
                 App.Users.Put(id, record);
-                return Public(record);
+                return Show(record);
             }
         }
 
@@ -248,9 +248,10 @@ namespace KScript.Auth
             Record(id) ?? throw new KScriptException($"There is no user with the id '{id}'.", "NotFound");
 
         public List<object> All() =>
-            App.Users.All().Select(kv => (object)Public(kv.Value))
-                .OrderBy(u => AuthApp.Text(((Dictionary<string, object>)u).GetValueOrDefault("created_at")), StringComparer.Ordinal)
-                .ThenBy(u => AuthApp.Text(((Dictionary<string, object>)u)["email"]), StringComparer.OrdinalIgnoreCase)
+            App.Users.All().Select(kv => kv.Value)
+                .OrderBy(u => AuthApp.Text(u.GetValueOrDefault("created_at")), StringComparer.Ordinal)
+                .ThenBy(u => AuthApp.Text(u.GetValueOrDefault("email")), StringComparer.OrdinalIgnoreCase)
+                .Select(u => (object)Show(u))
                 .ToList();
 
         /// <summary>The id of a user given as a map ({ id: ... }) or as the id itself.</summary>
@@ -278,9 +279,9 @@ namespace KScript.Auth
         internal object Invoke(CallContext c, string name) => name switch
         {
             "find" => Find(IdOf(c.Arg(0), "->find()")),
-            "find_email" => Public(RecordByEmail(c.Arg(0) is ISemanticText t ? t.Text : c.Str(0))),
+            "find_email" => Show(RecordByEmail(c.Arg(0) is ISemanticText t ? t.Text : c.Str(0))),
             "all" => All(),
-            "count" => (double)App.Users.All().Count(),
+            "count" => (double)App.Users.Count(),
             "verify" => Verify(c.Arg(0), c.Arg(1)),
             "update" => Update(c, IdOf(c.Arg(0), "->update()"), Fields(c, 1)),
             "set_password" => SetPassword(c, IdOf(c.Arg(0), "->set_password()"), c.Arg(1)),

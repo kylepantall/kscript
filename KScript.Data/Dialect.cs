@@ -208,11 +208,12 @@ namespace KScript.Data
             }
         }
 
-        protected virtual string ColumnDefinition(Column c, bool indexed)
+        protected internal virtual string ColumnDefinition(Column c, bool indexed)
         {
             var sb = new StringBuilder(Quote(c.Name)).Append(' ');
             if (c.AutoIncrement) return sb.Append(AutoKey).ToString();
             sb.Append(ColumnType(c, indexed));
+            if (c.Default != null) sb.Append(" DEFAULT ").Append(DefaultValue(c));
             if (c.IsKey) sb.Append(" PRIMARY KEY");
             else if (!c.Nullable) sb.Append(" NOT NULL");
             if (c.Kind == ColumnKind.Email) sb.Append(CaseInsensitive);
@@ -223,6 +224,14 @@ namespace KScript.Data
             }
             return sb.ToString();
         }
+
+        /// <summary>A column's default as SQL: <c>'member'</c>, <c>0</c>, or a bool as the database stores it.</summary>
+        protected internal virtual string DefaultValue(Column c) => c.Default switch
+        {
+            bool b => Bool(b) is bool stored ? (stored ? "TRUE" : "FALSE") : Convert.ToString(Bool(b), CultureInfo.InvariantCulture),
+            double d => d.ToString("R", CultureInfo.InvariantCulture),
+            _ => "'" + Convert.ToString(c.Default, CultureInfo.InvariantCulture).Replace("'", "''") + "'",
+        };
 
         /// <summary>
         /// How a column compares text without minding case: emails do, so JOAN@example.com and joan@example.com are the

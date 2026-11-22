@@ -34,7 +34,7 @@ namespace KScript.Docs
         /// <summary>The packages an example may import. KScript.Core is always there.</summary>
         public static readonly IReadOnlyList<string> Packages = new[]
         {
-            "KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Markdown", "KScript.Style",
+            "KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Markdown", "KScript.Style", "KScript.Data",
         };
 
         /// <summary>Packages that only work in a real script, with why.</summary>
@@ -48,7 +48,6 @@ namespace KScript.Docs
             ["KScript.Test"] = "runs with kscript test",
             ["KScript.Storage"] = "writes to your app's own folders",
             ["KScript.Cache"] = "keeps values between runs",
-            ["KScript.Data"] = "keeps a database file",
             ["KScript.Auth"] = "signs people in to a kscript serve app",
             ["KScript.Document"] = "writes PDF and Word files",
             ["KScript.Queue"] = "queues jobs for kscript worker",
@@ -118,13 +117,15 @@ namespace KScript.Docs
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var limit = timeout ?? DefaultTimeout;
             using var cancel = StartTimer(limit);
+            KScriptHost host = null;
             try
             {
-                var host = new KScriptHost(output, output, new StringReader(input ?? string.Empty))
+                host = new KScriptHost(output, output, new StringReader(input ?? string.Empty))
                 {
                     WorkingDirectory = folder,
                     FileRoot = folder,
                     FileRootName = "the example's folder",
+                    MemoryDatabase = true,
                 };
                 var options = new InterpreterOptions { MaxSteps = MaxSteps, MaxCallDepth = 300, Timeout = limit, Cancellation = cancel.Token };
                 var interpreter = new Interpreter(host, CreateRegistry(), options);
@@ -143,6 +144,7 @@ namespace KScript.Docs
             finally
             {
                 watch.Stop();
+                foreach (Action done in host?.AfterFile ?? new List<Action>()) done();
                 try { Directory.Delete(folder, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             }
 

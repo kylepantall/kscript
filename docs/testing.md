@@ -104,6 +104,7 @@ describe(name: a shopping cart) {
 | `matches: '^\d+$'` | Text matches the regular expression. |
 | `type: list` | The value is a `string`, `number`, `bool`, `list`, `map`, `date`, `fn` or `null`. |
 | `count: 3` | A list or map has that many items, or text has that many characters. |
+| `count_at_most: 4` | A list or map has at most that many items, or text has at most that many characters. With `@queries()`, it checks how many queries a test sent. |
 
 `message: …` on any check replaces the usual message.
 
@@ -191,7 +192,8 @@ Colours are used when the output is a terminal; set `NO_COLOR` to turn them off 
     "exclude": ["tests/slow"],              // default: _templates, node_modules, .git
     "timeout": 10,                          // seconds per test; 0 for no limit (default 10)
     "packages": ["KScript.Terminal"],       // imported by test files only
-    "env": "test"                           // the environment tests run in (KSCRIPT_ENV)
+    "env": "test",                          // the environment tests run in (KSCRIPT_ENV)
+    "database": "memory"                    // KScript.Data: a database in memory per test file, or config
   }
 }
 ```
@@ -209,6 +211,8 @@ database:
 ```
 
 `kscript test --env staging` and a `KSCRIPT_ENV` that is already set win over `test.env`.
+
+Tests that use [KScript.Data](data.md#testing-with-a-database) get a database of their own in memory whatever the config says, unless `test.database` is `config`. Each test's changes are undone when it ends.
 
 ### Testing an API
 

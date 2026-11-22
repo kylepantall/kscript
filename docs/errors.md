@@ -261,6 +261,14 @@ A built-in type that was renamed is an error, with a fix that writes the new nam
 
 **A value doesn't fit its declared type.** For example an `email` without an `@`, or a number outside the range a type allows.
 
+## KS5013
+
+**A column the model doesn't have**, named in a [KScript.Data](data.md) query, `->create()` or `->update()`: `$User->where(nmae: 'Joan')` or `->order_by(agee)`. The message suggests the closest field.
+
+## KS5014
+
+**A model the migrations don't match.** The model's table, as its fields say it should be, isn't what the files in `database/migrations` make. Run `kscript db diff` to write the migration, or `kscript db diff --pretend` to see it first. See [Migrations](data.md#migrations).
+
 ## Style
 
 Style rules keep code easy to read. They are warnings, and a [standard](standards.md) can turn each one off.

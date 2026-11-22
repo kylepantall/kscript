@@ -115,6 +115,16 @@ jobs:
       - name: Run KScript tests
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab samples/queue-app samples/data
 
+      - name: Run the data sample's migrations and seeder
+        shell: bash
+        run: |
+          K="dotnet KScriptApp/bin/Release/net8.0/KScript.dll"
+          $K db migrate --seed --project samples/data --no-ansi < /dev/null
+          # The migrations make the tables the models want, so there is nothing to write.
+          diff=$($K db diff --pretend --project samples/data --no-ansi < /dev/null)
+          echo "$diff"
+          grep -q "Nothing to write" <<< "$diff"
+
       - name: Check a new project (kscript make project)
         shell: bash
         run: |

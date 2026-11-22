@@ -111,6 +111,7 @@
             "home": { "type": "string", "default": "/", "description": "Where the guest middleware sends people who are signed in, and @intended()'s default." },
             "sessions": { "enum": ["file", "memory"], "default": "file", "description": "Where sessions are kept: file (the app's state folder, so they last across restarts) or memory." },
             "folder": { "type": "string", "description": "A folder, relative to the site, for users, sessions and tokens. By default they go in the app's data and state folders." },
+            "users": { "type": "string", "description": "A KScript.Data model in the models folder, such as \"User\", that holds the users. By default they are JSON files in the app's data folder." },
             "lifetime": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "2h", "description": "How long a session lasts after the last request." },
             "remember": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "30d", "description": "How long a \"remember me\" sign-in lasts." },
             "cookie": { "type": "string", "default": "ks_session", "description": "The session cookie's name." },
@@ -255,6 +256,11 @@
           "type": "string",
           "examples": ["test"],
           "description": "The environment the tests run in (KSCRIPT_ENV), so config/config.test.yaml can give tests their own database. kscript --env and a KSCRIPT_ENV already set win."
+        },
+        "database": {
+          "enum": ["memory", "config"],
+          "default": "memory",
+          "description": "The database KScript.Data gives each test file: memory (a new SQLite database in memory, made from the migrations or the models) or config (the one the config names). Each test's changes are undone when it ends."
         },
         "packages": {
           "type": "array",
