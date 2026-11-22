@@ -235,12 +235,42 @@ public class MoreNativeTypesTests
         foreach (NativeTypeInfo info in NativeTypes.All)
         {
             Assert.False(string.IsNullOrWhiteSpace(info.Description), info.Name);
-            Assert.NotNull(NativeParsers.Get(info.Name) ?? (object)SemanticTypes.IsSemantic(info.Name));
+            Assert.NotNull(NativeTypeRegistry.Get(info.Name));
             string value = info.Example.StartsWith('\'') ? info.Example : "'" + info.Example + "'";
             if (info.Name == "port") value = info.Example;
             Assert.Equal(info.Name == "port" ? "number" : info.Name, Code($"x: {info.Name} = {value}\necho $x->type()"));
         }
         Assert.Throws<ArgumentException>(() => new NativeTypeInfo("Bad", "x", "x"));
+    }
+
+    private sealed class SkuType : NativeType
+    {
+        public override string Name => "sku";
+        public override string Description => "A stock code: three letters, - and four digits.";
+        public override string Example => "ABC-1234";
+        public override RawText RawText => RawText.Word;
+        public override IReadOnlyList<string> StringMethods => new[] { "contains", "starts_with", "length" };
+        public override IReadOnlyList<string> Completions => Array.Empty<string>();
+        public override Equality Equality => Equality.ByText;
+        public override Ordering Ordering => Ordering.ByText;
+        public override Iteration Iteration => Iteration.None;
+
+        public override (object Value, string Reason) Parse(string text)
+        {
+            string t = text.Trim().ToUpperInvariant();
+            return System.Text.RegularExpressions.Regex.IsMatch(t, "^[A-Z]{3}-\\d{4}$") ? (new NativeText("sku", t, new Dictionary<string, object> { ["family"] = t.Substring(0, 3) }), null) : (null, "it must be three letters, - and four digits");
+        }
+
+        protected override void DeclareOperators(NativeOperators o)
+        {
+        }
+
+        protected override void DeclareListMembers(NativeListMembers l) =>
+            l.Filter("acme", "Codes in the ACM family.", v => ((NativeText)v).Text.StartsWith("ACM", StringComparison.Ordinal));
+
+        protected override void DeclareMembers(NativeMembers m) =>
+            m.Method("family", "", "The three letters.", KType.String, (t, c) => ((NativeText)t).Part("family"),
+                "<let name=\"s\" type=\"sku\" value=\"'abc-1234'\" />\n<echo>{ $s->family() }</echo>");
     }
 
     private sealed class SkuPackage : KScriptPackage
@@ -249,17 +279,7 @@ public class MoreNativeTypesTests
 
         public override string Description => "SKUs, for tests.";
 
-        protected override void Register(PackageBuilder p)
-        {
-            p.NativeType(new NativeTypeInfo("sku", "A stock code: three letters, - and four digits.", "ABC-1234", new[] { "contains", "starts_with", "length" }),
-                new NativeParser(text =>
-                {
-                    string t = text.Trim().ToUpperInvariant();
-                    return System.Text.RegularExpressions.Regex.IsMatch(t, "^[A-Z]{3}-\\d{4}$") ? (new NativeText("sku", t, new Dictionary<string, object> { ["family"] = t.Substring(0, 3) }), null) : (null, "it must be three letters, - and four digits");
-                }));
-            p.Method("sku", "family", "", "The three letters.", KType.String, (t, c) => ((NativeText)t).Part("family"));
-            p.Examples(("sku->family", "<let name=\"s\" type=\"sku\" value=\"'abc-1234'\" />\n<echo>{ $s->family() }</echo>"));
-        }
+        protected override void Register(PackageBuilder p) => p.NativeType(new SkuType());
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using KScript.Syntax.Markup;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
+using KScript.Metadata;
 using KScript.Syntax;
 using KScript.Syntax.Text;
 
@@ -67,7 +68,7 @@ namespace KScript.Language.Features
                         p.Type != null ? EnumValuesOf(analysis, SplitType(p.Type).Name) ?? NativeValues(analysis, p.Type) : null,
                         p.Type == KType.Bool)).ToList(),
                     ItemValues = fn.Parameters.Select(p => p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal)
-                        ? EnumValuesOf(analysis, p.Type.Substring(0, p.Type.Length - 2).Trim())
+                        ? EnumValuesOf(analysis, p.Type.Substring(0, p.Type.Length - 2).Trim()) ?? NativeValues(analysis, p.Type.Substring(0, p.Type.Length - 2).Trim())
                         : null).ToList(),
                 });
             }
@@ -120,7 +121,8 @@ namespace KScript.Language.Features
                 case MethodCallNode m:
                 {
                     TypeShape receiver = InferAt(analysis, region, m.Target);
-                    foreach (CallableInfo method in Catalog.GetMethods(m.Name, receiver.Type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)))
+                    string type = new TypeInference(Catalog, analysis).ReceiverType(m.Name, receiver);
+                    foreach (CallableInfo method in Catalog.GetMethods(m.Name, type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, type)))
                     {
                         AddCallable(method);
                     }
@@ -140,7 +142,8 @@ namespace KScript.Language.Features
                     {
                         piped = 0; // A method's receiver isn't one of its parameters.
                         TypeShape receiver = InferAt(analysis, region, pipe.Left);
-                        foreach (CallableInfo method in Catalog.GetMethods(id.Name, receiver.Type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)))
+                        string type = new TypeInference(Catalog, analysis).ReceiverType(id.Name, receiver);
+                        foreach (CallableInfo method in Catalog.GetMethods(id.Name, type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, type)))
                         {
                             AddCallable(method);
                         }
@@ -424,6 +427,82 @@ namespace KScript.Language.Features
                 .GroupBy(item => item.Label)
                 .Select(g => g.First())
                 .ToList();
+        }
+
+        /// <summary>
+        /// The word in <c>$versions->only(‸)</c>, <c>->without(‸)</c> or <c>$x->is_a(‸)</c>: on a list of one native
+        /// type, the filters it declares (releases, prereleases for semver), then the type names.
+        /// </summary>
+        private List<CompletionItem> WordArgumentCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)
+        {
+            string text = region.Source.Value;
+            int p = wordStart;
+            while (p > 0 && char.IsWhiteSpace(text[p - 1]))
+            {
+                p--;
+            }
+            if (p == 0 || "(,:".IndexOf(text[p - 1]) < 0 || InnermostCall(region, wordStart).Node is not MethodCallNode { Name: "only" or "without" or "is_a" } call)
+            {
+                return new List<CompletionItem>();
+            }
+            var items = new List<CompletionItem>();
+            if (call.Name != "is_a" && TypeInference.TypedListReceiver(InferAt(analysis, region, call.Target)) is string list
+                && NativeTypes.Get(list[..^2]) is NativeTypeInfo native)
+            {
+                items.AddRange(native.ListFilters.Select(f => new CompletionItem
+                {
+                    Label = f.Name,
+                    Kind = CompletionKind.Value,
+                    Detail = $"{list} filter",
+                    Documentation = f.Summary,
+                    ReplaceSpan = replace,
+                    SortText = "000" + f.Name,
+                }));
+            }
+            IEnumerable<string> typeNames = new[] { KType.Number, KType.String, "int", "float", KType.Bool, KType.Date, KType.List, KType.Map, KType.Null, KType.Error }
+                .Concat(NativeTypes.Names).Distinct(StringComparer.Ordinal);
+            items.AddRange(typeNames.Select(t => new CompletionItem
+            {
+                Label = t,
+                Kind = CompletionKind.Value,
+                Detail = "type",
+                Documentation = call.Name == "is_a" ? $"True when the value is {(NativeTypes.Get(t)?.WithArticle ?? "a " + t)}." : $"The items that are {(NativeTypes.Get(t)?.WithArticle ?? "a " + t)}.",
+                ReplaceSpan = replace,
+                SortText = "001" + t,
+            }));
+            return items;
+        }
+
+        /// <summary>The values a native type offers where it is expected (1h, 30m for a duration), or null for none.</summary>
+        private static IReadOnlyList<string> NativeCompletions(string type) =>
+            NativeTypes.Get(type)?.Completions is { Count: > 0 } values ? values : null;
+
+        /// <summary>
+        /// The start of the value of a variable declared with a native type (<c>wait: duration = ‸</c>, or
+        /// <c>&lt;let type="duration" value="‸"&gt;</c>): the values the type offers.
+        /// </summary>
+        private static List<CompletionItem> DeclaredTypeValueCompletions(ExpressionRegion region, int wordStart, TextSpan replace) =>
+            region.Attribute?.Name == "value" && string.IsNullOrWhiteSpace(region.Source.Value.Substring(0, Math.Min(wordStart, region.Source.Value.Length)))
+                ? DeclaredTypeValueCompletions(region.Element, replace)
+                : new List<CompletionItem>();
+
+        /// <summary>The values the native type a &lt;let&gt; or &lt;const&gt; is declared with offers, or none.</summary>
+        private static List<CompletionItem> DeclaredTypeValueCompletions(MarkupElement declaration, TextSpan replace)
+        {
+            if (declaration == null || ElementInfo.BareName(declaration.Name) is not ("let" or "const")
+                || NativeTypes.Get(declaration.GetAttributeValue("type")?.Trim()) is not NativeTypeInfo native)
+            {
+                return new List<CompletionItem>();
+            }
+            return native.Completions.Select((value, i) => new CompletionItem
+            {
+                Label = value,
+                Kind = CompletionKind.Value,
+                Detail = native.Name,
+                Documentation = native.Description,
+                ReplaceSpan = replace,
+                SortText = "000" + i.ToString("D3", System.Globalization.CultureInfo.InvariantCulture),
+            }).ToList();
         }
 
         /// <summary>Hover on <c>name</c> in <c>name: value</c>: the parameter it fills.</summary>

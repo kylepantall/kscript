@@ -298,6 +298,29 @@ namespace KScript.Language.Tests
             Assert.Equal(new[] { 12, 13, 14, 2, 8 }, outline);
         }
         [Fact]
+        public void WorkspaceSymbolsFollowAddedAndRemovedFolders()
+        {
+            string first = Path.Combine(Root, "one"), second = Path.Combine(Root, "two");
+            Memory files = new Memory();
+            files.Files[Path.Combine(first, "first.kscript")] = "fn first() => 1\n";
+            files.Files[Path.Combine(second, "second.kscript")] = "fn second() => 2\n";
+            JsonObject Folder(string path) => new JsonObject { ["uri"] = Workspace.PathToUri(path), ["name"] = Path.GetFileName(path) };
+            var (_, output) = Converse(files,
+                Req(1, "initialize", new JsonObject { ["rootUri"] = Workspace.PathToUri(first) }),
+                Req(2, "workspace/symbol", new JsonObject()),
+                Note("workspace/didChangeWorkspaceFolders", new JsonObject
+                {
+                    ["event"] = new JsonObject { ["removed"] = new JsonArray(Folder(first)), ["added"] = new JsonArray(Folder(second)) },
+                }),
+                Req(3, "workspace/symbol", new JsonObject()));
+            JsonNode capability = Reply(output, 1)["result"]["capabilities"]["workspace"]["workspaceFolders"];
+            Assert.True(capability["supported"].GetValue<bool>());
+            Assert.True(capability["changeNotifications"].GetValue<bool>());
+            Assert.Equal("first", Assert.Single(Reply(output, 2)["result"].AsArray())["name"].GetValue<string>());
+            Assert.Equal("second", Assert.Single(Reply(output, 3)["result"].AsArray())["name"].GetValue<string>());
+        }
+
+        [Fact]
         public void TheFoldersOpenInTheEditorAreSearchedForSymbols()
         {
             string root = Path.Combine(Path.GetTempPath(), "kscript-symbols");

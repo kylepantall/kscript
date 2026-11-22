@@ -10,7 +10,7 @@ namespace KScript.Language.Features
 {
     /// <summary>
     /// What a type accepts, for completion, hover and signature help: an enum's values, true and false, and what a
-    /// native type suggests through <see cref="NativeParser.Suggest"/> (every time zone, the project's routes...).
+    /// native type suggests through <see cref="NativeType.Suggest"/> (every time zone, the project's routes...).
     /// </summary>
     public sealed partial class LanguageService
     {
@@ -40,7 +40,7 @@ namespace KScript.Language.Features
                 values.Add(new NativeValueSuggestion("false", KType.Bool));
                 return values;
             }
-            if (NativeParsers.Get(name)?.Suggest is Func<NativeValueContext, IEnumerable<NativeValueSuggestion>> suggest)
+            if (NativeTypeRegistry.Get(name) is NativeType native)
             {
                 string root = ProjectFolder(analysis.Path);
                 NativeValueContext context = new NativeValueContext
@@ -54,7 +54,7 @@ namespace KScript.Language.Features
                 };
                 try
                 {
-                    values.AddRange(suggest(context).Where(v => v?.Value != null).Take(MaxAcceptedValues));
+                    values.AddRange(native.Suggest(context).Where(v => v?.Value != null).Take(MaxAcceptedValues));
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException or ProjectConfigException)
                 {

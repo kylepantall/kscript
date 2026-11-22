@@ -8,7 +8,7 @@ namespace KScript.Language.Analysis
     /// <summary>Works out the shape of an expression's value from the source (literals, declarations, return types).</summary>
     public sealed class TypeInference
     {
-        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip" };
+        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip", "only", "without" };
         private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "max_by", "min_by", "pop" };
 
         private readonly LanguageCatalog catalog;
@@ -82,8 +82,11 @@ namespace KScript.Language.Analysis
                     return shape;
                 }
 
-                case RangeNode _:
-                    return new TypeShape(KType.List) { Element = new TypeShape(KType.Number) };
+                case RangeNode range:
+                    // $monday..$friday step 1d: a native type declares ranges of its values, or of dates by its steps.
+                    return NativeRange(range, region) is NativeOperatorInfo nativeRange
+                        ? ShapeOfTypeName(nativeRange.Result)
+                        : new TypeShape(KType.List) { Element = new TypeShape(KType.Number) };
 
                 case LambdaNode _:
                     return new TypeShape(KType.Fn);
@@ -226,44 +229,55 @@ namespace KScript.Language.Analysis
                 }
 
                 case UnaryNode unary:
+                    if (unary.Operator == "-" && NativeNegation(Infer(unary.Operand, region)) is NativeOperatorInfo negation)
+                    {
+                        return ShapeOfTypeName(negation.Result); // -1h is a duration
+                    }
                     return unary.Operator == "not" ? new TypeShape(KType.Bool) : new TypeShape(KType.Number);
 
                 case BinaryNode binary:
                     switch (binary.Operator)
                     {
                         case "==": case "!=": case "===": case "!==": case "<": case "<=": case ">": case ">=":
-                        case "in": case "and": case "or":
+                        case "and": case "or":
                             return new TypeShape(KType.Bool);
                         case "??":
                         {
                             TypeShape l = Infer(binary.Left, region);
                             return l.Type == KType.Any || l.Type == KType.Null ? Infer(binary.Right, region) : l;
                         }
-                        case "+":
+                    }
+                    {
+                        // Each side once: a long chain of + would otherwise be inferred again and again.
+                        TypeShape l = Infer(binary.Left, region);
+                        TypeShape r = Infer(binary.Right, region);
+                        if (NativeBinary(binary.Operator, l, r) is NativeOperatorInfo native)
                         {
-                            TypeShape l = Infer(binary.Left, region);
-                            TypeShape r = Infer(binary.Right, region);
-                            if (l.Type == "slash_path")
-                            {
-                                // /docs + 'start' adds names.
-                                return l;
-                            }
-                            if (l.Type == KType.String || r.Type == KType.String)
-                            {
-                                return new TypeShape(KType.String);
-                            }
-                            if (l.Type == KType.List)
-                            {
-                                return l;
-                            }
-                            return l.Type == KType.Number && r.Type == KType.Number ? new TypeShape(KType.Number) : TypeShape.Unknown;
+                            // 1h + 30m is a duration, @now() + 1h a date, 1h / 15m a number: as the native type declares.
+                            return ShapeOfTypeName(native.Result);
                         }
-                        case "*" when Infer(binary.Left, region).Type == KType.String:
-                            // 'ab' * 3 repeats the text.
-                            return new TypeShape(KType.String);
-                        default:
-                            // dd-MM-yyyy is unquoted text, not a sum: a bare word in the arithmetic leaves the type unknown.
-                            return IsBareWord(binary.Left, region) || IsBareWord(binary.Right, region) ? TypeShape.Unknown : new TypeShape(KType.Number);
+                        switch (binary.Operator)
+                        {
+                            case "in":
+                                return new TypeShape(KType.Bool);
+                            case "+":
+                                if (l.Type == KType.String || r.Type == KType.String)
+                                {
+                                    return new TypeShape(KType.String);
+                                }
+                                if (l.Type == KType.List)
+                                {
+                                    return l;
+                                }
+                                return l.Type == KType.Number && r.Type == KType.Number ? new TypeShape(KType.Number) : TypeShape.Unknown;
+                            case "*" when l.Type == KType.String:
+                                // 'ab' * 3 repeats the text.
+                                return new TypeShape(KType.String);
+                            default:
+                                // dd-MM-yyyy is unquoted text, not a sum: a bare word in the arithmetic leaves the type unknown.
+                                return NativeTypes.IsNative(OperandType(l)) || NativeTypes.IsNative(OperandType(r)) || IsBareWord(binary.Left, region) || IsBareWord(binary.Right, region)
+                                    ? TypeShape.Unknown : new TypeShape(KType.Number);
+                        }
                     }
 
                 case MatchNode match:
@@ -280,6 +294,76 @@ namespace KScript.Language.Analysis
                     return TypeShape.Unknown;
             }
         }
+
+        /// <summary>
+        /// The type name an operator side is declared with (number, string, date, list, map or a native type's name
+        /// such as duration), or null when the shape doesn't say.
+        /// </summary>
+        internal static string OperandType(TypeShape shape) => shape?.Type switch
+        {
+            null => null,
+            "int" or "float" or KType.Number => KType.Number,
+            KType.String or KType.Bool or KType.Date or KType.List or KType.Map => shape.Type,
+            string t when NativeTypes.IsNative(t) => t,
+            _ => null,
+        };
+
+        /// <summary>The shape a declared result type names: <c>duration</c>, or <c>date[]</c> for a list of dates.</summary>
+        internal static TypeShape ShapeOfTypeName(string type) =>
+            type.EndsWith("[]", StringComparison.Ordinal)
+                ? new TypeShape(KType.List) { Element = ShapeOfTypeName(type[..^2]) }
+                : new TypeShape(type == "list" ? KType.List : type);
+
+        /// <summary>
+        /// The operator a native type declares for this <c>left op right</c>, or null. When one side's type isn't known,
+        /// the other side's declarations are used if they all give the same result ($d * $n is a duration either way).
+        /// </summary>
+        internal static NativeOperatorInfo NativeBinary(string op, TypeShape leftShape, TypeShape rightShape)
+        {
+            if (!IsNativeOperator(op))
+            {
+                return null;
+            }
+            string left = OperandType(leftShape);
+            string right = OperandType(rightShape);
+            if (!NativeTypes.IsNative(left) && !NativeTypes.IsNative(right))
+            {
+                return null;
+            }
+            if (left != null && right != null)
+            {
+                return NativeTypes.Operator(op, left, right);
+            }
+            string known = left ?? right;
+            List<NativeOperatorInfo> options = NativeTypes.OperatorsFor(op, known)
+                .Where(o => o.Left != null && (left != null ? o.Left == left : o.Right == right)).ToList();
+            return options.Count > 0 && options.All(o => o.Result == options[0].Result) ? options[0] : null;
+        }
+
+        /// <summary>The operators a native type can declare: the arithmetic ones and in.</summary>
+        internal static bool IsNativeOperator(string op) => op is "+" or "-" or "*" or "/" or "%" or "**" or "in";
+
+        /// <summary>Unary - as the operand's native type declares it, or null.</summary>
+        internal static NativeOperatorInfo NativeNegation(TypeShape operand)
+        {
+            string type = OperandType(operand);
+            return NativeTypes.IsNative(type) ? NativeTypes.OperatorsFor("-", type).FirstOrDefault(o => o.Left == null && o.Right == type) : null;
+        }
+
+        /// <summary>The range a native type declares for the range's values (text at the start takes the end's type), or null.</summary>
+        internal NativeOperatorInfo NativeRange(RangeNode range, ExpressionRegion region)
+        {
+            string type = OperandType(Infer(range.Start, region));
+            if (type is null or KType.String)
+            {
+                type = OperandType(Infer(range.End, region));
+            }
+            return type is null or KType.Number ? null : NativeTypes.All.SelectMany(t => t.Operators).FirstOrDefault(o => o.Operator == ".." && o.Left == type);
+        }
+
+        /// <summary>What a for loop over a native value gives, or null when the shape isn't a native type that can be walked.</summary>
+        internal static TypeShape NativeItems(TypeShape collection) =>
+            NativeTypes.Get(collection?.Type)?.Iterates is string item ? ShapeOfTypeName(item) : null;
 
         /// <summary>A word that isn't a variable, function or type here, or arithmetic that already has one.</summary>
         private bool IsBareWord(ExprNode node, ExpressionRegion region)
@@ -449,7 +533,16 @@ namespace KScript.Language.Analysis
         /// <c>User->where()</c>, <c>$user->save()</c>) when it has that method, otherwise its plain type's.
         /// </summary>
         internal string ReceiverType(string name, TypeShape receiver) =>
-            receiver.Kind != null && catalog.GetMethods(name, receiver.Kind).Any(m => m.ReceiverType == receiver.Kind) ? receiver.Kind : receiver.Type;
+            receiver.Kind != null && catalog.GetMethods(name, receiver.Kind).Any(m => m.ReceiverType == receiver.Kind) ? receiver.Kind
+            : TypedListReceiver(receiver) is string list && catalog.GetMethods(name, list).Any(m => m.ReceiverType == list) ? list
+            : receiver.Type;
+
+        /// <summary>
+        /// "semver[]" for a list whose items are all one native type, whose methods (->latest()) it has on top of a
+        /// list's; null for any other value.
+        /// </summary>
+        internal static string TypedListReceiver(TypeShape receiver) =>
+            receiver?.Type == KType.List && NativeTypes.IsNative(receiver.Element?.Type) ? receiver.Element.Type + "[]" : null;
 
         /// <summary>
         /// What a KScript.Data method gives, in terms of the model's records: a query on User is a query of Users,
@@ -494,7 +587,7 @@ namespace KScript.Language.Analysis
                     return receiver.Element ?? TypeShape.Unknown;
                 }
             }
-            return new TypeShape(method.ReturnType);
+            return ShapeOfTypeName(method.ReturnType);
         }
 
         /// <summary>A model's scope called on the model or one of its queries: <c>User->admins()</c>, <c>$q->admins()</c>.</summary>
@@ -527,7 +620,7 @@ namespace KScript.Language.Analysis
             {
                 return records;
             }
-            return method != null ? new TypeShape(method.ReturnType) : TypeShape.Unknown;
+            return method != null ? ShapeOfTypeName(method.ReturnType) : TypeShape.Unknown;
         }
 
     }

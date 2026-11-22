@@ -78,10 +78,10 @@ import also searches the rest of the project (`LanguageService.GetProjectReferen
 
 Where the type of a value is known (`tz: timezone = ‸`, a typed parameter, a named argument), completion lists the
 values the type accepts before anything else: an enum's values, and what a native type suggests. A native type supplies
-those through `NativeParser.Suggest` (KScript.Core/Runtime/NativeValues.cs), which gets a `NativeValueContext` (the
+those through `NativeType.Suggest` (KScript.Core/Runtime/Natives), which gets a `NativeValueContext` (the
 file, the project folder, what is typed, the type's options and the project's routes, read from the route files
-without running them) and returns `NativeValueSuggestion`s. Time zones, countries, currencies, locales, durations,
-cron macros, colours and media types use fixed lists (`NativeParser.Fixed`). Hover on a type name and signature help
+without running them) and returns `NativeValueSuggestion`s. By default it gives the type's `Completions`; timezone,
+country, currency and locale override it with every value, and slash_path with the project's routes. Hover on a type name and signature help
 say what the type accepts. Straight after `@` only commands and functions are offered (those that give the expected type
 first), and straight after `$` only variables.
 

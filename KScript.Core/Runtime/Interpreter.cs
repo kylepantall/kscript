@@ -573,6 +573,8 @@ namespace KScript.Runtime
         internal static KScriptException Wrap(Exception ex) => ex switch
         {
             KScriptException k => k,
+            // Sorting wraps a comparison's error ("Passwords can't be compared ..."): the error itself is the one to show.
+            InvalidOperationException { InnerException: KScriptException inner } => inner,
             FileNotFoundException f => new KScriptException(f.Message, "FileNotFound", f),
             DirectoryNotFoundException d => new KScriptException(d.Message, "FileNotFound", d),
             UnauthorizedAccessException u => new KScriptException(u.Message, "Access", u),

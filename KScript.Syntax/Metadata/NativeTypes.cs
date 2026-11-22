@@ -12,7 +12,11 @@ namespace KScript.Metadata
     /// </summary>
     public sealed class NativeTypeInfo
     {
-        public NativeTypeInfo(string name, string description, string example, IEnumerable<string> stringMethods = null)
+        /// <summary>
+        /// Made only by the runtime, from a <c>NativeType</c> (KScript.Core): a native type is declared by subclassing
+        /// it, which makes it say what it supports, so there is no other way to make one.
+        /// </summary>
+        internal NativeTypeInfo(string name, string description, string example, IEnumerable<string> stringMethods = null)
         {
             if (string.IsNullOrWhiteSpace(name) || !name.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '_') || !char.IsAsciiLetterLower(name[0]))
                 throw new ArgumentException($"A native type's name is lower case letters, digits and _, such as ip or semver: '{name}' isn't.", nameof(name));
@@ -55,6 +59,33 @@ namespace KScript.Metadata
         /// <summary>"a" or "an", for messages: an email, a url.</summary>
         public string Article { get; init; }
 
+        /// <summary>
+        /// The operators its values work with, besides == and the comparisons its <see cref="Ordering"/> gives. A range
+        /// is operator <c>...</c> with the values' type on the left and the step's on the right; unary - has no left.
+        /// </summary>
+        public IReadOnlyList<NativeOperatorInfo> Operators { get; init; } = Array.Empty<NativeOperatorInfo>();
+
+        /// <summary>How == treats it: "text" (the same once tidied), "value" (its own rule) or "never" (a password).</summary>
+        public string Equality { get; init; } = "text";
+
+        /// <summary>How &lt; &gt; &lt;= &gt;= and sorting treat it: "none" (an error), "text" (alphabetical) or "value" (its own order, such as 1.4.2 &lt; 1.10.0).</summary>
+        public string Ordering { get; init; } = "none";
+
+        /// <summary>What a for loop over a value gives (the items' type name), or null when it can't be looped over.</summary>
+        public string Iterates { get; init; }
+
+        /// <summary>When a value counts as false in if, and, or and ?: (one sentence), or null when it is always true.</summary>
+        public string Falsy { get; init; }
+
+        /// <summary>Values the editor offers where the type is expected, such as UTC and Europe/London for a timezone.</summary>
+        public IReadOnlyList<string> Completions { get; init; } = Array.Empty<string>();
+
+        /// <summary>
+        /// The named filters a list of the type takes in ->only(name) and ->without(name), such as releases and
+        /// prereleases for semver, each with one sentence on what it keeps. Set once the type's members register.
+        /// </summary>
+        public IReadOnlyList<(string Name, string Summary)> ListFilters { get; internal set; } = Array.Empty<(string, string)>();
+
         public string WithArticle => (Article ?? ("aeiou".Contains(Name[0]) && Name != "uuid" && Name != "url" ? "an" : "a")) + " " + Name;
     }
 
@@ -74,86 +105,15 @@ namespace KScript.Metadata
             "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json",
         };
 
-        private static string[] With(params string[] more) => Searchable.Concat(more).ToArray();
-
+        /// <summary>
+        /// The language's own types register from KScript.Core (each is a NativeType subclass there). Asking for the
+        /// types loads them, so the parser and editor see them even before a script runs.
+        /// </summary>
         static NativeTypes()
         {
-            // The first five came first, and keep the string methods they had (PR 86).
-            Add(new NativeTypeInfo("email", "An email address such as joan@example.com. Spaces are trimmed and the domain is lowercased.", "joan@example.com",
-                With("lower", "upper", "split", "replace")) { Article = "an", JsonFormat = "email", Options = new[] { "domains" } });
-            Add(new NativeTypeInfo("password", "A secret. It prints as ********, can't be compared with ==, and is hashed to be stored.", "'correct horse battery staple'",
-                Array.Empty<string>()) { Secret = true, Options = new[] { "upper", "lower", "digit", "symbol", "common", "score", "algorithm" }, JsonFormat = "password" });
-            Add(new NativeTypeInfo("handle", "@ followed by letters, digits, _, . or -: a username such as @joan. Lowercased.", "@joan",
-                new[] { "contains", "starts_with", "ends_with", "count", "upper", "slice", "matches", "truncate", "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json" })
-                { RawKind = "handle" });
-            Add(new NativeTypeInfo("uuid", "A UUID, versions 1 to 8 and the nil and max UUIDs, lowercased to 8-4-4-4-12.", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f",
-                new[] { "contains", "starts_with", "ends_with", "upper", "slice", "split", "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json" })
-                { Options = new[] { "v" }, JsonFormat = "uuid" });
-            Add(new NativeTypeInfo("regex", "A regular expression with flags i, m, s and x, written /.../ in code.", "/^[a-z]+$/i",
-                new[] { "contains", "starts_with", "ends_with", "count", "escape", "markdown_escape", "json" }) { JsonFormat = "regex" });
-
-            // Web and network.
-            Add(new NativeTypeInfo("url", "An absolute http, https, ftp, ws or wss URL. The scheme and host are lowercased.", "https://example.com/docs?page=2",
-                With("split", "replace")) { JsonFormat = "uri", Options = new[] { "schemes", "hosts" } });
-            Add(new NativeTypeInfo("domain", "A domain name such as example.com or api.example.co.uk, lowercased, without a trailing dot.", "example.com",
-                With("split", "upper")) { JsonFormat = "hostname" });
-            Add(new NativeTypeInfo("ip", "An IPv4 or IPv6 address, written the standard way: 192.168.0.1 or 2001:db8::1.", "192.168.0.1",
-                With("split")) { Article = "an", JsonFormat = "ip", Options = new[] { "version" } });
-            Add(new NativeTypeInfo("cidr", "A block of IP addresses: an address, / and a prefix length, such as 10.0.0.0/8.", "10.0.0.0/8",
-                With("split")));
-            Add(new NativeTypeInfo("mac", "A network card's MAC address, written as six lowercase pairs: 00:1a:2b:3c:4d:5e.", "00:1a:2b:3c:4d:5e",
-                With("split", "upper")));
-            Add(new NativeTypeInfo("port", "A network port, a whole number from 1 to 65535.", "8080",
-                Array.Empty<string>()));
-
-            // Identifiers and formats.
-            Add(new NativeTypeInfo("slug", "Lowercase words joined by -, for URLs: my-first-post.", "my-first-post",
-                With("split", "upper", "replace")));
-            Add(new NativeTypeInfo("slash_path", "Names joined by /, such as /docs/getting-started or /My Apps/Notes: a page, menu or category path rather than a file. It always starts with /, so home is /home. Spaces around each name, empty parts, . and a trailing / are dropped, and .. goes up one.", "/docs/getting-started",
-                With("split", "lower", "upper", "replace")) { RawKind = "slash" });
-            Add(new NativeTypeInfo("semver", "A semantic version such as 1.4.2, 2.0.0-beta.1 or 1.0.0+build.5. A leading v is dropped.", "1.4.2",
-                With("split")));
-            Add(new NativeTypeInfo("mime", "A media type such as text/html or application/json, lowercased, with any parameters.", "application/json",
-                With("split")) { JsonFormat = "media-type" });
-            Add(new NativeTypeInfo("hex", "Hexadecimal digits, such as a hash: a3f9c0. Lowercased; 0x is dropped.", "a3f9c0",
-                With("upper")) { Options = new[] { "bytes" } });
-            Add(new NativeTypeInfo("base64", "Base64 text (standard or URL-safe). ->decode() gives the text it holds.", "aGVsbG8=",
-                Searchable) { JsonFormat = "byte" });
-            Add(new NativeTypeInfo("jwt", "A JSON Web Token: three base64url parts. Its claims can be read; its signature isn't checked.", "'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig'",
-                Searchable));
-            Add(new NativeTypeInfo("json", "Text that holds valid JSON. ->json() gives the value.", "'{\"a\": 1}'",
-                Searchable));
-
-            // People and places.
-            Add(new NativeTypeInfo("phone", "A phone number in E.164: + then the country code and number, 8 to 15 digits. Spaces, dots, dashes and brackets are dropped.", "+447700900123",
-                Searchable) { Options = new[] { "countries" } });
-            Add(new NativeTypeInfo("country", "An ISO 3166 country code. Two-letter, three-letter and English names are read; it is kept as two capitals, such as GB.", "GB",
-                Searchable));
-            Add(new NativeTypeInfo("currency", "An ISO 4217 currency code, kept in capitals: GBP, USD, EUR.", "GBP",
-                Searchable));
-            Add(new NativeTypeInfo("locale", "A language tag (BCP 47) such as en, en-GB or pt-BR, in its usual case.", "en-GB",
-                With("split")));
-            Add(new NativeTypeInfo("timezone", "An IANA time zone such as Europe/London or America/New_York, or UTC.", "Europe/London",
-                With("split")));
-
-            // Time and things that run on it.
-            Add(new NativeTypeInfo("duration", "A length of time: 1h30m, 90s, 2d or ISO 8601 such as PT1H30M. Kept in its short form.", "1h30m",
-                Searchable));
-            Add(new NativeTypeInfo("date_format", "How a date is written, such as dd-MM-yyyy or d MMMM yyyy, HH:mm: dd is the day, MM the month, yyyy the year, HH the hour and mm the minute. Text goes in quotes ('at' HH:mm).", "dd-MM-yyyy",
-                Searchable));
-            Add(new NativeTypeInfo("cron", "A cron schedule of five fields (minute hour day month weekday), or @daily, @hourly and the like.", "'*/15 9-17 * * mon-fri'",
-                Searchable));
-            Add(new NativeTypeInfo("color", "A colour: #rgb, #rrggbb, #rrggbbaa, rgb(...) or a CSS name. Kept as lowercase #rrggbb (#rrggbbaa with alpha).", "#ff8800",
-                With("upper")));
-
-            // Money.
-            Add(new NativeTypeInfo("iban", "An international bank account number, checked with its mod-97 digits. Kept in capitals without spaces.", "GB82WEST12345698765432",
-                Searchable) { Article = "an" });
-            Add(new NativeTypeInfo("card", "A payment card number, checked with the Luhn digit. It prints masked apart from the last four digits.", "'4242 4242 4242 4242'",
-                Array.Empty<string>()) { Secret = true });
+            Type catalog = Type.GetType("KScript.Runtime.NativeTypeRegistry, KScript.Core");
+            if (catalog != null) System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(catalog.TypeHandle);
         }
-
-        private static void Add(NativeTypeInfo info) => Types[info.Name] = info;
 
         /// <summary>Adds a native type, as a package does when it loads. A name that is taken can't be reused.</summary>
         public static void Register(NativeTypeInfo info)
@@ -182,5 +142,57 @@ namespace KScript.Metadata
         }
 
         public static IEnumerable<string> Names => All.Select(t => t.Name);
+
+        /// <summary>
+        /// What <c>left op right</c> gives when a native type declares it (left and right are type names: duration,
+        /// number, date, ...), or null. The editor infers results and checks operators with this.
+        /// </summary>
+        public static NativeOperatorInfo Operator(string op, string left, string right)
+        {
+            foreach (NativeTypeInfo t in All)
+                foreach (NativeOperatorInfo o in t.Operators)
+                    if (o.Operator == op && o.Left == left && o.Right == right) return o;
+            return null;
+        }
+
+        /// <summary>Every operator a native type declares with this operator and one side of this type.</summary>
+        public static IEnumerable<NativeOperatorInfo> OperatorsFor(string op, string type) =>
+            All.SelectMany(t => t.Operators).Where(o => o.Operator == op && (o.Left == type || o.Right == type));
+    }
+
+    /// <summary>
+    /// One operator a native type declares: <c>duration + duration</c> is a duration, <c>date - duration</c> is a date.
+    /// A unary operator has no <see cref="Left"/>.
+    /// </summary>
+    public sealed class NativeOperatorInfo
+    {
+        public NativeOperatorInfo(string op, string left, string right, string result, string summary, string declaredBy)
+        {
+            Operator = op;
+            Left = left;
+            Right = right;
+            Result = result;
+            Summary = summary;
+            DeclaredBy = declaredBy;
+        }
+
+        /// <summary>+, -, *, /, %, **, in, .. (a range) or - with no left (negation).</summary>
+        public string Operator { get; }
+
+        /// <summary>The left side's type, or null for a unary operator (-$d).</summary>
+        public string Left { get; }
+
+        public string Right { get; }
+
+        /// <summary>The result's type name.</summary>
+        public string Result { get; }
+
+        /// <summary>What it does, for hovers and the docs: "The two lengths added: 1h + 30m is 1h30m."</summary>
+        public string Summary { get; }
+
+        /// <summary>The native type that declares it.</summary>
+        public string DeclaredBy { get; }
+
+        public string Display => Left == null ? $"{Operator}{Right}" : $"{Left} {Operator} {Right}";
     }
 }

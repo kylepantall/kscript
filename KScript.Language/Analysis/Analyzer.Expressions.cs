@@ -131,6 +131,12 @@ namespace KScript.Language.Analysis
                     CheckArithmetic(arithmetic, region);
                     return;
 
+                case BinaryNode { Operator: "<" or "<=" or ">" or ">=" } comparison:
+                    AnalyzeExpr(comparison.Left, region, scope, ExprContext.Value);
+                    AnalyzeExpr(comparison.Right, region, scope, ExprContext.Value);
+                    CheckNativeOrdering(comparison, region);
+                    return;
+
                 default:
                     foreach (ExprNode child in node.Children)
                     {
@@ -866,6 +872,7 @@ namespace KScript.Language.Analysis
 
         private static string Plural(string type) => type switch
         {
+            _ when type.EndsWith("[]", StringComparison.Ordinal) => $"lists of {type[..^2]} values",
             _ => type + "s",
         };
 

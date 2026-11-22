@@ -25,11 +25,52 @@ namespace KScript.Runtime
         /// </summary>
         public object EvaluateTyped(DecodedText text, Scope scope, Module module, string type)
         {
-            string kind = Shapes.RawTextKind(TypeRef.Parse(type), scope, module);
+            TypeRef typeRef = TypeRef.Parse(type);
+            string kind = Shapes.RawTextKind(typeRef, scope, module);
+            // semver[] = [1.0.0, 1.0.1-rc]: in a list of a type read from text, each item may be written raw too.
+            if (kind == null && typeRef is { ListDepth: 1 } && RawListItems(text.Value) is List<string> items
+                && Shapes.RawTextKind(TypeRef.Parse(type.Trim()[..^2]), scope, module) is string itemKind)
+                return items.Select(item => RawOrEvaluated(item, itemKind, text, scope, module)).ToList();
             if (kind == null) return EvaluateText(text, scope, module);
             ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
             if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(text.Value, kind)) return text.Value.Trim();
             return EvaluateText(text, scope, module);
+        }
+
+        private object RawOrEvaluated(string item, string kind, DecodedText whole, Scope scope, Module module)
+        {
+            ParseResult parsed = ExpressionParser.ParseExpression(item);
+            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(item, kind)) return item.Trim();
+            return Evaluate(parsed.Root, scope, new EvalContext(module, whole));
+        }
+
+        /// <summary>
+        /// The items of a list literal <c>[a, b]</c>, split at its top-level commas (not inside quotes or brackets), or
+        /// null when the text isn't one list literal.
+        /// </summary>
+        internal static List<string> RawListItems(string text)
+        {
+            string t = text.Trim();
+            if (t.Length < 2 || t[0] != '[' || t[^1] != ']') return null;
+            var items = new List<string>();
+            int depth = 0, start = 1;
+            char quote = '\0';
+            for (int i = 1; i < t.Length - 1; i++)
+            {
+                char c = t[i];
+                if (quote != '\0') { if (c == '\\') i++; else if (c == quote) quote = '\0'; continue; }
+                switch (c)
+                {
+                    case '\'': case '"': quote = c; break;
+                    case '[': case '(': case '{': depth++; break;
+                    case ']': case ')': case '}': if (--depth < 0) return null; break;
+                    case ',' when depth == 0: items.Add(t[start..i]); start = i + 1; break;
+                }
+            }
+            if (depth != 0 || quote != '\0') return null;
+            string last = t[start..^1];
+            if (last.Trim().Length > 0 || items.Count > 0) items.Add(last);
+            return items.Any(x => x.Trim().Length == 0) ? null : items;
         }
 
         private static readonly System.Text.RegularExpressions.Regex RawHandle = new System.Text.RegularExpressions.Regex(@"^@[\w.\-]+$");
@@ -281,6 +322,7 @@ namespace KScript.Runtime
                     switch (unary.Operator)
                     {
                         case "not": return !Values.Truthy(operand);
+                        case "-" when NativeTypeRegistry.TryNegate(operand, out object negated): return negated;
                         case "-": return -Values.ToNumber(operand, $"'-'{Where(unary, ctx)}");
                         default: return Values.ToNumber(operand, $"'+'{Where(unary, ctx)}");
                     }
@@ -425,9 +467,20 @@ namespace KScript.Runtime
 
         private object EvaluateRange(RangeNode range, Scope scope, EvalContext ctx)
         {
-            double start = Values.ToNumber(Evaluate(range.Start, scope, ctx), "The start of a range");
-            double end = Values.ToNumber(Evaluate(range.End, scope, ctx), "The end of a range");
-            double step = range.Step != null ? Values.ToNumber(Evaluate(range.Step, scope, ctx), "The step of a range") : (end >= start ? 1 : -1);
+            object from = Evaluate(range.Start, scope, ctx), to = Evaluate(range.End, scope, ctx);
+            object by = range.Step != null ? Evaluate(range.Step, scope, ctx) : null;
+            // A range of a native type's values, or of dates by a duration, is declared by the type.
+            try
+            {
+                if (NativeTypeRegistry.TryRange(from, to, by, out List<object> values)) return values;
+            }
+            catch (KScriptException ex) when (ex.Line == 0)
+            {
+                throw Fail(range, ctx, ex.Words, ex.Type);
+            }
+            double start = Values.ToNumber(from, "The start of a range");
+            double end = Values.ToNumber(to, "The end of a range");
+            double step = by != null ? Values.ToNumber(by, "The step of a range") : (end >= start ? 1 : -1);
             if (step == 0) throw Fail(range, ctx, "A range can't have a step of 0.", "Argument");
             var list = new List<object>();
             for (double x = start; step > 0 ? x < end : x > end; x += step)
@@ -491,6 +544,19 @@ namespace KScript.Runtime
         private object Binary(string op, object a, object b, ExprNode node, EvalContext ctx)
         {
             string where = Where(node, ctx);
+            // An operator a native type declares (duration + duration, date - duration, ip in cidr) runs as it says.
+            if (NativeOperators.BinaryOperators.Contains(op))
+            {
+                try
+                {
+                    if (NativeTypeRegistry.TryBinary(op, a, b, out object native)) return native;
+                }
+                catch (KScriptException ex) when (ex.Line == 0)
+                {
+                    throw Fail(node, ctx, ex.Words, ex.Type);
+                }
+                if (NativeTypeRegistry.BinaryProblem(op, a, b) is string problem) throw Fail(node, ctx, problem, "Type");
+            }
             switch (op)
             {
                 case "==": return Values.LooseEquals(a, b);
@@ -518,12 +584,6 @@ namespace KScript.Runtime
                         var merged = new Dictionary<string, object>(ma);
                         foreach (var kv in mb) merged[kv.Key] = kv.Value;
                         return merged;
-                    }
-                    // /docs + 'guides/start' adds names, the same as ->join().
-                    if (a is NativeText { TypeName: "slash_path" } path && b != null && !(b is List<object> || b is Dictionary<string, object>))
-                    {
-                        if (SemanticTypes.TryConvert("slash_path", path.Text + "/" + Values.ToStr(b), out object joined, out string why)) return joined;
-                        throw Fail(node, ctx, $"{path.Text} + {Values.Describe(b)} isn't a slash_path: {why}.", "Value");
                     }
                     if (a is string || b is string) return Values.ToStr(a) + Values.ToStr(b);
                     if (a is DateTime date && b is double days) return date.AddDays(days);
@@ -964,6 +1024,9 @@ namespace KScript.Runtime
             if (target is ErrorValue && module.Methods.TryGetValue("error:" + name, out method)) return true;
             // A package's records (a model's) have its methods as well as maps'.
             if (target is Record record && record.Type.RecordKind != null && module.Methods.TryGetValue(record.Type.RecordKind + ":" + name, out method)) return true;
+            // A list of one native type has that type's list methods too: $versions->without(prereleases).
+            if (target is List<object> { Count: > 0 } items && items[0] is IKObject first && NativeTypeRegistry.Get(first.TypeName) != null
+                && items.All(x => x is IKObject k && k.TypeName == first.TypeName) && module.Methods.TryGetValue(first.TypeName + "[]:" + name, out method)) return true;
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
             // An email, handle, uuid or regex is text too, so the string methods that make sense for it work on it.
@@ -1022,6 +1085,8 @@ namespace KScript.Runtime
             if (!defined && target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
                 throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
             if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);
+            // A NativeText has no methods of its own, so an any-method (->is_a(semver)) binds its bare words as declared.
+            if (defined && target is NativeText) return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             if (target is IKObject obj && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), name, out object result))
             {
                 return result;

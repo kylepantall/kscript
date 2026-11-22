@@ -62,7 +62,7 @@ namespace KScript.Language.Features
             DateTime sample = new DateTime(2026, 3, 7, 14, 5, 9, 123);
             foreach (string token in DateFormatTokens)
             {
-                NativeParsers.DateLetters.TryGetValue(token[0], out var letter);
+                DateFormatType.DateLetters.TryGetValue(token[0], out var letter);
                 string shows = sample.ToString(token.Length == 1 ? "%" + token : token, System.Globalization.CultureInfo.InvariantCulture);
                 items.Add(new CompletionItem
                 {

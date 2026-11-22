@@ -21,6 +21,7 @@
     "onLanguage:kscript-code",
     "workspaceContains:**/_components/*.html",
     "workspaceContains:**/_layout.html",
+    "workspaceContains:**/_layouts/*.html",
     "workspaceContains:**/kscript.json"
   ],
   "contributes": {
@@ -165,6 +166,11 @@
         "category": "KScript"
       },
       {
+        "command": "kscript.showSetup",
+        "title": "Open Install Guide",
+        "category": "KScript"
+      },
+      {
         "command": "kscript.restartServer",
         "title": "Restart Language Server",
         "category": "KScript"
@@ -199,6 +205,11 @@
       {
         "command": "kscript.serve",
         "title": "Serve Site",
+        "category": "KScript"
+      },
+      {
+        "command": "kscript.checkFile",
+        "title": "Check This File",
         "category": "KScript"
       },
       {
@@ -267,16 +278,27 @@
       "editor/title/run": [
         {
           "command": "kscript.run",
-          "when": "(editorLangId == kscript || editorLangId == kscript-code) && !(resourceFilename =~ /\\.test\\.((ks\\.)?xml|kscript)$/)",
+          "when": "(editorLangId == kscript || editorLangId == kscript-code) && !(resourceFilename =~ /\\.test\\.(ks\\.xml|kscript)$/)",
           "group": "navigation"
         },
         {
           "command": "kscript.runTestsInFile",
-          "when": "resourceFilename =~ /\\.test\\.((ks\\.)?xml|kscript)$/",
+          "when": "resourceFilename =~ /\\.test\\.(ks\\.xml|kscript)$/",
           "group": "navigation"
         }
       ],
+      "editor/context": [
+        {
+          "command": "kscript.checkFile",
+          "when": "resourceScheme == file && (editorLangId == kscript || editorLangId == kscript-code)",
+          "group": "1_modification"
+        }
+      ],
       "commandPalette": [
+        {
+          "command": "kscript.checkFile",
+          "when": "resourceScheme == file && (editorLangId == kscript || editorLangId == kscript-code)"
+        },
         {
           "command": "kscript.onEnter",
           "when": "false"
@@ -295,7 +317,7 @@
         },
         {
           "command": "kscript.runTestsInFile",
-          "when": "resourceFilename =~ /\\.test\\.((ks\\.)?xml|kscript)$/"
+          "when": "resourceFilename =~ /\\.test\\.(ks\\.xml|kscript)$/"
         }
       ]
     },

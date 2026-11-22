@@ -119,6 +119,11 @@ async function run() {
   const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', doc.uri, new vscode.Position(1, 4));
   assert.ok(hovers.length > 0, 'hover on <let>');
 
+  // An explicit file check works without a kscript.json and returns the CLI result.
+  assert.strictEqual(await vscode.commands.executeCommand('kscript.checkFile', doc.uri), 1, 'the typo fails Check This File');
+  const correct = await vscode.workspace.openTextDocument(path.join(folder, 'writes.kscript'));
+  assert.strictEqual(await vscode.commands.executeCommand('kscript.checkFile', correct.uri), 0, 'a valid file passes');
+
   // .html pages keep VS Code's HTML language and grammar; KScript only adds { } expressions on top.
   const page = await vscode.workspace.openTextDocument(path.join(folder, 'page.html'));
   assert.strictEqual(page.languageId, 'html', 'a page stays HTML');

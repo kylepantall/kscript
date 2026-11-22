@@ -43,6 +43,6 @@ namespace KScript.Runtime
         }
 
         /// <summary>A duration value of this many seconds.</summary>
-        public static object Of(double seconds) => NativeParsers.DurationOf(seconds);
+        public static object Of(double seconds) => DurationType.Of(seconds);
     }
 }

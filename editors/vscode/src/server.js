@@ -25,13 +25,14 @@ function installLocations(env = process.env, platform = process.platform, home =
   return locations;
 }
 
-/** The first `kscript` on the PATH, or null. */
-function findOnPath(env = process.env, platform = process.platform, exists = isFile) {
+/** The first executable with this name on PATH, or null. */
+function findOnPath(env = process.env, platform = process.platform, exists = isFile, name = 'kscript') {
   const sep = platform === 'win32' ? ';' : ':';
   const join = platform === 'win32' ? path.win32.join : path.posix.join;
-  const names = platform === 'win32'
-    ? (env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean).map((ext) => 'kscript' + ext.toLowerCase())
-    : ['kscript'];
+  const extensions = (env.PATHEXT || '.EXE;.CMD;.BAT').toLowerCase().split(';').filter(Boolean);
+  const names = platform === 'win32' && !extensions.includes(path.win32.extname(name).toLowerCase())
+    ? extensions.map((ext) => name + ext)
+    : [name];
   for (const dir of (env.PATH || env.Path || '').split(sep)) {
     if (!dir) continue;
     for (const name of names) {
@@ -75,12 +76,13 @@ function resolveServer(configured, args = ['lsp'], options = {}) {
         ? { command: 'dotnet', args: [p, ...args], source: 'setting' }
         : { error: `kscript.server.path points to ${p}, which doesn't exist.` };
     }
-    if (exists(p)) return { command: p, args, source: 'setting' };
     // A bare name such as "kscript-dev" is looked up on the PATH.
     if (!p.includes('/') && !p.includes('\\')) {
-      const onPath = findOnPath({ ...env, PATH: env.PATH || env.Path }, platform, (c) => exists(c) && path.basename(c).toLowerCase().startsWith(p.toLowerCase()));
+      const onPath = findOnPath(env, platform, exists, p);
       if (onPath) return { command: onPath, args, source: 'setting' };
+      return { error: `kscript.server.path names ${p}, which wasn't found on PATH.` };
     }
+    if (exists(p)) return { command: p, args, source: 'setting' };
     return { error: `kscript.server.path points to ${p}, which doesn't exist.` };
   }
 

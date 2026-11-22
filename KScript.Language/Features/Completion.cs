@@ -540,6 +540,12 @@ namespace KScript.Language.Features
                 case AttributeKind.ExpressionList:
                 case AttributeKind.Statements:
                 case AttributeKind.Template:
+                    if (cursor.Region == null && a.Name == "value" && string.IsNullOrWhiteSpace(before)
+                        && DeclaredTypeValueCompletions(cursor.TagElement, replace) is { Count: > 0 } typed)
+                    {
+                        // <let type="duration" value="‸">: the values a native type offers.
+                        return typed.Concat(ExpressionStartCompletions(analysis, cursor.Offset, replace, template: false)).ToList();
+                    }
                     return cursor.Region != null ? null : ExpressionStartCompletions(analysis, cursor.Offset, replace, a.Kind == AttributeKind.Template);
 
                 default:
@@ -829,6 +835,8 @@ namespace KScript.Language.Features
             List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false);
             start.InsertRange(0, ParameterNameCompletions(analysis, region, wordStart, replace));
             start.InsertRange(0, NamedValueCompletions(analysis, region, wordStart, replace));
+            start.InsertRange(0, DeclaredTypeValueCompletions(region, wordStart, replace));
+            start.InsertRange(0, WordArgumentCompletions(analysis, region, wordStart, replace));
             start.InsertRange(0, ListItemCompletions(analysis, region, wordStart, replace));
             return start;
         }
@@ -981,7 +989,7 @@ namespace KScript.Language.Features
         }
 
         private List<CompletionItem> BuiltInMethodItems(DocumentAnalysis analysis, TypeShape receiver, TextSpan replace) =>
-            Catalog.MethodsFor(receiver.Type).Where(m => !NeedsImport(analysis, m.Package))
+            BuiltInMethods(receiver).Where(m => !NeedsImport(analysis, m.Package))
                 .Select(m => new CompletionItem
                 {
                     Label = m.Name,
@@ -994,9 +1002,25 @@ namespace KScript.Language.Features
                     IsSnippet = true,
                     ReplaceSpan = replace,
                     SortText = m.Deprecated != null ? "9" + m.Name
-                        : receiver.Type == KType.Any || m.ReceiverType == receiver.Type ? "0" + Ranking.Method(m.ReceiverType, m.Name)
+                        : receiver.Type == KType.Any || m.ReceiverType == receiver.Type || m.ReceiverType == TypeInference.TypedListReceiver(receiver) ? "0" + Ranking.Method(m.ReceiverType, m.Name)
                         : (m.ReceiverType == KType.Any ? "1" : "2") + m.Name,
                 }).ToList();
+
+        /// <summary>
+        /// The catalog's methods for a value of this shape. A list of one native type (semver[]) has that type's list
+        /// methods (->latest()) first, on top of a list's.
+        /// </summary>
+        private IEnumerable<CallableInfo> BuiltInMethods(TypeShape receiver)
+        {
+            IEnumerable<CallableInfo> methods = Catalog.MethodsFor(receiver.Type);
+            if (TypeInference.TypedListReceiver(receiver) is not string list)
+            {
+                return methods;
+            }
+            List<CallableInfo> own = Catalog.MethodsFor(list).Where(m => m.ReceiverType == list).ToList();
+            var names = new HashSet<string>(own.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
+            return own.Concat(methods.Where(m => !names.Contains(m.Name)));
+        }
 
         /// <summary>What a method returns on this receiver: list methods such as filter keep the item type.</summary>
         private TypeShape MethodResult(CallableInfo m, TypeShape receiver) => TypeInference.MethodResult(m, receiver);

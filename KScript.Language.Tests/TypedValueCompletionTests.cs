@@ -164,7 +164,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Fixed_lists_and_type_options_reach_the_hook()
         {
-            Assert.Contains(NativeParser.Fixed(() => new[] { "a" })(new NativeValueContext()), v => v.Value == "a");
+            Assert.Contains(new DurationType().Suggest(new NativeValueContext()), v => v.Value == "30s");
             (string name, Dictionary<string, string> options) = LanguageService.SplitType("path(exists: 'route')?");
             Assert.Equal("path", name);
             Assert.Equal("route", options["exists"]);

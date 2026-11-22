@@ -1,4 +1,5 @@
 using System.Globalization;
+using KScript.Metadata;
 using KScript.Syntax;
 using KScript.Syntax.Text;
 
@@ -98,6 +99,10 @@ namespace KScript.Language.Analysis
         private void CheckArithmetic(BinaryNode binary, ExpressionRegion region)
         {
             string op = binary.Operator;
+            if (CheckNativeArithmetic(binary, region))
+            {
+                return;
+            }
             if (op == "+")
             {
                 CheckAddition(binary, region);
@@ -122,6 +127,62 @@ namespace KScript.Language.Analysis
                 WarnUnless(leftHolder, region.Source.ToSource(binary.Left.Span), DiagnosticCodes.TypeMismatch,
                     $"'{binary.OperatorText}' needs a number here, but {left}.");
             }
+        }
+
+        /// <summary>
+        /// Arithmetic with a native value on a side (<c>1h + 30m</c>, <c>@now() + 1h</c>, <c>1h * 1h</c>): fine when a
+        /// native type declares the pair, and a warning that says what the type does take when none does, as the
+        /// runtime would stop with. True when a native value is on a side, so the number checks don't apply.
+        /// </summary>
+        private bool CheckNativeArithmetic(BinaryNode binary, ExpressionRegion region)
+        {
+            TypeShape left = Infer(binary.Left, region);
+            TypeShape right = Infer(binary.Right, region);
+            string lt = TypeInference.OperandType(left), rt = TypeInference.OperandType(right);
+            NativeTypeInfo native = NativeTypes.Get(lt) ?? NativeTypes.Get(rt);
+            if (native == null)
+            {
+                return false;
+            }
+            // Text joins with + ('took ' + $d), text on the other side may be parsed ($d - '15m'), and an unknown side may fit.
+            if (lt is null or KType.String || rt is null or KType.String || NativeTypes.Operator(binary.Operator, lt, rt) != null)
+            {
+                return true;
+            }
+            List<string> takes = NativeTypes.OperatorsFor(binary.Operator, native.Name).Where(o => o.Left != null && o.Operator != "..").Select(o => o.Display).ToList();
+            Report(region.Source.ToSource(binary.Span), DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
+                $"'{binary.Operator}' doesn't work on {Described(binary.Left, lt, region)} and {Described(binary.Right, rt, region)}."
+                + (takes.Count > 0 ? $" With {native.Name} it takes {string.Join(", ", takes)}." : $" {NativeValues(native)} have no '{binary.Operator}'."));
+            return true;
+        }
+
+        /// <summary>
+        /// <c>$a &lt; $b</c> on a native type with no order: the runtime stops with "Sku values have no order", so the
+        /// editor says it first.
+        /// </summary>
+        private void CheckNativeOrdering(BinaryNode binary, ExpressionRegion region)
+        {
+            string lt = TypeInference.OperandType(Infer(binary.Left, region));
+            string rt = TypeInference.OperandType(Infer(binary.Right, region));
+            NativeTypeInfo native = NativeTypes.Get(lt) ?? NativeTypes.Get(rt);
+            if (native == null || native.Ordering != "none")
+            {
+                return;
+            }
+            Report(region.Source.ToSource(binary.Span), DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
+                $"{NativeValues(native)} have no order, so '{binary.Operator}' can't compare them. Compare a field, or the text with ->to_string().");
+        }
+
+        /// <summary>"Duration values", for messages that match the runtime's.</summary>
+        private static string NativeValues(NativeTypeInfo native) => char.ToUpperInvariant(native.Name[0]) + native.Name[1..] + " values";
+
+        /// <summary>A side as the runtime describes a value: a duration (1h), a number ($n).</summary>
+        private static string Described(ExprNode node, string type, ExpressionRegion region)
+        {
+            TextSpan span = node.Span;
+            string text = span.End <= region.Source.Value.Length ? region.Source.Value.Substring(span.Start, span.End - span.Start).Trim() : string.Empty;
+            string kind = NativeTypes.Get(type)?.WithArticle ?? (type == KType.Number ? "a number" : "a " + type);
+            return text.Length == 0 ? kind : $"{kind} ({Shown(text)})";
         }
 
         /// <summary><c>$list + 1</c>: + joins two lists, two maps or text, but a list and a number is an error.</summary>

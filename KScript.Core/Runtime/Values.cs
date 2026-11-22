@@ -184,6 +184,7 @@ namespace KScript.Runtime
         public static bool Truthy(object value) => value switch
         {
             null => false,
+            IKObject when NativeTypeRegistry.TryFalsy(value, out bool falsy) => !falsy,
             bool b => b,
             double d => d != 0 && !double.IsNaN(d),
             string s => s.Length > 0,
@@ -263,6 +264,7 @@ namespace KScript.Runtime
         {
             if (a == null || b == null) return a == null && b == null;
             if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
+            if (NativeTypeRegistry.TryEquals(a, b, out bool same)) return same;
             // An email or a handle equals text that means the same once normalised: 'Kyle@Example.com' == 'Kyle@example.com'.
             if (a is ISemanticText ta && b is string tb) return SemanticTypes.TryConvert(ta.TypeName, tb, out object nb, out _) && ta.Equals(nb);
             if (b is ISemanticText && a is string) return LooseEquals(b, a);
@@ -276,6 +278,7 @@ namespace KScript.Runtime
         public static int Compare(object a, object b, string op)
         {
             if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
+            if (NativeTypeRegistry.TryCompare(a, b, op, out int native)) return native;
             if (TryNumber(a, out double x) && TryNumber(b, out double y)) return x.CompareTo(y);
             if (a is DateTime da && b is DateTime db) return da.CompareTo(db);
             if (a == null || b == null)
