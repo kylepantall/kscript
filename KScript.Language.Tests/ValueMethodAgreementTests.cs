@@ -49,7 +49,7 @@ namespace KScript.Language.Tests
             Assert.Contains("to_string", offered);
             Assert.Contains("to_json", offered);
             Assert.All(offered, name => Assert.True(runs.Contains(name), $"->{name}() is offered on a {type}, which has no such method at run time."));
-            foreach (string text in new[] { "json", "upper", "length", "split", "to_date" })
+            foreach (string text in new[] { "json", "upper", "count", "split", "to_date" })
             {
                 Assert.DoesNotContain(text, offered);
             }
