@@ -17,7 +17,7 @@
     name="board_w"
     value="@min(40, ((@terminal_width() - 4) / 2)->floor())" />
   <let name="board_h" value="20" />
-  <let name="frame_ms" value="70" />
+  <let name="frame_time" value="70ms" />
 
   <fn name="draw" params="world: map, title = ''">
     <if @is_terminal()>
@@ -37,7 +37,7 @@
       <set name="w" value="@advance($w, generations: 1)" />
       <if @is_terminal()>
         <call fn="draw" args="$w, 'playing ' + ($i + 1) + '/' + $generations" />
-        <wait ms="$frame_ms" />
+        <wait duration="$frame_time" />
       </if>
       <if @population($w.grid) eq 0>
         <break />
@@ -56,7 +56,7 @@
         message="'{$name_or_path}' isn't a pattern name or a file. Patterns: { $patterns->keys()->join(', ') }." />
     </if>
     <let name="rows" value="@parse_cells(@read_text($name_or_path))" />
-    <return value="@new_world(@place(@blank(width: @max($board_w, @width($rows) + 2), height: @max($board_h, @height($rows) + 2)), rows: $rows), wrap: $wrap, pattern: @file($name_or_path)->name())" />
+    <return value="@new_world(@place(@blank(width: @max($board_w, @width($rows) + 2), height: @max($board_h, @height($rows) + 2)), rows: $rows), wrap: $wrap, pattern: @file($name_or_path).name)" />
   </fn>
 
   <!-- kscript life.ks.xml <pattern> [generations]: play and stop. -->
@@ -120,7 +120,7 @@
           value="$where->trim()->split(' ')->reject(fn($p) => $p eq '')->map(fn($p) => $p->to_int(default: 0) - 1)" />
         <if not ($xy->count() eq 2 and $xy[0] ge 0 and $xy[1] ge 0 and $xy[0] lt @width($world.grid) and $xy[1] lt @height($world.grid))>
           <echo>{ @color('That cell is off the board.', colour: 'red') }</echo>
-          <wait seconds="1" />
+          <wait duration="1s" />
           <continue />
         </if>
         <set
@@ -135,7 +135,7 @@
             value="@load_pattern($path->trim(), wrap: $world.wrap)" />
           <catch as="err">
             <echo>{ @color($err.message, colour: 'red') }</echo>
-            <wait seconds="1.5" />
+            <wait duration="1.5s" />
           </catch>
         </try>
       </case>

@@ -9,7 +9,7 @@ job ChargeCard(queue: "high", tries: 3, fail_on: [Validation]) {
 }
 
 /// Books the courier once the order is paid.
-job ShipOrder(unique_for: "1h", unique_by: [order_id]) {
+job ShipOrder(unique_for: 1h, unique_by: [order_id]) {
   order_id: int
 
   fn handle() {

@@ -52,7 +52,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | --- | --- |
 | `n = 3` (first time) | `<let name="n" value="3" />` |
 | `n = 4`, `total += 1` (after) | `<set name="n" value="4" />`, `<set name="total" op="+=" value="1" />` |
-| `const config = { retries: 3 }` | `<let name="config" const="yes" value="…" />` |
+| `const config = { retries: 3 }` | `<let name="config" const="true" value="…" />` |
 | `count: int = $raw` | `<let name="count" type="int" value="$raw" />` |
 | `@greet('Hi')` | `<do>@greet('Hi')</do>` |
 | `echo "Hello, $name"` | `<echo>Hello, $name</echo>` |
@@ -154,7 +154,7 @@ repo = ```<Repo>
   the next: see [Long strings and blocks of text](#long-strings-and-blocks-of-text)). `'single quotes'` are string literals inside
   expressions and are kept exactly as written.
 - In `name(...)` a value runs to the next `,` or `)` outside brackets; quote it to include a comma. A bare name such
-  as `wrap` means `wrap="yes"`.
+  as `wrap` means `wrap="true"`.
 - A list of names is an array: `Middleware(use: [secure_headers, json_only])`, `Resource(..., only: [index, show])`.
   The XML form writes the same list as text, `use="secure_headers, json_only"`, and `kscript convert` turns one into
   the other. The old string form (`use: "a, b"`) still works in `.kscript`, with a KS6006 hint to use the array.

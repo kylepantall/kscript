@@ -14,7 +14,7 @@ KScript.Window(
   rows = 24
   world = @pattern_world('glider_gun', $cols, $rows)
   playing = false
-  speed = 150
+  speed = 0.15
   pattern = 'glider_gun'
   soup = 30
   wrap = true
@@ -42,7 +42,7 @@ KScript.Window(
     Button(on-click: { world = @advance($world, 50) }) "+50"
     Spacer(size: 8)
     Text(color: "#94a3b8") "Speed"
-    Select(bind: speed, options: { Slow: 400, Normal: 150, Fast: 40 })
+    Select(bind: speed, options: { Slow: 0.4, Normal: 0.15, Fast: 0.04 })
     Text(color: "#94a3b8") "Pattern"
     Select(bind: pattern, options: $pattern_choices,
       on-change: { world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false })

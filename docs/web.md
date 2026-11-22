@@ -46,7 +46,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **Routing**: `/people` serves `people.html`, `people.md` or `people/index.html`; `/people/42` can match `people/[id].html` (`$request.params.id`). Files and folders starting with `_` or `.` and KScript sources (`.xml`) are never served. `_404.html` is used for missing pages.
 - **`$request`**: `method`, `path`, `query`, `form`, `headers`, `cookies`, `params` and `body`.
 - **Same language as scripts**: pages run on the KScript 2 interpreter, so every KScript.Core command and method works in them. Pages also get KScript.IO, KScript.Markdown and KScript.Web without importing them: `@read_json`, `@read_text`, `@read_markdown` (gives `html`, `title` and `meta`), `@files`, `@exists`, `@markdown`. Other packages are imported at the top of the page, as in a script: `<import package="KScript.Math" as="math" />` and then `{ @math.sqrt(2) }`.
-- **Sharing code with scripts**: `<import src="lib/text.ks.xml" />` at the top of a page gives it that script's top-level `<fn>` functions and `<let const="yes">` values. `as="text"` (then `@text.shout(...)`) and `names="shout"` work as they do in scripts.
+- **Sharing code with scripts**: `<import src="lib/text.ks.xml" />` at the top of a page gives it that script's top-level `<fn>` functions and `<let const="true">` values. `as="text"` (then `@text.shout(...)`) and `names="shout"` work as they do in scripts.
 - **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
 - **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
 
@@ -99,7 +99,7 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 
 - `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server keeps nothing between requests.
 - `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn($i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
-- `on-tick="…" every="200"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if $playing><span on-tick="frame += 1" every="100"></span></if>`.
+- `on-tick="…" every="200ms"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if $playing><span on-tick="frame += 1" every="100"></span></if>`.
 - `bind="name"` ties an input to a state variable both ways and redraws the block as you type.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.
 

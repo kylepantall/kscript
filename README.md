@@ -37,11 +37,11 @@ import KScript.Terminal
 
 folder = $args[0] ?? @known_folder(downloads)
 big = @files($folder, pattern: '*', recursive)
-  |> filter(fn($f) => $f->size() gt 1000000)
-  |> sort_by(fn($f) => -$f->size())
+  |> filter(fn($f) => $f.size gt 1000000)
+  |> sort_by(fn($f) => -$f.size)
 
 for f in $big {
-  echo "{ @bold($f->name()) }  { ($f->size() / 1000000)->round(digits: 1) } MB"
+  echo "{ @bold($f.name) }  { ($f.size / 1000000)->round(digits: 1) } MB"
 } else {
   echo "Nothing over 1 MB in {$folder}."
 }
@@ -50,7 +50,7 @@ if $big->count() gt 0 {
   confirm(to: ok) "Move them to an archive folder?"
   if $ok {
     for f in $big {
-      move(from: $f, to: @join_path(base: $folder, ['archive', $f->name()]))
+      move(from: $f, to: @join_path(base: $folder, ['archive', $f.name]))
     }
   }
 }

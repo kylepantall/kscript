@@ -3,7 +3,7 @@ type Username with [handle] {
   min: 3
   max: 16
   not: [@admin, @root]
-  validate: not $value->name()->contains('--'), "can't have two dashes in a row"
+  validate: not $value.name->contains('--'), "can't have two dashes in a row"
 }
 
 type Signup {

@@ -27,7 +27,7 @@
             name="world"
             value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
           <state name="playing" value="false" />
-          <state name="speed" value="'150'" />
+          <state name="speed" value="'0.15'" />
           <state name="pattern" value="'glider_gun'" />
           <state name="soup" value="'30'" />
           <let name="s" value="@summary($world)" />
@@ -48,9 +48,9 @@
             </div>
             <label>Speed
               <select bind="speed">
-                <option value="400" selected="{$speed eq '400'}">Slow</option>
-                <option value="150" selected="{$speed eq '150'}">Normal</option>
-                <option value="40" selected="{$speed eq '40'}">Fast</option>
+                <option value="0.4" selected="{$speed eq '0.4'}">Slow</option>
+                <option value="0.15" selected="{$speed eq '0.15'}">Normal</option>
+                <option value="0.04" selected="{$speed eq '0.04'}">Fast</option>
               </select>
             </label>
             <label>Pattern

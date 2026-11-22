@@ -172,7 +172,7 @@ Positional arguments fill parameters in order, and each `name: value` fills the 
 
 ### Flags
 
-A yes/no parameter can be written as a bare word: `recursive` sets it to yes and `not recursive` to no, so calls read like a sentence.
+A true/false parameter can be written as a bare word: `recursive` sets it to true and `not recursive` to false, so calls read like a sentence.
 
 ```kscript
 all = @files($folder, pattern: '*.txt', recursive)
@@ -281,7 +281,7 @@ The response from https://api.github.com/... doesn't fit Repo (2 problems):
   $.visibility: must be a Visibility (public, private, internal), but got the string 'secret'.
 ```
 
-In a `catch`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo->fields()` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
+In a `catch`, `$err.problems` is a list of `{ path, field, message }` maps. `$Repo->check($data)` returns that list without throwing (empty when the data fits), `$Repo.fields` lists the fields, and `$Repo->schema()` describes the type as JSON Schema.
 
 ## Values and methods
 
@@ -294,7 +294,21 @@ echo "{ $people |> sort_by(fn($p) => $p.name) |> first() }"
 echo "{ @now()->add_days(7)->format(pattern: 'd MMMM yyyy') }"
 ```
 
-The editor completes the methods for each type and shows what they do. `@json(text)` and `$value->to_json()` convert to and from JSON.
+A plain fact about a value is a field, read with a dot and no brackets, the same way a map's keys are:
+
+```kscript
+import KScript.IO
+
+day = @date('2026-11-19')
+file = @file('notes.txt')
+echo "{ $day.year } { $day.weekday } { $file.name } { $file.size }"
+```
+
+So `$response.status`, `$file.size`, `$url.host` and `$e.status` are fields, and anything that takes arguments or does work is a method: `$response->json()`, `$file->read_text()`, `$day->format('yyyy')`. A name that answers true or false starts with `is_` or `has_`: `$response.is_ok`, `$ip.is_private`, `$list->is_empty()`, `$map->has(key)`.
+
+A length of time is a duration: a number and a unit with no quotes, such as `500ms`, `30s`, `10m`, `2h`, `1d` or `1w`, joined for more (`1h30m`). Everything that takes a length of time takes one: `wait(duration: 500ms)`, `@api($url, timeout: 30s)`, `$cache->set(key, value, ttl: 10m)`. A plain number is always seconds.
+
+The editor completes the fields and methods for each type and shows what they do. `@json(text)` and `$value->to_json()` convert to and from JSON.
 
 ### Adding methods to a type: extend
 
@@ -329,7 +343,7 @@ extend date {
 }
 ```
 
-In XML, `extend` is `<extend type="date">` holding `<fn>` elements, and `override fn` is `<fn override="yes">`.
+In XML, `extend` is `<extend type="date">` holding `<fn>` elements, and `override fn` is `<fn override="true">`.
 
 **Where extensions apply.** A file's own `extend` blocks apply in that file and in every file that imports it. In a project (a folder with `kscript.json`), every file in the `extensions/` folder applies to every script, test and page in the project, with no import needed. Split them up however you like, one file per type for example:
 
@@ -433,7 +447,7 @@ features: [search, cart]
 
 ```kscript
 echo "{$config.database.host}:{$config.database.port}"
-timeout = @config('http.timeout', 30) // a path, and a default when it isn't set
+timeout = $config->get('http.timeout', 30) // a path, and a default when it isn't set
 if $config->has('features') {
   echo "{ $config.features->join(', ') }"
 }
@@ -445,7 +459,7 @@ key = $config->require('api.key') // stops with a clear message when it's missin
 1. `config.json`, `config.yaml`, `config.yml`, then `.env`
 2. `config.staging.json`, `config.staging.yaml`, `config.staging.yml`, then `.env.staging`
 3. `staging.json`, `staging.yaml`, `staging.yml`
-4. with `config.user` in `kscript.json` (or `config(user: yes)`), the person's own `config.json`, `config.yaml` or `config.yml` from the app's config folder (see [App folders](storage.md#the-persons-own-settings-configuser))
+4. with `config.user` in `kscript.json` (or `config(user: true)`), the person's own `config.json`, `config.yaml` or `config.yml` from the app's config folder (see [App folders](storage.md#the-persons-own-settings-configuser))
 5. environment variables with the prefix, when there is one
 
 **Environment variables.** With a prefix, variables override the files, and `__` nests: with `config(prefix: APP_)`, `APP_DATABASE__HOST=db.internal` sets `database.host`. Names don't depend on case, so `$config.database.host` and `$config.DATABASE.HOST` are the same setting. Values such as `true`, `false` and `8080` become booleans and numbers.
@@ -474,7 +488,7 @@ $log->info('Saved', { id: $id, size: $bytes })
 
 db = $log->named('db')->with({ host: $config.database.host })
 $db->debug('Connected') // category db, with a host field
-if $log->enabled('debug') {
+if $log->is_enabled('debug') {
   $log->debug(@to_json($everything))
 }
 
@@ -559,16 +573,16 @@ import slugify from "lib/strings.kscript"
 | --- | --- |
 | `KScript.Terminal` | `input(to, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, colour: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, headers, align)` (see [Terminal output](#terminal-output)) |
 | `KScript.Math` | `@sqrt` `@pow` `@round(x, digits: 2)` `@clamp` `@log` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
-| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have `->name()` `->extension()` `->size()` `->modified()`… |
-| `KScript.Net` | `@api(url, options: { method, headers, body, timeout })` (a path such as `'/api/notes'` asks the project's own routes, see [Calling your own API](http.md#calling-your-own-api)) returning a response (`->status()` `->ok()` `->json()` `->text()` `->check()`), `download(url, to)`, `@url_encode`, `@query_string` |
+| `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `<write>` `<move>` `<copy>` `<delete>` `<mkdir>`. File values have the fields `.name` `.extension` `.size` `.modified`… and methods such as `->read_text()`. |
+| `KScript.Net` | `@api(url, options: { method, headers, body, timeout })` (a path such as `'/api/notes'` asks the project's own routes, see [Calling your own API](http.md#calling-your-own-api)) returning a response (`.status` `.is_ok` `->json()` `.text` `->check()`), `download(url, to)`, `@url_encode`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
-| `KScript.AI` | `@llm(prompt, options)`, `llm(to, system, schema, tools)`, `@chat(system)` with `->ask()` `->history()` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
+| `KScript.AI` | `@llm(prompt, options)`, `llm(to, system, schema, tools)`, `@chat(system)` with `->ask()` `.history` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
 | `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast`, `@css_var`, `@css_vars`; `stylesheet(src, to, vars)` (see [Stylesheets](stylesheets.md)). |
 | `KScript.Http` | Routes, controllers and middleware for `kscript serve`: a `KScript.Routes { }` file holds `Get` `Post` `Put` `Patch` `Delete` `Any` `Route` `Resource` `Group` `Middleware`. Controllers use `@view`, `@response`, `@redirect`, `@abort` and `@route`. See [Routes, controllers and middleware](http.md). |
-| `KScript.Storage` | The app's own folders, in the right place on each platform: `@storage(config)` (also `data`, `cache`, `state`, `logs`) with `->read` `->read_json` `->write` `->write_json` `->append` `->list` `->delete` `->folder` `->path`, plus `@app_name()` and `@app_folders()`. See [App folders](storage.md). |
-| `KScript.Cache` | `$cache` (in memory) and `@cache(file)` with `->get` `->put` `->remember(key, fn, ttl: '10m')` `->has` `->forget` `->increment` `->ttl` `->keys` `->flush`. See [Caching](cache.md). |
-| `KScript.Auth` | Sign-in for `kscript serve` apps: `@register`, `@attempt`, `@login`, `@logout`, `@user()`, `@signed_in()`, `$session` (`->get` `->put` `->flash` …), `@users()`, `@csrf_field()`, `@reset_token`, `@reset_password`, `@api_token`, and the `auth` and `guest` middleware. See [Sign-in](auth.md). |
+| `KScript.Storage` | The app's own folders, in the right place on each platform: `@storage(config)` (also `data`, `cache`, `state`, `logs`) with `->read` `->read_json` `->write` `->write_json` `->append` `->list` `->delete` `->folder` `->path_of`, plus `@app_name()` and `@app_folders()`. See [App folders](storage.md). |
+| `KScript.Cache` | `$cache` (in memory) and `@cache(file)` with `->get` `->set` `->remember(key, fn, ttl: 10m)` `->has` `->remove` `->increment` `->ttl` `->keys` `->clear`. See [Caching](cache.md). |
+| `KScript.Auth` | Sign-in for `kscript serve` apps: `@register`, `@attempt`, `@login`, `@logout`, `@user()`, `@is_signed_in()`, `$session` (`->get` `->set` `->flash` …), `@users()`, `@csrf_field()`, `@reset_token`, `@reset_password`, `@api_token`, and the `auth` and `guest` middleware. See [Sign-in](auth.md). |
 | `KScript.Document` | `KScript.Document(template: paper, to: "paper.pdf") { }` with `Section`, `Paragraph`, `List`, `Table`, `Figure`, `Math`, `Bibliography` and more; `Letter` and `Invoice`; `->save` `->pages` `->words` `->markdown` `->latex` `->html`. See [Documents](documents.md). |
 | `KScript.UI` | Desktop windows: a `KScript.Window { }` block opens one. `Column` `Row` `Grid` `Text` `Button` `TextBox` `CheckBox` `Select` `Slider` `Box` `Spacer` `Timer`, `@close_window()`. See [Desktop apps](desktop.md). |
 | `KScript.Test` | `test`, `describe`, `before-each`, `after-each`, `expect`, `assert`, `expect-error`, `capture`, `@run_script`, `@assert`, `@fail`. Test files import it on their own (see [Testing scripts](testing.md)). |

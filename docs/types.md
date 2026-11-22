@@ -6,10 +6,10 @@ KScript has built-in types for text that means something, called native types: `
 type Username with [handle] {
   max: 16
   not: [@admin, @root]
-  validate: not $value->name()->starts_with('_'), 'A username cannot start with _'
+  validate: not $value.name->starts_with('_'), 'A username cannot start with _'
 }
 
-fn greet(user: Username) => 'Hi ' + $user->name()
+fn greet(user: Username) => 'Hi ' + $user.name
 
 echo @greet(@Joan)
 try {
@@ -23,11 +23,11 @@ try {
 
 | Type | What it holds | Tidied | Methods |
 | --- | --- | --- | --- |
-| `email` | An address such as `joan@example.com`. | Spaces are trimmed and the domain is lowercased. | `->local()`, `->domain()` |
-| `handle` | `@` followed by letters, digits, `_`, `.` or `-`, up to 30 of them. | Lowercased. | `->name()` (without the `@`) |
-| `uuid` | A UUID, versions 1 to 8, plus the nil and max UUIDs. | Lowercased to `8-4-4-4-12`. `urn:uuid:`, braces and 32 hex digits are read too. | `->version()` |
-| `regex` | A regular expression with flags `i`, `m`, `s` and `x`. | | `->test()`, `->match()`, `->match_all()`, `->replace()`, `->split()`, `->pattern()`, `->flags()` |
-| `password` | A secret. It never prints. | | `->hash()`, `->verify()`, `->needs_rehash()`, `->strength()`, `->strong()`, `->reveal()` |
+| `email` | An address such as `joan@example.com`. | Spaces are trimmed and the domain is lowercased. | `.local`, `.domain` |
+| `handle` | `@` followed by letters, digits, `_`, `.` or `-`, up to 30 of them. | Lowercased. | `.name` (without the `@`) |
+| `uuid` | A UUID, versions 1 to 8, plus the nil and max UUIDs. | Lowercased to `8-4-4-4-12`. `urn:uuid:`, braces and 32 hex digits are read too. | `.version` |
+| `regex` | A regular expression with flags `i`, `m`, `s` and `x`. | | `->test()`, `->match()`, `->match_all()`, `->replace()`, `->split()`, `.pattern`, `.flags` |
+| `password` | A secret. It never prints. | | `->hash()`, `->verify()`, `->needs_rehash()`, `->strength()`, `->is_strong()`, `->reveal()` |
 
 A native value is still text, and it compares equal to the same text once tidied. An email compares with its domain lowercased. It keeps the string methods that make sense for it, and the editor only suggests those:
 
@@ -63,15 +63,15 @@ A `port`, `card` or `password` keeps none. The rest, such as `->to_date()` on a 
 
 ```kscript
 email: email = ' Joan.Smith@Example.COM '
-echo "$email { $email->local() } at { $email->domain() }"
+echo "$email { $email.local } at { $email.domain }"
 echo "{ $email == 'Joan.Smith@EXAMPLE.com' }"
 
 who: handle = @Joan_S
-echo "$who { $who->name() }"
+echo "$who { $who.name }"
 
 id = @uuid()
 key = @uuid(v: 8, name: 'joan@example.com')
-echo "{ $id->version() } { $key->version() } { $key == @uuid(v: 8, name: 'joan@example.com') }"
+echo "{ $id.version } { $key.version } { $key == @uuid(v: 8, name: 'joan@example.com') }"
 ```
 
 `@uuid()` makes a random version 4 UUID. `@uuid(v: 8)` makes a version 8 UUID that is time-ordered. With `name:`, it is the same UUID every time for that name, and `namespace:` keeps names from different places apart.
@@ -90,36 +90,36 @@ These work the same way as `email` and `uuid`: a value is checked and tidied whe
 
 ```kscript
 site: url = https://example.com:8443/docs?page=2
-echo "{ $site->host() } { $site->port() } { $site->query().page }"
+echo "{ $site.host } { $site.port } { $site.query.page }"
 echo $site->with_query({ page: 3 })
 
 home: ip = 192.168.0.12
-echo "{ $home->private() } { $home->in('192.168.0.0/16') }"
+echo "{ $home.is_private } { $home->in('192.168.0.0/16') }"
 
 v: semver = 1.4.2
 echo "{ $v->satisfies('^1.2.0') } { $v->bump('minor') }"
 
 uk: country = 'United Kingdom'
-echo "$uk { $uk->name() } { $uk->currency()->format(1234.5) } { $uk->flag() }"
+echo "$uk { $uk.name } { $uk.currency->format(1234.5) } { $uk.flag }"
 
 wait: duration = 1h30m
-echo "{ $wait->minutes() } { $wait->plus('45m') }"
+echo "{ $wait.minutes } { $wait->plus(45m) }"
 
 brand: color = '#ff8800'
 echo "{ $brand->lighten(0.5) } { $brand->contrast(white) }"
 
 pay: card = '4242 4242 4242 4242'
-echo "$pay { $pay->brand() }"
+echo "$pay { $pay.brand }"
 ```
 
 ### Web and network
 
 | Type | What it holds | Tidied | Methods |
 | --- | --- | --- | --- |
-| `url` | An absolute `http`, `https`, `ftp`, `ws` or `wss` URL. | The scheme and host are lowercased. | `->scheme()`, `->host()`, `->port()`, `->path()`, `->query()`, `->fragment()`, `->origin()`, `->with_query(values)`, `->join(path)` |
-| `domain` | A domain name such as `api.example.co.uk`. International names work. | Lowercased, without a trailing dot. | `->tld()`, `->labels()`, `->is_subdomain_of(domain)`, `->ascii()` |
-| `ip` | An IPv4 or IPv6 address. | Written the standard way: `2001:db8::1`. | `->version()`, `->in(cidr)`, `->private()`, `->loopback()` |
-| `cidr` | A block of addresses, such as `10.0.0.0/8`. | Host bits are cleared: `10.1.2.3/8` is `10.0.0.0/8`. | `->contains(ip)`, `->network()`, `->prefix()`, `->size()` |
+| `url` | An absolute `http`, `https`, `ftp`, `ws` or `wss` URL. | The scheme and host are lowercased. | `.scheme`, `.host`, `.port`, `.path`, `.query`, `.fragment`, `.origin`, `->with_query(values)`, `->join(path)` |
+| `domain` | A domain name such as `api.example.co.uk`. International names work. | Lowercased, without a trailing dot. | `.tld`, `.labels`, `->is_subdomain_of(domain)`, `->ascii()` |
+| `ip` | An IPv4 or IPv6 address. | Written the standard way: `2001:db8::1`. | `.version`, `->in(cidr)`, `.is_private`, `.is_loopback` |
+| `cidr` | A block of addresses, such as `10.0.0.0/8`. | Host bits are cleared: `10.1.2.3/8` is `10.0.0.0/8`. | `->contains(ip)`, `.network`, `.prefix`, `.size` |
 | `mac` | A network card's MAC address. | Six lowercase pairs with `:`. | |
 | `port` | A port number from 1 to 65535. It is a number, not text. | | |
 
@@ -127,38 +127,38 @@ echo "$pay { $pay->brand() }"
 
 | Type | What it holds | Tidied | Methods |
 | --- | --- | --- | --- |
-| `slug` | Lowercase words joined by `-`, for URLs. `@slugify(text)` makes one. | | `->words()` |
-| `semver` | A semantic version such as `1.4.2` or `2.0.0-beta.1`. | A leading `v` is dropped. | `->major()`, `->minor()`, `->patch()`, `->prerelease()`, `->compare(other)`, `->satisfies(range)`, `->bump(part)` |
-| `mime` | A media type such as `application/json; charset=utf-8`. | The type is lowercased. | `->main_type()`, `->subtype()`, `->essence()`, `->params()`, `->is('text/*')` |
-| `hex` | Hexadecimal digits, such as a hash. | Lowercased; `0x` is dropped. | `->bytes()`, `->to_number()` |
-| `base64` | Base64 text, standard or URL-safe. `@base64(text)` makes one. | | `->decode()`, `->bytes()` |
-| `jwt` | A JSON Web Token. Its signature isn't checked, so don't trust its claims for sign-in. | | `->header()`, `->claims()`, `->expires()`, `->expired()` |
+| `slug` | Lowercase words joined by `-`, for URLs. `@slugify(text)` makes one. | | `.words` |
+| `semver` | A semantic version such as `1.4.2` or `2.0.0-beta.1`. | A leading `v` is dropped. | `.major`, `.minor`, `.patch`, `.prerelease`, `->compare(other)`, `->satisfies(range)`, `->bump(part)` |
+| `mime` | A media type such as `application/json; charset=utf-8`. | The type is lowercased. | `.main_type`, `.subtype`, `.essence`, `.params`, `->is('text/*')` |
+| `hex` | Hexadecimal digits, such as a hash. | Lowercased; `0x` is dropped. | `.bytes`, `->to_number()` |
+| `base64` | Base64 text, standard or URL-safe. `@base64(text)` makes one. | | `->decode()`, `.bytes` |
+| `jwt` | A JSON Web Token. Its signature isn't checked, so don't trust its claims for sign-in. | | `.header`, `.claims`, `.expires`, `.is_expired` |
 | `json` | Text that holds valid JSON. | | `->parse()` |
 
 ### People and places
 
 | Type | What it holds | Tidied | Methods |
 | --- | --- | --- | --- |
-| `phone` | A phone number in E.164: `+` then the country code and number. | Spaces, dots, dashes, brackets and a `(0)` are dropped: `+44 (0)7700 900123` is `+447700900123`. | `->country_code()`, `->national()`, `->tel()` |
-| `country` | An ISO 3166 country. Two-letter and three-letter codes and English names are read. | Two capitals: `GB`. | `->name()`, `->alpha3()`, `->currency()`, `->flag()` |
-| `currency` | An ISO 4217 currency code. | Capitals: `GBP`. | `->name()`, `->symbol()`, `->digits()`, `->format(amount)` |
-| `locale` | A language tag such as `en-GB` or `pt-BR`. | Its usual case: `en_gb` is `en-GB`. | `->language()`, `->region()`, `->name()`, `->native_name()`, `->format(value)` |
-| `timezone` | An IANA time zone such as `Europe/London`, or `UTC`. | Its usual case. | `->offset(at?)`, `->now()`, `->convert(time)`, `->dst(at?)` |
+| `phone` | A phone number in E.164: `+` then the country code and number. | Spaces, dots, dashes, brackets and a `(0)` are dropped: `+44 (0)7700 900123` is `+447700900123`. | `.country_code`, `.national`, `->tel()` |
+| `country` | An ISO 3166 country. Two-letter and three-letter codes and English names are read. | Two capitals: `GB`. | `.name`, `.alpha3`, `.currency`, `.flag` |
+| `currency` | An ISO 4217 currency code. | Capitals: `GBP`. | `.name`, `.symbol`, `.digits`, `->format(amount)` |
+| `locale` | A language tag such as `en-GB` or `pt-BR`. | Its usual case: `en_gb` is `en-GB`. | `.language`, `.region`, `.name`, `.native_name`, `->format(value)` |
+| `timezone` | An IANA time zone such as `Europe/London`, or `UTC`. | Its usual case. | `->offset(at?)`, `->now()`, `->convert(time)`, `->is_dst(at?)` |
 
 ### Time
 
 | Type | What it holds | Tidied | Methods |
 | --- | --- | --- | --- |
-| `duration` | A length of time: `1h30m`, `90s`, `2d`, ISO 8601 such as `PT1H30M`, or a number of seconds. | The short form: `90m` is `1h30m`. | `->seconds()`, `->minutes()`, `->hours()`, `->ms()`, `->iso()`, `->after(time?)`, `->before(time?)`, `->plus(other)` |
+| `duration` | A length of time: `1h30m`, `90s`, `2d`, ISO 8601 such as `PT1H30M`, or a number of seconds. | The short form: `90m` is `1h30m`. | `.seconds`, `.minutes`, `.hours`, `.ms`, `->iso()`, `->after(time?)`, `->before(time?)`, `->plus(other)` |
 | `cron` | A cron schedule of five fields, or `@daily`, `@hourly` and the like. | Lowercased. | `->next(after?)`, `->next_times(count, after?)` |
-| `color` | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb(...)` or a CSS colour name. | `#rrggbb`, or `#rrggbbaa` with transparency. | `->rgb()`, `->hex()`, `->css()`, `->mix(other, amount?)`, `->lighten(amount?)`, `->darken(amount?)`, `->luminance()`, `->contrast(other)` |
+| `color` | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb(...)` or a CSS colour name. | `#rrggbb`, or `#rrggbbaa` with transparency. | `->rgb()`, `->hex()`, `->css()`, `->mix(other, amount?)`, `->lighten(amount?)`, `->darken(amount?)`, `.luminance`, `->contrast(other)` |
 
 ### Money
 
 | Type | What it holds | Tidied | Methods |
 | --- | --- | --- | --- |
-| `iban` | A bank account number, checked with its mod-97 digits. | Capitals without spaces. | `->country()`, `->formatted()`, `->bban()` |
-| `card` | A payment card number, checked with the Luhn digit. Like a password, it prints masked: `•••• 4242`, in logs and JSON too. | Spaces and dashes are dropped. | `->last4()`, `->brand()`, `->reveal()` |
+| `iban` | A bank account number, checked with its mod-97 digits. | Capitals without spaces. | `.country`, `->formatted()`, `.bban` |
+| `card` | A payment card number, checked with the Luhn digit. Like a password, it prints masked: `•••• 4242`, in logs and JSON too. | Spaces and dashes are dropped. | `.last4`, `.brand`, `->reveal()` |
 
 ### Arguments for the newer types
 
@@ -179,6 +179,7 @@ echo "$api $office"
 
 Some values need no quotes, the same way a regex needs none in JavaScript.
 
+- **Durations** are literals anywhere: `30s`, `500ms`, `1h30m`. See [lengths of time](language.md#values-and-methods).
 - **Emails, URLs, UUIDs and regexes** are literals anywhere: `joan@example.com`, `https://example.com/docs`, `3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f`, `/^[a-z]+$/i`. The editor checks them as you type. A URL starts with `http://`, `https://`, `ftp://`, `ws://` or `wss://`, so its `//` is never a comment, and it ends at a space, a comma, a bracket or `->`.
 - **Handles** are written as `@joan` only where a handle is expected: a `handle` variable or parameter, a `not:` or `one_of:` list on a handle type, or next to a handle in `==`. Everywhere else, `@joan` still names the function `joan`.
 - **Words** need no quotes where the type is read from text. That covers an enum (`color: Color = red`), a type with a `pattern` (`size: Size = 1920x1080`), a refinement of text (`slug: Slug = my-post`) and the native types: `domain = example.com`, `ip = 10.0.0.1`, `cidr = 10.0.0.0/8`, `timezone = Europe/London`, `semver = 1.4.2`, `duration = 1h30m`, `color = red`, `country = GB` and the rest. Method arguments of those types work the same way: `$brand->contrast(white)`.
@@ -208,7 +209,7 @@ echo "{ $stored->starts_with('$argon2id$') } { $pw->verify($stored) }"
 
 weak: password = 'password1'
 echo "{ $weak->strength(min: 12, symbol: true).problems }"
-echo "{ $weak->strong() }"
+echo "{ $weak->is_strong() }"
 ```
 
 | Method | What it does |
@@ -217,7 +218,7 @@ echo "{ $weak->strong() }"
 | `->verify(hash)` | True if the password matches the hash, in constant time. Both formats are read. |
 | `->needs_rehash(hash)` | True when the hash was made with other settings, so it can be upgraded at the next sign-in. |
 | `->strength(...)` | `{ score, label, ok, problems }`. Score 0 to 4 estimates how hard it is to guess. |
-| `->strong(...)` | True when `strength` finds no problems. |
+| `->is_strong(...)` | True when `strength` finds no problems. |
 | `->reveal()` | The text itself, for the rare place that needs it. |
 
 `strength` and `strong` take named rules: `min` (8 by default) and `max` (length), `upper`, `lower`, `digit` and `symbol` (each one needed), `common: false` (allow the most common passwords), `not: [...]` (words it mustn't contain, such as the user's name) and `score` (the lowest score that passes, 3 by default). The same rules can be given to the type, as in `password(min: 12)`, and then a password that breaks them can't be made.
@@ -301,7 +302,7 @@ A value is converted to the base type first, then normalized, then checked again
 kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/" --normalize "$value->trim()->upper()"
 kscript make native Percent --base int --min 0 --max 100
 kscript make native Username --base handle --max 16 --not @admin,@root
-kscript make native CompanySite --base url --validate "$value->host()->ends_with('example.com'), 'Use a company site'"
+kscript make native CompanySite --base url --validate "$value.host->ends_with('example.com'), 'Use a company site'"
 ```
 
 The first one writes `natives/sku.kscript`:
@@ -422,7 +423,7 @@ In XML, the same types are attributes and elements of `<type>`:
 
 ```xml
 <type name="Username" with="handle" max="16" not="@admin, @root">
-  <validate test="not $value->name()->starts_with('_')" message="A username cannot start with _" />
+  <validate test="not $value.name->starts_with('_')" message="A username cannot start with _" />
 </type>
 <type name="Admin" with="User, Auditable">
   <field name="level" type="int" default="1" />

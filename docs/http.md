@@ -136,7 +136,7 @@ What a controller returns becomes the response:
 
 | Return | Response |
 | --- | --- |
-| A map, list, number or yes/no | JSON (`application/json`). |
+| A map, list, number or true/false | JSON (`application/json`). |
 | Text | HTML. |
 | `@view('people/show', person: $p)` | The view rendered with its layout. |
 | `@response(body, status: 201, type: 'text/csv', headers: { … })` | Your own status, type and headers. A map or list body is JSON. |
@@ -237,14 +237,14 @@ A function with the same name as a built-in wins, so you can replace one.
 
 Browsers and proxies can keep an answer and ask again only when it may have changed. KScript.Http helps at three levels, with [KScript.Cache](cache.md) underneath.
 
-**ETags.** `etag: yes` on a route (or the `etag` middleware) adds an `ETag` header to every `200` answer to `GET` and `HEAD`: a hash of the body. When the browser asks again with `If-None-Match` and the tag still matches, it gets `304 Not Modified` with no body, so nothing is sent twice.
+**ETags.** `etag: true` on a route (or the `etag` middleware) adds an `ETag` header to every `200` answer to `GET` and `HEAD`: a hash of the body. When the browser asks again with `If-None-Match` and the tag still matches, it gets `304 Not Modified` with no body, so nothing is sent twice.
 
 ```kscript
 KScript.Routes {
   import "controllers/people.kscript" as people
 
-  Get(path: /people, to: people.index, etag: yes, cache: 60)
-  Get(path: /people/{id}, to: people.show, etag: yes, cache: "private, max-age=0, must-revalidate")
+  Get(path: /people, to: people.index, etag: true, cache: 60)
+  Get(path: /people/{id}, to: people.show, etag: true, cache: "private, max-age=0, must-revalidate")
 }
 ```
 
@@ -263,7 +263,7 @@ kscript {
 }
 ```
 
-`@etag(value, weak: yes)` makes a weak tag, and a response can be tagged by hand with `->with_etag()` (a hash of its body) or `->with_etag($value)`.
+`@etag(value, weak: true)` makes a weak tag, and a response can be tagged by hand with `->with_etag()` (a hash of its body) or `->with_etag($value)`.
 
 **Cache-Control.** `cache` on a route (or the `cache_control` middleware) sets `Cache-Control` on successful `GET` answers and on `304`s. A number alone is a public max-age in seconds, so `cache: 300` gives `public, max-age=300`. Otherwise list the directives: `public`, `private`, `no-cache`, `no-store`, `no-transform`, `must-revalidate`, `proxy-revalidate`, `must-understand`, `immutable`, `max-age=`, `s-maxage=`, `stale-while-revalidate=` and `stale-if-error=`. A directive the browser wouldn't understand is an error when the route file loads. A header set by the controller (`->with_cache('no-store')`) wins.
 
@@ -308,7 +308,7 @@ Group(middleware: auth) {
 
 `@response()`, `@view()` and `@redirect()` give a response value. Middleware gets one back from `$next($request)`.
 
-- Read it with `->status()`, `->body()`, `->type()`, `->headers()`, `->header(name)`, `->ok()` and `->json()`.
+- Read it with `.status`, `.body`, `.type`, `.headers`, `->header(name)`, `.is_ok` and `->json()`.
 - Change it with `->with_status(code)`, `->with_header(name, value)`, `->with_type(type)`, `->with_etag(value)` and `->with_cache(directives)`. Each returns the response, so the calls chain.
 
 ## Calling your own API
@@ -320,10 +320,10 @@ import KScript.Net
 
 notes = @api('/api/notes')->check()->json()
 added = @api('/api/notes', options: { method: 'POST', body: { title: 'Ship it' } })
-echo $added->status()   // 201
+echo $added.status   // 201
 ```
 
-It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The options and the response are the same as for an address: `method`, `headers` and `body` (a map or list is sent as JSON), then `->status()`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
+It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The options and the response are the same as for an address: `method`, `headers` and `body` (a map or list is sent as JSON), then `.status`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
 
 A request made while answering another one, such as a page calling the API, or a route calling another route, sends on the `Cookie` and `Authorization` headers of the request being answered, so the API sees the same signed-in person. Give your own `headers` to send others. Requests inside one another stop after 8, so a route that calls itself is an error rather than a hang.
 

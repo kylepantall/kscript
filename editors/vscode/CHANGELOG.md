@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Plain facts about a value are fields: after a dot, `$response.` offers `status`, `is_ok` and `text`, `$file.` offers `name` and `size`, and `$date.` offers `year` and `weekday`, each with its type on hover. Calling one (`$file->size()`) or using a renamed method (`$cache->put()`, now `->set()`) is marked with a quick fix that rewrites it.
+- A length of time is highlighted as one value (`30s`, `500ms`, `1h30m`), and a time written without its unit or in quotes (`timeout: 30`, `ttl: '10m'`) gets a **Write 30s** quick fix (KS6018).
+
 - Help writing types and jobs, like C#'s "implement missing members" and "generate overrides": a job without `fn handle()` gets an **Add fn handle()** quick fix, and the lightbulb on a job offers **Add fn failed(err)**. On a joined type (`type Admin with [User]`) it offers **Override fn greet(who: string) from User** for each method a base gives it. A method two bases both give is an error with a **Declare fn label in C** fix, as at run time. Each fix writes a stub in the file's own format.
 - A **Get Started with KScript** walkthrough on the Welcome page: install, write a first script, run it, fix a mistake, find out what you can write, and start a project.
 - **KScript: New Script** (also in **File > New File…**) opens a short script that runs as it is, with a variable, a function, a list and a loop to change.
