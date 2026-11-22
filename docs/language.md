@@ -471,7 +471,7 @@ key = $config->require('api.key') // stops with a clear message when it's missin
 **`config`** reads the settings again with other options. Without `into`, it changes `$config`:
 
 ```kscript
-config(env: production, prefix: SHOP_, files: ['settings', 'secrets.yaml?', '.env'], root: conf, defaults: { server: { port: 8080 } }, require: "database.host, api.key")
+config(env: production, prefix: SHOP_, files: ['settings', 'secrets.yaml?', '.env'], root: conf, defaults: { server: { port: 8080 } }, require: ['database.host', 'api.key'])
 config(files: ['themes/dark.json'], into: theme) // a separate set of settings in $theme
 ```
 

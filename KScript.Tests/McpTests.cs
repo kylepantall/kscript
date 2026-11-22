@@ -289,12 +289,12 @@ public sealed class McpTests : IDisposable
             p.Command("fetch_text", "url, retries?", "Fetches text.", KType.String, call => null);
             p.Method(KType.String, "shout", "", "Upper-cases text.", KType.String, (target, call) => null);
             p.Element(new ElementInfo("beep", "Beeps.", ContentKind.Empty, new AttributeInfo("tone", AttributeKind.Template, "The sound."), new AttributeInfo("sound", AttributeKind.Template, "The sound.")), run => null);
-            p.Element(new ElementInfo("old-beep", "Beeps.", ContentKind.Empty), run => null);
+            p.Element(new ElementInfo("old_beep", "Beeps.", ContentKind.Empty), run => null);
             p.Deprecate("@old_sum", "Sums moved to KScript.Math.", "@sum");
             p.Deprecate("@fetch_text(retries)", "Requests are retried for you");
             p.Deprecate("string->shout", "", "->upper");
             p.Deprecate("<beep tone>", "Renamed", "sound");
-            p.Deprecate("<old-beep>", "");
+            p.Deprecate("<old_beep>", "");
         }
     }
 
@@ -319,8 +319,8 @@ public sealed class McpTests : IDisposable
         string beep = Call(server, "lookup", new { name = "<beep>" }).Text;
         Assert.Contains("| `tone` (deprecated) | text with `{ }` | **Deprecated.** Renamed. Use `sound` instead. The sound. |", beep);
         Assert.Contains("| `sound` | text with `{ }` | The sound. |", beep);
-        string oldBeep = Call(server, "lookup", new { name = "<old-beep>" }).Text;
-        Assert.StartsWith("# <old-beep> (deprecated)\n", oldBeep);
+        string oldBeep = Call(server, "lookup", new { name = "<old_beep>" }).Text;
+        Assert.StartsWith("# <old_beep> (deprecated)\n", oldBeep);
         Assert.Contains("\n**Deprecated.**\n", oldBeep);
 
         Assert.Contains("Deprecated. Adds two numbers.", Call(server, "search_docs", new { query = "old_sum" }).Text);
