@@ -25,7 +25,7 @@ namespace KScript.Runtime
         /// <summary>Every native type: these five, the rest of the language's own (url, ip, country, ...) and packages' types.</summary>
         public static IReadOnlyList<string> Names => KScript.Metadata.NativeTypes.Names.ToList();
 
-        public static bool IsSemantic(string type) => NativeTypeRegistry.Get(type) != null || NativeParsers.Get(type) != null;
+        public static bool IsSemantic(string type) => NativeTypeRegistry.Get(type) != null;
 
         /// <summary>
         /// Converts <paramref name="value"/> to the native type: a value of the type stays as it is, and text (or a
@@ -36,25 +36,22 @@ namespace KScript.Runtime
         {
             result = null;
             reason = null;
-            // A type on the NativeType contract parses itself; the rest still have a parser in NativeParsers.
-            NativeType native = NativeTypeRegistry.Get(type);
-            Func<string, (object Value, string Reason)> parse = native != null ? native.Parse : NativeParsers.Get(type)?.Parse;
-            if (parse == null) return false;
+            if (NativeTypeRegistry.Get(type) is not NativeType native) return false;
             if (value is IKObject own && own.TypeName == type)
             {
                 result = value;
                 return true;
             }
-            if (value is double && (native?.TakesNumbers ?? NativeParsers.Get(type).TakesNumbers)) value = Values.ToStr(value);
+            if (value is double && native.TakesNumbers) value = Values.ToStr(value);
             string text = value switch { string str => str, ISemanticText other => other.Text, _ => null };
             if (text == null) return false;
-            (result, reason) = parse(text);
+            (result, reason) = native.Parse(text);
             return result != null;
         }
 
         /// <summary>Why a native value breaks the options given where its type is used: ip(version: 4), url(schemes: [https]).</summary>
         public static IEnumerable<string> OptionProblems(string type, object value, IReadOnlyDictionary<string, object> options) =>
-            options.Count == 0 || NativeParsers.Get(type)?.OptionProblems is not { } check ? Enumerable.Empty<string>() : check(value, options);
+            options.Count == 0 || NativeTypeRegistry.Get(type) is not NativeType native ? Enumerable.Empty<string>() : native.OptionProblems(value, options);
 
         /// <summary>
         /// Why a value doesn't fit, starting "needs ...". The value itself is never shown for a password.

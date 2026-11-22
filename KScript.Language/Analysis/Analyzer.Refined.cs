@@ -236,7 +236,7 @@ namespace KScript.Language.Analysis
                 string lower = BuiltInTypeName(name);
                 if (SemanticTypeNames.Contains(lower))
                 {
-                    if (!(literal is string) && lower != "password" && !(literal is double && NativeParsers.Get(lower)?.TakesNumbers == true))
+                    if (!(literal is string) && lower != "password" && !(literal is double && NativeTypeRegistry.Get(lower)?.TakesNumbers == true))
                     {
                         return null;
                     }

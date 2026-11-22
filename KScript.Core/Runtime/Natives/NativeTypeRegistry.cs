@@ -21,10 +21,12 @@ namespace KScript.Runtime
             new HandleType(),
             new UuidType(),
             new RegexType(),
-            new DurationType(),
-            new TimezoneType(),
-            new CronType(),
-            new ColorType(),
+            new UrlType(),
+            new DomainType(),
+            new IpType(),
+            new CidrType(),
+            new MacType(),
+            new PortType(),
             new SlugType(),
             new SemverType(),
             new MimeType(),
@@ -32,18 +34,22 @@ namespace KScript.Runtime
             new Base64Type(),
             new JwtType(),
             new JsonType(),
-            new UrlType(),
-            new DomainType(),
-            new IpType(),
-            new CidrType(),
-            new MacType(),
-            new PortType(),
+            new PhoneType(),
+            new CountryType(),
+            new CurrencyType(),
+            new LocaleType(),
+            new TimezoneType(),
+            new DurationType(),
+            new CronType(),
+            new ColorType(),
+            new IbanType(),
+            new CardType(),
+            new MoneyType(),
         };
 
         static NativeTypeRegistry()
         {
             foreach (NativeType type in BuiltIn) Register(type);
-            LegacyNativeTypes.Register();
         }
 
         /// <summary>Adds a native type: its name, what the editor knows and its operators. Its members register with its package.</summary>
@@ -98,8 +104,9 @@ namespace KScript.Runtime
         {
             if (TypeOf(value) == type) return value;
             NativeType native = Get(type);
-            // Only plain text and numbers are parsed: a value of another native type (hex '10') is never read as this one.
-            return native != null && value is string or double ? native.Coerce(value) : null;
+            // Text is parsed, but a value of another native type is never read as this one: $phone + 1 isn't a duration.
+            bool text = value is string or double || (value is ISemanticText t && NativeTypes.Get(t.TypeName) == null);
+            return native != null && text ? native.Coerce(value) : null;
         }
 
         private static bool Involves(object a, object b) => Of(a) != null || Of(b) != null;
@@ -183,6 +190,8 @@ namespace KScript.Runtime
         {
             equal = false;
             NativeType type = Of(a) ?? Of(b);
+            if (type?.Equality.Kind == "never")
+                throw new KScriptException($"{Plural(type)} can't be compared with ==.", "Type");
             if (type == null || type.Equality.Equals == null) return false;
             object x = As(type.Name, a), y = As(type.Name, b);
             equal = x != null && y != null && type.Equality.Equals(x, y);

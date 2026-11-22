@@ -235,7 +235,7 @@ public class MoreNativeTypesTests
         foreach (NativeTypeInfo info in NativeTypes.All)
         {
             Assert.False(string.IsNullOrWhiteSpace(info.Description), info.Name);
-            Assert.NotNull(NativeParsers.Get(info.Name) ?? (object)SemanticTypes.IsSemantic(info.Name));
+            Assert.NotNull(NativeTypeRegistry.Get(info.Name));
             string value = info.Example.StartsWith('\'') ? info.Example : "'" + info.Example + "'";
             if (info.Name == "port") value = info.Example;
             Assert.Equal(info.Name == "port" ? "number" : info.Name, Code($"x: {info.Name} = {value}\necho $x->type()"));
