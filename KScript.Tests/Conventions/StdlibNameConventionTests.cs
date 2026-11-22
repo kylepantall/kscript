@@ -1,19 +1,19 @@
-using System.Text.RegularExpressions;
-
 using KScript.Language.Catalog;
 using KScript.Metadata;
 using KScript.Runtime;
 
 namespace KScript.Tests.Conventions;
 
+using Conventions = KScript.Runtime.Conventions;
+
 /// <summary>
 /// One name per thing in the standard library. These walk every command and method of every package that ships
 /// with kscript, so a second spelling (colour, ->length(), @to_upper()) fails here instead of reaching users.
+/// The rules are in <see cref="Conventions"/>, which the engine applies as each package registers; these tests apply
+/// them to everything that ships, one rule at a time.
 /// </summary>
 public class StdlibNameConventionTests
 {
-    private static readonly Regex SnakeCase = new Regex("^[a-z][a-z0-9_]*$", RegexOptions.CultureInvariant);
-
     private static readonly IReadOnlyList<KScriptPackage> Packages = PackageRegistry.Default.LoadAll().ToList();
 
     private static IEnumerable<CallableInfo> Commands => Packages.SelectMany(p => p.Commands.Values).Select(c => c.Info);
@@ -22,10 +22,16 @@ public class StdlibNameConventionTests
 
     private static IEnumerable<ElementInfo> Elements => Packages.SelectMany(p => p.Elements.Values).Select(e => e.Info);
 
-    private static string Show(CallableInfo c) =>
-        (c.Kind == CallableKind.Command ? "@" + c.Name : c.ReceiverType + "->" + c.Name) + "(" + string.Join(", ", Parameters(c).Select(p => p.Label)) + ") in " + c.Package;
-
     private static IReadOnlyList<ParameterInfo> Parameters(CallableInfo c) => c.Signatures.SelectMany(s => s.Parameters).ToList();
+
+    /// <summary>What a rule of <see cref="Conventions"/> says about each command and method: nothing, when all is well.</summary>
+    private static IEnumerable<string> Broken(Func<string, CallableInfo, string> rule) =>
+        Commands.Concat(Methods).Select(c => rule(c.Package, c)).Where(problem => problem != null);
+
+    /// <summary>What every rule that spans registrations says about the packages that ship, and what the tables in Conventions and Retired say.</summary>
+    private static readonly IReadOnlyList<string> Together = Conventions.Together(Packages);
+
+    private static readonly IReadOnlyList<string> Tables = Conventions.Tables(Packages);
 
     private static void None(IEnumerable<string> problems, string rule)
     {
@@ -43,82 +49,58 @@ public class StdlibNameConventionTests
     [Fact]
     public void Commands_methods_and_their_parameters_are_snake_case()
     {
-        None(Commands.Concat(Methods).Where(c => !SnakeCase.IsMatch(c.Name)).Select(Show),
-            "Command and method names are snake_case (letters, digits and _, starting with a letter):");
-        None(Commands.Concat(Methods).SelectMany(c => Parameters(c).Where(p => !SnakeCase.IsMatch(p.Name)).Select(p => $"{p.Name} of {Show(c)}")),
+        None(Broken(Conventions.CallableName), "Command and method names are snake_case (letters, digits and _, starting with a letter):");
+        None(Commands.Concat(Methods).SelectMany(c => Parameters(c).Select(p => Conventions.ParameterName(c.Package, c, p))).Where(problem => problem != null),
             "Parameter names are snake_case:");
     }
 
     [Fact]
     public void No_identifier_says_colour()
     {
-        static bool Colour(string name) => name != null && name.Contains("colour", StringComparison.OrdinalIgnoreCase);
-
         var problems = new List<string>();
         foreach (CallableInfo c in Commands.Concat(Methods))
         {
-            if (Colour(c.Name)) problems.Add(Show(c));
-            problems.AddRange(Parameters(c).Where(p => Colour(p.Name) || p.Values.Any(Colour)).Select(p => $"{p.Name} of {Show(c)}"));
+            problems.Add(Conventions.Color(c.Package, Conventions.Key(c), c.Name));
+            problems.AddRange(Parameters(c).Select(p => Conventions.ParameterColor(c.Package, c, p)));
         }
         foreach (ElementInfo e in Elements)
         {
-            if (Colour(e.Name)) problems.Add($"<{e.Name}> in {e.Package}");
-            problems.AddRange(e.Attributes.Where(a => Colour(a.Name) || a.Options.Any(Colour)).Select(a => $"{a.Name} of <{e.Name}> in {e.Package}"));
+            problems.Add(Conventions.Color(e.Package, $"<{e.Name}>", e.Name));
+            problems.AddRange(e.Attributes.Select(a => Conventions.ArgumentColor(e.Package, e, a)));
         }
         foreach (KScriptPackage p in Packages)
         {
-            problems.AddRange(p.Variables.Keys.Where(Colour).Select(v => $"${v} in {p.Name}"));
-            problems.AddRange(p.LogProviders.Keys.Where(Colour).Select(v => $"log provider {v} in {p.Name}"));
-            problems.AddRange(p.EchoFormats.Keys.Where(Colour).Select(v => $"echo format {v} in {p.Name}"));
+            problems.AddRange(p.Fields.Select(f => Conventions.Color(p.Name, $"{f.Receiver}.{f.Name}", f.Name)));
+            problems.AddRange(p.Variables.Keys.Select(v => Conventions.Color(p.Name, $"${v}", v)));
+            problems.AddRange(p.LogProviders.Keys.Select(v => Conventions.Color(p.Name, $"log provider {v}", v)));
+            problems.AddRange(p.EchoFormats.Keys.Select(v => Conventions.Color(p.Name, $"echo format {v}", v)));
         }
-        problems.AddRange(NativeTypes.Names.Where(Colour).Select(n => $"type {n}"));
-        None(problems, "Names say color (as CSS and the color type do); colour is for prose only:");
+        problems.AddRange(NativeTypes.Names.Select(n => Conventions.Color(null, $"type {n}", n)));
+        None(problems.Where(problem => problem != null), "Names say color (as CSS and the color type do); colour is for prose only:");
     }
 
     [Fact]
-    public void No_command_or_method_is_described_as_another_name_for_something()
-    {
+    public void No_command_or_method_is_described_as_another_name_for_something() =>
         // "(the same as filter)" and "an alias of" are how a second name for one thing announces itself.
-        var second = new Regex(@"\bthe same as\b|\balias(es)?\b|\bshort for\b|\bsynonym", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        None(Commands.Concat(Methods).Where(c => second.IsMatch(c.Description ?? string.Empty)).Select(c => $"{Show(c)}: {c.Description}"),
-            "A command or method that is the same as another one is a second spelling. Keep one:");
-    }
+        None(Broken(Conventions.SecondName), "A command or method that is the same as another one is a second spelling. Keep one:");
 
     [Fact]
-    public void No_two_commands_and_no_two_methods_of_a_type_share_a_description()
-    {
-        static string Key(string description) => Regex.Replace(description ?? string.Empty, @"\s+", " ").Trim().TrimEnd('.').ToLowerInvariant();
-
-        var problems = new List<string>();
-        foreach (var same in Commands.Where(c => !string.IsNullOrWhiteSpace(c.Description)).GroupBy(c => Key(c.Description)).Where(g => g.Count() > 1))
-        {
-            problems.Add(string.Join(" and ", same.Select(Show)) + $": \"{same.First().Description}\"");
-        }
-        foreach (var same in Methods.Where(m => !string.IsNullOrWhiteSpace(m.Description)).GroupBy(m => m.ReceiverType + "\n" + Key(m.Description)).Where(g => g.Count() > 1))
-        {
-            problems.Add(string.Join(" and ", same.Select(Show)) + $": \"{same.First().Description}\"");
-        }
-        None(problems, "Two names with one description are two spellings of one thing. Keep one (or say how they differ):");
-    }
+    public void No_two_commands_and_no_two_methods_of_a_type_share_a_description() =>
+        None(Together.Where(problem => problem.Contains("it has the description of")), "Two names with one description are two spellings of one thing. Keep one (or say how they differ):");
 
     [Fact]
-    public void No_method_is_registered_twice_for_a_type()
-    {
-        None(Methods.GroupBy(m => m.ReceiverType + "->" + m.Name).Where(g => g.Count() > 1).Select(g => string.Join(" and ", g.Select(Show))),
-            "A type has each method once, from one package:");
-    }
+    public void No_method_is_registered_twice_for_a_type() =>
+        None(Together.Where(problem => problem.Contains("already registered")), "A type has each method once, from one package:");
 
     [Fact]
     public void Count_takes_no_arguments()
     {
-        // ->count() is "how many" on every value. "How many match" is ->count_of(match).
-        None(Methods.Where(m => m.Name == "count" && Parameters(m).Count > 0).Select(Show),
-            "->count() takes no arguments; counting what matches is ->count_of(match):");
-        None(Methods.Where(m => m.Name == "length").Select(Show), "The number of items or characters is ->count(), not ->length():");
+        // ->count() is "how many" on every value. "How many match" is ->count_of(match). There is no ->length().
+        None(Broken(Conventions.Count), "->count() takes no arguments; counting what matches is ->count_of(match), and the number of items or characters is ->count(), not ->length():");
         // A list, a text and a map have no fields of their own (a map's are the user's keys), so "how many" is the
         // method on all of them and on everything else that is counted. See "Fields and methods" in
         // StdlibBehaviourConventionTests: a name is a field or a method, never both.
-        None(LanguageCatalog.Default.Fields.Where(f => f.Name is "count" or "length").Select(f => $"{f.Receiver}.{f.Name}"),
+        None(LanguageCatalog.Default.Fields.Select(f => Conventions.CountField(f.Package, f)).Where(problem => problem != null),
             "\"How many\" is the method ->count() on every type, never a field:");
         Assert.Contains("->count()", ScriptRunner.Fails("<echo>{ [1, 2].count }</echo>").Message);
         Assert.Contains("->count()", ScriptRunner.Fails("<echo>{ 'abc'.length }</echo>").Message);
@@ -128,123 +110,39 @@ public class StdlibNameConventionTests
     public void Retired_names_stay_retired()
     {
         // A KScript 1 command whose name a package uses again (@average in KScript.Math) says so in its replacement.
-        None(Commands.Where(c => Retired.Commands.TryGetValue(c.Name, out RetiredInfo r) && !r.Replacement.Contains("@" + c.Name + "(", StringComparison.Ordinal)).Select(Show),
-            "These commands are in Retired.Commands, which tells users what to write instead. Don't bring the old name back:");
-        None(Methods.Where(m => RetiredMembers.Method(m.ReceiverType, m.Name) != null).Select(Show),
-            "These methods are in RetiredMembers.Methods. Don't bring the old name back:");
-        None(Elements.Where(e => Retired.Elements.ContainsKey(e.Name)).Select(e => $"<{e.Name}> in {e.Package}"),
+        None(Broken(Conventions.RetiredCallable), "These are in Retired.Commands or RetiredMembers.Methods, which tell users what to write instead. Don't bring the old name back:");
+        None(Elements.Select(e => Conventions.RetiredElement(e.Package, e)).Where(problem => problem != null),
             "These statements are in Retired.Elements. Don't bring the old name back:");
-        // RetiredMembers is keyed "type:name". A rename that starts with a dot is a field (->ok() became .is_ok).
-        None(RetiredMembers.Methods.Where(r => r.Value.Rename != null).Select(r => (Old: r.Key, r.Value.Rename, Type: r.Key.Substring(0, r.Key.IndexOf(':'))))
-                .Where(x => x.Rename.StartsWith('.')
-                    ? LanguageCatalog.Default.GetField(x.Type, x.Rename.Substring(1)) == null
-                    : !Methods.Any(m => m.Name == x.Rename && KType.AcceptsMethod(m.ReceiverType, m.Name, x.Type)))
-                .Select(x => $"{x.Old} -> {x.Rename}"),
-            "A retired method's new name should exist on the same type:");
-        None(Retired.Commands.Values.Where(r => r.Rename != null && !Commands.Any(c => c.Name == r.Rename)).Select(r => $"@{r.Name} -> @{r.Rename}"),
-            "A retired command's new name should exist:");
+        None(Elements.SelectMany(e => e.Attributes.Select(a => Conventions.RetiredArgument(e.Package, e, a))).Where(problem => problem != null),
+            "These arguments are in Retired.RenamedAttributes. Don't bring the old name back:");
+        // Every new name a retired one points at exists, on the same type for a method (a rename that starts with
+        // a dot is a field: ->ok() became .is_ok).
+        None(Tables.Where(problem => problem.StartsWith("Retired", StringComparison.Ordinal)), "A retired name's new name should exist:");
     }
 
     #region Commands that repeat a method
 
-    /// <summary>
-    /// The pairs where a command and a method of its first argument's type do the same thing on purpose. Methods are
-    /// the primary form, so every entry needs a reason. Keys are "@command = type->method".
-    /// </summary>
-    private static readonly Dictionary<string, string> DeliberatePairs = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        // KScript.Math: formulas read as functions, @sqrt(@abs($x)), as they do in maths. Core's number and list
-        // methods cover the everyday cases without importing the package.
-        ["@sqrt = number->sqrt"] = "maths function",
-        ["@abs = number->abs"] = "maths function",
-        ["@floor = number->floor"] = "maths function",
-        ["@ceil = number->ceil"] = "maths function",
-        ["@round = number->round"] = "maths function",
-        ["@clamp = number->clamp"] = "maths function",
-        ["@sum = list->sum"] = "takes any number of values: @sum(1, 2, 3)",
-        ["@average = list->average"] = "takes any number of values",
-        ["@median = list->median"] = "takes any number of values",
-        ["@stdev = list->stdev"] = "takes any number of values",
-        ["@min = list->min"] = "takes any number of values: @min($a, $b, 0)",
-        ["@max = list->max"] = "takes any number of values",
-
-        // KScript.Style: inside a stylesheet a colour is CSS text (a name, hsl(), a variable's value), not a color value.
-        ["@lighten = color->lighten"] = "CSS colour text in stylesheets",
-        ["@darken = color->darken"] = "CSS colour text in stylesheets",
-        ["@mix = color->mix"] = "CSS colour text in stylesheets",
-
-        // KScript.Markdown: the command reads a whole document (title, front matter, html); the method gives only the HTML.
-        ["@markdown = string->markdown"] = "document map against HTML text",
-    };
-
-    /// <summary>The type of a command's first argument: the declared one, or what its name says by convention.</summary>
-    private static string FirstArgumentType(CallableInfo command)
-    {
-        ParameterInfo first = command.Signatures.FirstOrDefault()?.Parameters.FirstOrDefault();
-        if (first == null) return null;
-        if (first.Variadic) return first.Name == "values" ? KType.List : null;
-        string declared = first.Type switch { "int" => KType.Number, null => null, string t => t };
-        if (declared != null) return declared;
-        return first.Name switch
-        {
-            "text" => KType.String,
-            "number" or "n" or "x" or "a" => KType.Number,
-            "list" => KType.List,
-            "map" => KType.Map,
-            "date" => KType.Date,
-            "color" => "color",
-            "value" => KType.Any,
-            _ => null,
-        };
-    }
-
-    private static string Meaning(string description) => Regex.Replace(description ?? string.Empty, @"\s+", " ").Trim().TrimEnd('.').ToLowerInvariant();
-
-    /// <summary>Every command paired with a method of its first argument's type that has its name (or its to_ form) or its description.</summary>
-    private static IEnumerable<(CallableInfo Command, CallableInfo Method)> Pairs()
-    {
-        List<CallableInfo> methods = Methods.ToList();
-        foreach (CallableInfo command in Commands)
-        {
-            string type = FirstArgumentType(command);
-            if (type == null) continue;
-            foreach (CallableInfo method in methods.Where(m => m.ReceiverType == type || (m.ReceiverType == KType.Any && type != null)))
-            {
-                bool sameName = method.Name == command.Name || method.Name == "to_" + command.Name || "to_" + method.Name == command.Name;
-                bool sameMeaning = Meaning(method.Description).Length > 0 && Meaning(method.Description) == Meaning(command.Description);
-                if (sameName || sameMeaning) yield return (command, method);
-            }
-        }
-    }
-
-    private static string PairKey((CallableInfo Command, CallableInfo Method) pair) => $"@{pair.Command.Name} = {pair.Method.ReceiverType}->{pair.Method.Name}";
-
     [Fact]
     public void No_command_repeats_a_method_of_its_first_argument()
     {
-        List<string> pairs = Pairs().Select(PairKey).Distinct().ToList();
-        None(pairs.Where(p => !DeliberatePairs.ContainsKey(p)).Select(p => p + "  (write $value->method(); drop the command, or add the pair to DeliberatePairs with a reason)"),
-            "Methods are the primary form. These commands only repeat a method of their first argument:");
-        None(DeliberatePairs.Keys.Where(k => !pairs.Contains(k)), "These DeliberatePairs entries no longer match anything. Remove them:");
-        Assert.True(DeliberatePairs.Count <= 20, "DeliberatePairs is meant to stay short.");
+        // The pairs that are there on purpose are Conventions.DeliberatePairs, each with its reason.
+        None(Together.Where(problem => problem.Contains("it only repeats the method")), "Methods are the primary form. These commands only repeat a method of their first argument:");
+        None(Tables.Where(problem => problem.StartsWith("Conventions.DeliberatePairs", StringComparison.Ordinal)), "These DeliberatePairs entries no longer match anything. Remove them:");
+        Assert.True(Conventions.DeliberatePairs.Count <= 20, "DeliberatePairs is meant to stay short.");
+        Assert.All(Conventions.DeliberatePairs.Values, reason => Assert.False(string.IsNullOrWhiteSpace(reason)));
     }
 
     [Fact]
-    public void A_command_and_its_method_use_the_same_parameter_names()
+    public void A_command_and_its_method_use_the_same_parameter_names() =>
+        None(Together.Where(problem => problem.Contains("take the same parameter names")), "A command and the method of the same name take the same parameter names after the value:");
+
+    [Fact]
+    public void A_name_is_a_statement_or_a_command_not_both()
     {
-        var problems = new List<string>();
-        foreach (var (command, method) in Pairs().Where(p => p.Command.Name == p.Method.Name))
-        {
-            // @clamp(number, min, max) and $n->clamp(min, max): after the value itself, the names line up.
-            // Optional parameters at the end may be missing on either side.
-            List<ParameterInfo> rest = command.Signatures.First().Parameters.Skip(1).ToList();
-            List<ParameterInfo> own = method.Signatures.First().Parameters.ToList();
-            int shared = Math.Min(rest.Count, own.Count);
-            bool lineUp = rest.Take(shared).Select(p => p.Name).SequenceEqual(own.Take(shared).Select(p => p.Name))
-                && rest.Skip(shared).Concat(own.Skip(shared)).All(p => p.Optional || p.Variadic);
-            if (!lineUp) problems.Add($"{Show(command)} and {Show(method)}");
-        }
-        None(problems, "A command and the method of the same name take the same parameter names after the value:");
+        // The names that are both on purpose are Conventions.StatementAndCommand, each with its reason.
+        None(Together.Where(problem => problem.Contains("An action has one form")), "An action has one form, a statement or a command:");
+        None(Tables.Where(problem => problem.StartsWith("Conventions.StatementAndCommand", StringComparison.Ordinal)), "These StatementAndCommand entries are stale:");
+        Assert.True(Conventions.StatementAndCommand.Count <= 5, "StatementAndCommand is meant to stay short.");
     }
 
     #endregion

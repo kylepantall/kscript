@@ -19,10 +19,10 @@ namespace KScript.Language.Tests
         protected override void Register(PackageBuilder p)
         {
             p.Command("old_sum", "a, b", "Adds two numbers.", KType.Number, call => null);
-            p.Command("fetch_text", "url, timeout?, retries?, recursive?: bool", "Fetches text.", KType.String, call => null);
+            p.Command("fetch_text", "url, attempts?, retries?, recursive?: bool", "Fetches text.", KType.String, call => null);
             p.Method(KType.String, "shout", "", "Upper-cases text.", KType.String, (target, call) => null);
             p.Method(KType.String, "whisper", "volume?", "Lower-cases text.", KType.String, (target, call) => null);
-            p.Element(new ElementInfo("old-beep", "Beeps.", ContentKind.Empty), run => null);
+            p.Element(new ElementInfo("old_beep", "Beeps.", ContentKind.Empty), run => null);
             p.Element(new ElementInfo("beep", "Beeps.", ContentKind.Empty,
                 new AttributeInfo("sound", AttributeKind.Template, "The sound."),
                 new AttributeInfo("tone", AttributeKind.Template, "The sound, by its old name.")), run => null);
@@ -32,7 +32,7 @@ namespace KScript.Language.Tests
             p.Deprecate("@fetch_text(recursive)", "");
             p.Deprecate("string->shout", "", "->upper");
             p.Deprecate("string->whisper(volume)", "It was never used");
-            p.Deprecate("<old-beep>", "Use the shorter name", "<beep>");
+            p.Deprecate("<old_beep>", "Use the shorter name", "<beep>");
             p.Deprecate("<beep tone>", "Renamed", "sound");
         }
     }
@@ -67,7 +67,7 @@ namespace KScript.Language.Tests
                 <echo>{ @fetch_text('u', 5, 3) }</echo>
                 <echo>{ @fetch_text('u', retries: 2) }</echo>
                 <echo>{ @fetch_text('u', recursive) }</echo>
-                <echo>{ @fetch_text('u', timeout: 1) }</echo>
+                <echo>{ @fetch_text('u', attempts: 1) }</echo>
                 <echo>{ 'a'->shout() }</echo>
                 <echo>{ 'a'->whisper(volume: 1) }</echo>
                 <echo>{ 'a'->whisper() }</echo>
@@ -99,14 +99,14 @@ namespace KScript.Language.Tests
         {
             string xml = Script("""
                 <import package="KScript.Old" />
-                <old-beep />
+                <old_beep />
                 <beep tone="ping" />
                 <beep sound="ping" />
                 """);
             List<Diagnostic> found = Deprecations(xml);
             Assert.Equal(new[]
             {
-                "<old-beep> is deprecated. Use the shorter name. Use <beep> instead.",
+                "<old_beep> is deprecated. Use the shorter name. Use <beep> instead.",
                 "The 'tone' attribute of <beep> is deprecated. Renamed. Use sound instead.",
             }, found.Select(d => d.Message));
             Assert.Equal("Change to beep", Assert.Single(found[0].Fixes).Title);
@@ -116,7 +116,7 @@ namespace KScript.Language.Tests
             Diagnostic both = Assert.Single(Deprecations(Script("<import package=\"KScript.Old\" />\n<beep tone=\"a\" sound=\"b\" />")));
             Assert.Empty(both.Fixes);
 
-            List<Diagnostic> code = Deprecations("import KScript.Old\nold-beep\nbeep(tone: ping)\necho \"{ @old_sum(1, 2) }\"\n", "test.kscript");
+            List<Diagnostic> code = Deprecations("import KScript.Old\nold_beep\nbeep(tone: ping)\necho \"{ @old_sum(1, 2) }\"\n", "test.kscript");
             Assert.Equal(3, code.Count);
             Assert.Contains(code, d => d.Message.StartsWith("The 'tone' attribute", StringComparison.Ordinal));
         }
@@ -141,7 +141,7 @@ namespace KScript.Language.Tests
             (text, offset) = WithCaret(Script("<import package=\"KScript.Old\" />\n<echo>{ @fetch_text('u', ‸) }</echo>"));
             List<CompletionItem> names = Service.GetCompletions(Service.Analyze(text, "test.ks.xml"), offset);
             Assert.True(names.Single(i => i.Label == "retries:").Deprecated);
-            Assert.False(names.Single(i => i.Label == "timeout:").Deprecated);
+            Assert.False(names.Single(i => i.Label == "attempts:").Deprecated);
             Assert.True(names.Single(i => i.Label == "recursive").Deprecated);
 
             (text, offset) = WithCaret(Script("<import package=\"KScript.Old\" />\n<echo>{ 'a'->‸ }</echo>"));
@@ -149,8 +149,8 @@ namespace KScript.Language.Tests
 
             (text, offset) = WithCaret(Script("<import package=\"KScript.Old\" />\n<‸"));
             List<CompletionItem> elements = Service.GetCompletions(Service.Analyze(text, "test.ks.xml"), offset);
-            Assert.True(elements.Single(i => i.Label == "old-beep").Deprecated);
-            Assert.Contains("**Deprecated.** Use the shorter name. Use <beep> instead.", elements.Single(i => i.Label == "old-beep").Documentation);
+            Assert.True(elements.Single(i => i.Label == "old_beep").Deprecated);
+            Assert.Contains("**Deprecated.** Use the shorter name. Use <beep> instead.", elements.Single(i => i.Label == "old_beep").Documentation);
 
             (text, offset) = WithCaret(Script("<import package=\"KScript.Old\" />\n<beep ‸ />"));
             CompletionItem tone = Service.GetCompletions(Service.Analyze(text, "test.ks.xml"), offset).Single(i => i.Label == "tone");
@@ -177,7 +177,7 @@ namespace KScript.Language.Tests
         [InlineData("nope", "has no command or method nope")]
         [InlineData("@thing(nope)", "@thing has no parameter 'nope'")]
         [InlineData("<nope>", "has no element or attribute <nope>")]
-        [InlineData("<thing-el nope>", "has no element or attribute <thing-el nope>")]
+        [InlineData("<thing_el nope>", "has no element or attribute <thing_el nope>")]
         public void Each_kind_of_bad_key_is_rejected(string key, string message)
         {
             var package = new BrokenDeprecations(key);
@@ -214,7 +214,7 @@ namespace KScript.Language.Tests
             protected override void Register(PackageBuilder p)
             {
                 p.Command("thing", "a", "A thing.", KType.Any, call => null);
-                p.Element(new ElementInfo("thing-el", "A thing.", ContentKind.Empty), run => null);
+                p.Element(new ElementInfo("thing_el", "A thing.", ContentKind.Empty), run => null);
                 p.Deprecate(key, "Gone");
             }
         }

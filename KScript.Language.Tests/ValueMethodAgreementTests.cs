@@ -74,7 +74,7 @@ namespace KScript.Language.Tests
             public override string Description => "Dates written as JSON, for tests.";
 
             protected override void Register(PackageBuilder p) =>
-                p.Method(KType.Date, "json", "", "The date as a JSON string.", KType.String, (target, call) => null);
+                p.Method(KType.Date, "json", "indent?", "The date as a JSON string.", KType.String, (target, call) => null);
         }
 
         [Fact]

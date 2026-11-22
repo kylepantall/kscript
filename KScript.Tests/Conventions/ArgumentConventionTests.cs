@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Metadata;
@@ -9,30 +7,20 @@ using KScript.Syntax.Markup;
 
 namespace KScript.Tests.Conventions;
 
+using Conventions = KScript.Runtime.Conventions;
+
 /// <summary>
 /// The names of statements (elements) and their arguments (attributes), checked across every package so a new one
 /// can't bring a second spelling back. The rules are written down in docs/language.md, "Names of statements and
 /// arguments". Old spellings are in <see cref="Retired"/>, which says the new name.
+/// <para>
+/// The rules themselves are in <see cref="KScript.Runtime.Conventions"/>, which the engine applies to every
+/// registration, so a package that breaks one doesn't load. These tests apply the same checks to everything that
+/// ships and to the elements the catalog only plans, one rule at a time.
+/// </para>
 /// </summary>
 public class ArgumentConventionTests
 {
-    /// <summary>
-    /// The packages whose elements describe a thing in a tree (a window, a route table, a document), so they are
-    /// PascalCase. Every other package's elements are actions or declarations, in lower snake_case. Add a package
-    /// here only when its elements build a tree of things.
-    /// </summary>
-    private static readonly HashSet<string> ThingPackages = new(StringComparer.Ordinal) { "KScript.UI", "KScript.Http", "KScript.Document" };
-
-    /// <summary>
-    /// Arguments allowed to be called src or file. Empty on purpose: the file an element reads or acts on is
-    /// <c>path</c>, and where a result goes is <c>to</c>. (src stays on real HTML tags in pages, such as
-    /// &lt;img src&gt;, which are not KScript elements.)
-    /// </summary>
-    private static readonly HashSet<string> FileNameExceptions = new(StringComparer.Ordinal);
-
-    private static readonly Regex Snake = new("^[a-z][a-z0-9_]*$");
-    private static readonly Regex Pascal = new("^[A-Z][A-Za-z0-9]*$");
-
     /// <summary>Every element of every package, and the ones the catalog only plans.</summary>
     public static IEnumerable<(string Package, ElementInfo Element)> Elements()
     {
@@ -50,8 +38,12 @@ public class ArgumentConventionTests
         }
     }
 
-    private static IEnumerable<(string Where, ElementInfo Element, AttributeInfo Attribute)> Attributes() =>
-        Elements().SelectMany(x => x.Element.Attributes.Select(a => ($"{x.Package} {x.Element.Name}({a.Name})", x.Element, a)));
+    private static IEnumerable<(string Package, ElementInfo Element, AttributeInfo Attribute)> Attributes() =>
+        Elements().SelectMany(x => x.Element.Attributes.Select(a => (x.Package, x.Element, a)));
+
+    /// <summary>What a rule of <see cref="Conventions"/> says about each argument of each element: nothing, when all is well.</summary>
+    private static IEnumerable<string> Broken(Func<string, ElementInfo, AttributeInfo, string> rule) =>
+        Attributes().Select(x => rule(x.Package, x.Element, x.Attribute)).Where(problem => problem != null);
 
     private static void None(IEnumerable<string> offenders, string rule)
     {
@@ -72,50 +64,54 @@ public class ArgumentConventionTests
 
     [Fact]
     public void ArgumentNamesAreSnakeCase() =>
-        None(Attributes().Where(x => !Snake.IsMatch(x.Attribute.Name)).Select(x => x.Where),
-            "Argument names are lower snake_case (max_tokens, on_click), never kebab-case or camelCase:");
+        None(Broken(Conventions.ArgumentName), "Argument names are lower snake_case (max_tokens, on_click), never kebab-case or camelCase:");
 
     [Fact]
     public void ElementNamesArePascalCaseOrSnakeCaseWithNoHyphen() =>
-        None(Elements().Where(x => !Snake.IsMatch(x.Element.Name) && !Pascal.IsMatch(x.Element.Name)).Select(x => $"{x.Package} {x.Element.Name}"),
+        None(Elements().Where(x => !Conventions.IsSnakeCase(x.Element.Name) && !Conventions.IsPascalCase(x.Element.Name)).Select(x => $"{x.Package} {x.Element.Name}"),
             "Element names are PascalCase (things) or lower snake_case (actions), with no hyphen:");
 
     [Fact]
-    public void ThingsArePascalCaseAndActionsAreSnakeCase() =>
-        None(Elements().Where(x => x.Package.StartsWith("KScript.", StringComparison.Ordinal) && Pascal.IsMatch(x.Element.Name) != ThingPackages.Contains(x.Package))
-                .Select(x => $"{x.Package} {x.Element.Name}"),
-            "Elements of " + string.Join(", ", ThingPackages) + " describe things and are PascalCase; every other package's are actions in lower snake_case:");
+    public void ThingsArePascalCaseAndActionsAreSnakeCase()
+    {
+        None(Elements().Select(x => Conventions.ElementName(x.Package, x.Element)).Where(problem => problem != null),
+            "Elements of " + string.Join(", ", Conventions.ThingPackages) + " describe things and are PascalCase; every other package's are actions in lower snake_case:");
+        // The rule looks at every built-in package: none is skipped because of how its name is written.
+        Assert.All(PackageRegistry.BuiltIn, p => Assert.StartsWith("KScript.", p.Name));
+        Assert.All(Conventions.ThingPackages.Concat(Conventions.ThingsInside.Keys), name => Assert.Contains(PackageRegistry.BuiltIn, p => p.Name == name));
+    }
 
     [Fact]
     public void ToIsADestinationAndNeverTheVariableThatReceivesAResult() =>
-        None(Attributes().Where(x => x.Attribute.Name == "to" && x.Attribute.Kind is AttributeKind.DeclareVariable or AttributeKind.DeclareVariables).Select(x => x.Where),
-            "to: is where something goes (a file, a URL, a controller). The variable that receives a result is into:");
+        None(Broken(Conventions.ToIsADestination), "to: is where something goes (a file, a URL, a controller). The variable that receives a result is into:");
 
     [Fact]
     public void IntoIsAlwaysTheVariableThatReceivesAResult() =>
-        None(Attributes().Where(x => x.Attribute.Name == "into" && !(x.Attribute.Kind is AttributeKind.DeclareVariable or AttributeKind.DeclareVariables)).Select(x => x.Where),
-            "into: always names the variable that receives the result. Call a destination to: and a page element target:");
+        None(Broken(Conventions.IntoIsAResult), "into: always names the variable that receives the result. Call a destination to: and a page element target:");
 
     [Fact]
     public void AResultIsNeverDeclaredByAnArgumentWithAnotherName()
     {
         // The names an argument that declares a variable may have: what is declared (name), a result (into), a
         // caught error or import prefix (as), loop variables (each, at).
-        var allowed = new HashSet<string> { "name", "into", "as", "each", "at" };
-        None(Attributes().Where(x => x.Attribute.Kind is AttributeKind.DeclareVariable or AttributeKind.DeclareVariables && !allowed.Contains(x.Attribute.Name)).Select(x => x.Where),
-            "An argument that declares a variable is called name, into, as, each or at:");
+        Assert.Equal(new[] { "as", "at", "each", "into", "name" }, Conventions.DeclaringArguments.OrderBy(n => n, StringComparer.Ordinal));
+        None(Broken(Conventions.DeclaringArgument), "An argument that declares a variable is called name, into, as, each or at:");
     }
 
     [Fact]
-    public void TheFileAnElementReadsIsCalledPath() =>
-        None(Attributes().Where(x => x.Attribute.Name is "src" or "file" or "filename" or "file_name" or "source" or "sample" && !FileNameExceptions.Contains($"{x.Element.Name}.{x.Attribute.Name}"))
-                .Select(x => x.Where),
-            "The file an element reads or acts on is path:, and where its result goes is to:");
+    public void TheFileAnElementReadsIsCalledPath()
+    {
+        Assert.Equal(new[] { "file", "file_name", "filename", "sample", "source", "src" }, Conventions.FileArgumentNames.OrderBy(n => n, StringComparer.Ordinal));
+        None(Broken(Conventions.FileArgument), "The file an element reads or acts on is path:, and where its result goes is to:");
+    }
 
     [Fact]
     public void APositionIsCalledAt() =>
-        None(Attributes().Where(x => x.Attribute.Name is "index" or "position" or "idx" && x.Attribute.Kind is AttributeKind.DeclareVariable or AttributeKind.DeclareVariables).Select(x => x.Where),
-            "The variable for a position is at:, as in for item at i in $list:");
+        None(Broken(Conventions.PositionArgument), "The variable for a position is at:, as in for item at i in $list:");
+
+    [Fact]
+    public void AListIsAListKindAndNeverTextWithCommas() =>
+        None(Broken(Conventions.ListArgument), "A list is written as an array ([a, b]). Give these a list kind, or NameList = true:");
 
     [Fact]
     public void ATestHasNoLoopOfItsOwn()
@@ -128,8 +124,7 @@ public class ArgumentConventionTests
 
     [Fact]
     public void FunctionArgumentsAreDocumentedWithAt() =>
-        None(Attributes().Where(x => CodeArguments.TakesFunctions(x.Element.Name, x.Attribute) && !Regex.IsMatch(x.Attribute.Description, @"@[a-z_]")).Select(x => x.Where),
-            "An argument that names a function shows the @name form in its description (fn: @send):");
+        None(Broken(Conventions.FunctionArgument), "An argument that names a function shows the @name form in its description (fn: @send):");
 
     [Fact]
     public void RenamedElementsPointAtRealElements()
