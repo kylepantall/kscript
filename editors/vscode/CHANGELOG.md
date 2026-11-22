@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Check This File** saves and checks a single script and reports its diagnostics in Problems, including when no project is open.
+
+- Project commands use the active workspace folder and stop if its files cannot be saved. Standalone scripts and tests run from their own directory. Workspace symbol search follows folders added or removed during the session.
+- Open the install guide from an empty window, or select a custom CLI by its name on `PATH`. Both script forms have valid editor word patterns, and selecting a name before `->` in code leaves the arrow intact.
+
 - Two new native types. A `slash_path` is names joined by `/` (`/docs/start`, `/My Apps/Notes`), written without quotes and coloured as a value; `$name` and `{ expression }` in one are filled in, and `{id}` stays a route parameter. Route paths need no quotes either: `Get(path: /people/{id})`. A `date_format` (`dd-MM-yyyy`) is checked as you type, so `YYYY` or `DD` is underlined with what to write, and typing one after `date_format =`, `->format(` or `->to_date(` suggests the letters with what each shows.
 - Values such as `1.4.2-beta.1`, `10.0.0.1` and `dd-MM-yyyy` given without quotes to a parameter whose type reads text are checked against that type instead of being reported as unknown names.
 - Suggestions in views: in `views/auth/account.html`, `$` offers the variables the controller passes with `@view('auth/account', data: { ... })`, `$data.` offers their fields, and a loop such as `<for each="t" in="$data.tokens">` knows the fields of `$t`. Hovering a view's variable says which controller gives it, and Go to Definition opens the call. A page with `<import package="KScript.Auth" />` gets `$session`, and `$session->` lists its methods. `@user()` and `@api_tokens()` results offer their fields everywhere.

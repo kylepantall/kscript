@@ -184,6 +184,12 @@ namespace KScript.LanguageServer
                 case "workspace/didChangeWatchedFiles":
                     RefreshAll();
                     return null;
+                case "workspace/didChangeWorkspaceFolders":
+                    JsonNode folderEvent = p?["event"];
+                    folders.ExceptWith(FolderPaths(folderEvent?["removed"]));
+                    folders.UnionWith(FolderPaths(folderEvent?["added"]));
+                    symbolCache.Clear();
+                    return null;
 
                 case "textDocument/completion": return Completion(p);
                 case "textDocument/hover": return Hover(p);
@@ -243,6 +249,10 @@ namespace KScript.LanguageServer
                 ["renameProvider"] = new JsonObject { ["prepareProvider"] = true },
                 ["documentSymbolProvider"] = true,
                 ["workspaceSymbolProvider"] = true,
+                ["workspace"] = new JsonObject
+                {
+                    ["workspaceFolders"] = new JsonObject { ["supported"] = true, ["changeNotifications"] = true },
+                },
                 ["codeActionProvider"] = new JsonObject { ["codeActionKinds"] = new JsonArray("quickfix", "refactor.rewrite") },
                 ["documentLinkProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["inlayHintProvider"] = new JsonObject { ["resolveProvider"] = false },
@@ -710,7 +720,7 @@ namespace KScript.LanguageServer
         }
 
         // The folders open in the editor, searched by workspace/symbol.
-        private readonly List<string> folders = new List<string>();
+        private readonly HashSet<string> folders = new HashSet<string>(StringComparer.Ordinal);
 
         // By path: the text a closed file's symbols were read from, and the symbols.
         private readonly Dictionary<string, (string Text, List<(OutlineItem Item, JsonObject Range)> Symbols)> symbolCache =
@@ -719,11 +729,13 @@ namespace KScript.LanguageServer
         private void RememberFolders(JsonNode p)
         {
             folders.Clear();
-            IEnumerable<string> uris = p?["workspaceFolders"] is JsonArray list
-                ? list.Select(f => f?["uri"]?.GetValue<string>())
-                : new[] { p?["rootUri"]?.GetValue<string>() };
-            folders.AddRange(uris.Select(Workspace.UriToPath).Where(f => f != null).Distinct(StringComparer.Ordinal));
+            if (p?["workspaceFolders"] is JsonArray list) folders.UnionWith(FolderPaths(list));
+            else if (Workspace.UriToPath(p?["rootUri"]?.GetValue<string>()) is string root) folders.Add(root);
         }
+
+        private static IEnumerable<string> FolderPaths(JsonNode list) => list is JsonArray entries
+            ? entries.Select(f => Workspace.UriToPath(f?["uri"]?.GetValue<string>())).Where(path => path != null)
+            : Enumerable.Empty<string>();
 
         /// <summary>
         /// workspace/symbol: the functions and constants of every script in the open folders whose name contains the

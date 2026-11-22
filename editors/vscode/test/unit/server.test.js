@@ -183,7 +183,7 @@ test('the walkthrough is packaged and only runs commands the extension has', () 
       assert.ok(registered.includes(`'${id}'`), `${step.id}: ${id} is registered`);
     }
     // A step's button is a command people can also find by name.
-    for (const id of links.filter((l) => l !== 'kscript.showSetup')) assert.ok(contributed.has(id), `${step.id}: ${id} is contributed`);
+    for (const id of links) assert.ok(contributed.has(id), `${step.id}: ${id} is contributed`);
   }
   assert.ok(pkg.contributes.menus['file/newFile'].some((m) => m.command === 'kscript.newScript'), 'New Script is in File > New File…');
 });
@@ -193,4 +193,26 @@ test('the starter script selects the first thing to change', () => {
   const at = starterSelection();
   assert.strictEqual(STARTER.split('\n')[at.line].slice(at.start, at.end), 'world');
   assert.ok(STARTER.endsWith('\n') && !/\t|\r/.test(STARTER));
+});
+
+test('configured CLI names resolve exactly, including Windows executable suffixes', () => {
+  const unix = { env: { PATH: '/a:/b' }, platform: 'darwin', exists: only('/a/kscript', '/b/kscript-dev') };
+  assert.strictEqual(resolveServer('kscript-dev', [], unix).command, '/b/kscript-dev');
+  assert.match(resolveServer('ks', [], unix).error, /PATH/);
+  const win = { env: { Path: 'C:\\first;C:\\kit' }, platform: 'win32', exists: only('C:\\kit\\kscript-dev.exe') };
+  for (const name of ['kscript-dev', 'kscript-dev.exe']) {
+    assert.strictEqual(resolveServer(name, ['lsp'], win).command, 'C:\\kit\\kscript-dev.exe');
+  }
+});
+
+test('both language configurations parse and select words at KScript punctuation', () => {
+  const languages = require('../../package.json').contributes.languages.filter((l) => l.configuration);
+  for (const language of languages) {
+    const config = require(path.resolve(__dirname, '../..', language.configuration));
+    const words = new RegExp(config.wordPattern, 'g');
+    assert.deepStrictEqual('one;two'.match(words), ['one', 'two']);
+    if (language.id === 'kscript-code') {
+      assert.deepStrictEqual('$total->round(1.25)'.match(words), ['total', 'round', '1.25']);
+    }
+  }
 });
