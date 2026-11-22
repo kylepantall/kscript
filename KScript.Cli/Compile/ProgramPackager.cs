@@ -133,12 +133,13 @@ namespace KScript.Compile
                 foreach (string n in next) queue.Enqueue(n);
             }
 
-            // Packages named System.* replace framework assemblies with newer versions (System.Text.Json 10 for 8's),
-            // and every kscript assembly was built against those, so they stay whatever the program imports.
+            // Packages named System.* and Microsoft.Extensions.* replace framework assemblies with newer versions
+            // (System.Text.Json 10 for 8's, and the logging abstractions Npgsql brings for ASP.NET Core's), and every
+            // kscript assembly was built against those, so they stay whatever the program imports.
             foreach (var library in deps["libraries"].AsObject())
             {
                 string name = NameOf(library.Key);
-                if (library.Value["type"]?.GetValue<string>() == "package" && name.StartsWith("System.", StringComparison.Ordinal) && keep.Add(name) && graph.TryGetValue(name, out var more))
+                if (library.Value["type"]?.GetValue<string>() == "package" && ReplacesFramework(name) && keep.Add(name) && graph.TryGetValue(name, out var more))
                     foreach (string n in more) keep.Add(n);
             }
 
@@ -151,6 +152,9 @@ namespace KScript.Compile
             }
             return keep;
         }
+
+        private static bool ReplacesFramework(string name) =>
+            name.StartsWith("System.", StringComparison.Ordinal) || name.StartsWith("Microsoft.Extensions.", StringComparison.Ordinal);
 
         /// <summary>Removes the dropped libraries from deps.json and returns the bundle paths of their files.</summary>
         internal static HashSet<string> TrimDeps(JsonObject deps, HashSet<string> keep, string entryName)
