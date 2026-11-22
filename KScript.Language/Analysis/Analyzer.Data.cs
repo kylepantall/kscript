@@ -10,7 +10,7 @@ namespace KScript.Language.Analysis
     {
         /// <summary>
         /// Checks the column names a KScript.Data method is given against the model's fields:
-        /// <c>$User->where(nmae: 'Joan')</c> and <c>->order_by(agee)</c> are warnings that suggest the closest one.
+        /// <c>User->where(nmae: 'Joan')</c> and <c>->order_by(agee)</c> are warnings that suggest the closest one.
         /// </summary>
         private void CheckColumns(string method, TypeShape receiver, IReadOnlyList<ArgumentNode> args, ExpressionRegion region)
         {

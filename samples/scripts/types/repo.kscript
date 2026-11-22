@@ -1,0 +1,17 @@
+// The shape of GitHub's repository data. Other scripts import it; each type it
+// uses has its own file.
+import "owner.kscript"
+import "visibility.kscript"
+
+/// A GitHub repository.
+type Repo {
+  name: string
+  /// How many people starred it.
+  stars: int from stargazers_count
+  owner: Owner
+  topics: string[] = []
+  license?: string from license.name
+  visibility: Visibility
+  updated: date from updated_at
+  label => $name + ' (' + $stars + ' stars)'
+}

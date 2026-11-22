@@ -56,7 +56,7 @@ namespace KScript.Language.Agents
 
         public string Name { get; init; }
 
-        /// <summary>kscript or xml: the format the project writes scripts in (make.format).</summary>
+        /// <summary>kscript or xml: the format the project writes scripts in (make.syntax).</summary>
         public string Format { get; init; } = MakeSettings.KScriptFormat;
 
         /// <summary>Every package a script in the project uses, KScript.Core first.</summary>
@@ -131,7 +131,7 @@ namespace KScript.Language.Agents
         #region Reading the project
 
         /// <summary>Reads a project: its settings, its scripts' top-level symbols and the packages they use.</summary>
-        /// <param name="format">kscript or xml, to override make.format (kscript convert passes the format it converted to).</param>
+        /// <param name="format">kscript or xml, to override make.syntax (kscript convert passes the format it converted to).</param>
         /// <param name="skip">Full paths of scripts to leave out, such as the originals kscript convert just replaced.</param>
         public static AgentProject Read(string root, LanguageCatalog catalog = null, string format = null, ISet<string> skip = null)
         {
@@ -241,7 +241,7 @@ namespace KScript.Language.Agents
         }
 
         private static bool IsScriptOrPage(string file) =>
-            new[] { ".kscript", ".ks", ".ks.xml", ".xml", ".html", ".md" }.Any(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+            new[] { ".kscript", ".ks.xml", ".html", ".md" }.Any(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase))
             && !string.Equals(Path.GetFileName(file), AgentsFile, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(Path.GetFileName(file), "README.md", StringComparison.OrdinalIgnoreCase);
 
@@ -351,7 +351,7 @@ namespace KScript.Language.Agents
             {
                 fields.AddRange(inline.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0));
             }
-            string options = string.Concat(type.Attributes.Where(a => a.Name is "extra" or "sample").Select(a => $"({a.Name}: {a.ValueText?.Trim()})"));
+            string options = string.Concat(type.Attributes.Where(a => a.Name is "extra" or "path").Select(a => $"({a.Name}: {a.ValueText?.Trim()})"));
             return fields.Count == 0 ? $"type {s.Name}{options} {{ }}" : $"type {s.Name}{options} {{ {string.Join(", ", fields)} }}";
         }
 
@@ -414,7 +414,7 @@ namespace KScript.Language.Agents
             }
 
             w.Append("\n## Workflow\n\n");
-            w.Append("1. After each change run `kscript check --format json`. Each problem has `file`, `line`, `column`, `code`, `message` and `fixes` (exact text edits). Repeat until it reports 0 errors.\n");
+            w.Append("1. After each change run `kscript check --output json`. Each problem has `file`, `line`, `column`, `code`, `message` and `fixes` (exact text edits). Repeat until it reports 0 errors.\n");
             w.Append(project.Tests > 0 ? $"2. `kscript test` runs the {project.Tests} test file{(project.Tests == 1 ? string.Empty : "s")}. Add a test for each change.\n" : "2. `kscript test` runs `*.test.kscript` files. Add a test for each change.\n");
             w.Append("3. `kscript fmt` formats files. `kscript agents` refreshes these docs (the editor does it on save).\n");
             w.Append("4. Unsure about a command or method? Read `.kscript/agents/packages/<package>.md`, or call `lookup` / `search_docs` on the `kscript mcp` server (the full reference). Never invent names: `kscript check` rejects unknown ones.\n");
@@ -481,7 +481,7 @@ namespace KScript.Language.Agents
               if $tasks->is_empty() {
                 return [] // return early rather than else
               }
-              return $tasks->filter(fn($t) => not $t.done)->take($limit)
+              return $tasks->filter(fn(t) => not $t.done)->take($limit)
             }
 
             tasks = @exists('tasks.json') ? @read_json('tasks.json', as: 'Task[]') : []
@@ -491,16 +491,12 @@ namespace KScript.Language.Agents
               echo "{ $count }. { @label($task, mark: '*') }" // read with $, call with @
             }
             match $count {
-              case 0 {
-                echo 'Nothing to do'
-              }
-              default {
-                echo "$count open"
-              }
+              0 => echo 'Nothing to do'
+              _ => echo "$count open"
             }
             try {
-              @write_json('done.json', $tasks->where(fn($t) => $t.done))
-            } catch err when $err.type eq 'IO' {
+              @write_json('done.json', $tasks->filter(fn(t) => $t.done))
+            } catch err when $err.type == 'IO' {
               throw Validation "Could not save: { $err.message }"
             }
             """;
@@ -512,11 +508,14 @@ namespace KScript.Language.Agents
         }
 
         internal const string Rules = """
-            - `$name` reads a variable; `name = value` sets it. `@name(...)` calls a fn or command; `$x->name(...)` calls a method; `$x |> name()` pipes.
-            - Text: `"Hi { $name }"` or `"Hi $name"`; `{{ }}` for literal braces. Lambdas: `fn($x) => $x * 2`.
-            - Operators: `== !=` (loose) `=== !==` (strict) `lt le gt ge eq ne` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
+            - `$name` reads a variable; `name = value` sets it. `@name(...)` calls a fn or command; `$x->name(...)` calls a method; `$x.name` reads a field (a plain fact: `$response.status`, `$file.size`); `$x |> name()` pipes.
+            - Text: `"Hi { $name }"` or `"Hi $name"`; `{{ }}` for literal braces. Lambdas: `fn(x) => $x * 2`.
+            - Operators: `== !=` (loose) `=== !==` (strict) `< <= > >=` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
             - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enums are `enum Size { small, large }`, and their values are bare: `@known_folder(downloads)`.
             - Lists of names are arrays: `use: [log, cors]`, never `"log, cors"`.
+            - Types, models, enums, errors and jobs are named bare (`as: Task`, `User->create(name: 'Joan')`), and calling the name makes a value: `Task($data)`, `Task(title: 'x')`. An optional field is `due?: date`. Options go in brackets: `model User(timestamps, unique: [email]) { }`.
+            - A package is named only in its import: `import KScript.UI`, then `Window { }`, never `KScript.Window { }`. Nothing is imported for you (`job` and `dispatch` need `import KScript.Queue`).
+            - Lengths of time are durations, a number and a unit with no quotes: `timeout: 30s`, `ttl: 10m`, `wait(duration: 500ms)`. A plain number is seconds.
 
             """;
 
@@ -527,6 +526,7 @@ namespace KScript.Language.Agents
             - Inventing methods from other languages (`.length`, `.push()` on a string, `len()`): methods use `->` and are listed per package.
             - `else` after a branch that returns, breaks or continues: return early instead (KS6001).
             - Declaring a type in the file that uses it, or several in one file: each type, model, enum and error type gets its own file (`types/`, `models/`, `errors/`, request bodies in `requests/`), named after it in kebab-case, and the files that use it import it (KS6008).
+            - `$Task` for a type, `due: date?` for an optional field, a model's options as lines of its block (KS6014), and `Task->from($data)` (gone: write `Task($data)`).
 
             """;
 
@@ -589,10 +589,21 @@ namespace KScript.Language.Agents
                 entries.Add("\n## Commands\n\n");
                 entries.AddRange(commands.Select(CallableLine));
             }
-            foreach (IGrouping<string, CallableInfo> type in catalog.Methods.Where(m => m.Package == package).GroupBy(m => m.ReceiverType).OrderBy(g => g.Key, StringComparer.Ordinal))
+            // A type's fields (plain facts, read with a dot) come before its methods.
+            ILookup<string, ValueFieldInfo> fields = catalog.Fields.Where(f => f.Package == package).ToLookup(f => f.Receiver, StringComparer.Ordinal);
+            ILookup<string, CallableInfo> methods = catalog.Methods.Where(m => m.Package == package).ToLookup(m => m.ReceiverType, StringComparer.Ordinal);
+            foreach (string type in fields.Select(g => g.Key).Concat(methods.Select(g => g.Key)).Distinct(StringComparer.Ordinal).OrderBy(t => t, StringComparer.Ordinal))
             {
-                entries.Add($"\n## {type.Key} methods\n\n");
-                entries.AddRange(type.OrderBy(m => m.Name, StringComparer.Ordinal).Select(CallableLine));
+                if (fields.Contains(type))
+                {
+                    entries.Add($"\n## {type} fields\n\n");
+                    entries.AddRange(fields[type].OrderBy(f => f.Name, StringComparer.Ordinal).Select(FieldLine));
+                }
+                if (methods.Contains(type))
+                {
+                    entries.Add($"\n## {type} methods\n\n");
+                    entries.AddRange(methods[type].OrderBy(m => m.Name, StringComparer.Ordinal).Select(CallableLine));
+                }
             }
             List<ElementInfo> elements = catalog.Elements.Where(e => e.Package == package && (xml || !CodeSyntax.Contains(e.Name)))
                 .OrderBy(e => e.Name, StringComparer.Ordinal).ToList();
@@ -607,6 +618,14 @@ namespace KScript.Language.Agents
                 return w.ToString();
             }
             return Join(w.ToString(), entries, PackageBudget, "entries");
+        }
+
+        /// <summary>One field of a type of value: <c>- `.status: number` The status code.</c></summary>
+        internal static string FieldLine(ValueFieldInfo f)
+        {
+            string type = f.Type != null && f.Type != KType.Any ? ": " + f.Type : string.Empty;
+            string summary = Summarize(f.Description);
+            return $"- `.{f.Name}{type}`{(summary != null ? " " + summary : string.Empty)}\n";
         }
 
         internal static string CallableLine(CallableInfo c)

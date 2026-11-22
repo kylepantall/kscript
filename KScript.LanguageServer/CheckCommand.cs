@@ -8,7 +8,7 @@ namespace KScript.LanguageServer
     /// <summary>
     /// <c>kscript check</c>: analyzes files without running them and prints problems, for CI and editors without LSP.
     /// Inside a project, the nearest kscript.json decides which files a folder check covers (lint.include / lint.exclude),
-    /// the severity of each rule (lint.rules) and whether warnings fail the check (lint.warningsAsErrors).
+    /// the severity of each rule (lint.rules) and whether warnings fail the check (lint.warnings_as_errors).
     /// </summary>
     public static class CheckCommand
     {
@@ -18,13 +18,13 @@ namespace KScript.LanguageServer
         /// each problem has its file, 1-based line and column range, severity, code, message and fixes, and each fix
         /// has a title and exact text edits. Usage and settings errors are <c>{ "error": "..." }</c>.
         /// </param>
-        public static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors = false, bool json = false)
+        public static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors = false, bool json = false, bool fix = false)
         {
             if (json)
             {
                 var text = new StringWriter();
                 var report = new JsonReport();
-                int code = Run(paths, text, warningsAsErrors, report);
+                int code = Run(paths, text, warningsAsErrors, report, fix);
                 System.Text.Json.Nodes.JsonArray problems = report.Problems;
                 var result = new System.Text.Json.Nodes.JsonObject();
                 if (code == 2)
@@ -43,17 +43,17 @@ namespace KScript.LanguageServer
                 output.WriteLine(result.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
                 return code;
             }
-            return Run(paths, output, warningsAsErrors, null);
+            return Run(paths, output, warningsAsErrors, null, fix);
         }
 
-        /// <summary>What a check found, for --format json.</summary>
+        /// <summary>What a check found, for --output json.</summary>
         private sealed class JsonReport
         {
             public System.Text.Json.Nodes.JsonArray Problems { get; } = new System.Text.Json.Nodes.JsonArray();
             public int Files { get; set; }
         }
 
-        private static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors, JsonReport report)
+        private static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors, JsonReport report, bool fix = false)
         {
             var cli = new KScript.Output.CliOutput(output);
             List<string> given = paths.ToList();
@@ -99,13 +99,14 @@ namespace KScript.LanguageServer
 
             if (files.Count == 0)
             {
-                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .kscript, .ks or .ks.xml files, or .xml files that start with <kscript>; " +
+                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .kscript or .ks.xml files; " +
                                  ".html and .md pages are checked in folders with _layout.html, _components/, _layouts/ or kscript.json.");
                 return 2;
             }
 
             int errors = 0;
             int warnings = 0;
+            int fixedCount = 0, fixedFiles = 0;
             bool anyWarningsAsErrors = warningsAsErrors;
             foreach (var (file, isExplicit) in files.DistinctBy(f => Path.GetFullPath(f.File)).OrderBy(f => f.File, StringComparer.Ordinal))
             {
@@ -121,7 +122,20 @@ namespace KScript.LanguageServer
                 }
                 anyWarningsAsErrors |= config?.Lint.WarningsAsErrors == true;
 
-                DocumentAnalysis analysis = Analyzer.Analyze(File.ReadAllText(file), file);
+                string fileText = File.ReadAllText(file);
+                if (fix)
+                {
+                    // Rewrite the spellings that have one right form, then report what is left.
+                    (string fixedText, int count) = Fixer.Apply(fileText, file, isExplicit ? null : config, KScript.Syntax.Markup.CodeParser.IsArmFix);
+                    if (count > 0 && fixedText != fileText)
+                    {
+                        File.WriteAllText(file, fixedText);
+                        fileText = fixedText;
+                        fixedCount += count;
+                        fixedFiles++;
+                    }
+                }
+                DocumentAnalysis analysis = Analyzer.Analyze(fileText, file);
                 // A file named on the command line is checked even if lint.exclude covers it.
                 LintRules.Apply(analysis.Diagnostics, config, isExplicit ? null : file);
                 foreach (Diagnostic d in analysis.Diagnostics.OrderBy(d => d.Span.Start))
@@ -161,6 +175,8 @@ namespace KScript.LanguageServer
             if (report != null) output.WriteLine(summary);
             else
             {
+                if (fixedCount > 0) cli.Info($"Fixed {fixedCount} spelling{(fixedCount == 1 ? string.Empty : "s")} in {fixedFiles} file{(fixedFiles == 1 ? string.Empty : "s")}.");
+
                 if (errors + warnings > 0) cli.NewLine();
                 if (failed) cli.Error(summary);
                 else if (warnings > 0) cli.Warn(summary);
@@ -255,7 +271,7 @@ namespace KScript.LanguageServer
             }
 
             var rows = new List<(string Key, string Value, string Source)>();
-            rows.Add(("lint.warningsAsErrors", config.Lint.WarningsAsErrors ? "true" : "false", From("lint.warningsAsErrors")));
+            rows.Add(("lint.warnings_as_errors", config.Lint.WarningsAsErrors ? "true" : "false", From("lint.warnings_as_errors")));
             if (config.Lint.Rules.Count == 0)
             {
                 rows.Add(("lint.rules", "(none: every rule at its built-in severity, style rules KS6xxx off)", "default"));
@@ -270,10 +286,10 @@ namespace KScript.LanguageServer
             FormatSettings f = config.Format;
             rows.Add(("format.enabled", f.Enabled ? "true" : "false", From("format.enabled")));
             string indent = f.UseTabs == true ? "tab" : f.IndentSize is int size ? size.ToString() : "the editor's tab settings (kscript fmt: 2)";
-            rows.Add(("format.indent", indent, config.Sources.ContainsKey("format.indent") ? From("format.indent") : From("format.tabWidth")));
-            rows.Add(("format.printWidth", (f.PrintWidth ?? 80).ToString(), From("format.printWidth")));
-            rows.Add(("format.maxBlankLines", (f.MaxBlankLines ?? 1).ToString(), From("format.maxBlankLines")));
-            rows.Add(("format.endOfLine", f.EndOfLine, From("format.endOfLine")));
+            rows.Add(("format.indent", indent, config.Sources.ContainsKey("format.indent") ? From("format.indent") : From("format.tab_width")));
+            rows.Add(("format.print_width", (f.PrintWidth ?? 80).ToString(), From("format.print_width")));
+            rows.Add(("format.max_blank_lines", (f.MaxBlankLines ?? 1).ToString(), From("format.max_blank_lines")));
+            rows.Add(("format.end_of_line", f.EndOfLine, From("format.end_of_line")));
             rows.Add(("format.preserve", f.Preserve.Count == 0 ? "(none)" : string.Join(", ", f.Preserve), From("format.preserve")));
             foreach (string rule in FormatSettings.RuleNames)
             {
@@ -317,10 +333,9 @@ namespace KScript.LanguageServer
                     projectByDir[dir] = config = ConfigFor(dir, configs, output);
                 }
 
-                bool xmlScript = f.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) && !IsScriptName(f) && LooksLikeScript(f);
                 if (config != null)
                 {
-                    if (!config.IsExcluded(f) && (config.IsIncluded(f) || xmlScript))
+                    if (!config.IsExcluded(f) && config.IsIncluded(f))
                     {
                         yield return f;
                     }
@@ -332,7 +347,7 @@ namespace KScript.LanguageServer
                 {
                     continue;
                 }
-                if (IsScriptName(f) || xmlScript
+                if (IsScriptName(f)
                     || (site && (f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase))))
                 {
                     yield return f;
@@ -365,29 +380,12 @@ namespace KScript.LanguageServer
         private static bool IsSite(string folder) =>
             SiteMarkers.Any(m => Directory.Exists(Path.Combine(folder, m)) || File.Exists(Path.Combine(folder, m)));
 
-        private static bool IsScriptName(string f) =>
-            f.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".ks", StringComparison.OrdinalIgnoreCase)
-            || f.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase);
+        private static bool IsScriptName(string f) => KScript.Syntax.Markup.ScriptFiles.IsScript(f);
 
         private static System.Text.Json.Nodes.JsonObject Also(this System.Text.Json.Nodes.JsonObject o, Action<System.Text.Json.Nodes.JsonObject> set)
         {
             set(o);
             return o;
-        }
-
-        private static bool LooksLikeScript(string path)
-        {
-            try
-            {
-                using StreamReader reader = new StreamReader(path);
-                char[] buffer = new char[512];
-                int n = reader.Read(buffer, 0, buffer.Length);
-                return new string(buffer, 0, n).Contains("<kscript", StringComparison.Ordinal);
-            }
-            catch (IOException)
-            {
-                return false;
-            }
         }
     }
 }

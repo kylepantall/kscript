@@ -40,7 +40,7 @@ namespace KScript.Language.Tests
         }
     }
 
-    /// <summary>kscript agents: AGENTS.md and .kscript/agents from the code graph, the agent doc tags, and check --format json.</summary>
+    /// <summary>kscript agents: AGENTS.md and .kscript/agents from the code graph, the agent doc tags, and check --output json.</summary>
     [Collection(WorkingDirectoryCollection.Name)]
     public sealed class AgentDocsTests : IDisposable
     {
@@ -140,7 +140,7 @@ namespace KScript.Language.Tests
             Write("lib/tasks.kscript", Tasks);
             Write("lib/use.kscript", "import add_task from \"tasks.kscript\"\nfn seed() => @add_task([], title: 'a')\n");
             Write("data.xml", "<root />");
-            Write("script.xml", "<kscript><fn name=\"x_fn\" params=\"a\" value=\"$a\" /></kscript>");
+            Write("script.ks.xml", "<kscript><fn name=\"x_fn\" params=\"a\" value=\"$a\" /></kscript>");
             Write("tests/tasks.test.kscript", "import KScript.Test\n");
             Write("index.html", "<p>hi</p>");
             Write("about.md", "# About");
@@ -153,7 +153,7 @@ namespace KScript.Language.Tests
             Assert.Equal("lib/tasks.kscript", project.Main);
             Assert.Equal(1, project.Tests);
             Assert.Equal(2, project.Pages);
-            Assert.Equal(new[] { "lib/tasks.kscript", "lib/use.kscript", "script.xml" }, project.Scripts);
+            Assert.Equal(new[] { "lib/tasks.kscript", "lib/use.kscript", "script.ks.xml" }, project.Scripts);
             Assert.Equal(new[] { "KScript.Core", "KScript.IO", "KScript.Math" }, project.Packages);
             Assert.DoesNotContain(project.Symbols, s => s.Name is "_private" or "hidden" or "inner" or "skipped" or "skipped2");
 
@@ -240,14 +240,14 @@ namespace KScript.Language.Tests
             Assert.StartsWith(AgentDocs.Begin, section);
             Assert.EndsWith(AgentDocs.End + "\n", section);
             Assert.Contains("```kscript\nimport KScript.IO", section);
-            Assert.Contains("kscript check --format json", section);
+            Assert.Contains("kscript check --output json", section);
             Assert.Contains("1 script, 0 test files. Its own 1 function and 0 types, enums and consts", section);
             Assert.Contains("runs `*.test.kscript` files", section);
             Assert.Contains("- `KScript.Core`: The language itself", section);
             Assert.DoesNotContain("Entry point", section);
             Assert.True(AgentDocs.EstimateTokens(section) < 2000);
 
-            Write("kscript.json", "{ \"name\": \"demo\", \"make\": { \"format\": \"xml\" } }");
+            Write("kscript.json", "{ \"name\": \"demo\", \"make\": { \"syntax\": \"xml\" } }");
             Write("a.test.kscript", "import KScript.Test\n");
             Write("b.test.kscript", "import KScript.Test\n");
             Write("index.html", "<p>hi</p>");
@@ -264,7 +264,7 @@ namespace KScript.Language.Tests
         {
             Write("tasks.json", "[{ \"title\": \"a\" }]");
             Write("course.kscript", AgentDocs.CrashCourse);
-            Write("kscript.json", "{ \"make\": { \"format\": \"xml\" } }");
+            Write("kscript.json", "{ \"make\": { \"syntax\": \"xml\" } }");
             string section = AgentDocs.AgentsSection(AgentDocs.Read(dir));
             int start = section.IndexOf("```xml\n", StringComparison.Ordinal) + 7;
             Write("course.ks.xml", section.Substring(start, section.IndexOf("\n```", start, StringComparison.Ordinal) - start));
@@ -288,7 +288,7 @@ namespace KScript.Language.Tests
 
             string io = AgentDocs.Package("KScript.IO");
             Assert.Contains("Import with `import KScript.IO`.", io);
-            Assert.Contains("  - prefer: @read_json($path, as: $Type)", io);
+            Assert.Contains("  - prefer: @read_json($path, as: Type)", io);
             Assert.Contains("  - pitfall: A missing file throws FileNotFound", io);
             Assert.Contains("Import with `<import package=\"KScript.IO\" />`.", AgentDocs.Package("KScript.IO", format: "xml"));
             Assert.Contains("  - pitfall: A 4xx or 5xx status doesn't throw", AgentDocs.Package("KScript.Net"));
@@ -400,7 +400,7 @@ namespace KScript.Language.Tests
         public void TheIndexStartsWithTheRoutes()
         {
             Write("kscript.json", "{ \"name\": \"site\" }");
-            Write("api.ks.xml", "<KScript.Routes prefix=\"/api\"><import src=\"controllers/ping.ks.xml\" as=\"ping\" /><Get path=\"/ping\" to=\"ping.show\" /></KScript.Routes>");
+            Write("api.ks.xml", "<KScript.Routes prefix=\"/api\"><import path=\"controllers/ping.ks.xml\" as=\"ping\" /><Get path=\"/ping\" to=\"ping.show\" /></KScript.Routes>");
             Write("controllers/ping.ks.xml", "<kscript><fn name=\"show\" value=\"'pong'\" /></kscript>");
             string index = AgentDocs.Index(AgentDocs.Read(dir));
             Assert.Contains("## Routes (kscript routes)", index);

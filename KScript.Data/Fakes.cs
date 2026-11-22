@@ -6,7 +6,7 @@ using KScript.Runtime;
 namespace KScript.Data
 {
     /// <summary>
-    /// <c>$User->fake(role: 'admin')</c>: a saved record with made-up values for the fields that need one, for tests
+    /// <c>User->fake(role: 'admin')</c>: a saved record with made-up values for the fields that need one, for tests
     /// and seeders. Optional fields and fields with defaults are left to the model, and a required belongs-to relation
     /// gets a fake record of its own.
     /// </summary>

@@ -360,7 +360,7 @@ public sealed class DocsTests
         Assert.Equal("hi\n", Playground.Run("<kscript>\n  <echo>hi</echo>\n</kscript>").Output);
         Assert.Equal("hi\n", Playground.Run("<!-- a comment -->\n<kscript><echo>hi</echo></kscript>").Output);
         Assert.Equal("6\n", Playground.Run("x = 2\necho \"{ $x * 3 }\"", "kscript").Output);
-        Assert.EndsWith("Joan\n", Playground.Run("<import package=\"KScript.Terminal\" />\n<input to=\"n\">Name? </input>\n<echo>$n</echo>", input: "Joan\n").Output);
+        Assert.EndsWith("Joan\n", Playground.Run("<import package=\"KScript.Terminal\" />\n<input into=\"n\">Name? </input>\n<echo>$n</echo>", input: "Joan\n").Output);
 
         Assert.True(Playground.IsWholeScript("<?xml version=\"1.0\"?><kscript/>"));
         Assert.True(Playground.IsWholeScript("<KScript.Window/>"));
@@ -430,7 +430,7 @@ public sealed class DocsTests
         Assert.NotNull(loop.Error);
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30));
 
-        PlaygroundResult wait = Playground.Run("<wait seconds=\"10\" />", timeout: TimeSpan.FromMilliseconds(300));
+        PlaygroundResult wait = Playground.Run("<wait duration=\"10s\" />", timeout: TimeSpan.FromMilliseconds(300));
         Assert.NotNull(wait.Error);
 
         PlaygroundResult big = Playground.Run("<for each=\"i\" in=\"0..2000\"><echo>{ 'x'->repeat(60) }</echo></for>");
@@ -543,20 +543,22 @@ public sealed class DocsTests
         Assert.Contains(":root[data-format=\"kscript\"] .code-pair > .code[data-lang=\"xml\"]", css);
         Assert.Contains("setPreferredFormat", DocsSite.ReadAsset("docs.js"));
 
-        Assert.Equal("kscript", DocsCommand.NormalizeFormat(" .KScript "));
-        Assert.Equal("kscript", DocsCommand.NormalizeFormat("ks"));
-        Assert.Equal("xml", DocsCommand.NormalizeFormat("ks.xml"));
+        Assert.Equal("kscript", DocsCommand.NormalizeFormat(" KScript "));
+        Assert.Equal("xml", DocsCommand.NormalizeFormat("xml"));
+        // One spelling each: the extensions and old short names are not syntax names.
+        Assert.Null(DocsCommand.NormalizeFormat("ks"));
+        Assert.Null(DocsCommand.NormalizeFormat("ks.xml"));
         Assert.Null(DocsCommand.NormalizeFormat("yaml"));
         Assert.Null(DocsCommand.NormalizeFormat(null));
 
-        // kscript docs takes the default from the project it runs in: make.format, else .kscript.
+        // kscript docs takes the default from the project it runs in: make.syntax, else .kscript.
         string root = Path.Combine(Path.GetTempPath(), "kscript-docs-format-" + Guid.NewGuid().ToString("N"));
         try
         {
             Directory.CreateDirectory(Path.Combine(root, "xml-project", "src"));
             Directory.CreateDirectory(Path.Combine(root, "plain-project"));
             Directory.CreateDirectory(Path.Combine(root, "broken"));
-            File.WriteAllText(Path.Combine(root, "xml-project", "kscript.json"), "{ \"make\": { \"format\": \"xml\" } }");
+            File.WriteAllText(Path.Combine(root, "xml-project", "kscript.json"), "{ \"make\": { \"syntax\": \"xml\" } }");
             File.WriteAllText(Path.Combine(root, "plain-project", "kscript.json"), "{ }");
             File.WriteAllText(Path.Combine(root, "broken", "kscript.json"), "{ nope");
             Assert.Equal("xml", DocsCommand.ProjectFormat(Path.Combine(root, "xml-project", "src")));
@@ -570,9 +572,11 @@ public sealed class DocsTests
 
         var output = new StringWriter();
         var error = new StringWriter();
-        Assert.Equal(1, DocsCommand.Run(new[] { "--format", "yaml" }, output, error));
-        Assert.Contains("--format needs kscript or xml", error.ToString());
-        Assert.Equal(1, DocsCommand.Run(new[] { "--format" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--syntax", "yaml" }, output, error));
+        Assert.Contains("--syntax needs kscript or xml", error.ToString());
+        Assert.Equal(2, DocsCommand.Run(new[] { "--syntax" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--format", "xml" }, output, error));
+        Assert.Contains("--format was renamed. Use --syntax kscript|xml.", error.ToString());
     }
 
     [Fact]
@@ -582,10 +586,10 @@ public sealed class DocsTests
         var error = new StringWriter();
         Assert.Equal(0, DocsCommand.Run(new[] { "--help" }, output, error));
         Assert.Contains("Usage: kscript docs", output.ToString());
-        Assert.Equal(1, DocsCommand.Run(new[] { "--port" }, output, error));
-        Assert.Equal(1, DocsCommand.Run(new[] { "--port", "70000" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--port" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--port", "70000" }, output, error));
         Assert.Contains("--port needs a number", error.ToString());
-        Assert.Equal(1, DocsCommand.Run(new[] { "--nope" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--nope" }, output, error));
         Assert.Contains("Unknown option '--nope'", error.ToString());
 
         var busy = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
@@ -654,7 +658,7 @@ public sealed class DocsTests
         string opened = null;
         int port = DocsCommand.FreePort(DocsCommand.DefaultPort + 7);
         var before = Directory.GetDirectories(Path.GetTempPath(), "kscript-docs-*").ToHashSet();
-        var server = Task.Run(() => DocsCommand.Run(new[] { "--port", port.ToString(), "--format", "xml", "string", "replace" }, output, TextWriter.Null, stop.Token, url => opened = url));
+        var server = Task.Run(() => DocsCommand.Run(new[] { "--port", port.ToString(), "--syntax", "xml", "string", "replace" }, output, TextWriter.Null, stop.Token, url => opened = url));
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
         var deadline = DateTime.UtcNow.AddSeconds(60);
@@ -752,12 +756,12 @@ public sealed class DocsTests
             p.Command("fetch_text", "url, retries?", "Fetches text.", KType.String, call => null);
             p.Method(KType.String, "shout", "", "Upper-cases text.", KType.String, (target, call) => null);
             p.Element(new ElementInfo("beep", "Beeps.", ContentKind.Empty, new AttributeInfo("tone", AttributeKind.Template, "The sound.")), run => null);
-            p.Element(new ElementInfo("old-beep", "Beeps.", ContentKind.Empty), run => null);
+            p.Element(new ElementInfo("old_beep", "Beeps.", ContentKind.Empty), run => null);
             p.Deprecate("@old_sum", "Sums moved to `KScript.Math`", "@sum");
             p.Deprecate("@fetch_text(retries)", "Requests are retried for you");
             p.Deprecate("string->shout", "", "->upper");
             p.Deprecate("<beep tone>", "Renamed", "sound");
-            p.Deprecate("<old-beep>", "");
+            p.Deprecate("<old_beep>", "");
         }
     }
 
@@ -778,7 +782,7 @@ public sealed class DocsTests
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Requests are retried for you.</p>", package);
         Assert.Contains("<tr class=\"deprecated\"><td><del><code>tone</code></del>", package);
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Renamed. Use <code>sound</code> instead.</p>", package);
-        Assert.Contains("<del><span class=\"f-xml\"><code>&lt;old-beep&gt;</code></span><span class=\"f-ks\"><code>old-beep</code></span></del>", package);
+        Assert.Contains("<del><span class=\"f-xml\"><code>&lt;old_beep&gt;</code></span><span class=\"f-ks\"><code>old_beep</code></span></del>", package);
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong></p>", package);
         Assert.Contains("title=\"Deprecated\"><del><code>-&gt;shout()</code></del></a>", package);
         Assert.Contains("<del class=\"param\"", site.Find("/reference/retiring").Body);
@@ -789,7 +793,7 @@ public sealed class DocsTests
 
         var search = JsonDocument.Parse(site.SearchJson()).RootElement.EnumerateArray().ToList();
         Assert.StartsWith("Deprecated. ", search.Single(e => e.GetProperty("t").GetString() == "@old_sum()").GetProperty("d").GetString());
-        Assert.StartsWith("Deprecated. ", search.Single(e => e.GetProperty("t").GetString() == "<old-beep>").GetProperty("d").GetString());
+        Assert.StartsWith("Deprecated. ", search.Single(e => e.GetProperty("t").GetString() == "<old_beep>").GetProperty("d").GetString());
         Assert.Contains(".badge.deprecated-badge", DocsSite.ReadAsset("docs.css"));
     }
 
@@ -874,8 +878,8 @@ public sealed class DocsTests
         Assert.Contains("<span class=\"f-xml\">A branch of &lt;match&gt;:", core.Body);
         Assert.Contains("<a href=\"#el-break\"><span class=\"f-xml\">&lt;break&gt;</span><span class=\"f-ks\">break</span></a>", html);
         Assert.Contains("<a href=\"#elements\"><span class=\"f-xml\">Elements</span><span class=\"f-ks\">Statements</span></a>", html);
-        Assert.Equal("KScript.Window", DocsSite.CodeName(site.Catalog.GetElement("Window")));
-        Assert.Contains("A file made of a <code>KScript.Window { }</code> block imports it for you.", site.Find("/reference/ui").Body);
+        Assert.Equal("Window", DocsSite.CodeName(site.Catalog.GetElement("Window")));
+        Assert.Contains("A .kscript file names a package only in its import: write <code>Window { }</code>, never <code>KScript.Window { }</code>.", site.Find("/reference/ui").Body);
 
         string css = DocsSite.ReadAsset("docs.css");
         Assert.Contains(":root[data-format=\"kscript\"] .f-xml, :root:not([data-format=\"kscript\"]) .f-ks { display: none; }", css);

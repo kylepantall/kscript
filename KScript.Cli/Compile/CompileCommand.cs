@@ -126,7 +126,7 @@ namespace KScript.Compile
                 catch (CompileException ex)
                 {
                     KScript.Runtime.ErrorReport.Write(error, ex);
-                    return 1;
+                    return ExitCodes.Usage;
                 }
             }
 
@@ -162,7 +162,7 @@ namespace KScript.Compile
             catch (ProjectConfigException ex)
             {
                 KScript.Runtime.ErrorReport.Write(error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
             catch (KScriptException ex)
             {
@@ -266,7 +266,7 @@ namespace KScript.Compile
                     foreach (KScriptPackage p in m.Packages) plan.Packages.Add(p.Name);
                     if (!IsInside(m.Path, sourceFolder)) throw new CompileException($"{Path.GetFileName(script)} imports {m.Path}, which is outside {sourceFolder}, so it can't go in the program.");
                 }
-                plan.Kind = main.Root.Name == "KScript.Window" ? ProgramKind.Window : ProgramKind.Script;
+                plan.Kind = main.MainElementName == "Window" ? ProgramKind.Window : ProgramKind.Script;
                 plan.Main = Relative(sourceFolder, script);
             }
             else
@@ -441,7 +441,7 @@ namespace KScript.Compile
         private static string StemOf(string script)
         {
             string stem = Path.GetFileName(script);
-            string ext = new[] { ".app.ks.xml", ".ks.xml", ".xml", ".kscript", ".ks" }.FirstOrDefault(e => stem.EndsWith(e, StringComparison.OrdinalIgnoreCase));
+            string ext = new[] { ".app.ks.xml", ".ks.xml", ".kscript" }.FirstOrDefault(e => stem.EndsWith(e, StringComparison.OrdinalIgnoreCase));
             return ext != null && stem.Length > ext.Length ? stem[..^ext.Length] : stem;
         }
 

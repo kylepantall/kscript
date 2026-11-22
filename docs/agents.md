@@ -8,7 +8,7 @@ kscript agents            # write AGENTS.md and .kscript/agents
 kscript agents --check    # write nothing; fail if they are out of date (for CI)
 kscript agents --print    # print AGENTS.md's generated part
 kscript watch             # rewrite them each time a file changes, until Ctrl+C
-kscript check --format json   # problems as JSON, with fixes as exact text edits
+kscript check --output json   # problems as JSON, with fixes as exact text edits
 ```
 
 `kscript make project` (and `--bare`) writes them for you. After that they keep themselves up to date: the editor
@@ -114,17 +114,17 @@ show them under each entry:
   - pitfall: Returns a new list and leaves the old one alone: write items = $items->push($x).
   - e.g. `[1, 2]->push(3, 4)`
 - `@api(url, options?): response` Makes an HTTP request and returns the response.
-  - prefer: @api($url)->check()->json(as: $Type) to fail fast and check the data's shape.
-  - pitfall: A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test ->ok().
+  - prefer: @api($url)->check()->json(as: Type) to fail fast and check the data's shape.
+  - pitfall: A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test .is_ok.
 ```
 
 A package written in C# adds them with `p.AgentNotes(("list->push", new AgentNotes(pitfall: "...")))`, keyed like
-`p.Examples` (`"@api"`, `"list->push"`, or `"<download>"` for an element). Keep each note to one short line,
+`p.Examples` (`"@api"`, `"list->push"`, or `"<input>"` for an element). Keep each note to one short line,
 since agents read all of them.
 
 ## JSON diagnostics
 
-`kscript check --format json` prints one JSON document, so an agent can fix problems without parsing text:
+`kscript check --output json` prints one JSON document, so an agent can fix problems without parsing text:
 
 ```json
 {
@@ -148,7 +148,7 @@ since agents read all of them.
 
 Lines and columns count from 1, and each range ends just past its last character. A fix is the same quick fix the
 editor offers: apply its edits from the last to the first, so the earlier positions stay right. The exit code is the
-same as for text: 0 with no errors, 1 with errors (or warnings with `--warnaserror`), and 2 for bad usage, where the
+same as for text: 0 with no errors, 1 with errors (or warnings with `--warnings-as-errors`), and 2 for bad usage, where the
 JSON is `{ "error": "..." }`.
 
 ## CI
@@ -157,6 +157,6 @@ Add `kscript agents --check` next to `kscript check`, so a pull request that cha
 docs:
 
 ```sh
-kscript check --warnaserror
+kscript check --warnings-as-errors
 kscript agents --check
 ```

@@ -152,7 +152,7 @@ namespace KScript.Language.Features
                 bool fnParameter = e.GetAttribute("params")?.Value is DecodedText ps && ps.SourceSpan.Contains(s.DeclarationSpan.Start);
                 if (!fnParameter)
                 {
-                    // A lambda's parameter: only worth a hint when it holds a list or map (fn($p) => $p.name).
+                    // A lambda's parameter: only worth a hint when it holds a list or map (fn(p) => $p.name).
                     return s.Shape.Type != KType.Map && s.Shape.Type != KType.List;
                 }
                 // params="x: int" and params="count = 0" already show the type.
@@ -164,7 +164,7 @@ namespace KScript.Language.Features
                 }
                 return end < text.Length && (text[end] == ':' || text[end] == '=');
             }
-            if (s.Kind == SymbolKind.LoopVariable && e.GetAttribute("index")?.Value is DecodedText index && index.SourceSpan.Contains(s.DeclarationSpan.Start))
+            if (s.Kind == SymbolKind.LoopVariable && e.GetAttribute("at")?.Value is DecodedText index && index.SourceSpan.Contains(s.DeclarationSpan.Start))
             {
                 return true;
             }

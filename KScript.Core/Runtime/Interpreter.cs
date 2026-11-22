@@ -60,7 +60,7 @@ namespace KScript.Runtime
 
                 List<MarkupElement> roots = document.RootElements.ToList();
                 if (roots.Count == 0)
-                    throw Located(new KScriptException("The script is empty. A script starts with <kscript> and ends with </kscript>.", "Syntax"), module, 0);
+                    throw Located(new KScriptException($"The script is empty. A script starts with <kscript> and ends with </kscript>.", "Syntax"), module, 0);
                 if (roots.Count > 1)
                     throw Located(new KScriptException($"A script has one root element, but this one has <{roots[0].Name}> and then <{roots[1].Name}>. Put everything inside <kscript>.", "Syntax"), module, roots[1].Span.Start);
 
@@ -69,6 +69,11 @@ namespace KScript.Runtime
                 if (root.Name.StartsWith("KScript.", StringComparison.Ordinal))
                 {
                     module.IsPackageRoot = true;
+                    module.MainElement = root;
+                }
+                else if (root.ChildElements.Where(e => char.IsUpper(e.Name[0])).Take(2).ToList() is { Count: 1 } things)
+                {
+                    module.MainElement = things[0];
                 }
                 else if (root.Name != "kscript")
                 {
@@ -109,6 +114,7 @@ namespace KScript.Runtime
                 foreach (var c in package.Commands) module.Commands[c.Key] = c.Value;
             }
             foreach (MethodDefinition m in package.Methods) module.Methods[m.Receiver + ":" + m.Name] = m;
+            foreach (ValueFieldDefinition f in package.Fields) module.Fields[f.Receiver + ":" + f.Name] = f;
             foreach (var v in package.Variables) module.Variables[v.Key] = v.Value;
             foreach (var f in package.EchoFormats) module.EchoFormats[f.Key] = f.Value;
         }
@@ -123,22 +129,17 @@ namespace KScript.Runtime
                 Add(GetPackage(name, module, null), null);
             }
 
-            // <KScript.Window> (as the root or anywhere) brings in the package that defines Window.
+            // In an XML file, <KScript.Window> (as the root or anywhere) brings in the package that defines Window. A
+            // .kscript file never has one: its packages are named only by import.
             foreach (MarkupElement e in module.Document.DescendantElements().Where(e => e.Name.StartsWith("KScript.", StringComparison.Ordinal)))
             {
                 string bare = e.Name.Substring(8);
                 KScriptPackage owner = Packages.LoadAll().FirstOrDefault(p => p.Elements.ContainsKey(bare));
                 if (owner == null)
                 {
-                    throw Located(new KScriptException($"No KScript package has an element called <{bare}>, so <{e.Name}> can't be used." + SuggestElement(bare, Packages.LoadAll().SelectMany(p => p.Elements.Keys)), "Import"), module, e.NameSpan.Start);
+                    throw Located(new KScriptException(Wording.Of($"No KScript package has an element called <{bare}>, so <{e.Name}> can't be used.") + SuggestElement(bare, Packages.LoadAll().SelectMany(p => p.Elements.Keys)), "Import"), module, e.NameSpan.Start);
                 }
                 Add(owner, null);
-            }
-
-            // job and dispatch are keywords whose package comes with them.
-            foreach (string implied in module.Document.DescendantElements().Select(e => Metadata.ImpliedPackages.ByElement.TryGetValue(e.Name, out string p) ? p : null).Where(p => p != null).Distinct())
-            {
-                Add(GetPackage(implied, module, null), null);
             }
 
             foreach (MarkupElement import in module.Root.ChildElements.Where(e => e.Name == "import"))
@@ -154,7 +155,7 @@ namespace KScript.Runtime
                     Add(GetPackage(packageName, module, import), alias);
                     continue;
                 }
-                string src = import.GetAttributeValue("src");
+                string src = import.GetAttributeValue("path");
                 if (src == null) continue; // reported by the attribute check
                 Module imported = LoadImport(src, module, import);
                 module.ScriptImports[import] = imported;
@@ -198,7 +199,7 @@ namespace KScript.Runtime
         }
 
         /// <summary>
-        /// Loads and runs a script (once) and gives a module its exports, as <c>&lt;import src="..." /&gt;</c> does:
+        /// Loads and runs a script (once) and gives a module its exports, as <c>&lt;import path="..." /&gt;</c> does:
         /// all of them, the comma separated <paramref name="names"/>, or under <paramref name="alias"/>.
         /// </summary>
         public void ImportScript(Module module, string path, Scope scope, string alias = null, string names = null)
@@ -243,7 +244,7 @@ namespace KScript.Runtime
         private Module LoadImport(string src, Module from, MarkupElement import)
         {
             string full = System.IO.Path.GetFullPath(System.IO.Path.Combine(from.Directory, src));
-            int at = import.GetAttribute("src").Value?.SourceSpan.Start ?? import.Span.Start;
+            int at = import.GetAttribute("path").Value?.SourceSpan.Start ?? import.Span.Start;
             if (loading.Contains(full))
                 throw Located(new KScriptException($"{src} imports this script back (directly or through other scripts). Imports can't go round in a circle.", "Import"), from, at);
             if (modulesByPath.TryGetValue(full, out Module cached)) return cached;
@@ -256,10 +257,10 @@ namespace KScript.Runtime
 
         #region Checking
 
-        private static string SuggestElement(string name, IEnumerable<string> names)
+        private static Wording SuggestElement(string name, IEnumerable<string> names)
         {
             string close = Values.Closest(name, names);
-            return close != null ? $" Did you mean <{close}>?" : string.Empty;
+            return close != null ? Wording.Of($" Did you mean <{close}>?") : null;
         }
 
         /// <summary>Finds an element's definition, or explains why it can't be used here.</summary>
@@ -274,14 +275,16 @@ namespace KScript.Runtime
                 return def;
             }
 
+            if (Retired.RenamedElement(name) is RetiredInfo renamed)
+                throw Located(new KScriptException(Wording.Prose(renamed.Message(module.ElementHint(name))), "Retired"), module, e.NameSpan.Start);
             if (Retired.Elements.TryGetValue(name, out RetiredInfo retired))
-                throw Located(new KScriptException($"<{name}> was removed in KScript 2. {retired.Replacement}", "Retired"), module, e.NameSpan.Start);
+                throw Located(new KScriptException(Wording.Prose(retired.Message($"<{name}>")), "Retired"), module, e.NameSpan.Start);
 
             KScriptPackage owner = Packages.FindElement(name, module.Packages).FirstOrDefault();
             if (owner != null)
                 throw Located(new KScriptException($"{module.ElementHint(name)} is part of {owner.Name}. Add {module.ImportHint(owner.Name)} at the top of the script.", "Import"), module, e.NameSpan.Start);
 
-            throw Located(new KScriptException($"Unknown element <{name}>." + SuggestElement(name, module.Elements.Keys), "Syntax"), module, e.NameSpan.Start);
+            throw Located(new KScriptException(Wording.Of($"Unknown element <{name}>.") + SuggestElement(name, module.Elements.Keys), "Syntax"), module, e.NameSpan.Start);
         }
 
         /// <summary>Checks an element, its attributes, its expressions and (for statement blocks) its children.</summary>
@@ -292,7 +295,7 @@ namespace KScript.Runtime
                 foreach (MarkupAttribute a in e.Attributes)
                 {
                     if (Retired.Attributes.TryGetValue(a.Name, out RetiredInfo r))
-                        throw Located(new KScriptException($"{a.Name}=\"...\" was removed in KScript 2. {r.Replacement}", "Retired"), module, a.NameSpan.Start);
+                        throw Located(new KScriptException(Wording.Prose(r.Message($"{a.Name}=\"...\"")), "Retired"), module, a.NameSpan.Start);
                     throw Located(new KScriptException($"<kscript> has no attributes, but this one has {a.Name}=\"...\".", "Syntax"), module, a.NameSpan.Start);
                 }
                 CheckStatements(module, e);
@@ -305,11 +308,12 @@ namespace KScript.Runtime
             if ((info.Context & ElementContext.Script) == 0 && def.Handler == null)
                 throw Located(new KScriptException($"<{info.Name}> only works in web pages served by kscript serve, not in scripts.", "Syntax"), module, e.NameSpan.Start);
 
+            NormaliseArguments(module, e, info);
             CheckAttributes(module, e, info);
 
             if (info.MustBeInside != null && info.MustBeInside.Count > 0 && !e.Ancestors().Any(a => info.MustBeInside.Contains(BareName(a.Name))
                     || (info.MustBeInside.Contains("fn") && module.Elements.TryGetValue(BareName(a.Name), out ElementDefinition outer) && outer.Info.IsFunctionBody)))
-                throw Located(new KScriptException($"<{info.Name}> must be inside {Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.", "Syntax"), module, e.NameSpan.Start);
+                throw Located(new KScriptException($"<{info.Name}> must be inside {Values.OrList(info.MustBeInside.Select(n => module.ElementHint(n)).ToList())}.", "Syntax"), module, e.NameSpan.Start);
 
             if (def.OwnsContent) return;
 
@@ -357,6 +361,17 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>Reads .kscript arguments by the one rule (see <see cref="CodeArguments"/>): quotes are strings, the rest is code.</summary>
+        internal void NormaliseArguments(Module module, MarkupElement e, ElementInfo info)
+        {
+            if (e.Attributes.Count == 0) return;
+            CodeArguments.Normalise(e, info);
+            foreach (MarkupAttribute a in e.Attributes)
+            {
+                if (a.FormError != null) throw Located(new KScriptException(a.FormError, "Syntax"), module, a.Span.Start);
+            }
+        }
+
         private static string BareName(string name) => name.StartsWith("KScript.", StringComparison.Ordinal) ? name.Substring(8) : name;
 
         private void CheckStatements(Module module, MarkupElement parent)
@@ -383,12 +398,14 @@ namespace KScript.Runtime
                 AttributeInfo spec = info.GetAttribute(a.Name);
                 if (spec == null)
                 {
+                    if (Retired.RenamedAttribute(info, a.Name) is RetiredInfo renamed)
+                        throw Located(new KScriptException(Wording.Prose(renamed.Message($"{module.ElementHint(info.Name)}: '{a.Name}'")), "Retired"), module, a.NameSpan.Start);
                     if (info.AllowsExtraAttributes || a.Name.StartsWith("on-", StringComparison.Ordinal) && info.Content == ContentKind.Markup) continue;
                     if (Retired.Attributes.TryGetValue(a.Name, out RetiredInfo r))
-                        throw Located(new KScriptException($"{a.Name}=\"...\" was removed in KScript 2. {r.Replacement}", "Retired"), module, a.NameSpan.Start);
+                        throw Located(new KScriptException(Wording.Prose(r.Message($"{a.Name}=\"...\"")), "Retired"), module, a.NameSpan.Start);
                     string close = Values.Closest(a.Name, info.Attributes.Select(x => x.Name));
-                    string list = info.Attributes.Count == 0 ? $"<{info.Name}> has no attributes." : $"Its attributes are: {string.Join(", ", info.Attributes.Select(x => x.Name))}.";
-                    throw Located(new KScriptException($"<{info.Name}> has no attribute '{a.Name}'." + (close != null ? $" Did you mean {close}?" : string.Empty) + " " + list, "Syntax"), module, a.NameSpan.Start);
+                    Wording list = info.Attributes.Count == 0 ? Wording.Of($"<{info.Name}> has no attributes.") : Wording.Of($"Its attributes are: {string.Join(", ", info.Attributes.Select(x => x.Name))}.");
+                    throw Located(new KScriptException(Wording.Of($"<{info.Name}> has no attribute '{a.Name}'.") + (close != null ? $" Did you mean {close}?" : string.Empty) + " " + list, "Syntax"), module, a.NameSpan.Start);
                 }
 
                 if (a.Value == null) continue;
@@ -403,7 +420,7 @@ namespace KScript.Runtime
                         GetParse(module, a.Value, ParseMode.List, check: true);
                         break;
                     case AttributeKind.Template:
-                        GetTemplate(module, a.Value, bareReferences: false, check: true);
+                        GetTemplate(module, a.Value, bareReferences: true, check: true);
                         break;
                     case AttributeKind.Enum:
                         if (spec.Options.Count > 0 && !spec.Options.Contains(a.Value.Value.Trim()) && !a.Value.Value.Contains('{'))
@@ -411,7 +428,7 @@ namespace KScript.Runtime
                         break;
                     case AttributeKind.Bool:
                         if (Values.ParseBool(a.Value.Value) == null && !a.Value.Value.Contains('{'))
-                            throw Located(new KScriptException($"{a.Name}=\"{a.Value.Value}\" should be yes or no.", "Syntax"), module, a.Value.SourceSpan.Start);
+                            throw Located(new KScriptException($"{a.Name}=\"{a.Value.Value}\" should be true or false.", "Syntax"), module, a.Value.SourceSpan.Start);
                         break;
                 }
             }
@@ -420,7 +437,7 @@ namespace KScript.Runtime
             {
                 if (e.GetAttribute(required.Name) != null) continue;
                 if (required.SatisfiedByContent && ContentOf(module, e) is DecodedText t && t.Value.Trim().Length > 0) continue;
-                throw Located(new KScriptException($"<{info.Name}> needs a {required.Name} attribute: {required.Description}" + (info.Example != null ? $" For example: {info.Example.Split('\n')[0]}" : string.Empty), "Syntax"), module, e.NameSpan.Start);
+                throw Located(new KScriptException(Wording.Of($"<{info.Name}> needs a {required.Name} attribute: {Wording.Prose(required.Description)}") + (info.Example != null ? Wording.Of($" For example: {Wording.Snippet(info.Example.Split('\n')[0])}") : null), "Syntax"), module, e.NameSpan.Start);
             }
         }
 
@@ -449,7 +466,7 @@ namespace KScript.Runtime
             if (!result.Success)
             {
                 SyntaxError error = result.Errors[0];
-                throw Located(new KScriptException(error.Message, "Syntax"), module, text.ToSource(error.Span.Start));
+                throw Located(new KScriptException(error.Words, "Syntax"), module, text.ToSource(error.Span.Start));
             }
             return result;
         }
@@ -468,7 +485,7 @@ namespace KScript.Runtime
             SyntaxError error = template.Errors.FirstOrDefault();
             if (error != null)
             {
-                throw Located(new KScriptException(error.Message, "Syntax"), module, text.ToSource(error.Span.Start));
+                throw Located(new KScriptException(error.Words, "Syntax"), module, text.ToSource(error.Span.Start));
             }
             return template;
         }
@@ -512,6 +529,7 @@ namespace KScript.Runtime
 
         internal static KScriptException Located(KScriptException ex, Module module, int? offset)
         {
+            ex.InFile(ex.OffsetModule ?? module);
             if (ex.HasLocation) return ex;
             // The error's own position (in the module it came from), or else this one.
             (Module owner, int? at) = ex.Offset != null ? (ex.OffsetModule ?? module, ex.Offset) : (module, offset);
@@ -627,11 +645,11 @@ namespace KScript.Runtime
             }
             catch (BreakSignal)
             {
-                throw new KScriptException("<break/> must be inside a loop (<for> or <while>).", "Syntax");
+                throw Located(new KScriptException($"<break/> must be inside a loop (<for> or <while>).", "Syntax"), module, null);
             }
             catch (ContinueSignal)
             {
-                throw new KScriptException("<continue/> must be inside a loop (<for> or <while>).", "Syntax");
+                throw Located(new KScriptException($"<continue/> must be inside a loop (<for> or <while>).", "Syntax"), module, null);
             }
             finally
             {
@@ -711,8 +729,8 @@ namespace KScript.Runtime
                 if (!imported.Exports.TryGetValue(name, out object value))
                 {
                     string close = Values.Closest(name, imported.Exports.Keys);
-                    throw new KScriptException($"{imported.DisplayName} doesn't export '{name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                        + " Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s, <model>s and <job>s.", "Import");
+                    throw new KScriptException(Wording.Of($"{imported.DisplayName} doesn't export '{name}'.") + (close != null ? $" Did you mean {close}?" : string.Empty)
+                        + Wording.Of($" Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s, <model>s and <job>s."), "Import");
                 }
                 scope.Declare(name, value);
             }
@@ -787,6 +805,7 @@ namespace KScript.Runtime
             ElementDefinition def = ResolveElement(module, e);
             if (def.Handler == null)
                 throw Located(new KScriptException($"<{def.Name}> only works in web pages served by kscript serve.", "Syntax"), module, e.Span.Start);
+            NormaliseArguments(module, e, def.Info);
             try
             {
                 return def.Handler(new ElementRun(this, module, e, def, scope, chain));
@@ -812,7 +831,7 @@ namespace KScript.Runtime
         internal void DeclareFunction(MarkupElement e, Scope scope, Module module)
         {
             string name = e.GetAttributeValue("name")?.Trim().TrimStart('@');
-            if (string.IsNullOrEmpty(name)) throw new KScriptException("<fn> needs a name, such as <fn name=\"greet\" params=\"who\">.", "Syntax");
+            if (string.IsNullOrEmpty(name)) throw new KScriptException($"<fn> needs a name, such as <fn name=\"greet\" params=\"who\">.", "Syntax");
             List<Parameter> parameters = Parameter.ParseList(e.GetAttributeValue("params"), out string error);
             if (error != null) throw new KScriptException(error, "Syntax") { Offset = e.GetAttribute("params")?.Value?.SourceSpan.Start };
 

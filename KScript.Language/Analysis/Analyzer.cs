@@ -28,6 +28,7 @@ namespace KScript.Language.Analysis
             this.catalog = catalog ?? LanguageCatalog.Default;
             directory = path != null ? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) : null;
             result = new DocumentAnalysis(source, path, kind, MarkupParser.Parse(source, kind, path));
+            CodeArguments.Normalise(result.Markup, this.catalog.GetElement);
         }
 
         private DocumentKind Kind => result.Kind;
@@ -52,6 +53,8 @@ namespace KScript.Language.Analysis
             DocumentKind documentKind = kind ?? MarkupParser.KindFromPath(path);
             Analyzer analyzer = RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog));
             analyzer.ReportDeferred();
+            analyzer.CheckSpellings();
+            analyzer.CheckNamingStyle();
             analyzer.CheckUnused(projectWide);
             analyzer.SpeakCode();
             return analyzer.result;
@@ -164,10 +167,9 @@ namespace KScript.Language.Analysis
         {
             (string type, string description) = catalog.BuiltInVariables[name];
             TypeShape shape = new TypeShape(type);
-            foreach (KeyValuePair<string, string> field in catalog.FieldsOf(type))
+            foreach (KeyValuePair<string, ValueFieldInfo> field in catalog.FieldsOf(type))
             {
-                shape.Fields[field.Key] = new FieldInfo(field.Key, field.Key == "query" || field.Key == "form" || field.Key == "params" || field.Key == "headers" || field.Key == "cookies"
-                    ? new TypeShape(KType.Map) : TypeShape.Unknown, null, field.Value);
+                shape.Fields[field.Key] = new FieldInfo(field.Key, field.Value.Type is null or KType.Any ? TypeShape.Unknown : new TypeShape(field.Value.Type), null, field.Value.Description);
             }
             Symbol symbol = new Symbol { Name = name, Kind = SymbolKind.BuiltIn, Shape = shape, Description = description };
             result.Symbols.Add(symbol);
@@ -261,7 +263,7 @@ namespace KScript.Language.Analysis
 
         private void HoistImport(MarkupElement e, Scope root)
         {
-            string src = e.GetAttributeValue("src")?.Trim();
+            string src = e.GetAttributeValue("path")?.Trim();
             string full = ResolvePath(src);
             Dictionary<string, (FunctionParameter[] Params, ExternalLocation Location, string Description)> exported = ReadExports(full);
             Dictionary<string, (ExternalLocation Location, string Description)> constants = ReadConstantExports(full);
@@ -304,10 +306,10 @@ namespace KScript.Language.Analysis
             MarkupAttribute namesAttr = e.GetAttribute("names");
             if (namesAttr?.Value == null)
             {
-                // <import src="lib.ks.xml" /> with neither as nor names brings in every exported function.
+                // <import path="lib.ks.xml" /> with neither as nor names brings in every exported function.
                 if (string.IsNullOrWhiteSpace(asAttr?.ValueText) && exported != null)
                 {
-                    MarkupAttribute srcAttr = e.GetAttribute("src");
+                    MarkupAttribute srcAttr = e.GetAttribute("path");
                     TextSpan at = srcAttr?.Value != null ? TrimmedSpan(srcAttr.Value) : e.NameSpan;
                     foreach (var export in exported)
                     {
@@ -411,6 +413,7 @@ namespace KScript.Language.Analysis
                     {
                         importedEnums[(full, name)] = EnumValuesOf(e);
                     }
+                    importedTypes.Add((full, name));
                     Symbol symbol = ImportedConstant(name, owner.NameSpan, owner, full, where,
                         (new ExternalLocation(full, other.GetPosition(span.Start), other.GetPosition(span.End)), e.Documentation ?? $"A native type of this project, from {where}"));
                     root.Declare(symbol, 0);
@@ -514,6 +517,7 @@ namespace KScript.Language.Analysis
 
             SourceText other = new SourceText(text);
             MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
+            CodeArguments.Normalise(doc, catalog.GetElement);
             Dictionary<string, (ExternalLocation, string)> constants = new Dictionary<string, (ExternalLocation, string)>(StringComparer.Ordinal);
             MarkupElement root = doc.RootElements.FirstOrDefault();
             if (root == null)
@@ -530,6 +534,10 @@ namespace KScript.Language.Analysis
                 if (let.Name == "error")
                 {
                     importedErrors.Add(nameAttr.ValueText.Trim());
+                }
+                if (let.Name != "let" && let.Name != "const")
+                {
+                    importedTypes.Add((path, nameAttr.ValueText.Trim().TrimStart('$')));
                 }
                 if (let.Name == "enum")
                 {
@@ -552,6 +560,7 @@ namespace KScript.Language.Analysis
 
             SourceText other = new SourceText(text);
             MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
+            CodeArguments.Normalise(doc, catalog.GetElement);
             Dictionary<string, (FunctionParameter[], ExternalLocation, string)> exports = new Dictionary<string, (FunctionParameter[], ExternalLocation, string)>(StringComparer.Ordinal);
             foreach (MarkupElement fn in doc.DescendantElements().Where(x => x.Name == "fn" && x.Parent?.Name != "extend"))
             {
@@ -578,11 +587,11 @@ namespace KScript.Language.Analysis
             if (roots.Count > 1)
             {
                 Report(roots[1].NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MarkupSyntax,
-                    "A script has one root element. Put everything inside <kscript>.");
+                    $"A script has one root element. Put everything inside <kscript>.");
             }
             if (roots.Count > 0 && roots[0].Name != "kscript" && catalog.GetElement(roots[0].Name) != null)
             {
-                Report(roots[0].NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.MisplacedElement, "Scripts start with <kscript>.");
+                Report(roots[0].NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.MisplacedElement, $"Scripts start with <kscript>.");
             }
         }
 
@@ -613,7 +622,7 @@ namespace KScript.Language.Analysis
                         else if (!text.IsWhitespace)
                         {
                             Report(TrimmedSpan(text.Content), DiagnosticSeverity.Warning, DiagnosticCodes.StrayText,
-                                "Text here is ignored. To print it, put it in <echo>.");
+                                $"Text here is ignored. To print it, put it in <echo>.");
                         }
                         if (!text.IsWhitespace)
                         {
@@ -678,9 +687,16 @@ namespace KScript.Language.Analysis
                 Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.MisplacedElement, $"<{e.Name}> only works in pages served by kscript serve.");
             }
 
+            if (info.Planned && Kind == DocumentKind.Script)
+            {
+                // Described in the catalog, but no package runs it: the runtime would call it unknown.
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.PlannedFeature,
+                    $"<{e.Name}> is planned but not built yet, so it can't run.");
+            }
+
             // Elements that build their own scopes (fn, catch) must not also get an empty content scope,
             // or Scope.Innermost would find the empty one first.
-            bool ownScopes = info.Name == "fn" || info.Name == "catch" || (info.Name == "test" && info.Package == "KScript.Test" && e.GetAttribute("each") != null);
+            bool ownScopes = info.Name == "fn" || info.Name == "catch";
             Scope inner = e.SelfClosing || !e.StartTagClosed || ownScopes ? scope : new Scope(scope, e.ContentSpan);
             List<Action> declareAfter = new List<Action>();
 
@@ -734,12 +750,8 @@ namespace KScript.Language.Analysis
                     AnalyzeStatementsContent(e, scope, declare: false);
                     return;
 
-                case "test" when info.Package == "KScript.Test" && e.GetAttribute("each") != null:
-                    AnalyzeTestEach(e, info, scope, markupMode);
-                    return;
-
-                case "expect-error" when info.Package == "KScript.Test":
-                    // <expect-error as="err"> declares the caught error after the element, shaped like <catch as>.
+                case "expect_error" when info.Package == "KScript.Test":
+                    // <expect_error as="err"> declares the caught error after the element, shaped like <catch as>.
                     AnalyzeAttributes(e, info, scope, skip: "as");
                     WalkChildren(e.Children, inner, markupMode);
                     DeclareFromAttribute(e, "as", scope, e.Span.End, SymbolKind.Variable, CaughtErrorShape(e, scope));
@@ -799,13 +811,13 @@ namespace KScript.Language.Analysis
 
             AnalyzeAttributes(e, info, scope);
 
-            // Elements that store a result: <input to>, <llm to>, <marray id>, <file_info to>, <picker to>.
+            // Elements that store a result: <input into>, <llm into>, <collection name>, <picker into>.
             foreach (AttributeInfo a in info.Attributes.Where(a => a.Kind == AttributeKind.DeclareVariable && info.Name != "import"))
             {
                 MarkupAttribute attr = e.GetAttribute(a.Name);
                 if (attr?.Value != null)
                 {
-                    TypeShape shape = info.Name == "marray" ? MarrayShape(e) : info.Name == "llm" && e.GetAttribute("schema") != null ? new TypeShape(KType.Map) : new TypeShape(info.DeclaresType ?? KType.String);
+                    TypeShape shape = info.Name == "collection" ? CollectionShape(e) : info.Name == "llm" && e.GetAttribute("schema") != null ? new TypeShape(KType.Map) : new TypeShape(info.DeclaresType ?? KType.String);
                     declareAfter.Add(() => DeclareFromAttribute(e, a.Name, scope, e.Span.End, SymbolKind.Variable, shape));
                 }
             }
@@ -947,15 +959,19 @@ namespace KScript.Language.Analysis
             }
 
             // KScript 1 was XML only, so a .kscript file never holds one of its elements: there the word is just unknown.
-            RetiredInfo retired = IsCode ? null : catalog.GetRetiredElement(e.Name);
+            RetiredInfo retired = catalog.GetRetiredElement(e.Name);
+            if (IsCode && retired?.Renamed != true)
+            {
+                retired = null;
+            }
             if (retired != null)
             {
                 List<QuickFix> fixes = new List<QuickFix>();
                 if (retired.Rename != null)
                 {
-                    fixes.Add(RenameElementFix(e, retired.Rename));
+                    fixes.Add(RenameElementFix(e, retired.Rename, retired.Renamed));
                 }
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredElement, $"<{e.Name}> was removed in KScript 2. {retired.Replacement}", fixes);
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredElement, Wording.Prose(retired.Message(IsCode ? e.Name : $"<{e.Name}>")), fixes);
                 return;
             }
 
@@ -968,14 +984,14 @@ namespace KScript.Language.Analysis
                 suggestion != null ? new[] { RenameElementFix(e, suggestion) } : null);
         }
 
-        private QuickFix RenameElementFix(MarkupElement e, string name)
+        private QuickFix RenameElementFix(MarkupElement e, string name, bool renamed = false)
         {
             List<TextChange> changes = new List<TextChange> { new TextChange(e.NameSpan, name) };
             if (e.EndNameSpan.HasValue)
             {
                 changes.Add(new TextChange(e.EndNameSpan.Value, name));
             }
-            return new QuickFix(IsCode ? $"Change to {name}" : $"Change to <{name}>", changes.ToArray());
+            return new QuickFix((renamed ? Fixer.RenameTitle : "Change to ") + (IsCode ? name : $"<{name}>"), changes.ToArray());
         }
 
         private void CheckComponent(MarkupElement e, bool required)
@@ -1000,7 +1016,7 @@ namespace KScript.Language.Analysis
             IEnumerable<string> known = files.ListFiles(componentDir, "*.html").Select(f => System.IO.Path.GetFileNameWithoutExtension(f));
             string suggestion = Suggestions.Closest(e.Name, known);
             Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownElement,
-                $"No component named <{e.Name}>: _components/{e.Name}.html doesn't exist." + (suggestion != null ? $" Did you mean <{suggestion}>?" : string.Empty),
+                Wording.Of($"No component named <{e.Name}>: _components/{e.Name}.html doesn't exist.") + (suggestion != null ? Wording.Of($" Did you mean <{suggestion}>?") : null),
                 suggestion != null ? new[] { RenameElementFix(e, suggestion) } : null);
         }
 
@@ -1028,12 +1044,13 @@ namespace KScript.Language.Analysis
                     continue;
                 }
 
-                RetiredInfo retired = catalog.GetRetiredAttribute(attr.Name);
+                RetiredInfo retired = catalog.GetRetiredAttribute(info, attr.Name);
                 if (retired != null)
                 {
-                    Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredAttribute, $"The '{attr.Name}' attribute was removed in KScript 2. {retired.Replacement}",
+                    Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredAttribute,
+                        retired.Renamed ? Wording.Prose(retired.Message($"'{attr.Name}'")) : Wording.Of($"The '{attr.Name}' attribute was removed in KScript 2. {Wording.Prose(retired.Replacement)}"),
                         retired.Rename != null && info.GetAttribute(retired.Rename) != null && e.GetAttribute(retired.Rename) == null
-                            ? new[] { new QuickFix($"Change to {retired.Rename}", new TextChange(attr.NameSpan, retired.Rename)) }
+                            ? new[] { new QuickFix((retired.Renamed ? Fixer.RenameTitle : "Change to ") + retired.Rename, new TextChange(attr.NameSpan, retired.Rename)) }
                             : null);
                     continue;
                 }
@@ -1045,7 +1062,7 @@ namespace KScript.Language.Analysis
 
                 string suggestion = Suggestions.Closest(attr.Name, info.Attributes.Select(x => x.Name));
                 Report(attr.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownAttribute,
-                    $"<{e.Name}> has no '{attr.Name}' attribute." + (suggestion != null ? $" Did you mean '{suggestion}'?" : AttributeList(info)),
+                    Wording.Of($"<{e.Name}> has no '{attr.Name}' attribute.") + (suggestion != null ? $" Did you mean '{suggestion}'?" : AttributeList(info)),
                     suggestion != null ? new[] { new QuickFix($"Change to {suggestion}", new TextChange(attr.NameSpan, suggestion)) } : null);
             }
 
@@ -1053,7 +1070,7 @@ namespace KScript.Language.Analysis
             {
                 if (e.GetAttribute(a.Name) == null && !RequiredSatisfiedOtherwise(e, info, a))
                 {
-                    Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<{e.Name}> needs the '{a.Name}' attribute: {a.Description}");
+                    Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<{e.Name}> needs the '{a.Name}' attribute: {Wording.Prose(a.Description)}");
                 }
             }
         }
@@ -1063,7 +1080,7 @@ namespace KScript.Language.Analysis
 
         /// <summary>A retired attribute that maps onto the missing one (condition= for test=) has already been reported.</summary>
         private bool RequiredSatisfiedOtherwise(MarkupElement e, ElementInfo info, AttributeInfo a) =>
-            e.Attributes.Any(x => catalog.GetRetiredAttribute(x.Name)?.Rename == a.Name);
+            e.Attributes.Any(x => catalog.GetRetiredAttribute(info, x.Name)?.Rename == a.Name);
 
         private void CheckAttributeValue(MarkupAttribute attr, AttributeInfo a)
         {
@@ -1082,7 +1099,7 @@ namespace KScript.Language.Analysis
             }
             else if (a.Kind == AttributeKind.Bool && KScript.Runtime.Values.ParseBool(value) == null)
             {
-                Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{a.Name}' takes yes or no, not '{value}'.");
+                Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{a.Name}' takes true or false, not '{value}'.");
             }
         }
 
@@ -1108,7 +1125,7 @@ namespace KScript.Language.Analysis
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
                         IsCode
                             ? $"'{e.Name}' only works inside {KScript.Runtime.Values.OrList(info.MustBeInside.ToList())}."
-                            : $"<{e.Name}> must be inside {KScript.Runtime.Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.");
+                            : $"<{e.Name}> must be inside {KScript.Runtime.Values.OrList(info.MustBeInside.Select(n => IsCode ? n : "<" + n + ">").ToList())}.");
                 }
             }
 
@@ -1164,6 +1181,7 @@ namespace KScript.Language.Analysis
         private void AnalyzeAttribute(MarkupElement e, MarkupAttribute attr, AttributeInfo a, Scope scope)
         {
             CheckNameListString(e, attr, a);
+            CheckArgumentForm(e, attr, a);
             switch (a.Kind)
             {
                 case AttributeKind.Expression:
@@ -1173,6 +1191,8 @@ namespace KScript.Language.Analysis
                     AnalyzeExpressionRegion(attr.Value, RegionKind.ExpressionList, scope, e, attr);
                     break;
                 case AttributeKind.Template:
+                    AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: true);
+                    break;
                 case AttributeKind.Text when attr.ValueText.Contains('{') && !a.Literal:
                     AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: false);
                     break;
@@ -1254,8 +1274,8 @@ namespace KScript.Language.Analysis
                 if (!hasText)
                 {
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute,
-                        isLet ? "<let> needs a name and a value: <let name=\"x\" value=\"3\" /> or <let>x = 3</let>."
-                              : "<set> needs a name and a value: <set name=\"x\" value=\"3\" /> or <set>x = 3</set>.");
+                        isLet ? new Wording("<let> needs a name and a value: <let name=\"x\" value=\"3\" /> or <let>x = 3</let>.", "A variable needs a name and a value: x = 3.")
+                              : new Wording("<set> needs a name and a value: <set name=\"x\" value=\"3\" /> or <set>x = 3</set>.", "An assignment needs a name and a value: x = 3."));
                     return;
                 }
                 AnalyzeStatementsContent(e, scope, declare: isLet);
@@ -1288,11 +1308,11 @@ namespace KScript.Language.Analysis
             }
             else if (isLet)
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "<let> needs a value: a value attribute or text.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<let> needs a value: a value attribute or text.");
             }
             else
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "<set> needs a value: a value attribute or text.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<set> needs a value: a value attribute or text.");
             }
 
             if (region?.Parse?.Root != null)
@@ -1325,7 +1345,7 @@ namespace KScript.Language.Analysis
                 Symbol declared = DeclareFromAttribute(e, "name", scope, e.Span.End, isConst ? SymbolKind.Constant : SymbolKind.Variable, shape);
                 if (declared != null && region?.Parse?.Root is LambdaNode lambda)
                 {
-                    declared.Description = "fn(" + string.Join(", ", lambda.Parameters.Select(p => "$" + p.Name)) + ")";
+                    declared.Description = "fn(" + string.Join(", ", lambda.Parameters.Select(p => p.Name)) + ")";
                 }
                 if (declared != null && e.Documentation is string doc)
                 {
@@ -1411,7 +1431,7 @@ namespace KScript.Language.Analysis
             {
                 if (e.Name == "do")
                 {
-                    Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.StatementSyntax, "<do> is empty.");
+                    Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.StatementSyntax, $"<do> is empty.");
                 }
                 return;
             }
@@ -1518,38 +1538,6 @@ namespace KScript.Language.Analysis
             return region.Source.ToSource(local);
         }
 
-        /// <summary>
-        /// &lt;test each="case" in="[...]" name="… {$case.x}"&gt;: the item (and index) are visible in the name, the
-        /// other attributes and the body, like a loop variable.
-        /// </summary>
-        private void AnalyzeTestEach(MarkupElement e, ElementInfo info, Scope outer, bool markupMode)
-        {
-            TypeShape itemShape = TypeShape.Unknown;
-            MarkupAttribute inAttr = e.GetAttribute("in");
-            if (inAttr?.Value != null)
-            {
-                ExpressionRegion region = AnalyzeExpressionRegion(inAttr.Value, RegionKind.Expression, outer, e, inAttr);
-                if (region.Parse.Root != null)
-                {
-                    TypeShape collection = Infer(region.Parse.Root, region);
-                    itemShape = collection.Type == KType.List ? collection.Element ?? TypeShape.Unknown : TypeShape.Unknown;
-                }
-            }
-
-            Scope testScope = new Scope(outer, e.Span);
-            DeclareFromAttribute(e, "each", testScope, e.Span.Start, SymbolKind.LoopVariable, itemShape);
-            DeclareFromAttribute(e, "index", testScope, e.Span.Start, SymbolKind.LoopVariable, new TypeShape(KType.Number));
-
-            foreach (MarkupAttribute attr in e.Attributes.Where(a => a.Name != "in" && a.Name != "each" && a.Name != "index"))
-            {
-                if (attr.Value != null && info.GetAttribute(attr.Name) is AttributeInfo ai)
-                {
-                    AnalyzeAttribute(e, attr, ai, testScope);
-                }
-            }
-            WalkChildren(e.Children, e.SelfClosing || !e.StartTagClosed ? testScope : new Scope(testScope, e.ContentSpan), markupMode);
-        }
-
         private void AnalyzeFor(MarkupElement e, Scope outer, Scope body)
         {
             ElementInfo info = catalog.GetElement("for");
@@ -1583,7 +1571,7 @@ namespace KScript.Language.Analysis
                 }
             }
 
-            DeclareFromAttribute(e, "index", body, e.ContentSpan.Start, SymbolKind.LoopVariable, new TypeShape(KType.Number));
+            DeclareFromAttribute(e, "at", body, e.ContentSpan.Start, SymbolKind.LoopVariable, new TypeShape(KType.Number));
         }
 
         private void AnalyzeFn(MarkupElement e, Scope outer, bool markupMode)
@@ -1621,7 +1609,7 @@ namespace KScript.Language.Analysis
             bool hasBody = e.Children.Any(c => c is MarkupElement || (c is MarkupText t && !t.IsWhitespace));
             if (e.GetAttribute("value") != null && hasBody)
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttribute, "<fn> has both a value and a body. Use one.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttribute, $"<fn> has both a value and a body. Use one.");
             }
 
             WalkChildren(e.Children, new Scope(body, e.ContentSpan), markupMode);
@@ -1659,7 +1647,7 @@ namespace KScript.Language.Analysis
             return shape;
         }
 
-        private TypeShape MarrayShape(MarkupElement e)
+        private TypeShape CollectionShape(MarkupElement e)
         {
             List<MarkupElement> items = e.ChildElements.Where(c => c.Name == "item").ToList();
             bool keyed = items.Count > 0 && items.All(i => i.GetAttribute("key") != null);

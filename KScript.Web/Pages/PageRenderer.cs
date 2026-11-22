@@ -1,3 +1,4 @@
+using KScript.Syntax.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,7 +10,7 @@ using KScript.Runtime;
 
 namespace KScript.Pages
 {
-    /// <summary>What a page produced: usually HTML, or a response set by &lt;respond&gt; / &lt;redirect&gt;.</summary>
+    /// <summary>What a page produced: usually HTML, or a response set by &lt;respond&gt;.</summary>
     public sealed class PageResult
     {
         public int Status { get; set; } = 200;
@@ -24,7 +25,7 @@ namespace KScript.Pages
         public string FilePath { get; set; }
     }
 
-    /// <summary>Thrown by &lt;respond&gt; and &lt;redirect&gt; to stop rendering and send a specific response.</summary>
+    /// <summary>Thrown by &lt;respond&gt; to stop rendering and send a specific response.</summary>
     internal sealed class PageResponseSignal : Exception
     {
         public PageResponseSignal(PageResult result) : base("response") { Result = result; }
@@ -376,12 +377,12 @@ namespace KScript.Pages
 
                 case "layout":
                 {
-                    string src = el.Attr("src") ?? throw new PageException("<layout> needs a src attribute, e.g. <layout src=\"_layout.html\">.");
+                    string src = el.Attr("path") ?? throw new PageException(el.HasAttr("src") ? "<layout src> was renamed: write <layout path=\"_layout.html\">." : "<layout> needs a path attribute, e.g. <layout path=\"_layout.html\">.");
                     var inner = scope.Child();
                     var body = new StringBuilder();
                     RenderNodes(el.Children, inner, body, state);
                     var layoutScope = scope.Child();
-                    foreach (var a in el.Attributes.Where(a => a.Name != "src")) layoutScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
+                    foreach (var a in el.Attributes.Where(a => a.Name != "path")) layoutScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
                     AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), layoutScope, body.ToString()), state);
                     return;
                 }
@@ -393,9 +394,9 @@ namespace KScript.Pages
 
                 case "include":
                 {
-                    string src = el.Attr("src") ?? throw new PageException("<include> needs a src attribute.");
+                    string src = el.Attr("path") ?? throw new PageException(el.HasAttr("src") ? "<include src> was renamed: write <include path=\"...\" />." : "<include> needs a path attribute.");
                     var incScope = scope.Child();
-                    foreach (var a in el.Attributes.Where(a => a.Name != "src")) incScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
+                    foreach (var a in el.Attributes.Where(a => a.Name != "path")) incScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
                     AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), incScope, null), state);
                     return;
                 }
@@ -412,7 +413,13 @@ namespace KScript.Pages
                 {
                     var result = new PageResult();
                     if (el.Attr("status") is string status) result.Status = (int)Values.ToNumber(Eval(status, scope, state), "<respond status>");
-                    if (el.Attr("json") is string json)
+                    if (el.Attr("redirect") is string redirect)
+                    {
+                        if (el.Attr("status") == null) result.Status = 302;
+                        result.Body = string.Empty;
+                        result.Headers["Location"] = Interpolate(redirect, scope, state, EscapeMode.None);
+                    }
+                    else if (el.Attr("json") is string json)
                     {
                         result.ContentType = "application/json; charset=utf-8";
                         result.Body = Values.ToJson(Eval(json, scope, state), indented: true);
@@ -428,16 +435,11 @@ namespace KScript.Pages
                         result.Headers[a.Name.Substring(7)] = Interpolate(a.Value ?? string.Empty, scope, state, EscapeMode.None);
                     throw new PageResponseSignal(result);
                 }
-
-                case "redirect":
-                {
-                    string to = el.Attr("to") ?? throw new PageException("<redirect> needs a to attribute, e.g. <redirect to=\"/thanks\" />.");
-                    var result = new PageResult { Status = 302, Body = string.Empty };
-                    if (el.Attr("status") is string status) result.Status = (int)Values.ToNumber(Eval(status, scope, state), "<redirect status>");
-                    result.Headers["Location"] = Interpolate(to, scope, state, EscapeMode.None);
-                    throw new PageResponseSignal(result);
-                }
             }
+
+            // One way to end a request from a page: <respond>. The old element says so instead of becoming HTML.
+            if (el.Name == "redirect" && el.Attr("to") is string oldTo)
+                throw new PageException($"<redirect> was removed. Use <respond redirect=\"{oldTo}\" />.");
 
             if (PageElementNames.CanBeComponent(el.Name) && TryComponent(el, scope, sb, state)) return;
 
@@ -512,8 +514,8 @@ namespace KScript.Pages
                 }
                 if (a.Name == "every" && el.HasAttr("on-tick"))
                 {
-                    // <span on-tick="..." every="200">: how often, in milliseconds, the tick handler runs.
-                    double ms = Values.ToNumber(TryWholeExpression(a.Value ?? string.Empty, out string everyExpr, out _) ? Eval(everyExpr, scope, state) : a.Value, "every");
+                    // <span on-tick="..." every="200ms">: how often the tick handler runs. A plain number is seconds.
+                    double ms = Duration.Seconds(TryWholeExpression(a.Value ?? string.Empty, out string everyExpr, out _) ? Eval(everyExpr, scope, state) : a.Value, "every") * 1000;
                     sb.Append(" data-ks-every=\"").Append(Values.ToStr(Math.Max(16, Math.Round(ms)))).Append('"');
                     continue;
                 }
@@ -593,7 +595,7 @@ namespace KScript.Pages
         {
             string each = el.Attr("each") ?? throw new PageException("<for> needs each and in attributes, e.g. <for each=\"p\" in=\"$people\">.");
             string inExpr = el.Attr("in") ?? throw new PageException("<for> needs an in attribute, e.g. <for each=\"p\" in=\"$people\">.");
-            string indexName = el.Attr("index");
+            string indexName = el.Attr("at");
             var names = each.Split(',').Select(n => n.Trim().TrimStart('$')).ToArray();
 
             object source = Eval(inExpr, scope, state);
@@ -734,13 +736,10 @@ namespace KScript.Pages
                 if (c.Name == "default") hit = true;
                 else if (c.Name == "case")
                 {
-                    if (c.Attr("is") is string isExpr)
-                    {
-                        var options = state.Ctx.Runtime.EvaluateList(isExpr, matchScope, state.Module);
-                        hit = options.Any(o => Values.LooseEquals(o, value));
-                    }
-                    else if (c.Attr("when") is string when) hit = Values.Truthy(Eval(when, matchScope, state));
-                    else throw new PageException("<case> needs an is or when attribute.");
+                    string isExpr = c.Attr("is"), when = c.Attr("when");
+                    if (isExpr == null && when == null) throw new PageException("<case> needs an is or when attribute.");
+                    hit = (isExpr == null || state.Ctx.Runtime.EvaluateList(isExpr, matchScope, state.Module).Any(o => Values.LooseEquals(o, value)))
+                        && (when == null || Values.Truthy(Eval(when, matchScope, state)));
                 }
                 else throw new PageException($"Only <case> and <default> can go inside <match>, not <{c.Name}>.");
 
@@ -811,7 +810,7 @@ namespace KScript.Pages
                 char c = text[i];
                 if (quote != '\0')
                 {
-                    if (c == '\\') i++;
+                    if (Quotes.IsEscape(text, i, text.Length, quote)) i++;
                     else if (c == quote) quote = '\0';
                     continue;
                 }

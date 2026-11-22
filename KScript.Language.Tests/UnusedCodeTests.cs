@@ -122,14 +122,14 @@ namespace KScript.Language.Tests
             return new MemoryFiles()
                 .Add(At("p", "kscript.json"), "{}")
                 .Add(At("p", "lib", "strings.ks.xml"), lib)
-                .Add(At("p", "a.ks.xml"), "<kscript><import src=\"lib/strings.ks.xml\" names=\"slugify\" /><echo>{ @slugify('a') }</echo></kscript>")
-                .Add(At("p", "c.ks.xml"), "<kscript><import src=\"lib/strings.ks.xml\" /><echo>{ @whisper('a') }</echo></kscript>")
-                .Add(At("p", "sub", "b.ks.xml"), "<kscript><import src=\"../lib/strings.ks.xml\" as=\"str\" /><echo>{ @str.shout('a') } { str.PI }</echo></kscript>")
+                .Add(At("p", "a.ks.xml"), "<kscript><import path=\"lib/strings.ks.xml\" names=\"slugify\" /><echo>{ @slugify('a') }</echo></kscript>")
+                .Add(At("p", "c.ks.xml"), "<kscript><import path=\"lib/strings.ks.xml\" /><echo>{ @whisper('a') }</echo></kscript>")
+                .Add(At("p", "sub", "b.ks.xml"), "<kscript><import path=\"../lib/strings.ks.xml\" as=\"str\" /><echo>{ @str.shout('a') } { str.PI }</echo></kscript>")
                 .Add(At("p", "other.ks.xml"), "<kscript><echo>strings</echo></kscript>")
                 .Add(At("p", "notes.txt"), "strings")
-                .Add(At("p", "README.md"), "Import strings with `<import src=\"lib/strings.ks.xml\" />`.")
-                .Add(At("p", "bin", "d.ks.xml"), "<kscript><import src=\"../lib/strings.ks.xml\" names=\"orphan\" /><echo>{ @orphan() }</echo></kscript>")
-                .Add(At("p", ".hidden", "e.ks.xml"), "<kscript><import src=\"../lib/strings.ks.xml\" names=\"orphan\" /><echo>{ @orphan() }</echo></kscript>");
+                .Add(At("p", "README.md"), "Import strings with `<import path=\"lib/strings.ks.xml\" />`.")
+                .Add(At("p", "bin", "d.ks.xml"), "<kscript><import path=\"../lib/strings.ks.xml\" names=\"orphan\" /><echo>{ @orphan() }</echo></kscript>")
+                .Add(At("p", ".hidden", "e.ks.xml"), "<kscript><import path=\"../lib/strings.ks.xml\" names=\"orphan\" /><echo>{ @orphan() }</echo></kscript>");
         }
 
         [Fact]
@@ -156,7 +156,7 @@ namespace KScript.Language.Tests
             MemoryFiles files = new MemoryFiles()
                 .Add(At("one", "kscript.json"), "{}")
                 .Add(At("one", "lib.ks.xml"), "<kscript><fn name=\"a\" value=\"1\" /><fn name=\"b\" value=\"1\" /><const name=\"C\" value=\"1\" /></kscript>")
-                .Add(At("one", "main.ks.xml"), "<kscript><import src=\"lib.ks.xml\" names=\"a\" /><echo>{ @a() }</echo></kscript>");
+                .Add(At("one", "main.ks.xml"), "<kscript><import path=\"lib.ks.xml\" names=\"a\" /><echo>{ @a() }</echo></kscript>");
             string path = At("one", "lib.ks.xml");
             DocumentAnalysis a = Analyzer.Analyze(files.ReadText(path), path, files);
             Assert.Equal("The function b is never called. main.ks.xml imports this script but doesn't call it.", Find(a, DiagnosticCodes.UnusedFunction, "b").Message);
@@ -168,8 +168,8 @@ namespace KScript.Language.Tests
         {
             MemoryFiles files = new MemoryFiles()
                 .Add(At("loose", "lib.ks.xml"), "<kscript><fn name=\"near\" value=\"1\" /><fn name=\"far\" value=\"1\" /></kscript>")
-                .Add(At("loose", "main.ks.xml"), "<kscript><import src=\"lib.ks.xml\" as=\"lib\" /><echo>{ @lib.near() }</echo></kscript>")
-                .Add(At("loose", "deeper", "x.ks.xml"), "<kscript><import src=\"../lib.ks.xml\" as=\"lib\" /><echo>{ @lib.far() }</echo></kscript>");
+                .Add(At("loose", "main.ks.xml"), "<kscript><import path=\"lib.ks.xml\" as=\"lib\" /><echo>{ @lib.near() }</echo></kscript>")
+                .Add(At("loose", "deeper", "x.ks.xml"), "<kscript><import path=\"../lib.ks.xml\" as=\"lib\" /><echo>{ @lib.far() }</echo></kscript>");
             string path = At("loose", "lib.ks.xml");
             Assert.Equal(new[] { "KS6002:far" }, Unused(Analyzer.Analyze(files.ReadText(path), path, files)));
         }
@@ -184,7 +184,7 @@ namespace KScript.Language.Tests
                 MemoryFiles files = new MemoryFiles()
                     .Add(At("h", "kscript.json"), "{}")
                     .Add(At("h", "controllers", "people.ks.xml"), people)
-                    .Add(At("h", "routes.ks.xml"), "<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n" + routes + "\n</KScript.Routes>");
+                    .Add(At("h", "routes.ks.xml"), "<KScript.Routes>\n  <import path=\"controllers/people.ks.xml\" as=\"people\" />\n" + routes + "\n</KScript.Routes>");
                 string path = At("h", "controllers", "people.ks.xml");
                 return Unused(Analyzer.Analyze(people, path, files));
             }
@@ -195,7 +195,7 @@ namespace KScript.Language.Tests
 
             // The route file's import counts as used by the Resource.
             MemoryFiles routesOnly = new MemoryFiles().Add(At("h2", "controllers", "people.ks.xml"), people);
-            DocumentAnalysis routesFile = Check("<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n  <Resource path=\"/people\" to=\"people\" />\n</KScript.Routes>",
+            DocumentAnalysis routesFile = Check("<KScript.Routes>\n  <import path=\"controllers/people.ks.xml\" as=\"people\" />\n  <Resource path=\"/people\" to=\"people\" />\n</KScript.Routes>",
                 Path.Combine("h2", "routes.ks.xml"), routesOnly);
             Assert.Empty(Unused(routesFile));
         }
@@ -292,7 +292,7 @@ namespace KScript.Language.Tests
         {
             string text = Script("<fn name=\"f\" params=\"a, b, c\"><return value=\"$b\" /></fn>\n<fn name=\"g\" params=\"only\"><return value=\"1\" /></fn>\n"
                 + "<fn name=\"dead\" params=\"z\" value=\"1\" />\n<fn name=\"skip\" params=\"_q\" value=\"1\" />\n"
-                + "<let name=\"h\" value=\"fn($x, $y) => $x\" />\n<let name=\"k\" value=\"fn($x, $y) => $y\" />\n<let name=\"m\" value=\"fn($_x) => 1\" />\n"
+                + "<let name=\"h\" value=\"fn(x, y) => $x\" />\n<let name=\"k\" value=\"fn(x, y) => $y\" />\n<let name=\"m\" value=\"fn(_x) => 1\" />\n"
                 + "<echo>{ @f(1, 2, 3) } { @g(1) } { @skip(1) } { $h(1, 2) } { $k(1, 2) } { $m(1) }</echo>");
             DocumentAnalysis a = Check(text);
             Assert.Equal(new[] { "KS6004:a", "KS6004:c", "KS6004:only", "KS6002:dead", "KS6004:y" }, Unused(a));
@@ -304,7 +304,7 @@ namespace KScript.Language.Tests
             Assert.Contains("<fn name=\"g\">", Fix(a, Find(a, DiagnosticCodes.UnusedParameter, "only"), "Remove"));
             Diagnostic lambda = Find(a, DiagnosticCodes.UnusedParameter, "y");
             Assert.Equal("The lambda parameter $y is never used.", lambda.Message);
-            Assert.Contains("fn($x, $_y) => $x", Fix(a, lambda, "Rename"));
+            Assert.Contains("fn(x, _y) => $x", Fix(a, lambda, "Rename"));
         }
 
         [Fact]
@@ -329,40 +329,40 @@ namespace KScript.Language.Tests
         [Fact]
         public void UnusedScriptImports()
         {
-            DocumentAnalysis alias = Imports("<import src=\"lib.ks.xml\" as=\"lib\" />");
+            DocumentAnalysis alias = Imports("<import path=\"lib.ks.xml\" as=\"lib\" />");
             Diagnostic d = Find(alias, DiagnosticCodes.UnusedImport, "lib");
             Assert.Equal("Nothing imported as lib is used.", d.Message);
             Assert.Equal(Script(string.Empty).Replace("\n\n", "\n"), Fix(alias, d, "Remove the import"));
 
-            DocumentAnalysis aliasAndNames = Imports("<import src=\"lib.ks.xml\" as=\"lib\" names=\"one\" /><echo>{ @one() }</echo>");
-            Assert.Contains("<import src=\"lib.ks.xml\" names=\"one\" />", Fix(aliasAndNames, Find(aliasAndNames, DiagnosticCodes.UnusedImport, "lib"), "Remove as"));
+            DocumentAnalysis aliasAndNames = Imports("<import path=\"lib.ks.xml\" as=\"lib\" names=\"one\" /><echo>{ @one() }</echo>");
+            Assert.Contains("<import path=\"lib.ks.xml\" names=\"one\" />", Fix(aliasAndNames, Find(aliasAndNames, DiagnosticCodes.UnusedImport, "lib"), "Remove as"));
 
-            DocumentAnalysis names = Imports("<import src=\"lib.ks.xml\" names=\"one, two, three\" /><echo>{ @two() }</echo>");
+            DocumentAnalysis names = Imports("<import path=\"lib.ks.xml\" names=\"one, two, three\" /><echo>{ @two() }</echo>");
             Assert.Equal(new[] { "KS6005:one", "KS6005:three" }, Unused(names));
             Assert.Equal("one is imported but never used.", Find(names, DiagnosticCodes.UnusedImport, "one").Message);
             Assert.Contains("names=\"two, three\"", Fix(names, Find(names, DiagnosticCodes.UnusedImport, "one"), "Remove one"));
             Assert.Contains("names=\"one, two\"", Fix(names, Find(names, DiagnosticCodes.UnusedImport, "three"), "Remove three"));
 
-            DocumentAnalysis spaced = Imports("<import src=\"lib.ks.xml\" names=\"one , two\" /><echo>{ @two() }</echo>");
+            DocumentAnalysis spaced = Imports("<import path=\"lib.ks.xml\" names=\"one , two\" /><echo>{ @two() }</echo>");
             Assert.Contains("names=\"two\"", Fix(spaced, Find(spaced, DiagnosticCodes.UnusedImport, "one"), "Remove one"));
 
             // Windows line endings and trailing spaces go with the removed line.
-            DocumentAnalysis crlf = Check("<kscript>\r\n  <import src=\"lib.ks.xml\" as=\"lib\" />  \r\n</kscript>", Path.Combine("i", "main.ks.xml"), Lib());
+            DocumentAnalysis crlf = Check("<kscript>\r\n  <import path=\"lib.ks.xml\" as=\"lib\" />  \r\n</kscript>", Path.Combine("i", "main.ks.xml"), Lib());
             Assert.Equal("<kscript>\r\n</kscript>", Fix(crlf, Find(crlf, DiagnosticCodes.UnusedImport, "lib"), "Remove the import"));
 
-            DocumentAnalysis lone = Imports("<import src=\"lib.ks.xml\" names=\"three\" />");
+            DocumentAnalysis lone = Imports("<import path=\"lib.ks.xml\" names=\"three\" />");
             Assert.DoesNotContain("<import", Fix(lone, Find(lone, DiagnosticCodes.UnusedImport, "three"), "Remove the import"));
 
-            DocumentAnalysis loneWithAlias = Imports("<import src=\"lib.ks.xml\" as=\"lib\" names=\"two\" /><echo>{ @lib.one() }</echo>");
-            Assert.Contains("<import src=\"lib.ks.xml\" as=\"lib\" />", Fix(loneWithAlias, Find(loneWithAlias, DiagnosticCodes.UnusedImport, "two"), "Remove names"));
+            DocumentAnalysis loneWithAlias = Imports("<import path=\"lib.ks.xml\" as=\"lib\" names=\"two\" /><echo>{ @lib.one() }</echo>");
+            Assert.Contains("<import path=\"lib.ks.xml\" as=\"lib\" />", Fix(loneWithAlias, Find(loneWithAlias, DiagnosticCodes.UnusedImport, "two"), "Remove names"));
 
-            DocumentAnalysis all = Imports("<import src=\"lib.ks.xml\" />");
+            DocumentAnalysis all = Imports("<import path=\"lib.ks.xml\" />");
             Assert.Equal("Nothing from lib.ks.xml is used.", Find(all, DiagnosticCodes.UnusedImport, "lib.ks.xml").Message);
 
-            Assert.Empty(Unused(Imports("<import src=\"lib.ks.xml\" names=\"nope\" />")));
-            Assert.Empty(Unused(Imports("<import src=\"missing.ks.xml\" />")));
-            Assert.Empty(Unused(Imports("<import src=\"lib.ks.xml\" /><echo>{ @three() }</echo>")));
-            Assert.Empty(Unused(Imports("<import src=\"lib.ks.xml\" as=\"lib\" /><call fn=\"lib.two\" />")));
+            Assert.Empty(Unused(Imports("<import path=\"lib.ks.xml\" names=\"nope\" />")));
+            Assert.Empty(Unused(Imports("<import path=\"missing.ks.xml\" />")));
+            Assert.Empty(Unused(Imports("<import path=\"lib.ks.xml\" /><echo>{ @three() }</echo>")));
+            Assert.Empty(Unused(Imports("<import path=\"lib.ks.xml\" as=\"lib\" /><call fn=\"lib.two\" />")));
         }
 
         [Fact]
@@ -370,12 +370,12 @@ namespace KScript.Language.Tests
         {
             Assert.Equal("Nothing from KScript.Math is used.", Find(Imports("<import package=\"KScript.Math\" />"), DiagnosticCodes.UnusedImport, "KScript.Math").Message);
             Assert.Equal(new[] { "KS6005:KScript.Math" }, Unused(Imports("<import package=\"KScript.Math\" as=\"m\" />")));
-            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><echo>{ @pow(2, 3) }</echo>")));
+            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><echo>{ @sqrt(4) }</echo>")));
             Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><echo>{ 4->sqrt() }</echo>")));
             Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><echo>{ $pi }</echo>")));
-            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" as=\"m\" /><echo>{ @m.pow(2, 3) }</echo>")));
-            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><call fn=\"pow\" args=\"2, 3\" />")));
-            Assert.Empty(Unused(Imports("<import package=\"KScript.Terminal\" /><input to=\"name\">Name? </input><echo>$name</echo>")));
+            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" as=\"m\" /><echo>{ @m.hypot(3, 4) }</echo>")));
+            Assert.Empty(Unused(Imports("<import package=\"KScript.Math\" /><call fn=\"hypot\" args=\"3, 4\" />")));
+            Assert.Empty(Unused(Imports("<import package=\"KScript.Terminal\" /><input into=\"name\">Name? </input><echo>$name</echo>")));
             Assert.Empty(Unused(Imports("<import package=\"KScript.Core\" /><import package=\"KScript.Nope\" />")));
             Assert.Empty(Unused(Check("<import package=\"KScript.Math\" />", "page.html")));
         }
@@ -450,7 +450,7 @@ namespace KScript.Language.Tests
             files.Add(lib, "<kscript><fn name=\"a\" value=\"1\" /></kscript>");
             for (int i = 0; i < 5; i++)
             {
-                files.Add(Path.Combine(Root, $"use{i}.ks.xml"), "<kscript><import src=\"lib.ks.xml\" names=\"a\" /><echo>{ @a() }</echo></kscript>");
+                files.Add(Path.Combine(Root, $"use{i}.ks.xml"), "<kscript><import path=\"lib.ks.xml\" names=\"a\" /><echo>{ @a() }</echo></kscript>");
             }
 
             int maxFiles = ProjectUsage.MaxFiles;

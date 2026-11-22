@@ -50,7 +50,7 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("enum Color { red, green }\nc: Color = red\necho $c")]
-        [InlineData("h: handle = @Joan\necho $h->name()")]
+        [InlineData("h: handle = @Joan\necho $h.name")]
         [InlineData("type Size {\n  pattern: /^(?<w>\\d+)x(?<h>\\d+)$/\n  w: int\n  h: int\n}\ns: Size = 3x4\necho $s.w")]
         [InlineData("type Slug with [string] { pattern: /^[a-z]+$/; normalize: $value->lower() }\ns: Slug = A1\necho $s")]
         [InlineData("type Slug with [string] { pattern: /^[a-z]+$/ }\ns: Slug = 3\necho $s")]
@@ -60,14 +60,14 @@ namespace KScript.Language.Tests
         [InlineData("type Age with [int] { min: 0 }\na: Age = 'x'\necho $a")]
         [InlineData("type Age with [int] { min: 0 }\nfn f(a: Age = 5) => $a\necho @f()")]
         [InlineData("type Who with [handle] {}\nfn f(h: Who = @me) => $h\necho @f()")]
-        [InlineData("fn who(h: handle) => $h->name()\necho @who(@Sam)\necho @who(h: @Ann)")]
+        [InlineData("fn who(h: handle) => $h.name\necho @who(@Sam)\necho @who(h: @Ann)")]
         [InlineData("h: handle = @a\nok = $h == @a\nno = @b != $h\necho \"$ok $no\"")]
-        [InlineData("u: uuid = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\necho $u->version()")]
-        [InlineData("e = joan@example.com\necho $e->domain()\necho $e->upper()")]
+        [InlineData("u: uuid = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\necho $u.version")]
+        [InlineData("e = joan@example.com\necho $e.domain\necho $e->upper()")]
         [InlineData("r = /ab+/i\necho $r->test('abb')")]
-        [InlineData("type User { name: string; fn hi(to: string = 'you') => 'hi ' + $to }\nu = $User->from({ name: 'x' })\necho $u->hi()\necho $u->hi('me')\necho $u->hi(to: 'me')")]
+        [InlineData("type User { name: string; fn hi(to: string = 'you') => 'hi ' + $to }\nu = User({ name: 'x' })\necho $u->hi()\necho $u->hi('me')\necho $u->hi(to: 'me')")]
         [InlineData("type Slug with [string] { pattern: 'a+' }\ns: Slug = aa\necho $s")]
-        [InlineData("type A { a: int }\ntype B with [A] { b: int }\nx = $B->from({ a: 1, b: 2 })\necho $x.a")]
+        [InlineData("type A { a: int }\ntype B with [A] { b: int }\nx = B({ a: 1, b: 2 })\necho $x.a")]
         [InlineData("<kscript><let name=\"h\" type=\"handle\" value=\"@me\" /><echo>$h</echo></kscript>")]
         [InlineData("<kscript><let name=\"h\" type=\"handle\">@me</let><echo>$h</echo></kscript>")]
         [InlineData("<kscript><type name=\"Who\" with=\"[handle]\" max=\"5\" /><let name=\"h\" type=\"Who?\" value=\"@me\" /><echo>$h</echo></kscript>")]
@@ -76,10 +76,10 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("x = @nobody", "KS5001")]
-        [InlineData("fn who(h: handle, n: int) => $h->name()\necho @who(@Sam, @nobody)", "KS5001")]
-        [InlineData("type User { name: string; fn hi() => 'hi' }\nu = $User->from({ name: 'x' })\necho $u->nope()", "KS5003")]
-        [InlineData("type User { name: string; fn hi() => 'hi' }\nu = $User->from({ name: 'x' })\necho $u->hi(1, 2)", "KS5004")]
-        [InlineData("type User { name: string; fn hi(a: int) => 'hi' }\nu = $User->from({ name: 'x' })\necho $u->hi(b: 1)", null)]
+        [InlineData("fn who(h: handle, n: int) => $h.name\necho @who(@Sam, @nobody)", "KS5001")]
+        [InlineData("type User { name: string; fn hi() => 'hi' }\nu = User({ name: 'x' })\necho $u->nope()", "KS5003")]
+        [InlineData("type User { name: string; fn hi() => 'hi' }\nu = User({ name: 'x' })\necho $u->hi(1, 2)", "KS5004")]
+        [InlineData("type User { name: string; fn hi(a: int) => 'hi' }\nu = User({ name: 'x' })\necho $u->hi(b: 1)", null)]
         [InlineData("r = /ab+/i\necho $r->nope()", "KS5003")]
         [InlineData("type C with [Nope] {}", "KS3006")]
         public void MistakesAroundTypesAreReported(string code, string expected)
@@ -114,7 +114,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("type Username with [handle] {\n  max: 16\n  not: [@admin, @root]\n  validate: not $value->name()->starts_with('_'), 'A username cannot start with _'\n}")]
+        [InlineData("type Username with [handle] {\n  max: 16\n  not: [@admin, @root]\n  validate: not $value.name->starts_with('_'), 'A username cannot start with _'\n}")]
         [InlineData("type Age with [int] { min: 0; max: 150 }")]
         [InlineData("type Admin with [User, Auditable] {\n  level: int = 1\n  fn up(by: int = 1) => $level + $by\n}")]
         [InlineData("type Slug with [string] {\n  pattern: /^[a-z0-9]+(-[a-z0-9]+)*$/\n  normalize: $value->trim()->lower()\n}")]
@@ -148,13 +148,13 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("type User { a: int }\ntype A with User {\n  b: int\n}\nx = $A->from({ a: 1, b: 2 })\necho $x.a")]
+        [InlineData("type User { a: int }\ntype A with User {\n  b: int\n}\nx = A({ a: 1, b: 2 })\necho $x.a")]
         [InlineData("type T {\n  min\n  max: int(\n}")]
         [InlineData("msg = 'too small'\ntype A with [int] {\n  validate: $value > 0, $msg\n}\nx: A = 3\necho $x")]
         [InlineData("x = (//c\n  1)\necho $x")]
         [InlineData("x = 1 +\n  /* c */\n  2\necho $x")]
         [InlineData("x = /* c */\n  2\necho $x")]
-        [InlineData("type User { a: int }\ntype A with [User, 'it\\'s'] {}")]
+        [InlineData("type User { a: int }\ntype A with [User, 'its'] {}")]
         public void TypeBodiesParse(string code)
         {
             MarkupDocument doc = CodeParser.Parse(code);
@@ -163,7 +163,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("<kscript><type name=\"A\" fields=\"a: int\"><fn name=\"hi\" value=\"'x'\" /></type><type name=\"B\" with=\"A\" /><let name=\"b\" value=\"$B->from({ a: 1 })\" /><echo>{ $b->hi() }</echo></kscript>", null)]
+        [InlineData("<kscript><type name=\"A\" fields=\"a: int\"><fn name=\"hi\" value=\"'x'\" /></type><type name=\"B\" with=\"A\" /><let name=\"b\" value=\"B({ a: 1 })\" /><echo>{ $b->hi() }</echo></kscript>", null)]
         [InlineData("<kscript><type name=\"T\" fields=\"a: int\"><fn value=\"1\" /></type></kscript>", "needs the 'name' attribute")]
         [InlineData("<kscript><type name=\"A\" with=\"int\"><field name=\"x\" /></type></kscript>", "A refines int, so it has no fields.")]
         [InlineData("<kscript><type name=\"P\" fields=\"a: string\" parse=\"{ a: $value + $match.text }\" /></kscript>", null)]

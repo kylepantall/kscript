@@ -135,13 +135,13 @@ namespace KScript.Language.Tests
         [Fact]
         public void StartTagsTheAuthorWrappedStayWrapped()
         {
-            string input = "<kscript>\n<test name=\"a\"\n    each=\"c\" in=\"$cases\">\n<echo>x</echo>\n</test>\n</kscript>\n";
+            string input = "<kscript>\n<test name=\"a\"\n    skip=\"c\" timeout=\"$cases\">\n<echo>x</echo>\n</test>\n</kscript>\n";
             Assert.Equal(Lines(
                 "<kscript>",
                 "  <test",
                 "    name=\"a\"",
-                "    each=\"c\"",
-                "    in=\"$cases\">",
+                "    skip=\"c\"",
+                "    timeout=\"$cases\">",
                 "    <echo>x</echo>",
                 "  </test>",
                 "</kscript>"), Fmt(input));
@@ -150,11 +150,11 @@ namespace KScript.Language.Tests
         [Fact]
         public void MultiLineAttributeValuesAreNotTouched()
         {
-            string input = "<kscript>\n<let name=\"names\" value=\"$people\n      |> map(fn($p) => $p.name)\n      |> join(', ')\" />\n</kscript>\n";
+            string input = "<kscript>\n<let name=\"names\" value=\"$people\n      |> map(fn(p) => $p.name)\n      |> join(', ')\" />\n</kscript>\n";
             Assert.Equal(Lines(
                 "<kscript>",
                 "  <let name=\"names\" value=\"$people",
-                "      |> map(fn($p) => $p.name)",
+                "      |> map(fn(p) => $p.name)",
                 "      |> join(', ')\" />",
                 "</kscript>"), Fmt(input));
         }
@@ -299,12 +299,12 @@ namespace KScript.Language.Tests
         public void WrapAttributesOffKeepsTagsAsWritten()
         {
             string value = new string('a', 120);
-            string input = $"<kscript>\n<let name=\"x\" value=\"'{value}'\" />\n<test name=\"a\"\n   each=\"c\" in=\"$cases\" />\n</kscript>\n";
+            string input = $"<kscript>\n<let name=\"x\" value=\"'{value}'\" />\n<test name=\"a\"\n   skip=\"c\" timeout=\"$cases\" />\n</kscript>\n";
             Assert.Equal(Lines(
                 "<kscript>",
                 $"  <let name=\"x\" value=\"'{value}'\" />",
                 "  <test name=\"a\"",
-                "   each=\"c\" in=\"$cases\" />",
+                "   skip=\"c\" timeout=\"$cases\" />",
                 "</kscript>"), Fmt(input, options: new FormatOptions { WrapAttributes = false }));
         }
 
@@ -376,9 +376,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void KScriptControlElementsInPagesAreIndented()
         {
-            string input = "<layout src=\"_layout.html\" title=\"Home\">\n<ul>\n<for each=\"p\" in=\"$people\">\n<li>{$p.name}</li>\n</for>\n</ul>\n</layout>\n";
+            string input = "<layout path=\"_layout.html\" title=\"Home\">\n<ul>\n<for each=\"p\" in=\"$people\">\n<li>{$p.name}</li>\n</for>\n</ul>\n</layout>\n";
             Assert.Equal(Lines(
-                "<layout src=\"_layout.html\" title=\"Home\">",
+                "<layout path=\"_layout.html\" title=\"Home\">",
                 "  <ul>",
                 "    <for each=\"p\" in=\"$people\">",
                 "      <li>{$p.name}</li>",
@@ -638,7 +638,7 @@ namespace KScript.Language.Tests
         public void FormatSettingsAreRead()
         {
             ProjectConfig config = ProjectConfig.Parse(
-                "{ \"format\": { \"indent\": \"tab\", \"tabWidth\": 4, \"printWidth\": 80, \"maxBlankLines\": 2, \"endOfLine\": \"crlf\", \"preserve\": [\"echo\"], \"nope\": 1 } }",
+                "{ \"format\": { \"indent\": \"tab\", \"tab_width\": 4, \"print_width\": 80, \"max_blank_lines\": 2, \"end_of_line\": \"crlf\", \"preserve\": [\"echo\"], \"nope\": 1 } }",
                 Path.Combine(dir, "kscript.json"));
             FormatOptions options = FormatOptions.From(config, editorTabSize: 8, editorInsertSpaces: true);
             Assert.True(options.UseTabs);
@@ -650,7 +650,7 @@ namespace KScript.Language.Tests
             Assert.Contains(config.Warnings, w => w.Contains("format.nope"));
 
             ProjectConfig rules = ProjectConfig.Parse(
-                "{ \"format\": { \"enabled\": false, \"rules\": { \"statementPerLine\": false, \"tidytags\": \"off\", \"bogus\": false, \"indent\": 3 } } }",
+                "{ \"format\": { \"enabled\": false, \"rules\": { \"statement_per_line\": false, \"TIDY_TAGS\": \"off\", \"bogus\": false, \"indent\": 3 } } }",
                 Path.Combine(dir, "kscript.json"));
             Assert.False(rules.Format.Enabled);
             FormatOptions ruled = FormatOptions.From(rules);
@@ -661,7 +661,7 @@ namespace KScript.Language.Tests
             Assert.Contains(rules.Warnings, w => w.Contains("format.rules.indent should be true or false"));
 
             ProjectConfig off = ProjectConfig.Parse(
-                "{ \"format\": { \"endOfLine\": \"lf\", \"rules\": { \"indent\": false, \"wrapAttributes\": \"off\", \"trimTrailingWhitespace\": false, \"collapseBlankLines\": false, \"finalNewline\": false } } }",
+                "{ \"format\": { \"end_of_line\": \"lf\", \"rules\": { \"indent\": false, \"wrap_attributes\": \"off\", \"trim_trailing_whitespace\": false, \"collapse_blank_lines\": false, \"final_newline\": false } } }",
                 Path.Combine(dir, "kscript.json"));
             FormatOptions allOff = FormatOptions.From(off);
             Assert.Equal(EndOfLine.Lf, allOff.EndOfLine);
@@ -696,13 +696,16 @@ namespace KScript.Language.Tests
             Assert.Matches(@"notes\.md \.+ Markdown pages are not reformatted SKIPPED", Run(md).Output);
 
             Write("_templates/t.ks.xml", Messy);
-            string xml = Write("plain.xml", Messy);
+            string xml = Write("plain.ks.xml", Messy);
+            // A plain .xml file is not a script, whatever it holds.
+            string other = Write("legacy.xml", Messy);
             Write("data.xml", "<data />");
             File.CreateSymbolicLink(Path.Combine(dir, "gone.xml"), Path.Combine(dir, "nowhere.xml"));
             (int code, string output) = Run(dir);
             Assert.Equal(0, code);
             Assert.Contains("1 file checked: 1 formatted.", output);
             Assert.Equal(Tidy, File.ReadAllText(xml));
+            Assert.Equal(Messy, File.ReadAllText(other));
         }
 
         [Fact]

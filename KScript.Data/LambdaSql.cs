@@ -4,7 +4,7 @@ using KScript.Syntax;
 namespace KScript.Data
 {
     /// <summary>
-    /// Turns a query lambda, <c>fn($u) => $u.age >= 18 and $u.email->ends_with('@acme.com')</c>, into a SQL condition.
+    /// Turns a query lambda, <c>fn(u) => $u.age >= 18 and $u.email->ends_with('@acme.com')</c>, into a SQL condition.
     /// The lambda's parameter is the row: <c>$u.age</c> is a column. Every part that doesn't use the row (variables,
     /// calls, literals) is worked out once, as KScript, and sent as a parameter. Anything that can't be SQL is an error
     /// that says why, rather than a query that quietly does something else.
@@ -46,14 +46,14 @@ namespace KScript.Data
         public static SqlExpr Compile(ICallable fn, ModelInfo model, Interpreter interpreter, string method)
         {
             if (fn is not Lambda lambda)
-                throw new KScriptException($"->{method}() needs a condition written as a lambda, such as fn($u) => $u.age >= 18, so it can run in the database. A function declared with fn name() can't be turned into SQL.", "Argument");
+                throw new KScriptException($"->{method}() needs a condition written as a lambda, such as fn(u) => $u.age >= 18, so it can run in the database. A function declared with fn name() can't be turned into SQL.", "Argument");
             if (lambda.Node.Parameters.Count != 1)
-                throw new KScriptException($"The condition in ->{method}() takes one parameter, the row: fn($u) => $u.active.", "Argument");
+                throw new KScriptException($"The condition in ->{method}() takes one parameter, the row: fn(u) => $u.active.", "Argument");
             return new LambdaSql(lambda, model, interpreter).Condition(lambda.Node.Body);
         }
 
         private KScriptException Cannot(ExprNode node, string why) =>
-            new KScriptException($"The condition {Text(node)} can't run in the database: {why}", "QueryError");
+            new KScriptException($"The condition {Text(node)} can't run in the database: {why}", "Query");
 
         /// <summary>The part of the lambda as written, such as '$u.name->reverse()'.</summary>
         private string Text(ExprNode node)
@@ -95,7 +95,7 @@ namespace KScript.Data
                 case MemberNode m when Ref(m.Target) is RowRef outer && outer.Model?.Relation(m.Name) is Relation rel:
                 {
                     if (rel.ToMany)
-                        throw Cannot(m, $"{outer.Text}.{m.Name} is a list of {rel.Target.Name} records. Use ->any(), ->count() or ->all() on it, such as {outer.Text}.{m.Name}->any(fn($x) => ...).");
+                        throw Cannot(m, $"{outer.Text}.{m.Name} is a list of {rel.Target.Name} records. Use ->any(), ->count() or ->all() on it, such as {outer.Text}.{m.Name}->any(fn(x) => ...).");
                     string alias = NextAlias();
                     string from = outer.Table ?? outer.Model.Table;
                     return new RowRef(rel.Target, alias,
@@ -124,7 +124,7 @@ namespace KScript.Data
                     {
                         if (rel.Kind == RelationKind.BelongsTo) return owner.Wrap(Column(owner, rel.ForeignKey, m), owner.Model.Column(rel.ForeignKey));
                         throw Cannot(m, rel.ToMany
-                            ? $"{owner.Text}.{m.Name} is a list of {rel.Target.Name} records. Use ->any(), ->count() or ->all() on it, such as {owner.Text}.{m.Name}->any(fn($x) => ...)."
+                            ? $"{owner.Text}.{m.Name} is a list of {rel.Target.Name} records. Use ->any(), ->count() or ->all() on it, such as {owner.Text}.{m.Name}->any(fn(x) => ...)."
                             : $"{owner.Text}.{m.Name} is a {rel.Target.Name} record. Read one of its fields, such as {owner.Text}.{m.Name}.{rel.Target.Key}, or compare it with null.");
                     }
                     SqlColumn c = Column(owner, m.Name, m);
@@ -204,7 +204,7 @@ namespace KScript.Data
                 return true;
             }
             if (rel.Kind != RelationKind.BelongsTo)
-                throw Cannot(b, $"{owner.Text}.{m.Name} {rel.Describe()}: compare one of its fields instead, such as {owner.Text}.{m.Name}->any(fn($x) => $x.{rel.Target.Key} == ...).");
+                throw Cannot(b, $"{owner.Text}.{m.Name} {rel.Describe()}: compare one of its fields instead, such as {owner.Text}.{m.Name}->any(fn(x) => $x.{rel.Target.Key} == ...).");
             object value = Evaluate(other);
             object key = value is Record r ? ModelInfo.KeyOfTarget(rel, r) : value;
             Column fk = owner.Model.Column(rel.ForeignKey);
@@ -213,8 +213,8 @@ namespace KScript.Data
         }
 
         /// <summary>
-        /// A method on a relation that is a list: <c>$u.posts->count()</c>, <c>->any(fn($p) => ...)</c>,
-        /// <c>->all(fn($p) => ...)</c>, <c>->sum(fn($p) => $p.views)</c>. The lambda inside runs in the subquery, and
+        /// A method on a relation that is a list: <c>$u.posts->count()</c>, <c>->any(fn(p) => ...)</c>,
+        /// <c>->all(fn(p) => ...)</c>, <c>->sum(fn(p) => $p.views)</c>. The lambda inside runs in the subquery, and
         /// can read the outer rows too.
         /// </summary>
         private bool TryRelationMethod(MethodCallNode call, out SqlExpr result)
@@ -230,7 +230,7 @@ namespace KScript.Data
                 if (call.Arguments.Count <= index) return null;
                 ExprNode arg = call.Arguments[index].Value;
                 if (arg is not LambdaNode)
-                    throw Cannot(call, $"->{call.Name}() on {text} takes a lambda on one {rel.Target.Name}, such as fn($x) => $x.{rel.Target.Key} > 1.");
+                    throw Cannot(call, $"->{call.Name}() on {text} takes a lambda on one {rel.Target.Name}, such as fn(x) => $x.{rel.Target.Key} > 1.");
                 var fn = (Lambda)Evaluate(arg);
                 if (fn.Node.Parameters.Count != 1) throw Cannot(call, $"the lambda in ->{call.Name}() takes one parameter, a {rel.Target.Name}.");
                 var inner = new LambdaSql(fn, rel.Target, interpreter, this, alias);
@@ -243,13 +243,11 @@ namespace KScript.Data
             switch (call.Name)
             {
                 case "count":
-                case "length":
                     Most(1);
                     result = owner.Wrap(rel.Subquery(Call, from, alias, "COUNT(*)", condition: Inner(0, true)), null);
                     return true;
                 case "any":
                 case "is_empty":
-                case "none":
                 {
                     Most(call.Name == "is_empty" ? 0 : 1);
                     SqlExpr exists = new SqlUnary("EXISTS", rel.Subquery(Call, from, alias, "1", condition: Inner(0, true)));
@@ -259,24 +257,24 @@ namespace KScript.Data
                 case "all":
                 {
                     Most(1);
-                    SqlExpr test = Inner(0, true) ?? throw Cannot(call, $"->all() on {text} needs a lambda: fn($x) => $x.published.");
+                    SqlExpr test = Inner(0, true) ?? throw Cannot(call, $"->all() on {text} needs a lambda: fn(x) => $x.published.");
                     result = owner.Wrap(new SqlUnary("NOT", new SqlUnary("EXISTS", rel.Subquery(Call, from, alias, "1", condition: new SqlUnary("NOT", test)))), null);
                     return true;
                 }
                 case "sum":
-                case "avg":
+                case "average":
                 case "min":
                 case "max":
                 {
                     Most(1);
-                    SqlExpr value = Inner(0, false) ?? throw Cannot(call, $"->{call.Name}() on {text} needs a lambda that picks the value: fn($x) => $x.total.");
-                    SqlExpr aggregate = new SqlCall(call.Name.ToUpperInvariant(), value);
+                    SqlExpr value = Inner(0, false) ?? throw Cannot(call, $"->{call.Name}() on {text} needs a lambda that picks the value: fn(x) => $x.total.");
+                    SqlExpr aggregate = new SqlCall(call.Name == "average" ? "AVG" : call.Name.ToUpperInvariant(), value);
                     if (call.Name == "sum") aggregate = new SqlCall("COALESCE", aggregate, new SqlValue(0.0));
                     result = owner.Wrap(rel.Subquery(Call, from, alias, null, selectExpr: aggregate), null);
                     return true;
                 }
                 default:
-                    throw Cannot(call, $"->{call.Name}() on a relation has no SQL form. Use ->count(), ->any(), ->is_empty(), ->all(), ->sum(), ->avg(), ->min() or ->max().");
+                    throw Cannot(call, $"->{call.Name}() on a relation has no SQL form. Use ->count(), ->any(), ->is_empty(), ->all(), ->sum(), ->average(), ->min() or ->max().");
             }
         }
 
@@ -387,9 +385,11 @@ namespace KScript.Data
                 case "lower":
                 case "upper":
                 case "trim":
-                case "length":
                     Count(0);
                     return new SqlCall(call.Name.ToUpperInvariant(), target);
+                case "count":
+                    Count(0);
+                    return new SqlCall("LENGTH", target);
                 case "matches":
                 case "test":
                 {
@@ -398,7 +398,7 @@ namespace KScript.Data
                     return new SqlMatch(target, regex);
                 }
                 default:
-                    throw Cannot(call, $"->{call.Name}() has no SQL form. Use ->contains(), ->starts_with(), ->ends_with(), ->lower(), ->upper(), ->trim(), ->length() or ->matches().");
+                    throw Cannot(call, $"->{call.Name}() has no SQL form. Use ->contains(), ->starts_with(), ->ends_with(), ->lower(), ->upper(), ->trim(), ->count() or ->matches().");
             }
         }
 

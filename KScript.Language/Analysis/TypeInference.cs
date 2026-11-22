@@ -8,7 +8,7 @@ namespace KScript.Language.Analysis
     /// <summary>Works out the shape of an expression's value from the source (literals, declarations, return types).</summary>
     public sealed class TypeInference
     {
-        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "where", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip" };
+        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip" };
         private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "max_by", "min_by", "pop" };
 
         private readonly LanguageCatalog catalog;
@@ -41,6 +41,7 @@ namespace KScript.Language.Analysis
                         LiteralKind.Email => KType.Email,
                         LiteralKind.Uuid => KType.Uuid,
                         LiteralKind.Url => "url",
+                        LiteralKind.Duration => "duration",
                         _ => KType.Null,
                     });
 
@@ -103,10 +104,28 @@ namespace KScript.Language.Analysis
                 case IdentifierNode id when ErrorTypeNamed(id, region) is TypeShape errorType:
                     return errorType;
 
+                case CallNode call when call.Callee is IdentifierNode typeName && TypeSymbolNamed(typeName, region) is Symbol made:
+                {
+                    // Repo($data) makes a record (a list of them from a list); Size('small') and Age(7) check a value.
+                    if (made.EnumValues != null) return new TypeShape(KType.String);
+                    TypeShape instance = made.Shape.Instance;
+                    if (instance == null) return TypeShape.Unknown;
+                    ArgumentNode first = call.Arguments.FirstOrDefault(a => a.Name == null);
+                    return first != null && Infer(first.Value, region).Type == KType.List && instance.Type == KType.Map ? new TypeShape(KType.List) { Element = instance } : instance;
+                }
+
+                case IdentifierNode id when TypeSymbolNamed(id, region) is Symbol named:
+                    // A declared type is named bare: Repo->check($data), User->find(1), Size.small.
+                    return named.Shape;
+
                 case MemberNode member:
                 {
                     TypeShape target = Infer(member.Target, region);
-                    return target.Fields.TryGetValue(member.Name, out FieldInfo f) ? f.Shape : TypeShape.Unknown;
+                    if (target.Fields.TryGetValue(member.Name, out FieldInfo f)) return f.Shape;
+                    // A field the value's type has: $response.status, $date.year.
+                    return (catalog.GetField(target.Kind, member.Name) ?? catalog.GetField(target.Type, member.Name)) is ValueFieldInfo builtIn && builtIn.Type is not (null or KType.Any)
+                        ? new TypeShape(builtIn.Type) { Declared = true }
+                        : TypeShape.Unknown;
                 }
 
                 case IndexNode index:
@@ -164,16 +183,11 @@ namespace KScript.Language.Analysis
                 case MethodCallNode m:
                 {
                     TypeShape receiver = Infer(m.Target, region);
-                    // ->map(fn($p) => $p.name) is a list of whatever the lambda returns.
+                    // ->map(fn(p) => $p.name) is a list of whatever the lambda returns.
                     if (receiver.Type == KType.List && m.Name == "map" && m.Arguments.Count == 1 && m.Arguments[0].Value is LambdaNode lambda)
                     {
                         TypeShape item = Infer(lambda.Body, region);
                         return item.Type == KType.Any ? new TypeShape(KType.List) : new TypeShape(KType.List) { Element = item };
-                    }
-                    if (receiver.Type == KType.Type && receiver.Instance != null && m.Name == "from")
-                    {
-                        TypeShape data = m.Arguments.Count > 0 ? Infer(m.Arguments[0].Value, region) : TypeShape.Unknown;
-                        return data.Type == KType.List ? new TypeShape(KType.List) { Element = receiver.Instance } : receiver.Instance;
                     }
                     if (m.Name == "json" && MappedShape(catalog.GetMethods("json", receiver.Type).FirstOrDefault(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)), m.Arguments, 0, null, region) is TypeShape asType)
                     {
@@ -188,7 +202,16 @@ namespace KScript.Language.Analysis
                     switch (pipe.Right)
                     {
                         case CallNode call when call.Callee is IdentifierNode id:
-                            return FunctionNamed(id.Name) is Symbol piped ? piped.ReturnShape : InferMethod(id.Name, left, call.Arguments.Count);
+                            if (FunctionNamed(id.Name) is Symbol piped)
+                            {
+                                return piped.ReturnShape;
+                            }
+                            // $text |> json(as: Repo) gives records, as $text->json(as: Repo) does.
+                            if (id.Name == "json" && MappedShape(catalog.GetMethods("json", left.Type).FirstOrDefault(x => KType.AcceptsMethod(x.ReceiverType, x.Name, left.Type)), call.Arguments, 0, null, region) is TypeShape asPiped)
+                            {
+                                return asPiped;
+                            }
+                            return InferMethod(id.Name, left, call.Arguments.Count);
                         case CommandCallNode command:
                             return Infer(command, region);
                         default:
@@ -244,6 +267,18 @@ namespace KScript.Language.Analysis
                 default:
                     return TypeShape.Unknown;
             }
+        }
+
+        /// <summary>True for a symbol that is a declared type: a type, model, enum, error type or job.</summary>
+        internal static bool IsTypeSymbol(Symbol symbol) =>
+            symbol != null && (symbol.EnumValues != null || symbol.Shape?.Type is KType.Type or KType.ErrorType or KType.JobType);
+
+        /// <summary>The type, model or enum a bare name means here (or null). Errors and jobs have their own rules.</summary>
+        private Symbol TypeSymbolNamed(IdentifierNode id, ExpressionRegion region)
+        {
+            int offset = region.Source.ToSource(id.Span.Start);
+            Symbol symbol = result.RootScope.Innermost(offset).Lookup(id.Name, offset);
+            return symbol != null && (symbol.EnumValues != null || symbol.Shape?.Type is KType.Type or KType.JobType) ? symbol : null;
         }
 
         /// <summary>The job type a name means here: a declared job (or null).</summary>
@@ -382,13 +417,13 @@ namespace KScript.Language.Analysis
 
         /// <summary>
         /// The type whose methods a value uses for <paramref name="name"/>: a model's or record's own (KScript.Data's
-        /// <c>$User->where()</c>, <c>$user->save()</c>) when it has that method, otherwise its plain type's.
+        /// <c>User->where()</c>, <c>$user->save()</c>) when it has that method, otherwise its plain type's.
         /// </summary>
         internal string ReceiverType(string name, TypeShape receiver) =>
             receiver.Kind != null && catalog.GetMethods(name, receiver.Kind).Any(m => m.ReceiverType == receiver.Kind) ? receiver.Kind : receiver.Type;
 
         /// <summary>
-        /// What a KScript.Data method gives, in terms of the model's records: a query on $User is a query of Users,
+        /// What a KScript.Data method gives, in terms of the model's records: a query on User is a query of Users,
         /// ->get() a list of them, and ->first() one.
         /// </summary>
         private static TypeShape ModelResult(CallableInfo method, TypeShape receiver)
@@ -433,7 +468,7 @@ namespace KScript.Language.Analysis
             return new TypeShape(method.ReturnType);
         }
 
-        /// <summary>A model's scope called on the model or one of its queries: <c>$User->admins()</c>, <c>$q->admins()</c>.</summary>
+        /// <summary>A model's scope called on the model or one of its queries: <c>User->admins()</c>, <c>$q->admins()</c>.</summary>
         internal static Symbol ScopeOf(TypeShape receiver, string name) =>
             (receiver.Kind == KType.Model || receiver.Type == KType.Query) && receiver.Instance != null && receiver.Instance.Scopes.TryGetValue(name, out Symbol scope) ? scope : null;
 

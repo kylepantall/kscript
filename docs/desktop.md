@@ -1,38 +1,40 @@
 # Desktop apps: KScript.UI
 
-A script made of a `KScript.Window { }` block (`<KScript.Window>` in XML) opens a native window on macOS, Windows or Linux. There is nothing else to write: no Swift, C#, XAML or shell scripts.
+A script that imports KScript.UI and holds a `Window { }` block (`<KScript.Window>` in XML) opens a native window on macOS, Windows or Linux. There is nothing else to write: no Swift, C#, XAML or shell scripts.
 
 ```kscript
-KScript.Window(title: Counter, width: 320, height: 200) {
+import KScript.UI
+
+Window(title: "Counter", width: 320, height: 200) {
   count = 0
 
   Text(size: 32) "{$count}"
   Row {
-    Button(variant: primary, on-click: count += 1) "Add one"
-    Button(on-click: count = 0, disabled: $count eq 0) "Reset"
+    Button(variant: primary, on_click: count += 1) "Add one"
+    Button(on_click: count = 0, disabled: $count == 0) "Reset"
   }
 }
 ```
 
 `kscript counter.kscript` opens it, and the script ends when the window is closed. It works like a `<live>` block on a page:
 
-- Variables, `fn` functions and `import`s directly inside `KScript.Window` run once and hold the window's state.
-- Everything else is the layout. After every `on-click`, `on-change`, `on-enter` or `on-tick`, the layout is drawn again from the variables. `if`, `for` and `{ }` work as they do anywhere else. Controls stay the same object from one draw to the next, so typing and focus aren't lost.
-- `bind: name` ties a `TextBox`, `CheckBox`, `Select` or `Slider` to a state variable. `$event.value` holds the new value in `on-change`.
-- `Timer(every: 100, when: $playing, on-tick: …)` runs on a timer while `when` is true.
+- `import KScript.UI` goes at the top of the file with the other imports. Variables and `fn` functions directly inside `Window` run once and hold the window's state.
+- Everything else is the layout. After every `on_click`, `on_change`, `on_enter` or `on_tick`, the layout is drawn again from the variables. `if`, `for` and `{ }` work as they do anywhere else. Controls stay the same object from one draw to the next, so typing and focus aren't lost.
+- `bind: name` ties a `TextBox`, `CheckBox`, `Select` or `Slider` to a state variable. `$event.value` holds the new value in `on_change`.
+- `Timer(every: 100ms, when: $playing, on_tick: …)` runs on a timer while `when` is true.
 - If a handler fails, the error is shown at the top of the window and the window carries on.
-- `KScript.Window` can also go in the middle of a script. The script waits while the window is open, then carries on with the window's changes.
+- `Window` can also go in the middle of a script. The script waits while the window is open, then carries on with the window's changes.
 
 | Element | What it is |
 | --- | --- |
 | `Column(gap, align, scroll)`, `Row(gap, align, wrap)`, `Grid(columns, gap)` | Layout: top to bottom, side by side, or equal columns. |
 | `Text(size, weight, color, wrap)` | Text. |
-| `Button(on-click, variant: primary, disabled)` | A button. |
-| `TextBox(bind, placeholder, on-enter, multiline)`, `CheckBox(bind)`, `Select(bind, options)`, `Slider(bind, min, max, step)` | Inputs, each tied to a variable. `options` is a list, a list of `{ label, value }` maps, or a map from label to value. |
-| `Box(on-click, border)` | A rectangle: a cell, a card or a panel. It can hold other elements. |
-| `Spacer(size)`, `Timer(every, when, on-tick)` | Space, and a timer. |
+| `Button(on_click, variant: primary, disabled)` | A button. |
+| `TextBox(bind, placeholder, on_enter, multiline)`, `CheckBox(bind)`, `Select(bind, options)`, `Slider(bind, min, max, step)` | Inputs, each tied to a variable. `options` is a list, a list of `{ label, value }` maps, or a map from label to value. |
+| `Box(on_click, border)` | A rectangle: a cell, a card or a panel. It can hold other elements. |
+| `Spacer(size)`, `Timer(every, when, on_tick)` | Space, and a timer. |
 
-Every element takes `width`, `height`, `padding`, `margin`, `background`, `radius` and `tooltip`. Colours are names such as `teal` or `#rrggbb`. `KScript.Window` takes `title`, `width`, `height`, `theme` (`dark`, `light` or `system`), `background`, `padding`, `gap` and `resizable`.
+Every element takes `width`, `height`, `padding`, `margin`, `background`, `radius` and `tooltip`. Colours are names such as `teal` or `#rrggbb`. `Window` takes `title`, `width`, `height`, `theme` (`dark`, `light` or `system`), `background`, `padding`, `gap` and `resizable`.
 
 ## Building the app: kscript compile
 

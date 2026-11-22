@@ -324,7 +324,7 @@ namespace KScript.Language.Analysis
                 // names="a, b" declares each name where it is written; a bare import brings every export in at src.
                 List<Symbol> named = brought.Where(s => result.References.Any(r => r.IsDeclaration && r.Symbol == s)).ToList();
                 List<Symbol> all = brought.Except(named).ToList();
-                string src = e.GetAttributeValue("src")?.Trim();
+                string src = e.GetAttributeValue("path")?.Trim();
 
                 bool aliasUnused = alias != null && alias.Shape.Fields.Count > 0 && !uses[alias].Any();
                 List<Symbol> unusedNames = named.Where(s => !Used(s) && !result.Diagnostics.Any(d => d.Span.Equals(s.DeclarationSpan) && d.Code == DiagnosticCodes.UndefinedFunction)).ToList();
@@ -333,7 +333,7 @@ namespace KScript.Language.Analysis
                 if (aliasUnused)
                 {
                     Report(alias.DeclarationSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnusedImport, $"Nothing imported as {alias.Name} is used.",
-                        new[] { nothingUsed ? RemoveElementFix(e, "Remove the import") : RemoveAttributeFix(e.GetAttribute("as"), "Remove as=\"" + alias.Name + "\"") });
+                        new[] { nothingUsed ? RemoveElementFix(e, "Remove the import") : RemoveAttributeFix(e.GetAttribute("as"), IsCode ? $"Remove as {alias.Name}" : $"Remove as=\"{alias.Name}\"") });
                 }
                 foreach (Symbol s in unusedNames)
                 {
@@ -341,7 +341,7 @@ namespace KScript.Language.Analysis
                     fix ??= nothingUsed ? RemoveElementFix(e, "Remove the import") : RemoveAttributeFix(e.GetAttribute("names"), $"Remove names=\"{s.Name}\"");
                     Report(s.DeclarationSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnusedImport, $"{s.Name} is imported but never used.", new[] { fix });
                 }
-                if (alias == null && named.Count == 0 && all.Count > 0 && !all.Any(Used) && e.GetAttribute("src")?.Value is DecodedText srcValue)
+                if (alias == null && named.Count == 0 && all.Count > 0 && !all.Any(Used) && e.GetAttribute("path")?.Value is DecodedText srcValue)
                 {
                     Report(TrimmedSpan(srcValue), DiagnosticSeverity.Warning, DiagnosticCodes.UnusedImport, $"Nothing from {src} is used.", new[] { RemoveElementFix(e, "Remove the import") });
                 }
@@ -384,7 +384,7 @@ namespace KScript.Language.Analysis
                 return;
             }
             // In a route file, importing KScript.Auth turns on the CSRF check for its web routes.
-            if (package == "KScript.Auth" && result.Markup.RootElements.Any(r => r.Name == "KScript.Routes"))
+            if (package == "KScript.Auth" && result.Markup.RootElements.Any(r => r.Name == "KScript.Routes" || r.ChildElements.Any(c => c.Name == "Routes")))
             {
                 return;
             }

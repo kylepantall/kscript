@@ -6,7 +6,7 @@ using KScript.Runtime;
 namespace KScript.Data
 {
     /// <summary>
-    /// A query being built: <c>$User->where(role: admin)->latest()->limit(10)</c>. Each method returns a new query and
+    /// A query being built: <c>User->where(role: admin)->latest()->limit(10)</c>. Each method returns a new query and
     /// leaves the old one as it was, so a query kept in a variable can be the start of several others. Nothing runs
     /// until a method that reads or writes rows, such as <c>->get()</c>, <c>->count()</c> or <c>->update()</c>.
     /// </summary>
@@ -73,7 +73,7 @@ namespace KScript.Data
             return value != null || name == "model";
         }
 
-        /// <summary>A scope of the model: <c>$User->where(...)->admins()</c>.</summary>
+        /// <summary>A scope of the model: <c>User->where(...)->admins()</c>.</summary>
         public bool TryCallMethod(CallContext call, string name, out object result)
         {
             result = null;
@@ -132,7 +132,7 @@ namespace KScript.Data
             if (Model.Relation(name) is Relation r)
             {
                 if (r.Kind == RelationKind.BelongsTo) return new SqlColumn(r.ForeignKey, Model.Column(r.ForeignKey));
-                throw new KScriptException($"{r.Where} {r.Describe()}, so it isn't a column{where}. Use a lambda: fn($x) => $x.{name}->any().", "Argument");
+                throw new KScriptException($"{r.Where} {r.Describe()}, so it isn't a column{where}. Use a lambda: fn(x) => $x.{name}->any().", "Argument");
             }
             return new SqlColumn(name, Model.Need(name, where));
         }
@@ -382,7 +382,7 @@ namespace KScript.Data
         /// <summary>Brings back soft-deleted rows.</summary>
         public double Restore(CallContext call)
         {
-            if (Model?.SoftDeletes != true) throw new KScriptException($"->restore() is for models with soft_deletes: yes, and {Model?.Name ?? Table} doesn't have it.", "Argument");
+            if (Model?.SoftDeletes != true) throw new KScriptException($"->restore() is for models with soft_deletes: true, and {Model?.Name ?? Table} doesn't have it.", "Argument");
             return (this with { Trashed = "only" }).Update(call, new[] { new KeyValuePair<string, object>(ModelInfo.DeletedAt, null) });
         }
 

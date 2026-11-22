@@ -9,9 +9,9 @@ quarters = [
   { quarter: 'Q3', visitors: 17800, signups: 1020 },
   { quarter: 'Q4', visitors: 21300, signups: 1310 },
 ]
-total = $quarters->map(fn($q) => $q.signups)->sum()
+total = $quarters->map(fn(q) => $q.signups)->sum()
 
-KScript.Document(
+Document(
   template: report,
   title: "Annual Report 2026",
   subtitle: "Life Lab: a year in numbers",
@@ -21,7 +21,7 @@ KScript.Document(
 ) {
   Contents
 
-  Section(title: Summary) {
+  Section(title: "Summary") {
     Paragraph "Life Lab grew every quarter this year. **$total people** signed \
       up, and visits rose by \( 72\% \) from the first quarter to the last."
 
@@ -32,24 +32,24 @@ KScript.Document(
     }
   }
 
-  Section(title: Growth, new-page) {
+  Section(title: "Growth", new_page) {
     Table(
       caption: "Visitors and sign-ups by quarter.",
-      id: tab-growth,
-      data: $quarters,
+      id: "tab-growth",
+      rows: $quarters,
       columns: {
         Quarter: 'quarter',
         Visitors: 'visitors',
         'Sign-ups': 'signups'
       },
-      align: "lrr"
+      align: ['left', 'right', 'right']
     )
 
     Paragraph "The conversion rate is the share of visitors who sign up:"
 
-    Math(numbered: no) "r = \frac{\text{sign-ups}}{\text{visitors}}"
+    Math(numbered: false) "r = \frac{\text{sign-ups}}{\text{visitors}}"
 
-    Section(title: By quarter) {
+    Section(title: "By quarter") {
       for q in $quarters {
         Paragraph "**$q.quarter:** { $q.visitors } visitors, { $q.signups } \
           sign-ups, a rate of { ($q.signups / $q.visitors * 100)->round(1) }%."
@@ -57,7 +57,7 @@ KScript.Document(
     }
   }
 
-  Section(title: Next year, new-page) {
+  Section(title: "Next year", new_page) {
     Markdown "
       We plan three things for next year:
 

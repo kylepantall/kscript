@@ -205,8 +205,5 @@ namespace KScript.Language.Analysis
             }
             return true;
         }
-
-        /// <summary>Methods of jobs and chains work wherever a job is made, without importing KScript.Queue.</summary>
-        private static bool IsJobValue(TypeShape shape) => shape.Type == KType.Job || shape.Type == KType.Chain;
     }
 }

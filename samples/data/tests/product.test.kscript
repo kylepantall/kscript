@@ -5,25 +5,25 @@ import "../models/product.kscript"
 // migrations, and undoes each test's changes when it ends.
 describe(name: 'Product') {
   test(name: 'is saved and found again') {
-    tea = $Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
-    expect(value: $Product->find($tea.id).name, equals: 'Black tea')
+    tea = Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
+    expect(value: Product->find($tea.id).name, equals: 'Black tea')
     expect(value: $tea.stock, equals: 0)
   }
 
   test(name: 'starts each test with no products') {
-    expect(value: $Product->count(), equals: 0)
+    expect(value: Product->count(), equals: 0)
   }
 
   test(name: 'keeps skus unique') {
-    $Product->fake(sku: 'TEA-9')
-    expect-error(type: UniqueViolation) {
-      $Product->fake(sku: 'TEA-9')
+    Product->fake(sku: 'TEA-9')
+    expect_error(type: UniqueViolation) {
+      Product->fake(sku: 'TEA-9')
     }
   }
 
   test(name: 'lists products in one query') {
-    $Product->fake_many(3)
-    names = $Product->order_by(name)->pluck(name)
+    Product->fake_many(3)
+    names = Product->order_by(name)->pluck(name)
     expect(value: $names, count: 3)
     expect(value: @queries(), count_at_most: 4)
   }

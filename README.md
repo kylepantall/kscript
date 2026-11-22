@@ -9,7 +9,7 @@ KScript is an open source language for scripts, web pages and desktop apps. You 
 ```kscript
 import KScript.Terminal
 
-input(to: name) "What's your name? "
+input(into: name) "What's your name? "
 echo "Hello, { $name->trim()->title() }!"
 ```
 
@@ -37,26 +37,26 @@ import KScript.Terminal
 
 folder = $args[0] ?? @known_folder(downloads)
 big = @files($folder, pattern: '*', recursive)
-  |> filter(fn($f) => $f->size() gt 1000000)
-  |> sort_by(fn($f) => -$f->size())
+  |> filter(fn(f) => $f.size > 1000000)
+  |> sort_by(fn(f) => -$f.size)
 
 for f in $big {
-  echo "{ @bold($f->name()) }  { ($f->size() / 1000000)->round(digits: 1) } MB"
+  echo "{ @bold($f.name) }  { ($f.size / 1000000)->round(digits: 1) } MB"
 } else {
   echo "Nothing over 1 MB in {$folder}."
 }
 
-if $big->count() gt 0 {
-  confirm(to: ok) "Move them to an archive folder?"
+if $big->count() > 0 {
+  confirm(into: ok) "Move them to an archive folder?"
   if $ok {
     for f in $big {
-      move(from: $f, to: @join_path(base: $folder, ['archive', $f->name()]))
+      @move($f, @join_path(base: $folder, ['archive', $f.name]))
     }
   }
 }
 ```
 
-You get real values (strings, numbers, lists, maps, dates, files), methods on all of them with `->`, pipes with `|>`, lambdas with `fn($x) => …`, `try`/`catch`, and functions you call like commands. Calling an API takes one line too:
+You get real values (strings, numbers, lists, maps, dates, files), methods on all of them with `->`, pipes with `|>`, lambdas with `fn(x) => …`, `try`/`catch`, and functions you call like commands. Calling an API takes one line too:
 
 ```kscript
 import KScript.Net
@@ -128,20 +128,22 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
 | `KScript.Data` | Models with relations, a query builder whose conditions are lambdas, transactions, safe raw SQL, and migrations written from the models by `kscript db diff`, on SQLite, Postgres, MySQL and MariaDB |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
-| `KScript.Queue` | Background jobs: `job`, `dispatch`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
+| `KScript.Queue` | Background jobs: `job`, `->dispatch()`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
 | `KScript.Document` | Papers, reports, letters and invoices with LaTeX maths, tables, figures and citations, saved as PDF, Word, LaTeX, Markdown or HTML |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
 
 ## Desktop apps, still just KScript
 
-A `KScript.Window { }` block opens a native window on macOS, Windows or Linux. It works like `<live>`: the variables hold the state, the rest is the layout, and the window is redrawn after every handler.
+After `import KScript.UI`, a `Window { }` block opens a native window on macOS, Windows or Linux. It works like `<live>`: the variables hold the state, the rest is the layout, and the window is redrawn after every handler.
 
 ```kscript
-KScript.Window(title: Counter, width: 320, height: 200) {
+import KScript.UI
+
+Window(title: "Counter", width: 320, height: 200) {
   count = 0
   Text(size: 32) "{$count}"
-  Button(variant: primary, on-click: count += 1) "Add one"
+  Button(variant: primary, on_click: count += 1) "Add one"
 }
 ```
 
@@ -177,7 +179,7 @@ The editor extension shows errors as you type and gives completion, hover docs, 
 Tests are KScript too:
 
 ```kscript
-test(name: greets by name) {
+test(name: "greets by name") {
   expect(value: @greeting('Joan'), equals: 'Hello, Joan!')
 }
 ```
@@ -207,7 +209,7 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/kylepantall/kscript/master/install.ps1 | iex
 ```
 
-Then save the first example above as `hello.kscript`, run `kscript hello.kscript`, and run `kscript ide install` to set up your editor. [`samples/kscript2/`](samples/kscript2) and [`Example Sites/team`](Example%20Sites/team) have more to read and run.
+Then save the first example above as `hello.kscript`, run `kscript hello.kscript`, and run `kscript ide install` to set up your editor. [`samples/scripts/`](samples/scripts) and [`Example Sites/team`](Example%20Sites/team) have more to read and run, and [`samples/xml/`](samples/xml) has the same scripts in the XML form.
 
 ## Documentation
 
@@ -220,14 +222,15 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Stylesheets](docs/stylesheets.md): `.ks.css`, `.ks.scss` and `.ks.sass`, and `kscript css`
 - [Routes, controllers and middleware](docs/http.md): KScript.Http route files, JSON APIs, views and middleware
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
-- [Desktop apps](docs/desktop.md): `<KScript.Window>` and its elements
+- [Desktop apps](docs/desktop.md): `Window { }` and its elements, from `KScript.UI`
 - [Programs](docs/compile.md): `kscript compile`, targets, icons and what a program holds
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
-- [Coding agents](docs/agents.md): `kscript agents`, AGENTS.md, agent doc tags and `kscript check --format json`
+- [Coding agents](docs/agents.md): `kscript agents`, AGENTS.md, agent doc tags and `kscript check --output json`
 - [Standards](docs/standards.md): shareable lint and format standards, `kscript:recommended` and `kscript check --print-config`
 - [Error codes](docs/errors.md): what each `KS` code means and how to fix it
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
+- [What changed](docs/upgrading.md): every spelling that was renamed or removed, with what to write now
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI
 - [Roadmap](docs/roadmap.md): what's planned next, such as compiling KScript to TypeScript
 

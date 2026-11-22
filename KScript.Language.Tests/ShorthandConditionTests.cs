@@ -32,7 +32,7 @@ namespace KScript.Language.Tests
         [InlineData("<if $n < 3>body", "$n < 3", "body")]
         [InlineData("<if $n <= 3 and $m <$k>body", "$n <= 3 and $m <$k", "body")]
         [InlineData("<if $list->count() gt 0>body", "$list->count() gt 0", "body")]
-        [InlineData("<if $list->any(fn($x) => $x > 1)>body", "$list->any(fn($x) => $x > 1)", "body")]
+        [InlineData("<if $list->any(fn(x) => $x > 1)>body", "$list->any(fn(x) => $x > 1)", "body")]
         [InlineData("<if ($a>1)>body", "($a>1)", "body")]
         [InlineData("<if [1, 2][0]>body", "[1, 2][0]", "body")]
         [InlineData("<if { a: 1 }.a>body", "{ a: 1 }.a", "body")]
@@ -70,9 +70,9 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("<assert $total eq 30 />", "$total eq 30")]
-        [InlineData("<assert $total eq 30/>", "$total eq 30")]
-        [InlineData("<assert $a / 2 eq 1 />", "$a / 2 eq 1")]
+        [InlineData("<match $total eq 30 />", "$total eq 30")]
+        [InlineData("<match $total eq 30/>", "$total eq 30")]
+        [InlineData("<match $a / 2 eq 1 />", "$a / 2 eq 1")]
         public void ReadsSelfClosingTags(string tag, string expression)
         {
             var r = Scan(tag);
@@ -113,7 +113,7 @@ namespace KScript.Language.Tests
             Assert.Equal("test", ShorthandCondition.AttributeFor("if"));
             Assert.Equal("test", ShorthandCondition.AttributeFor("elif"));
             Assert.Equal("test", ShorthandCondition.AttributeFor("while"));
-            Assert.Equal("test", ShorthandCondition.AttributeFor("assert"));
+            Assert.Null(ShorthandCondition.AttributeFor("assert")); // @assert() is a command
             Assert.Equal("value", ShorthandCondition.AttributeFor("match"));
             Assert.Null(ShorthandCondition.AttributeFor("for"));
             Assert.Null(ShorthandCondition.AttributeFor("IF"));
@@ -123,7 +123,7 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("$ready", true)]
         [InlineData("  $n > 3  ", true)]
-        [InlineData("$list->any(fn($x) => $x>1)", true)]
+        [InlineData("$list->any(fn(x) => $x>1)", true)]
         [InlineData("$a>3", false)]
         [InlineData("$a >3", false)]
         [InlineData("$a > 3 /", false)]
@@ -217,11 +217,11 @@ namespace KScript.Language.Tests
         [Fact]
         public void PagesReadTheShorthandAndKeepItsCase()
         {
-            const string text = "<ul><IF $User.isLoggedIn><li><a href=\"/profile\">Profile</a></li></IF></ul>";
+            const string text = "<ul><IF User.isLoggedIn><li><a href=\"/profile\">Profile</a></li></IF></ul>";
             MarkupDocument doc = MarkupParser.Parse(text, DocumentKind.Page);
             Assert.Empty(doc.Diagnostics);
             MarkupElement e = doc.RootElements.Single().ChildElements.Single();
-            Assert.Equal("$User.isLoggedIn", e.GetAttributeValue("test"));
+            Assert.Equal("User.isLoggedIn", e.GetAttributeValue("test"));
             Assert.Equal("li", e.ChildElements.Single().Name);
         }
 
@@ -301,10 +301,10 @@ namespace KScript.Language.Tests
         [Fact]
         public void TheFormatterKeepsTheShorthand()
         {
-            const string text = "<kscript>\n<let name=\"n\" value=\"5\" />\n<if   $n > 3  ><echo>big</echo></if>\n<assert $n eq 5/>\n</kscript>\n";
+            const string text = "<kscript>\n<let name=\"n\" value=\"5\" />\n<if   $n > 3  ><echo>big</echo></if>\n<while   $n > 9><break /></while>\n</kscript>\n";
             FormatResult result = Formatter.Format(text, "test.ks.xml");
             Assert.True(result.Succeeded, result.Error);
-            Assert.Equal("<kscript>\n  <let name=\"n\" value=\"5\" />\n  <if $n > 3>\n    <echo>big</echo>\n  </if>\n  <assert $n eq 5 />\n</kscript>\n", result.Text);
+            Assert.Equal("<kscript>\n  <let name=\"n\" value=\"5\" />\n  <if $n > 3>\n    <echo>big</echo>\n  </if>\n  <while $n > 9>\n    <break />\n  </while>\n</kscript>\n", result.Text);
             Assert.Equal(result.Text, Formatter.Format(result.Text, "test.ks.xml").Text);
         }
 
@@ -320,7 +320,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void ConvertingToXmlWritesTheShorthand()
         {
-            ConversionResult r = ScriptConverter.Convert("n = 5\nif $n > 3 {\n  echo \"big\"\n} elif $n gt 1 {\n  echo \"mid\"\n}\nwhile $n lt 3 {\n  break\n}\nmatch $n {\n  case 5 {\n    echo \"five\"\n  }\n}\n", "a.kscript");
+            ConversionResult r = ScriptConverter.Convert("n = 5\nif $n > 3 {\n  echo \"big\"\n} elif $n gt 1 {\n  echo \"mid\"\n}\nwhile $n lt 3 {\n  break\n}\nmatch $n {\n  5 => {\n    echo \"five\"\n  }\n}\n", "a.kscript");
             Assert.Contains("<if $n > 3>", r.Text);
             Assert.Contains("<elif $n gt 1>", r.Text);
             Assert.Contains("<while $n lt 3>", r.Text);

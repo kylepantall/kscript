@@ -144,12 +144,12 @@ namespace KScript.Data
                 if (backs.Count == 1)
                 {
                     bool backRequired = target.DeclaredRequired(backs[0].Name);
-                    // profile: Profile? here and user: User there: the profile holds user_id, so this side has one.
+                    // profile?: Profile here and user: User there: the profile holds user_id, so this side has one.
                     if (!required && backRequired)
                         return new Relation { Name = field.Name, Owner = owner, Target = target, Kind = RelationKind.HasOne, ForeignKey = ForeignKeyName(backs[0].Name, owner), Scope = scope };
                     if (required == backRequired)
                         throw new KScriptException($"{where} and {target.Name}.{backs[0].Name} point at each other, so it isn't clear which table holds the link. "
-                            + $"Make the side that has one optional, such as {field.Name}: {target.Name}?, or name the other side's field: {field.Name}: {target.Name}(by: {backs[0].Name})?.", "Type");
+                            + $"Make the side that has one optional, such as {field.Name}?: {target.Name}, or name the other side's field: {field.Name}?: {target.Name}(by: {backs[0].Name}).", "Type");
                 }
                 return new Relation
                 {
@@ -596,7 +596,7 @@ namespace KScript.Data
         internal bool IsScope(string name) =>
             Type.OwnMethods.TryGetValue(name, out MarkupElement e) && Parameter.ParseList(e.GetAttributeValue("params"), out _) is { Count: > 0 } p && p[0].Name == "query";
 
-        /// <summary>Runs a scope on a query: <c>fn admins(query) => $query->where(role: admin)</c> makes <c>$User->admins()</c>.</summary>
+        /// <summary>Runs a scope on a query: <c>fn admins(query) => $query->where(role: admin)</c> makes <c>User->admins()</c>.</summary>
         internal Query ApplyScope(CallContext call, Query query, string name, IReadOnlyList<object> args, IReadOnlyDictionary<string, object> named)
         {
             MarkupElement e = Type.OwnMethods[name];
@@ -639,7 +639,7 @@ namespace KScript.Data
             return true;
         }
 
-        /// <summary><c>$User->admins()</c>: a scope, on a query of the whole model.</summary>
+        /// <summary><c>User->admins()</c>: a scope, on a query of the whole model.</summary>
         public bool TryCallTypeMethod(CallContext call, RecordType type, string name, out object result)
         {
             result = null;

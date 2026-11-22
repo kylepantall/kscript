@@ -95,14 +95,14 @@ namespace KScript.Language.Tests
             Assert.Contains("already added to date", Code("extend date {\n  fn x() => 1\n}\nextend date {\n  fn x() => 2\n}\n").Diagnostics.Single(d => d.Code == DiagnosticCodes.DuplicateDeclaration).Message);
             Assert.Contains("top level", Code("if true {\n  extend date {\n    fn x() => 1\n  }\n}\n").Diagnostics.Single(d => d.Code == DiagnosticCodes.MisplacedElement).Message);
             Assert.Contains("<extend> needs the 'type' attribute", Analyze(Script("<extend><fn name=\"x\" value=\"1\" /></extend>")).Diagnostics.First(d => d.Code == DiagnosticCodes.MissingAttribute).Message);
-            Assert.Contains("override=\"yes\"", Analyze(Script("<extend type=\"date\"><fn name=\"to_json\" value=\"1\" /></extend>")).Diagnostics.Single(d => d.Code == DiagnosticCodes.DuplicateDeclaration).Message);
+            Assert.Contains("override=\"true\"", Analyze(Script("<extend type=\"date\"><fn name=\"to_json\" value=\"1\" /></extend>")).Diagnostics.Single(d => d.Code == DiagnosticCodes.DuplicateDeclaration).Message);
             AssertClean(Analyze(Script("<extend type=\"date\"><fn name=\"to_json\" override=\"yes\" value=\"1\" /></extend>")));
         }
 
         [Fact]
         public void DeclaredTypesCanBeExtended()
         {
-            DocumentAnalysis a = Code("type User {\n  name: string\n}\nextend User {\n  fn hello() => 'Hi ' + $this.name\n}\nu = $User->from({ name: 'Kyle' })\necho \"{ $u->hello() }\"\n");
+            DocumentAnalysis a = Code("type User {\n  name: string\n}\nextend User {\n  fn hello() => 'Hi ' + $this.name\n}\nu = User({ name: 'Kyle' })\necho \"{ $u->hello() }\"\n");
             AssertClean(a);
             Assert.Contains("A User already has ->keys()", AssertSingle(Code("type User {\n  name: string\n}\nextend User {\n  fn keys() => 1\n}\n"), DiagnosticCodes.DuplicateDeclaration).Message);
         }

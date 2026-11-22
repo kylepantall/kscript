@@ -3,7 +3,7 @@ import KScript.Document
 // A formal letter: the Letter element lays out addresses, the date, the opening
 // and the closing.
 
-KScript.Document(template: letter, to: [letter.pdf, letter.docx]) {
+Document(template: letter, to: ['letter.pdf', 'letter.docx']) {
   Letter(
     from: "Life Lab\n12 Grid Street\nCambridge CB1 2AB",
     to: "Dr Ada Lovelace\nDepartment of Computing\nExample University",

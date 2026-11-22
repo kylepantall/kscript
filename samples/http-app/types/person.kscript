@@ -1,0 +1,7 @@
+/// Someone in data/people.json.
+type Person {
+  id: int
+  name: string
+  age: int
+  role: string
+}

@@ -37,24 +37,24 @@ namespace KScript.Data
         {
             var attributes = new List<A>
             {
-                new A("name", K.DeclareVariable, "The model's name, such as User: $User->where(...) queries it, and its records have its fields.", true),
+                new A("name", K.DeclareVariable, "The model's name, such as User: User->where(...) queries it, and its records have its fields.", true),
                 new A("fields", K.Fields, "A short model's fields on one line: `name: string, email: email`. Bigger models list one <field> per line."),
                 new A("table", K.Text, "The table its records are kept in. Default: the plural of the name in snake case (User is users, BlogPost blog_posts)."),
                 new A("connection", K.Text, "The database connection, from database.connections in your config. Default: the default connection (main)."),
                 new A("key", K.Text, "The field that is the key. Default: id, an int the database numbers, added when the model doesn't declare it."),
-                new A("timestamps", K.Bool, "yes adds created_at and updated_at, set when records are saved."),
-                new A("soft_deletes", K.Bool, "yes adds deleted_at: ->delete() sets it instead of removing the row, and queries leave those records out (->with_trashed() keeps them)."),
+                new A("timestamps", K.Bool, "true adds created_at and updated_at, set when records are saved."),
+                new A("soft_deletes", K.Bool, "true adds deleted_at: ->delete() sets it instead of removing the row, and queries leave those records out (->with_trashed() keeps them)."),
                 new A("unique", K.Text, "Fields no two records may share: `[email]`, or `[email, [team_id, slug]]` for a pair that is unique together. Saving a clash fails with UniqueViolation."),
                 new A("index", K.Text, "Fields to index, so queries on them are fast: `[team_id, [team_id, created_at]]`."),
                 new A("hidden", K.Text, "Fields left out of JSON (and so out of route responses): `[password]`."),
-                new A("guarded", K.Text, "Fields ->create($form) and ->update($form) don't set, so a form can't change them: `[role]`. Set them on the record instead: `$user.role = 'admin'`."),
+                new A("guarded", K.Text, "Fields ->create($form) and ->update($form) don't set, so a form can't change them: `[role]`. Set them on the record instead: `user.role = 'admin'`."),
                 new A("extra", K.Enum, "Keys ->create() is given that the model doesn't have: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
                 new A("description", K.Text, "What the model is, shown on hover."),
             };
-            p.Element(new ElementInfo("model", "Declares a model: a <type> whose records are kept in a database table. `$User->where(role: admin)->get()` reads them, `$User->create({...})` adds one, and `$user->save()` writes changes. Its fields are checked by their types and rules on every save.",
+            p.Element(new ElementInfo("model", "Declares a model: a <type> whose records are kept in a database table. `User->where(role: admin)->get()` reads them, `User->create({...})` adds one, and `$user->save()` writes changes. Its fields are checked by their types and rules on every save.",
                 ContentKind.Statements, attributes.ToArray())
             {
-                Example = "<model name=\"User\" timestamps=\"yes\" unique=\"email\">\n  <field name=\"name\" type=\"string(max: 120)\" />\n  <field name=\"email\" type=\"email\" />\n</model>",
+                Example = "<model name=\"User\" timestamps=\"true\" unique=\"email\">\n  <field name=\"name\" type=\"string(max: 120)\" />\n  <field name=\"email\" type=\"email\" />\n</model>",
             }, run =>
             {
                 RecordType type = ModelInfo.Declare(run);
@@ -67,7 +67,7 @@ namespace KScript.Data
 
         #region Queries
 
-        /// <summary>The query a method works on: the query itself, or (for $User->...) one on the model with no conditions yet.</summary>
+        /// <summary>The query a method works on: the query itself, or (for User->...) one on the model with no conditions yet.</summary>
         private static Query QueryOf(object target, CallContext call)
         {
             if (target is Query q) return q;
@@ -103,11 +103,11 @@ namespace KScript.Data
                     case Dictionary<string, object>:
                         break;
                     default:
-                        throw new KScriptException($"->{method}() takes conditions as a lambda, fn($u) => $u.age >= 18, or as names and values, role: admin, not {Values.Describe(a)}.", "Argument");
+                        throw new KScriptException($"->{method}() takes conditions as a lambda, fn(u) => $u.age >= 18, or as names and values, role: admin, not {Values.Describe(a)}.", "Argument");
                 }
             }
             if (c.Named.Count > 0) Add(q.Equalities(c.Named, method));
-            if (all == null) throw new KScriptException($"->{method}() needs a condition: a lambda, fn($u) => $u.active, or names and values, role: admin.", "Argument");
+            if (all == null) throw new KScriptException($"->{method}() needs a condition: a lambda, fn(u) => $u.active, or names and values, role: admin.", "Argument");
             return all;
         }
 
@@ -135,13 +135,13 @@ namespace KScript.Data
 
         private static readonly QueryMethod[] QueryMethods =
         {
-            new("where", "conditions...", "Keeps the rows that match: a lambda compiled to SQL, `fn($u) => $u.age >= 18 and $u.name->starts_with('J')`, or names and values, `role: admin, team_id: 3` (a list means any of them; null means none).", KType.Query,
+            new("where", "conditions...", "Keeps the rows that match: a lambda compiled to SQL, `fn(u) => $u.age >= 18 and $u.name->starts_with('J')`, or names and values, `role: admin, team_id: 3` (a list means any of them; null means none).", KType.Query,
                 (q, c) => q.And(Conditions(q, c, "where")), Bare: true),
             new("or_where", "conditions...", "Like ->where(), joined with or: rows that match the conditions so far, or these.", KType.Query,
                 (q, c) => q.Or(Conditions(q, c, "or_where")), Bare: true),
             new("where_not", "conditions...", "Leaves out the rows that match.", KType.Query,
                 (q, c) => q.And(new SqlUnary("NOT", Conditions(q, c, "where_not"))), Bare: true),
-            new("when", "test, then: fn, otherwise?: fn", "Changes the query only when the test is true: `->when($search != null, fn($q) => $q->where(fn($u) => $u.name->contains($search)))`.", KType.Query,
+            new("when", "test, then: fn, otherwise?: fn", "Changes the query only when the test is true: `->when($search != null, fn(q) => $q->where(fn(u) => $u.name->contains($search)))`.", KType.Query,
                 (q, c) =>
                 {
                     ICallable fn = Values.Truthy(c.Arg(0)) ? c.Fn(1) : c.Has(2) && c.Arg(2) != null ? c.Fn(2) : null;
@@ -150,7 +150,7 @@ namespace KScript.Data
                 }),
             new("select", "columns...", "Reads only these columns: `->select(id, name)`. Records get null for the others.", KType.Query,
                 (q, c) => q.Selecting(Flatten(c.Args).Select(a => { string w = Word(a, "->select()"); q.ColumnNamed(w, " for ->select()"); return w; }).ToList()), Bare: true),
-            new("distinct", "", "Leaves out rows that are the same as another, in the columns selected.", KType.Query, (q, c) => q.Unique()),
+            new("distinct", "", "Leaves out rows that repeat an earlier one, in the columns selected.", KType.Query, (q, c) => q.Unique()),
             new("order_by", "columns...", "Sorts the rows: `->order_by(name)`, `->order_by(created_at: desc, name: asc)`.", KType.Query,
                 (q, c) =>
                 {
@@ -180,13 +180,13 @@ namespace KScript.Data
             new("first_or_fail", "", "The first row, or a ModelNotFound error (a 404 in a route) when none match.", KType.Any, (q, c) => q.FirstOrFail(c)),
             new("find", "id", "The record with this key, or null.", KType.Any, (q, c) => q.ById(c.Arg(0)).First(c)),
             new("find_or_fail", "id", "The record with this key, or a ModelNotFound error (a 404 in a route).", KType.Any, (q, c) => q.ById(c.Arg(0)).FirstOrFail(c, c.Arg(0))),
-            new("exists", "", "yes if any row matches.", KType.Bool, (q, c) => q.Exists(c)),
+            new("exists", "", "True when any row matches.", KType.Bool, (q, c) => q.Exists(c)),
             new("count", "", "How many rows match.", KType.Number, (q, c) => q.Count(c)),
             new("sum", "column", "The total of a column over the rows that match (0 when none do).", KType.Number, (q, c) => q.Aggregate(c, "SUM", Word(c.Arg(0), "->sum()")), Bare: true),
-            new("avg", "column", "The average of a column, or null when no rows match.", KType.Number, (q, c) => q.Aggregate(c, "AVG", Word(c.Arg(0), "->avg()")), Bare: true),
+            new("average", "column", "The average of a column, or null when no rows match.", KType.Number, (q, c) => q.Aggregate(c, "AVG", Word(c.Arg(0), "->average()")), Bare: true),
             new("min", "column", "The smallest value of a column, or null when no rows match.", KType.Any, (q, c) => q.Aggregate(c, "MIN", Word(c.Arg(0), "->min()")), Bare: true),
             new("max", "column", "The largest value of a column, or null when no rows match.", KType.Any, (q, c) => q.Aggregate(c, "MAX", Word(c.Arg(0), "->max()")), Bare: true),
-            new("pluck", "column", "One column of every row that matches, as a list: `$User->pluck(email)`.", KType.List, (q, c) => q.Pluck(c, Word(c.Arg(0), "->pluck()")), Bare: true),
+            new("pluck", "column", "One column of every row that matches, as a list: `User->pluck(email)`.", KType.List, (q, c) => q.Pluck(c, Word(c.Arg(0), "->pluck()")), Bare: true),
             new("value", "column", "One column of the first row, or null.", KType.Any, (q, c) => q.Value(c, Word(c.Arg(0), "->value()")), Bare: true),
             new("paginate", "per_page?: number, page?: number", "One page of rows: { items, page, per_page, total, last_page, from, to, has_more }. per_page is 15 by default; page (1 by default) can be text such as $query.page.", KType.Map,
                 (q, c) =>
@@ -209,9 +209,9 @@ namespace KScript.Data
             new("restore", "", "For models with soft_deletes: brings back the deleted records that match. Returns how many.", KType.Number, (q, c) => q.Restore(c)),
             new("insert", "rows", "Adds rows: a map, or a list of maps. On a model each one is checked like ->create(). Returns how many were added.", KType.Number, (q, c) => q.Insert(c, c.Arg(0))),
             new("sql", "", "The SQL the query runs and its parameters, without running it: { sql, params }.", KType.Map, (q, c) => q.Describe()),
-            new("with", "relations...", "Loads relations with the records, one query per relation rather than one per record: `->with(author, tags)`, `->with(posts.tags)`, or `->with(posts: fn($q) => $q->where(published: true))` to load only some.", KType.Query,
+            new("with", "relations...", "Loads relations with the records, one query per relation rather than one per record: `->with(author, tags)`, `->with(posts.tags)`, or `->with(posts: fn(q) => $q->where(published: true))` to load only some.", KType.Query,
                 (q, c) => Relations(c, "with").Aggregate(q, (acc, r) => acc.Loading(r.Path, r.Constrain)), Bare: true),
-            new("with_count", "relations...", "Counts a list relation for each record, as a field named after it: `->with_count(posts)` gives each user posts_count. `->with_count(posts: fn($q) => $q->where(published: true))` counts only some.", KType.Query,
+            new("with_count", "relations...", "Counts a list relation for each record, as a field named after it: `->with_count(posts)` gives each user posts_count. `->with_count(posts: fn(q) => $q->where(published: true))` counts only some.", KType.Query,
                 (q, c) => Relations(c, "with_count").Aggregate(q, (acc, r) => acc.Counting(r.Path, r.Constrain)), Bare: true),
         };
 
@@ -222,7 +222,7 @@ namespace KScript.Data
             foreach (object a in Flatten(c.Args)) list.Add((Word(a, $"->{method}()"), null));
             foreach (KeyValuePair<string, object> kv in c.Named)
             {
-                ICallable fn = kv.Value as ICallable ?? (kv.Value == null ? null : throw new KScriptException($"->{method}({kv.Key}: ...) takes a function that changes the relation's query: {kv.Key}: fn($q) => $q->where(...).", "Argument"));
+                ICallable fn = kv.Value as ICallable ?? (kv.Value == null ? null : throw new KScriptException($"->{method}({kv.Key}: ...) takes a function that changes the relation's query: {kv.Key}: fn(q) => $q->where(...).", "Argument"));
                 list.Add((kv.Key, fn));
             }
             if (list.Count == 0) throw new KScriptException($"->{method}() needs a relation, such as ->{method}(author) or ->{method}(posts, tags).", "Argument");
@@ -283,7 +283,7 @@ namespace KScript.Data
 
         private static readonly QueryMethod[] ModelMethods =
         {
-            new("create", "values...", "Checks the values against the model, saves a new record and returns it: `$User->create({ name: 'Joan', email: 'joan@example.com' })` or `$User->create(name: 'Joan', ...)`. Guarded fields are left out.", KType.Record,
+            new("create", "values...", "Checks the values against the model, saves a new record and returns it: `User->create({ name: 'Joan', email: 'joan@example.com' })` or `User->create(name: 'Joan', ...)`. Guarded fields are left out.", KType.Record,
                 (q, c) => Records.Create(c, q.Model, ValuesOf(c, "create", allowEmpty: true)), Bare: true),
             new("all", "", "Every record (leaving out soft-deleted ones).", KType.List, (q, c) => q.Get(c)),
             new("first_or_create", "match: map, values?: map", "The first record that matches, or a new one made from both maps.", KType.Record,
@@ -296,9 +296,9 @@ namespace KScript.Data
                     return Records.Create(c, q.Model, values);
                 }),
             new("query", "", "A query on the model with no conditions yet, to build on.", KType.Query, (q, c) => q),
-            new("fake", "values...", "Saves a record with made-up values for the fields that need one, and these values: `$User->fake(role: 'admin')`. Optional fields and fields with defaults are left to the model, and a required relation gets a fake record too. For tests and seeders.", KType.Record,
+            new("fake", "values...", "Saves a record with made-up values for the fields that need one, and these values: `User->fake(role: 'admin')`. Optional fields and fields with defaults are left to the model, and a required relation gets a fake record too. For tests and seeders.", KType.Record,
                 (q, c) => Fakes.Make(c, q.Model, ValuesOf(c, "fake", allowEmpty: true)), Bare: true),
-            new("fake_many", "count: number, values...", "Saves count fake records, each with these values, and returns them: `$Post->fake_many(3, author: $joan)`.", KType.List,
+            new("fake_many", "count: number, values...", "Saves count fake records, each with these values, and returns them: `Post->fake_many(3, author: $joan)`.", KType.List,
                 (q, c) =>
                 {
                     int count = Count(c.Arg(0, "count"), "->fake_many()'s count");
@@ -343,7 +343,7 @@ namespace KScript.Data
                 (t, c) => Records.Save(c, RecordOf(t, c)));
             p.Method(KType.Record, "update", "values...", "Sets fields and saves: `$user->update(name: 'Joan')` or `->update($form)`. Each value is checked by its field's type; guarded fields are left out. Returns the record.", KType.Record,
                 (t, c) => Records.Update(c, RecordOf(t, c), ValuesOf(c, "update"))).Info.KeepsBareWords = true;
-            p.Method(KType.Record, "delete", "", "Deletes the record. With soft_deletes it is only marked deleted (->restore() brings it back). yes if it was deleted.", KType.Bool,
+            p.Method(KType.Record, "delete", "", "Deletes the record. With soft_deletes it is only marked deleted (->restore() brings it back). True when it was deleted.", KType.Bool,
                 (t, c) => Records.Delete(c, RecordOf(t, c), force: false));
             p.Method(KType.Record, "force_delete", "", "Deletes the record from the table, even with soft_deletes.", KType.Bool,
                 (t, c) => Records.Delete(c, RecordOf(t, c), force: true));
@@ -351,7 +351,7 @@ namespace KScript.Data
                 (t, c) => Records.Restore(c, RecordOf(t, c)));
             p.Method(KType.Record, "fresh", "", "The record as the database has it now (a new record), or null if it was deleted.", KType.Record,
                 (t, c) => Records.Fresh(c, RecordOf(t, c)));
-            p.Method(KType.Record, "is_dirty", "field?", "yes if the record has changes that aren't saved: any field, or the one named.", KType.Bool,
+            p.Method(KType.Record, "is_dirty", "field?", "True when the record has changes that aren't saved: any field, or the one named.", KType.Bool,
                 (t, c) =>
                 {
                     Record r = RecordOf(t, c);
@@ -371,12 +371,12 @@ namespace KScript.Data
                     Data.Relation.LoadPaths(c, ModelInfo.Of(r), new[] { r }, Relations(c, "load"));
                     return r;
                 }).Info.KeepsBareWords = true;
-            p.Method(KType.Record, "is_saved", "", "yes if the record is in the database: it was read from it or has been saved.", KType.Bool,
+            p.Method(KType.Record, "is_saved", "", "True when the record is in the database: it was read from it or has been saved.", KType.Bool,
                 (t, c) => Records.State(RecordOf(t, c))?.Exists == true);
 
-            p.Method(KType.PasswordHash, "verify", "password", "yes if the password someone typed is the one this hash was made from: `$user.password->verify($form.password)`.", KType.Bool,
+            p.Method(KType.PasswordHash, "verify", "password", "True when the password someone typed is the one this hash was made from: `$user.password->verify($form.password)`.", KType.Bool,
                 (t, c) => ((PasswordHash)t).Verify(c.Arg(0)));
-            p.Method(KType.PasswordHash, "needs_rehash", "algorithm?: argon2id|bcrypt", "yes if the hash was made with weaker settings (or another algorithm) than ->hash() uses now, so it should be made again at the next sign-in.", KType.Bool,
+            p.Method(KType.PasswordHash, "needs_rehash", "algorithm?: argon2id|bcrypt", "True when the hash was made with weaker settings (or another algorithm) than ->hash() uses now, so it should be made again at the next sign-in.", KType.Bool,
                 (t, c) => PasswordValue.NeedsRehash(((PasswordHash)t).Stored, c.Has(0) ? c.Str(0) : "argon2id"));
         }
 
@@ -498,24 +498,17 @@ namespace KScript.Data
             p.Command("queries", "", "The SQL statements this run has sent, oldest first (the last 1000), each as { sql, bindings, database }. In a test, only the test's own: `expect(value: @queries(), count_at_most: 4)` catches a page that makes a query per row.", KType.List,
                 c => QueryLog.Of(c.Interpreter));
 
-            p.Command("transaction", "work: fn, retries?: number, connection?", "Runs work in a transaction and returns what it returns: everything it saves is kept together, or (when it fails) not at all. retries tries again when the database is busy.", KType.Any,
-                c =>
-                {
-                    string connection = c.Arg(2, "connection") != null ? Word(c.Arg(2, "connection"), "connection") : null;
-                    return Transaction(c, Database.For(c, connection), c.Fn(0), c.Arg(1, "retries"));
-                }).Info.KeepsBareWords = true;
-
             p.Element(new ElementInfo("transaction", "Runs its statements in a transaction: what they save is kept when the block ends, and undone if anything in it fails (the error then carries on). A transaction inside another is a savepoint, so only its own changes are undone.",
                 ContentKind.Statements,
                 new A("retries", K.Expression, "Tries the block again this many times when the database is busy or a deadlock stops it."),
                 new A("connection", K.Text, "The database connection, from database.connections in your config. Default: the default connection."))
             {
-                Example = "<model name=\"Order\">\n  <field name=\"total\" type=\"number\" />\n</model>\n<do>$db->create_table($Order)</do>\n<transaction>\n  <do>$Order->create(total: 10)</do>\n</transaction>\n<echo>{ $Order->count() }</echo>",
+                Example = "<model name=\"Order\">\n  <field name=\"total\" type=\"number\" />\n</model>\n<do>$db->create_table(Order)</do>\n<transaction>\n  <do>Order->create(total: 10)</do>\n</transaction>\n<echo>{ Order->count() }</echo>",
             }, run =>
             {
                 string connection = run.Raw("connection")?.Trim();
                 Database db = Database.For(run.Host, run.Module.Directory, connection);
-                int retries = run.Has("retries") ? Count(run.Eval("retries"), "<transaction retries>") : 0;
+                int retries = run.Has("retries") ? Count(run.Eval("retries"), run.Module.ArgumentHint("transaction", "retries")) : 0;
                 db.InTransaction<object>(run.Interpreter, () =>
                 {
                     run.RunChildren();
@@ -535,7 +528,7 @@ namespace KScript.Data
                 (t, c) => RunSql(c, DatabaseOf(t, c), c.Str(0), c.Arg(1, "as"))).Info.KeepsBareWords = true;
             p.Method(KType.Database, "tables", "", "The names of the tables in the database.", KType.List,
                 (t, c) => DatabaseOf(t, c).Tables(c.Interpreter).Cast<object>().ToList());
-            p.Method(KType.Database, "has_table", "name", "yes if the database has the table: a name, or a model's table.", KType.Bool,
+            p.Method(KType.Database, "has_table", "name", "True when the database has the table: a name, or a model's table.", KType.Bool,
                 (t, c) =>
                 {
                     string table = ModelInfo.Of(c.Arg(0))?.Table ?? Word(c.Arg(0), "->has_table()");
@@ -563,7 +556,7 @@ namespace KScript.Data
                     }
                     return !existed;
                 });
-            p.Method(KType.Database, "drop_table", "table", "Deletes a table and everything in it, if it is there: a name, or a model's table. yes if there was one.", KType.Bool,
+            p.Method(KType.Database, "drop_table", "table", "Deletes a table and everything in it, if it is there: a name, or a model's table. True when there was one.", KType.Bool,
                 (t, c) =>
                 {
                     string table = ModelInfo.Of(c.Arg(0))?.Table ?? Word(c.Arg(0), "->drop_table()");
@@ -573,10 +566,13 @@ namespace KScript.Data
                     db.Execute(c.Interpreter, new SqlStatement("DROP TABLE IF EXISTS " + db.Dialect.Quote(table), Array.Empty<object>()), table);
                     return existed;
                 }).Info.KeepsBareWords = true;
-            p.Method(KType.Database, "transaction", "work: fn, retries?: number", "Runs work in a transaction on this connection, like @transaction.", KType.Any,
+            p.Method(KType.Database, "transaction", "work: fn, retries?: number", "Runs work in a transaction on this connection and returns what it returns: everything it saves is kept together, or (when it fails) not at all. retries tries again when the database is busy.", KType.Any,
                 (t, c) => Transaction(c, DatabaseOf(t, c), c.Fn(0), c.Arg(1, "retries")));
-            p.Method(KType.Database, "in_transaction", "", "yes while a transaction is open on this connection.", KType.Bool,
-                (t, c) => DatabaseOf(t, c).InTransaction(c.Interpreter));
+            p.Field(KType.Database, "name", KType.String, "The connection's name in kscript.json.");
+            p.Field(KType.Database, "driver", KType.String, "The kind of database: sqlite, postgres, mysql or sqlserver.");
+            p.Field(KType.Database, "file", KType.String, "The database file, for SQLite, or null.");
+            p.Field(KType.Database, "is_in_transaction", KType.Bool, "True while a transaction is open on this connection.",
+                (t, i) => (t is DefaultDatabase d ? d.Resolve() : (Database)t).InTransaction(i));
         }
 
         #endregion

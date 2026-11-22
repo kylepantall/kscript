@@ -1,0 +1,6 @@
+/// What a client sends to add a person. A body that doesn't fit is answered with 422 and every problem.
+type NewPerson {
+  name: string
+  age?: int
+  role?: string
+}

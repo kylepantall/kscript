@@ -105,13 +105,13 @@ jobs:
         if: matrix.rid != 'osx-x64'
         shell: bash
         run: |
-          printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.xml
-          ./dist/kscript${{ matrix.ext }} smoke.xml | tee smoke.out
+          printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.ks.xml
+          ./dist/kscript${{ matrix.ext }} smoke.ks.xml | tee smoke.out
           grep -q "kscript ok: 3" smoke.out
           ./dist/kscript${{ matrix.ext }} --version
-          ./runtime-dist/kscript${{ matrix.ext }} smoke.xml | grep -q "kscript ok: 3"
+          ./runtime-dist/kscript${{ matrix.ext }} smoke.ks.xml | grep -q "kscript ok: 3"
           # The native kscript compiles programs with the runtime it would download from the release.
-          mkdir hello && cp smoke.xml hello/hello.ks.xml
+          mkdir hello && cp smoke.ks.xml hello/hello.ks.xml
           ./dist/kscript${{ matrix.ext }} compile hello/hello.ks.xml --runtime "runtime-dist/kscript${{ matrix.ext }}" --out compiled
           ls -R compiled
 

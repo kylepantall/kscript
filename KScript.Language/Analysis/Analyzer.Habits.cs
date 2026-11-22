@@ -22,7 +22,7 @@ namespace KScript.Language.Analysis
         private static readonly Dictionary<string, (string Use, string Example)> ForeignKeywords = new Dictionary<string, (string, string)>(StringComparer.Ordinal)
         {
             ["foreach"] = ("for", "for item in $list { }"),
-            ["switch"] = ("match", "match $value { case 1 { } default { } }"),
+            ["switch"] = ("match", "match $value { 1 => { } _ => { } }"),
             ["elseif"] = ("elif", "} elif $n > 1 { }"),
             ["elsif"] = ("elif", "} elif $n > 1 { }"),
             ["require"] = ("import", "import \"lib/tools.kscript\""),
@@ -41,20 +41,20 @@ namespace KScript.Language.Analysis
         /// <summary>Commands other languages have, and what to write in KScript.</summary>
         private static readonly Dictionary<string, string> ForeignCommands = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["len"] = "Use the length method: $list->length().",
-            ["length"] = "Use the length method: $list->length().",
-            ["size"] = "Use the length method: $list->length().",
+            ["len"] = "Use the count method: $list->count().",
+            ["length"] = "Use the count method: $list->count().",
+            ["size"] = "Use the count method: $list->count().",
             ["count"] = "Use the count method: $list->count().",
-            ["strlen"] = "Use the length method: $text->length().",
+            ["strlen"] = "Use the count method: $text->count().",
             ["print"] = "Print with echo: echo \"Hello\".",
             ["println"] = "Print with echo: echo \"Hello\".",
-            ["typeof"] = "Use @type($value), or $value->type().",
-            ["str"] = "Use @string($value), or $value->to_string().",
-            ["tostring"] = "Use @string($value), or $value->to_string().",
-            ["int"] = "Use @number($value).",
-            ["float"] = "Use @number($value).",
-            ["parseint"] = "Use @number($value).",
-            ["parsefloat"] = "Use @number($value).",
+            ["typeof"] = "Use the type method: $value->type().",
+            ["str"] = "Use the to_string method: $value->to_string().",
+            ["tostring"] = "Use the to_string method: $value->to_string().",
+            ["int"] = "Use the to_int method: $text->to_int().",
+            ["float"] = "Use the to_number method: $text->to_number().",
+            ["parseint"] = "Use the to_int method: $text->to_int().",
+            ["parsefloat"] = "Use the to_number method: $text->to_number().",
             ["upper"] = "Use the upper method: $text->upper().",
             ["lower"] = "Use the lower method: $text->lower().",
             ["strtoupper"] = "Use the upper method: $text->upper().",
@@ -247,7 +247,6 @@ namespace KScript.Language.Analysis
             {
                 Diagnostic d = result.Diagnostics[i];
                 string message = d.Message
-                    .Replace(" (a raw & isn't allowed in XML)", string.Empty, StringComparison.Ordinal)
                     .Replace("assign with <let>, <set> or <do>.", "assign on a line of its own: x = 1.", StringComparison.Ordinal)
                     .Replace("Assign with <set> or <do>.", "Assign on a line of its own: x += 1.", StringComparison.Ordinal);
                 message = ElementInAngles.Replace(message, m => catalog.GetElement(m.Groups[1].Value) != null ? m.Groups[1].Value : m.Value);

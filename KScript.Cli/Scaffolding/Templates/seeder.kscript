@@ -8,4 +8,4 @@ hint: Fill it in, then run kscript db seed {{ kebab }} (or kscript db fresh --se
 ---
 // {{ title }}: run by kscript db seed. Import the models it makes records of, then make them:
 // import "{{ up }}{{ paths.models }}/user{{ ext }}"
-// $User->create(name: 'Ada', email: 'ada@example.com')
+// User->create(name: 'Ada', email: 'ada@example.com')

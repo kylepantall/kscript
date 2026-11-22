@@ -7,23 +7,19 @@ import KScript.Data
 
 enum Role { member, editor, admin }
 
-model User {
-  timestamps: yes
-  unique: [email]
-  hidden: [password]
-  guarded: [role]
+model User(timestamps, unique: [email], hidden: [password], guarded: [role]) {
   name: string(max: 120)
   email: email
-  age: int?
+  age?: int
   role: Role = 'member'
   password: password
 }
 
-$db->create_table($User)
+$db->create_table(User)
 
-joan = $User->create(name: 'Joan', email: 'joan@example.com', age: 34, password: 'correct horse battery')
-adults = $User->where(fn($u) => $u.age >= 18 and $u.email->ends_with('@example.com'))->order_by(name)->get()
-echo $adults->map(fn($u) => $u.name)
+joan = User->create(name: 'Joan', email: 'joan@example.com', age: 34, password: 'correct horse battery')
+adults = User->where(fn(u) => $u.age >= 18 and $u.email->ends_with('@example.com'))->order_by(name)->get()
+echo $adults->map(fn(u) => $u.name)
 echo $joan.id
 ```
 
@@ -37,10 +33,7 @@ A model is declared like a [type](types.md), with `model` instead of `type`. Its
 import KScript.Data
 
 /// A post on the blog.
-model Post {
-  timestamps: yes
-  soft_deletes: yes
-  index: [published]
+model Post(timestamps, soft_deletes, index: [published]) {
   title: string(max: 200)
   body: string
   published: bool = false
@@ -49,24 +42,24 @@ model Post {
   fn excerpt() => $body->truncate(80)
 }
 
-$db->create_table($Post)
-post = $Post->create(title: 'Hello', body: 'The first post.')
+$db->create_table(Post)
+post = Post->create(title: 'Hello', body: 'The first post.')
 echo $post->excerpt()
 ```
 
-Settings go first, one per line:
+A model's options go in the brackets after its name, like the options of every other declaration: `model Post(table: "posts", timestamps, unique: [slug])`. The block holds only fields, `validate` rules and `fn`. An option written as a line of the block still runs, but `kscript check` reports it (KS6014) and `kscript check --fix` moves it into the brackets.
 
-| Setting | What it does |
+| Option | What it does |
 | --- | --- |
-| `table: posts` | The table. Default: the plural of the name in snake case (`User` is `users`, `BlogPost` is `blog_posts`). |
-| `key: slug` | The field that is the key. Default: `id`, an `int` the database numbers, added for you. |
-| `timestamps: yes` | Adds `created_at` and `updated_at`, set when records are saved. |
-| `soft_deletes: yes` | Adds `deleted_at`. `->delete()` sets it instead of removing the row, and queries leave those records out. |
+| `table: "posts"` | The table. Default: the plural of the name in snake case (`User` is `users`, `BlogPost` is `blog_posts`). |
+| `key: "slug"` | The field that is the key. Default: `id`, an `int` the database numbers, added for you. |
+| `timestamps` | Adds `created_at` and `updated_at`, set when records are saved. |
+| `soft_deletes` | Adds `deleted_at`. `->delete()` sets it instead of removing the row, and queries leave those records out. |
 | `unique: [email, [team_id, slug]]` | Fields no two records may share. A list in the list is a set of fields that is unique together. A save that clashes fails with `UniqueViolation`. |
 | `index: [team_id]` | Fields to index, so queries on them stay fast. |
 | `hidden: [password]` | Fields left out of JSON, so they never reach a route's response. |
-| `guarded: [role]` | Fields `->create($form)` and `->update($form)` leave alone, so a form can't set them. Set them on the record: `$user.role = 'admin'`. |
-| `connection: reports` | The [connection](#connections) the table is in. |
+| `guarded: [role]` | Fields `->create($form)` and `->update($form)` leave alone, so a form can't set them. Set them on the record: `user.role = 'admin'`. |
+| `connection: "reports"` | The [connection](#connections) the table is in. |
 
 How each type is stored:
 
@@ -82,41 +75,41 @@ How each type is stored:
 | a list of another model (`posts: Post[]`) | A [relation](#relations), with no column of its own here. |
 | lists, maps and other types | JSON. |
 
-An optional field (`age: int?`) is a column that can be null. A computed field (`label => $first + ' ' + $last`) isn't stored: it is worked out each time a record is read.
+An optional field (`age?: int`) is a column that can be null. A computed field (`label => $first + ' ' + $last`) isn't stored: it is worked out each time a record is read.
 
 ## Adding and saving
 
 ```kscript
 import KScript.Data
 
-model Note {
-  timestamps: yes
+model Note(timestamps) {
   text: string
   pinned: bool = false
 }
 
-$db->create_table($Note)
+$db->create_table(Note)
 
-note = $Note->create(text: 'Buy milk')
-$note.pinned = true
+note = Note->create(text: 'Buy milk')
+note.pinned = true
 $note->save()
 
 $note->update(text: 'Buy oat milk')
 echo $note->is_dirty()
-echo $Note->count()
+echo Note->count()
 ```
 
 | Method | What it does |
 | --- | --- |
-| `$Model->create(values)` | Checks the values, saves a new record and returns it. Takes a map (`->create($form)`) or names and values. |
-| `$Model->first_or_create(match, values)` | The first record matching `match`, or a new one made from both maps. |
+| `Model->create(values)` | Checks the values, saves a new record and returns it. Takes a map (`->create($form)`) or names and values. |
+| `Model(values)` | Calling the model makes a record without saving it, the way calling any type makes a value: `note = Note(text: 'Buy milk')`. `$note->save()` adds it. |
+| `Model->first_or_create(match, values)` | The first record matching `match`, or a new one made from both maps. |
 | `$record->save()` | Saves a record: adds it if it's new, otherwise writes only the fields that changed (and `updated_at`). |
 | `$record->update(values)` | Sets fields and saves. |
 | `$record->delete()` | Deletes it (with `soft_deletes`, marks it deleted). `->force_delete()` always removes it, and `->restore()` brings a soft-deleted one back. |
 | `$record->fresh()` | The record as the database has it now. |
 | `$record->is_dirty(field?)`, `->dirty()` | Whether it has changes that aren't saved, and which fields. |
 
-Values are checked as they are set: `$note.pinned = 'maybe'` fails with a Type error before anything reaches the database.
+Values are checked as they are set: `note.pinned = 'maybe'` fails with a Type error before anything reaches the database.
 
 ## Queries
 
@@ -125,40 +118,39 @@ Every query starts from the model, and each step returns a new query, so a query
 ```kscript
 import KScript.Data
 
-model Order {
-  timestamps: yes
+model Order(timestamps) {
   customer: string
   total: number
   status: string = 'open'
 }
 
-$db->create_table($Order)
-$Order->insert([
+$db->create_table(Order)
+Order->insert([
   { customer: 'Ada', total: 120 },
   { customer: 'Ben', total: 35, status: 'paid' },
   { customer: 'Ada', total: 60, status: 'paid' },
 ])
 
 big = 50
-paid = $Order->where(status: 'paid')
+paid = Order->where(status: 'paid')
 echo $paid->count()
 echo $paid->sum(total)
-echo $Order->where(fn($o) => $o.total > $big)->order_by(total: desc)->pluck(customer)
-echo $Order->where(fn($o) => $o.customer->starts_with('A'))->latest()->first().total
+echo Order->where(fn(o) => $o.total > $big)->order_by(total: desc)->pluck(customer)
+echo Order->where(fn(o) => $o.customer->starts_with('A'))->latest()->first().total
 ```
 
 ### Conditions
 
 `->where()` takes a lambda whose parameter is the row: `$o.total` is a column. The rest of the lambda (variables, function calls, literals) is worked out first and sent to the database as a parameter, so a value can never change the SQL.
 
-These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->length()` and `->matches(regex)`. `$o.x == null` is `IS NULL`. Anything else is a `QueryError` that says which part can't run in the database, rather than a query that quietly does something else.
+These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something else.
 
 Names and values are a shorter way to write equality: `->where(status: 'paid', customer: 'Ada')`. A list means any of them (`status: [open, paid]`), and `null` means the column is empty. Enum words don't need quotes: `->where(role: admin)`.
 
 | Method | What it does |
 | --- | --- |
 | `->where(...)`, `->or_where(...)`, `->where_not(...)` | Keep the rows that match, or that match these instead, or that don't. |
-| `->when(test, fn($q) => ...)` | Changes the query only when the test is true, for optional filters. |
+| `->when(test, fn(q) => ...)` | Changes the query only when the test is true, for optional filters. |
 | `->order_by(name)`, `->order_by(total: desc)` | Sorts. `->latest()` and `->oldest()` sort by `created_at`. |
 | `->limit(n)`, `->offset(n)` | Reads at most `n` rows, after skipping `n`. |
 | `->select(id, name)`, `->distinct()` | Reads only these columns, and leaves out rows that repeat. |
@@ -169,19 +161,19 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 
 | Method | What it gives |
 | --- | --- |
-| `->get()`, `$Model->all()` | A list of records. |
+| `->get()`, `Model->all()` | A list of records. |
 | `->first()`, `->find(id)` | One record, or null. |
 | `->first_or_fail()`, `->find_or_fail(id)` | One record, or a `ModelNotFound` error, which a route answers with 404. |
 | `->count()`, `->exists()` | How many rows match, and whether any do. |
-| `->sum(col)`, `->avg(col)`, `->min(col)`, `->max(col)` | Totals over the rows that match. |
+| `->sum(col)`, `->average(col)`, `->min(col)`, `->max(col)` | Totals over the rows that match. |
 | `->pluck(col)`, `->value(col)` | One column of every row, or of the first. |
 | `->paginate(per_page, page)` | One page: `{ items, page, per_page, total, last_page, from, to, has_more }`. `page` may be text, such as `$query.page`. |
-| `->chunk(size, fn($rows, $n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
+| `->chunk(size, fn(rows, n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
 | `->sql()` | The SQL and parameters the query would run, without running it. |
 
 ### Changing many rows
 
-`->update(values)`, `->increment(col, by)`, `->decrement(col, by)`, `->delete()`, `->force_delete()` and `->restore()` change every row that matches, in one statement, and return how many rows changed. `$Model->insert(rows)` adds a list of rows, each checked like `->create()`.
+`->update(values)`, `->increment(col, by)`, `->decrement(col, by)`, `->delete()`, `->force_delete()` and `->restore()` change every row that matches, in one statement, and return how many rows changed. `Model->insert(rows)` adds a list of rows, each checked like `->create()`.
 
 ## Relations
 
@@ -193,7 +185,7 @@ import KScript.Data
 model User {
   name: string
   posts: Post[](by: author)
-  profile: Profile?
+  profile?: Profile
 }
 
 model Profile {
@@ -213,27 +205,27 @@ model Tag {
   posts: Post[]
 }
 
-$db->create_table($User)
-$db->create_table($Profile)
-$db->create_table($Post)
-$db->create_table($Tag)
+$db->create_table(User)
+$db->create_table(Profile)
+$db->create_table(Post)
+$db->create_table(Tag)
 
-ada = $User->create(name: 'Ada')
-$Profile->create(user: $ada, bio: 'Mathematician')
+ada = User->create(name: 'Ada')
+Profile->create(user: $ada, bio: 'Mathematician')
 post = $ada->posts()->create(title: 'Notes on the engine')
-maths = $Tag->create(name: 'maths')
+maths = Tag->create(name: 'maths')
 $post->tags()->attach($maths)
 
 echo $post.author.name
 echo $ada.profile.bio
-echo $ada.posts->map(fn($p) => $p.title)
+echo $ada.posts->map(fn(p) => $p.title)
 echo $maths.posts->count()
 ```
 
 | The field | The kind | Where the link is kept |
 | --- | --- | --- |
 | `author: User` | belongs to | `author_id` on this table, a foreign key to `users`. The model gets an `author_id` field too. |
-| `profile: Profile?`, where Profile has `user: User` | has one | `user_id` on `profiles`. The side that has one is the optional one. |
+| `profile?: Profile`, where Profile has `user: User` | has one | `user_id` on `profiles`. The side that has one is the optional one. |
 | `posts: Post[]`, where Post has one field that is a User | has many | That field's column on `posts`: `author_id`. |
 | `tags: Tag[]`, where Tag has no field that is one Post | many to many | A pivot table, `post_tag`, with `post_id` and `tag_id`. |
 | `comments: Comment[](through: posts)` | has many through | Nothing of its own: the comments of this user's posts. |
@@ -256,7 +248,7 @@ Two models that link to each other can each live in their own file without impor
 Reading a relation on a record loads it: one record (or null) for belongs to and has one, a list for the others. A record read in a list loads the relation for the whole list at once, so a loop like this makes one query for the authors, not one for each post:
 
 ```kscript
-for post in $Post->latest()->get() {
+for post in Post->latest()->get() {
   echo "{$post.title} by {$post.author.name}"
 }
 ```
@@ -266,14 +258,14 @@ for post in $Post->latest()->get() {
 ```kscript
 import KScript.Data
 
-users = $User->with(profile, posts.tags)->get()
-users = $User->with(posts: fn($q) => $q->where(published: true))->get()
+users = User->with(profile, posts.tags)->get()
+users = User->with(posts: fn(q) => $q->where(published: true))->get()
 $post->load(author, tags)
 ```
 
 A relation that hasn't been loaded is left out of JSON, so a route's response only has the ones you loaded.
 
-`->with_count(posts)` gives each record a `posts_count` field, counted by the database. `->with_count(posts: fn($q) => $q->where(published: true))` counts some of them.
+`->with_count(posts)` gives each record a `posts_count` field, counted by the database. `->with_count(posts: fn(q) => $q->where(published: true))` counts some of them.
 
 ### Relations as queries
 
@@ -294,21 +286,21 @@ $ada->posts()->create(title: 'A second post')
 | `->sync(records)` | Links exactly these, unlinking the rest. Gives `{ attached, detached }`. |
 | `->toggle(records)` | Links the ones that aren't linked and unlinks the ones that are. |
 
-A belongs-to relation is set on the record: `$post.author = $ben` sets `author_id`, and `$post->save()` writes it.
+A belongs-to relation is set on the record: `post.author = $ben` sets `author_id`, and `$post->save()` writes it.
 
 ### Relations in conditions
 
 A condition can read through relations, and the database does the work:
 
 ```kscript
-busy = $User->where(fn($u) => $u.posts->count() > 10)->get()
-tagged = $Post->where(fn($p) => $p.tags->any(fn($t) => $t.name == 'maths'))->get()
-by_ada = $Post->where(fn($p) => $p.author.name == 'Ada')->get()
-no_profile = $User->where(fn($u) => $u.profile == null)->get()
-mine = $Post->where(author: $ada)->get()
+busy = User->where(fn(u) => $u.posts->count() > 10)->get()
+tagged = Post->where(fn(p) => $p.tags->any(fn(t) => $t.name == 'maths'))->get()
+by_ada = Post->where(fn(p) => $p.author.name == 'Ada')->get()
+no_profile = User->where(fn(u) => $u.profile == null)->get()
+mine = Post->where(author: $ada)->get()
 ```
 
-On a list relation, `->count()`, `->any()`, `->is_empty()`, `->none()`, `->all()`, `->sum()`, `->avg()`, `->min()` and `->max()` become SQL, each with an optional lambda on the related record. On one record, its fields can be read (`$p.author.name`), it can be compared with a record (`$p.author == $ada`), and with null.
+On a list relation, `->count()`, `->any()`, `->is_empty()`, `->all()`, `->sum()`, `->average()`, `->min()` and `->max()` become SQL, each with an optional lambda on the related record. On one record, its fields can be read (`$p.author.name`), it can be compared with a record (`$p.author == $ada`), and with null.
 
 ### Scopes
 
@@ -323,11 +315,11 @@ model Article {
   published: bool = false
 
   fn live(query) => $query->where(published: true)
-  fn popular(query, over: int = 100) => $query->where(fn($a) => $a.views > $over)
+  fn popular(query, over: int = 100) => $query->where(fn(a) => $a.views > $over)
 }
 
-$db->create_table($Article)
-echo $Article->live()->popular(over: 10)->count()
+$db->create_table(Article)
+echo Article->live()->popular(over: 10)->count()
 ```
 
 ## Transactions
@@ -342,15 +334,15 @@ model Account {
   balance: number = 0
 }
 
-$db->create_table($Account)
-$Account->create(owner: 'Ada', balance: 100)
-$Account->create(owner: 'Ben')
+$db->create_table(Account)
+Account->create(owner: 'Ada', balance: 100)
+Account->create(owner: 'Ben')
 
 fn transfer(from: int, to: int, amount: number) {
   transaction {
-    $Account->where(id: $from)->decrement(balance, by: $amount)
-    $Account->where(id: $to)->increment(balance, by: $amount)
-    if $Account->find($from).balance < 0 {
+    Account->where(id: $from)->decrement(balance, by: $amount)
+    Account->where(id: $to)->increment(balance, by: $amount)
+    if Account->find($from).balance < 0 {
       throw Conflict(message: 'Not enough money')
     }
   }
@@ -362,10 +354,10 @@ try {
 } catch Conflict as e {
   echo $e.message
 }
-echo $Account->pluck(balance)
+echo Account->pluck(balance)
 ```
 
-`@transaction(fn() => ...)` does the same for a function and returns what it returns. A transaction inside another is a savepoint, so only its own changes are undone. `retries: 3` tries again when the database is busy.
+`$db->transaction(fn() => ...)` does the same for a function and returns what it returns. A transaction inside another is a savepoint, so only its own changes are undone. `retries: 3` tries again when the database is busy.
 
 ## Raw SQL
 
@@ -382,7 +374,7 @@ $db->sql("insert into visits (page, at) values ({$page}, {@now()->to_string()})"
 echo @sql("select count(*) as n from visits where page = {$page}")[0].n
 ```
 
-A query gives its rows as maps (or as a type: `@sql(text, as: $User)`), and anything else gives how many rows it changed. `@db('visits')` is a query on a table with no model, whose rows are maps.
+A query gives its rows as maps (or as a type: `@sql(text, as: User)`), and anything else gives how many rows it changed. `@db('visits')` is a query on a table with no model, whose rows are maps.
 
 ## Connections
 
@@ -439,8 +431,8 @@ Raw SQL in `@sql` is given to the database as it is, so it is written in that da
 | `ModelNotFound` (extends `NotFound`) | `->find_or_fail()` and `->first_or_fail()` find nothing. `$e.model` and `$e.id` say what. | 404 |
 | `UniqueViolation` (extends `Conflict`) | A save would give two records the same unique value. `$e.fields` names the fields. | 409 |
 | `ForeignKeyViolation` (extends `Conflict`) | A change would leave a row pointing at one that isn't there. | 409 |
-| `QueryError` | The database refused a query, or a condition can't be turned into SQL. | 500 |
-| `ConnectionError` | The database can't be opened. | 503 |
+| `Query` | The database refused a query, or a condition can't be turned into SQL. | 500 |
+| `Connection` | The database can't be opened. | 503 |
 
 ## Making a model
 
@@ -467,15 +459,17 @@ A migration it writes looks like this:
 
 ```kscript
 // Written by kscript db diff from the models.
-KScript.Migration {
-  CreateTable(name: users) {
-    Field(name: id, type: int, key, auto)
-    Field(name: name, type: string, max: 80)
-    Field(name: email, type: email)
-    Field(name: role, type: enum, values: [member, admin], default: 'member')
+import KScript.Data
+
+Migration {
+  CreateTable(name: 'users') {
+    Field(name: 'id', type: int, key, auto)
+    Field(name: 'name', type: string, max: 80)
+    Field(name: 'email', type: email)
+    Field(name: 'role', type: enum, values: [member, admin], default: 'member')
     Index(columns: [email], unique)
   }
-  AddField(table: posts, name: views, type: int, default: 0)
+  AddField(table: 'posts', name: 'views', type: int, default: 0)
 }
 ```
 
@@ -509,7 +503,7 @@ kscript db migrate            # runs what hasn't run, as one batch
 kscript db migrate --pretend  # prints the SQL instead
 kscript db rollback           # undoes the last batch
 kscript db rollback --steps 2 # undoes the last two migrations
-kscript db status             # what has run, and what the models want that no migration makes (--format json too)
+kscript db status             # what has run, and what the models want that no migration makes (--output json too)
 kscript db fresh              # drops every table and runs every migration again
 ```
 
@@ -529,7 +523,7 @@ A seeder is a script in `database/seeders` (`paths.seeders`) that fills the data
 import KScript.Data
 import "../../models/user.kscript"
 
-$User->create(name: 'Ada', email: 'ada@example.com')
+User->create(name: 'Ada', email: 'ada@example.com')
 ```
 
 `kscript db seed` runs every seeder in name order, and `kscript db seed users` runs one. `kscript db migrate --seed` and `kscript db fresh --seed` run them after migrating.
@@ -546,13 +540,13 @@ import KScript.Data
 import "../models/post.kscript"
 
 test(name: "a post starts with no views") {
-  post = $Post->fake(title: 'Hello')
+  post = Post->fake(title: 'Hello')
   expect(value: $post.views, equals: 0)
-  expect(value: $Post->count(), equals: 1)
+  expect(value: Post->count(), equals: 1)
 }
 
 test(name: "each test starts empty") {
-  expect(value: $Post->count(), equals: 0)
+  expect(value: Post->count(), equals: 0)
 }
 ```
 
@@ -560,11 +554,11 @@ test(name: "each test starts empty") {
 
 ### Fakes
 
-`$Model->fake(fields...)` saves a record with made-up values for the fields you don't give, and `->fake_many(count, fields...)` saves several. The values fit each field's type and limits (a `string(min: 3, max: 12)` is 3 to 12 characters, an `email` ends in `@example.com`, an enum is its first value), and a required relation gets a fake record of its own:
+`Model->fake(fields...)` saves a record with made-up values for the fields you don't give, and `->fake_many(count, fields...)` saves several. The values fit each field's type and limits (a `string(min: 3, max: 12)` is 3 to 12 characters, an `email` ends in `@example.com`, an enum is its first value), and a required relation gets a fake record of its own:
 
 ```kscript
-joan = $Author->fake(name: 'Joan')
-posts = $Post->fake_many(3, author: $joan)
+joan = Author->fake(name: 'Joan')
+posts = Post->fake_many(3, author: $joan)
 ```
 
 ### Counting queries
@@ -573,8 +567,8 @@ posts = $Post->fake_many(3, author: $joan)
 
 ```kscript
 test(name: "the post list loads authors at once") {
-  $Post->fake_many(10)
-  $Post->with(author)->get()
+  Post->fake_many(10)
+  Post->with(author)->get()
   expect(value: @queries(), count_at_most: 2)
 }
 ```
@@ -587,7 +581,7 @@ test(name: "the post list loads authors at once") {
 
 ## In the editor
 
-The language server knows each model's fields. It completes them in `->where(`, `->order_by(`, `->create(` and the rest, and relations in `->with(`; a field the model doesn't have is `KS5013` (see [errors](errors.md)). A `where` lambda's parameter is the model's record, so `fn($p) => $p.` completes its fields too.
+The language server knows each model's fields. It completes them in `->where(`, `->order_by(`, `->create(` and the rest, and relations in `->with(`; a field the model doesn't have is `KS5013` (see [errors](errors.md)). A `where` lambda's parameter is the model's record, so `fn(p) => $p.` completes its fields too.
 
 Hover over a query method to see the SQL the chain sends, roughly, with `?` for the values:
 

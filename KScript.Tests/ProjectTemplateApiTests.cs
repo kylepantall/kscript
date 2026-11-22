@@ -69,7 +69,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.Equal(new[]
         {
             ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config/config.test.yaml", "config/config.yaml",
-            "controllers/accounts.kscript", "controllers/notes.kscript", "kscript.json", "lib/cache.kscript", "middleware/request_id.kscript",
+            "controllers/accounts.kscript", "controllers/notes.kscript", "kscript.json", "lib/cache.kscript", "middleware/request-id.kscript",
             "models/note.kscript", "requests/note-input.kscript", "requests/sign-in.kscript", "requests/sign-up.kscript", "routes/api.kscript", "tests/accounts.test.kscript", "tests/api.test.kscript", "tests/notes.test.kscript",
         }, Files(root));
         // Each type has its own file, and the controllers import them.
@@ -117,7 +117,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     [Theory]
     [InlineData("--db", "none")]
     [InlineData("--no-auth", "--no-cache")]
-    [InlineData("--format", "xml")]
+    [InlineData("--syntax", "xml")]
     public void EveryApiOptionMixPassesItsTests(string option, string value)
     {
         using var parent = new TempSite();
@@ -159,7 +159,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var parent = new TempSite();
         var (code, _, err) = Make(parent.Root, "x", "--template", "api", "--db", "oracle");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("--db should be sqlite, postgres, mysql or none, not 'oracle'.", err);
         Assert.Equal("a", ProjectScaffolder.Either(new[] { "a" }));
     }
@@ -189,8 +189,8 @@ public sealed class ProjectTemplateApiTests : IDisposable
         {
             ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_components/site-nav.html", "_layout.html",
             "config/config.test.yaml", "config/config.yaml", "controllers/notes.kscript", "index.html", "kscript.json", "lib/cache.kscript",
-            "lib/notes_client.kscript", "models/note.kscript", "notes.html", "requests/note-input.kscript", "routes/api.kscript", "site.css", "tests/api.test.kscript",
-            "tests/notes_client.test.kscript",
+            "lib/notes-client.kscript", "models/note.kscript", "notes.html", "requests/note-input.kscript", "routes/api.kscript", "site.css", "tests/api.test.kscript",
+            "tests/notes-client.test.kscript",
         }, Files(root));
         Assert.Contains("and its API under /api", output);
         var (tested, report) = Test(root);
@@ -231,7 +231,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     public void FullstackWithAuthAddsTheSignInPages()
     {
         using var parent = new TempSite();
-        var (code, output, err) = Make(parent.Root, "app", "--template", "fullstack", "--auth", "--format", "xml");
+        var (code, output, err) = Make(parent.Root, "app", "--template", "fullstack", "--auth", "--syntax", "xml");
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "app");
         foreach (string f in new[] { "routes/web.ks.xml", "controllers/accounts.ks.xml", "views/auth/login.html", "views/auth/register.html" })
@@ -330,7 +330,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
 
         // Input that ends before the wizard is done stops it.
         var (stopped, _, stoppedErr) = Make(parent.Root);
-        Assert.Equal(1, stopped);
+        Assert.Equal(2, stopped);
         Assert.Contains("The input ended", stoppedErr);
 
         // Not at a terminal, a missing folder is still an error.
@@ -373,9 +373,9 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ \"name\": \"local\" }"),
-            ("routes/api.kscript", "KScript.Routes {\n  Get(path: \"/echo\") {\n    return { query: $request.query, auth: $request.headers.authorization ?? '', cookie: $request.cookies.sid ?? '' }\n  }\n  Post(path: \"/echo\") {\n    return @response({ body: $request.body, type: $request.headers['content-type'] }, status: 201)\n  }\n  Get(path: \"/loop\") {\n    return @api('/api/loop')->json()\n  }\n  Get(path: \"/again\") {\n    return @api('/api/echo')->json()\n  }\n}\n"),
-            ("scripts/ask.kscript", "import KScript.Net\nr = @api('/api/echo?a=1&b=two+words&flag')\necho $r->status()\necho $r->json().query\necho @api('/api/echo', options: { method: 'post', body: 'plain' })->json()\necho @api('/api/echo', options: { method: 'POST', body: { x: 1 }, headers: { 'Content-Type': 'application/merge+json' } })->json().type\necho @api('/nothing')->status()\necho @api('/api/missing')->status()\n"),
-            ("scripts/loop.kscript", "import KScript.Net\necho @api('/api/loop')->status()\n"));
+            ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/echo\") {\n    return { query: $request.query, auth: $request.headers.authorization ?? '', cookie: $request.cookies.sid ?? '' }\n  }\n  Post(path: \"/echo\") {\n    return @response({ body: $request.body, type: $request.headers['content-type'] }, status: 201)\n  }\n  Get(path: \"/loop\") {\n    return @api('/api/loop')->json()\n  }\n  Get(path: \"/again\") {\n    return @api('/api/echo')->json()\n  }\n}\n"),
+            ("scripts/ask.kscript", "import KScript.Net\nr = @api('/api/echo?a=1&b=two+words&flag')\necho $r.status\necho $r->json().query\necho @api('/api/echo', options: { method: 'post', body: 'plain' })->json()\necho @api('/api/echo', options: { method: 'POST', body: { x: 1 }, headers: { 'Content-Type': 'application/merge+json' } })->json().type\necho @api('/nothing').status\necho @api('/api/missing').status\n"),
+            ("scripts/loop.kscript", "import KScript.Net\necho @api('/api/loop').status\n"));
         var (output, error) = RunScript(Path.Combine(site.Root, "scripts", "ask.kscript"));
         Assert.Null(error);
         Assert.Contains("200", output);
@@ -397,7 +397,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ \"name\": \"fwd\" }"),
-            ("routes/api.kscript", "KScript.Routes {\n  import KScript.Net\n  Get(path: \"/who\") {\n    return { auth: $request.headers.authorization ?? '', sid: $request.cookies.sid ?? '' }\n  }\n  Get(path: \"/relay\") {\n    return @api('/api/who')->json()\n  }\n  Get(path: \"/own\") {\n    return @api('/api/who', options: { headers: { Cookie: 'sid=mine' } })->json()\n  }\n}\n"),
+            ("routes/api.kscript", "import KScript.Http\nimport KScript.Net\n\nRoutes {\n  Get(path: \"/who\") {\n    return { auth: $request.headers.authorization ?? '', sid: $request.cookies.sid ?? '' }\n  }\n  Get(path: \"/relay\") {\n    return @api('/api/who')->json()\n  }\n  Get(path: \"/own\") {\n    return @api('/api/who', options: { headers: { Cookie: 'sid=mine' } })->json()\n  }\n}\n"),
             ("page.html", "<import package=\"KScript.Net\" />\n<p>{ @api('/api/who')->json().sid }</p>\n"));
         var app = new HttpApp(site.Root, ProjectConfig.Load(Path.Combine(site.Root, "kscript.json")));
         var request = new Dictionary<string, object>
@@ -429,12 +429,12 @@ public sealed class ProjectTemplateApiTests : IDisposable
     [Fact]
     public void ApiWithAPathNeedsAProjectWithRoutes()
     {
-        using var lone = new TempSite(("ask.kscript", "import KScript.Net\necho @api('/api/x')->status()\n"));
+        using var lone = new TempSite(("ask.kscript", "import KScript.Net\necho @api('/api/x').status\n"));
         var (_, error) = RunScript(Path.Combine(lone.Root, "ask.kscript"));
         Assert.NotNull(error);
         Assert.Contains("isn't in a project with routes", error.Message);
 
-        using var bare = new TempSite(("kscript.json", "{ }"), ("ask.kscript", "import KScript.Net\necho @api('/api/x')->status()\n"));
+        using var bare = new TempSite(("kscript.json", "{ }"), ("ask.kscript", "import KScript.Net\necho @api('/api/x').status\n"));
         Assert.Contains("isn't in a project with routes", RunScript(Path.Combine(bare.Root, "ask.kscript")).Error.Message);
         // Asking twice reuses the app it made for the project.
         Assert.Contains("isn't in a project with routes", RunScript(Path.Combine(bare.Root, "ask.kscript")).Error.Message);
@@ -479,7 +479,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     [Fact]
     public void ServedAppsAnswerLocalRequestsWhileTheyServe()
     {
-        using var site = new TempSite(("kscript.json", "{ }"), ("routes/api.kscript", "KScript.Routes {\n  Get(path: \"/n\") {\n    return { n: 1 }\n  }\n}\n"));
+        using var site = new TempSite(("kscript.json", "{ }"), ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/n\") {\n    return { n: 1 }\n  }\n}\n"));
         var app = new HttpApp(site.Root, ProjectConfig.Load(Path.Combine(site.Root, "kscript.json")));
         LocalApi.Serve(app);
         try
@@ -500,7 +500,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ }"),
-            ("routes/api.kscript", "KScript.Routes {\n  import KScript.Auth\n  Get(path: \"/c\") {\n    $session->put('k', 'v')\n    return { ok: true }\n  }\n}\n"));
+            ("routes/api.kscript", "import KScript.Http\nimport KScript.Auth\n\nRoutes {\n  Get(path: \"/c\") {\n    $session->set('k', 'v')\n    return { ok: true }\n  }\n}\n"));
         LocalResponse r = LocalRequests.Send(new KScriptHost(TextWriter.Null, TextWriter.Null), site.Root,
             new Dictionary<string, object> { ["method"] = "GET", ["path"] = "/api/c", ["headers"] = new Dictionary<string, object>() });
         Assert.Equal(200, r.Status);
@@ -542,7 +542,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         KScript.Testing.TestCommand.Run(new[] { Path.Combine(broken.Root, "a.test.kscript") }, new StringWriter(), new StringWriter(), color: false);
         Assert.Null(Environment.GetEnvironmentVariable("KSCRIPT_ENV"));
         // --filter's value isn't a folder, so it isn't looked in for a project.
-        Assert.Equal(1, KScript.Testing.TestCommand.Run(new[] { "--filter", "a", Path.Combine(broken.Root, "nowhere") }, new StringWriter(), new StringWriter(), color: false));
+        Assert.Equal(2, KScript.Testing.TestCommand.Run(new[] { "--filter", "a", Path.Combine(broken.Root, "nowhere") }, new StringWriter(), new StringWriter(), color: false));
     }
 
     [Fact]
@@ -551,7 +551,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         using var site = new TempSite(
             ("kscript.json", "{ \"config\": { \"root\": \"config\" } }"),
             ("config/config.yaml", "app:\n  name: Configured\n"),
-            ("routes/api.kscript", "KScript.Routes {\n  Get(path: \"/name\") {\n    return { name: $config.app.name }\n  }\n}\n"),
+            ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/name\") {\n    return { name: $config.app.name }\n  }\n}\n"),
             ("blog/page.html", "<p>{ $config.app.name }</p>\n"));
         var app = new HttpApp(site.Root, ProjectConfig.Load(Path.Combine(site.Root, "kscript.json")));
         Assert.Contains("Configured", Get(app, "/api/name").Body);
@@ -560,7 +560,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         // Without config.root, the files are read from the project folder; a broken kscript.json is left to report itself.
         using var plain = new TempSite(("kscript.json", "{ }"), ("config.yaml", "app:\n  name: Plain\n"), ("sub/page.html", "<p>{ $config.app.name }</p>\n"));
         Assert.Contains("<p>Plain</p>", plain.Render("sub/page.html").Body);
-        using var broken = new TempSite(("kscript.json", "{ nope"), ("page.html", "<p>{ @config('x', 'none') }</p>\n"));
+        using var broken = new TempSite(("kscript.json", "{ nope"), ("page.html", "<p>{ $config->get('x', 'none') }</p>\n"));
         Assert.Contains("<p>none</p>", broken.Render("page.html").Body);
     }
 }

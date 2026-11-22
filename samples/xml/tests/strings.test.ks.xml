@@ -1,0 +1,26 @@
+<kscript>
+  <!-- Run with: kscript test (from samples/xml), or kscript test tests/strings.test.ks.xml -->
+  <import path="../lib/strings.ks.xml" />
+
+  <describe name="slugify">
+    <test name="lower-cases and joins words with dashes">
+      <expect value="@slugify('Hello World')" equals="'hello-world'" />
+    </test>
+
+    <for each="case" in="[
+      { text: 'One', slug: 'one' },
+      { text: 'Two Words', slug: 'two-words' },
+      { text: 'ALREADY-SLUG', slug: 'already-slug' },
+    ]">
+      <test name="slug of '{$case.text}'">
+        <expect value="@slugify($case.text)" equals="$case.slug" />
+      </test>
+    </for>
+  </describe>
+
+  <describe name="titlecase">
+    <test name="upper-cases">
+      <do>@assert(@titlecase('abc') eq 'ABC')</do>
+    </test>
+  </describe>
+</kscript>

@@ -131,7 +131,7 @@ public class ScaffolderTests
     {
         using var site = new TempSite();
         var (code, _, err) = Make(site.Root, "component", name);
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("already an HTML or KScript element", err);
         Assert.False(Directory.Exists(Path.Combine(site.Root, "_components")));
     }
@@ -142,7 +142,7 @@ public class ScaffolderTests
         using var site = new TempSite(("_layout.html", "<html><title>{$title}</title><body><slot /></body></html>"));
         Assert.Equal(0, Make(site.Root, "page", "AboutUs", "--title", "About the team").Code);
 
-        Assert.Equal("<layout src=\"_layout.html\" title=\"About the team\">\n  <h1>About the team</h1>\n  <!-- TODO: Add what the page shows. -->\n</layout>\n", Read(site, "about-us.html"));
+        Assert.Equal("<layout path=\"_layout.html\" title=\"About the team\">\n  <h1>About the team</h1>\n  <!-- TODO: Add what the page shows. -->\n</layout>\n", Read(site, "about-us.html"));
         string html = site.Render("about-us.html").Body;
         Assert.Contains("<title>About the team</title>", html);
         Assert.Contains("<h1>About the team</h1>", html);
@@ -175,7 +175,7 @@ public class ScaffolderTests
     {
         using var site = new TempSite();
         var (code, _, err) = Make(site.Root, "markdown", "page", "about", "--title", "About us");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("kscript make markdown takes one name, but got 'page' and 'about'.", err);
         Assert.Contains("Did you mean: kscript make markdown about --title \"About us\"", err);
         Assert.Empty(Directory.GetFiles(site.Root, "*", SearchOption.AllDirectories));
@@ -218,7 +218,7 @@ public class ScaffolderTests
         Assert.Contains("<html lang=\"en-GB\">", layout);
         Assert.Contains("<link rel=\"stylesheet\" href=\"/site.css\">\n    <link rel=\"stylesheet\" href=\"/print.css\">", layout);
 
-        site.Write("index.html", "<layout src=\"_layouts/main.html\" title=\"Home\"><p>hi</p></layout>");
+        site.Write("index.html", "<layout path=\"_layouts/main.html\" title=\"Home\"><p>hi</p></layout>");
         string html = site.Render("index.html").Body;
         Assert.Contains("<title>Home</title>", html);
         Assert.Contains("<p>hi</p>", html);
@@ -228,14 +228,14 @@ public class ScaffolderTests
     public void ScriptRuns()
     {
         using var site = new TempSite();
-        // Scripts are .kscript by default, and XML with --format xml.
+        // Scripts are .kscript by default, and XML with --syntax xml.
         Assert.Equal(0, Make(site.Root, "script", "tidy_downloads").Code);
         Assert.Equal("// TODO: Write what the script does.\necho \"Hello from Tidy Downloads!\"\n", Read(site, "scripts/tidy-downloads.kscript"));
         var output = new StringWriter();
         new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(output, "")).RunFile(Path.Combine(site.Root, "scripts", "tidy-downloads.kscript"));
         Assert.Contains("Hello from Tidy Downloads!", output.ToString());
 
-        Assert.Equal(0, Make(site.Root, "script", "tidy_downloads", "--format", "xml").Code);
+        Assert.Equal(0, Make(site.Root, "script", "tidy_downloads", "--syntax", "xml").Code);
         string xml = Read(site, "scripts/tidy-downloads.ks.xml");
         Assert.StartsWith("<kscript>", xml);
         Assert.Contains("Hello from Tidy Downloads!", ScriptRunner.Run(xml));
@@ -252,7 +252,7 @@ public class ScaffolderTests
         Assert.StartsWith("%PDF-", File.ReadAllText(Path.Combine(site.Root, "documents", "annual-report.pdf")));
         Assert.True(File.Exists(Path.Combine(site.Root, "documents", "annual-report.docx")));
 
-        Assert.Equal(0, Make(site.Root, "document", "annual_report", "--format", "xml", "--template", "report").Code);
+        Assert.Equal(0, Make(site.Root, "document", "annual_report", "--syntax", "xml", "--template", "report").Code);
         string xml = Read(site, "documents/annual-report.ks.xml");
         Assert.Matches(@"<KScript.Document\s+template=""report""", xml);
         // The .kscript template's [a, b] list is plain text in XML.
@@ -274,7 +274,7 @@ public class ScaffolderTests
         new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(output, "")).RunFile(Path.Combine(site.Root, "main.kscript"));
         Assert.Contains("Order 7 could not be paid 402", output.ToString());
 
-        Assert.Equal(0, Make(site.Root, "error", "Gone", "--format", "xml").Code);
+        Assert.Equal(0, Make(site.Root, "error", "Gone", "--syntax", "xml").Code);
         Assert.Contains("<error name=\"Gone\" message=\"Gone\" description=\"Gone.\" />", Read(site, "errors/gone.ks.xml"));
     }
 
@@ -283,7 +283,7 @@ public class ScaffolderTests
     {
         using var site = new TempSite(("_components/hero.html", "mine"));
         var (code, _, err) = Make(site.Root, "component", "Hero");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("already exists", err);
         Assert.Equal("mine", Read(site, "_components/hero.html"));
 
@@ -366,7 +366,7 @@ public class ScaffolderTests
     {
         using var site = new TempSite();
         var (code, _, err) = Make(site.Root, args);
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains(message, err);
     }
 
@@ -375,7 +375,7 @@ public class ScaffolderTests
     {
         using var site = new TempSite(("_templates/evil.html", "--- make\nto: ../{{ kebab }}.html\n---\nx"));
         var (code, _, err) = Make(site.Root, "evil", "x");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("outside the project folder", err);
     }
 }

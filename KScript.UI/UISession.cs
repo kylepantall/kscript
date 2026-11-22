@@ -51,7 +51,7 @@ namespace KScript.UI
         /// <summary>Runs the window's setup and draws it for the first time.</summary>
         internal static UISession Start(ElementRun run)
         {
-            if (CurrentParent != null) throw run.Error("A <Window> can't be inside another window.", null, "Syntax");
+            if (CurrentParent != null) throw run.Error($"A <Window> can't be inside another window.", null, "Syntax");
             var session = new UISession(run);
             List<MarkupNode> setup = run.Element.Children.Where(n => n is MarkupElement e && SetupElements.Contains(e.Name)).ToList();
             run.Run(setup, session.State);
@@ -86,7 +86,7 @@ namespace KScript.UI
             if (notify) Redrawn?.Invoke();
         }
 
-        /// <summary>Runs a node's handler (on-click, on-tick…) and redraws. Returns false if it has no such handler.</summary>
+        /// <summary>Runs a node's handler (on_click, on_tick…) and redraws. Returns false if it has no such handler.</summary>
         public bool Fire(UINode node, string handler, Dictionary<string, object> evt = null)
         {
             if (!node.Handlers.TryGetValue(handler, out UIHandler h)) return false;
@@ -109,7 +109,7 @@ namespace KScript.UI
             return true;
         }
 
-        /// <summary>The person changed a bound input: stores the value, runs on-change, and redraws.</summary>
+        /// <summary>The person changed a bound input: stores the value, runs on_change, and redraws.</summary>
         public void SetBound(UINode node, object value)
         {
             if (node.Bind == null) return;
@@ -124,7 +124,7 @@ namespace KScript.UI
                 return;
             }
             var evt = new Dictionary<string, object> { ["value"] = value };
-            if (!Fire(node, "on-change", evt)) Redraw();
+            if (!Fire(node, "on_change", evt)) Redraw();
         }
 
         #region For tests and tools
@@ -138,7 +138,7 @@ namespace KScript.UI
             ?? throw new InvalidOperationException($"No <{type}> says '{text}'. The window has: {string.Join(", ", Tree.Descendants().Where(n => n.Text != null).Select(n => n.ToString()))}");
 
         /// <summary>Clicks the button (or box) with this text.</summary>
-        public void Click(string text) => Fire(Tree.Descendants().First(n => (n.Type == "Button" || n.Type == "Box") && n.Text?.Trim() == text), "on-click");
+        public void Click(string text) => Fire(Tree.Descendants().First(n => (n.Type == "Button" || n.Type == "Box") && n.Text?.Trim() == text), "on_click");
 
         #endregion
     }

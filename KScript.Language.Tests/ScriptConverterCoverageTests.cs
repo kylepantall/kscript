@@ -20,12 +20,12 @@ namespace KScript.Language.Tests
                 "  </echo>",
                 "  stray text",
                 "  <!--- Greets someone. -->",
-                "  <fn name=\"f\" params=\"a = 'it\\'s', b = [1, 2]\"><echo>x</echo></fn>",
+                "  <fn name=\"f\" params=\"a = 'its', b = [1, 2]\"><echo>x</echo></fn>",
                 "  <let name=\"y\" value=\"1\" />",
                 "  <if test=\"true\"><let name=\"y\" value=\"2\" /></if>",
                 "  <echo value=\"$y\" />",
                 "  <match value=\"$y\"><!-- c --><case is=\"1\"><echo>one</echo></case></match>",
-                "  <call fn=\"greet\" args=\"'x'\" to=\"r\" />",
+                "  <call fn=\"greet\" args=\"'x'\" into=\"r\" />",
                 "  <do />",
                 "  <do>x = = 1</do>",
                 "  <if test=\"$x\"></if>",
@@ -40,7 +40,7 @@ namespace KScript.Language.Tests
                 "echo \"Hi \\\"there\\\" \\\\\"",
                 "// stray text",
                 "/// Greets someone.",
-                "fn f(a = 'it\\'s', b = [1, 2]) {",
+                "fn f(a = 'its', b = [1, 2]) {",
                 "  echo \"x\"",
                 "}",
                 "y = 1",
@@ -50,9 +50,7 @@ namespace KScript.Language.Tests
                 "echo $y",
                 "match $y {",
                 "  // c",
-                "  case 1 {",
-                "    echo \"one\"",
-                "  }",
+                "  1 => echo \"one\"",
                 "}",
                 "r = @greet('x')",
                 "x = = 1",
@@ -139,7 +137,7 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("a.kscript", "a.ks.xml")]
         [InlineData("a.ks.xml", "a.kscript")]
-        [InlineData("a.xml", "a.kscript")]
+        [InlineData("a.test.ks.xml", "a.test.kscript")]
         [InlineData("a.txt", "a.txt.kscript")]
         public void ConvertedPaths(string path, string converted) => Assert.Equal(converted, ScriptConverter.ConvertedPath(path));
     }

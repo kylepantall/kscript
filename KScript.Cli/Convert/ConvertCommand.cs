@@ -10,7 +10,7 @@ using KScript.Syntax.Markup;
 namespace KScript.Conversion
 {
     /// <summary>
-    /// kscript convert &lt;file-or-folder&gt;... [--to xml|kscript] [--out path] [--stdout] [--force]:
+    /// kscript convert &lt;file-or-folder&gt;... [--syntax kscript|xml] [--out path] [--stdout] [--force]:
     /// writes the .kscript version of an XML script (x.ks.xml gives x.kscript) or the XML version of a .kscript file.
     /// The original is never changed.
     /// </summary>
@@ -26,13 +26,18 @@ namespace KScript.Conversion
 
             for (int i = 0; i < args.Length; i++)
             {
+                if (CliFlags.Retired("convert", args[i]) is string renamed)
+                {
+                    error.WriteLine(renamed);
+                    return ExitCodes.Usage;
+                }
                 switch (args[i])
                 {
-                    case "--to":
+                    case CliFlags.Syntax:
                         if (i + 1 >= args.Length || args[i + 1] is not ("xml" or "kscript"))
                         {
-                            error.WriteLine("--to needs xml or kscript, e.g. --to kscript");
-                            return 1;
+                            error.WriteLine("--syntax needs kscript or xml, e.g. --syntax kscript");
+                            return ExitCodes.Usage;
                         }
                         to = args[++i];
                         break;
@@ -41,7 +46,7 @@ namespace KScript.Conversion
                         if (i + 1 >= args.Length)
                         {
                             error.WriteLine("--out needs a file name.");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         outPath = args[++i];
                         break;
@@ -60,7 +65,7 @@ namespace KScript.Conversion
                         if (args[i].StartsWith("-", StringComparison.Ordinal))
                         {
                             error.WriteLine($"Unknown option '{args[i]}'. Run kscript convert --help.");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         inputs.Add(args[i]);
                         break;
@@ -70,7 +75,7 @@ namespace KScript.Conversion
             if (inputs.Count == 0)
             {
                 PrintUsage(error);
-                return 1;
+                return ExitCodes.Usage;
             }
 
             List<string> files = new List<string>();
@@ -89,14 +94,14 @@ namespace KScript.Conversion
                 else
                 {
                     error.WriteLine($"There is no file or folder at '{input}'.");
-                    return 2;
+                    return ExitCodes.Usage;
                 }
             }
 
             if (outPath != null && files.Count != 1)
             {
                 error.WriteLine("--out works with one file. For a folder, each file is written next to its original.");
-                return 1;
+                return ExitCodes.Usage;
             }
 
             // Every file this run converts, so imports between them can point at the new files.
@@ -107,6 +112,12 @@ namespace KScript.Conversion
             int failures = 0;
             foreach (string file in files)
             {
+                if (!ScriptFiles.IsScript(file))
+                {
+                    string renamed = ScriptFiles.RenamedFrom(file);
+                    error.WriteLine($"{file} is not a script: scripts end in {ScriptFiles.Code}, or {ScriptFiles.Xml} for the XML form." + (renamed != null ? $" Rename it to {Path.GetFileName(renamed)} first." : string.Empty));
+                    return ExitCodes.Usage;
+                }
                 bool isCode = MarkupParser.IsCodePath(file);
                 if ((to == "xml" && !isCode) || (to == "kscript" && isCode))
                 {
@@ -190,7 +201,7 @@ namespace KScript.Conversion
                 }
             }
 
-            // Pages in a converted folder import the scripts too (<import src="lib/tasks.ks.xml" />), and a project's
+            // Pages in a converted folder import the scripts too (<import path="lib/tasks.ks.xml" />), and a project's
             // Makefile runs them (kscript desktop.ks.xml).
             foreach (string page in roots.SelectMany(r => Directory.EnumerateFiles(r, "*", SearchOption.AllDirectories))
                          .Where(f => f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
@@ -222,7 +233,7 @@ namespace KScript.Conversion
             OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
         /// <summary>
-        /// The src a converted import gets. An import of a script in the other format points at that script's
+        /// The path a converted import gets. An import of a script in the other format points at that script's
         /// converted version when this run writes it or it already exists; anything else is kept as written.
         /// </summary>
         private static string ImportPath(string file, string src, bool toCode, HashSet<string> converting, List<string> notConverted)
@@ -232,7 +243,7 @@ namespace KScript.Conversion
                 return src;
             }
             bool srcIsCode = MarkupParser.IsCodePath(src);
-            if (srcIsCode == toCode || !(srcIsCode || IsXmlScriptName(src)))
+            if (srcIsCode == toCode || !(srcIsCode || IsXmlScript(src)))
             {
                 return src;
             }
@@ -246,7 +257,7 @@ namespace KScript.Conversion
         }
 
         private static readonly System.Text.RegularExpressions.Regex Mention = new System.Text.RegularExpressions.Regex(
-            @"(?<![\w/.\-])((?:\.\.?/)*[\w\-]+(?:/[\w\-.]+)*?\.(?:ks\.xml|kscript|ks|xml))(?![\w\-/]|\.\w)");
+            @"(?<![\w/.\-])((?:\.\.?/)*[\w\-]+(?:/[\w\-.]+)*?\.(?:ks\.xml|kscript))(?![\w\-/]|\.\w)");
 
         /// <summary>
         /// File names in comments and strings (lib/tasks.ks.xml, '../scripts/hello.ks.xml') that name a script this
@@ -274,15 +285,11 @@ namespace KScript.Conversion
             });
         }
 
-        private static bool IsXmlScriptName(string path) =>
-            path.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".ks", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase);
-
-        private static bool IsXmlScript(string path) =>
-            path.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".ks", StringComparison.OrdinalIgnoreCase);
+        private static bool IsXmlScript(string path) => ScriptFiles.IsXml(path);
 
         private static void PrintUsage(TextWriter writer)
         {
-            writer.WriteLine("Usage: kscript convert <file-or-folder>... [--to xml|kscript] [--out file] [--stdout] [--force]");
+            writer.WriteLine("Usage: kscript convert <file-or-folder>... [--syntax kscript|xml] [--out file] [--stdout] [--force]");
             writer.WriteLine("  Writes the .kscript version of an XML script (x.ks.xml -> x.kscript), or the XML version of a .kscript file.");
             writer.WriteLine("  The original is left as it is. A folder converts every script in it (*.ks.xml, *.ks, *.kscript, tests too).");
             writer.WriteLine("  Imports, and file names in comments and strings, that point at a converted script are changed to its new name.");

@@ -17,11 +17,20 @@ namespace KScript.Metadata
         public bool Required { get; }
         public IReadOnlyList<string> Options { get; }
 
+        /// <summary>
+        /// The type of value an expression attribute takes, when it has one: <c>duration</c> for a length of time
+        /// (<c>timeout: 30s</c>). Null when any value fits.
+        /// </summary>
+        public string Type { get; init; }
+
         /// <summary>Another attribute that can stand in for this one when it is required (<c>value</c> or element text).</summary>
         public bool SatisfiedByContent { get; init; }
 
         /// <summary>True for text that is used as written, without <c>{ }</c> interpolation, such as a route path <c>/people/{id}</c>.</summary>
         public bool Literal { get; init; }
+
+        /// <summary>True for a bare word that names something in the project (a controller, a queue), so it is written without quotes like any other name.</summary>
+        public bool IsName { get; init; }
 
         /// <summary>Set when the attribute is deprecated; it still works, with a warning.</summary>
         public Deprecation Deprecated { get; internal set; }
@@ -86,7 +95,7 @@ namespace KScript.Metadata
         /// <summary>True if attributes other than the listed ones are allowed (they become variables, as in <c>&lt;layout&gt;</c>).</summary>
         public bool AllowsExtraAttributes { get; init; }
 
-        /// <summary>The type of the variable its declare-variable attribute (to:, into:) makes, when not text.</summary>
+        /// <summary>The type of the variable its declare-variable attribute (into:) makes, when not text.</summary>
         public string DeclaresType { get; init; }
 
         /// <summary>True if the element is in the KScript 2 design but no package implements it yet.</summary>
@@ -121,5 +130,15 @@ namespace KScript.Metadata
 
         /// <summary>If the fix is a plain rename, the new name (offered as a quick fix).</summary>
         public string Rename { get; }
+
+        /// <summary>
+        /// True for a name KScript 2 itself changed (<c>before-each</c> is now <c>before_each</c>), rather than
+        /// KScript 1 syntax that was removed. <see cref="Replacement"/> then finishes the sentence: "is now before_each."
+        /// </summary>
+        public bool Renamed { get; init; }
+
+        /// <summary>The whole message for something written the old way: what it was, and what to write instead.</summary>
+        public string Message(string written) =>
+            Renamed ? $"{written} {Replacement}" : $"{written} was removed in KScript 2. {Replacement}";
     }
 }

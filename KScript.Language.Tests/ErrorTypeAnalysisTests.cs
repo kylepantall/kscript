@@ -72,7 +72,7 @@ namespace KScript.Language.Tests
                 } catch IO {
                   echo "{ $err.message } { $err.cause.message } { $err.cause.cause.cause.cause.anything }"
                 } catch err {
-                  saved = $Plain->new()
+                  saved = Plain()
                   throw $saved
                 }
                 """));
@@ -113,7 +113,7 @@ namespace KScript.Language.Tests
                 <error name="Gone2" fields="a: int, a: int" />
                 <error />
                 <throw value="Gone(what: 'x')" />
-                <expect-error type="Gone2" />
+                <expect_error type="Gone2" />
                 """), "/tmp/errors/test.ks.xml"));
             Assert.Equal("KS4004 KS3007 KS4001 KS4004 KS3005 KS5004 KS3009", string.Join(" ", a.Diagnostics.Select(d => d.Code)));
         }
@@ -156,8 +156,9 @@ namespace KScript.Language.Tests
             Assert.Contains("cause", fields);
             Assert.Contains("item", Labels(Declarations + "x = OutOfStock(item: 'a')\necho \"{ $x.‸ }\""));
             Assert.Contains("is", Labels(Declarations + "try { } catch e {\n  echo \"{ $e->‸ }\"\n}"));
-            Assert.Contains("new", Labels(Declarations + "echo \"{ $Plain->‸ }\""));
-            Assert.Contains("new", Labels(Declarations + "t = Plain\necho \"{ $t->‸ }\""));
+            Assert.Contains("fields", Labels(Declarations + "echo \"{ Plain.‸ }\""));
+            Assert.Contains("fields", Labels(Declarations + "t = Plain\necho \"{ $t.‸ }\""));
+            Assert.DoesNotContain("new", Labels(Declarations + "echo \"{ Plain->‸ }\""));
         }
 
         [Fact]
@@ -182,7 +183,7 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("error A", "<error name=\"A\" />")]
-        [InlineData("error A(status: 404, message: No {$id}) extends NotFound {\n  id: int\n}", "<error name=\"A\" status=\"404\" message=\"No {$id}\" extends=\"NotFound\">\n    <field name=\"id\" type=\"int\" />\n  </error>")]
+        [InlineData("error A(status: 404, message: \"No {$id}\") extends NotFound {\n  id: int\n}", "<error name=\"A\" status=\"404\" message=\"No {$id}\" extends=\"NotFound\">\n    <field name=\"id\" type=\"int\" />\n  </error>")]
         [InlineData("error A extends NotFound", "<error name=\"A\" extends=\"NotFound\" />")]
         [InlineData("error A {\n  // why\n  id: int\n}", "<error name=\"A\">\n    <!-- why -->\n    <field name=\"id\" type=\"int\" />\n  </error>")]
         public void ConvertsBothWays(string code, string xml)

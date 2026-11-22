@@ -21,7 +21,7 @@ namespace KScript.Scaffolding
     /// pages it renders (views/auth/: sign in, sign up, forgot and reset password, the account page with API tokens),
     /// adds their routes to the web routes file (and, with --api, token routes to the API file), and gives
     /// kscript.json a password rule. The files come from Scaffolding/Auth, written once as .kscript and converted with
-    /// --format xml like every other template.
+    /// --syntax xml like every other template.
     /// </summary>
     public static class AuthMaker
     {

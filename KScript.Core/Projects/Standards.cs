@@ -45,7 +45,7 @@ namespace KScript.Projects
     ///   "name": "acme",
     ///   "extends": "kscript:recommended",
     ///   "lint": { "rules": { "KS6*": "error", "KS3003": "off" } },
-    ///   "format": { "indent": 4, "printWidth": 100 }
+    ///   "format": { "indent": 4, "print_width": 100 }
     /// }
     /// </code>
     /// </summary>
@@ -77,23 +77,23 @@ namespace KScript.Projects
                     "rules": { "KS6*": "warning" }
                   },
                   "format": {
-                    "printWidth": 80,
-                    "maxBlankLines": 1,
-                    "endOfLine": "auto",
+                    "print_width": 80,
+                    "max_blank_lines": 1,
+                    "end_of_line": "auto",
                     "rules": {
                       "indent": true,
-                      "statementPerLine": true,
-                      "tidyTags": true,
-                      "wrapAttributes": true,
-                      "trimTrailingWhitespace": true,
-                      "collapseBlankLines": true,
-                      "finalNewline": true,
+                      "statement_per_line": true,
+                      "tidy_tags": true,
+                      "wrap_attributes": true,
+                      "trim_trailing_whitespace": true,
+                      "collapse_blank_lines": true,
+                      "final_newline": true,
                       "spacing": true,
-                      "braceStyle": true,
-                      "wrapStrings": true,
-                      "wrapChains": true,
-                      "wrapBodies": true,
-                      "wrapComments": true
+                      "brace_style": true,
+                      "wrap_strings": true,
+                      "wrap_chains": true,
+                      "wrap_bodies": true,
+                      "wrap_comments": true
                     }
                   }
                 }
@@ -105,7 +105,7 @@ namespace KScript.Projects
                   "extends": "kscript:recommended",
                   "lint": {
                     "rules": { "KS6*": "error" },
-                    "warningsAsErrors": true
+                    "warnings_as_errors": true
                   }
                 }
                 """,

@@ -219,8 +219,8 @@ public sealed class McpTests : IDisposable
         Assert.Contains("`$args`", docs.Page("/reference/variables", "kscript"));
 
         string withFields = docs.Catalog.Methods.Where(m => !m.Planned).Select(m => m.ReceiverType).First(t => docs.Catalog.FieldsOf(t).Count > 0);
-        Assert.Contains("Fields: ", docs.Page("/reference/methods/" + withFields, "kscript"));
-        Assert.DoesNotContain("Fields: ", docs.Page("/reference/methods/string", "kscript"));
+        Assert.Contains("## Fields", docs.Page("/reference/methods/" + withFields, "kscript"));
+        Assert.DoesNotContain("## Fields", docs.Page("/reference/methods/string", "kscript"));
 
         string cli = docs.Page("/cli", "kscript");
         Assert.Contains("## kscript mcp", cli);
@@ -289,12 +289,12 @@ public sealed class McpTests : IDisposable
             p.Command("fetch_text", "url, retries?", "Fetches text.", KType.String, call => null);
             p.Method(KType.String, "shout", "", "Upper-cases text.", KType.String, (target, call) => null);
             p.Element(new ElementInfo("beep", "Beeps.", ContentKind.Empty, new AttributeInfo("tone", AttributeKind.Template, "The sound."), new AttributeInfo("sound", AttributeKind.Template, "The sound.")), run => null);
-            p.Element(new ElementInfo("old-beep", "Beeps.", ContentKind.Empty), run => null);
+            p.Element(new ElementInfo("old_beep", "Beeps.", ContentKind.Empty), run => null);
             p.Deprecate("@old_sum", "Sums moved to KScript.Math.", "@sum");
             p.Deprecate("@fetch_text(retries)", "Requests are retried for you");
             p.Deprecate("string->shout", "", "->upper");
             p.Deprecate("<beep tone>", "Renamed", "sound");
-            p.Deprecate("<old-beep>", "");
+            p.Deprecate("<old_beep>", "");
         }
     }
 
@@ -319,8 +319,8 @@ public sealed class McpTests : IDisposable
         string beep = Call(server, "lookup", new { name = "<beep>" }).Text;
         Assert.Contains("| `tone` (deprecated) | text with `{ }` | **Deprecated.** Renamed. Use `sound` instead. The sound. |", beep);
         Assert.Contains("| `sound` | text with `{ }` | The sound. |", beep);
-        string oldBeep = Call(server, "lookup", new { name = "<old-beep>" }).Text;
-        Assert.StartsWith("# <old-beep> (deprecated)\n", oldBeep);
+        string oldBeep = Call(server, "lookup", new { name = "<old_beep>" }).Text;
+        Assert.StartsWith("# <old_beep> (deprecated)\n", oldBeep);
         Assert.Contains("\n**Deprecated.**\n", oldBeep);
 
         Assert.Contains("Deprecated. Adds two numbers.", Call(server, "search_docs", new { query = "old_sum" }).Text);
@@ -505,7 +505,7 @@ public sealed class McpTests : IDisposable
         Assert.Contains("Exit code 0", ran);
         Assert.Contains("Output:\nn is 3\n", ran);
 
-        Assert.Contains("Joan", Call(server, "run_code", new { code = "<import package=\"KScript.Terminal\" />\n<input to=\"name\">Name? </input><echo>$name</echo>", input = "Joan\n" }).Text);
+        Assert.Contains("Joan", Call(server, "run_code", new { code = "<import package=\"KScript.Terminal\" />\n<input into=\"name\">Name? </input><echo>$name</echo>", input = "Joan\n" }).Text);
         Assert.Contains("It printed nothing.", Call(server, "run_code", new { code = "n = 1" }).Text);
         Assert.Contains("cut short", Call(server, "run_code", new { code = "for i in 1..20000 {\n  echo \"0123456789\"\n}" }).Text);
 
@@ -616,16 +616,17 @@ public sealed class McpTests : IDisposable
         Assert.EndsWith("}\n", output);
         Assert.NotEqual(0xEF, Encoding.UTF8.GetBytes(output)[0]);
 
-        // The project's make.format decides how examples are shown.
-        Write("xmlproj/kscript.json", "{ \"make\": { \"format\": \"xml\" } }");
+        // The project's make.syntax decides how examples are shown.
+        Write("xmlproj/kscript.json", "{ \"make\": { \"syntax\": \"xml\" } }");
         Assert.Contains("as XML unless", Command("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n", "--dir", Path.Combine(dir, "xmlproj")).Out);
-        Assert.Contains("as XML unless", Command("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n", "--format", "xml").Out);
+        Assert.Contains("as XML unless", Command("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n", "--syntax", "xml").Out);
 
         Assert.Contains("Usage: kscript mcp", Command("", "--help").Log);
-        Assert.Equal(1, Command("", "--port", "nope").Code);
-        Assert.Equal(1, Command("", "--port").Code);
-        Assert.Equal(1, Command("", "--format", "yaml").Code);
-        Assert.Equal(1, Command("", "--format").Code);
+        Assert.Equal(2, Command("", "--port", "nope").Code);
+        Assert.Equal(2, Command("", "--port").Code);
+        Assert.Equal(2, Command("", "--syntax", "yaml").Code);
+        Assert.Equal(2, Command("", "--syntax").Code);
+        Assert.Equal(2, Command("", "--format", "xml").Code);
         Assert.Contains("--dir needs a folder", Command("", "--dir").Log);
         Assert.Contains("There is no folder", Command("", "--dir", Path.Combine(dir, "nope")).Log);
         Assert.Contains("Unknown option '--nope'", Command("", "--nope").Log);

@@ -1,3 +1,4 @@
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 
 namespace KScript.Runtime
@@ -9,7 +10,7 @@ namespace KScript.Runtime
     /// <c>catch NotFound</c> catches it and every error type that extends it, <c>NotFound(id: 42)</c> makes one, and a
     /// <c>status</c> (its own or a parent's) is the HTTP status KScript.Http answers with when a route doesn't catch it.
     /// </summary>
-    public sealed class ErrorType : IKObject
+    public sealed class ErrorType : IKObject, IDeclaredType
     {
         private readonly string parentName;
         private ErrorType parent;
@@ -93,7 +94,7 @@ namespace KScript.Runtime
             {
                 linked = false;
                 string close = Values.Closest(parentName, ErrorTypes.Names(Closure));
-                throw new KScriptException($"The error {Name} extends '{parentName}', which isn't an error type." + (close != null ? $" Did you mean {close}?" : " Declare it with <error name=\"" + parentName + "\">."), "Name");
+                throw new KScriptException(Wording.Of($"The error {Name} extends '{parentName}', which isn't an error type.") + (close != null ? $" Did you mean {close}?" : Wording.Of($" Declare it with <error name=\"{parentName}\">.")), "Name");
             }
             for (ErrorType t = found; t != null; t = t.parent)
             {
@@ -207,11 +208,7 @@ namespace KScript.Runtime
             switch (name)
             {
                 case "new":
-                    result = Create(call.Interpreter, call.Args, call.Named).ToValue();
-                    return true;
-                case "fields":
-                    result = FieldList();
-                    return true;
+                    throw new KScriptException($"->new() is gone: call the error type to make an error, {Name}(...).", "Retired");
                 default:
                     result = null;
                     return false;
@@ -228,13 +225,20 @@ namespace KScript.Runtime
 
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("new", "fields...", "Makes an error of this type without throwing it: $NotFound->new(id: 42). Throw it later with throw $e.", "error"),
-            ("fields", "", "The error's fields (its own and the ones it inherits): name, type, optional and description.", "list"),
+        };
+
+        internal static readonly (string Name, string Type, string Description)[] ValueFields =
+        {
+            ("name", "string", "The error type's name."),
+            ("extends", "string", "The error type it extends, or null."),
+            ("status", "number", "The HTTP status errors of this type carry, such as 404, or null."),
+            ("description", "string", "What the error type is for, or null."),
+            ("fields", "list", "The error's fields (its own and the ones it inherits): name, type, optional and description."),
         };
     }
 
     /// <summary>
-    /// A caught error: what <c>catch NotFound as e</c> and <c>&lt;expect-error as&gt;</c> declare. It is a map
+    /// A caught error: what <c>catch NotFound as e</c> and <c>&lt;expect_error as&gt;</c> declare. It is a map
     /// (<c>$e.type</c>, <c>$e.message</c>, <c>$e.status</c>, <c>$e.cause</c>, its fields), so it prints and converts to
     /// JSON like one, and it remembers the error so <c>throw $e</c> rethrows it unchanged.
     /// </summary>
@@ -258,8 +262,11 @@ namespace KScript.Runtime
 
         static ErrorTypes()
         {
-            void Add(string name, string parent, string description, int? status = null) =>
+            void Add(string name, string parent, string description, int? status = null)
+            {
+                Conventions.Enforce(Conventions.ErrorTypeName(name));
                 builtIn[name] = new ErrorType(name, parent, status, description);
+            }
 
             Add(Root, null, "Any error. Every error type extends Error.");
             Add("Syntax", Root, "A script that can't be read: bad syntax, an unknown element or a misplaced one.");
@@ -270,6 +277,8 @@ namespace KScript.Runtime
             Add("Argument", Root, "A call with the wrong arguments.");
             Add("Value", Root, "A value that isn't allowed here.");
             Add("Const", Root, "Changing a const.");
+            Add("Math", Root, "A calculation with no answer, such as dividing by zero, or maths in a document that can't be read.");
+            Add("Index", "Value", "A position outside a list.");
             Add("Format", Root, "Text that isn't in the expected format, such as a date.");
             Add("Json", "Format", "Text that isn't valid JSON.");
             Add("Yaml", "Format", "Text that isn't valid YAML.");
@@ -289,6 +298,9 @@ namespace KScript.Runtime
             Add("Timeout", "Network", "A request that took too long.");
             Add("Http", Root, "A mistake in a KScript.Http app, or a request that failed.");
             Add("AI", Root, "A call to a language model that failed.");
+            Add("UI", Root, "A desktop window that can't be opened, such as on a machine without the window library.");
+            Add("Reference", Root, "A document that refers to a section, figure or source it doesn't have, or uses an id twice.");
+            Add("Internal", Root, "A fault in KScript itself, not in the script.");
             Add("Assertion", Root, "A failed check in a test.");
             Add("Validation", Root, "Input that isn't valid. Answers 422 in a KScript.Http route.", 422);
             Add("BadRequest", Root, "A request that can't be handled as sent. Answers 400.", 400);
@@ -302,9 +314,24 @@ namespace KScript.Runtime
             Add("ModelNotFound", "NotFound", "A KScript.Data record that isn't in the database: ->find_or_fail() and ->first_or_fail(). $err.model and $err.id say which. Answers 404.", 404);
             Add("UniqueViolation", "Conflict", "A save that would give two records the same value in a unique field. $err.fields names them. Answers 409.", 409);
             Add("ForeignKeyViolation", "Conflict", "A save or delete that would leave a record pointing at one that isn't there. Answers 409.", 409);
-            Add("QueryError", Root, "A database query that failed, or a condition that can't be turned into SQL.");
-            Add("ConnectionError", Root, "A database that can't be reached or opened. Answers 503.", 503);
+            Add("Query", Root, "A database query that failed, or a condition that can't be turned into SQL.");
+            Add("Connection", Root, "A database that can't be reached or opened. Answers 503.", 503);
+            Add("Migration", Root, "A migration that can't be read or run, or a kscript db command that can't go ahead.");
         }
+
+        /// <summary>
+        /// Built-in error types that had another name, with the name each has now. No error type's name ends in
+        /// "Error" (they are all errors), so <c>catch QueryError</c> is told the new name instead of never matching.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> Renamed = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["QueryError"] = "Query",
+            ["ConnectionError"] = "Connection",
+        };
+
+        /// <summary>What to say about a renamed built-in type, or null if <paramref name="name"/> isn't one.</summary>
+        public static string RenamedMessage(string name) =>
+            name != null && Renamed.TryGetValue(name, out string now) ? $"The error type {name} was renamed to {now}." : null;
 
         /// <summary>The built-in error types, by name.</summary>
         public static IReadOnlyDictionary<string, ErrorType> BuiltIn => builtIn;

@@ -12,16 +12,16 @@ namespace KScript.Language.Features
         internal static readonly string[] Statements = { "echo", "if", "for", "fn", "while", "return", "match", "try", "import", "const" };
 
         /// <summary>In a test file, the test statements come before those.</summary>
-        internal static readonly string[] TestStatements = { "test", "expect", "describe", "expect-error" };
+        internal static readonly string[] TestStatements = { "test", "expect", "describe", "expect_error" };
 
         /// <summary>The methods reached for first on each type of value.</summary>
         internal static readonly Dictionary<string, string[]> Methods = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            [KType.String] = new[] { "length", "upper", "lower", "trim", "contains", "replace", "split", "starts_with", "ends_with", "slice" },
+            [KType.String] = new[] { "count", "upper", "lower", "trim", "contains", "replace", "split", "starts_with", "ends_with", "slice" },
             [KType.List] = new[] { "count", "map", "filter", "first", "last", "join", "sort", "push", "contains", "each" },
             [KType.Map] = new[] { "keys", "values", "has", "get", "set", "merge" },
             [KType.Number] = new[] { "round", "format", "abs", "floor", "ceil" },
-            [KType.Date] = new[] { "format", "add_days", "year", "month", "day" },
+            [KType.Date] = new[] { "format", "add_days", "add_months", "iso" },
         };
 
         /// <summary>A sort key that puts the names of <paramref name="common"/> first, in its order, and the rest after by name.</summary>

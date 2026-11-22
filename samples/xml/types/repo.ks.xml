@@ -1,0 +1,20 @@
+<kscript>
+  <!-- The shape of GitHub's repository data. Other scripts import it; each type it uses has its own file. -->
+  <import path="owner.ks.xml" />
+  <import path="visibility.ks.xml" />
+
+  <type name="Repo" description="A GitHub repository.">
+    <field name="name" type="string" />
+    <field
+      name="stars"
+      type="int"
+      from="stargazers_count"
+      description="How many people starred it." />
+    <field name="owner" type="Owner" />
+    <field name="topics" type="string[]" default="[]" />
+    <field name="license?" type="string" from="license.name" />
+    <field name="visibility" type="Visibility" />
+    <field name="updated" type="date" from="updated_at" />
+    <field name="label" value="$name + ' (' + $stars + ' stars)'" />
+  </type>
+</kscript>

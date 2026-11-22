@@ -32,7 +32,7 @@ public class ErrorTypeTests
             try {
               throw PersonNotFound(id: 42)
             } catch NotFound as e {
-              echo "{ $e.message } | { $e.type } | { $e.status } | { $e.id } | { $e->is(NotFound) } | { $e->is(PersonNotFound) } | { $e->is('Validation') } | { $e->chain() } | { @type($e) }"
+              echo "{ $e.message } | { $e.type } | { $e.status } | { $e.id } | { $e->is(NotFound) } | { $e->is(PersonNotFound) } | { $e->is('Validation') } | { $e->chain() } | { $e->type() }"
             }
             """);
         Assert.Equal("No person with id 42 | PersonNotFound | 404 | 42 | true | true | false | PersonNotFound, NotFound, Error | error\n", output);
@@ -48,7 +48,7 @@ public class ErrorTypeTests
                   @raise_stock()
                 }
                 if $which == 2 {
-                  x = @json('nope')
+                  x = 'nope'->json()
                 }
                 @missing_file()
               } catch OutOfStock as e {
@@ -94,7 +94,7 @@ public class ErrorTypeTests
             } catch ConfigBroken as e {
               echo "{ $e.message } because { $e.cause.type }: { $e.cause.message }"
             }
-            saved = $OutOfStock->new(item: "milk", left: 2)
+            saved = OutOfStock(item: "milk", left: 2)
             echo "{ $saved.message } { $saved.status }"
             try {
               throw $saved
@@ -109,9 +109,9 @@ public class ErrorTypeTests
     public void ErrorTypesAreValuesWithMembers()
     {
         string output = Run(Declarations + """
-            echo "{ $PersonNotFound.name } { $PersonNotFound.extends } { $PersonNotFound.status } { $PersonNotFound.description }"
-            echo "{ $OutOfStock->fields()->map(fn($f) => $f.name + ':' + $f.type) } { $OutOfStock.fields->count() } { $Plain.extends } { $Plain.status ?? 'none' }"
-            echo "{ NotFound.status } { NotFound.extends } { Shape.extends } { @type($Plain) }"
+            echo "{ PersonNotFound.name } { PersonNotFound.extends } { PersonNotFound.status } { PersonNotFound.description }"
+            echo "{ OutOfStock.fields->map(fn(f) => $f.name + ':' + $f.type) } { OutOfStock.fields->count() } { Plain.extends } { Plain.status ?? 'none' }"
+            echo "{ NotFound.status } { NotFound.extends } { Shape.extends } { Plain->type() }"
             """);
         Assert.Equal("PersonNotFound NotFound 404 Nothing has that id.\nitem:string, left:int 2 Error none\n404 Error Type error_type\n", output);
     }
@@ -229,8 +229,8 @@ public class ErrorTypeTests
     [InlineData("throw PersonNotFound(1, 2)", "takes its fields by name, such as PersonNotFound(id: ...)")]
     [InlineData("throw Plain(1, 2)", "such as Plain(message: '...')")]
     [InlineData("throw Validation(cause: 3)", "The cause of a Validation is an error")]
-    [InlineData("throw $PersonNotFound", "PersonNotFound has fields, so throw it with them: PersonNotFound(id: ...).")]
-    [InlineData("n = 42\nthrow $n", "<throw value> needs an error, such as NotFound(id: 42) or a caught $err, not a number (42).")]
+    [InlineData("throw PersonNotFound", "PersonNotFound has fields, so throw it with them: PersonNotFound(id: ...).")]
+    [InlineData("n = 42\nthrow $n", "throw needs an error, such as NotFound(id: 42) or a caught $err, not a number (42).")]
     public void MistakesInThrowingAreExplained(string code, string message)
     {
         Assert.Contains(message, Fails(Declarations + code).Message);
@@ -330,7 +330,7 @@ public class ErrorTypeTests
                   throw PersonNotFound(id: $id)
                 }
                 test(name: "subtypes count") {
-                  expect-error(type: NotFound, as: e) {
+                  expect_error(type: NotFound, as: e) {
                     @find(1)
                   }
                   expect(value: $e.id, equals: 1)
@@ -338,7 +338,7 @@ public class ErrorTypeTests
                 }
                 test(name: "throws") {
                   expect(value: @find(2), throws: PersonNotFound)
-                  expect(value: @json('nope'), throws: Format)
+                  expect(value: 'nope'->json(), throws: Format)
                 }
                 test(name: "throws the wrong type") {
                   expect(value: @find(3), throws: IO)
@@ -346,8 +346,8 @@ public class ErrorTypeTests
                 test(name: "throws nothing") {
                   expect(value: 1 + 1, throws: IO)
                 }
-                test(name: "expect-error the wrong type") {
-                  expect-error(type: IO) {
+                test(name: "expect_error the wrong type") {
+                  expect_error(type: IO) {
                     @find(4)
                   }
                 }
@@ -406,13 +406,15 @@ public class ErrorStatusTests
         """;
 
     private const string Routes = """
-        KScript.Routes {
-          import "controllers/people.kscript" as people
-          Get(path: "/people/{id}", to: people.show, where: "id: int")
-          Get(path: "/pay", to: people.pay)
-          Get(path: "/forbid", to: people.forbid)
-          Get(path: "/caught", to: people.caught)
-          Get(path: "/crash", to: people.crash)
+        import KScript.Http
+        import "controllers/people.kscript" as people
+
+        Routes {
+          Get(path: "/people/{id}", to: @people.show, where: "id: int")
+          Get(path: "/pay", to: @people.pay)
+          Get(path: "/forbid", to: @people.forbid)
+          Get(path: "/caught", to: @people.caught)
+          Get(path: "/crash", to: @people.crash)
         }
         """;
 

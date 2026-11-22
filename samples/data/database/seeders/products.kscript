@@ -3,9 +3,9 @@
 import KScript.Data
 import "../../models/product.kscript"
 
-$Product->insert([
+Product->insert([
   { sku: 'TEA-1', name: 'Green tea', price: 4.5, stock: 20, tags: ['drinks'] },
   { sku: 'MUG-1', name: 'Blue mug', price: 12, stock: 3, tags: ['kitchen'] },
   { sku: 'POT-1', name: 'Tea pot', price: 30, stock: 1, tags: ['kitchen'] },
 ])
-echo "Products: { $Product->count() }"
+echo "Products: { Product->count() }"

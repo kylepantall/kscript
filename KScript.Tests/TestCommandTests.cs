@@ -35,7 +35,7 @@ public class TestCommandTests
     {
         using var site = new TempSite(
             ("kscript.json", "{ \"name\": \"demo\" }"),
-            ("tests/a.test.ks.xml", "<kscript><test name=\"ok\"><assert test=\"true\" /></test></kscript>"),
+            ("tests/a.test.ks.xml", "<kscript><test name=\"ok\"><do>@assert(true)</do></test></kscript>"),
             ("tests/empty.test.ks.xml", "<kscript></kscript>"));
 
         var (code, output, _) = Command(site.Root, "--timeout", "5");
@@ -63,7 +63,7 @@ public class TestCommandTests
     {
         using var site = new TempSite(("kscript.json", "{ not json"), ("a.test.ks.xml", "<kscript />"));
         var (code, _, error) = Command(site.Root);
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("kscript.json", error);
 
         TestFileResult file = TestRunner.RunFile(Path.Combine(site.Root, "a.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root });
@@ -101,9 +101,9 @@ public class TestCommandTests
     [Fact]
     public void Checks_explain_their_failures()
     {
-        Assert.Equal("@assert() got false, which isn't true.", Fails("<do>@assert(false)</do>"));
+        Assert.Equal("Expected false to be true.", Fails("<do>@assert(false)</do>"));
         Assert.Equal("custom", Fails("<do>@assert(0, 'custom')</do>"));
-        Assert.Contains("fails: ", Fails("<let name=\"m\" value=\"{}\" /><assert test=\"false and $m.a.b\" />"));
+        Assert.Contains("fails: ", Fails("<let name=\"m\" value=\"{}\" /><do>@assert(false and $m.a.b)</do>"));
         Assert.Contains("isn't a valid regular expression", Fails("<expect value=\"'a'\" matches=\"'['\" />"));
         Assert.Contains("which has no count", Fails("<expect value=\"5\" count=\"1\" />"));
         Assert.Contains("checks a list, text or a map, but 5 is 5", Fails("<expect value=\"5\" contains=\"1\" />"));
@@ -111,14 +111,14 @@ public class TestCommandTests
         Assert.Equal("Expected [1] to equal ['1'], but it was [1].", Fails("<expect value=\"[1]\" equals=\"['1']\" />"));
         Assert.Equal("Expected { a: 1 } to equal { a: '1' }, but it was { a: 1 }.", Fails("<expect value=\"{ a: 1 }\" equals=\"{ a: '1' }\" />"));
         Assert.Contains("fn f", Fails("<expect value=\"@f\" equals=\"1\" />"));
-        Assert.Contains("2026-01-02", Fails("<expect value=\"@date('2026-01-02')\" equals=\"1\" />"));
+        Assert.Contains("2026-01-02", Fails("<expect value=\"'2026-01-02'->to_date()\" equals=\"1\" />"));
         Assert.Contains("takes its options as a map", Fails("<do>@run_script('child.ks.xml', 5)</do>"));
     }
 
     [Fact]
     public void Hooks_loops_and_signals_inside_tests()
     {
-        TestResult afterFails = Single("<after-each><throw message=\"cleanup broke\" /></after-each><test name=\"t\"><do>1</do></test>");
+        TestResult afterFails = Single("<after_each><throw message=\"cleanup broke\" /></after_each><test name=\"t\"><do>1</do></test>");
         Assert.Equal(TestOutcome.Failed, afterFails.Outcome);
         Assert.Contains("cleanup broke", afterFails.Message);
 
@@ -126,8 +126,8 @@ public class TestCommandTests
         Assert.Equal(TestOutcome.Failed, loose.Outcome);
         Assert.Contains("<break/>", loose.Message);
 
-        using var site = new TempSite(("t.test.ks.xml", "<kscript><test name=\"none {$x}\" each=\"x\" in=\"null\" /></kscript>"), ("u.test.ks.xml", "<kscript><test name=\"t\" each=\"x\" in=\"5\" /></kscript>"));
+        using var site = new TempSite(("t.test.ks.xml", "<kscript><for each=\"x\" in=\"null\"><test name=\"none {$x}\" /></for></kscript>"), ("u.test.ks.xml", "<kscript><test name=\"t\" each=\"x\" in=\"5\" /></kscript>"));
         Assert.Empty(TestRunner.RunFile(Path.Combine(site.Root, "t.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root }).Tests);
-        Assert.Contains("runs over a list or a map", TestRunner.RunFile(Path.Combine(site.Root, "u.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root }).Error);
+        Assert.Contains("was replaced by a for loop round the test", TestRunner.RunFile(Path.Combine(site.Root, "u.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root }).Error);
     }
 }

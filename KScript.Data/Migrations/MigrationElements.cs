@@ -24,7 +24,7 @@ namespace KScript.Data.Migrations
     }
 
     /// <summary>
-    /// The elements of a migration file: <c>KScript.Migration { CreateTable(name: posts) { Field(...) } }</c>. Running
+    /// The elements of a migration file: <c>Migration { CreateTable(name: 'posts') { Field(...) } }</c> after <c>import KScript.Data</c>. Running
     /// the file collects its steps; <c>kscript db migrate</c> works out their SQL and runs it.
     /// </summary>
     internal static class MigrationElements

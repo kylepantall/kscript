@@ -71,9 +71,9 @@ namespace KScript.Language.Analysis
             {
                 visited.Add(System.IO.Path.GetFullPath(result.Path));
             }
-            foreach (MarkupElement import in result.Markup.DescendantElements().Where(x => IsKScriptElementName(x, "import") && x.GetAttribute("src") != null))
+            foreach (MarkupElement import in result.Markup.DescendantElements().Where(x => IsKScriptElementName(x, "import") && x.GetAttribute("path") != null))
             {
-                AddExternalExtensions(ResolvePath(import.GetAttributeValue("src")?.Trim()), visited, project: false);
+                AddExternalExtensions(ResolvePath(import.GetAttributeValue("path")?.Trim()), visited, project: false);
             }
             List<string> projectFiles = ProjectExtensionFiles();
             projectExtensionFile = result.Path != null && projectFiles.Contains(System.IO.Path.GetFullPath(result.Path), StringComparer.Ordinal);
@@ -127,6 +127,7 @@ namespace KScript.Language.Analysis
             }
             SourceText other = new SourceText(text);
             MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
+            CodeArguments.Normalise(doc, catalog.GetElement);
             HashSet<string> declaredHere = new HashSet<string>(doc.DescendantElements().Where(x => x.Name is "type" or "model").Select(x => x.GetAttributeValue("name")?.Trim()).Where(n => n != null), StringComparer.Ordinal);
             foreach (MarkupElement e in doc.DescendantElements().Where(x => x.Name == "extend"))
             {
@@ -179,9 +180,9 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            foreach (MarkupElement import in doc.DescendantElements().Where(x => x.Name == "import" && x.GetAttribute("src") != null))
+            foreach (MarkupElement import in doc.DescendantElements().Where(x => x.Name == "import" && x.GetAttribute("path") != null))
             {
-                string src = import.GetAttributeValue("src")?.Trim();
+                string src = import.GetAttributeValue("path")?.Trim();
                 string dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path));
                 AddExternalExtensions(string.IsNullOrEmpty(src) || dir == null ? null : System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, src)), visited, project: false);
             }
@@ -293,13 +294,13 @@ namespace KScript.Language.Analysis
             if (builtIn && !isOverride)
             {
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration,
-                    $"{article} already has ->{name}(). To replace it, write " + (code ? $"override fn {name}(...)" : $"override=\"yes\"") + "; to add a new method, give it another name.");
+                    $"{article} already has ->{name}(). To replace it, write " + (code ? $"override fn {name}(...)" : $"override=\"true\"") + "; to add a new method, give it another name.");
                 return;
             }
             if (isOverride && !builtIn)
             {
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
-                    $"{article} has no built-in ->{name}() to override. " + (code ? "Drop override" : "Drop override=\"yes\"") + " to add it as a new method.");
+                    $"{article} has no built-in ->{name}() to override. " + (code ? "Drop override" : "Drop override=\"true\"") + " to add it as a new method.");
                 return;
             }
         }

@@ -1,31 +1,33 @@
 // Written by kscript db diff from the models. Read it, change it if you need
 // to, then run kscript db migrate.
-KScript.Migration {
-  CreateTable(name: products) {
-    Field(name: id, type: int, key, auto)
-    Field(name: sku, type: string, max: 20)
-    Field(name: name, type: string, max: 120)
-    Field(name: price, type: number)
-    Field(name: stock, type: int, default: 0)
-    Field(name: tags, type: json, optional)
-    Field(name: created_at, type: date, optional)
-    Field(name: updated_at, type: date, optional)
+import KScript.Data
+
+Migration {
+  CreateTable(name: 'products') {
+    Field(name: 'id', type: int, key, auto)
+    Field(name: 'sku', type: string, max: 20)
+    Field(name: 'name', type: string, max: 120)
+    Field(name: 'price', type: number)
+    Field(name: 'stock', type: int, default: 0)
+    Field(name: 'tags', type: json, optional)
+    Field(name: 'created_at', type: date, optional)
+    Field(name: 'updated_at', type: date, optional)
     Index(columns: [sku], unique)
   }
-  CreateTable(name: orders) {
-    Field(name: id, type: int, key, auto)
-    Field(name: product_id, type: int, references: products)
-    Field(name: customer, type: email)
-    Field(name: quantity, type: int)
+  CreateTable(name: 'orders') {
+    Field(name: 'id', type: int, key, auto)
+    Field(name: 'product_id', type: int, references: 'products')
+    Field(name: 'customer', type: email)
+    Field(name: 'quantity', type: int)
     Field(
-      name: status,
+      name: 'status',
       type: enum,
       values: [open, paid, shipped, cancelled],
       default: 'open'
     )
-    Field(name: created_at, type: date, optional)
-    Field(name: updated_at, type: date, optional)
-    Field(name: deleted_at, type: date, optional)
+    Field(name: 'created_at', type: date, optional)
+    Field(name: 'updated_at', type: date, optional)
+    Field(name: 'deleted_at', type: date, optional)
     Index(columns: [status, created_at])
     Index(columns: [product_id])
   }

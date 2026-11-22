@@ -5,8 +5,8 @@ every package are the same: the parser (`KScript.Syntax/Markup/CodeParser.cs`) b
 XML parser builds, so `kscript`, `kscript check` and the language server treat both alike. The file extension picks
 the parser; `.ks.xml` scripts are unchanged, and the two kinds can import each other.
 
-`kscript make project`, `kscript make script` and `kscript make test` write `.kscript` files; pass `--format xml`, or set
-`"make": { "format": "xml" }` in `kscript.json`, to get `.ks.xml` instead.
+`kscript make project`, `kscript make script` and `kscript make test` write `.kscript` files; pass `--syntax xml`, or set
+`"make": { "syntax": "xml" }` in `kscript.json`, to get `.ks.xml` instead.
 
 ```kscript try
 import KScript.IO
@@ -25,7 +25,7 @@ for p in $people {
 }
 ```
 
-Samples: `samples/code-format/` (rewrites of `samples/kscript2/`) and `samples/life-lab/desktop.kscript`.
+Samples: every folder under `samples/` is written this way. `samples/xml/` has the scripts of `samples/scripts/` in the XML form, to compare the two side by side.
 
 ## Assignment
 
@@ -52,24 +52,24 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | --- | --- |
 | `n = 3` (first time) | `<let name="n" value="3" />` |
 | `n = 4`, `total += 1` (after) | `<set name="n" value="4" />`, `<set name="total" op="+=" value="1" />` |
-| `const config = { retries: 3 }` | `<let name="config" const="yes" value="…" />` |
+| `const config = { retries: 3 }` | `<const name="config" value="…" />` |
 | `count: int = $raw` | `<let name="count" type="int" value="$raw" />` |
 | `@greet('Hi')` | `<do>@greet('Hi')</do>` |
 | `echo "Hello, $name"` | `<echo>Hello, $name</echo>` |
 | `echo $list[1]`, `echo(format: json) $data` | `<echo value="$list[1]" />` |
-| `if a { } elif b { } else { }` (also `else if`) | `<if test>`, `<elif test>`, `<else>` |
+| `if a { } elif b { } else { }` | `<if test>`, `<elif test>`, `<else>` |
 | `for item in $list { }`, `for key, value in $map { }` | `<for each in>` |
-| `for item at i in $list { }` | `<for each="item" index="i" in="$list">` |
+| `for item at i in $list { }` | `<for each="item" at="i" in="$list">` |
 | `while test { }`, `break`, `continue` | `<while test>`, `<break/>`, `<continue/>` |
-| `match $x { case 1, 2 { } when $x > 9 { } default { } }` | `<match value>`, `<case is>`, `<case when>`, `<default>` |
+| `match $x { 1, 2 => { }, _ when $x > 9 => { }, _ => { } }` | `<match value>`, `<case is>`, `<case when>`, `<default>` |
 | `fn greet(who: string, hi = 'Hello') { }` | `<fn name="greet" params="who: string, hi = 'Hello'">` |
 | `fn double(x: int) => $x * 2` | `<fn name="double" params="x: int" value="$x * 2" />` |
 | `return $x`, `exit 1` | `<return value="$x" />`, `<exit code="1" />` |
-| `try { } catch err when test { } catch { } finally { }` | `<try>` with `<catch as when>` and `<finally>` inside |
+| `try { } catch NotFound as err { } catch err { } finally { }` | `<try>` with `<catch type as>` and `<finally>` inside (`when test` adds a test to a catch) |
 | `throw Validation "Bad {$x}"` | `<throw type="Validation">Bad {$x}</throw>` |
 | `import KScript.Math as math` | `<import package="KScript.Math" as="math" />` |
-| `import "lib/s.kscript" as s` | `<import src="lib/s.kscript" as="s" />` |
-| `import slugify from "lib/s.kscript"` | `<import src="lib/s.kscript" names="slugify" />` |
+| `import "lib/s.kscript" as s` | `<import path="lib/s.kscript" as="s" />` |
+| `import slugify from "lib/s.kscript"` | `<import path="lib/s.kscript" names="slugify" />` |
 | `enum Size { small, medium, large }` | `<enum name="Size" values="small, medium, large" />` |
 | `type Repo(extra: error) { … }` | `<type name="Repo" extra="error">` with `<field>`s inside |
 | `stars: int from stargazers_count` (in a type) | `<field name="stars" type="int" from="stargazers_count" />` |
@@ -86,9 +86,9 @@ A field line in a `type` block is `name[?][: type] [from path] [= default | => v
 Any other name is an element: `name(attribute: value, ...) "text" { children }`, each part optional.
 
 ```
-input(to: old_dir) "Move files from: "
+input(into: old_dir) "Move files from: "
 Row(gap: 8, wrap) {
-  Button(variant: primary, on-click: "playing = not $playing") "{ $playing ? 'Pause' : 'Play' }"
+  Button(variant: primary, on_click: "playing = not $playing") "{ $playing ? 'Pause' : 'Play' }"
 }
 ```
 
@@ -103,9 +103,9 @@ echo "Hello { $name }. KScript reads your whole script, checks it, \
   and only then runs it."
 ```
 
-That prints one line. It works in `"text"` and in `'expression strings'`, and keeps any spaces before the `\`. Write
+That prints one line. It works in `"double-quoted"` and `'single-quoted'` strings, and keeps any spaces before the `\`. Write
 `\\` for a backslash of your own at the end of a line of text. `kscript fmt` uses it to wrap a string that runs past
-`printWidth` (the [`wrapStrings`](formatting.md) rule).
+`print_width` (the [`wrap_strings`](formatting.md) rule).
 
 For text that should keep its new lines, such as a query, a template or an equation, use a block fenced with three
 backticks, as in Markdown:
@@ -135,7 +135,7 @@ repo = ```<Repo>
   `markdown`), `latex` (or `tex`), `yaml` (or `yml`) or `xml`. It changes nothing at run time; editors use it to
   highlight the block. Any other word is an error, so a typo such as ```` ```textc ```` is caught.
 - A type in angle brackets parses the block: `` ```<json> `` is the parsed JSON, and `` ```<Repo> `` maps it onto a
-  `type`, with the same checks (and `Shape` errors) as `->json(as: $Repo)`.
+  `type`, with the same checks (and `Shape` errors) as `->json(as: Repo)`.
 - As an element's text (after `echo`, `Paragraph`, `Math`, ...) a block is the same as `"text"`: `{ }` interpolates
   where the element interpolates, and `Math` keeps its braces. In an expression it is a string, like `'single quotes'`.
   No escapes apply inside a block.
@@ -146,22 +146,33 @@ repo = ```<Repo>
 - A statement ends at a new line, `;` or the `}` that closes its block. It carries on when a bracket is open, the
   line ends with an operator (`|>`, `->`, `+`, `,`, `and`, ...), or the next line starts with `|>`, `->`, `?`, `:`,
   `.`, `and` or `or`.
-- In the head of `if`, `elif`, `for`, `while`, `match`, `case` and `when`, the first `{` outside brackets opens the
+- In the head of `if`, `elif`, `for`, `while` and `match`, the first `{` outside brackets opens the
   block. Wrap a map literal in parentheses there.
+- A `match` holds arms, `pattern => result`: `1, 2 => echo "low"`, `_ when $x > 9 => { }` for a test and `_ => { }`
+  for anything else. The result is one statement on the arm's line or a `{ }` block, and arms are separated by a new
+  line or a comma. A match used as a value (`label = match $x { 1 => 'one', _ => 'other' }`) writes its arms the
+  same way.
 - `"double quotes"` are text, exactly like XML element text or an attribute value: `{ }` and `$name` interpolate where
   the element interpolates, and in an expression too (`greeting = "Hello $name"`), where a `{ }` is filled in when it
   starts with `$` or `@`. `\"` and `\\` are the only escapes (plus a `\` at the end of a line, which joins it to
   the next: see [Long strings and blocks of text](#long-strings-and-blocks-of-text)). `'single quotes'` are string literals inside
   expressions and are kept exactly as written.
 - In `name(...)` a value runs to the next `,` or `)` outside brackets; quote it to include a comma. A bare name such
-  as `wrap` means `wrap="yes"`.
+  as `wrap` means `wrap="true"`.
 - A list of names is an array: `Middleware(use: [secure_headers, json_only])`, `Resource(..., only: [index, show])`.
   The XML form writes the same list as text, `use="secure_headers, json_only"`, and `kscript convert` turns one into
   the other. The old string form (`use: "a, b"`) still works in `.kscript`, with a KS6006 hint to use the array.
-- Expressions are kept as written, so raw `<` and `>` work (`lt` and `gt` still do).
-- The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. A file whose only
-  statement is `kscript { }` or a `KScript.*` element (such as `KScript.Window(...) { }`) uses that element as the
-  root. `import` goes at that top level, not inside another block.
+- Comparisons are symbols (`<`, `<=`, `>`, `>=`, `==`, `!=`) and logic is words (`and`, `or`, `not`). The comparison
+  words `lt`, `le`, `gt`, `ge`, `eq` and `ne` are the XML spellings: `kscript convert` writes the symbols, and a
+  word left in a `.kscript` file is reported (KS6012) with a fix.
+- A name is declared bare and read with `$`: `total = 0`, `total += 1`, `for item in $list`, `fn double(n)`,
+  `fn(n) => $n * 2`. Writing `$total = 0` or `fn($n)` is reported (KS6010) with a fix.
+- The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. `import` goes at that top
+  level, not inside another block.
+- A package is named only in `import KScript.UI`. A statement is never written with the `KScript.` prefix: write
+  `import KScript.UI` and then `Window(...) { }`, not `KScript.Window(...) { }` (which is an error that says so). An
+  XML file names the package in its root tag instead, `<KScript.Window>`, and `kscript convert` turns one into the
+  other.
 - `//` and `/* */` are comments. Either can go on its own lines, at the end of a line, or inside an expression
   that spans lines (`[1, /* first */ 2]`). `kscript convert` keeps them; XML has one kind of comment, so they come
   back from XML as `//` lines.
@@ -203,11 +214,11 @@ before the element, or in its `description` attribute.
 ```
 kscript convert tour.ks.xml          # writes tour.kscript
 kscript convert tour.kscript         # writes tour.ks.xml
-kscript convert scripts/ --to kscript   # every XML script in a folder (tests are skipped)
+kscript convert scripts/ --syntax kscript   # every XML script in a folder (tests are skipped)
 kscript convert tour.ks.xml --stdout    # print instead of writing
 ```
 
-Options: `--to xml|kscript`, `--out file`, `--stdout`, `--force` (replace an existing file). Comments, doc comments
+Options: `--syntax kscript|xml`, `--out file`, `--stdout`, `--force` (replace an existing file). Comments, doc comments
 and blank lines are kept, and expressions are copied as written. Where one meaning has two spellings, the converter
 picks one (`<call fn="greet" args="'x'" />` becomes `@greet('x')`; `x = 3` becomes `<let>` or `<set>`; `const x = 1`
 becomes `<const>`), so the first conversion may tidy a file, and converting back and forth after that changes nothing.
@@ -217,7 +228,7 @@ of the same name.
 Converting keeps a project working in the new format:
 
 - An import of a script that is converted in the same run, or already has a converted version, points at the new
-  file (`<import src="lib/tasks.ks.xml" />` becomes `import "lib/tasks.kscript"`). An import of a script that stays
+  file (`<import path="lib/tasks.ks.xml" />` becomes `import "lib/tasks.kscript"`). An import of a script that stays
   in the old format is kept, with a note; the two formats can import each other.
 - File names in comments and strings that name a converted script are renamed too (`@run_script('hello.ks.xml')`),
   and one-line XML examples in comments are written the .kscript way.
@@ -226,7 +237,7 @@ Converting keeps a project working in the new format:
   each `*.ks.xml` include pattern gains a `*.kscript` twin.
 
 ```
-kscript convert . --to kscript     # the whole project
+kscript convert . --syntax kscript     # the whole project
 ```
 
 Test files can be written in this format: `name.test.kscript` files get KScript.Test without an import and run with

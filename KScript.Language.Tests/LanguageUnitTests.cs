@@ -45,7 +45,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Package_elements_with_expression_and_assignment_content_are_checked()
         {
-            DocumentAnalysis a = AnalyzerCoverageTests.Check("<import package=\"KScript.Shapes\" /><let name=\"n\" value=\"1\" /><total>$n + $missing</total><steps>$n = 2; $other = 3</steps><total> </total><steps></steps>", catalog: Catalog());
+            DocumentAnalysis a = AnalyzerCoverageTests.Check("<import package=\"KScript.Shapes\" /><let name=\"n\" value=\"1\" /><total>$n + $missing</total><steps>$n = 2; other = 3</steps><total> </total><steps></steps>", catalog: Catalog());
             Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.UndefinedVariable && d.Message.Contains("$missing"));
             Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.SetUndeclared || d.Message.Contains("other"));
         }
@@ -62,10 +62,10 @@ namespace KScript.Language.Tests
         {
             var unreadable = new AnalyzerCoverageTests.Files();
             unreadable.Unreadable.Add(Path.Combine(AnalyzerCoverageTests.Folder, "kscript.json"));
-            Assert.Contains(AnalyzerCoverageTests.Check("<input to=\"x\" />", files: unreadable).Diagnostics, d => d.Code == DiagnosticCodes.MissingImport);
+            Assert.Contains(AnalyzerCoverageTests.Check("<input into=\"x\" />", files: unreadable).Diagnostics, d => d.Code == DiagnosticCodes.MissingImport);
 
             var broken = new AnalyzerCoverageTests.Files(("kscript.json", "{ nope"));
-            Assert.Contains(AnalyzerCoverageTests.Check("<input to=\"x\" />", files: broken).Diagnostics, d => d.Code == DiagnosticCodes.MissingImport);
+            Assert.Contains(AnalyzerCoverageTests.Check("<input into=\"x\" />", files: broken).Diagnostics, d => d.Code == DiagnosticCodes.MissingImport);
         }
 
         [Fact]
@@ -87,7 +87,7 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("{ a: 'x' }['a']", "string")]
         [InlineData("'abc'[0]", "any")]
-        [InlineData("1 |> fn($x) => $x", "any")]
+        [InlineData("1 |> fn(x) => $x", "any")]
         [InlineData("[1] + [2]", "list<number>")]
         public void Expressions_have_types(string expression, string type)
         {
@@ -115,7 +115,7 @@ namespace KScript.Language.Tests
             [Fact]
         public void Imported_constants_keep_their_types()
         {
-            DocumentAnalysis a = AnalyzerCoverageTests.Check("<import src=\"limits.ks.xml\" /><let name=\"v\" value=\"$limit\" /><echo>{$v}</echo>");
+            DocumentAnalysis a = AnalyzerCoverageTests.Check("<import path=\"limits.ks.xml\" /><let name=\"v\" value=\"$limit\" /><echo>{$v}</echo>");
             Assert.Equal("number", a.Symbols.First(s => s.Name == "limit").Shape.Display());
         }
     }

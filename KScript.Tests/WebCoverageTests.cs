@@ -173,9 +173,9 @@ public class WebCoverageTests
         Assert.Contains("<default> must be inside <match>", RenderFails("<default>x</default>"));
         Assert.Contains("<case> needs an is or when attribute", RenderFails("<match value=\"1\"><case>x</case></match>"));
         Assert.Contains("Only <case> and <default> can go inside <match>, not <p>", RenderFails("<match value=\"1\"><p>x</p></match>"));
-        Assert.Contains("<include> needs a src attribute", RenderFails("<include />"));
+        Assert.Contains("<include> needs a path attribute", RenderFails("<include />"));
         Assert.Contains("<for> can't loop over", RenderFails("<for each=\"x\" in=\"true\">{$x}</for>"));
-        Assert.Contains("<import> needs a package or src", RenderFails("<import as=\"m\" />"));
+        Assert.Contains("<import> needs a package or path", RenderFails("<import as=\"m\" />"));
     }
 
     [Fact]
@@ -190,13 +190,13 @@ public class WebCoverageTests
     public void Includes_slots_responses_and_bound_controls()
     {
         using var site = new TempSite(
-            ("index.html", "<div>\n  <include src=\"_part.html\" who=\"Ann\" />\n</div>"),
+            ("index.html", "<div>\n  <include path=\"_part.html\" who=\"Ann\" />\n</div>"),
             ("_part.html", "<b>{$who}</b>"),
-            ("empty.html", "<layout src=\"_layout.html\"></layout>"),
+            ("empty.html", "<layout path=\"_layout.html\"></layout>"),
             ("_layout.html", "<main>\n  <slot />\n</main>"),
             ("api.html", "<respond type=\"text/plain\" header-x-kind=\"demo\">ok</respond>"),
             ("form.html", "<live id=\"f\"><state name=\"on\" value=\"true\" /><state name=\"note\" value=\"'hi'\" /><input type=\"checkbox\" bind=\"on\" /><textarea bind=\"note\"></textarea><span hidden>x</span></live>"),
-            ("tick.html", "<live id=\"t\"><state name=\"n\" value=\"0\" /><span on-tick=\"n += 1\" every=\"{ 5 }\">{$n}</span></live>"));
+            ("tick.html", "<live id=\"t\"><state name=\"n\" value=\"0\" /><span on-tick=\"n += 1\" every=\"{ 5ms }\">{$n}</span></live>"));
 
         Assert.Equal("<div>\n<b>Ann</b></div>", site.Render("index.html").Body);
         Assert.Equal("<main>\n</main>", site.Render("empty.html").Body);
@@ -255,7 +255,7 @@ public class WebCoverageTests
     [Fact]
     public void While_loops_slots_markdown_components_and_attribute_braces()
     {
-        Assert.Equal("12", Render("<let name=\"i\" value=\"0\" /><while test=\"$i < 2\"><do>$i += 1</do>{$i}</while>"));
+        Assert.Equal("12", Render("<let name=\"i\" value=\"0\" /><while test=\"$i < 2\"><do>i += 1</do>{$i}</while>"));
         Assert.Equal("<main>fallback</main>", Render("<main><slot>fallback</slot></main>"));
         Assert.Equal("<p title=\"2\">x</p>", Render("<p title=\"{ { a: 2 }.a }\">x</p>"));
         Assert.Contains("never closed", RenderFails("<p title=\"{ 'a' \">x</p>"));

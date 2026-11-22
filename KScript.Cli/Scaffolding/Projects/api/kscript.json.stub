@@ -15,9 +15,9 @@
   "config": {
     "root": "config"
   },
-  // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
+  // kscript make writes new scripts and tests in this syntax: kscript (.kscript files) or xml (.ks.xml).
   "make": {
-    "format": "{{ format }}"
+    "syntax": "{{ syntax }}"
   },
   "lint": {
     "include": ["**/*.kscript", "**/*.ks.xml"],

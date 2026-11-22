@@ -12,16 +12,16 @@ namespace KScript.Language.Features
     {
         private static readonly Dictionary<string, string> OperatorDocs = new Dictionary<string, string>
         {
-            ["=="] = "Loose equality: compares after conversion, so `'3' == 3` is true. Also written `eq`.",
-            ["eq"] = "Loose equality: compares after conversion, so `'3' eq 3` is true. Also written `==`.",
-            ["!="] = "Loose inequality. Also written `ne`.",
-            ["ne"] = "Loose inequality. Also written `!=`.",
+            ["=="] = "Loose equality: compares after conversion, so `'3' == 3` is true. In XML, also written `eq`.",
+            ["eq"] = "Loose equality: compares after conversion, so `'3' eq 3` is true. The XML spelling of `==`.",
+            ["!="] = "Loose inequality. In XML, also written `ne`.",
+            ["ne"] = "Loose inequality. The XML spelling of `!=`.",
             ["==="] = "Strict equality: type and value must both match, so `'3' === 3` is false.",
             ["!=="] = "Strict inequality: true if the type or the value differs.",
-            ["lt"] = "Less than. XML doesn't allow a raw `<` in attributes, so the word form is the usual spelling.",
-            ["le"] = "Less than or equal.",
-            ["gt"] = "Greater than (`>` also works).",
-            ["ge"] = "Greater than or equal (`>=` also works).",
+            ["lt"] = "Less than. The XML spelling of `<` (XML doesn't allow a raw `<` in attributes).",
+            ["le"] = "Less than or equal. The XML spelling of `<=`.",
+            ["gt"] = "Greater than. The XML spelling of `>`.",
+            ["ge"] = "Greater than or equal. The XML spelling of `>=`.",
             ["and"] = "True if both sides are true.",
             ["or"] = "True if either side is true.",
             ["not"] = "Negates a condition.",
@@ -30,15 +30,15 @@ namespace KScript.Language.Features
             ["?."] = "Field access that gives null instead of an error when the value is null.",
             ["|>"] = "Pipe: `a |> f(b)` calls `f(a, b)`, so steps read left to right.",
             ["->"] = "Method call on a value: `$name->upper()`.",
-            ["=>"] = "Separates a lambda's parameters from its body: `fn($x) => $x * 2`.",
+            ["=>"] = "Separates a lambda's parameters from its body: `fn(x) => $x * 2`.",
             [".."] = "Range, end exclusive: `0..10`, or `0..100 step 5`.",
             ["step"] = "The step of a range: `0..100 step 5`.",
             ["**"] = "Power: `2 ** 10` is 1024.",
             ["%"] = "Remainder: `7 % 3` is 1.",
-            ["fn"] = "A lambda: `fn($a, $b) => $a + $b`. Lambdas are values; store them, pass them, pipe into them.",
+            ["fn"] = "A lambda: `fn(a, b) => $a + $b`. Lambdas are values; store them, pass them, pipe into them.",
             ["match"] = "Picks a result by value: `match $x { 1 => 'one', 2 => 'two', _ => 'other' }`.",
-            ["true"] = "The boolean true (prints as yes).",
-            ["false"] = "The boolean false (prints as no).",
+            ["true"] = "The boolean true.",
+            ["false"] = "The boolean false.",
             ["null"] = "No value.",
         };
 
@@ -66,7 +66,7 @@ namespace KScript.Language.Features
                 RetiredInfo retired = Catalog.GetRetiredElement(e.Name);
                 if (retired != null)
                 {
-                    return new HoverResult($"**<{e.Name}>** was removed in KScript 2.\n\n{retired.Replacement}", span);
+                    return new HoverResult(retired.Renamed ? retired.Message($"**{e.Name}**") : $"**<{e.Name}>** was removed in KScript 2.\n\n{retired.Replacement}", span);
                 }
                 DocumentLink link = analysis.LinkAt(offset);
                 if (link != null)
@@ -84,10 +84,10 @@ namespace KScript.Language.Features
                 {
                     return new HoverResult($"**{a.Name}** ({KindLabel(a.Kind)}{(a.Required ? ", required" : string.Empty)})\n\n{DeprecationLine(a.Deprecated, a.Name)}{a.Description}{OptionsLine(a)}", cursor.Attribute.NameSpan);
                 }
-                RetiredInfo retired = Catalog.GetRetiredAttribute(cursor.Attribute.Name);
+                RetiredInfo retired = Catalog.GetRetiredAttribute(info, cursor.Attribute.Name);
                 if (retired != null)
                 {
-                    return new HoverResult($"**{cursor.Attribute.Name}** was removed in KScript 2.\n\n{retired.Replacement}", cursor.Attribute.NameSpan);
+                    return new HoverResult(retired.Renamed ? retired.Message($"**{cursor.Attribute.Name}**") : $"**{cursor.Attribute.Name}** was removed in KScript 2.\n\n{retired.Replacement}", cursor.Attribute.NameSpan);
                 }
                 return null;
             }
@@ -154,6 +154,11 @@ namespace KScript.Language.Features
                     {
                         return new HoverResult($"```kscript\n.{field.Name}: {field.Shape.Pretty()}\n```" + (field.Description != null ? "\n\n" + field.Description : string.Empty),
                             region.Source.ToSource(member.NameSpan));
+                    }
+                    if ((Catalog.GetField(target.Kind, member.Name) ?? Catalog.GetField(target.Type, member.Name)) is ValueFieldInfo builtIn)
+                    {
+                        return new HoverResult($"```kscript\n{builtIn.Receiver}.{builtIn.Name}: {builtIn.Type ?? KType.Any}\n```\n\n{builtIn.Description}"
+                            + (builtIn.Example != null ? "\n\n```kscript\n" + builtIn.Example + "\n```" : string.Empty), region.Source.ToSource(member.NameSpan));
                     }
                     break;
                 }

@@ -77,8 +77,8 @@ namespace KScript.Testing
 
     /// <summary>
     /// Finds test files and runs them. Each file runs in its own interpreter: its top-level code runs once and
-    /// collects the &lt;test&gt; elements, then each test runs in a fresh scope with the &lt;before-each&gt; and
-    /// &lt;after-each&gt; blocks around it, so a test sees the file's variables and functions but not another test's.
+    /// collects the &lt;test&gt; elements, then each test runs in a fresh scope with the &lt;before_each&gt; and
+    /// &lt;after_each&gt; blocks around it, so a test sees the file's variables and functions but not another test's.
     /// </summary>
     public static class TestRunner
     {
@@ -86,7 +86,7 @@ namespace KScript.Testing
 
         /// <summary>
         /// The test files in <paramref name="paths"/>: files as given, and the test files in folders (by test.include and
-        /// test.exclude in the folder's kscript.json, or named *.test.ks.xml / *.test.xml). Missing paths go in <paramref name="missing"/>.
+        /// test.exclude in the folder's kscript.json, or named *.test.kscript / *.test.ks.xml). Missing paths go in <paramref name="missing"/>.
         /// </summary>
         public static List<string> Discover(IEnumerable<string> paths, List<string> missing = null)
         {
@@ -167,7 +167,7 @@ namespace KScript.Testing
             var result = new TestFileResult { Path = full, DisplayPath = Display(full, settings.BaseDirectory) };
             var clock = Stopwatch.StartNew();
 
-            // Scripts run on a thread with a large stack, as `kscript script.xml` does, so deep recursion behaves the same.
+            // Scripts run on a thread with a large stack, as `kscript script.kscript` does, so deep recursion behaves the same.
             Exception crash = null;
             var thread = new Thread(() =>
             {
@@ -305,7 +305,7 @@ namespace KScript.Testing
                     }
                     finally
                     {
-                        // <after-each> runs even when the test failed; the test's own failure is the one reported.
+                        // <after_each> runs even when the test failed; the test's own failure is the one reported.
                         foreach (TestGroup group in Enumerable.Reverse(chain))
                         {
                             foreach (TestHook hook in group.AfterEach)

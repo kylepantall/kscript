@@ -43,7 +43,7 @@ public sealed class ReleaseFeatureCoverageTests
             ("kscript.json", "{ \"paths\": { \"routes\": \"app/routes\" } }"));
         var (code, output, err) = Make(site.Root, "route", "users/{id}", "--method", "put");
         Assert.True(code == 0, err);
-        Assert.Contains("Put(path: \"/users/{id}\", to: users.update)", output);
+        Assert.Contains("Put(path: \"/users/{id}\", to: @users.update)", output);
         Assert.Contains("kscript serve only finds app/routes/web.kscript once kscript.json lists it", output);
         Assert.True(File.Exists(Path.Combine(site.Root, "app", "routes", "web.kscript")));
     }
@@ -53,12 +53,12 @@ public sealed class ReleaseFeatureCoverageTests
     {
         using var site = new TempSite(
             ("kscript.json", "{}"),
-            ("routes/web.kscript", "KScript.Routes {\n  import \"../lib/a.kscript\" as users\n  import \"../lib/b.kscript\" as admin_users\n  import \"../lib/c.kscript\" as admin_users2\n}\n"));
+            ("routes/web.kscript", "import KScript.Http\nimport \"../lib/a.kscript\" as users\nimport \"../lib/b.kscript\" as admin_users\nimport \"../lib/c.kscript\" as admin_users2\n\nRoutes {\n}\n"));
         var (code, _, err) = Make(site.Root, "route", "admin/users", "--controller", "admin/users");
         Assert.True(code == 0, err);
         string routes = File.ReadAllText(Path.Combine(site.Root, "routes", "web.kscript")).Replace("\r\n", "\n");
         Assert.Contains("import \"../controllers/admin/users.kscript\" as admin_users3", routes);
-        Assert.Contains("Get(path: \"/admin/users\", to: admin_users3.index)", routes);
+        Assert.Contains("Get(path: \"/admin/users\", to: @admin_users3.index)", routes);
     }
 
     private const string Sizes = "<enum name=\"Size\" values=\"small, medium, large\" />"

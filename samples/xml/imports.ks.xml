@@ -1,0 +1,7 @@
+<kscript>
+  <import path="lib/strings.ks.xml" as="str" />
+  <import path="lib/strings.ks.xml" names="slugify" />
+  <let name="title" value="'Hello World'" />
+  <echo>{ $title |> str.slugify() }</echo>
+  <echo>@slugify($title)</echo>
+</kscript>

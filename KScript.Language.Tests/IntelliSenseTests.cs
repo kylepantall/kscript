@@ -41,9 +41,9 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData(People + "<p>{$people->first().‸}</p>")]
         [InlineData(People + "<for each=\"p\" in=\"$people\"><p>{$p.‸}</p></for>")]
-        [InlineData(People + "<p>{$people->filter(fn($p) => $p.‸)}</p>")]
-        [InlineData(People + "<p>{$people |> max_by(fn($p) => $p.‸)}</p>")]
-        [InlineData(People + "<p>{$people->reduce(fn($total, $p) => $total + $p.‸, initial: 0)}</p>")]
+        [InlineData(People + "<p>{$people->filter(fn(p) => $p.‸)}</p>")]
+        [InlineData(People + "<p>{$people |> max_by(fn(p) => $p.‸)}</p>")]
+        [InlineData(People + "<p>{$people->reduce(fn(total, p) => $total + $p.‸, initial: 0)}</p>")]
         public void JsonFileFieldsComplete(string page)
         {
             List<string> labels = Labels(page);
@@ -54,7 +54,7 @@ namespace KScript.Language.Tests
         public void NestedJsonAndMappedListsHaveTypes()
         {
             Assert.Contains("city", Labels(People + "<p>{$people->first().address.‸}</p>"));
-            List<string> methods = Labels(People + "<p>{$people->map(fn($p) => $p.name)->first()->‸}</p>");
+            List<string> methods = Labels(People + "<p>{$people->map(fn(p) => $p.name)->first()->‸}</p>");
             Assert.Contains("upper", methods);
             Assert.DoesNotContain("filter", methods);
         }

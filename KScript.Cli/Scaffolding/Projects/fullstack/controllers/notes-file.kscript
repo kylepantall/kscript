@@ -19,7 +19,7 @@ import "../requests/note-input{{ ext }}"
 fn all_notes() => @exists($config.notes.file) ? @read_json($config.notes.file) : []
 
 /// The notes this request may see{{#if auth}}: the signed-in user's{{/if}}.
-fn mine() => {{#if auth}}@all_notes()->filter(fn($n) => $n.user_id == @user().id){{else}}@all_notes(){{/if}}
+fn mine() => {{#if auth}}@all_notes()->filter(fn(n) => $n.user_id == @user().id){{else}}@all_notes(){{/if}}
 
 /// Saves every note.
 fn save_notes(notes: list) {
@@ -41,7 +41,7 @@ fn index() {
 /// POST /api/notes
 fn store(json: NoteInput) {
   notes = @all_notes()
-  id = $notes->count() == 0 ? 1 : $notes->map(fn($n) => $n.id)->max() + 1
+  id = $notes->count() == 0 ? 1 : $notes->map(fn(n) => $n.id)->max() + 1
   note = { id: $id, {{#if auth}}user_id: @user().id, {{/if}}title: $json.title, body: $json.body, done: $json.done }
   @save_notes($notes->push($note))
   return @response($note, status: 201)
@@ -49,7 +49,7 @@ fn store(json: NoteInput) {
 
 /// GET /api/notes/:id
 fn show(id: int) {
-  note = @mine()->filter(fn($n) => $n.id == $id)->first()
+  note = @mine()->filter(fn(n) => $n.id == $id)->first()
   if $note == null {
     throw NotFound "There is no note $id."
   }
@@ -59,14 +59,14 @@ fn show(id: int) {
 /// PUT or PATCH /api/notes/:id
 fn update(id: int, json: NoteInput) {
   note = @show($id)->merge({ title: $json.title, body: $json.body, done: $json.done })
-  @save_notes(@all_notes()->map(fn($n) => $n.id == $id ? $note : $n))
+  @save_notes(@all_notes()->map(fn(n) => $n.id == $id ? $note : $n))
   return $note
 }
 
 /// DELETE /api/notes/:id
 fn destroy(id: int) {
   @show($id)
-  @save_notes(@all_notes()->reject(fn($n) => $n.id == $id))
+  @save_notes(@all_notes()->reject(fn(n) => $n.id == $id))
   return null
 }
 {{#if cache}}

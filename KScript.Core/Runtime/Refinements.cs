@@ -127,13 +127,13 @@ namespace KScript.Runtime
             switch (e.Name)
             {
                 case "validate":
-                    DecodedText test = e.GetAttribute("test")?.Value ?? throw run.Error("<validate> needs a test: test=\"$value > 0\".", null, "Syntax");
+                    DecodedText test = e.GetAttribute("test")?.Value ?? throw run.Error($"<validate> needs a test: test=\"$value > 0\".", null, "Syntax");
                     Validators.Add(new Validator(test, e.GetAttributeValue("message")));
                     return true;
                 case "normalize":
-                    if (!allowNormalize) throw run.Error("<normalize> only goes in a type made with with=\"...\" from one other type, such as <type name=\"Slug\" with=\"string\">.", null, "Syntax");
-                    if (Normalize != null) throw run.Error("A type can only have one <normalize>.", null, "Syntax");
-                    Normalize = e.GetAttribute("value")?.Value ?? throw run.Error("<normalize> needs a value: value=\"$value->lower()\".", null, "Syntax");
+                    if (!allowNormalize) throw run.Error($"<normalize> only goes in a type made with with=\"...\" from one other type, such as <type name=\"Slug\" with=\"string\">.", null, "Syntax");
+                    if (Normalize != null) throw run.Error($"A type can only have one <normalize>.", null, "Syntax");
+                    Normalize = e.GetAttribute("value")?.Value ?? throw run.Error($"<normalize> needs a value: value=\"$value->lower()\".", null, "Syntax");
                     return true;
                 default:
                     return false;
@@ -349,7 +349,7 @@ namespace KScript.Runtime
     /// A type made from one other type plus rules: <c>type Age with [int] { min: 0; max: 150 }</c>. Its values are
     /// values of the base type (an Age is a number), so it works anywhere the base type does.
     /// </summary>
-    public sealed class RefinedType : IKObject
+    public sealed class RefinedType : IKObject, IDeclaredType
     {
         internal RefinedType(string name, TypeRef baseType, TypeRules rules, string description, Scope closure, Module module)
         {
@@ -390,13 +390,9 @@ namespace KScript.Runtime
             switch (name)
             {
                 case "from":
-                    result = Shapes.Convert(call.Interpreter, call.Arg(0), TypeRef.Of(this), "The value", Closure, Module);
-                    return true;
+                    throw new KScriptException($"->from() is gone: call the type to make a value of it, {Name}($value).", "Retired");
                 case "check":
                     result = Shapes.Problems(call.Interpreter, call.Arg(0), TypeRef.Of(this), Closure, Module);
-                    return true;
-                case "name":
-                    result = Name;
                     return true;
                 default:
                     result = null;

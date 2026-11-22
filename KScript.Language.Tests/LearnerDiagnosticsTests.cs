@@ -94,7 +94,7 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("foreach x in [1] {\n  echo $x\n}\n", "KScript writes for, not foreach: for item in $list { }", "Change to for")]
-        [InlineData("switch 1 {\n}\n", "KScript writes match, not switch: match $value { case 1 { } default { } }", "Change to match")]
+        [InlineData("switch 1 {\n}\n", "KScript writes match, not switch: match $value { 1 => { } _ => { } }", "Change to match")]
         [InlineData("raise Validation \"no\"\n", "KScript writes throw, not raise: throw Validation \"Age must be positive\"", "Change to throw")]
         public void KeywordsOfOtherLanguagesNameKScriptsWord(string text, string message, string fix)
         {
@@ -138,13 +138,13 @@ namespace KScript.Language.Tests
         public void XmlScriptsKeepTheirWording()
         {
             Assert.Contains(Errors("<kscript><return value=\"5\" /></kscript>", "a.ks.xml"), d => d.Message == "<return> must be inside <fn>.");
-            Assert.Contains(Errors("<kscript><let name=\"x\" value=\"1 &amp;&amp; 2\" /></kscript>", "a.ks.xml"), d => d.Message.Contains("isn't allowed in XML"));
+            Assert.Contains(Errors("<kscript><let name=\"x\" value=\"1 &amp;&amp; 2\" /></kscript>", "a.ks.xml"), d => d.Message == "Use 'and' instead of '&&'.");
         }
 
         [Theory]
-        [InlineData("len", "KScript has no @len. Use the length method: $list->length().")]
-        [InlineData("strlen", "KScript has no @strlen. Use the length method: $text->length().")]
-        [InlineData("typeof", "KScript has no @typeof. Use @type($value), or $value->type().")]
+        [InlineData("len", "KScript has no @len. Use the count method: $list->count().")]
+        [InlineData("strlen", "KScript has no @strlen. Use the count method: $text->count().")]
+        [InlineData("typeof", "KScript has no @typeof. Use the type method: $value->type().")]
         public void CommandsOfOtherLanguagesNameTheMethod(string name, string message)
         {
             Diagnostic d = Assert.Single(Errors($"nums = [1, 2]\necho @{name}($nums)\n"));
@@ -155,7 +155,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void AFunctionOfYourOwnWithThatNameIsNotAHabit()
         {
-            Assert.Empty(Errors("fn len(list) => $list->length()\necho @len([1, 2])\n"));
+            Assert.Empty(Errors("fn len(list) => $list->count()\necho @len([1, 2])\n"));
         }
 
         [Fact]
@@ -171,7 +171,7 @@ namespace KScript.Language.Tests
         [InlineData("total = 1 +\n  2\necho $total\n")]
         [InlineData("a = 1\ntotal = $a +\n  $a\necho $total\n")]
         [InlineData("ok = true and\n  not false\necho $ok\n")]
-        [InlineData("names = [1, 2]\n  |> map(fn($n) => $n)\necho $names\n")]
+        [InlineData("names = [1, 2]\n  |> map(fn(n) => $n)\necho $names\n")]
         public void AValueCanStillCarryOnAfterAnOperator(string text)
         {
             Assert.Empty(Analyze(text).Diagnostics);

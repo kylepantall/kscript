@@ -1,0 +1,4 @@
+/// Filters for the list of people.
+type PeopleQuery {
+  role?: string
+}

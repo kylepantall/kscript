@@ -6,7 +6,7 @@ using KScript.Syntax.Text;
 namespace KScript.Language.Analysis
 {
     /// <summary>
-    /// &lt;type&gt; declarations: the shape of some data, such as an API response. Each one is a constant (<c>$Repo</c>)
+    /// &lt;type&gt; declarations: the shape of some data, such as an API response. Each one is a constant (<c>Repo</c>)
     /// whose records have the fields it lists, so <c>->json(as: Repo)</c>, <c>&lt;let type="Repo"&gt;</c> and
     /// <c>repo: Repo</c> parameters complete <c>$repo.</c> with them.
     /// </summary>
@@ -131,7 +131,7 @@ namespace KScript.Language.Analysis
                 result.References.Add(new SymbolReference(method, span, true, true));
                 if (IsModelElement(e) && method.Parameters.Count > 0 && method.Parameters[0].Name == "query")
                 {
-                    // A scope: $User->admins() runs it on a query of the model, which it is given as query.
+                    // A scope: User->admins() runs it on a query of the model, which it is given as query.
                     var scope = new Symbol { Name = fnName, Kind = SymbolKind.Function, DeclarationSpan = span, DeclaringElement = fn, Description = fn.Documentation,
                         ReturnShape = new TypeShape(KType.Query) { Name = shape.Name, Instance = shape } };
                     scope.Parameters.AddRange(method.Parameters.Skip(1));
@@ -270,7 +270,7 @@ namespace KScript.Language.Analysis
         /// <summary>The fields of a type: from its sample file, then its fields attribute, then its &lt;field&gt; elements.</summary>
         private void FillFields(MarkupElement e, TypeShape shape)
         {
-            string sample = e.GetAttributeValue("sample")?.Trim();
+            string sample = e.GetAttributeValue("path")?.Trim();
             if (!string.IsNullOrEmpty(sample) && result.JsonFileShape(sample) is TypeShape json)
             {
                 TypeShape map = json.Type == KType.List ? json.Element : json;
@@ -349,7 +349,11 @@ namespace KScript.Language.Analysis
                 char c = i < text.Length ? text[i] : ',';
                 if (quote != '\0')
                 {
-                    if (c == quote)
+                    if (Quotes.IsEscape(text, i, text.Length, quote))
+                    {
+                        i++;
+                    }
+                    else if (c == quote)
                     {
                         quote = '\0';
                     }
@@ -383,6 +387,7 @@ namespace KScript.Language.Analysis
         {
             // parse="..." sees the text being read, so it is analyzed below with $value and $match.
             AnalyzeAttributes(e, info, scope, skip: "parse");
+            CheckOptionsAreInBrackets(e);
             var seen = new HashSet<string>(StringComparer.Ordinal);
             MarkupAttribute fields = e.GetAttribute("fields");
             if (fields?.Value != null)
@@ -422,15 +427,15 @@ namespace KScript.Language.Analysis
                     Report(TrimmedSpan(nameAttr.Value), DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"The field '{name}' is listed twice.");
                 }
             }
-            bool hasFields = seen.Count > 0 || e.GetAttribute("sample") != null || e.GetAttribute("with") != null;
+            bool hasFields = seen.Count > 0 || e.GetAttribute("path") != null || e.GetAttribute("with") != null;
             if (!hasFields)
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "<type> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<type> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.");
             }
-            string sample = e.GetAttributeValue("sample")?.Trim();
+            string sample = e.GetAttributeValue("path")?.Trim();
             if (!string.IsNullOrEmpty(sample) && ResolvePath(sample) is string full && files.FileExists(full) && result.JsonFileShape(sample) == null)
             {
-                Report(TrimmedSpan(e.GetAttribute("sample").Value), DiagnosticSeverity.Warning, DiagnosticCodes.InvalidAttributeValue, $"'{sample}' isn't a JSON file the editor can read, so the type's fields from it aren't known.");
+                Report(TrimmedSpan(e.GetAttribute("path").Value), DiagnosticSeverity.Warning, DiagnosticCodes.InvalidAttributeValue, $"'{sample}' isn't a JSON file the editor can read, so the type's fields from it aren't known.");
             }
             CheckWithNames(e);
             CheckInheritedMembers(e);
@@ -526,7 +531,7 @@ namespace KScript.Language.Analysis
                 if (!parsed.Success)
                 {
                     Report(value.ToSource(new TextSpan(start, part.Length)), DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax,
-                        $"The default of '{head.Trim()}' isn't a valid expression: {parsed.Errors[0].Message}");
+                        $"The default of '{head.Trim()}' isn't a valid expression: {parsed.Errors[0].Words}");
                 }
             }
             int colon = head.IndexOf(':');
@@ -548,6 +553,8 @@ namespace KScript.Language.Analysis
                 string type = head.Substring(colon + 1);
                 int typeStart = start + colon + 1 + (type.Length - type.TrimStart().Length);
                 CheckTypeText(type.Trim(), value.ToSource(new TextSpan(typeStart, Math.Max(type.Trim().Length, 1))), value.ToSource(typeStart));
+                string written = namePart.Trim();
+                CheckOptionalIsOnName(written, value.ToSource(new TextSpan(at, written.Length)), type.Trim(), value.ToSource(new TextSpan(typeStart, type.Trim().Length)));
             }
         }
 
@@ -566,6 +573,10 @@ namespace KScript.Language.Analysis
                 {
                     Report(TrimmedSpan(name.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                         $"'{n}' can't be a field name: use letters, digits and _, starting with a letter. To read a key like '{n}', use from=\"{n}\".");
+                }
+                else if (e.GetAttribute("type")?.Value is DecodedText fieldType && fieldType.Value.Trim().Length > 0)
+                {
+                    CheckOptionalIsOnName(name.ValueText.Trim(), TrimmedSpan(name.Value), fieldType.Value.Trim(), TrimmedSpan(fieldType));
                 }
             }
             MarkupAttribute from = e.GetAttribute("from");
@@ -664,19 +675,6 @@ namespace KScript.Language.Analysis
             result.Symbols.Where(s => s.EnumValues != null || s.Shape.Type == KType.Type).Select(s => s.Name).Concat(DeclaredEnums()).Distinct();
 
         private TypeShape TypeNamed(string text, int offset) => (types ??= new TypeInference(catalog, result)).TypeNamed(text, offset);
-
-        /// <summary>A bare type name in a call (<c>as: Repo</c>) is the type, not a word: a reference to it.</summary>
-        private bool ReferenceBareType(IdentifierNode node, ExpressionRegion region, Scope scope)
-        {
-            TextSpan span = region.Source.ToSource(node.Span);
-            Symbol symbol = scope.Lookup(node.Name, span.Start);
-            if (symbol?.Shape.Type != KType.Type)
-            {
-                return false;
-            }
-            result.References.Add(new SymbolReference(symbol, span, false, false));
-            return true;
-        }
 
         /// <summary>A field a record's type doesn't have: <c>$repo.stras</c>.</summary>
         private void CheckRecordField(TypeShape target, MemberNode member, ExpressionRegion region)

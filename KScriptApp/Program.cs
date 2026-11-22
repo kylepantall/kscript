@@ -97,7 +97,7 @@ namespace KScript
                         if (i + 1 >= args.Length || !int.TryParse(args[++i], out int p))
                         {
                             Error.WriteLine("--port needs a number, e.g. --port 8080");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         port = p;
                         break;
@@ -105,7 +105,7 @@ namespace KScript
                         if (i + 1 >= args.Length)
                         {
                             Error.WriteLine("--host needs a value, e.g. --host 0.0.0.0");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         host = args[++i];
                         break;
@@ -122,7 +122,7 @@ namespace KScript
                         if (i + 1 >= args.Length || !int.TryParse(args[++i], out int dp) || dp < 1 || dp > 65535)
                         {
                             Error.WriteLine("--docs-port needs a number, e.g. --docs-port 4180");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         docsPort = dp;
                         withDocs ??= true;
@@ -141,7 +141,7 @@ namespace KScript
             catch (KScript.Projects.ProjectConfigException ex)
             {
                 ErrorReport.Write(Error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
 
             if (project != null)
@@ -187,12 +187,12 @@ namespace KScript
             catch (DirectoryNotFoundException ex)
             {
                 ErrorReport.Write(Error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
             catch (FileNotFoundException ex)
             {
                 ErrorReport.Write(Error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
             catch (IOException ex)
             {
@@ -256,7 +256,7 @@ namespace KScript
         /// </summary>
         static string[] TakeAnsi(string[] args)
         {
-            bool command = args.Length > 0 && (CliReference.Find(args[0]) != null || args[0].StartsWith("make:", StringComparison.Ordinal) || args[0] == "help");
+            bool command = args.Length > 0 && (CliReference.Find(args[0]) != null || args[0] == "help");
             var rest = new List<string>();
             bool before = true;
             foreach (string a in args)
@@ -272,39 +272,50 @@ namespace KScript
             return rest.ToArray();
         }
 
-        /// <summary>kscript openapi [folder] [--yaml] [--out file]: the OpenAPI document made from a site's routes.</summary>
+        /// <summary>kscript openapi [folder] [--output json|yaml] [--out file]: the OpenAPI document made from a site's routes.</summary>
         int OpenApi(string[] args)
         {
             string output = null, folder = null;
-            bool yaml = false;
+            bool? yaml = null;
             for (int i = 0; i < args.Length; i++)
             {
+                if (CliFlags.Retired("openapi", args[i]) is string renamed)
+                {
+                    Error.WriteLine(renamed);
+                    return ExitCodes.Usage;
+                }
                 switch (args[i])
                 {
-                    case "--yaml": yaml = true; break;
-                    case "--json": yaml = false; break;
+                    case "--output":
+                        if (i + 1 >= args.Length || args[i + 1] is not ("json" or "yaml"))
+                        {
+                            Error.WriteLine("--output needs json or yaml, e.g. --output yaml");
+                            return ExitCodes.Usage;
+                        }
+                        yaml = args[++i] == "yaml";
+                        break;
                     case "--out":
                     case "-o":
                         if (i + 1 >= args.Length)
                         {
                             Error.WriteLine("--out needs a file name.");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         output = args[++i];
                         break;
                     default:
                         if (args[i].StartsWith("-", StringComparison.Ordinal))
                         {
-                            Error.WriteLine($"Unknown option '{args[i]}' for kscript openapi. Use --yaml or --out file.");
-                            return 1;
+                            Error.WriteLine($"Unknown option '{args[i]}' for kscript openapi. Use --output json|yaml or --out file.");
+                            return ExitCodes.Usage;
                         }
                         folder = args[i];
                         break;
                 }
             }
-            if (output != null && (output.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || output.EndsWith(".yml", StringComparison.OrdinalIgnoreCase))) yaml = true;
-            if (!TryFindSite(ref folder, out KScript.Projects.ProjectConfig project)) return 1;
-            return KScript.Http.HttpServer.WriteOpenApi(folder ?? ".", project, yaml, output, Out, Error);
+            yaml ??= output != null && (output.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || output.EndsWith(".yml", StringComparison.OrdinalIgnoreCase));
+            if (!TryFindSite(ref folder, out KScript.Projects.ProjectConfig project)) return ExitCodes.Usage;
+            return KScript.Http.HttpServer.WriteOpenApi(folder ?? ".", project, yaml.Value, output, Out, Error);
         }
 
         /// <summary>The site folder for a command given an optional folder: the project's site root when it names the project.</summary>
@@ -344,7 +355,7 @@ namespace KScript
             catch (KScript.Projects.ProjectConfigException ex)
             {
                 ErrorReport.Write(Error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
             string given = folder == null ? null : Path.GetFullPath(folder);
             if (project != null && (given == null || string.Equals(given.TrimEnd(Path.DirectorySeparatorChar), project.Directory, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)))
@@ -352,7 +363,7 @@ namespace KScript
             if (!Directory.Exists(folder ?? "."))
             {
                 Error.WriteLine($"Site folder not found: {folder}");
-                return 1;
+                return ExitCodes.Usage;
             }
             return KScript.Http.HttpServer.ListRoutes(folder ?? ".", project, Out, Error, verbose);
         }
@@ -379,7 +390,7 @@ namespace KScript
             {
                 Out.Flush();
                 ErrorReport.Write(Error, ex);
-                return ErrorReport.ToKScript(ex).Type == ErrorReport.InternalType ? 70 : 1;
+                return ErrorReport.ToKScript(ex).Type == ErrorReport.InternalType ? ExitCodes.Internal : ExitCodes.Failed;
             }
         }
 
@@ -434,7 +445,7 @@ namespace KScript
             catch (ArgumentException ex)
             {
                 ErrorReport.Write(Error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
 
             if (args.Length > 0 && (args[0] == "--version" || args[0] == "version"))
@@ -448,13 +459,13 @@ namespace KScript
                 // kscript help serve shows one command, as artisan help does.
                 if (args.Length > 1 && !args[1].StartsWith("-", StringComparison.Ordinal))
                 {
-                    if (CliReference.Find(args[1] == "make:" ? "make" : args[1]) is CliCommand command)
+                    if (CliReference.Find(args[1]) is CliCommand command)
                     {
                         CliReference.PrintCommand(Out, command);
                         return 0;
                     }
                     new KScript.Output.CliOutput(Error).Error($"There is no command '{args[1]}'. kscript --help lists them.");
-                    return 1;
+                    return ExitCodes.Usage;
                 }
                 PrintUsage(Out);
                 return 0;
@@ -488,15 +499,36 @@ namespace KScript
             {
                 if (args.Contains("--print-config"))
                     return KScript.LanguageServer.CheckCommand.PrintConfig(args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Out);
-                int formatAt = Array.IndexOf(args, "--format");
-                string format = formatAt > 0 && formatAt + 1 < args.Length ? args[formatAt + 1] : args.FirstOrDefault(a => a.StartsWith("--format=", StringComparison.Ordinal))?.Substring(9) ?? "text";
-                if (format != "text" && format != "json")
+                string format = "text";
+                bool warningsAsErrors = false, fix = false;
+                var paths = new List<string>();
+                for (int i = 1; i < args.Length; i++)
                 {
-                    Error.WriteLine($"Unknown --format '{format}'. Use text or json.");
-                    return 2;
+                    string a = args[i];
+                    if (CliFlags.Retired("check", a) is string renamed)
+                    {
+                        Error.WriteLine(renamed);
+                        return ExitCodes.Usage;
+                    }
+                    if (a == "--warnings-as-errors") warningsAsErrors = true;
+                    else if (a == "--fix") fix = true;
+                    else if (a == "--output" || a.StartsWith("--output=", StringComparison.Ordinal))
+                    {
+                        format = a == "--output" ? (i + 1 < args.Length ? args[++i] : null) : a.Substring(9);
+                        if (format != "text" && format != "json")
+                        {
+                            Error.WriteLine(format == null ? "--output needs text or json, e.g. --output json" : $"Unknown --output '{format}'. Use text or json.");
+                            return ExitCodes.Usage;
+                        }
+                    }
+                    else if (a.StartsWith("--", StringComparison.Ordinal))
+                    {
+                        Error.WriteLine($"Unknown option '{a}' for kscript check. Use --warnings-as-errors, --fix, --output text|json or --print-config.");
+                        return ExitCodes.Usage;
+                    }
+                    else paths.Add(a);
                 }
-                IEnumerable<string> paths = args.Skip(1).Where((a, i) => !a.StartsWith("--", StringComparison.Ordinal) && !(formatAt > 0 && i + 1 == formatAt + 1));
-                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: args.Contains("--warnaserror"), json: format == "json");
+                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: warningsAsErrors, json: format == "json", fix: fix);
             }
 
             if (args.Length > 0 && args[0] == "watch")
@@ -517,7 +549,7 @@ namespace KScript
             if (args.Length == 0)
             {
                 PrintUsage(Out);
-                return 1;
+                return ExitCodes.Usage;
             }
 
             if (args[0] == "serve")
@@ -570,27 +602,41 @@ namespace KScript
                 return KScript.Queueing.QueueCommand.RunQueue(args.Skip(1).ToArray(), Out, Error, environment: EnvironmentName);
             }
 
-            // kscript make component Hero, or Artisan-style kscript make:component Hero
-            if (args[0] == "make" || args[0].StartsWith("make:", StringComparison.Ordinal))
+            // kscript make component Hero. The colon spelling (make:component) is gone: say what to write.
+            if (args[0].StartsWith("make:", StringComparison.Ordinal))
             {
-                var rest = args[0] == "make" ? args.Skip(1) : new[] { args[0].Substring(5) }.Concat(args.Skip(1));
-                return KScript.Scaffolding.MakeCommand.Run(rest.ToArray(), Out, Error);
+                string type = args[0].Substring(5);
+                new KScript.Output.CliOutput(Error).Error($"'{args[0]}' is written with a space: kscript make {(type.Length == 0 ? "<type>" : type)}{(args.Length > 1 ? " " + string.Join(" ", args.Skip(1)) : string.Empty)}");
+                return ExitCodes.Usage;
+            }
+            if (args[0] == "make")
+            {
+                return KScript.Scaffolding.MakeCommand.Run(args.Skip(1).ToArray(), Out, Error);
             }
 
             if (args[0].StartsWith("-", StringComparison.Ordinal))
             {
                 new KScript.Output.CliOutput(Error).Error($"Unknown option '{args[0]}'.\nRun kscript --help for usage.");
-                return 1;
+                return ExitCodes.Usage;
             }
 
             string path = ResolveScriptPath(args[0]);
             if (path == null)
             {
                 new KScript.Output.CliOutput(Error).Error($"There is no script at '{args[0]}'." + (CliReference.Find(args[0]) == null && !args[0].Contains('.') ? " kscript --help lists the commands." : string.Empty));
-                return 2;
+                return ExitCodes.Usage;
             }
 
-            // kscript greet.test.ks.xml runs the file's tests.
+            // One extension per form: an old .ks or plain .xml script is told its new name.
+            if (!KScript.Syntax.Markup.ScriptFiles.IsScript(path))
+            {
+                string renamed = KScript.Syntax.Markup.ScriptFiles.RenamedFrom(path);
+                new KScript.Output.CliOutput(Error).Error($"'{args[0]}' is not a script: scripts end in .kscript, or .ks.xml for the XML form."
+                    + (renamed != null ? $" Rename it to {Path.GetFileName(renamed)}." : string.Empty));
+                return ExitCodes.Usage;
+            }
+
+            // kscript greet.test.kscript runs the file's tests.
             if (KScript.Projects.TestSettings.IsTestFileName(path))
             {
                 return RunTests(new[] { path }.Concat(args.Skip(1)).ToArray());
@@ -613,7 +659,7 @@ namespace KScript
             {
                 Out.Flush();
                 ErrorReport.Write(Error, ex);
-                return 70;
+                return ExitCodes.Internal;
             }
         }
 
@@ -763,7 +809,7 @@ namespace KScript
             catch (ProjectConfigException ex)
             {
                 ErrorReport.Write(Error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
 
             var host = KScriptHost.Console();
@@ -782,7 +828,7 @@ namespace KScript
             catch (Exception ex) when (cancel.IsCancellationRequested && (ex is OperationCanceledException || ex is KScriptException { Type: "Cancelled" }))
             {
                 // Stopped with Ctrl+C: the usual exit code for an interrupted command, without an error report.
-                return 130;
+                return ExitCodes.Interrupted;
             }
             catch (Exception ex) when (ex is not ControlSignal)
             {
@@ -796,7 +842,7 @@ namespace KScript
                     report = Path.GetFullPath(at.File) + report.Substring(Path.GetFileName(at.File).Length);
                 }
                 ErrorReport.WriteMessage(Error, report);
-                return 3;
+                return ExitCodes.ScriptError;
             }
             finally
             {

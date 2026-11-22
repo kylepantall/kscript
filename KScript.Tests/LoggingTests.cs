@@ -49,8 +49,8 @@ public sealed class LoggingTests : IDisposable
         var (output, error, _) = RunWith(
             "<log>skipped</log><log level=\"error\" category=\"pay\" fields=\"{ id: 7 }\">Declined</log>" +
             "<let name=\"db\" value=\"$log->named('db')->with({ host: 'x' })\" /><do>$db->debug('Query'); $db->named('noisy')->error('never'); $db->named('slow')->trace('no')</do>" +
-            "<for each=\"e\" in=\"$log->entries()\"><echo>{$e.level} {$e.category} {$e.message} { @to_json($e.fields) } {$e.script} {$e.line ?? '-'}</echo></for>" +
-            "<echo>{ $log->enabled('info') } { $db->enabled('debug') } { $db.category } { $db.fields.host } {$log} {$db}</echo>");
+            "<for each=\"e\" in=\"$log->entries()\"><echo>{$e.level} {$e.category} {$e.message} { $e.fields->to_json() } {$e.script} {$e.line ?? '-'}</echo></for>" +
+            "<echo>{ $log->is_enabled('info') } { $db->is_enabled('debug') } { $db.category } { $db.fields.host } {$log} {$db}</echo>");
         Assert.Equal("error pay Declined {\"id\":7} job.ks.xml 1\ndebug db Query {\"host\":\"x\"} job.ks.xml -\nfalse true db x logger logger (db)\n", output);
         Assert.Equal("", error);
     }
@@ -74,9 +74,9 @@ public sealed class LoggingTests : IDisposable
     {
         var (output, _, _) = RunWith(
             "<fn name=\"alert\" params=\"entry\"><echo>ALERT {$entry.level}: {$entry.message} ({$entry.fields.order})</echo><do>$log->error('inside')</do></fn>" +
-            "<log-provider fn=\"alert\" level=\"error\" replace=\"yes\" />" +
+            "<log_provider fn=\"alert\" level=\"error\" replace=\"yes\" />" +
             "<log level=\"warn\">ignored</log><log level=\"error\" fields=\"{ order: 9 }\">Card declined</log>" +
-            "<log-provider type=\"memory\" /><let name=\"hook\" value=\"fn($e) => @echo('fn ' + $e.message)\" />");
+            "<log_provider type=\"memory\" /><let name=\"hook\" value=\"fn(e) => @echo('fn ' + $e.message)\" />");
         Assert.Equal("ALERT error: Card declined (9)\n", output);
     }
 
@@ -93,9 +93,9 @@ public sealed class LoggingTests : IDisposable
     [Fact]
     public void Console_colours_at_a_terminal_and_time_formats()
     {
-        string error = Errors("<log-provider type=\"console\" replace=\"yes\" time=\"\" /><do>$log->debug('d'); $log->info('i'); $log->warn('w'); $log->error('e')</do><config defaults=\"{}\" />", h => h.Logs.Level = LogLevel.Debug, interactive: true);
+        string error = Errors("<log_provider type=\"console\" replace=\"yes\" time=\"\" /><do>$log->debug('d'); $log->info('i'); $log->warn('w'); $log->error('e')</do><config defaults=\"{}\" />", h => h.Logs.Level = LogLevel.Debug, interactive: true);
         Assert.Equal("\u001b[90mDEBUG d\u001b[0m\n\u001b[36mINFO  i\u001b[0m\n\u001b[33mWARN  w\u001b[0m\n\u001b[31mERROR e\u001b[0m\n", error);
-        Assert.Equal("12:30 INFO  plain\n", Errors("<log-provider type=\"console\" replace=\"yes\" colour=\"no\" time=\"HH:mm\" /><log>plain</log>", interactive: true));
+        Assert.Equal("12:30 INFO  plain\n", Errors("<log_provider type=\"console\" replace=\"yes\" color=\"no\" time=\"HH:mm\" /><log>plain</log>", interactive: true));
     }
 
     [Fact]
@@ -129,11 +129,11 @@ public sealed class LoggingTests : IDisposable
         Assert.Contains("roll should be never or daily", Fails("<log>x</log>").Message);
         FileOf("config.yaml", "logging:\n  providers:\n    - type: memory\n      level: loud\n");
         Assert.Contains("logging.providers[0] level: 'loud' isn't a log level", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: console\n      colour: off\n      stream: stdout\n    - type: console\n      colour: true\n      stream: stdout\n");
+        FileOf("config.yaml", "logging:\n  providers:\n    - type: console\n      color: off\n      stream: stdout\n    - type: console\n      color: true\n      stream: stdout\n");
         Assert.Equal("12:30:15 INFO  x\n\u001b[36m12:30:15 INFO  x\u001b[0m\n", RunWith("<log>x</log>").Output);
         File.Delete(Path.Combine(dir, "config.yaml"));
-        Assert.Contains("there is no function called nope", Fails("<log-provider fn=\"nope\" />").Message);
-        Assert.Contains("fn should be a function", Fails("<let name=\"n\" value=\"1\" /><log-provider fn=\"n\" />").Message);
+        Assert.Contains("there is no function called nope", Fails("<log_provider fn=\"nope\" />").Message);
+        Assert.Contains("fn should be a function", Fails("<let name=\"n\" value=\"1\" /><log_provider fn=\"n\" />").Message);
         Assert.Contains("level=\"loud\" isn't one of", Fails("<log level=\"loud\">x</log>").Message);
         Assert.Contains("$log->log() level", Fails("<do>$log->log('loud', 'x')</do>").Message);
     }
@@ -142,7 +142,7 @@ public sealed class LoggingTests : IDisposable
     public void A_failing_provider_is_reported_once_and_the_others_keep_going()
     {
         var failing = new Failing();
-        var (_, error, host) = RunWith("<log-provider type=\"memory\" /><do>$log->info('a'); $log->info('b'); $log->flush()</do><echo>{ $log->entries()->count() }</echo>",
+        var (_, error, host) = RunWith("<log_provider type=\"memory\" /><do>$log->info('a'); $log->info('b'); $log->flush()</do><echo>{ $log->entries()->count() }</echo>",
             h => h.Logs.AddProvider(failing, LogLevel.Info, "broken"));
         Assert.Equal("   ERROR  Log provider 'broken' failed.\n          Error: nope\n", error.Replace("12:30:15 INFO  a\n12:30:15 INFO  b\n", string.Empty));
         Assert.Equal(2, failing.Writes);
@@ -165,7 +165,7 @@ public sealed class LoggingTests : IDisposable
     [Fact]
     public void Pages_and_read_only_hosts_cannot_log_to_files()
     {
-        var ex = Assert.Throws<KScriptException>(() => RunWith("<log-provider type=\"file\" path=\"x.log\" />", h => h.CanWriteFiles = false));
+        var ex = Assert.Throws<KScriptException>(() => RunWith("<log_provider type=\"file\" path=\"x.log\" />", h => h.CanWriteFiles = false));
         Assert.Contains("Logging to a file can't change files here", ex.Message);
     }
 
@@ -191,11 +191,11 @@ public sealed class LoggingTests : IDisposable
         });
 
         var (_, error, _) = RunWith("<import package=\"KScript.Net\" />" +
-            $"<log-provider type=\"http\" url=\"http://localhost:{port}/logs\" batch=\"2\" headers=\"{{ 'X-Key': 'k1' }}\" replace=\"yes\" />" +
+            $"<log_provider type=\"http\" url=\"http://localhost:{port}/logs\" batch=\"2\" headers=\"{{ 'X-Key': 'k1' }}\" replace=\"yes\" />" +
             "<do>$log->info('one'); $log->info('two'); $log->warn('three')</do>");
         Assert.Equal("", error);
         var (_, error2, _) = RunWith("<import package=\"KScript.Net\" />" +
-            $"<log-provider type=\"http\" url=\"http://localhost:{port}/logs\" replace=\"yes\" /><log>lost</log>");
+            $"<log_provider type=\"http\" url=\"http://localhost:{port}/logs\" replace=\"yes\" /><log>lost</log>");
         serve.Wait(TimeSpan.FromSeconds(10));
 
         Assert.Equal(new[] { "one", "two" }, JsonDocument.Parse(bodies[0]).RootElement.EnumerateArray().Select(e => e.GetProperty("message").GetString()));
@@ -208,12 +208,12 @@ public sealed class LoggingTests : IDisposable
     [Fact]
     public void Http_provider_options_are_checked_and_need_the_import()
     {
-        Assert.Contains("there is no log provider type 'http'", Fails("<log-provider type=\"http\" url=\"http://x\" />").Message);
-        Assert.Contains("url should be an http or https address", Fails("<import package=\"KScript.Net\" /><log-provider type=\"http\" url=\"ftp://x\" />").Message);
-        Assert.Contains("needs a url", Fails("<import package=\"KScript.Net\" /><log-provider type=\"http\" />").Message);
-        Assert.Contains("headers should be a map", Fails("<import package=\"KScript.Net\" /><log-provider type=\"http\" url=\"http://x\" headers=\"[1]\" />").Message);
-        Assert.Contains("batch should be 1 or more", Fails("<import package=\"KScript.Net\" /><log-provider type=\"http\" url=\"http://x\" batch=\"0\" />").Message);
-        Assert.Contains("Types: console, file, memory, http, fn", Fails("<import package=\"KScript.Net\" /><log-provider type=\"pigeon\" />").Message);
+        Assert.Contains("there is no log provider type 'http'", Fails("<log_provider type=\"http\" url=\"http://x\" />").Message);
+        Assert.Contains("url should be an http or https address", Fails("<import package=\"KScript.Net\" /><log_provider type=\"http\" url=\"ftp://x\" />").Message);
+        Assert.Contains("needs a url", Fails("<import package=\"KScript.Net\" /><log_provider type=\"http\" />").Message);
+        Assert.Contains("headers should be a map", Fails("<import package=\"KScript.Net\" /><log_provider type=\"http\" url=\"http://x\" headers=\"[1]\" />").Message);
+        Assert.Contains("batch should be 1 or more", Fails("<import package=\"KScript.Net\" /><log_provider type=\"http\" url=\"http://x\" batch=\"0\" />").Message);
+        Assert.Contains("Types: console, file, memory, http, fn", Fails("<import package=\"KScript.Net\" /><log_provider type=\"pigeon\" />").Message);
     }
 
     private static int FreePort()

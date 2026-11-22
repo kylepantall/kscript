@@ -1,4 +1,5 @@
 using KScript.Metadata;
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 
 namespace KScript.Runtime
@@ -41,7 +42,7 @@ namespace KScript.Runtime
         /// <summary>The attribute's text, or an error saying it is needed.</summary>
         public string RequiredRaw(string attribute) => Raw(attribute) ?? throw Missing(attribute);
 
-        /// <summary>A variable name written in an attribute (name="count", to="answer"), without a leading $.</summary>
+        /// <summary>A variable name written in an attribute (name="count", into="answer"), without a leading $.</summary>
         public string VariableName(string attribute, bool required = true)
         {
             string raw = required ? RequiredRaw(attribute) : Raw(attribute);
@@ -80,13 +81,13 @@ namespace KScript.Runtime
             return Interpreter.EvaluateList(a.Value, Scope, Module);
         }
 
-        /// <summary>The attribute with its <c>{ }</c> values filled in.</summary>
+        /// <summary>The attribute with its <c>{ }</c> values and bare <c>$name</c> references filled in, as element text is.</summary>
         public string Template(string attribute, string fallback = null)
         {
             MarkupAttribute a = Element.GetAttribute(attribute);
             if (a == null) return fallback;
             if (a.Value == null) return string.Empty;
-            return Interpreter.Interpolate(a.Value, Scope, Module, bareReferences: false);
+            return Interpreter.Interpolate(a.Value, Scope, Module, bareReferences: true);
         }
 
         public string RequiredTemplate(string attribute) => Template(attribute) ?? throw Missing(attribute);
@@ -97,7 +98,24 @@ namespace KScript.Runtime
             string raw = Raw(attribute);
             if (raw == null) return fallback;
             if (raw.Contains('{')) return Values.Truthy(Interpreter.InterpolateValue(Element.GetAttribute(attribute).Value, Scope, Module));
-            return Values.ParseBool(raw) ?? throw Error($"{attribute}=\"{raw}\" should be yes or no.", attribute);
+            return Values.ParseBool(raw) ?? throw Error($"{attribute}=\"{raw}\" should be true or false.", attribute);
+        }
+
+        /// <summary>
+        /// A length of time, in seconds: a duration (<c>30s</c>, <c>500ms</c>, <c>1h30m</c>), text that reads as one, or
+        /// a plain number of seconds. Null when the attribute isn't there.
+        /// </summary>
+        public double? Seconds(string attribute)
+        {
+            if (!Has(attribute)) return null;
+            try
+            {
+                return Duration.Seconds(Eval(attribute), attribute);
+            }
+            catch (KScriptException ex) when (ex.Type == "Argument")
+            {
+                throw Error(ex.Message, attribute, "Argument");
+            }
         }
 
         /// <summary>A number attribute written as an expression.</summary>
@@ -146,7 +164,7 @@ namespace KScript.Runtime
         #region Errors
 
         /// <summary>An error that points at this element, or at one of its attributes.</summary>
-        public KScriptException Error(string message, string attribute = null, string type = "Error")
+        public KScriptException Error(Wording message, string attribute = null, string type = "Error")
         {
             int? offset = attribute != null ? Element.GetAttribute(attribute)?.Span.Start : null;
             return new KScriptException(message, type) { Offset = offset ?? Element.Span.Start, OffsetModule = Module };
@@ -155,7 +173,7 @@ namespace KScript.Runtime
         private KScriptException Missing(string attribute)
         {
             AttributeInfo info = Definition.Info.GetAttribute(attribute);
-            return Error($"<{Name}> needs a {attribute} attribute{(info != null ? ": " + info.Description : ".")}", null, "Syntax");
+            return Error($"<{Name}> needs a {attribute} attribute{(info != null ? Wording.Of($": {Wording.Prose(info.Description)}") : ".")}", null, "Syntax");
         }
 
         #endregion

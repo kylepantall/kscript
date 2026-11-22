@@ -139,7 +139,12 @@
     "keywords": {
       "patterns": [
         {
-          "match": "(?<![\\w$@.-])(if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue)(?![\\w-])",
+          "match": "(?<![\\w$@.-])(if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue)(?![\\w-])",
+          "name": "keyword.control.flow.kscript"
+        },
+        {
+          "comment": "The arm of a match that takes anything: _ => ... or _ when $n > 9 => ...",
+          "match": "(?<![\\w$@.-])_(?=\\s*(?:=>|when(?![\\w-])))",
           "name": "keyword.control.flow.kscript"
         },
         {
@@ -159,7 +164,7 @@
     "element": {
       "patterns": [
         {
-          "begin": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)\\s*(\\()",
+          "begin": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)\\s*(\\()",
           "beginCaptures": {
             "1": {
               "name": "entity.name.tag.kscript"
@@ -192,7 +197,7 @@
           ]
         },
         {
-          "match": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)(?=\\s*(?:\\\"|\\{|$))",
+          "match": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)(?=\\s*(?:\\\"|\\{|$))",
           "captures": {
             "1": {
               "name": "entity.name.tag.kscript"
@@ -321,6 +326,7 @@
       ]
     },
     "string": {
+      "comment": "Single quotes keep text as written: no escapes. A backslash at the end of a line still joins it to the next.",
       "name": "string.quoted.single.kscript",
       "begin": "'",
       "end": "'",
@@ -328,10 +334,6 @@
         {
           "match": "\\\\$",
           "name": "constant.character.escape.line-continuation.kscript"
-        },
-        {
-          "match": "\\\\.",
-          "name": "constant.character.escape.kscript"
         }
       ]
     },
@@ -354,8 +356,12 @@
     "constants": {
       "patterns": [
         {
-          "match": "(?<![\\w$.])(true|false|null|yes|no)(?![\\w-])",
+          "match": "(?<![\\w$.])(true|false|null)(?![\\w-])",
           "name": "constant.language.kscript"
+        },
+        {
+          "match": "(?<![\\w$])(?:\\d+(?:\\.\\d+)?(?:ms|min|w|d|h|m|s))+(?![\\w-])",
+          "name": "constant.numeric.duration.kscript"
         },
         {
           "match": "(?<![\\w$])-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b",
@@ -366,7 +372,13 @@
     "operators": {
       "patterns": [
         {
-          "match": "(?<![\\w$@.-])(and|or|not|is|in|gt|lt|ge|le|eq|ne)(?![\\w-])",
+          "comment": "Logic is written in words. Comparisons are symbols in a .kscript file (lt, gt, eq and the rest are the XML spellings).",
+          "match": "(?<![\\w$@.-])(and|or|not|is|in)(?![\\w-])",
+          "name": "keyword.operator.word.kscript"
+        },
+        {
+          "comment": "1..10 step 2. Not an argument named step (@range(step: 2)).",
+          "match": "(?<![\\w$@.-])(step)(?![\\w-]|\\s*:)",
           "name": "keyword.operator.word.kscript"
         },
         {
@@ -374,7 +386,7 @@
           "name": "storage.type.function.arrow.kscript"
         },
         {
-          "match": "->|\\|>|\\?\\?=?|==|!=|<=|>=|\\+=|-=|\\*=|/=|%=|\\+\\+|--|[-+*/%<>=?!]",
+          "match": "->|\\|>|\\?\\?=?|\\?\\.|\\.\\.|===|!==|==|!=|<=|>=|\\+=|-=|\\*=|/=|\\*\\*|[-+*/%<>=?!]",
           "name": "keyword.operator.kscript"
         }
       ]

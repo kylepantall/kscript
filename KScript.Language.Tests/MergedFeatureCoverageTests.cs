@@ -37,20 +37,21 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void Plain_xml_files_are_offered_only_when_they_are_scripts()
+        public void Only_kscript_and_ks_xml_files_are_offered_as_scripts()
         {
             // No kscript.json anywhere above: the project is the file's own folder.
             Write("main.kscript", "echo \"hi\"");
             Write("old.xml", "<?xml version=\"1.0\"?>\n<kscript>\n</kscript>");
             Write("data.xml", "<people><person /></people>");
-            Write("sub/older.xml", "<kscript />");
-            Write("sub/feed.xml", "<rss />");
+            Write("sub/older.ks", "<kscript />");
+            Write("sub/lib.ks.xml", "<kscript />");
 
+            // One extension per form: a plain .xml or .ks file is not a script, whatever it holds.
             List<string> labels = ImportLabels("main.kscript");
-            Assert.Contains("old.xml", labels);
-            Assert.Contains("sub/older.xml", labels);
+            Assert.Contains("sub/lib.ks.xml", labels);
+            Assert.DoesNotContain("old.xml", labels);
+            Assert.DoesNotContain("sub/older.ks", labels);
             Assert.DoesNotContain("data.xml", labels);
-            Assert.DoesNotContain("sub/feed.xml", labels);
         }
 
         [Fact]
@@ -79,13 +80,13 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void A_missing_import_in_a_window_goes_inside_the_window()
+        public void A_missing_import_in_a_window_goes_with_the_imports_at_the_top()
         {
-            const string text = "KScript.Window(title: \"Tests\") {\n  describe(name: x) {\n  }\n}\n";
+            const string text = "import KScript.UI\n\nWindow(title: \"Tests\") {\n  describe(name: x) {\n  }\n}\n";
             var files = new LanguageService(files: EmptyFileSystem.Instance);
             Diagnostic d = files.Analyze(text, Path.Combine(Path.GetTempPath(), "w.kscript")).Diagnostics
                 .First(x => x.Code == DiagnosticCodes.MissingImport && x.Message.Contains("KScript.Test"));
-            Assert.Equal("KScript.Window(title: \"Tests\") {\n  import KScript.Test\n  describe(name: x) {\n  }\n}\n",
+            Assert.Equal("import KScript.UI\nimport KScript.Test\n\nWindow(title: \"Tests\") {\n  describe(name: x) {\n  }\n}\n",
                 AnalyzerTests.Apply(text, d.Fixes[0].Changes));
         }
 

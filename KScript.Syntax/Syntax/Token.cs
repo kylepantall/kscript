@@ -32,6 +32,9 @@ namespace KScript.Syntax
 
         /// <summary>A URL written without quotes: <c>https://example.com/docs</c>.</summary>
         Url,
+
+        /// <summary>A length of time written without quotes: <c>30s</c>, <c>500ms</c>, <c>1h30m</c>.</summary>
+        Duration,
     }
 
     public readonly struct Token
@@ -199,6 +202,13 @@ namespace KScript.Syntax
 
             if (char.IsDigit(c))
             {
+                // 30s, 500ms, 1h30m: a number with a unit was never valid code, so nothing changes meaning.
+                int durationEnd = DurationEnd(text, start, end);
+                if (durationEnd > 0)
+                {
+                    Position = durationEnd;
+                    return Make(TokenKind.Duration, start);
+                }
                 while (Position < end && char.IsDigit(text[Position]))
                 {
                     Position++;
@@ -216,16 +226,16 @@ namespace KScript.Syntax
 
             if (c == '\'' || c == '"')
             {
-                int close = text.IndexOf(c, start + 1, end - start - 1);
+                int close = Quotes.Close(text, start, end);
                 if (close < 0)
                 {
                     Position = end;
-                    return new Token(TokenKind.String, LineJoins.Join(text.Substring(start + 1, end - start - 1)), TextSpan.FromBounds(start, end),
+                    return new Token(TokenKind.String, Quotes.Decode(text, start + 1, end, c), TextSpan.FromBounds(start, end),
                         $"This string is missing its closing {c}.");
                 }
                 Position = close + 1;
                 // A backslash at the end of a line joins it to the next one: the break isn't part of the string.
-                return new Token(TokenKind.String, LineJoins.Join(text.Substring(start + 1, close - start - 1)), TextSpan.FromBounds(start, Position));
+                return new Token(TokenKind.String, Quotes.Decode(text, start + 1, close, c), TextSpan.FromBounds(start, Position));
             }
 
             if (c == '`' && StringBlock.Read(text, start, end) is StringBlock block)
@@ -338,7 +348,7 @@ namespace KScript.Syntax
                     if (i >= end || !char.IsAsciiHexDigit(text[i])) return -1;
                 }
             }
-            // A method call may follow: 3f2a...->version().
+            // A method call may follow: 3f2a...->to_text().
             bool arrow = i + 1 < end && text[i] == '-' && text[i + 1] == '>';
             return i < end && (IsIdentChar(text[i]) || (text[i] == '-' && !arrow)) ? -1 : i;
         }
@@ -431,6 +441,34 @@ namespace KScript.Syntax
                 }
                 tokens.Add(t);
             }
+        }
+
+        /// <summary>The units a duration literal may use, as the duration type reads them.</summary>
+        private static readonly string[] DurationUnits = { "ms", "min", "w", "d", "h", "m", "s" };
+
+        /// <summary>
+        /// Where a duration literal starting at <paramref name="start"/> ends, or -1: one or more numbers, each with a
+        /// unit (w, d, h, m or min, s, ms), with nothing but the end of a word after the last: <c>30s</c>, <c>1.5h</c>,
+        /// <c>1h30m</c>.
+        /// </summary>
+        public static int DurationEnd(string text, int start, int end)
+        {
+            int i = start;
+            bool any = false;
+            while (i < end && char.IsDigit(text[i]))
+            {
+                while (i < end && char.IsDigit(text[i])) i++;
+                if (i + 1 < end && text[i] == '.' && char.IsDigit(text[i + 1]))
+                {
+                    i++;
+                    while (i < end && char.IsDigit(text[i])) i++;
+                }
+                int unitStart = i;
+                while (i < end && text[i] >= 'a' && text[i] <= 'z') i++;
+                if (Array.IndexOf(DurationUnits, text.Substring(unitStart, i - unitStart)) < 0) return -1;
+                any = true;
+            }
+            return any && (i >= end || !IsIdentChar(text[i])) ? i : -1;
         }
 
         private Token Make(TokenKind kind, int start) => new Token(kind, text.Substring(start, Position - start), TextSpan.FromBounds(start, Position));

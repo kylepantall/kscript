@@ -15,7 +15,8 @@ namespace KScript.Language.Formatting
     /// line), one statement per line (<c>a = 1; b = 2</c> and one-line blocks are split), <c>} else {</c> on one line,
     /// spaces after commas and after the colon of <c>name: value</c>, around assignments and before a block's
     /// <c>{</c>, long argument lists, arrays and maps wrapped one item per line, trailing spaces, blank lines and the
-    /// final newline.
+    /// final newline. A match statement's arms (<c>1, 2 =&gt; statement</c> or <c>=&gt; { block }</c>) are laid out as
+    /// statements: one arm per line as written, and an arm's block opened up like any other.
     /// </para>
     /// <para>
     /// Text in <c>"double quotes"</c>, <c>'strings'</c> and comments is never changed (a multi-line <c>/* */</c>
@@ -134,6 +135,8 @@ namespace KScript.Language.Formatting
             public State[] States;
             public int[] Match;          // for an opener or closer, the index of its partner (or -1)
             public bool[] IsBlock;       // for a '{' or '}': it opens or closes a block of statements
+            public bool[] IsMatch;       // for a block's '{': the block of a match statement, which holds arms
+            public bool[] ArmArrow;      // for the '=' of '=>': it ends the pattern of a match statement's arm
             public bool[] InExpression;  // for a code char: some enclosing bracket is ( [ or a map's {
             public List<int> LineStarts = new List<int>();
             public bool[] Verbatim;      // characters inside kscript-fmt: off regions and ignored statements
@@ -153,6 +156,8 @@ namespace KScript.Language.Formatting
                 States = new State[text.Length],
                 Match = Enumerable.Repeat(-1, text.Length).ToArray(),
                 IsBlock = new bool[text.Length],
+                IsMatch = new bool[text.Length],
+                ArmArrow = new bool[text.Length],
                 InExpression = new bool[text.Length],
                 Verbatim = new bool[text.Length],
                 Joined = new bool[text.Length],
@@ -166,6 +171,7 @@ namespace KScript.Language.Formatting
             State state = State.Code;
             Stack<int> open = new Stack<int>();
             int expressionDepth = 0;
+            bool armOpen = false; // inside a match block, before the => of the arm being read
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
@@ -174,6 +180,19 @@ namespace KScript.Language.Formatting
                     case State.Code:
                         s.States[i] = State.Code;
                         s.InExpression[i] = expressionDepth > 0;
+                        if (expressionDepth == 0 && open.Count > 0 && s.IsMatch[open.Peek()])
+                        {
+                            if (c == '\n' || c == ',' || c == ';')
+                            {
+                                armOpen = true;
+                            }
+                            else if (armOpen && c == '=' && Peek(text, i + 1) == '>')
+                            {
+                                // 1, 2 => ...: what follows is the arm's statement, or its block.
+                                s.ArmArrow[i] = true;
+                                armOpen = false;
+                            }
+                        }
                         if (c == '/' && Peek(text, i + 1) == '/' && !KScript.Syntax.Lexer.AfterUrlScheme(text, i))
                         {
                             state = State.LineComment;
@@ -202,8 +221,10 @@ namespace KScript.Language.Formatting
                         {
                             bool block = c == '{' && expressionDepth == 0 && OpensBlock(s, text, i);
                             s.IsBlock[i] = block;
+                            s.IsMatch[i] = block && OpensMatch(text, i);
                             if (!block) expressionDepth++;
                             open.Push(i);
+                            armOpen = s.IsMatch[i];
                         }
                         else if ((c == ')' || c == ']' || c == '}') && open.Count > 0)
                         {
@@ -213,12 +234,13 @@ namespace KScript.Language.Formatting
                             s.IsBlock[i] = s.IsBlock[o];
                             if (!s.IsBlock[o]) expressionDepth--;
                             s.InExpression[i] = expressionDepth > 0;
+                            if (s.IsBlock[o]) armOpen = open.Count > 0 && s.IsMatch[open.Peek()];
                         }
                         break;
                     case State.Single:
                     case State.Double:
                         s.States[i] = state;
-                        if (c == '\\' && i + 1 < text.Length)
+                        if (c == '\\' && i + 1 < text.Length && (text[i + 1] == '\n' || text[i + 1] == '\r' || Quotes.IsEscape(text, i, text.Length, state == State.Single ? '\'' : '"')))
                         {
                             if (text[i + 1] == '\n') s.Joined[i + 1] = true;
                             s.States[++i] = state;
@@ -264,6 +286,8 @@ namespace KScript.Language.Formatting
             while (p >= 0 && (text[p] == ' ' || text[p] == '\t')) p--;
             if (p < 0 || text[p] == '\n') return false;
             char c = text[p];
+            // 1, 2 => { ... } in a match statement: the arm's block.
+            if (c == '>' && p > 0 && s.ArmArrow[p - 1]) return true;
             if (c == ')' || c == ']' || c == '"') return true;
             if (!Lexer.IsIdentChar(c)) return false;
             int end = p + 1;
@@ -278,6 +302,25 @@ namespace KScript.Language.Formatting
             return !HasTopLevelAssignment(text, lineStart, brace);
         }
 
+        /// <summary>The block's head is <c>match value</c>: a match statement, whose block holds arms (<c>1 =&gt; ...</c>).</summary>
+        private static bool OpensMatch(string text, int brace)
+        {
+            int lineStart = text.LastIndexOf('\n', Math.Max(0, brace - 1)) + 1;
+            string head = text.Substring(lineStart, brace - lineStart);
+            int at = head.LastIndexOf("match", StringComparison.Ordinal);
+            while (at >= 0)
+            {
+                bool word = (at + 5 >= head.Length || !Lexer.IsIdentChar(head[at + 5])) && head.IndexOf('{', at) < 0;
+                string before = head.Substring(0, at).TrimEnd();
+                if (word && (before.Length == 0 || before.EndsWith("=>", StringComparison.Ordinal) || before[before.Length - 1] is '{' or ';' or ','))
+                {
+                    return true;
+                }
+                at = at == 0 ? -1 : head.LastIndexOf("match", at - 1, StringComparison.Ordinal);
+            }
+            return false;
+        }
+
         private static bool HasTopLevelAssignment(string text, int start, int end)
         {
             int depth = 0;
@@ -289,7 +332,7 @@ namespace KScript.Language.Formatting
                     i++;
                     while (i < end && text[i] != c)
                     {
-                        if (text[i] == '\\') i++;
+                        if (Quotes.IsEscape(text, i, end, c)) i++;
                         i++;
                     }
                     continue;
@@ -564,7 +607,14 @@ namespace KScript.Language.Formatting
                     char before = Peek(text, i - 1);
                     if (before != ' ' && before != '\t' && before != '\n' && before != '\0') edits.Insert(i, " ");
                     char after = Peek(text, i + 2);
-                    if (after != ' ' && after != '\t' && after != '\n' && after != '\0') edits.Insert(i + 2, " ");
+                    // (A block's { straight after => gets its space from the block rule above.)
+                    if (after != ' ' && after != '\t' && after != '\n' && after != '\0' && !(after == '{' && s.IsBlock[i + 2])) edits.Insert(i + 2, " ");
+                    if (s.ArmArrow[i])
+                    {
+                        // The arm's statement starts here: 1 => total += 1.
+                        statementStart = i + 2;
+                        assignedInStatement = false;
+                    }
                     i++;
                     continue;
                 }
@@ -1179,7 +1229,7 @@ namespace KScript.Language.Formatting
         }
 
         /// <summary>
-        /// A one-line function (<c>fn name(args) =&gt; body</c>, or a lambda <c>fn($x) =&gt; body</c> outside
+        /// A one-line function (<c>fn name(args) =&gt; body</c>, or a lambda <c>fn(x) =&gt; body</c> outside
         /// brackets) whose line is too long: the body moves to the next line, one level in.
         /// </summary>
         private static bool WrapBody(Scan s, int start, int end, Edits edits, bool nested = false)
@@ -1188,7 +1238,7 @@ namespace KScript.Language.Formatting
             bool[] top = TopLevel(s, start, end, out _);
             for (int i = start; i + 1 < end; i++)
             {
-                // nested: a lambda passed as the only argument, $list->map(fn($x) => ...), once nothing else helped.
+                // nested: a lambda passed as the only argument, $list->map(fn(x) => ...), once nothing else helped.
                 if ((nested ? !Editable(s, i) || !s.InExpression[i] : !top[i - start]) || text[i] != '=' || text[i + 1] != '>' || !Editable(s, i + 1)) continue;
                 int body = SkipAllSpaces(text, i + 2);
                 if (nested && (body >= end || !Editable(s, body) || text[body] == '{')) continue;

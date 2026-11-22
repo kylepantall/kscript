@@ -79,13 +79,13 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("<let name=\"r\" value=\"$Repo->from({})\" />", "Repo")]
-        [InlineData("<let name=\"r\" value=\"$Repo->from([{}])\" />", "list<Repo>")]
-        [InlineData("<let name=\"r\" value=\"@json('{}', as: Repo)\" />", "Repo")]
-        [InlineData("<let name=\"r\" value=\"@json('{}', Repo)\" />", "Repo")]
-        [InlineData("<let name=\"r\" value=\"@json('{}', as: $Repo)\" />", "Repo")]
-        [InlineData("<let name=\"r\" value=\"@json('[]', as: 'Repo[]')\" />", "list<Repo>")]
-        [InlineData("<let name=\"r\" value=\"@json('[]', as: 'int[][]?')\" />", "list<list<number>>")]
+        [InlineData("<let name=\"r\" value=\"Repo({})\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"Repo([{}])\" />", "list<Repo>")]
+        [InlineData("<let name=\"r\" value=\"'{}'->json(as: Repo)\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"'{}'->json(Repo)\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"'{}' |> json(as: Repo)\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"'[]'->json(as: 'Repo[]')\" />", "list<Repo>")]
+        [InlineData("<let name=\"r\" value=\"'[]'->json(as: 'int[][]?')\" />", "list<list<number>>")]
         [InlineData("<let name=\"r\" value=\"'{}'->json(as: User)\" />", "User")]
         [InlineData("<let name=\"r\" value=\"'{}'->json(as: 'Nope')\" />", "any")]
         [InlineData("<let name=\"r\" value=\"'{}'->json()\" />", "any")]
@@ -99,9 +99,9 @@ namespace KScript.Language.Tests
         [InlineData("<let name=\"r\" type=\"list\" value=\"[]\" />", "list")]
         [InlineData("<let name=\"r\" type=\"fn\" value=\"fn() => 1\" />", "fn")]
         [InlineData("<let name=\"r\" type=\"any\" value=\"1\" />", "any")]
-        [InlineData("<let name=\"r\" value=\"$Repo->from({}).owner\" />", "User")]
-        [InlineData("<let name=\"r\" value=\"$Repo->from([{}])->first()\" />", "Repo")]
-        [InlineData("<let name=\"r\" value=\"$Repo->from()\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"Repo({}).owner\" />", "User")]
+        [InlineData("<let name=\"r\" value=\"Repo([{}])->first()\" />", "Repo")]
+        [InlineData("<let name=\"r\" value=\"Repo()\" />", "Repo")]
         [InlineData("<let name=\"r\" value=\"[1]->json(as: Repo)\" />", "any")]
         public void CallsAndDeclarationsGiveRecords(string body, string expected)
         {
@@ -115,17 +115,18 @@ namespace KScript.Language.Tests
             Assert.Equal("list<User>", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json('users.json', as: User)\" />"), "r"));
             Assert.Equal("User", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json($path, as: User)\" />"), "r"));
             Assert.Equal("list<{ login: string, id: number }>", Show(Open("<import package=\"KScript.IO\" />\n" + Types + "<let name=\"r\" value=\"@read_json('users.json')\" />"), "r"));
-            Assert.Equal("User", Show(Open(Types + "<let name=\"r\" value=\"'{}' |> @json(as: User)\" />"), "r"));
+            Assert.Equal("User", Show(Open(Types + "<let name=\"r\" value=\"'{}' |> json(as: User)\" />"), "r"));
         }
 
         [Fact]
         public void RecordFieldsComplete()
         {
             Assert.Equal(new[] { "name", "stars", "owner", "topics", "visibility", "label", "note" },
-                Labels(Types + "<let name=\"r\" value=\"$Repo->from({})\" />\n<echo>{ $r.‸ }</echo>").Take(7));
+                Labels(Types + "<let name=\"r\" value=\"Repo({})\" />\n<echo>{ $r.‸ }</echo>").Take(7));
             Assert.Contains("login", Labels(Types + "<fn name=\"f\" params=\"repo: Repo\"><echo>{ $repo.owner.‸ }</echo></fn>"));
             Assert.Contains("stars", Labels(Types + "<let name=\"rs\" type=\"Repo[]\" value=\"[]\" />\n<for each=\"r\" in=\"$rs\"><echo>{ $r.‸ }</echo></for>"));
-            Assert.Contains("from", Labels(Types + "<echo>{ $Repo->‸ }</echo>"));
+            Assert.Contains("check", Labels(Types + "<echo>{ Repo->‸ }</echo>"));
+            Assert.DoesNotContain("from", Labels(Types + "<echo>{ Repo->‸ }</echo>"));
         }
 
         [Fact]
@@ -137,16 +138,16 @@ namespace KScript.Language.Tests
             Assert.Contains("number", types);
             Assert.Contains("Repo", Labels(Types + "<type name=\"T\"><field name=\"a\" type=\"‸\" /></type>"));
             Assert.Contains("Repo", Labels(Types + "<echo>{ '{}'->json(as: ‸) }</echo>"));
-            Assert.Contains("User", Labels(Types + "<echo>{ @json('{}', ‸) }</echo>"));
+            Assert.Contains("User", Labels(Types + "<echo>{ '{}'->json(‸) }</echo>"));
         }
 
         [Fact]
         public void HoversAndInlayHintsNameTheType()
         {
-            (string text, int offset) = WithCaret(Script(Types + "<echo>{ $Re‸po }</echo>"));
+            (string text, int offset) = WithCaret(Script(Types + "<echo>{ Re‸po }</echo>"));
             Assert.Contains("type Repo {", Service.GetHover(Service.Analyze(text, DocPath), offset).Markdown);
 
-            DocumentAnalysis a = Open(Types + "<let name=\"r\" value=\"$Repo->from({})\" />");
+            DocumentAnalysis a = Open(Types + "<let name=\"r\" value=\"Repo({})\" />");
             Assert.Contains(Service.GetInlayHints(a), h => h.Label == ": Repo");
 
             (text, offset) = WithCaret(Script(Types + "<echo>{ '{}'->json(as: Re‸po) }</echo>"));
@@ -158,19 +159,20 @@ namespace KScript.Language.Tests
         [Fact]
         public void BareTypeNamesAreValues()
         {
-            AssertClean(Open(Types + "<let name=\"t\" value=\"Repo\" />\n<echo>{ '{}'->json(User) } { @json('{}', as: Repo) }</echo>"));
-            AssertSingle(Open(Types + "<let name=\"t\" value=\"Nope\" />"), DiagnosticCodes.BareIdentifier);
+            AssertClean(Open(Types + "<let name=\"t\" value=\"Repo\" />\n<echo>{ '{}'->json(User) } { '{}'->json(as: Repo) }</echo>"));
+            AssertSingle(Open(Types + "<let name=\"t\" value=\"Nope\" />"), DiagnosticCodes.UndefinedVariable);
+            AssertSingle(Open(Types + "<let name=\"t\" value=\"nope\" />"), DiagnosticCodes.BareIdentifier);
         }
 
         [Fact]
         public void UnknownFieldsOfRecordsAreWarnings()
         {
-            Diagnostic d = AssertSingle(Open(Types + "<let name=\"r\" value=\"$Repo->from({})\" />\n<echo>{ $r.starz }</echo>"), DiagnosticCodes.UnknownField);
+            Diagnostic d = AssertSingle(Open(Types + "<let name=\"r\" value=\"Repo({})\" />\n<echo>{ $r.starz }</echo>"), DiagnosticCodes.UnknownField);
             Assert.Equal("Repo has no field 'starz'. Did you mean stars?", d.Message);
             Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
             Assert.Equal("stars", d.Fixes.Single().Changes.Single().NewText);
-            Assert.StartsWith("Repo has no field 'zzzzzz'. Its fields are: name, stars", AssertSingle(Open(Types + "<let name=\"r\" value=\"$Repo->from({})\" />\n<echo>{ $r.zzzzzz }</echo>"), DiagnosticCodes.UnknownField).Message);
-            AssertClean(Open("<type name=\"T\" fields=\"a\" extra=\"keep\" />\n<let name=\"r\" value=\"$T->from({})\" />\n<echo>{ $r.b }</echo>"));
+            Assert.StartsWith("Repo has no field 'zzzzzz'. Its fields are: name, stars", AssertSingle(Open(Types + "<let name=\"r\" value=\"Repo({})\" />\n<echo>{ $r.zzzzzz }</echo>"), DiagnosticCodes.UnknownField).Message);
+            AssertClean(Open("<type name=\"T\" fields=\"a\" extra=\"keep\" />\n<let name=\"r\" value=\"T({})\" />\n<echo>{ $r.b }</echo>"));
             AssertClean(Open("<let name=\"r\" value=\"{ a: 1 }\" />\n<echo>{ $r.b }</echo>"));
         }
 
@@ -218,7 +220,7 @@ namespace KScript.Language.Tests
         [InlineData("<type name=\"T\"><field name=\"a\" from=\"a..b\" /></type>", DiagnosticCodes.InvalidAttributeValue, "'a..b' isn't a path.")]
         [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" from=\"b\" /></type>", DiagnosticCodes.InvalidAttribute, "A field with a value is worked out from the others")]
         [InlineData("<type name=\"T\"><field name=\"a\" value=\"$nope\" /></type>", DiagnosticCodes.UndefinedVariable, "$nope is not defined")]
-        [InlineData("<type name=\"T\" sample=\"bad.json\" />", DiagnosticCodes.InvalidAttributeValue, "'bad.json' isn't a JSON file the editor can read")]
+        [InlineData("<type name=\"T\" path=\"bad.json\" />", DiagnosticCodes.InvalidAttributeValue, "'bad.json' isn't a JSON file the editor can read")]
         [InlineData("<type fields=\"a\" />", DiagnosticCodes.MissingAttribute, "<type> needs")]
         [InlineData("<type name=\"1x\" fields=\"a\" />", DiagnosticCodes.InvalidAttributeValue, "'1x' isn't a valid name.")]
         [InlineData("<type name=\"T\" fields=\": int\" />", DiagnosticCodes.InvalidAttributeValue, "': int' isn't a field.")]
@@ -265,7 +267,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void SampleFilesGiveFields()
         {
-            DocumentAnalysis a = Open("<type name=\"Repo\" sample=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /></type>\n<type name=\"Item\" sample=\"list.json\" />\n<type name=\"Gone\" sample=\"missing.json\" fields=\"a\" />");
+            DocumentAnalysis a = Open("<type name=\"Repo\" path=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /></type>\n<type name=\"Item\" path=\"list.json\" />\n<type name=\"Gone\" path=\"missing.json\" fields=\"a\" />");
             Assert.Equal(new[] { "name", "stargazers_count", "avatar_url", "owner", "stars" }, a.Symbols.First(s => s.Name == "Repo").Shape.Instance.Fields.Keys);
             Assert.Equal(new[] { "id", "tag" }, a.Symbols.First(s => s.Name == "Item").Shape.Instance.Fields.Keys);
             Assert.Single(a.Diagnostics, d => d.Message.Contains("missing.json"));
@@ -282,18 +284,18 @@ namespace KScript.Language.Tests
         [Fact]
         public void OddSamplesAndInlineFields()
         {
-            Assert.Empty(Open("<type name=\"E\" sample=\"empty.json\" />").Symbols.First(s => s.Name == "E").Shape.Instance.Fields);
-            Assert.Equal("_2x", Open("<type name=\"D\" sample=\"digits.json\" />").Symbols.First(s => s.Name == "D").Shape.Instance.Fields.Keys.Single());
+            Assert.Empty(Open("<type name=\"E\" path=\"empty.json\" />").Symbols.First(s => s.Name == "E").Shape.Instance.Fields);
+            Assert.Equal("_2x", Open("<type name=\"D\" path=\"digits.json\" />").Symbols.First(s => s.Name == "D").Shape.Instance.Fields.Keys.Single());
             DocumentAnalysis a = Open("<type name=\"T\" fields=\"a = 'x,y', b: list = [{ c: (1) }], d: string[] = []\" />");
             AssertClean(a);
             Assert.Equal(new[] { "a", "b", "d" }, a.Symbols.First(s => s.Name == "T").Shape.Instance.Fields.Keys);
-            AssertClean(Analyzer.Analyze(Script("<type name=\"T\" sample=\"bad.json\" fields=\"a\" />"), null, EmptyFileSystem.Instance));
+            AssertClean(Analyzer.Analyze(Script("<type name=\"T\" path=\"bad.json\" fields=\"a\" />"), null, EmptyFileSystem.Instance));
         }
 
         [Fact]
         public void ImportedTypesAreKnown()
         {
-            DocumentAnalysis a = Open("<import src=\"lib.ks.xml\" />\n<let name=\"t\" value=\"$Team->from({})\" />\n<let name=\"u\" type=\"Team\" value=\"{}\" />\n<echo>{ $t.size } { $u.name }</echo>");
+            DocumentAnalysis a = Open("<import path=\"lib.ks.xml\" />\n<let name=\"t\" value=\"Team({})\" />\n<let name=\"u\" type=\"Team\" value=\"{}\" />\n<echo>{ $t.size } { $u.name }</echo>");
             AssertClean(a);
             Assert.Equal("Team", Show(a, "t"));
             Assert.Equal("Team", Show(a, "u"));

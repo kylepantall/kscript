@@ -10,7 +10,7 @@ Codes are grouped by what they are about: `KS1` the shape of the file, `KS2` val
 
 **Something is written where it can't go.** A quote, bracket or comment was opened and never closed, or two statements share a line.
 
-```kscript
+```kscript wrong
 echo "Hello          // wrong: the text never ends
 echo "Hello"         // right
 ```
@@ -33,7 +33,7 @@ for i in 0..3 {
 
 ## KS1004
 
-**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(seconds: 2)`.
+**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(duration: 2s)`.
 
 ## KS1005
 
@@ -45,7 +45,7 @@ for i in 0..3 {
 
 **A value isn't written correctly.** The message says what was expected. Common causes are a line that ends with an operator, a bracket that is never closed, and `&&`, `||` or `!` (KScript writes `and`, `or` and `not`).
 
-```kscript
+```kscript wrong
 total = 5 +          // wrong: nothing after the +
 total = 5 + 1        // right
 ```
@@ -54,7 +54,7 @@ total = 5 + 1        // right
 
 **`=` is used where a value is expected.** To compare, write `==`. To give a variable a value, put the assignment on a line of its own.
 
-```kscript
+```kscript wrong
 if $count = 1 { }    // wrong
 if $count == 1 { }   // right
 ```
@@ -77,7 +77,7 @@ name = $other        // right: another variable
 
 **Single quotes keep text as written.** `"Double quotes"` fill in `$name` and `{ }`. `'Single quotes'` never do, so a variable named inside them is not filled in. The quick fix changes the quotes.
 
-```kscript
+```kscript wrong
 name = 'Joan'
 greeting = 'Hello $name'         // warning: holds the text "Hello $name"
 greeting = "Hello $name"         // right: Hello Joan
@@ -86,7 +86,7 @@ label = 'Costs $5'               // fine: $5 is not a variable
 
 The same code warns when SQL text is filled in before it reaches `@sql`, because the values are then pasted into the SQL instead of being sent as parameters:
 
-```kscript
+```kscript wrong
 query = "select * from users where id = {$id}"   // filled in here
 rows = @sql($query)                              // warning: nothing left to send as a parameter
 rows = @sql("select * from users where id = {$id}")   // right: {$id} is a parameter
@@ -108,7 +108,7 @@ rows = @sql("select * from users where id = {$id}")   // right: {$id} is a param
 
 ## KS3002
 
-**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element.
+**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element. A statement that was renamed says its new name in both formats (`before-each is now before_each.`), and `kscript check --fix` renames it.
 
 ## KS3003
 
@@ -116,7 +116,7 @@ rows = @sql("select * from users where id = {$id}")   // right: {$id} is a param
 
 ## KS3004
 
-**An argument KScript 2 removed.** The message names what replaced it.
+**An argument KScript 2 removed, or one that was renamed.** The message names what replaced it: `'to' is now into.`, `'must-exist' is now must_exist`, `'src' is now path.` A renamed argument has a quick fix, and `kscript check --fix` applies it. See [Names of statements and arguments](language.md#names-of-statements-and-arguments).
 
 ## KS3005
 
@@ -192,7 +192,7 @@ echo "Hello $name"   // right
 
 ## KS5001
 
-**A command that doesn't exist is called.** Commands start with `@`, including your own functions: `@greet('World')`. Some things are methods in KScript and not commands: the length of a list is `$list->length()`.
+**A command that doesn't exist is called.** Commands start with `@`, including your own functions: `@greet('World')`. Some things are methods in KScript and not commands: the length of a list is `$list->count()`.
 
 ## KS5002
 
@@ -212,7 +212,7 @@ echo "Hello $name"   // right
 
 The same code warns about arithmetic and arguments that can only fail when the script runs:
 
-```kscript
+```kscript wrong
 name = 'Joan'
 total = $name - 1            // warning: '-' needs a number here, but $name holds the text 'Joan'
 total = [1, 2] + 3           // warning: + joins two lists. Use ->push(3)
@@ -223,7 +223,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 ## KS5006
 
-**A planned feature is used.** It is described in the docs but not built yet.
+**A planned feature is used.** `render`, `on` and `@dom()` (scripts that run in the browser) are described in the reference but no package runs them yet, so a script that uses one stops there. The check reports each use.
 
 ## KS5007
 
@@ -231,7 +231,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 ## KS5008
 
-**A named argument is given twice, or a word is used as a flag on a parameter that isn't yes/no.** Give each argument once, and give other parameters a value: `name: value`.
+**A named argument is given twice, or a word is used as a flag on a parameter that isn't true/false.** Give each argument once, and give other parameters a value: `name: value`.
 
 ## KS5009
 
@@ -243,7 +243,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 A map written in the code is checked too. Reading a field a map doesn't have gives nothing, so a near miss of one it does have is almost always a typo:
 
-```kscript
+```kscript wrong
 person = { name: 'Joan', age: 82 }
 echo $person.nmae            // warning: Did you mean name?
 echo $person.email ?? '-'    // fine: not close to a field, so it may be optional
@@ -255,13 +255,15 @@ Text and numbers have no fields at all, so `$name.upper` stops the script. Call 
 
 **An error type that isn't declared.** Declare it with `error Name { }`, or use a built-in one such as `Validation`, `NotFound` or `IO`.
 
+A built-in type that was renamed is an error, with a fix that writes the new name: `QueryError` is now `Query`, and `ConnectionError` is now `Connection`.
+
 ## KS5012
 
 **A value doesn't fit its declared type.** For example an `email` without an `@`, or a number outside the range a type allows.
 
 ## KS5013
 
-**A column the model doesn't have**, named in a [KScript.Data](data.md) query, `->create()` or `->update()`: `$User->where(nmae: 'Joan')` or `->order_by(agee)`. The message suggests the closest field.
+**A column the model doesn't have**, named in a [KScript.Data](data.md) query, `->create()` or `->update()`: `User->where(nmae: 'Joan')` or `->order_by(agee)`. The message suggests the closest field.
 
 ## KS5014
 
@@ -302,3 +304,37 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 ## KS6008
 
 **A second type in one file.** In a project, each type, model, enum and error type goes in its own file (`types/`, `models/`, `errors/`, or `requests/` for request bodies) and is imported where it is used. The message names the file to move it to. See [One type per file](projects.md#where-files-go-the-recommended-layout).
+
+## KS6009
+
+**Text written as a bare word.** In a `.kscript` argument list, quotes make text and everything else is code, so text goes in quotes: `Section(title: "Results")`, `Document(to: 'paper.pdf')`. A bare word is a name: a variable to fill (`to: answer`), a function, a type or one of a fixed set of words (`align: right`). `kscript check --fix` adds the quotes.
+
+## KS6010
+
+**A name declared with `$`.** `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
+
+## KS6011
+
+**yes/no where true/false is meant.** Booleans are `true` and `false` everywhere in `.kscript`: `Section(numbered: false)`. A flag on its own (`Section(numbered)`) means true.
+
+## KS6012
+
+**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`; XML keeps the words). Logic stays as words: `and`, `or`, `not`. A function is named as `@name` in an argument, as it is in an expression: `spawn(fn: @job)`, `llm(tools: [@lookup])`, `Get(to: @people.show)`, not a bare `job`. `kscript check --fix` rewrites each one.
+
+## KS6013
+
+**A name that breaks the naming rules.** Functions, variables, fields and arguments are `snake_case`; types, models, enums and error types are `PascalCase`. The editor renames a variable everywhere the file uses it with the quick fix; a function, a parameter, a field or a type has no quick fix, because other files and callers may name it, so use the editor's rename. `kscript check --fix` leaves names alone.
+
+## KS6014
+
+**A type written the long way.** Each of these has one form, and `kscript check --fix` rewrites the other:
+
+- A type, model, enum, error or job is named bare, without `$`: `$text->json(as: Repo)`, `User->create(name: 'Joan')`. `$` reads a variable.
+- An optional field is marked on its name, `age?: int`, not on its type (`age: int?`). `T?` stays for a parameter that may be null: `fn show(repo: Repo?)`.
+- A model's options go in its brackets, `model User(timestamps, unique: [email]) { }`, not as lines of its block. The block holds fields, `validate` and `fn`.
+
+Calling the name makes a value of every kind of type: `Repo($data)`, `Repo(name: 'x')`, `Age(7)`, `Size('small')`, `NotFound(id: 42)`, `SendWelcome(user_id: 7)`. `->from()` and `->new()` are gone, and using one is an error (KS5003) whose fix writes the call.
+
+## KS6018
+
+**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so the fix adds `s`.

@@ -6,7 +6,7 @@ KScript.Cache keeps values by key for as long as you say, so slow work (a web re
 import KScript.Cache
 import KScript.Net
 
-repos = $cache->remember('repos', fn() => @api('https://api.example.com/repos')->json(), ttl: '10m')
+repos = $cache->remember('repos', fn() => @api('https://api.example.com/repos')->json(), ttl: 10m)
 echo "{ $repos->count() } repos"
 ```
 
@@ -19,32 +19,32 @@ echo "{ $repos->count() } repos"
 | `$cache` or `@cache(memory)` | In memory | While kscript runs. In `kscript serve` that means every request shares it. |
 | `@cache(file)` | One file per key in the app's `cache` folder (see [App folders](storage.md)) | Until it runs out, across runs. |
 
-A name keeps a store's keys apart from other stores': `@cache(file, name: 'weather')`. Stores are per app, so two apps never see each other's keys. File values are kept as JSON, so keep maps, lists, text, numbers and yes/no in a file store.
+A name keeps a store's keys apart from other stores': `@cache(file, name: 'weather')`. Stores are per app, so two apps never see each other's keys. File values are kept as JSON, so keep maps, lists, text, numbers and true/false in a file store.
 
 ## Methods
 
 | Method | What it does |
 | --- | --- |
 | `->get(key, default: …)` | The value, or the default (`null`) when it isn't there or has run out. |
-| `->put(key, value, ttl: …)` | Keeps the value and returns it. |
+| `->set(key, value, ttl: …)` | Keeps the value and returns it. |
 | `->remember(key, compute, ttl: …)` | The value, or else what `compute` returns, which is then kept. |
 | `->has(key)` | True when a value is there and hasn't run out. |
-| `->forget(key)` | Removes the key. True if it was there. |
+| `->remove(key)` | Removes the key. True if it was there. |
 | `->increment(key, by: 1, ttl: …)` | Adds to a number (0 when it isn't there) and returns the new number. A count keeps the time limit it started with unless you give a new one. |
-| `->ttl(key)` | The seconds until the key runs out, or `null` when it never does. |
+| `->ttl(key)` | How long until the key runs out, as a duration, or `null` when it never does. |
 | `->keys()` | The keys that are there, sorted. |
-| `->flush()` | Removes every key and returns how many there were. |
+| `->clear()` | Removes every key and returns how many there were. |
 
 ## Time limits
 
-`ttl` is how long a value is kept: a number of seconds (`ttl: 90`), or text with a unit: `'500ms'`, `'30s'`, `'10m'`, `'2h'`, `'1d'` or `'1w'`. Without a `ttl` a value is kept until it is forgotten or the store is flushed.
+`ttl` is how long a value is kept, written as a duration: `500ms`, `30s`, `10m`, `2h`, `1d` or `1w`, and joined for more (`1h30m`). A plain number is seconds (`ttl: 90`). Without a `ttl` a value is kept until it is removed or the store is cleared.
 
 ```kscript
 import KScript.Cache
 
 store = @cache(file, name: 'visits')
-count = $store->increment('today', ttl: '1d')
-echo "Visit $count today, { $store->ttl('today') } seconds left"
+count = $store->increment('today', ttl: 1d)
+echo "Visit $count today, { $store->ttl('today') } left"
 ```
 
 ## In routes: ETags and Cache-Control
@@ -52,11 +52,12 @@ echo "Visit $count today, { $store->ttl('today') } seconds left"
 KScript.Http uses KScript.Cache for HTTP caching. A route can tag its answers with an ETag, answer `304 Not Modified` when the browser already has them, set `Cache-Control`, and keep whole answers in the memory cache:
 
 ```kscript
-KScript.Routes {
-  import "controllers/people.kscript" as people
+import KScript.Http
+import "controllers/people.kscript" as people
 
-  Get(path: /people, to: people.index, etag: yes, cache: 60)
-  Get(path: /stats, to: people.stats, middleware: "cache_response:5m")
+Routes {
+  Get(path: "/people", to: @people.index, etag: true, cache: 60)
+  Get(path: "/stats", to: @people.stats, middleware: "cache_response:5m")
 }
 ```
 

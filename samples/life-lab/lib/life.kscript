@@ -1,0 +1,257 @@
+// Life Lab: the rules and the bookkeeping of Conway's Game of Life, shared by every front end.
+// life.kscript (terminal), index.html (browser) and the Mac app all import this file and call the same
+// functions, so a rule changed here changes everywhere.
+//
+// A grid is a list of rows, each a string: 'O' is a live cell, '.' a dead one.
+// A world is a map: { grid, generation, history, wrap, pattern, births, deaths }.
+import KScript.Math
+
+/// A pattern that can't be read or loaded.
+error Pattern extends Validation
+
+const alive_cell = 'O'
+const dead_cell = '.'
+const history_size = 12
+
+// Each pattern is drawn with O and . (the plaintext .cells format).
+const patterns = {
+  glider: { about: 'The smallest spaceship: it walks one cell diagonally every 4 generations.',
+    rows: ['.O.', '..O', 'OOO'] },
+  blinker: { about: 'The smallest oscillator, period 2.', rows: ['OOO'] },
+  toad: { about: 'A period 2 oscillator.', rows: ['.OOO', 'OOO.'] },
+  beacon: { about: 'Two blocks that blink at each other, period 2.', rows: ['OO..', 'OO..', '..OO', '..OO'] },
+  pulsar: { about: 'A large period 3 oscillator.', rows: [
+    '..OOO...OOO..',
+    '.............',
+    'O....O.O....O',
+    'O....O.O....O',
+    'O....O.O....O',
+    '..OOO...OOO..',
+    '.............',
+    '..OOO...OOO..',
+    'O....O.O....O',
+    'O....O.O....O',
+    'O....O.O....O',
+    '.............',
+    '..OOO...OOO..'] },
+  spaceship: { about: 'A lightweight spaceship: it flies sideways, 2 cells every 4 generations.',
+    rows: ['.O..O', 'O....', 'O...O', 'OOOO.'] },
+  r_pentomino: { about: 'Five cells that keep changing for over a thousand generations.', rows: ['.OO', 'OO.', '.O.'] },
+  acorn: { about: 'Seven cells that grow into a large, long-lived mess.', rows: ['.O.....', '...O...', 'OO..OOO'] },
+  diehard: { about: 'Vanishes completely after 130 generations.', rows: ['......O.', 'OO......', '.O...OOO'] },
+  glider_gun: { about: 'Fires a new glider every 30 generations. Needs a board at least 40 wide.', rows: [
+    '........................O...........',
+    '......................O.O...........',
+    '............OO......OO............OO',
+    '...........O...O....OO............OO',
+    'OO........O.....O...OO..............',
+    'OO........O...O.OO....O.O...........',
+    '..........O.....O.......O...........',
+    '...........O...O....................',
+    '............OO......................'] }
+}
+
+// Grids
+/// An empty grid.
+fn blank(width: int, height: int) {
+  return (0..$height)->map(fn(_y) => $dead_cell->repeat($width))
+}
+
+/// How many cells wide a grid is.
+fn width(grid: string[]) => $grid->is_empty() ? 0 : $grid[0]->count()
+
+/// How many cells high a grid is.
+fn height(grid: string[]) => $grid->count()
+
+/// yes if the cell at x, y is alive.
+fn is_alive(grid: string[], x: int, y: int) => $grid[$y][$x] == $alive_cell
+
+/// How many cells are alive.
+fn population(grid: string[]) => $grid->sum(fn(row) => $row->count_of($alive_cell))
+
+/// A copy of the grid with one cell made alive or dead.
+fn set_cell(grid: string[], x: int, y: int, alive: bool) {
+  row = $grid[$y]
+  cell = $alive ? $alive_cell : $dead_cell
+  return $grid->map(fn(r, i) => $i == $y ? $row->slice(start: 0, end: $x) + $cell + $row->slice(start: $x + 1) : $r)
+}
+
+/// A copy of the grid with one cell flipped.
+fn toggle(grid: string[], x: int, y: int) {
+  return @set_cell($grid, x: $x, y: $y, alive: not @is_alive($grid, x: $x, y: $y))
+}
+
+/// Draws a pattern onto a grid, centred unless left and top are given. Cells off the edge are dropped.
+fn place(grid: string[], rows: string[], left = null, top = null) {
+  x0 = $left ?? ((@width($grid) - @width($rows)) / 2)->floor()
+  y0 = $top ?? ((@height($grid) - @height($rows)) / 2)->floor()
+  out = $grid
+  for row at dy in $rows {
+    for c at dx in $row->chars() {
+      x = $x0 + $dx
+      y = $y0 + $dy
+      if $c == $alive_cell and $x >= 0 and $y >= 0 and $x < @width($grid) and $y < @height($grid) {
+        out = @set_cell($out, x: $x, y: $y, alive: true)
+      }
+    }
+  }
+  return $out
+}
+
+/// A grid where about density percent of the cells are alive.
+fn random_grid(width: int, height: int, density = 30) {
+  return (0..$height)->map(fn(_y) => (0..$width)->map(fn(_x) => @random(low: 1, high: 100) <= $density ? $alive_cell : $dead_cell)->join(''))
+}
+
+/// Reads a pattern in the plaintext .cells format: lines of O and ., with ! comment lines. Any of O, o, *, # or X counts as alive.
+fn parse_cells(text: string) {
+  lines = $text->lines()->map(fn(l) => $l->trim_end())->reject(fn(l) => $l->starts_with('!'))
+  w = $lines->map(fn(l) => $l->count())->max() ?? 0
+  if $w == 0 {
+    throw Pattern "That pattern has no cells in it."
+  }
+  return $lines->map(fn(l) => $l->pad_right($w, char: '.')->replace_pattern(pattern: '[oO*#X]', replacement: $alive_cell)->replace_pattern(pattern: '[^O]', replacement: $dead_cell))
+}
+
+// The rules
+/// How many of the 8 cells around x, y are alive. With wrap, the edges join up like a torus.
+fn neighbours(grid: string[], x: int, y: int, wrap = true) {
+  w = @width($grid)
+  h = @height($grid)
+  count = 0
+  for dy in [-1, 0, 1] {
+    for dx in [-1, 0, 1] {
+      if $dx != 0 or $dy != 0 {
+        nx = $x + $dx
+        ny = $y + $dy
+        if $wrap {
+          nx = ($nx + $w) % $w
+          ny = ($ny + $h) % $h
+        }
+        if $nx >= 0 and $ny >= 0 and $nx < $w and $ny < $h and $grid[$ny][$nx] == $alive_cell {
+          count += 1
+        }
+      }
+    }
+  }
+  return $count
+}
+
+/// Conway's rule: a live cell with 2 or 3 neighbours lives on; a dead cell with exactly 3 comes alive.
+fn next_state(alive: bool, neighbours: int) {
+  return $neighbours == 3 or ($alive and $neighbours == 2)
+}
+
+/// The next generation of a grid.
+fn next_generation(grid: string[], wrap = true) {
+  // Adds up each column of three cells once, then each cell's neighbours are three of those sums minus itself.
+  w = @width($grid)
+  h = @height($grid)
+  ones = $grid->map(fn(row) => $row->chars()->map(fn(c) => $c == $alive_cell ? 1 : 0))
+  none = (0..$w)->map(fn(_x) => 0)
+  row_at = fn(y) => $wrap ? $ones[($y + $h) % $h] : ($y >= 0 and $y < $h ? $ones[$y] : $none)
+  return (0..$h)->map(fn(y) => @next_row(above: $row_at($y - 1), row: $ones[$y], below: $row_at($y + 1), w: $w, wrap: $wrap))
+}
+
+/// One row of the next generation, from the rows above and below it.
+fn next_row(above: number[], row: number[], below: number[], w: int, wrap: bool) {
+  sums = (0..$w)->map(fn(x) => $above[$x] + $row[$x] + $below[$x])
+  sum_at = fn(x) => $wrap ? $sums[($x + $w) % $w] : ($x >= 0 and $x < $w ? $sums[$x] : 0)
+  return (0..$w)->map(fn(x) =>
+    @next_state(alive: $row[$x] == 1, neighbours: $sum_at($x - 1) + $sums[$x] + $sum_at($x + 1) - $row[$x]) ? $alive_cell : $dead_cell
+  )->join('')
+}
+
+// Worlds: a grid plus what happened to it
+/// A world at generation 0.
+fn new_world(grid: string[], wrap = true, pattern = 'custom') {
+  return { grid: $grid, generation: 0, history: [$grid->join('')], wrap: $wrap, pattern: $pattern, births: 0, deaths: 0 }
+}
+
+/// A world with a named pattern from $patterns in the middle.
+fn pattern_world(name: string, width: int, height: int, wrap = true) {
+  if not $patterns->has($name) {
+    throw Pattern "There's no pattern called '{$name}'. Try one of: { $patterns->keys()->join(', ') }."
+  }
+  return @new_world(@place(@blank(width: $width, height: $height), rows: $patterns[$name].rows), wrap: $wrap, pattern: $name)
+}
+
+/// The world with its grid replaced by hand (a click or a typed cell). Starts the history again.
+fn edit_world(world: map, grid: string[]) {
+  return $world->merge({ grid: $grid, history: [$grid->join('')], pattern: 'custom' })
+}
+
+/// The world with one cell flipped, where is "column,row" from 0 (what a board button sends). Anything else leaves the world as it is.
+fn flip(world: map, where: string?) {
+  xy = ($where ?? '')->split(',')->map(fn(p) => $p->trim()->to_int(default: -1))
+  if $xy->count() != 2 or $xy[0] < 0 or $xy[1] < 0 or $xy[0] >= @width($world.grid) or $xy[1] >= @height($world.grid) {
+    return $world
+  }
+  return @edit_world($world, grid: @toggle($world.grid, x: $xy[0], y: $xy[1]))
+}
+
+/// Runs a world forward, counting births and deaths and keeping a short history for spotting cycles. Stops early once nothing is left alive.
+fn advance(world: map, generations: int = 1) {
+  w = $world
+  for _i in 0..$generations {
+    if @population($w.grid) == 0 {
+      break
+    }
+    before = $w.grid->join('')
+    next = @next_generation($w.grid, wrap: $w.wrap)
+    after = $next->join('')
+    born = (0..$after->count())->count_of(fn(k) => $after[$k] == $alive_cell and $before[$k] != $alive_cell)
+    died = (0..$after->count())->count_of(fn(k) => $before[$k] == $alive_cell and $after[$k] != $alive_cell)
+    w = $w->merge({
+      grid: $next,
+      generation: $w.generation + 1,
+      history: $w.history->push($after)->slice(start: -$history_size),
+      births: $w.births + $born,
+      deaths: $w.deaths + $died })
+  }
+  return $w
+}
+
+/// The length of the cycle the world is in (1 for a still life), or 0 if it hasn't repeated within the history.
+fn period(world: map) {
+  h = $world.history
+  now = $h->last()
+  for back in 1..$h->count() {
+    if $h[-1 - $back] == $now {
+      return $back
+    }
+  }
+  return 0
+}
+
+/// A short description of what the world is doing.
+fn status(world: map) {
+  p = @period($world)
+  return match true {
+    @population($world.grid) == 0 => 'Extinct',
+      $p == 1 => 'Still life',
+      $p > 1 => 'Oscillating, period ' + $p,
+      _ => 'Evolving'
+  }
+}
+
+/// The numbers both front ends show under the grid.
+fn summary(world: map) {
+  pop = @population($world.grid)
+  cells = @width($world.grid) * @height($world.grid)
+  return {
+    generation: $world.generation,
+    population: $pop,
+    density: ($pop / $cells * 100)->round(digits: 1),
+    births: $world.births,
+    deaths: $world.deaths,
+    status: @status($world),
+    size: @width($world.grid) + ' × ' + @height($world.grid),
+    edges: $world.wrap ? 'wrap around' : 'walls'
+  }
+}
+
+/// The grid as lines of text, for terminals and tests.
+fn to_text(grid: string[], alive = '█', dead = '·') {
+  return $grid->map(fn(row) => $row->replace(old: $alive_cell, new: $alive)->replace(old: $dead_cell, new: $dead))->join(@char_of(10))
+}

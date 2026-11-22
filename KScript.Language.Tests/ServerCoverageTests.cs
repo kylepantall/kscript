@@ -187,7 +187,7 @@ namespace KScript.Language.Tests
             //           0         1         2         3
             //           0123456789012345678901234567890123
             string main = "<kscript>\n" +
-                          "<import src=\"lib/strings.ks.xml\" as=\"str\" />\n" +    // line 1
+                          "<import path=\"lib/strings.ks.xml\" as=\"str\" />\n" +    // line 1
                           "<let name=\"people\" value=\"[1, 2]\" />\n" +           // line 2
                           "<fn name=\"twice\" params=\"n: int\">\n" +             // line 3
                           "<return value=\"$n * 2\" />\n" +                      // line 4
@@ -264,7 +264,7 @@ namespace KScript.Language.Tests
             Memory files = new Memory();
             string team = Path.Combine(Root, "team.json");
             files.Files[Path.Combine(Root, "kscript.json")] = "{ \"standard\": \"team.json\" }";
-            files.Files[team] = "{ \"format\": { \"printWidth\": 70 } }";
+            files.Files[team] = "{ \"format\": { \"print_width\": 70 } }";
             KScriptLanguageServer server = new KScriptLanguageServer(Stream.Null, Stream.Null, files);
             Assert.Equal(70, server.ProjectFor(Main).Format.PrintWidth);
 

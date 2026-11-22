@@ -38,12 +38,12 @@ namespace KScript.Pages
     /// <summary>
     /// File-based routing for a site folder: <c>/people</c> is people.html, people.md or people/index.html;
     /// <c>/people/42</c> can match people/[id].html. Files and folders starting with _ or . are never served,
-    /// and KScript sources (.xml, .ks) and kscript.json are never sent as text.
+    /// and KScript sources (.kscript, .ks.xml and any other .xml) and kscript.json are never sent as text.
     /// </summary>
     public sealed class PageSite
     {
         private static readonly string[] PageExtensions = { ".html", ".htm", ".md" };
-        private static readonly string[] HiddenExtensions = { ".xml", ".ks", ".kscript" };
+        private static readonly string[] HiddenExtensions = { ".xml", ".kscript" };
 
         public PageSite(string root)
         {

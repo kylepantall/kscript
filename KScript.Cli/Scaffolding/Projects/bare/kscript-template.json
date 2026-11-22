@@ -3,8 +3,8 @@
 {
   "description": "A bare-bones project: kscript.json, one script and a test. Add --web, --api or --desktop for an empty website, API or desktop app.",
   "options": {
-    "format": {
-      "question": "Which file format for scripts?",
+    "syntax": {
+      "question": "Which syntax for scripts?",
       "default": "kscript",
       "choices": ["kscript", "xml"],
       "description": "kscript writes scripts and tests as .kscript files; xml writes them as .ks.xml."
@@ -22,7 +22,7 @@
     "desktop": {
       "question": "Add a desktop app (the same app in a window)?",
       "default": false,
-      "description": "Add an empty desktop app: desktop.kscript (a KScript.Window) and the kscript.json app settings."
+      "description": "Add an empty desktop app: desktop.kscript (a Window block) and the kscript.json app settings."
     },
     "port": {
       "question": "Which port should kscript serve use?",

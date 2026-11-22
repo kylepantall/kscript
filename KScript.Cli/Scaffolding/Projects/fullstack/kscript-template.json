@@ -3,8 +3,8 @@
 {
   "description": "A web app with its own JSON API: pages that call /api through @api, routes, controllers, a Note model in a database, caching and tests",
   "options": {
-    "format": {
-      "question": "Which file format for scripts?",
+    "syntax": {
+      "question": "Which syntax for scripts?",
       "default": "kscript",
       "choices": ["kscript", "xml"],
       "description": "kscript writes scripts, tests and routes as .kscript files; xml writes them as .ks.xml. Pages stay HTML."

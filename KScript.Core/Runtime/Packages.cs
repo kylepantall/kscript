@@ -110,6 +110,7 @@ namespace KScript.Runtime
         private readonly Dictionary<string, ElementDefinition> elements = new Dictionary<string, ElementDefinition>(StringComparer.Ordinal);
         private readonly Dictionary<string, CommandDefinition> commands = new Dictionary<string, CommandDefinition>(StringComparer.Ordinal);
         private readonly List<MethodDefinition> methods = new List<MethodDefinition>();
+        private readonly List<ValueFieldDefinition> fields = new List<ValueFieldDefinition>();
         private readonly Dictionary<string, VariableDefinition> variables = new Dictionary<string, VariableDefinition>(StringComparer.Ordinal);
         private readonly Dictionary<string, EchoFormatter> echoFormats = new Dictionary<string, EchoFormatter>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> requires = new List<string>();
@@ -129,10 +130,13 @@ namespace KScript.Runtime
         public IReadOnlyDictionary<string, ElementDefinition> Elements { get { EnsureRegistered(); return elements; } }
         public IReadOnlyDictionary<string, CommandDefinition> Commands { get { EnsureRegistered(); return commands; } }
         public IReadOnlyList<MethodDefinition> Methods { get { EnsureRegistered(); return methods; } }
+
+        /// <summary>Fields the package adds to types of value: <c>$response.status</c>.</summary>
+        public IReadOnlyList<ValueFieldDefinition> Fields { get { EnsureRegistered(); return fields; } }
         public IReadOnlyDictionary<string, VariableDefinition> Variables { get { EnsureRegistered(); return variables; } }
         public IReadOnlyDictionary<string, EchoFormatter> EchoFormats { get { EnsureRegistered(); return echoFormats; } }
 
-        /// <summary>Kinds of log provider this package adds, by type name: logging.providers[].type and &lt;log-provider type&gt;.</summary>
+        /// <summary>Kinds of log provider this package adds, by type name: logging.providers[].type and &lt;log_provider type&gt;.</summary>
         public IReadOnlyDictionary<string, LogProviderType> LogProviders { get { EnsureRegistered(); return logProviders; } }
 
         /// <summary>Packages that are imported along with this one.</summary>
@@ -144,8 +148,28 @@ namespace KScript.Runtime
             lock (gate)
             {
                 if (registered) return;
-                Register(new PackageBuilder(this));
-                registered = true;
+                try
+                {
+                    Register(new PackageBuilder(this));
+                    registered = true;
+                    // The rules about several registrations together (a method that is also a field, a command
+                    // that repeats a statement), now that the package has everything.
+                    Conventions.Enforce(Conventions.Together(new[] { this }));
+                }
+                catch
+                {
+                    // A package that breaks a rule doesn't load, and says the same thing every time it is asked.
+                    registered = false;
+                    elements.Clear();
+                    commands.Clear();
+                    methods.Clear();
+                    fields.Clear();
+                    variables.Clear();
+                    echoFormats.Clear();
+                    requires.Clear();
+                    logProviders.Clear();
+                    throw;
+                }
             }
         }
 
@@ -163,6 +187,9 @@ namespace KScript.Runtime
             /// <summary>Adds an element. <paramref name="handler"/> may be null for elements that only describe syntax.</summary>
             public ElementDefinition Element(ElementInfo info, ElementHandler handler, bool ownsContent = false, bool hoisted = false)
             {
+                Conventions.Enforce(Conventions.Element(package.Name, info));
+                if (package.elements.ContainsKey(info.Name))
+                    throw new ConventionException($"{package.Name} registers element '{info.Name}' twice: a package has each element once.");
                 info.Package = package.Name;
                 var def = new ElementDefinition(info, handler, package) { OwnsContent = ownsContent, Hoisted = hoisted };
                 package.elements[info.Name] = def;
@@ -175,6 +202,9 @@ namespace KScript.Runtime
 
             public CommandDefinition Command(CallableInfo info, CommandHandler handler)
             {
+                Conventions.Enforce(Conventions.Callable(package.Name, info));
+                if (package.commands.ContainsKey(info.Name))
+                    throw new ConventionException($"{package.Name} registers command '@{info.Name}' twice: a package has each command once.");
                 info.Package = package.Name;
                 var def = new CommandDefinition(info, handler, package);
                 package.commands[info.Name] = def;
@@ -188,6 +218,7 @@ namespace KScript.Runtime
             /// </summary>
             public void NativeType(KScript.Metadata.NativeTypeInfo info, NativeParser parser)
             {
+                Conventions.Enforce(Conventions.Name(package.Name, "type", info.Name));
                 info.Package ??= package.Name;
                 NativeParsers.Register(info, parser);
             }
@@ -196,9 +227,25 @@ namespace KScript.Runtime
             public MethodDefinition Method(string receiver, string name, string parameters, string description, string returns, MethodHandler handler)
             {
                 var info = new CallableInfo(CallableKind.Method, name, description, new[] { Signature.Parse(parameters) }) { ReceiverType = receiver, ReturnType = returns };
+                Conventions.Enforce(Conventions.Callable(package.Name, info));
                 info.Package = package.Name;
                 var def = new MethodDefinition(info, handler, package);
                 package.methods.Add(def);
+                return def;
+            }
+
+            /// <summary>
+            /// Adds a field, read as <c>value.name</c> on values of <paramref name="receiver"/>. A field is a plain fact
+            /// about the value (<c>$response.status</c>, <c>$file.name</c>); anything that takes arguments or does work
+            /// is a <see cref="Method"/>. Without a <paramref name="handler"/> the value's own
+            /// <see cref="IKObject.TryGetMember"/> reads it.
+            /// </summary>
+            public ValueFieldDefinition Field(string receiver, string name, string type, string description, FieldHandler handler = null)
+            {
+                var info = new ValueFieldInfo(receiver, name, type, description) { Package = package.Name };
+                Conventions.Enforce(Conventions.Field(package.Name, info));
+                var def = new ValueFieldDefinition(info, handler ?? ((t, _) => t is IKObject o && o.TryGetMember(name, out object v) ? v : null), package);
+                package.fields.Add(def);
                 return def;
             }
 
@@ -212,6 +259,15 @@ namespace KScript.Runtime
             {
                 foreach (var (key, example) in examples)
                 {
+                    // "url.host" names a field.
+                    int dot = key.IndexOf('.');
+                    if (dot > 0 && !key.StartsWith("@", StringComparison.Ordinal) && !key.Contains("->"))
+                    {
+                        ValueFieldDefinition field = package.fields.FirstOrDefault(f => f.Receiver == key.Substring(0, dot) && f.Name == key.Substring(dot + 1))
+                            ?? throw new InvalidOperationException($"{package.Name} has no field {key} to give an example to.");
+                        field.Info.Example = example;
+                        continue;
+                    }
                     Find(key, "an example").Example = example;
                 }
             }
@@ -305,19 +361,27 @@ namespace KScript.Runtime
 
             public VariableDefinition Variable(string name, string type, string description, Func<Interpreter, Module, object> value)
             {
+                Conventions.Enforce(Conventions.Name(package.Name, "variable", name));
                 var def = new VariableDefinition(name, type, description, value, package);
                 package.variables[name] = def;
                 return def;
             }
 
-            public void EchoFormat(string name, EchoFormatter formatter) => package.echoFormats[name] = formatter;
+            public void EchoFormat(string name, EchoFormatter formatter)
+            {
+                Conventions.Enforce(Conventions.Name(package.Name, "echo format", name));
+                package.echoFormats[name] = formatter;
+            }
 
             /// <summary>
             /// Adds a kind of log provider, such as http. Scripts that import the package can name it in
-            /// logging.providers (type: http) or &lt;log-provider type="http"&gt;; <paramref name="create"/> gets the options.
+            /// logging.providers (type: http) or &lt;log_provider type="http"&gt;; <paramref name="create"/> gets the options.
             /// </summary>
-            public void LogProvider(string type, string description, Func<LogProviderContext, ILogProvider> create) =>
+            public void LogProvider(string type, string description, Func<LogProviderContext, ILogProvider> create)
+            {
+                Conventions.Enforce(Conventions.Name(package.Name, "log provider", type));
                 package.logProviders[type] = new LogProviderType(type, description, create, package.Name);
+            }
 
             /// <summary>Another package that is always imported with this one.</summary>
             public void Requires(string packageName) => package.requires.Add(packageName);
@@ -348,7 +412,7 @@ namespace KScript.Runtime
             ("KScript.Queue", "KScript.Queueing.QueuePackage, KScript.Queue", "Queued jobs: job declarations, dispatch, retries with backoff, failed jobs, and the worker that runs them."),
             ("KScript.Http", "KScript.Http.HttpPackage, KScript.Http", "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve."),
             ("KScript.Auth", "KScript.Auth.AuthPackage, KScript.Auth", "Sign-in for kscript serve apps: users, sessions, the auth and guest middleware, CSRF, password resets and API tokens."),
-            ("KScript.Test", "KScript.Testing.TestPackage, KScript.Test", "Tests run by kscript test: <test>, <describe>, <expect>, <assert> and <capture>."),
+            ("KScript.Test", "KScript.Testing.TestPackage, KScript.Test", "Tests run by kscript test: <test>, <describe>, <expect>, <capture> and @assert()."),
             ("KScript.UI", "KScript.UI.UIPackage, KScript.UI", "Desktop windows with buttons, text and inputs."),
             ("KScript.AI", "KScript.AI.AIPackage, KScript.AI", "Language models: @llm, @chat and <llm>."),
         };
@@ -364,6 +428,7 @@ namespace KScript.Runtime
 
         private readonly object gate = new object();
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
+        private volatile bool checkedTogether;
 
         private sealed class Entry
         {
@@ -398,6 +463,7 @@ namespace KScript.Runtime
             {
                 if (entries.TryGetValue(name, out Entry existing) && existing.Instance != null) return;
                 entries[name] = new Entry { Name = name, TypeName = typeName, Description = description };
+                checkedTogether = false;
             }
         }
 
@@ -406,6 +472,7 @@ namespace KScript.Runtime
             lock (gate)
             {
                 entries[package.Name] = new Entry { Name = package.Name, Instance = package, Description = package.Description };
+                checkedTogether = false;
             }
         }
 
@@ -475,7 +542,18 @@ namespace KScript.Runtime
         }
 
         /// <summary>Loads every installed package. Used by tools and to suggest which package has a missing name.</summary>
-        public IEnumerable<KScriptPackage> LoadAll() => Names.Select(Get).Where(p => p != null).ToList();
+        public IEnumerable<KScriptPackage> LoadAll()
+        {
+            List<KScriptPackage> all = Names.Select(Get).Where(p => p != null).ToList();
+            if (!checkedTogether)
+            {
+                // Once for a set of packages: the rules that span packages (a method two packages add to one type,
+                // a command in one that repeats a statement in another).
+                Conventions.Enforce(Conventions.Together(all));
+                checkedTogether = true;
+            }
+            return all;
+        }
 
         /// <summary>The installed packages (other than <paramref name="except"/>) that define an element with this name.</summary>
         public IEnumerable<KScriptPackage> FindElement(string name, IEnumerable<KScriptPackage> except = null) =>
@@ -486,5 +564,9 @@ namespace KScript.Runtime
 
         public IEnumerable<KScriptPackage> FindMethod(string name, IEnumerable<KScriptPackage> except = null) =>
             LoadAll().Where(p => p.Methods.Any(m => m.Name == name) && (except == null || !except.Contains(p)));
+
+        /// <summary>The field called <paramref name="name"/> on values of <paramref name="receiver"/>, from any installed package, or null.</summary>
+        public ValueFieldDefinition FindField(string receiver, string name) =>
+            LoadAll().SelectMany(p => p.Fields).FirstOrDefault(f => f.Receiver == receiver && f.Name == name);
     }
 }

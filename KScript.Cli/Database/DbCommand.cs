@@ -20,20 +20,24 @@ namespace KScript.Databases
     /// </summary>
     public static class DbCommand
     {
-        public const string Usage = "kscript db diff [name]|migrate|rollback [--steps n]|status|fresh [--seed]|seed [name] [--pretend] [--force] [--project folder]";
+        public const string Usage = "kscript db diff [name] [--syntax kscript|xml]|migrate|rollback [--steps n]|status [--output text|json]|fresh [--seed]|seed [name] [--pretend] [--force] [--project folder]";
 
-        private static readonly string[] Valued = { "steps", "project", "format", "name" };
+        private static readonly string[] Valued = { "steps", "project", "output", "syntax", "name" };
 
         public static int Run(string[] args, TextWriter output, TextWriter error, string workingDirectory = null, string environment = null, TextReader input = null, bool? interactive = null)
         {
-            CliArgs a = CliArgs.Parse(args, Valued);
             var cli = new CliOutput(output);
             var err = new CliOutput(error);
+            foreach (string arg in args)
+            {
+                if (CliFlags.Retired("db", arg) is string renamed) return BadUsage(err, renamed);
+            }
+            CliArgs a = CliArgs.Parse(args, Valued);
             if (a.Positional.Count == 0 || a.Flag("help") == true || a.Flag("h") == true)
             {
                 output.WriteLine("Usage: " + Usage);
                 output.WriteLine("Migrations are in database/migrations, seeders in database/seeders. kscript db diff writes a migration from the models.");
-                return a.Positional.Count == 0 && a.Flag("help") != true && a.Flag("h") != true ? 1 : 0;
+                return a.Positional.Count == 0 && a.Flag("help") != true && a.Flag("h") != true ? ExitCodes.Usage : ExitCodes.Ok;
             }
             string action = a.Positional[0];
             string folder = Path.GetFullPath(a.Value("project") ?? workingDirectory ?? WorkingFolder.Current);
@@ -45,7 +49,7 @@ namespace KScript.Databases
             catch (ProjectConfigException ex)
             {
                 ErrorReport.Write(error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
             environment ??= project?.ConfigOptions(null).Environment ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
             ConfigOptions config = project?.ConfigOptions(environment);
@@ -71,13 +75,17 @@ namespace KScript.Databases
                         int? steps = null;
                         if (a.Value("steps") is string s)
                         {
-                            if (!int.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture, out int n) || n < 1) return Fail(err, "--steps needs a number of migrations, e.g. --steps 2");
+                            if (!int.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture, out int n) || n < 1) return BadUsage(err, "--steps needs a number of migrations, e.g. --steps 2");
                             steps = n;
                         }
                         return Rollback(migrator, steps, a.Flag("all") == true, a.Flag("pretend") == true, cli);
                     }
                     case "status":
-                        return Status(migrator, a.Value("format") == "json", cli, output);
+                    {
+                        string how = (a.Value("output") ?? "text").Trim().ToLowerInvariant();
+                        if (how != "text" && how != "json") return BadUsage(err, $"--output should be text or json, not '{how}'.");
+                        return Status(migrator, how == "json", cli, output);
+                    }
                     case "fresh":
                     {
                         if (production && a.Flag("force") != true) return Fail(err, "db fresh drops every table, so it doesn't run on the production database. Add --force if you really mean it.");
@@ -92,7 +100,7 @@ namespace KScript.Databases
                         return Seed(migrator, a.Positional.Count > 1 ? a.Positional[1] : null, cli);
                     default:
                         string close = Values.Closest(action, new[] { "diff", "migrate", "rollback", "status", "fresh", "seed" });
-                        return Fail(err, $"kscript db has no '{action}' command." + (close != null ? $" Did you mean db {close}?" : string.Empty) + " Usage: " + Usage);
+                        return BadUsage(err, $"kscript db has no '{action}' command." + (close != null ? $" Did you mean db {close}?" : string.Empty) + " Usage: " + Usage);
                 }
             }
             catch (KScriptException ex)
@@ -112,10 +120,18 @@ namespace KScript.Databases
         private static int Refused(CliOutput err, string command) =>
             Fail(err, $"Stopped: the environment is production. Run kscript db {command} --force to do it anyway.");
 
+        /// <summary>The work could not be done: exit code 1.</summary>
         private static int Fail(CliOutput err, string message)
         {
             err.Error(message);
-            return 1;
+            return ExitCodes.Failed;
+        }
+
+        /// <summary>The command line can't be run as written: exit code 2.</summary>
+        private static int BadUsage(CliOutput err, string message)
+        {
+            err.Error(message);
+            return ExitCodes.Usage;
         }
 
         private static string Count(int n, string what) => n.ToString(CultureInfo.InvariantCulture) + " " + what + (n == 1 ? string.Empty : "s");
@@ -151,7 +167,7 @@ namespace KScript.Databases
             if (name.Length == 0) name = Differ.NameFor(steps);
             string text = MigrationWriter.File(steps, $"Written by kscript db diff from the models. Read it, change it if you need to, then run kscript db migrate.");
             string file = Path.Combine(migrator.Relative(migrator.MigrationsFolder), KScript.Scaffolding.Scaffolder.Clock().ToString("yyyy_MM_dd_HHmmss", CultureInfo.InvariantCulture) + "_" + name + ".kscript").Replace('\\', '/');
-            string format = ScriptFormat.Resolve(a.Value("format") is string f ? new Dictionary<string, string> { ["format"] = f } : null, project);
+            string format = ScriptFormat.Resolve(a.Value(ScriptFormat.Option) is string f ? new Dictionary<string, string> { [ScriptFormat.Option] = f } : null, project);
             (file, text) = ScriptFormat.Apply("migration.kscript", file, text, format);
             if (a.Flag("pretend") == true)
             {

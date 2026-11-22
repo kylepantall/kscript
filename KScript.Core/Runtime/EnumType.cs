@@ -2,10 +2,10 @@ namespace KScript.Runtime
 {
     /// <summary>
     /// The value of <c>&lt;enum name="Size" values="small, medium, large" /&gt;</c>: a map from each name to itself, so
-    /// <c>$Size.small</c> is 'small' and <c>'small' in $Size</c> works. As a parameter type (<c>params="size: Size"</c>)
+    /// <c>Size.small</c> is 'small' and <c>'small' in Size</c> works. As a parameter type (<c>params="size: Size"</c>)
     /// it limits the argument to those values, which calls may then write bare: <c>@pack(large)</c>.
     /// </summary>
-    public sealed class EnumType : Dictionary<string, object>
+    public sealed class EnumType : Dictionary<string, object>, IDeclaredType
     {
         public EnumType(string name, IEnumerable<string> names) : base(StringComparer.Ordinal)
         {

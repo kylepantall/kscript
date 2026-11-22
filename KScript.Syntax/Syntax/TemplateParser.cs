@@ -177,6 +177,14 @@ namespace KScript.Syntax
             while (i < end)
             {
                 char c = text[i];
+                if (Quotes.IsEscape(text, i, end, '"'))
+                {
+                    // \" and \\ are the two escapes; the value is used when something else is filled in too.
+                    literal.Append(text[i + 1]);
+                    i += 2;
+                    continue;
+                }
+
                 if ((c == '{' || c == '}') && i + 1 < end && text[i + 1] == c)
                 {
                     literal.Append(c);

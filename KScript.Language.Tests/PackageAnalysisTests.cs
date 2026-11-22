@@ -8,11 +8,11 @@ namespace KScript.Language.Tests
     public class PackageAnalysisTests
     {
         [Theory]
-        [InlineData("<input to=\"x\">?</input>", "KScript.Terminal", "input")]
+        [InlineData("<input into=\"x\">?</input>", "KScript.Terminal", "input")]
         [InlineData("<echo>{ @sqrt(2) }</echo>", "KScript.Math", "@sqrt")]
         [InlineData("<echo>{ $pi }</echo>", "KScript.Math", "pi")]
         [InlineData("<echo>{ [1, 2]->median() }</echo>", "KScript.Math", "median")]
-        [InlineData("<move from=\"'a'\" to=\"'b'\" />", "KScript.IO", "move")]
+        [InlineData("<do>@download('https://example.com/a', 'a')</do>", "KScript.Net", "@download")]
         [InlineData("<let name=\"r\" value=\"@api('https://example.com')\" />", "KScript.Net", "@api")]
         public void PackageFeaturesNeedAnImport(string body, string package, string marked)
         {
@@ -26,18 +26,18 @@ namespace KScript.Language.Tests
         [Fact]
         public void TheQuickFixAddsTheImportAfterTheOthers()
         {
-            string text = "<kscript>\n  <import package=\"KScript.IO\" />\n  <input to=\"x\">?</input>\n</kscript>";
+            string text = "<kscript>\n  <import package=\"KScript.IO\" />\n  <input into=\"x\">?</input>\n</kscript>";
             Diagnostic d = AssertSingle(Analyze(text), DiagnosticCodes.MissingImport);
             TextChange change = d.Fixes.Single().Changes.Single();
             string fixedText = text.Insert(change.Span.Start, change.NewText);
-            Assert.Equal("<kscript>\n  <import package=\"KScript.IO\" />\n  <import package=\"KScript.Terminal\" />\n  <input to=\"x\">?</input>\n</kscript>", fixedText);
+            Assert.Equal("<kscript>\n  <import package=\"KScript.IO\" />\n  <import package=\"KScript.Terminal\" />\n  <input into=\"x\">?</input>\n</kscript>", fixedText);
             AssertClean(Analyze(fixedText));
         }
 
         [Theory]
-        [InlineData("<import package=\"KScript.Terminal\" /><input to=\"x\">?</input><echo>$x</echo>")]
+        [InlineData("<import package=\"KScript.Terminal\" /><input into=\"x\">?</input><echo>$x</echo>")]
         [InlineData("<import package=\"Math\" /><echo>{ @sqrt(2) } { $pi }</echo>")]
-        [InlineData("<import package=\"KScript.Math\" as=\"math\" /><echo>{ @math.sqrt(2) } { math.pow(2, 3) }</echo>")]
+        [InlineData("<import package=\"KScript.Math\" as=\"math\" /><echo>{ @math.sqrt(2) } { math.hypot(3, 4) }</echo>")]
         [InlineData("<import package=\"KScript.Terminal\" /><echo format=\"markdown\">**hi**</echo>")]
         public void ImportsBringPackagesIn(string body)
         {
@@ -69,7 +69,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void KScriptPrefixedElementsImportTheirPackage()
         {
-            AssertClean(Analyze(Script("<KScript.input to=\"x\">?</KScript.input><input to=\"y\">?</input><echo>$x $y</echo>")));
+            AssertClean(Analyze(Script("<KScript.input into=\"x\">?</KScript.input><input into=\"y\">?</input><echo>$x $y</echo>")));
         }
 
         [Fact]
@@ -80,7 +80,7 @@ namespace KScript.Language.Tests
             {
                 [Path.Combine(dir, "kscript.json")] = "{ \"packages\": [\"KScript.Terminal\", \"Math\"] }",
             });
-            AssertClean(Analyzer.Analyze(Script("<input to=\"x\">?</input><echo>{ @sqrt($x) }</echo>"), Path.Combine(dir, "scripts", "a.ks.xml"), files));
+            AssertClean(Analyzer.Analyze(Script("<input into=\"x\">?</input><echo>{ @sqrt($x) }</echo>"), Path.Combine(dir, "scripts", "a.ks.xml"), files));
         }
 
         private sealed class FakeFiles : IFileSystem

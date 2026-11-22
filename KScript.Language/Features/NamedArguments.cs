@@ -194,7 +194,7 @@ namespace KScript.Language.Features
                             Kind = CompletionKind.Keyword,
                             Detail = "flag",
                             Deprecated = signature.DeprecatedParameters.Contains(name),
-                            Documentation = $"Sets `{name}` to {(label.StartsWith("not ", StringComparison.Ordinal) ? "no" : "yes")} in `{signature.Label}`.",
+                            Documentation = $"Sets `{name}` to {(label.StartsWith("not ", StringComparison.Ordinal) ? "false" : "true")} in `{signature.Label}`.",
                             ReplaceSpan = replace,
                             FilterText = label,
                             SortText = "01" + label,
@@ -233,7 +233,7 @@ namespace KScript.Language.Features
         }
 
         /// <summary>
-        /// The model's columns in a KScript.Data call: <c>$User->where(‸)</c> offers <c>name:</c>, <c>->order_by(‸)</c>
+        /// The model's columns in a KScript.Data call: <c>User->where(‸)</c> offers <c>name:</c>, <c>->order_by(‸)</c>
         /// offers <c>name</c>, and <c>->with(‸)</c> the relations.
         /// </summary>
         private List<CompletionItem> ColumnCompletions(DocumentAnalysis analysis, ExpressionRegion region, ExprNode node, HashSet<string> named, TextSpan replace)
@@ -375,7 +375,7 @@ namespace KScript.Language.Features
                             var flag = signature.Details.FirstOrDefault(d => d.Flag && d.Name == word);
                             if (bare.Name == null && flag.Name != null)
                             {
-                                return new HoverResult($"**{(negated ? "not " : string.Empty)}{word}**: flag, sets `{word}` to {(negated ? "no" : "yes")} in `{signature.Label}`.", region.Source.ToSource(node.Span));
+                                return new HoverResult($"**{(negated ? "not " : string.Empty)}{word}**: flag, sets `{word}` to {(negated ? "false" : "true")} in `{signature.Label}`.", region.Source.ToSource(node.Span));
                             }
                             var owner = signature.Details.FirstOrDefault(d => d.Values != null && d.Values.Contains(word, StringComparer.OrdinalIgnoreCase));
                             if (owner.Name != null)

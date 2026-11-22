@@ -37,7 +37,7 @@ namespace KScript.Language.Tests
         [InlineData("log(category: ‸) \"a\"", "category?: text")]
         [InlineData("log(category: 'x', level: ‸)", "level?: trace|debug|info|warn|error|fatal")]
         [InlineData("fn f() {\n  log(fields: { a: 1, b: 2 }, ‸)\n}", "level?: trace|debug|info|warn|error|fatal")]
-        [InlineData("wait(‸)", "ms?: any")]
+        [InlineData("wait(‸)", "duration: duration")]
         public void StatementsShowTheirAttributesAsParameters(string code, string active)
         {
             SignatureHelpResult help = Help(code);
@@ -63,9 +63,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void AllAttributesWrittenHighlightsNone()
         {
-            SignatureHelpResult help = Help("wait(ms: 1, seconds: 2‸)");
-            Assert.Equal("seconds?: any", ActiveLabel(help));
-            SignatureHelpResult none = Help("wait(ms: 1, seconds: 2, ‸)");
+            SignatureHelpResult help = Help("wait(duration: 1s‸)");
+            Assert.Equal("duration: duration", ActiveLabel(help));
+            SignatureHelpResult none = Help("wait(duration: 1s, ‸)");
             Assert.Null(ActiveLabel(none));
         }
 

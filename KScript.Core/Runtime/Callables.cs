@@ -1,3 +1,4 @@
+using KScript.Syntax.Text;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
 
@@ -93,7 +94,7 @@ namespace KScript.Runtime
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (quote != '\0') { if (c == quote) quote = '\0'; continue; }
+                if (quote != '\0') { if (Quotes.IsEscape(text, i, text.Length, quote)) i++; else if (c == quote) quote = '\0'; continue; }
                 if (c == '\'' || c == '"') quote = c;
                 else if (c == '(' || c == '[' || c == '{') depth++;
                 else if (c == ')' || c == ']' || c == '}') depth--;
@@ -113,7 +114,7 @@ namespace KScript.Runtime
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (quote != '\0') { if (c == quote) quote = '\0'; continue; }
+                if (quote != '\0') { if (Quotes.IsEscape(text, i, text.Length, quote)) i++; else if (c == quote) quote = '\0'; continue; }
                 if (c == '\'' || c == '"') quote = c;
                 else if (c == '(' || c == '[' || c == '{') depth++;
                 else if (c == ')' || c == ']' || c == '}') depth--;
@@ -123,7 +124,7 @@ namespace KScript.Runtime
         }
     }
 
-    /// <summary><c>fn($x) => expression</c>, closed over the scope it was written in.</summary>
+    /// <summary><c>fn(x) => expression</c>, closed over the scope it was written in.</summary>
     public sealed class Lambda : ICallable
     {
         internal Lambda(LambdaNode node, Scope closure, EvalContext context, string source)
@@ -153,7 +154,7 @@ namespace KScript.Runtime
             return call.Interpreter.Evaluate(Node.Body, scope, Context);
         }
 
-        public override string ToString() => Source ?? "fn(" + string.Join(", ", Parameters.Select(p => "$" + p)) + ") => …";
+        public override string ToString() => Source ?? "fn(" + string.Join(", ", Parameters) + ") => …";
     }
 
     /// <summary>A function declared with &lt;fn name params&gt;, called as <c>@name(args)</c>.</summary>
@@ -218,7 +219,8 @@ namespace KScript.Runtime
                 }
                 catch (KScriptException ex)
                 {
-                    throw new KScriptException(ex.Message.Replace($"Unknown type '{t.Name}'.", $"Unknown type '{t.Name}' for a parameter of @{Name}()."), ex.Type);
+                    (string was, string now) = ($"Unknown type '{t.Name}'.", $"Unknown type '{t.Name}' for a parameter of @{Name}().");
+                    throw new KScriptException(new Wording(ex.Words.Xml.Replace(was, now), ex.Words.Code.Replace(was, now)), ex.Type);
                 }
                 if (declared is EnumType e) enums[p.Name] = e;
             }
@@ -320,6 +322,9 @@ namespace KScript.Runtime
         /// <summary>The parameter names of the signature the arguments were bound to, when known (for error messages).</summary>
         public IReadOnlyList<string> ParameterNames { get; init; }
 
+        /// <summary>Where a command was called, as written in the script, or null when that isn't known (a command passed as a value).</summary>
+        public CallSite Site { get; internal set; }
+
         public int Count => Args.Count;
         public KScriptHost Host => Interpreter.Host;
 
@@ -349,7 +354,7 @@ namespace KScript.Runtime
 
         public bool Bool(int i, bool fallback = false) => Has(i) ? Values.Truthy(Arg(i)) : fallback;
 
-        public ICallable Fn(int i) => Need(i) as ICallable ?? throw Error($"{Display} needs a function like fn($x) => ... as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
+        public ICallable Fn(int i) => Need(i) as ICallable ?? throw Error($"{Display} needs a function like fn(x) => ... as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
 
         public List<object> List(int i) => Need(i) as List<object> ?? throw Error($"{Display} needs a list as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
 
@@ -366,7 +371,7 @@ namespace KScript.Runtime
         /// <summary>Calls a function value with these arguments.</summary>
         public object Call(ICallable fn, params object[] args) => Interpreter.Call(fn, args, null, Scope, Module);
 
-        public KScriptException Error(string message, string type = "Error") => new KScriptException(message, type);
+        public KScriptException Error(KScript.Syntax.Wording message, string type = "Error") => new KScriptException(message, type);
     }
 
     /// <summary>

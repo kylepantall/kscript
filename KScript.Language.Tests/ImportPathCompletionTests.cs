@@ -15,7 +15,7 @@ namespace KScript.Language.Tests
             Write("tour.kscript", "echo \"hi\"");
             Write("lib/strings.ks.xml", "<kscript />");
             Write("lib/maths.kscript", "fn double(x) => $x * 2");
-            Write("lib/deep/util.ks", "<kscript />");
+            Write("lib/deep/util.ks.xml", "<kscript />");
             Write("lib/notes.txt", "not a script");
             Write("node_modules/pkg/x.ks.xml", "<kscript />");
         }
@@ -41,7 +41,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("<kscript>\n  <import src=\"‸\" />\n</kscript>", "main.ks.xml")]
+        [InlineData("<kscript>\n  <import path=\"‸\" />\n</kscript>", "main.ks.xml")]
         [InlineData("import \"‸\"", "tour.kscript")]
         [InlineData("import double from \"‸\"", "tour.kscript")]
         public void EmptyPathListsEveryScriptInTheProject(string text, string file)
@@ -49,7 +49,7 @@ namespace KScript.Language.Tests
             List<string> labels = Labels(text, file);
             Assert.Contains("lib/strings.ks.xml", labels);
             Assert.Contains("lib/maths.kscript", labels);
-            Assert.Contains("lib/deep/util.ks", labels);
+            Assert.Contains("lib/deep/util.ks.xml", labels);
             Assert.Contains("lib/", labels);
             Assert.DoesNotContain("lib/notes.txt", labels);
             Assert.DoesNotContain(labels, l => l.Contains("node_modules"));
@@ -57,7 +57,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("<kscript><import src=\"lib/‸\" /></kscript>", "main.ks.xml")]
+        [InlineData("<kscript><import path=\"lib/‸\" /></kscript>", "main.ks.xml")]
         [InlineData("import \"lib/‸\" as m", "tour.kscript")]
         public void FolderPathListsThatFolder(string text, string file)
         {
@@ -73,7 +73,7 @@ namespace KScript.Language.Tests
         {
             List<string> labels = Labels("import \"‸\"", "lib/maths.kscript");
             Assert.Contains("strings.ks.xml", labels);
-            Assert.Contains("deep/util.ks", labels);
+            Assert.Contains("deep/util.ks.xml", labels);
             Assert.Contains("../tour.kscript", labels);
             Assert.Contains("../main.ks.xml", labels);
         }

@@ -27,7 +27,7 @@ namespace KScript.Http
             public bool Api { get; init; }
         }
 
-        private static readonly string[] RouteExtensions = { ".ks.xml", ".kscript", ".ks", ".xml" };
+        private static readonly string[] RouteExtensions = { ".kscript", ".ks.xml" };
         private static readonly string[] ViewExtensions = { ".html", ".htm", ".md" };
 
         private readonly object gate = new object();
@@ -193,9 +193,9 @@ namespace KScript.Http
             foreach (RouteFileInfo file in ctx.App.Files)
             {
                 Module module = interpreter.Load(file.Path);
-                if (!module.IsPackageRoot || ElementName(module) != "Routes")
+                if (module.MainElementName != "Routes")
                 {
-                    throw new KScriptException($"{Path.GetFileName(file.Path)} is a route file, so it starts with <KScript.Routes> (or KScript.Routes {{ }} in a .kscript file), not <{module.Root.Name}>.", "Http")
+                    throw new KScriptException($"{Path.GetFileName(file.Path)} is a route file, so it holds Routes {{ }} after import KScript.Http (or <KScript.Routes> in an XML file), not {(module.MainElement ?? module.Root).Name}.", "Http")
                     { File = file.Path, Line = 1 };
                 }
                 ctx.File = file;
@@ -214,7 +214,6 @@ namespace KScript.Http
             }
         }
 
-        private static string ElementName(Module module) => Metadata.ElementInfo.BareName(module.Root.Name);
 
         #endregion
 

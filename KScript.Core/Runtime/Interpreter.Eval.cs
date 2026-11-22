@@ -68,7 +68,7 @@ namespace KScript.Runtime
             return parsed.Nodes.Select(n => Evaluate(n, scope, ctx)).ToList();
         }
 
-        /// <summary>Runs <c>x = 3; $total += $price</c> statements. With <paramref name="declare"/>, plain names are declared (as &lt;let&gt; does).</summary>
+        /// <summary>Runs <c>x = 3; total += $price</c> statements. With <paramref name="declare"/>, plain names are declared (as &lt;let&gt; does).</summary>
         /// <summary>
         /// Runs assignment statements and calls. <paramref name="declare"/> declares every assigned name in this scope
         /// (&lt;let&gt;); <paramref name="declareNew"/> declares only names not yet in scope and changes the rest
@@ -143,7 +143,7 @@ namespace KScript.Runtime
 
         #region Evaluation
 
-        private KScriptException Fail(ExprNode node, EvalContext ctx, string message, string type = "Error")
+        private KScriptException Fail(ExprNode node, EvalContext ctx, Wording message, string type = "Error")
         {
             return new KScriptException(message, type) { Offset = node == null ? null : ctx.ToSource(node.Span.Start), OffsetModule = ctx.Module };
         }
@@ -187,7 +187,7 @@ namespace KScript.Runtime
                         LiteralKind.Number => double.Parse(lit.Value, NumberStyles.Float, CultureInfo.InvariantCulture),
                         LiteralKind.String => lit.Template == null ? lit.Value : FillIn(lit.Template, scope, ctx),
                         LiteralKind.Bool => lit.Value == "true",
-                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url => TypedLiteral(lit, ctx),
+                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Duration => TypedLiteral(lit, ctx),
                         _ => null,
                     };
 
@@ -199,8 +199,8 @@ namespace KScript.Runtime
 
                 case IdentifierNode id:
                     if (ctx.Module != null && ctx.Module.Aliases.TryGetValue(id.Name, out ImportNamespace ns)) return ns;
-                    // A <type> can be named without $: as: Repo.
-                    if (scope.TryGet(id.Name, out object declaredType) && (declaredType is RecordType || declaredType is ErrorType)) return declaredType;
+                    // A declared type (type, model, enum, error, job) is named bare: as: Repo, User->find(1), Size.small.
+                    if (scope.TryGet(id.Name, out object declaredType) && declaredType is IDeclaredType) return declaredType;
                     // So is an error type: catch NotFound, $err->is(NotFound).
                     if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType) return errorType;
                     throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
@@ -249,7 +249,7 @@ namespace KScript.Runtime
                         return found is CommandDefinition cmd ? new NativeFunction(cmd.Name, call => InvokeCommand(cmd, call)) : found;
                     }
                     (List<object> args, Dictionary<string, object> named) = EvaluateArguments(command.Arguments, scope, ctx, command.Name);
-                    return CallCommand(command.Name, args, named, scope, ctx, command);
+                    return CallCommand(command.Name, args, named, scope, ctx, command, new CallSite(command, command.Arguments, ctx));
                 }
 
                 case CallNode call:
@@ -288,13 +288,17 @@ namespace KScript.Runtime
                     object subject = Evaluate(match.Subject, scope, ctx);
                     foreach (MatchArmNode arm in match.Arms)
                     {
-                        if (arm.Pattern == null || Matches(subject, arm.Pattern, scope, ctx)) return Evaluate(arm.Result, scope, ctx);
+                        if ((arm.Patterns.Count == 0 || arm.Patterns.Any(p => Matches(subject, p, scope, ctx)))
+                            && (arm.Guard == null || Values.Truthy(Evaluate(arm.Guard, scope, ctx))))
+                        {
+                            return Evaluate(arm.Result, scope, ctx);
+                        }
                     }
                     return null;
                 }
 
                 case AssignmentNode assignment:
-                    throw Fail(assignment, ctx, "Assignment isn't allowed here. Use == (or ===) to compare; assign with <let>, <set> or <do>.", "Syntax");
+                    throw Fail(assignment, ctx, $"Assignment isn't allowed here. Use == (or ===) to compare; assign with <let>, <set> or <do>.", "Syntax");
 
                 case ErrorNode:
                     throw Fail(node, ctx, "This expression has a syntax error.", "Syntax");
@@ -308,10 +312,10 @@ namespace KScript.Runtime
             return string.IsNullOrEmpty(source) ? string.Empty : $" in '{source}'";
         }
 
-        private static string UndefinedMessage(string name, Scope scope)
+        private static Wording UndefinedMessage(string name, Scope scope)
         {
             string close = Values.Closest(name, scope.Names());
-            return $"${name} is not defined." + (close != null ? $" Did you mean ${close}?" : $" Declare it with <let name=\"{name}\" value=\"...\" />.");
+            return Wording.Of($"${name} is not defined.") + (close != null ? $" Did you mean ${close}?" : Wording.Of($" Declare it with <let name=\"{name}\" value=\"...\" />."));
         }
 
         private bool Matches(object subject, ExprNode pattern, Scope scope, EvalContext ctx)
@@ -381,7 +385,7 @@ namespace KScript.Runtime
                 negated = true;
             }
             if (node is IdentifierNode id && id.Name != "_" && !(ctx.Module != null && ctx.Module.Aliases.ContainsKey(id.Name))
-                && !(!negated && scope.TryGet(id.Name, out object value) && (value is RecordType || value is ErrorType))
+                && !(!negated && scope.TryGet(id.Name, out object value) && value is IDeclaredType)
                 && !(!negated && ErrorTypes.FindExact(id.Name, null) != null))
             {
                 return new BareWord(id.Name, negated, afterNamed);
@@ -536,14 +540,13 @@ namespace KScript.Runtime
                     }
                     catch (KScriptException ex)
                     {
-                        throw Fail(node, ctx, ex.Message, ex.Type);
+                        throw Fail(node, ctx, ex.Words, ex.Type);
                     }
                 case Dictionary<string, object> map:
                     return map.TryGetValue(name, out object v) ? v : null;
-                case List<object> list when name == "count" || name == "length":
-                    return (double)list.Count;
-                case string s when name == "length":
-                    return (double)s.Length;
+                case List<object> or string when name is "count" or "length":
+                    // A list or text has no fields: the number of items or characters is the method, as for a map.
+                    throw Fail(node, ctx, $".{name} isn't a field of {Values.Describe(target)}. The number of {(target is string ? "characters" : "items")} is ->count().", "Name");
                 case ImportNamespace ns:
                     if (ns.TryGet(name, out object member))
                     {
@@ -559,6 +562,10 @@ namespace KScript.Runtime
                     if (obj.TryGetMember(name, out object field)) return field;
                     break;
             }
+            // A field a package gives the type: $response.status, $date.year.
+            if (TryFindField(target, name, ctx.Module, out ValueFieldDefinition definition)) return definition.Handler(target, this);
+            if (TryFindMethod(target, name, ctx.Module, out MethodDefinition asMethod) && asMethod.Receiver != "any")
+                throw Fail(node, ctx, $"{name} is a method of {Values.Describe(target)}, not a field. Call it with ->{name}().", "Name");
             throw Fail(node, ctx, $"{Values.Describe(target)} has no field '{name}'." + (target is string || target is double ? $" To call a method, write ->{name}()." : string.Empty), "Name");
         }
 
@@ -584,6 +591,9 @@ namespace KScript.Runtime
                 }
                 case IKObject obj when obj.TryGetMember(Values.ToStr(key), out object field):
                     return field;
+                // A field a package gives the type, by name: $file['size'].
+                case IKObject when key is string name && TryFindField(target, name, ctx.Module, out ValueFieldDefinition definition):
+                    return definition.Handler(target, this);
             }
             throw Fail(node, ctx, $"Can't index into {Values.Describe(target)}.", "Type");
         }
@@ -618,16 +628,16 @@ namespace KScript.Runtime
             {
                 case MemberNode member:
                 {
-                    object container = Evaluate(member.Target, scope, ctx);
+                    object container = Evaluate(AssignedThrough(member.Target), scope, ctx);
                     if (container is not Dictionary<string, object> map)
-                        throw Fail(member, ctx, $"Only map fields can be set, but {SourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
+                        throw Fail(member, ctx, $"Only map fields can be set, but {ReadSourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
                     if (node.Operator != "=") value = Combine(map.TryGetValue(member.Name, out object cur) ? cur : null, node.Operator, value, node, ctx);
                     SetKey(map, member.Name, value, member, ctx);
                     return;
                 }
                 case IndexNode index:
                 {
-                    object container = Evaluate(index.Target, scope, ctx);
+                    object container = Evaluate(AssignedThrough(index.Target), scope, ctx);
                     object key = Evaluate(index.Index, scope, ctx);
                     switch (container)
                     {
@@ -649,11 +659,33 @@ namespace KScript.Runtime
                             return;
                         }
                     }
-                    throw Fail(index, ctx, $"Only list items and map keys can be set, but {SourceOf(index.Target, ctx)} is {Values.Describe(container)}.", "Type");
+                    throw Fail(index, ctx, $"Only list items and map keys can be set, but {ReadSourceOf(index.Target, ctx)} is {Values.Describe(container)}.", "Type");
                 }
             }
             throw Fail(target, ctx, "Only a variable, a map field or a list item can be assigned to.", "Syntax");
         }
+
+        /// <summary>How an assignment's target is read, for a message: <c>s.a = 1</c> sets a field of <c>$s</c>.</summary>
+        private string ReadSourceOf(ExprNode node, EvalContext ctx)
+        {
+            ExprNode root = node;
+            while (root is MemberNode or IndexNode) root = root is MemberNode m ? m.Target : ((IndexNode)root).Target;
+            return (root is IdentifierNode ? "$" : string.Empty) + SourceOf(node, ctx);
+        }
+
+        /// <summary>
+        /// What a field or item is set on, as an expression to read: the name an assignment starts with is written
+        /// bare (<c>user.name = 'Ada'</c>, <c>totals[0] += 1</c>), and it is the variable.
+        /// </summary>
+        private static ExprNode AssignedThrough(ExprNode node) => node switch
+        {
+            IdentifierNode id => new VariableNode { Name = id.Name, Span = id.Span },
+            MemberNode m when AssignedThrough(m.Target) is ExprNode inner && !ReferenceEquals(inner, m.Target) =>
+                new MemberNode { Target = inner, Name = m.Name, NameSpan = m.NameSpan, NullSafe = m.NullSafe, Span = m.Span },
+            IndexNode i when AssignedThrough(i.Target) is ExprNode inner && !ReferenceEquals(inner, i.Target) =>
+                new IndexNode { Target = inner, Index = i.Index, Span = i.Span },
+            _ => node,
+        };
 
         /// <summary>Sets a map key. A record checks the key is one of its fields and converts the value.</summary>
         private void SetKey(Dictionary<string, object> map, string key, object value, ExprNode node, EvalContext ctx)
@@ -669,7 +701,7 @@ namespace KScript.Runtime
             }
             catch (KScriptException ex)
             {
-                throw Fail(node, ctx, ex.Message, ex.Type);
+                throw Fail(node, ctx, ex.Words, ex.Type);
             }
         }
 
@@ -713,7 +745,7 @@ namespace KScript.Runtime
                 if (module == null || !module.Aliases.TryGetValue(alias, out ImportNamespace ns))
                 {
                     string close = module == null ? null : Values.Closest(alias, module.Aliases.Keys);
-                    throw Fail(node, ctx, $"@{name}: nothing is imported as '{alias}'." + (close != null ? $" Did you mean {close}?" : $" Import it with <import package=\"...\" as=\"{alias}\" /> or <import src=\"...\" as=\"{alias}\" />."), "Name");
+                    throw Fail(node, ctx, Wording.Of($"@{name}: nothing is imported as '{alias}'.") + (close != null ? $" Did you mean {close}?" : Wording.Of($" Import it with <import package=\"...\" as=\"{alias}\" /> or <import path=\"...\" as=\"{alias}\" />.")), "Name");
                 }
                 if (ns.TryGet(member, out object found))
                 {
@@ -727,7 +759,7 @@ namespace KScript.Runtime
             if (module != null && module.Commands.TryGetValue(name, out CommandDefinition command)) return command;
 
             if (Retired.Commands.TryGetValue(name, out var retired))
-                throw Fail(node, ctx, $"@{name}() was removed in KScript 2. {retired.Replacement}", "Retired");
+                throw Fail(node, ctx, $"@{name}() was removed in KScript 2. {Wording.Prose(retired.Replacement)}", "Retired");
 
             KScriptPackage owner = Packages.FindCommand(name, module?.Packages).FirstOrDefault();
             if (owner != null)
@@ -737,18 +769,18 @@ namespace KScript.Runtime
             throw Fail(node, ctx, $"Unknown command @{name}()." + Suggest(name, known).Replace("Did you mean ", "Did you mean @"), "Name");
         }
 
-        private object CallCommand(string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
+        private object CallCommand(string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node, CallSite site = null)
         {
             object target = ResolveCallable(name, scope, ctx, node);
-            return CallResolved(target, name, args, named, scope, ctx, node);
+            return CallResolved(target, name, args, named, scope, ctx, node, site);
         }
 
-        private object CallResolved(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
+        private object CallResolved(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node, CallSite site = null)
         {
             switch (target)
             {
                 case CommandDefinition command:
-                    return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module));
+                    return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module) { Site = site });
                 case ICallable fn:
                     return Call(fn, args, named, scope, ctx.Module);
             }
@@ -757,7 +789,9 @@ namespace KScript.Runtime
 
         internal object InvokeCommand(CommandDefinition command, CallContext call)
         {
+            CallSite site = call.Site;
             call = ArgumentBinder.Bind(command.Info, call);
+            call.Site = site;
             CallableInfoCheck(command.Info, call);
             return command.Handler(call);
         }
@@ -792,8 +826,13 @@ namespace KScript.Runtime
                         }
                         catch (KScriptException ex)
                         {
-                            throw Fail(call, ctx, ex.Message, ex.Type);
+                            throw Fail(call, ctx, ex.Words, ex.Type);
                         }
+                    }
+                    // Repo($data), Repo(name: 'x'), Email('a@b.co'), Size('small'): calling a type makes a value of it.
+                    if (stored is RecordType or RefinedType or EnumType)
+                    {
+                        return Construct(stored, args, named, scope, ctx);
                     }
                     if (piped && Extensions.TryFind(pipedValue, id.Name, ctx.Module, out ExtensionMethod extension))
                     {
@@ -810,14 +849,14 @@ namespace KScript.Runtime
                     }
                     if (ctx.Module != null && ctx.Module.Commands.TryGetValue(id.Name, out CommandDefinition command))
                     {
-                        return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module));
+                        return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module) { Site = piped ? null : new CallSite(call, call.Arguments, ctx) });
                     }
                     if (piped) return InvokeMethod(pipedValue, id.Name, args.Skip(1).ToList(), named, scope, ctx, call);
-                    return CallCommand(id.Name, args, named, scope, ctx, call.Callee);
+                    return CallCommand(id.Name, args, named, scope, ctx, call.Callee, new CallSite(call, call.Arguments, ctx));
                 }
 
                 case MemberNode member when member.Target is IdentifierNode alias && ctx.Module != null && ctx.Module.Aliases.ContainsKey(alias.Name):
-                    return CallCommand(alias.Name + "." + member.Name, args, named, scope, ctx, call.Callee);
+                    return CallCommand(alias.Name + "." + member.Name, args, named, scope, ctx, call.Callee, new CallSite(call, call.Arguments, ctx));
             }
 
             object callee = Evaluate(call.Callee, scope, ctx);
@@ -825,6 +864,25 @@ namespace KScript.Runtime
         }
 
         private static readonly object NotPiped = new object();
+
+        /// <summary>Calling a declared type: a record of a type or model, a checked value of a refined type or an enum.</summary>
+        private object Construct(object type, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx)
+        {
+            named ??= new Dictionary<string, object>();
+            switch (type)
+            {
+                case RecordType record:
+                    return record.Construct(this, args, named);
+                case RefinedType refined:
+                    if (args.Count != 1 || named.Count > 0) throw new KScriptException($"{refined.Name}() takes one value to check: {refined.Name}($value).", "Argument");
+                    return Shapes.Convert(this, args[0], TypeRef.Of(refined), "The value", refined.Closure, refined.Module);
+                case EnumType e:
+                    if (args.Count != 1 || named.Count > 0) throw new KScriptException($"{e.Name}() takes one value to check: {e.Name}($value).", "Argument");
+                    return e.Check(args[0], "The value");
+                default:
+                    throw new KScriptException($"{Values.Describe(type)} can't be called.", "Type");
+            }
+        }
 
         private object EvaluatePipe(PipeNode pipe, Scope scope, EvalContext ctx)
         {
@@ -847,7 +905,7 @@ namespace KScript.Runtime
                 case CallNode call:
                     return EvaluateCall(call, left, scope, ctx);
                 case MethodCallNode:
-                    throw Fail(pipe.Right, ctx, "After |> write the method name without ->: $list |> filter(fn($x) => ...).", "Syntax");
+                    throw Fail(pipe.Right, ctx, "After |> write the method name without ->: $list |> filter(fn(x) => ...).", "Syntax");
             }
             object right = Evaluate(pipe.Right, scope, ctx);
             return CallResolved(right, SourceOf(pipe.Right, ctx), new List<object> { left }, null, scope, ctx, pipe.Right);
@@ -856,6 +914,18 @@ namespace KScript.Runtime
         #endregion
 
         #region Methods
+
+        /// <summary>The field a package adds to values like <paramref name="target"/>: <c>$response.status</c>.</summary>
+        private bool TryFindField(object target, string name, Module module, out ValueFieldDefinition field)
+        {
+            field = null;
+            if (target == null || target is Dictionary<string, object>) return false;
+            string type = Values.TypeOf(target);
+            if (module != null && module.Fields.TryGetValue(type + ":" + name, out field)) return true;
+            // A value can reach a script that doesn't import the package it came from.
+            field = Packages.FindField(type, name);
+            return field != null;
+        }
 
         private bool TryFindMethod(object target, string name, Module module, out MethodDefinition method)
         {
@@ -884,7 +954,7 @@ namespace KScript.Runtime
         /// <summary>A regex, email or UUID written without quotes. One that isn't valid fails at the literal.</summary>
         private object TypedLiteral(LiteralNode lit, EvalContext ctx)
         {
-            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, LiteralKind.Url => "url", _ => SemanticTypes.Uuid };
+            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, LiteralKind.Url => "url", LiteralKind.Duration => Duration.TypeName, _ => SemanticTypes.Uuid };
             if (SemanticTypes.TryConvert(type, lit.Value, out object value, out string reason)) return value;
             throw Fail(lit, ctx, $"{lit.Value} isn't {KScript.Metadata.NativeTypes.Get(type).WithArticle}: {reason}.", "Syntax");
         }
@@ -918,6 +988,9 @@ namespace KScript.Runtime
 
             // A package's methods for its own objects come first, so their arguments are bound by name (and flags) like commands'.
             bool defined = TryFindMethod(target, name, ctx.Module, out MethodDefinition method);
+            // A renamed method says so before its arguments are looked at: User->avg(age) is told about ->average(), not about age.
+            if (!defined && target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
+                throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
             if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             if (target is IKObject obj && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), name, out object result))
             {
@@ -927,6 +1000,9 @@ namespace KScript.Runtime
             {
                 return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             }
+
+            if (TryFindField(target, name, ctx.Module, out _))
+                throw Fail(node, ctx, $"{name} is a field of {Values.Describe(target)}, not a method. Read it with a dot and no brackets: .{name}", "Name");
 
             if (target == null)
                 throw Fail(node, ctx, $"Can't call ->{name}() on null. Use ?? to give a default, such as ($value ?? '')->{name}().", "Null");

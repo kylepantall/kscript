@@ -61,14 +61,14 @@ public class CoreTests
     [Fact]
     public void LetTypeConverts()
     {
-        Assert.Equal("number 42\n", RunBody("<let name=\"n\" value=\"'42'\" type=\"int\" /><echo>{ @type($n) } $n</echo>"));
+        Assert.Equal("number 42\n", RunBody("<let name=\"n\" value=\"'42'\" type=\"int\" /><echo>{ $n->type() } $n</echo>"));
         Assert.Throws<KScriptException>(() => RunBody("<let name=\"n\" value=\"'abc'\" type=\"int\" />"));
     }
 
     [Fact]
     public void DoRunsStatements()
     {
-        Assert.Equal("7\n", RunBody("<let name=\"x\" value=\"0\" /><do>$x = 3; $x += 4</do><echo>$x</echo>"));
+        Assert.Equal("7\n", RunBody("<let name=\"x\" value=\"0\" /><do>x = 3; x += 4</do><echo>$x</echo>"));
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class CoreTests
     [Fact]
     public void ForWithIndex()
     {
-        Assert.Equal("0:a\n1:b\n", RunBody("<for each=\"x\" index=\"i\" in=\"['a', 'b']\"><echo>$i:$x</echo></for>"));
+        Assert.Equal("0:a\n1:b\n", RunBody("<for each=\"x\" at=\"i\" in=\"['a', 'b']\"><echo>$i:$x</echo></for>"));
     }
 
     [Fact]
@@ -169,9 +169,9 @@ public class CoreTests
     [Fact]
     public void LambdasAndListMethods()
     {
-        Assert.Equal("2,4,6\n", RunBody("<echo>{ [1, 2, 3]->map(fn($x) => $x * 2)->join(',') }</echo>"));
-        Assert.Equal("Joan\n", RunBody("<let name=\"people\" value=\"[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]\" /><echo>{ $people->max_by(fn($p) => $p.age).name }</echo>"));
-        Assert.Equal("3\n", RunBody("<echo>{ [1, 2, 3, 4, 5] |> filter(fn($x) => $x gt 2) |> count() }</echo>"));
+        Assert.Equal("2,4,6\n", RunBody("<echo>{ [1, 2, 3]->map(fn(x) => $x * 2)->join(',') }</echo>"));
+        Assert.Equal("Joan\n", RunBody("<let name=\"people\" value=\"[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]\" /><echo>{ $people->max_by(fn(p) => $p.age).name }</echo>"));
+        Assert.Equal("3\n", RunBody("<echo>{ [1, 2, 3, 4, 5] |> filter(fn(x) => $x gt 2) |> count() }</echo>"));
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public class CoreTests
     [Fact]
     public void MarrayBuildsNestedValues()
     {
-        Assert.Equal("1 x\n", RunBody("<marray name=\"cfg\"><item key=\"a\">1</item><item key=\"list\"><item>x</item></item></marray><echo>$cfg.a {$cfg.list[0]}</echo>"));
+        Assert.Equal("1 x\n", RunBody("<collection name=\"cfg\"><item key=\"a\">1</item><item key=\"list\"><item>x</item></item></collection><echo>$cfg.a {$cfg.list[0]}</echo>"));
     }
 
     [Fact]
@@ -249,6 +249,6 @@ public class CoreTests
     [Fact]
     public void StepLimitStopsRunawayLoops()
     {
-        Assert.Throws<KScriptException>(() => Run("<kscript><while test=\"true\"><do>$x = 1</do></while></kscript>", options: new InterpreterOptions { MaxSteps = 1000 }));
+        Assert.Throws<KScriptException>(() => Run("<kscript><while test=\"true\"><do>x = 1</do></while></kscript>", options: new InterpreterOptions { MaxSteps = 1000 }));
     }
 }

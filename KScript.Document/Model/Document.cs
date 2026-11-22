@@ -3,7 +3,7 @@ using KScript.Documents.Maths;
 namespace KScript.Documents
 {
     /// <summary>
-    /// A document: metadata, a page style and a tree of blocks. Scripts build one with a <c>KScript.Document { }</c>
+    /// A document: metadata, a page style and a tree of blocks. Scripts build one with a <c>Document { }</c>
     /// block; the writers in Export/ and Pdf/ turn it into PDF, LaTeX, Word, Markdown or HTML.
     /// </summary>
     public sealed class Document

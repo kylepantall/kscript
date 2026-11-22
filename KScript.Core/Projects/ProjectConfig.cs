@@ -73,7 +73,7 @@ namespace KScript.Projects
 
         public bool WarningsAsErrors { get; set; }
 
-        public static readonly string[] DefaultInclude = { "**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html", "**/*.md" };
+        public static readonly string[] DefaultInclude = { "**/*.kscript", "**/*.ks.xml", "**/*.html", "**/*.md" };
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
     }
 
@@ -108,17 +108,11 @@ namespace KScript.Projects
         public static readonly string[] DatabaseChoices = { "memory", "config" };
 
         public const double DefaultTimeout = 10;
-        public static readonly string[] DefaultInclude = { "**/*.test.kscript", "**/*.test.ks.xml", "**/*.test.xml" };
+        public static readonly string[] DefaultInclude = { "**/*.test.kscript", "**/*.test.ks.xml" };
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
 
-        /// <summary>True for a file named like a test: <c>name.test.kscript</c>, <c>name.test.ks.xml</c> or <c>name.test.xml</c>.</summary>
-        public static bool IsTestFileName(string path)
-        {
-            string name = Path.GetFileName(path ?? string.Empty);
-            return name.EndsWith(".test.kscript", StringComparison.OrdinalIgnoreCase)
-                || name.EndsWith(".test.ks.xml", StringComparison.OrdinalIgnoreCase)
-                || name.EndsWith(".test.xml", StringComparison.OrdinalIgnoreCase);
-        }
+        /// <summary>True for a file named like a test: <c>name.test.kscript</c> or <c>name.test.ks.xml</c>.</summary>
+        public static bool IsTestFileName(string path) => KScript.Syntax.Markup.ScriptFiles.IsTest(path);
     }
 
     /// <summary>The <c>config</c> section: where <c>$config</c> reads a script's settings from.</summary>
@@ -170,21 +164,19 @@ namespace KScript.Projects
 
         public List<string> Exclude { get; set; } = new List<string>(DefaultExclude);
 
-        public static readonly string[] DefaultInclude = { "**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html" };
+        public static readonly string[] DefaultInclude = { "**/*.kscript", "**/*.ks.xml", "**/*.html" };
         public static readonly string[] DefaultExclude = { "_templates", "node_modules", ".git" };
 
         /// <summary>False turns formatting off for the whole project (kscript fmt skips it, the editor makes no changes).</summary>
         public bool Enabled { get; set; } = true;
 
-        /// <summary>Rules turned on or off by name, from "rules": { "statementPerLine": false }. Unlisted rules are on.</summary>
+        /// <summary>Rules turned on or off by name, from "rules": { "statement_per_line": false }. Unlisted rules are on.</summary>
         public Dictionary<string, bool> Rules { get; } = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>The formatter's rules, each of which can be turned off in format.rules.</summary>
-        public static readonly string[] RuleNames =
-        {
-            "indent", "statementPerLine", "tidyTags", "wrapAttributes", "trimTrailingWhitespace", "collapseBlankLines", "finalNewline",
-            "spacing", "braceStyle", "wrapStrings", "wrapChains", "wrapBodies", "wrapComments",
-        };
+        public static readonly string[] RuleNames = KScript.Runtime.Conventions.Settings("format.rules",
+            "indent", "statement_per_line", "tidy_tags", "wrap_attributes", "trim_trailing_whitespace", "collapse_blank_lines", "final_newline",
+            "spacing", "brace_style", "wrap_strings", "wrap_chains", "wrap_bodies", "wrap_comments");
     }
 
     /// <summary>
@@ -196,11 +188,11 @@ namespace KScript.Projects
     ///   "name": "my-site",
     ///   "standard": "kscript:recommended",
     ///   "serve": { "root": ".", "port": 8080, "host": "localhost" },
-    ///   "app": { "main": "app.ks.xml", "name": "My App", "icon": "icon.icns" },
+    ///   "app": { "main": "app.kscript", "name": "My App", "icon": "icon.icns" },
     ///   "lint": {
     ///     "exclude": ["_templates", "drafts/**"],
     ///     "rules": { "KS3003": "off", "KS4*": "error" },
-    ///     "warningsAsErrors": false
+    ///     "warnings_as_errors": false
     ///   }
     /// }
     /// </code>
@@ -241,7 +233,7 @@ namespace KScript.Projects
 
         public static readonly string[] Drivers = { "sync", "memory", "file", "database" };
 
-        public static readonly string[] SettingNames = { "default", "connections", "queues", "failed", "worker", "env" };
+        public static readonly string[] SettingNames = KScript.Runtime.Conventions.Settings("queue", "default", "connections", "queues", "failed", "worker", "env");
 
         /// <summary>The connection jobs use unless they name one.</summary>
         public string Default { get; set; } = "file";
@@ -419,7 +411,7 @@ namespace KScript.Projects
 
         public static readonly string[] SameSiteValues = { "Lax", "Strict", "None" };
 
-        public static readonly string[] SettingNames = { "token_env", "login", "home", "sessions", "folder", "users", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime" };
+        public static readonly string[] SettingNames = KScript.Runtime.Conventions.Settings("auth", "token_env", "login", "home", "sessions", "folder", "users", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime");
     }
 
     public sealed class ProjectConfig
@@ -547,7 +539,7 @@ namespace KScript.Projects
         public static string ScriptName(string path)
         {
             string name = Path.GetFileName(path);
-            string suffix = ScriptSuffixes.FirstOrDefault(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase));
+            string suffix = KScript.Syntax.Markup.ScriptFiles.Extensions.FirstOrDefault(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase));
             return suffix == null ? name : name.Substring(0, name.Length - suffix.Length);
         }
 
@@ -562,19 +554,18 @@ namespace KScript.Projects
             return files.FirstOrDefault(f =>
             {
                 string name = Path.GetFileName(f);
-                string suffix = ScriptSuffixes.FirstOrDefault(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase));
+                string suffix = KScript.Syntax.Markup.ScriptFiles.Extensions.FirstOrDefault(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase));
                 return suffix != null && !TestSettings.IsTestFileName(name) && Plain(name.Substring(0, name.Length - suffix.Length)) == wanted;
             });
         }
 
-        private static readonly string[] ScriptSuffixes = { ".kscript", ".ks.xml", ".ks" };
         private static readonly string[] SkippedFolders = { "node_modules", ".git", "_templates", "bin", "obj" };
 
         /// <summary>True for a file name that can hold a script's extend blocks (and isn't a test).</summary>
         public static bool IsExtensionFileName(string path)
         {
             string name = Path.GetFileName(path ?? string.Empty);
-            return ScriptSuffixes.Any(x => name.EndsWith(x, StringComparison.OrdinalIgnoreCase)) && !TestSettings.IsTestFileName(name);
+            return KScript.Syntax.Markup.ScriptFiles.IsScript(name) && !TestSettings.IsTestFileName(name);
         }
 
         /// <summary>
@@ -1046,13 +1037,14 @@ namespace KScript.Projects
             {
                 switch (p.Name)
                 {
-                    case "format":
-                        string format = String(p.Value, "make.format", config);
+                    case "syntax":
+                        string format = String(p.Value, "make.syntax", config);
                         if (format == MakeSettings.KScriptFormat || format == MakeSettings.XmlFormat) config.Make.Format = format;
-                        else if (format != null) config.Warnings.Add($"make.format should be \"kscript\" or \"xml\", not \"{format}\".");
+                        else if (format != null) config.Warnings.Add($"make.syntax should be \"kscript\" or \"xml\", not \"{format}\".");
                         break;
                     default:
-                        config.Warnings.Add($"unknown setting 'make.{p.Name}' (expected format).");
+                        RefuseRetired("make." + p.Name);
+                        config.Warnings.Add($"unknown setting 'make.{p.Name}' (expected syntax).");
                         break;
                 }
             }
@@ -1194,7 +1186,7 @@ namespace KScript.Projects
                     case "routes":
                         if (p.Value.ValueKind != JsonValueKind.Array)
                         {
-                            config.Warnings.Add("http.routes should be a list of route files, e.g. [\"routes.ks.xml\", { \"file\": \"api.ks.xml\", \"prefix\": \"/api\", \"api\": true }].");
+                            config.Warnings.Add("http.routes should be a list of route files, e.g. [\"routes.kscript\", { \"file\": \"api.kscript\", \"prefix\": \"/api\", \"api\": true }].");
                             break;
                         }
                         http.Routes = new List<HttpSettings.RouteFile>();
@@ -1418,6 +1410,38 @@ namespace KScript.Projects
             }
         }
 
+        /// <summary>
+        /// Settings that were renamed (kscript.json keys are snake_case). An old name is an error that says what to
+        /// write instead, never a second spelling.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> RetiredSettings = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["lint.warningsAsErrors"] = "lint.warnings_as_errors",
+            ["format.tabWidth"] = "format.tab_width",
+            ["format.printWidth"] = "format.print_width",
+            ["format.maxBlankLines"] = "format.max_blank_lines",
+            ["format.endOfLine"] = "format.end_of_line",
+            ["format.rules.statementPerLine"] = "format.rules.statement_per_line",
+            ["format.rules.tidyTags"] = "format.rules.tidy_tags",
+            ["format.rules.wrapAttributes"] = "format.rules.wrap_attributes",
+            ["format.rules.trimTrailingWhitespace"] = "format.rules.trim_trailing_whitespace",
+            ["format.rules.collapseBlankLines"] = "format.rules.collapse_blank_lines",
+            ["format.rules.finalNewline"] = "format.rules.final_newline",
+            ["format.rules.braceStyle"] = "format.rules.brace_style",
+            ["format.rules.wrapStrings"] = "format.rules.wrap_strings",
+            ["format.rules.wrapChains"] = "format.rules.wrap_chains",
+            ["format.rules.wrapBodies"] = "format.rules.wrap_bodies",
+            ["format.rules.wrapComments"] = "format.rules.wrap_comments",
+            ["make.format"] = "make.syntax",
+        };
+
+        /// <summary>Fails with "x was renamed to y" when <paramref name="setting"/> is an old name.</summary>
+        private static void RefuseRetired(string setting)
+        {
+            if (RetiredSettings.TryGetValue(setting, out string now))
+                throw new ProjectConfigException($"'{setting}' was renamed to '{now}'. Settings in kscript.json are written in snake_case.");
+        }
+
         private static void ReadLint(JsonElement e, ProjectConfig config)
         {
             if (!Object(e, "lint", config)) return;
@@ -1437,13 +1461,13 @@ namespace KScript.Projects
                         config.Lint.Exclude = Strings(p.Value, "lint.exclude", config) ?? config.Lint.Exclude;
                         config.Set("lint.exclude");
                         break;
-                    case "warningsAsErrors":
+                    case "warnings_as_errors":
                         if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False)
                         {
                             config.Lint.WarningsAsErrors = p.Value.GetBoolean();
-                            config.Set("lint.warningsAsErrors");
+                            config.Set("lint.warnings_as_errors");
                         }
-                        else config.Warnings.Add($"lint.warningsAsErrors should be true or false.");
+                        else config.Warnings.Add($"lint.warnings_as_errors should be true or false.");
                         break;
                     case "rules":
                         if (!Object(p.Value, "lint.rules", config)) break;
@@ -1460,7 +1484,8 @@ namespace KScript.Projects
                         }
                         break;
                     default:
-                        config.Warnings.Add($"unknown setting 'lint.{p.Name}' (expected include, exclude, rules or warningsAsErrors).");
+                        RefuseRetired("lint." + p.Name);
+                        config.Warnings.Add($"unknown setting 'lint.{p.Name}' (expected include, exclude, rules or warnings_as_errors).");
                         break;
                 }
             }
@@ -1561,22 +1586,22 @@ namespace KScript.Projects
                         }
                         else config.Warnings.Add("format.indent should be a number of spaces from 1 to 16, or \"tab\".");
                         break;
-                    case "tabWidth":
-                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int tab) && tab >= 1 && tab <= 16) { config.Format.IndentSize = tab; config.Set("format.tabWidth"); }
-                        else config.Warnings.Add("format.tabWidth should be a number from 1 to 16.");
+                    case "tab_width":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int tab) && tab >= 1 && tab <= 16) { config.Format.IndentSize = tab; config.Set("format.tab_width"); }
+                        else config.Warnings.Add("format.tab_width should be a number from 1 to 16.");
                         break;
-                    case "printWidth":
-                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int width) && width >= 20) { config.Format.PrintWidth = width; config.Set("format.printWidth"); }
-                        else config.Warnings.Add("format.printWidth should be a number of columns (20 or more).");
+                    case "print_width":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int width) && width >= 20) { config.Format.PrintWidth = width; config.Set("format.print_width"); }
+                        else config.Warnings.Add("format.print_width should be a number of columns (20 or more).");
                         break;
-                    case "maxBlankLines":
-                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int blank) && blank >= 0) { config.Format.MaxBlankLines = blank; config.Set("format.maxBlankLines"); }
-                        else config.Warnings.Add("format.maxBlankLines should be 0 or more.");
+                    case "max_blank_lines":
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int blank) && blank >= 0) { config.Format.MaxBlankLines = blank; config.Set("format.max_blank_lines"); }
+                        else config.Warnings.Add("format.max_blank_lines should be 0 or more.");
                         break;
-                    case "endOfLine":
+                    case "end_of_line":
                         string eol = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString().Trim().ToLowerInvariant() : null;
-                        if (eol == "auto" || eol == "lf" || eol == "crlf") { config.Format.EndOfLine = eol; config.Set("format.endOfLine"); }
-                        else config.Warnings.Add("format.endOfLine should be \"auto\", \"lf\" or \"crlf\".");
+                        if (eol == "auto" || eol == "lf" || eol == "crlf") { config.Format.EndOfLine = eol; config.Set("format.end_of_line"); }
+                        else config.Warnings.Add("format.end_of_line should be \"auto\", \"lf\" or \"crlf\".");
                         break;
                     case "enabled":
                         if (p.Value.ValueKind == JsonValueKind.True || p.Value.ValueKind == JsonValueKind.False) { config.Format.Enabled = p.Value.GetBoolean(); config.Set("format.enabled"); }
@@ -1595,6 +1620,7 @@ namespace KScript.Projects
                                 _ => null,
                             };
                             string known = FormatSettings.RuleNames.FirstOrDefault(n => string.Equals(n, rule.Name, StringComparison.OrdinalIgnoreCase));
+                            if (known == null) RefuseRetired("format.rules." + rule.Name);
                             if (known == null)
                                 config.Warnings.Add($"format.rules: there is no rule '{rule.Name}'. Rules: {string.Join(", ", FormatSettings.RuleNames)}.");
                             else if (on == null)
@@ -1623,7 +1649,8 @@ namespace KScript.Projects
                         config.Set("format.exclude");
                         break;
                     default:
-                        config.Warnings.Add($"unknown setting 'format.{p.Name}' (expected enabled, rules, indent, tabWidth, printWidth, maxBlankLines, endOfLine, preserve, include or exclude).");
+                        RefuseRetired("format." + p.Name);
+                        config.Warnings.Add($"unknown setting 'format.{p.Name}' (expected enabled, rules, indent, tab_width, print_width, max_blank_lines, end_of_line, preserve, include or exclude).");
                         break;
                 }
             }

@@ -454,7 +454,7 @@ namespace KScript.Data.Migrations
 
         public void Open(string element, params (string Name, string Value)[] args)
         {
-            Line(Call(element, args) + " {");
+            Line((args.Length == 0 ? element : Call(element, args)) + " {");
             depth++;
         }
 
@@ -471,23 +471,28 @@ namespace KScript.Data.Migrations
         {
             var w = new MigrationWriter();
             if (comment != null) w.Line("// " + comment);
-            w.Open("KScript.Migration");
+            w.Line("import KScript.Data");
+            w.Line(string.Empty);
+            w.Open("Migration");
             foreach (Step step in steps) step.Write(w);
             w.Close();
             return w.ToString();
         }
 
         public static string Call(string element, params (string Name, string Value)[] args) =>
-            args.Length == 0 ? element + (element.StartsWith("KScript.", StringComparison.Ordinal) ? string.Empty : "()") : element + "(" + string.Join(", ", args.Select(a => a.Value == null ? a.Name : a.Name + ": " + a.Value)) + ")";
+            args.Length == 0 ? element + "()" : element + "(" + string.Join(", ", args.Select(a => a.Value == null ? a.Name : a.Name + ": " + a.Value)) + ")";
 
-        /// <summary>A table or column name: bare when it is a word, else in quotes.</summary>
-        public static string Name(string name) =>
+        /// <summary>A table or column name as an argument's value: text, so in quotes.</summary>
+        public static string Name(string name) => Text(name);
+
+        /// <summary>A name in a list of names ([status, created_at]): bare when it is a word, else in quotes.</summary>
+        private static string Word(string name) =>
             name.Length > 0 && (char.IsLetter(name[0]) || name[0] == '_') && name.All(ch => char.IsLetterOrDigit(ch) || ch == '_') ? name : Text(name);
 
         /// <summary>Text as a migration writes it: 'single quotes', which are taken as written, or "double quotes" for text with a ' in it.</summary>
         public static string Text(string text) => text.Contains('\'') ? "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"" : "'" + text + "'";
 
-        public static string List(IEnumerable<string> names) => "[" + string.Join(", ", names.Select(Name)) + "]";
+        public static string List(IEnumerable<string> names) => "[" + string.Join(", ", names.Select(Word)) + "]";
 
         public static (string, string)[] IndexArgs(string table, TableIndex index)
         {

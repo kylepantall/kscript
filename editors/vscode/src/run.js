@@ -30,13 +30,13 @@ function parseRunError(output) {
 
 /** Where a new, unsaved script is written so it can run: the editor's name for it, with the extension its language needs. */
 function untitledPath(name, languageId, tmp = os.tmpdir()) {
-  const base = String(name || 'Untitled').replace(/[^\w.-]+/g, '-').replace(/\.(kscript|ks\.xml|xml)$/i, '') || 'Untitled';
+  const base = String(name || 'Untitled').replace(/[^\w.-]+/g, '-').replace(/\.(kscript|ks\.xml)$/i, '') || 'Untitled';
   return path.join(tmp, 'kscript-untitled', base + (languageId === 'kscript' ? '.ks.xml' : '.kscript'));
 }
 
-/** True for name.test.kscript, name.test.ks.xml and name.test.xml: files `kscript test` runs. */
+/** True for name.test.kscript and name.test.ks.xml: files `kscript test` runs. */
 function isTestFile(file) {
-  return /\.test\.(kscript|ks\.xml|xml)$/i.test(String(file));
+  return /\.test\.(kscript|ks\.xml)$/i.test(String(file));
 }
 
 function decode(text) {

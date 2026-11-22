@@ -21,15 +21,11 @@ namespace KScript.Language.Tests
             enum Role { member, admin }
 
             /// Someone who can sign in.
-            model User {
-              timestamps: yes
-              soft_deletes: yes
-              unique: [email]
-              hidden: [password]
+            model User(timestamps, soft_deletes, unique: [email], hidden: [password]) {
               name: string
               email: email
               role: Role = 'member'
-              password: password?
+              password?: password
 
               fn label() => $name + ' <' + $email + '>'
             }
@@ -40,24 +36,24 @@ namespace KScript.Language.Tests
         public void ModelsAreTypesWithQueryMethods()
         {
             DocumentAnalysis a = Code(Users + """
-                $db->create_table($User)
-                u = $User->create(name: 'Ada', email: 'ada@example.com')
+                $db->create_table(User)
+                u = User->create(name: 'Ada', email: 'ada@example.com')
                 $u->save()
                 echo $u->label()
                 echo [$u.id, $u.created_at, $u.updated_at, $u.deleted_at]
-                adults = $User->where(role: admin, name: ['a', 'b'])->or_where(fn($x) => $x.name->starts_with('A'))->order_by(name: desc, email)->get()
+                adults = User->where(role: admin, name: ['a', 'b'])->or_where(fn(x) => $x.name->starts_with('A'))->order_by(name: desc, email)->get()
                 for one in $adults {
                   echo $one.name
                   $one->delete()
                 }
-                first = $User->where(role: member)->first()
+                first = User->where(role: member)->first()
                 echo $first.email
-                echo $User->pluck(email)
-                echo $User->find_or_fail(1).name
-                echo $User->paginate(10).items
-                q = $User->query()
+                echo User->pluck(email)
+                echo User->find_or_fail(1).name
+                echo User->paginate(10).items
+                q = User->query()
                 echo $q->count()
-                echo $User->all()->count()
+                echo User->all()->count()
                 email = 'ada@example.com'
                 limit = 3
                 echo @sql("select * from users where email = {$email} and id > {{ 1 }}")
@@ -67,7 +63,7 @@ namespace KScript.Language.Tests
                 echo @db(users)->where(name: 'Ada')->get()
                 echo @db(connection: main)->tables()
                 transaction {
-                  $User->where(name: 'Ada')->update(name: 'Ada L')
+                  User->where(name: 'Ada')->update(name: 'Ada L')
                 }
                 """);
             TestHelpers.AssertClean(a);
@@ -77,10 +73,10 @@ namespace KScript.Language.Tests
         public void MistakesOnModelsAndRecordsAreFound()
         {
             DocumentAnalysis a = Code(Users + """
-                u = $User->find(1)
+                u = User->find(1)
                 echo $u.nme
-                echo $User->wher(name: 'x')
-                echo $User->where(name: 'x')->frist()
+                echo User->wher(name: 'x')
+                echo User->where(name: 'x')->frist()
                 """);
             Assert.Contains(a.Diagnostics, d => d.Message.Contains("User has no field 'nme'"));
             Assert.Contains(a.Diagnostics, d => d.Message.Contains("Unknown method ->wher()"));
@@ -93,11 +89,10 @@ namespace KScript.Language.Tests
             DocumentAnalysis a = Code("""
                 import KScript.Data
 
-                model Country {
-                  key: code
+                model Country(key: 'code') {
                   code: string
                 }
-                c = $Country->find('nz')
+                c = Country->find('nz')
                 echo $c.code
                 echo $c.id
                 """);
@@ -107,9 +102,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void HoverShowsTheModel()
         {
-            string text = Users + "q = $User->where(name: 'x')\necho $q\n";
+            string text = Users + "q = User->where(name: 'x')\necho $q\n";
             DocumentAnalysis a = Service.Analyze(text, Path.Combine(Folder, "app.kscript"));
-            string hover = Service.GetHover(a, text.IndexOf("$User->where", StringComparison.Ordinal) + 2).Markdown;
+            string hover = Service.GetHover(a, text.IndexOf("User->where", StringComparison.Ordinal) + 2).Markdown;
             Assert.Contains("model User {", hover);
             Assert.Contains("created_at", hover);
             string query = Service.GetHover(a, text.LastIndexOf("$q", StringComparison.Ordinal) + 1).Markdown;
@@ -131,7 +126,7 @@ namespace KScript.Language.Tests
                 import KScript.Data
                 import "user.ks.xml"
 
-                echo $User->first().name
+                echo User->first().name
                 """, files);
             TestHelpers.AssertClean(a);
             DocumentAnalysis xml = TestHelpers.WithoutUnused(Analyzer.Analyze(files.ReadText(Path.Combine(Folder, "user.ks.xml")), Path.Combine(Folder, "user.ks.xml"), files));
@@ -145,11 +140,7 @@ namespace KScript.Language.Tests
             const string code = """
                 import KScript.Data
 
-                model Post(table: posts) {
-                  timestamps: yes
-                  unique: [slug, [team, slug]]
-                  index: [team]
-                  guarded: [team]
+                model Post(table: 'posts', timestamps, unique: [slug, [team, slug]], index: [team], guarded: [team]) {
                   slug: string
                   team: int
                 }
@@ -157,15 +148,16 @@ namespace KScript.Language.Tests
             MarkupDocument doc = CodeParser.Parse(code);
             Assert.DoesNotContain(doc.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
             MarkupElement model = doc.RootElements.Single().ChildElements.Single(e => e.Name == "model");
-            Assert.Equal("posts", model.GetAttributeValue("table"));
+            Assert.Equal("'posts'", model.GetAttributeValue("table"));
             Assert.Equal("yes", model.GetAttributeValue("timestamps"));
             Assert.Equal("[slug, [team, slug]]", model.GetAttributeValue("unique"));
 
             string xml = ScriptConverter.Convert(code, "post.kscript").Text;
             Assert.Contains("<model name=\"Post\" table=\"posts\" timestamps=\"yes\" unique=\"[slug, [team, slug]]\" index=\"[team]\" guarded=\"[team]\">", xml);
             string back = ScriptConverter.Convert(xml, "post.ks.xml").Text;
-            Assert.Contains("model Post {\n  table: posts\n  timestamps: yes\n  unique: [slug, [team, slug]]\n  index: [team]\n  guarded: [team]\n  slug: string", back);
-            Assert.Contains("model User {\n  hidden: [password]", ScriptConverter.Convert("<kscript><import package=\"KScript.Data\" /><model name=\"User\" hidden=\"password\" fields=\"name: string, password: password\" /></kscript>", "u.ks.xml").Text);
+            // Options go in the brackets, whichever way the file was written.
+            Assert.Contains("model Post(table: \"posts\", timestamps, unique: [slug, [team, slug]], index: [team], guarded: [team]) {\n  slug: string", back);
+            Assert.Contains("model User(hidden: [password]) {\n  name: string", ScriptConverter.Convert("<kscript><import package=\"KScript.Data\" /><model name=\"User\" hidden=\"password\" fields=\"name: string, password: password\" /></kscript>", "u.ks.xml").Text);
 
             MarkupDocument twice = CodeParser.Parse("model A {\n  timestamps: yes\n  timestamps: no\n  name: string\n}\n");
             Assert.Contains(twice.Diagnostics, d => d.Message == "This model already sets timestamps.");
@@ -177,7 +169,7 @@ namespace KScript.Language.Tests
             model User {
               name: string
               posts: Post[](by: author)
-              profile: Profile?
+              profile?: Profile
             }
 
             model Profile {
@@ -205,28 +197,28 @@ namespace KScript.Language.Tests
         public void RelationsAreFieldsMethodsAndColumns()
         {
             DocumentAnalysis a = Code(Blog + """
-                u = $User->find(1)
-                echo $u.posts->map(fn($p) => $p.title)
+                u = User->find(1)
+                echo $u.posts->map(fn(p) => $p.title)
                 echo $u.profile.bio
                 echo $u.posts_count
-                p = $Post->first()
+                p = Post->first()
                 echo [$p.author.name, $p.author_id]
                 q = $u->posts()->where(published: true)
                 echo $q->first().title
                 echo $u->posts()->create(title: 'x').author.name
                 echo $p->tags()->attach([1, 2])
-                echo $Post->drafts()->popular(5)->with(author, tags, author.posts)->with_count(tags)->get()
-                echo $Post->where(fn($x) => $x.author.name == 'Ada')->drafts()->first().title
+                echo Post->drafts()->popular(5)->with(author, tags, author.posts)->with_count(tags)->get()
+                echo Post->where(fn(x) => $x.author.name == 'Ada')->drafts()->first().title
                 echo $p->load(author).title
                 """);
             TestHelpers.AssertClean(a);
 
             DocumentAnalysis wrong = Code(Blog + """
-                u = $User->find(1)
+                u = User->find(1)
                 echo $u.profile_id
                 echo $u->postz()
-                echo $Post->popular(1, 2, 3)
-                echo $Post->draftz()
+                echo Post->popular(1, 2, 3)
+                echo Post->draftz()
                 echo @len(author.posts)
                 """);
             Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("User has no field 'profile_id'"));
@@ -246,10 +238,10 @@ namespace KScript.Language.Tests
                   name: string
                   posts: Post[]
                   badges: Badge[]
-                  self: User?
+                  self?: User
                 }
 
-                u = $User->first()
+                u = User->first()
                 echo $u.posts[0].author.name
                 echo $u->posts()->count()
                 echo $u.posts[0]->publish()
@@ -298,11 +290,11 @@ namespace KScript.Language.Tests
                   title: string
                   views: int = 0
 
-                  fn popular(query, at_least: int = 10) => $query->where(fn($p) => $p.views >= $at_least)
+                  fn popular(query, at_least: int = 10) => $query->where(fn(p) => $p.views >= $at_least)
                   fn unused(query) => $query
                 }
 
-                echo $Post->popular()->count()
+                echo Post->popular()->count()
                 """;
             DocumentAnalysis a = Analyzer.Analyze(post, Path.Combine(Folder, "app.kscript"), EmptyFileSystem.Instance);
             Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.MissingParameterType);
@@ -321,20 +313,20 @@ namespace KScript.Language.Tests
                 import KScript.Data
 
                 Migration {
-                  CreateTable(name: teams) {
-                    Field(name: id, type: int, key, auto)
-                    Field(name: name, type: string, max: 40)
+                  CreateTable(name: 'teams') {
+                    Field(name: 'id', type: int, key, auto)
+                    Field(name: 'name', type: string, max: 40)
                     Index(columns: [name], unique)
                   }
-                  AddField(table: teams, name: size, type: int, default: 0)
+                  AddField(table: 'teams', name: 'size', type: int, default: 0)
                   Down {
-                    DropTable(name: teams)
+                    DropTable(name: 'teams')
                   }
                 }
                 """);
             TestHelpers.AssertClean(a);
 
-            DocumentAnalysis outside = Code("import KScript.Data\n\nField(name: x, type: string)\n");
+            DocumentAnalysis outside = Code("import KScript.Data\n\nField(name: 'x', type: string)\n");
             Assert.Contains(outside.Diagnostics, d => d.Code == "KS3007" && d.Message.Contains("inside CreateTable", StringComparison.Ordinal));
 
             DocumentAnalysis xml = TestHelpers.WithoutUnused(Analyzer.Analyze(
@@ -348,12 +340,12 @@ namespace KScript.Language.Tests
         {
             DocumentAnalysis a = Code(Users + """
                 try {
-                  $User->find_or_fail(1)
+                  User->find_or_fail(1)
                 } catch ModelNotFound as e {
                   echo $e.message
                 } catch UniqueViolation {
                   echo 'taken'
-                } catch QueryError {
+                } catch Query {
                   echo 'query'
                 }
                 """);
@@ -368,8 +360,7 @@ namespace KScript.Language.Tests
               posts: Post[]
             }
 
-            model Post {
-              soft_deletes: yes
+            model Post(soft_deletes) {
               title: string
               views: int = 0
               author: Author
@@ -388,11 +379,11 @@ namespace KScript.Language.Tests
         public void ColumnsAreCheckedAndCompleted()
         {
             DocumentAnalysis a = Code(Shop + """
-                echo $Post->where(titel: 'x', views: 1)->order_by(veiws, title: desc)->with(autor, author.posts)->get()
-                echo $Post->where(fn($p) => $p.titel == 'x')->pluck(title)
-                echo $Author->create(nme: 'Joan')
-                echo $Post->fake_many(2, count: 3)
-                echo $Post->latest(xyz)->first()
+                echo Post->where(titel: 'x', views: 1)->order_by(veiws, title: desc)->with(autor, author.posts)->get()
+                echo Post->where(fn(p) => $p.titel == 'x')->pluck(title)
+                echo Author->create(nme: 'Joan')
+                echo Post->fake_many(2, count: 3)
+                echo Post->latest(xyz)->first()
                 """);
             string[] messages = a.Diagnostics.Where(d => d.Code is "KS5013" or "KS5010").Select(d => d.Code + " " + d.Message).ToArray();
             Assert.Contains("KS5013 Post has no field 'titel'. Did you mean title?", messages);
@@ -404,13 +395,13 @@ namespace KScript.Language.Tests
             Assert.Equal(6, messages.Length);
             Assert.Contains(a.Diagnostics, d => d.Code == "KS5013" && d.Fixes?.Count > 0);
 
-            List<string> where = Labels(Shop + "echo $Post->where(‸)");
+            List<string> where = Labels(Shop + "echo Post->where(‸)");
             Assert.Equal(new[] { "author_id:", "deleted_at:", "id:", "title:", "views:" }, where.Take(5).OrderBy(l => l, StringComparer.Ordinal));
-            Assert.DoesNotContain("title:", Labels(Shop + "echo $Post->where(title: 'x', ‸)"));
-            Assert.Contains("views", Labels(Shop + "echo $Post->order_by(‸)"));
-            Assert.Equal("author", Labels(Shop + "echo $Post->with(‸)")[0]);
-            Assert.Contains("title", Labels(Shop + "echo $Post->where(fn($p) => $p.‸)"));
-            Assert.DoesNotContain("title:", Labels(Shop + "echo $Post->paginate(‸)"));
+            Assert.DoesNotContain("title:", Labels(Shop + "echo Post->where(title: 'x', ‸)"));
+            Assert.Contains("views", Labels(Shop + "echo Post->order_by(‸)"));
+            Assert.Equal("author", Labels(Shop + "echo Post->with(‸)")[0]);
+            Assert.Contains("title", Labels(Shop + "echo Post->where(fn(p) => $p.‸)"));
+            Assert.DoesNotContain("title:", Labels(Shop + "echo Post->paginate(‸)"));
             Assert.DoesNotContain("title:", Labels("echo [1]->map(‸)"));
         }
 
@@ -427,22 +418,22 @@ namespace KScript.Language.Tests
             }
 
             Assert.Equal("SELECT * FROM posts\nWHERE title = ? AND views IN (…) AND deleted_at IS NULL\nORDER BY views, title DESC\nLIMIT ? OFFSET ?",
-                Sql("echo $Post->where(title: 'x', views: [1])->order_by(views, title: desc)->limit(2)->offset(4)->get()", "->get"));
+                Sql("echo Post->where(title: 'x', views: [1])->order_by(views, title: desc)->limit(2)->offset(4)->get()", "->get"));
             Assert.Equal("SELECT * FROM posts\nWHERE ((title LIKE ? OR views > ?) AND NOT (author_id IS NULL) OR UPPER(title) <> ?) AND deleted_at IS NULL\nORDER BY id DESC\nLIMIT 1",
-                Sql("echo $Post->where(fn($p) => ($p.title->starts_with('A') or $p.views > 3) and not ($p.author_id == null) or $p.title->upper() != $x)->latest()->first()", "->first"));
+                Sql("echo Post->where(fn(p) => ($p.title->starts_with('A') or $p.views > 3) and not ($p.author_id == null) or $p.title->upper() != $x)->latest()->first()", "->first"));
             Assert.Equal("SELECT DISTINCT COUNT(*) FROM posts\nWHERE (author_id IS NOT NULL OR …) AND deleted_at IS NOT NULL",
-                Sql("echo $Post->where(fn($p) => $p.author_id != null)->or_where(fn($a, $b) => 1)->only_trashed()->distinct()->count()", "->count"));
+                Sql("echo Post->where(fn(p) => $p.author_id != null)->or_where(fn(a, b) => 1)->only_trashed()->distinct()->count()", "->count"));
             Assert.Equal("SELECT title FROM authors\nWHERE NOT (name IS NULL AND …) AND id = ?\nLIMIT 1\n-- then one query for posts.author",
-                Sql("echo $Author->select(title)->where_not(name: null, fn($a) => $a.name->trim())->with(posts.author)->find(1)", "->find"));
+                Sql("echo Author->select(title)->where_not(name: null, fn(a) => $a.name->trim())->with(posts.author)->find(1)", "->find"));
             Assert.Equal("SELECT SUM(views) FROM posts\nORDER BY id ASC",
-                Sql("echo $Post->with_trashed()->oldest()->sum(views)", "->sum"));
-            Assert.Equal("SELECT 1 FROM authors\nLIMIT 1", Sql("echo $Author->exists()", "->exists"));
-            Assert.Equal("SELECT MAX(…) FROM authors", Sql("echo $Author->select($x)->max()", "->max"));
-            Assert.Equal("SELECT name FROM authors\nWHERE …", Sql("echo $Author->where()->pluck('name')", "->pluck"));
-            Assert.Null(Sql("p = $Post->first()\necho $p->posts()->count()", "->count"));
+                Sql("echo Post->with_trashed()->oldest()->sum(views)", "->sum"));
+            Assert.Equal("SELECT 1 FROM authors\nLIMIT 1", Sql("echo Author->exists()", "->exists"));
+            Assert.Equal("SELECT MAX(…) FROM authors", Sql("echo Author->select($x)->max()", "->max"));
+            Assert.Equal("SELECT name FROM authors\nWHERE …", Sql("echo Author->where()->pluck('name')", "->pluck"));
+            Assert.Null(Sql("p = Post->first()\necho $p->posts()->count()", "->count"));
             Assert.Null(Sql("echo [1, 2]->count()", "->count"));
             Assert.Null(Sql("echo $db->tables()", "->tables"));
-            Assert.Equal("SELECT * FROM posts\nWHERE … AND deleted_at IS NULL", Sql("echo $Post->where(fn($p) => [1])->get()", "->get"));
+            Assert.Equal("SELECT * FROM posts\nWHERE … AND deleted_at IS NULL", Sql("echo Post->where(fn(p) => [1])->get()", "->get"));
         }
 
         [Fact]
@@ -463,22 +454,22 @@ namespace KScript.Language.Tests
                 Assert.DoesNotContain(Check(model).Diagnostics, d => d.Code == "KS5014");
 
                 string migration = Path.Combine(root, "database", "migrations", "2026_01_01_000000_notes.kscript");
-                File.WriteAllText(migration, "KScript.Migration {\n  CreateTable(name: notes) {\n    Field(name: id, type: int, key, auto)\n  }\n}\n");
+                File.WriteAllText(migration, "import KScript.Data\n\nMigration {\n  CreateTable(name: 'notes') {\n    Field(name: 'id', type: int, key, auto)\n  }\n}\n");
                 Diagnostic drift = Assert.Single(Check(model).Diagnostics, d => d.Code == "KS5014");
                 Assert.Equal("The migrations don't make Note's table as it is now: it needs a migration to add field notes.body. Run kscript db diff to write it.", drift.Message);
                 Assert.Equal("Note", model.Substring(drift.Span.Start, drift.Span.Length));
 
                 // The same files give the same answer without running them again; a changed one is read again.
                 Assert.Single(Check(model).Diagnostics, d => d.Code == "KS5014");
-                File.WriteAllText(migration, "KScript.Migration {\n  CreateTable(name: notes) {\n    Field(name: id, type: int, key, auto)\n    Field(name: body, type: string)\n  }\n}\n");
+                File.WriteAllText(migration, "import KScript.Data\n\nMigration {\n  CreateTable(name: 'notes') {\n    Field(name: 'id', type: int, key, auto)\n    Field(name: 'body', type: string)\n  }\n}\n");
                 File.SetLastWriteTimeUtc(migration, DateTime.UtcNow.AddMinutes(1));
                 Assert.DoesNotContain(Check(model).Diagnostics, d => d.Code == "KS5014");
 
                 // Two changes, a migration that can't run, and a file that isn't in a project.
-                File.WriteAllText(migration, "KScript.Migration {\n  CreateTable(name: notes) {\n    Field(name: id, type: int, key, auto)\n    Field(name: old, type: string)\n  }\n}\n");
+                File.WriteAllText(migration, "import KScript.Data\n\nMigration {\n  CreateTable(name: 'notes') {\n    Field(name: 'id', type: int, key, auto)\n    Field(name: 'old', type: string)\n  }\n}\n");
                 File.SetLastWriteTimeUtc(migration, DateTime.UtcNow.AddMinutes(2));
                 Assert.Contains("and 1 more change", Assert.Single(Check(model).Diagnostics, d => d.Code == "KS5014").Message);
-                File.WriteAllText(migration, "KScript.Migration {\n  DropTable(name: nope)\n}\n");
+                File.WriteAllText(migration, "import KScript.Data\n\nMigration {\n  DropTable(name: 'nope')\n}\n");
                 File.SetLastWriteTimeUtc(migration, DateTime.UtcNow.AddMinutes(3));
                 Assert.DoesNotContain(Check(model).Diagnostics, d => d.Code == "KS5014");
                 File.WriteAllText(Path.Combine(root, "kscript.json"), "{ \"name\": ");

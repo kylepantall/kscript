@@ -1,3 +1,4 @@
+using KScript.Syntax.Text;
 namespace KScript.Syntax.Markup
 {
     /// <summary>
@@ -16,13 +17,13 @@ namespace KScript.Syntax.Markup
         /// <summary>The attribute a shorthand start tag fills in for an element, or null if it has no shorthand.</summary>
         public static string AttributeFor(string element) => element switch
         {
-            "if" or "elif" or "while" or "assert" => "test",
+            "if" or "elif" or "while" => "test",
             "match" => "value",
             _ => null,
         };
 
         /// <summary>The elements that have a shorthand start tag.</summary>
-        public static IReadOnlyList<string> Elements { get; } = new[] { "if", "elif", "while", "match", "assert" };
+        public static IReadOnlyList<string> Elements { get; } = new[] { "if", "elif", "while", "match" };
 
         /// <summary>The result of <see cref="Scan"/>.</summary>
         public readonly struct Head
@@ -76,7 +77,7 @@ namespace KScript.Syntax.Markup
                 char c = text[i];
                 if (c == '\'' || c == '"')
                 {
-                    int close = text.IndexOf(c, i + 1);
+                    int close = Quotes.Close(text, i, text.Length);
                     i = close < 0 ? text.Length : close + 1;
                     continue;
                 }

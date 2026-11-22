@@ -33,11 +33,11 @@ namespace KScript.Language.Tests
         public void A_test_file_offers_the_test_statements_before_those()
         {
             List<string> labels = Labels("‸", "cart.test.kscript");
-            Assert.Equal(new[] { "test", "expect", "describe", "expect-error", "echo", "if" }, labels.Take(6));
+            Assert.Equal(new[] { "test", "expect", "describe", "expect_error", "echo", "if" }, labels.Take(6));
         }
 
         [Theory]
-        [InlineData("name = 'Joan'\necho $name->‸", "length", "upper", "lower", "trim")]
+        [InlineData("name = 'Joan'\necho $name->‸", "count", "upper", "lower", "trim")]
         [InlineData("items = [1, 2]\necho $items->‸", "count", "map", "filter", "first")]
         [InlineData("user = { name: 'Joan' }\necho $user->‸", "keys", "values", "has", "get")]
         [InlineData("n = 4.5\necho $n->‸", "round", "format", "abs", "floor")]
@@ -95,7 +95,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Arithmetic_on_a_function_says_what_it_is()
         {
-            DocumentAnalysis a = Service.Analyze("echo 5 - (fn($n) => $n)\n", "test.kscript");
+            DocumentAnalysis a = Service.Analyze("echo 5 - (fn(n) => $n)\n", "test.kscript");
             Assert.Contains(a.Diagnostics, d => d.Message.Contains("this is a function", StringComparison.Ordinal));
         }
 
@@ -131,7 +131,7 @@ namespace KScript.Language.Tests
         {
             // 'ab' * 3 repeats the text, so the result has text's methods.
             Assert.Contains("upper", Labels("line = '-' * 20\necho $line->‸"));
-            Assert.Equal("length", Labels("line = '-' * 20\necho $line->‸")[0]);
+            Assert.Equal("count", Labels("line = '-' * 20\necho $line->‸")[0]);
         }
 
         [Fact]

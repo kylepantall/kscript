@@ -1,0 +1,107 @@
+import KScript.IO
+
+// Expressions, interpolation and variables
+n = 3
+name = 'Kyle'
+if $n < 10 and $name != '' {
+  echo "{ $n == 1 ? 'item' : 'items' }"
+}
+price = 2.5
+qty = 4
+total = 0
+total = $total + $price * $qty
+total += 1
+x = 3
+x += 1
+x = 3
+total += $price * $qty
+echo "$x $total"
+const config = { debug: false, retries: 3 }
+echo "Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for \
+  braces."
+
+// Lists, maps, lambdas and pipes
+colours = ['red', 'green', 'blue']
+echo $colours[1]
+person = { name: 'Joan', age: 82 }
+echo "$person.name is { $person['age'] }"
+people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
+names = $people
+  |> filter(fn(p) => $p.age >= 18)
+  |> map(fn(p) => $p.name)
+  |> join(', ')
+by_age = fn(a, b) => $a.age - $b.age
+sorted = $people->sort($by_age)
+echo "Youngest: {$sorted[0].name}"
+echo $names |> lower() |> @greet('Hi')
+
+// Loops
+for i in 0..10 {
+  echo $i
+}
+for i in 0..100 step 5 {
+  echo $i
+}
+for item at k in $colours {
+  echo "$k: $item"
+}
+for key, value in $config {
+  echo "$key = $value"
+}
+while $n < 3 {
+  n += 1
+}
+
+// Branches
+score = 80
+if $score >= 90 {
+  echo "A"
+} elif $score >= 75 {
+  echo "B"
+} else {
+  echo "C"
+}
+choice = 2
+match $choice {
+  1 => @greet('settings')
+  2, 3 => {
+    echo "Coming soon"
+  }
+  _ when $choice > 9 => echo "Out of range"
+  _ => echo "Unknown option"
+}
+label = match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }
+echo $label
+
+// Functions
+fn greet(who: string, greeting = 'Hello') {
+  return $greeting + ', ' + $who + '!'
+}
+fn double(x: int) => $x * 2
+echo @greet('World')
+echo "{ 'Kyle' |> @greet('Hi') } { @double(4) }"
+
+// Errors
+path = 'data.json'
+try {
+  data = @read_text($path) |> json()
+  echo $data
+} catch FileNotFound {
+  echo "No file at {$path}, using defaults."
+} catch err {
+  echo "Failed: {$err.message} (line {$err.line})"
+} finally {
+  echo "done"
+}
+age = -1
+try {
+  if $age < 0 {
+    throw Validation "Age must be positive, got {$age}"
+  }
+} catch Validation as err {
+  echo "{$err.type}: {$err.message}"
+}
+
+// Null handling and membership
+user = null
+echo "{ $user?.name ?? 'guest' } { '.cs' in ['.cs', '.xml'] }"

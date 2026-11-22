@@ -74,7 +74,7 @@ namespace KScript.Syntax
         public const string StatementSyntax = "KS2003";
         public const string BareIdentifier = "KS2004";
 
-        /// <summary>Text used as a value that holds <c>$name</c> or <c>{ }</c>: only templates (after echo, element text) fill those in.</summary>
+        /// <summary>A 'single quoted' string that holds <c>$name</c> or <c>{ }</c>: single quotes keep text as written, double quotes fill it in.</summary>
         public const string TextNotFilledIn = "KS2005";
 
         public const string UnknownElement = "KS3001";
@@ -102,16 +102,17 @@ namespace KScript.Syntax
         public const string UnknownMethod = "KS5003";
         public const string ArgumentCount = "KS5004";
         public const string TypeMismatch = "KS5005";
+        /// <summary>An element or command the catalog describes but no package runs yet (render, on, @dom).</summary>
         public const string PlannedFeature = "KS5006";
         public const string UnknownParameter = "KS5007";
         public const string NamedArgument = "KS5008";
         public const string InvalidArgumentValue = "KS5009";
         public const string UnknownField = "KS5010";
-        /// <summary>A literal that can't be the type it is written for: a bad email, an Age of 200, a word not in an enum.</summary>
-        public const string InvalidTypedValue = "KS5012";
-
         /// <summary>A catch, throw or extends that names an error type nobody declared.</summary>
         public const string UnknownErrorType = "KS5011";
+
+        /// <summary>A literal that can't be the type it is written for: a bad email, an Age of 200, a word not in an enum.</summary>
+        public const string InvalidTypedValue = "KS5012";
 
         /// <summary>A KScript.Data query, create or update that names a column the model doesn't have.</summary>
         public const string UnknownColumn = "KS5013";
@@ -142,6 +143,27 @@ namespace KScript.Syntax
 
         /// <summary>A script in a project that declares more than one type, model, enum or error type: each goes in its own file.</summary>
         public const string OneTypePerFile = "KS6008";
+
+        /// <summary>Text given to a .kscript argument as a bare word; text goes in quotes: <c>title: "Report"</c>.</summary>
+        public const string QuoteText = "KS6009";
+
+        /// <summary>An assignment or lambda parameter written with <c>$</c>; names are declared bare: <c>total = 3</c>, <c>fn(n) =&gt; $n * 2</c>.</summary>
+        public const string BareDeclaration = "KS6010";
+
+        /// <summary>yes/no (or on/off) in a .kscript file; booleans are <c>true</c> and <c>false</c>.</summary>
+        public const string BoolWords = "KS6011";
+
+        /// <summary>A second spelling the parser accepts: <c>else if</c>, <c>key = value</c> in arguments, <c>catch A, B</c>, <c>lt</c>/<c>gt</c> for comparisons in .kscript.</summary>
+        public const string OneSpelling = "KS6012";
+
+        /// <summary>A name that doesn't follow the naming rules: snake_case for functions, variables, fields and arguments; PascalCase for types.</summary>
+        public const string NamingStyle = "KS6013";
+
+        /// <summary>A type name written with <c>$</c> (<c>$Repo</c>), or an optional field marked on its type (<c>age: int?</c>) rather than its name.</summary>
+        public const string TypeForm = "KS6014";
+
+        /// <summary>A length of time written without its unit (<c>timeout: 30</c>) or in quotes (<c>ttl: '10m'</c>); a duration is <c>30s</c>.</summary>
+        public const string DurationUnit = "KS6018";
 
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>

@@ -24,7 +24,7 @@ public sealed class AuthPackageTests : IDisposable
 
         fn t_reg(json) => @register($json.email, $json.password, name: $json.name ?? 'Joan')
         fn t_attempt(json) => { user: @attempt($json.email, $json.password, remember: $json.remember ?? false, session: $json.session ?? true) }
-        fn t_me() => { user: @user(), signed: @signed_in(), id: @user()?.id }
+        fn t_me() => { user: @user(), signed: @is_signed_in(), id: @user()?.id }
         fn t_login_copy(json) => @login({ id: 'x1', email: 'own@example.com', name: $json.name }, remember: true)
         fn t_login_bad() => @login('')
         fn t_logout(json) {
@@ -32,19 +32,19 @@ public sealed class AuthPackageTests : IDisposable
           return { ok: true }
         }
         fn t_put(json) {
-          $session->put('a', $json.v)
+          $session->set('a', $json.v)
           $session->flash('f', 'once')
-          return { a: $session->get('a'), missing: $session->get('nope', 'dflt'), has: $session->has('a'), all: $session->all(), token: $session->token() }
+          return { a: $session->get('a'), missing: $session->get('nope', 'dflt'), has: $session->has('a'), all: $session->all(), token: $session.token }
         }
         fn t_peek() => { a: $session->get('a'), f: $session->get('f', 'gone'), all: $session->all() }
-        fn t_forget() => { gone: $session->forget('a'), again: $session->forget('a') }
+        fn t_forget() => { gone: $session->remove('a'), again: $session->remove('a') }
         fn t_regen() {
           $session->regenerate()
           $session->regenerate()
           return { ok: true }
         }
-        fn t_private_key() => $session->put('_user', 1)
-        fn t_keep_password(json) => $session->put('p', [{ secret: $Secret->from($json).password }])
+        fn t_private_key() => $session->set('_user', 1)
+        fn t_keep_password(json) => $session->set('p', [{ secret: Secret($json).password }])
         fn t_users(json) {
           u = @users()
           joan = $u->find_email('JOAN@example.com')
@@ -53,7 +53,7 @@ public sealed class AuthPackageTests : IDisposable
         fn t_update(json) => @users()->update($json.id, nickname: 'Jo', name: null)
         fn t_update_email(json) => @users()->update($json.id, email: $json.email)
         fn t_update_kept(json) => @users()->update($json.id, password_hash: 'x')
-        fn t_update_password(json) => @users()->update($json.id, secret: $Secret->from($json).password)
+        fn t_update_password(json) => @users()->update($json.id, secret: Secret($json).password)
         fn t_set_password(json) => @users()->set_password($json.id, $json.password)
         fn t_delete(json) => { first: @users()->delete($json.id), second: @users()->delete($json.id) }
         fn t_find_number() => @users()->find(42)
@@ -73,58 +73,60 @@ public sealed class AuthPackageTests : IDisposable
         """;
 
     private const string Api = """
-        KScript.Routes {
-          import KScript.Http
-          import KScript.Auth
-          import "c.kscript" as c
-          Post(path: "/reg", to: c.t_reg)
-          Post(path: "/attempt", to: c.t_attempt)
-          Get(path: "/me", to: c.t_me)
-          Post(path: "/login-copy", to: c.t_login_copy)
-          Post(path: "/login-bad", to: c.t_login_bad)
-          Post(path: "/logout", to: c.t_logout)
-          Post(path: "/put", to: c.t_put)
-          Get(path: "/peek", to: c.t_peek)
-          Post(path: "/forget", to: c.t_forget)
-          Post(path: "/regen", to: c.t_regen)
-          Post(path: "/private-key", to: c.t_private_key)
-          Post(path: "/keep-password", to: c.t_keep_password)
-          Post(path: "/users", to: c.t_users)
-          Post(path: "/update", to: c.t_update)
-          Post(path: "/update-email", to: c.t_update_email)
-          Post(path: "/update-kept", to: c.t_update_kept)
-          Post(path: "/update-password", to: c.t_update_password)
-          Post(path: "/set-password", to: c.t_set_password)
-          Post(path: "/delete", to: c.t_delete)
-          Get(path: "/find-number", to: c.t_find_number)
-          Get(path: "/find-bad", to: c.t_find_bad)
-          Post(path: "/token", to: c.t_token)
-          Post(path: "/token-bare", to: c.t_token_bare)
-          Post(path: "/token-nobody", to: c.t_token_nobody)
-          Post(path: "/tokens", to: c.t_tokens)
-          Get(path: "/my-tokens", to: c.t_my_tokens, middleware: auth)
-          Post(path: "/revoke", to: c.t_revoke)
-          Post(path: "/reset-token", to: c.t_reset_token)
-          Post(path: "/reset", to: c.t_reset)
-          Get(path: "/text", to: c.t_text)
-          Post(path: "/intended", to: c.t_intended)
-          Get(path: "/session-only", to: c.t_ok, middleware: auth:session)
-          Get(path: "/token-only", to: c.t_ok, middleware: auth:token)
-          Get(path: "/machines", to: c.t_ok, middleware: auth:MACHINE_TOKEN)
-          Get(path: "/unset", to: c.t_ok, middleware: auth:UNSET_TOKEN)
-          Get(path: "/guests", to: c.t_ok, middleware: guest)
+        import KScript.Http
+        import KScript.Auth
+        import "c.kscript" as c
+
+        Routes {
+          Post(path: "/reg", to: @c.t_reg)
+          Post(path: "/attempt", to: @c.t_attempt)
+          Get(path: "/me", to: @c.t_me)
+          Post(path: "/login-copy", to: @c.t_login_copy)
+          Post(path: "/login-bad", to: @c.t_login_bad)
+          Post(path: "/logout", to: @c.t_logout)
+          Post(path: "/put", to: @c.t_put)
+          Get(path: "/peek", to: @c.t_peek)
+          Post(path: "/forget", to: @c.t_forget)
+          Post(path: "/regen", to: @c.t_regen)
+          Post(path: "/private-key", to: @c.t_private_key)
+          Post(path: "/keep-password", to: @c.t_keep_password)
+          Post(path: "/users", to: @c.t_users)
+          Post(path: "/update", to: @c.t_update)
+          Post(path: "/update-email", to: @c.t_update_email)
+          Post(path: "/update-kept", to: @c.t_update_kept)
+          Post(path: "/update-password", to: @c.t_update_password)
+          Post(path: "/set-password", to: @c.t_set_password)
+          Post(path: "/delete", to: @c.t_delete)
+          Get(path: "/find-number", to: @c.t_find_number)
+          Get(path: "/find-bad", to: @c.t_find_bad)
+          Post(path: "/token", to: @c.t_token)
+          Post(path: "/token-bare", to: @c.t_token_bare)
+          Post(path: "/token-nobody", to: @c.t_token_nobody)
+          Post(path: "/tokens", to: @c.t_tokens)
+          Get(path: "/my-tokens", to: @c.t_my_tokens, middleware: auth)
+          Post(path: "/revoke", to: @c.t_revoke)
+          Post(path: "/reset-token", to: @c.t_reset_token)
+          Post(path: "/reset", to: @c.t_reset)
+          Get(path: "/text", to: @c.t_text)
+          Post(path: "/intended", to: @c.t_intended)
+          Get(path: "/session-only", to: @c.t_ok, middleware: auth:session)
+          Get(path: "/token-only", to: @c.t_ok, middleware: auth:token)
+          Get(path: "/machines", to: @c.t_ok, middleware: auth:MACHINE_TOKEN)
+          Get(path: "/unset", to: @c.t_ok, middleware: auth:UNSET_TOKEN)
+          Get(path: "/guests", to: @c.t_ok, middleware: guest)
         }
         """;
 
     private const string Web = """
-        KScript.Routes {
-          import KScript.Http
-          import KScript.Auth
-          import "c.kscript" as c
-          Get(path: "/form", to: c.t_csrf)
-          Post(path: "/post", to: c.t_ok)
-          Get(path: "/private", to: c.t_ok, middleware: auth)
-          Get(path: "/login", to: c.t_ok, middleware: auth)
+        import KScript.Http
+        import KScript.Auth
+        import "c.kscript" as c
+
+        Routes {
+          Get(path: "/form", to: @c.t_csrf)
+          Post(path: "/post", to: @c.t_ok)
+          Get(path: "/private", to: @c.t_ok, middleware: auth)
+          Get(path: "/login", to: @c.t_ok, middleware: auth)
         }
         """;
 
@@ -378,7 +380,7 @@ public sealed class AuthPackageTests : IDisposable
         string token = Values.ToStr(Map(Post(b, "/token", $$"""{ "id": "{{id}}", "expires": "1h" }"""))["token"]);
         Assert.StartsWith("ks_", token);
         Assert.StartsWith("ks_", Post(b, "/token-bare", $$"""{ "id": "{{id}}" }""").Body.Trim('"'));
-        Assert.Contains("isn't a length of time", Post(b, "/token", $$"""{ "id": "{{id}}", "expires": "soon" }""").Body);
+        Assert.Contains("should be a length of time", Post(b, "/token", $$"""{ "id": "{{id}}", "expires": "soon" }""").Body);
         Assert.Equal(404, Post(b, "/token-nobody").Status);
 
         var bearer = new Dictionary<string, object> { ["authorization"] = "Bearer " + token };
@@ -548,7 +550,7 @@ public sealed class AuthPackageTests : IDisposable
         string output = ScriptRunner.Run("""
             import KScript.Auth
             echo @user() ?? 'nobody'
-            echo @signed_in()
+            echo @is_signed_in()
             echo @users()->count()
             try {
               $session->get('a')

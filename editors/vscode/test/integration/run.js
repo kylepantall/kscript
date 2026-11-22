@@ -23,7 +23,7 @@ const { runTests } = require('@vscode/test-electron');
     "test(name: starts empty) {\n  expect(value: 0, equals: 0)\n}\ntest(name: fails) {\n  expect(value: 1, equals: 2)\n}\n");
   // A kscript serve page: VS Code's HTML grammar must still apply, with KScript { } highlighted on top.
   fs.writeFileSync(path.join(workspace, '_layout.html'), '<!doctype html>\n<html><body><main><slot /></main></body></html>\n');
-  fs.writeFileSync(path.join(workspace, 'page.html'), '<layout src="_layout.html" title="Home">\n  <p class="lead">Hi {$title->upper()}</p>\n</layout>\n');
+  fs.writeFileSync(path.join(workspace, 'page.html'), '<layout path="_layout.html" title="Home">\n  <p class="lead">Hi {$title->upper()}</p>\n</layout>\n');
 
   try {
     await runTests({

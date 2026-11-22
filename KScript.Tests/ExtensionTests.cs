@@ -35,7 +35,7 @@ public class ExtensionTests
             + "extend int {\n  fn double(by = 2) => $this * $by\n}\n"
             + "extend string {\n  fn slug() => $this->lower()->replace(' ', '-')\n}\n"
             + "extend map {\n  fn size() => $this->keys()->count()\n}\n"
-            + "echo \"{ @date('2026-11-21')->json() } { @date('2026-11-21')->is_weekend() } { [1, 2, 3]->second() }\"\n"
+            + "echo \"{ '2026-11-21'->to_date()->json() } { '2026-11-21'->to_date()->is_weekend() } { [1, 2, 3]->second() }\"\n"
             + "echo \"{ 4->double() } { 4->double(by: 3) } { 4 |> double() } { 'Hello World'->slug() } { { a: 1 }->size() }\"\n");
         Assert.Equal("2026-11-21 true 2\n8 12 8 hello-world 1\n", output);
     }
@@ -46,7 +46,7 @@ public class ExtensionTests
         string output = RunCode(
             "type User {\n  name: string\n}\n"
             + "extend User {\n  fn hello(greeting = 'Hi') => $greeting + ' ' + $this.name\n}\n"
-            + "u = $User->from({ name: 'Kyle' })\n"
+            + "u = User({ name: 'Kyle' })\n"
             + "echo \"{ $u->hello() } { $u->hello(greeting: 'Hey') } { $u->keys()->join(',') }\"\n");
         Assert.Equal("Hi Kyle Hey Kyle name\n", output);
     }
@@ -55,14 +55,14 @@ public class ExtensionTests
     public void ExtensionMethodsCanHaveBodies()
     {
         Assert.Equal("weekday\n", RunCode(
-            "extend date {\n  fn kind() {\n    if $this->format('ddd') in ['Sat', 'Sun'] {\n      return 'weekend'\n    }\n    return 'weekday'\n  }\n}\necho @date('2026-11-20')->kind()\n"));
+            "extend date {\n  fn kind() {\n    if $this->format('ddd') in ['Sat', 'Sun'] {\n      return 'weekend'\n    }\n    return 'weekday'\n  }\n}\necho '2026-11-20'->to_date()->kind()\n"));
     }
 
     [Fact]
     public void OverrideReplacesABuiltInMethod()
     {
         Assert.Equal("D:2026 [1,2]\n", RunCode(
-            "extend date {\n  override fn to_json() => 'D:' + $this->format('yyyy')\n}\necho \"{ @date('2026-01-02')->to_json() } { [1, 2]->to_json() }\"\n"));
+            "extend date {\n  override fn to_json() => 'D:' + $this->format('yyyy')\n}\necho \"{ '2026-01-02'->to_date()->to_json() } { [1, 2]->to_json() }\"\n"));
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class ExtensionTests
     {
         Assert.Equal("2026 x\n", RunBody(
             "<extend type=\"date\"><fn name=\"json\" value=\"$this->format('yyyy')\" /><fn name=\"to_json\" override=\"yes\" value=\"'x'\" /></extend>"
-            + "<echo>{ @date('2026-11-21')->json() } { @date('2026-11-21')->to_json() }</echo>"));
+            + "<echo>{ '2026-11-21'->to_date()->json() } { '2026-11-21'->to_date()->to_json() }</echo>"));
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public class ExtensionTests
         Directory.CreateDirectory(Path.Combine(dir, "lib"));
         File.WriteAllText(Path.Combine(dir, "lib", "inner.kscript"), "extend string {\n  fn shout() => $this->upper() + '!'\n}\n");
         File.WriteAllText(Path.Combine(dir, "lib", "dates.kscript"), "import \"inner.kscript\"\nextend date {\n  fn stamp() => $this->format('yyyy')\n}\n");
-        File.WriteAllText(Path.Combine(dir, "main.kscript"), "import \"lib/dates.kscript\" as d\necho \"{ @date('2026-01-01')->stamp() } { 'hi'->shout() }\"\n");
+        File.WriteAllText(Path.Combine(dir, "main.kscript"), "import \"lib/dates.kscript\" as d\necho \"{ '2026-01-01'->to_date()->stamp() } { 'hi'->shout() }\"\n");
         Assert.Equal("2026 HI!\n", RunFile(Path.Combine(dir, "main.kscript")));
     }
 
@@ -138,7 +138,7 @@ public class ExtensionTests
             ("extensions/text/slug.kscript", "extend string {\n  fn slug() => $this->lower()->replace(' ', '-')\n}\n"),
             ("extensions/lists.ks.xml", "<kscript><extend type=\"list\"><fn name=\"second\" value=\"$this[1]\" /></extend></kscript>"),
             ("extensions/date.test.kscript", "this isn't loaded"),
-            ("scripts/main.kscript", "echo \"{ @date('2026-11-21')->json() } { 'Hello World'->slug() } { [1, 2]->second() }\"\n"));
+            ("scripts/main.kscript", "echo \"{ '2026-11-21'->to_date()->json() } { 'Hello World'->slug() } { [1, 2]->second() }\"\n"));
         Assert.Equal("2026-11-21 hello-world 2\n", RunFile(Path.Combine(dir, "scripts", "main.kscript")));
         Assert.Contains("Dates have no method ->json()", Assert.Throws<KScriptException>(() =>
             RunFile(Path.Combine(dir, "scripts", "main.kscript"), new InterpreterOptions { ProjectExtensions = false })).Message);
@@ -183,7 +183,7 @@ public class ExtensionTests
         string dir = Project("{}",
             ("extensions/a.kscript", "extend string {\n  fn shout() => $this->upper() + '!'\n}\n"),
             ("extensions/b.kscript", "extend date {\n  fn loud() => $this->format('yyyy')->shout()\n}\n"),
-            ("main.kscript", "echo @date('2026-01-01')->loud()\n"));
+            ("main.kscript", "echo '2026-01-01'->to_date()->loud()\n"));
         Assert.Equal("2026!\n", RunFile(Path.Combine(dir, "main.kscript")));
     }
 }

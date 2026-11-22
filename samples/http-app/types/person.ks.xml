@@ -1,4 +1,0 @@
-<kscript>
-  <!--- Someone in data/people.json. -->
-  <type name="Person" fields="id: int, name: string, age: int, role: string" />
-</kscript>

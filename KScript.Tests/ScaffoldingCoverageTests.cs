@@ -102,7 +102,7 @@ public class ScaffoldingCoverageTests
         {
             Directory.SetCurrentDirectory(previous);
         }
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("kscript.json", err);
     }
 }

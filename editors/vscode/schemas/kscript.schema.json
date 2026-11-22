@@ -64,7 +64,7 @@
       "properties": {
         "routes": {
           "type": "array",
-          "description": "The route files, relative to the site folder. Without this, kscript serve loads routes.ks.xml (or .kscript) and api.ks.xml (under /api).",
+          "description": "The route files, relative to the site folder. Without this, kscript serve loads routes.kscript and api.kscript (under /api), or their .ks.xml forms.",
           "items": {
             "oneOf": [
               { "type": "string" },
@@ -161,7 +161,7 @@
         "include": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html", "**/*.md"],
+          "default": ["**/*.kscript", "**/*.ks.xml", "**/*.html", "**/*.md"],
           "description": "Files kscript check looks at, as globs relative to kscript.json. .xml files that start with <kscript> are always included."
         },
         "exclude": {
@@ -177,7 +177,7 @@
           "additionalProperties": { "enum": ["off", "hint", "info", "warning", "error"] },
           "examples": [{ "KS3003": "off", "KS4*": "error" }]
         },
-        "warningsAsErrors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnaserror)." }
+        "warnings_as_errors": { "type": "boolean", "default": false, "description": "Make kscript check fail on warnings too (same as --warnings-as-errors)." }
       }
     },
     "paths": {
@@ -214,7 +214,7 @@
       "description": "Settings for kscript make.",
       "additionalProperties": false,
       "properties": {
-        "format": { "enum": ["kscript", "xml"], "default": "kscript", "description": "The format kscript make writes scripts, tests, routes and desktop apps in: kscript (.kscript files) or xml (.ks.xml). --format on the command line wins." }
+        "syntax": { "enum": ["kscript", "xml"], "default": "kscript", "description": "The syntax kscript make writes scripts, tests, routes and desktop apps in: kscript (.kscript files) or xml (.ks.xml). --syntax on the command line wins." }
       }
     },
     "app": {
@@ -222,7 +222,7 @@
       "description": "Used by kscript compile, which builds a script, desktop app or site into a program for macOS, Windows and Linux.",
       "additionalProperties": false,
       "properties": {
-        "main": { "type": "string", "description": "The script the app runs, relative to kscript.json. Usually one whose root is <KScript.Window>." },
+        "main": { "type": "string", "description": "The script the app runs, relative to kscript.json. Usually one that imports KScript.UI and holds a Window { } (<KScript.Window> as the root of an XML file)." },
         "name": { "type": "string", "description": "The app's name in the Dock, Start menu or launcher. Defaults to the project's name." },
         "id": { "type": "string", "description": "A reverse-DNS id such as com.example.lifelab (the macOS bundle id)." },
         "version": { "type": "string", "description": "The app's version, such as 1.0.0." },
@@ -237,7 +237,7 @@
         "include": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["**/*.test.kscript", "**/*.test.ks.xml", "**/*.test.xml"],
+          "default": ["**/*.test.kscript", "**/*.test.ks.xml"],
           "description": "The test files kscript test runs, as globs relative to kscript.json."
         },
         "exclude": {
@@ -378,22 +378,22 @@
         },
         "rules": {
           "type": "object",
-          "description": "Turn individual formatting rules off, e.g. { \"statementPerLine\": false }. Every rule is on unless listed. To leave part of a file alone, use <!-- kscript-fmt: off --> ... <!-- kscript-fmt: on --> or <!-- kscript-fmt-ignore --> before an element.",
+          "description": "Turn individual formatting rules off, e.g. { \"statement_per_line\": false }. Every rule is on unless listed. To leave part of a file alone, use <!-- kscript-fmt: off --> ... <!-- kscript-fmt: on --> or <!-- kscript-fmt-ignore --> before an element.",
           "additionalProperties": false,
           "properties": {
             "indent": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Re-indent elements by how deeply they are nested. Off: lines keep their indentation." },
-            "statementPerLine": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Put each statement and block-level element on its own line. Off: line breaks only change where there was already whitespace." },
-            "tidyTags": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One space between attributes, and <x /> for self-closing tags. Off: start tags are kept exactly as written." },
-            "wrapAttributes": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One attribute per line for long start tags and tags already written that way. Off: tags are never wrapped or joined." },
-            "trimTrailingWhitespace": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Remove spaces at the ends of lines of text." },
-            "collapseBlankLines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to maxBlankLines." },
-            "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." },
+            "statement_per_line": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Put each statement and block-level element on its own line. Off: line breaks only change where there was already whitespace." },
+            "tidy_tags": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One space between attributes, and <x /> for self-closing tags. Off: start tags are kept exactly as written." },
+            "wrap_attributes": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "One attribute per line for long start tags and tags already written that way. Off: tags are never wrapped or joined." },
+            "trim_trailing_whitespace": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Remove spaces at the ends of lines of text." },
+            "collapse_blank_lines": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "Shrink runs of blank lines to max_blank_lines." },
+            "final_newline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." },
             "spacing": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: one space after commas and colons, around assignments and =>, and before a block's '{'. Off: spacing inside lines is kept." },
-            "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." },
-            "wrapStrings": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: break a string that runs past printWidth at a space, with a \\ at the end of the line (the break isn't part of the string). Off: long strings stay on one line." },
-            "wrapChains": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a -> chain or |> pipe that runs past printWidth puts each call on its own line, indented under where the chain starts. Off: chains stay on one line." },
-            "wrapBodies": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a one-line function (fn name() => body) that runs past printWidth moves its body to the next line. Off: it stays on one line." },
-            "wrapComments": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a // or /// comment line that runs past printWidth is broken between words onto a new comment line. Off: comments stay as written." }
+            "brace_style": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." },
+            "wrap_strings": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: break a string that runs past print_width at a space, with a \\ at the end of the line (the break isn't part of the string). Off: long strings stay on one line." },
+            "wrap_chains": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a -> chain or |> pipe that runs past print_width puts each call on its own line, indented under where the chain starts. Off: chains stay on one line." },
+            "wrap_bodies": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a one-line function (fn name() => body) that runs past print_width moves its body to the next line. Off: it stays on one line." },
+            "wrap_comments": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a // or /// comment line that runs past print_width is broken between words onto a new comment line. Off: comments stay as written." }
           }
         },
         "indent": {
@@ -401,26 +401,26 @@
           "default": 2,
           "description": "Spaces per indent level, or \"tab\" to indent with tabs."
         },
-        "tabWidth": {
+        "tab_width": {
           "type": "integer",
           "minimum": 1,
           "maximum": 16,
           "default": 2,
           "description": "With \"indent\": \"tab\", how many columns a tab counts as when lining up existing text."
         },
-        "printWidth": {
+        "print_width": {
           "type": "integer",
           "minimum": 20,
           "default": 80,
           "description": "The longest a line should be (80 by default). Longer lines are wrapped: a start tag gets one attribute per line, and in .kscript files a long call, chain, one-line function, string or comment is broken onto more lines."
         },
-        "maxBlankLines": {
+        "max_blank_lines": {
           "type": "integer",
           "minimum": 0,
           "default": 1,
           "description": "Blank lines kept in a row; extra ones are removed."
         },
-        "endOfLine": {
+        "end_of_line": {
           "enum": ["auto", "lf", "crlf"],
           "default": "auto",
           "description": "Line endings to write. auto keeps the ones each file already uses."
@@ -434,7 +434,7 @@
         "include": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html"],
+          "default": ["**/*.kscript", "**/*.ks.xml", "**/*.html"],
           "description": "Files kscript fmt formats in a project folder, as globs relative to kscript.json. .xml files that start with <kscript> are always included; Markdown pages are never reformatted."
         },
         "exclude": {

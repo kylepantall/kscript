@@ -97,8 +97,8 @@ namespace KScript.Data.Migrations
         {
             var plan = new MigrationPlan();
             Module module = interpreter.Load(path);
-            if (!module.IsPackageRoot || Metadata.ElementInfo.BareName(module.Root.Name) != "Migration")
-                throw new KScriptException($"{System.IO.Path.GetFileName(path)} is in the migrations folder, so it starts with KScript.Migration {{ }} (<KScript.Migration> in XML), not {module.Root.Name}.", "Migration")
+            if (module.MainElementName != "Migration")
+                throw new KScriptException($"{System.IO.Path.GetFileName(path)} is in the migrations folder, so it holds Migration {{ }} after import KScript.Data (or <KScript.Migration> in an XML file), not {(module.MainElement ?? module.Root).Name}.", "Migration")
                 { File = path, Line = 1 };
             lock (host.Items)
             {
@@ -448,7 +448,7 @@ namespace KScript.Data.Migrations
             }
             catch (DbException ex)
             {
-                throw Database.Dialect.Translate(ex, null) ?? new KScriptException(ex.Message, "QueryError", ex);
+                throw Database.Dialect.Translate(ex, null) ?? new KScriptException(ex.Message, "Query", ex);
             }
         }
 

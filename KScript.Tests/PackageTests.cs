@@ -12,7 +12,7 @@ public class PackageTests
     [Fact]
     public void PackageElementsNeedAnImport()
     {
-        KScriptException ex = Fails("<input to=\"x\">?</input>");
+        KScriptException ex = Fails("<input into=\"x\">?</input>");
         Assert.Equal("Import", ex.Type);
         Assert.Contains("<import package=\"KScript.Terminal\" />", ex.Message);
     }
@@ -67,7 +67,7 @@ public class PackageTests
         {
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><fn name=\"double\" params=\"n\" value=\"$n * 2\" /><let name=\"limit\" value=\"10\" const=\"yes\" /></kscript>");
             string main = Path.Combine(dir, "main.ks.xml");
-            Assert.Equal("8 10 6\n", Run("<kscript><import src=\"lib.ks.xml\" as=\"lib\" /><import src=\"lib.ks.xml\" names=\"double\" /><echo>{ lib.double(4) } { lib.limit } { @double(3) }</echo></kscript>", path: main));
+            Assert.Equal("8 10 6\n", Run("<kscript><import path=\"lib.ks.xml\" as=\"lib\" /><import path=\"lib.ks.xml\" names=\"double\" /><echo>{ lib.double(4) } { lib.limit } { @double(3) }</echo></kscript>", path: main));
         }
         finally
         {
@@ -92,40 +92,40 @@ public class PackageTests
     [Fact]
     public void InputConvertsAndRetries()
     {
-        Assert.Equal("Age: \nPlease enter a whole number.\nAge: \n43\n", RunBody("<input to=\"age\" type=\"int\">Age: </input><echo>{ $age + 1 }</echo>", "abc\n42\n", "KScript.Terminal"));
+        Assert.Equal("Age: \nPlease enter a whole number.\nAge: \n43\n", RunBody("<input into=\"age\" type=\"int\">Age: </input><echo>{ $age + 1 }</echo>", "abc\n42\n", "KScript.Terminal"));
     }
 
     [Fact]
     public void InputDefault()
     {
-        Assert.EndsWith("Kyle\n", RunBody("<input to=\"name\" default=\"'Kyle'\">Name? </input><echo>$name</echo>", "\n", "KScript.Terminal"));
+        Assert.EndsWith("Kyle\n", RunBody("<input into=\"name\" default=\"'Kyle'\">Name? </input><echo>$name</echo>", "\n", "KScript.Terminal"));
     }
 
     [Fact]
     public void InputWithNoMoreInputIsAnError()
     {
-        Assert.Throws<KScriptException>(() => RunBody("<input to=\"name\">Name? </input>", "", "KScript.Terminal"));
+        Assert.Throws<KScriptException>(() => RunBody("<input into=\"name\">Name? </input>", "", "KScript.Terminal"));
     }
 
     [Fact]
     public void MenuPicksByNumberOrLabel()
     {
-        Assert.EndsWith("Exit 1\n", RunBody("<menu to=\"choice\" index=\"i\" options=\"['Settings', 'Exit']\">Next?</menu><echo>$choice $i</echo>", "2\n", "KScript.Terminal"));
-        Assert.EndsWith("Settings\n", RunBody("<menu to=\"choice\" options=\"['Settings', 'Exit']\" /><echo>$choice</echo>", "settings\n", "KScript.Terminal"));
+        Assert.EndsWith("Exit 1\n", RunBody("<menu into=\"choice\" at=\"i\" options=\"['Settings', 'Exit']\">Next?</menu><echo>$choice $i</echo>", "2\n", "KScript.Terminal"));
+        Assert.EndsWith("Settings\n", RunBody("<menu into=\"choice\" options=\"['Settings', 'Exit']\" /><echo>$choice</echo>", "settings\n", "KScript.Terminal"));
     }
 
     [Fact]
     public void ConfirmAndPause()
     {
-        Assert.EndsWith("true\n", RunBody("<confirm to=\"ok\">Sure?</confirm><echo>$ok</echo>", "y\n", "KScript.Terminal"));
-        Assert.EndsWith("false\n", RunBody("<confirm to=\"ok\" default=\"no\">Sure?</confirm><echo>$ok</echo>", "\n", "KScript.Terminal"));
+        Assert.EndsWith("true\n", RunBody("<confirm into=\"ok\">Sure?</confirm><echo>$ok</echo>", "y\n", "KScript.Terminal"));
+        Assert.EndsWith("false\n", RunBody("<confirm into=\"ok\" default=\"no\">Sure?</confirm><echo>$ok</echo>", "\n", "KScript.Terminal"));
         Assert.StartsWith("Press enter", RunBody("<pause>Press enter</pause>", "\n", "KScript.Terminal"));
     }
 
     [Fact]
     public void ColoursArePlainWhenNotATerminal()
     {
-        Assert.Equal("ok\n", RunBody("<echo>{ @color('ok', colour: 'green') }</echo>", "", "KScript.Terminal"));
+        Assert.Equal("ok\n", RunBody("<echo>{ @color('ok', color: 'green') }</echo>", "", "KScript.Terminal"));
         Assert.Equal("false\n", RunBody("<echo>{ @is_terminal() }</echo>", "", "KScript.Terminal"));
     }
 
@@ -149,9 +149,9 @@ public class PackageTests
 
     [Theory]
     [InlineData("@sqrt(16)", "4")]
-    [InlineData("@pow(2, exponent: 8)", "256")]
+    [InlineData("2 ** 8", "256")]
     [InlineData("@round(2.345, digits: 2)", "2.35")]
-    [InlineData("@clamp(15, low: 0, high: 10)", "10")]
+    [InlineData("@clamp(15, min: 0, max: 10)", "10")]
     [InlineData("@median(3, 1, 2, 10)", "2.5")]
     [InlineData("@average([2, 4])", "3")]
     [InlineData("@gcd(a: 12, b: 18)", "6")]
@@ -185,18 +185,18 @@ public class PackageTests
             string script = """
                 <kscript>
                   <import package="KScript.IO" />
-                  <write to="'out/a.txt'">hello</write>
-                  <write to="'out/a.txt'" append="yes">again</write>
+                  <do>@write_text('out/a.txt', 'hello')</do>
+                  <do>@append_text('out/a.txt', @char_of(10) + 'again')</do>
                   <do>@write_json('out/data.json', value: { n: 1 })</do>
                   <echo>{ @read_lines('out/a.txt')->count() } { @read_json('out/data.json').n }</echo>
                   <for each="f" in="@files('out', pattern: '*.txt')">
-                    <echo>{ $f->name() } { $f->extension() } { $f->size() gt 0 }</echo>
+                    <echo>{ $f.name } { $f.extension } { $f.size gt 0 }</echo>
                   </for>
-                  <mkdir path="'moved'" />
-                  <move from="'out/a.txt'" to="'moved'" />
-                  <copy from="'moved/a.txt'" to="'moved/b.txt'" />
+                  <do>@create_folder('moved')</do>
+                  <do>@move('out/a.txt', 'moved')</do>
+                  <do>@copy('moved/a.txt', 'moved/b.txt')</do>
                   <echo>{ @exists('out/a.txt') } { @is_file('moved/a.txt') } { @is_file('moved/b.txt') }</echo>
-                  <delete path="'moved'" />
+                  <do>@delete('moved')</do>
                   <echo>{ @is_folder('moved') }</echo>
                 </kscript>
                 """;
@@ -224,8 +224,8 @@ public class PackageTests
             File.WriteAllText(Path.Combine(dir, "a.txt"), "a");
             File.WriteAllText(Path.Combine(dir, "b.txt"), "b");
             string path = Path.Combine(dir, "s.ks.xml");
-            Assert.Throws<KScriptException>(() => Run("<kscript><import package=\"KScript.IO\" /><move from=\"'a.txt'\" to=\"'b.txt'\" /></kscript>", path: path));
-            Run("<kscript><import package=\"KScript.IO\" /><move from=\"'a.txt'\" to=\"'b.txt'\" overwrite=\"yes\" /></kscript>", path: path);
+            Assert.Throws<KScriptException>(() => Run("<kscript><import package=\"KScript.IO\" /><do>@move('a.txt', 'b.txt')</do></kscript>", path: path));
+            Run("<kscript><import package=\"KScript.IO\" /><do>@move('a.txt', 'b.txt', overwrite: true)</do></kscript>", path: path);
             Assert.Equal("a", File.ReadAllText(Path.Combine(dir, "b.txt")));
         }
         finally

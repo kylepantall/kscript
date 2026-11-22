@@ -108,11 +108,11 @@ public sealed class StyleTests : IDisposable
         Assert.Equal("#002bff", Eval("@darken('#3355ff', '10%')"));
         Assert.Equal("#ffffff", Eval("@lighten('#3355ff', 1)"));
         Assert.Equal("#808080", Eval("@mix('black', 'white')"));
-        Assert.Equal("#bfbfbf", Eval("@mix('#fff', '#000', 0.75)"));
+        Assert.Equal("#bfbfbf", Eval("@mix('#fff', '#000', 0.25)"));
         Assert.Equal("rgba(51, 85, 255, 0.5)", Eval("@alpha('#3355ff', '50%')"));
         Assert.Equal("rgba(255, 0, 0, 0.25)", Eval("@alpha('rgb(255, 0, 0)', 0.25)"));
-        Assert.Equal("#ffffff", Eval("@contrast('#3355ff')"));
-        Assert.Equal("#111", Eval("@contrast('#ffff00', '#111', '#eee')"));
+        Assert.Equal("#ffffff", Eval("@contrast_color('#3355ff')"));
+        Assert.Equal("#111", Eval("@contrast_color('#ffff00', '#111', '#eee')"));
         Assert.Equal("#ff0000", Eval("@lighten('hsl(0, 100%, 50%)', 0)"));
         Assert.Equal("#00ff00", Eval("@lighten('hsla(120deg 100% 50% / 1)', 0)"));
         Assert.Equal("#808080", Eval("@lighten('hsl(0, 0%, 50%)', 0)"));
@@ -140,10 +140,10 @@ public sealed class StyleTests : IDisposable
     }
 
     [Fact]
-    public void Stylesheet_element_and_command_from_scripts()
+    public void Stylesheet_command_from_scripts()
     {
         FileOf("theme.ks.css", ".a { color: {$vars.c ?? 'red'}; }");
-        string script = FileOf("build.ks.xml", "<kscript><import package=\"KScript.Style\" /><stylesheet src=\"theme.ks.css\" /><stylesheet src=\"theme.ks.css\" to=\"out/blue.css\" vars=\"{ c: 'blue' }\" /><echo>{ @stylesheet('theme.ks.css', { c: 'green' }) }</echo></kscript>");
+        string script = FileOf("build.ks.xml", "<kscript><import package=\"KScript.Style\" /><import package=\"KScript.IO\" /><do>@write_text('theme.css', @stylesheet('theme.ks.css'))</do><do>@write_text('out/blue.css', @stylesheet('theme.ks.css', { c: 'blue' }))</do><echo>{ @stylesheet('theme.ks.css', { c: 'green' }) }</echo></kscript>");
         var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
         new Interpreter(KScriptHost.ForText(output)).RunFile(script);
         Assert.Equal(".a { color: green; }\n", output.ToString());
@@ -153,8 +153,8 @@ public sealed class StyleTests : IDisposable
         Assert.Contains("isn't a stylesheet", Assert.Throws<KScriptException>(() => Stylesheets.OutputPath("a.css")).Message);
         Assert.Equal("a.scss", Stylesheets.OutputPath("a.ks.scss"));
         Assert.Equal("a.sass", Stylesheets.OutputPath("a.KS.SASS"));
-        Assert.Equal("{}", Stylesheets.CompileText("{ @to_json($vars) }", null));
-        Assert.Equal("{\"a\":{\"b\":1}}", Stylesheets.CompileText("{ @to_json({ a: { b: 1 } }) }", null));
+        Assert.Equal("{}", Stylesheets.CompileText("{ $vars->to_json() }", null));
+        Assert.Equal("--a-b: 1;", Stylesheets.CompileText("{ @css_vars({ a: { b: 1 } }) }", null));
         Assert.NotEmpty(new StylePackage().Description);
     }
 
@@ -162,7 +162,7 @@ public sealed class StyleTests : IDisposable
     public void Stylesheets_in_read_only_hosts_cannot_write()
     {
         FileOf("t.ks.css", "a{}");
-        string script = FileOf("b.ks.xml", "<kscript><import package=\"KScript.Style\" /><stylesheet src=\"t.ks.css\" /></kscript>");
+        string script = FileOf("b.ks.xml", "<kscript><import package=\"KScript.Style\" /><import package=\"KScript.IO\" /><do>@write_text('t.css', @stylesheet('t.ks.css'))</do></kscript>");
         var host = KScriptHost.ForText(new StringWriter());
         host.CanWriteFiles = false;
         host.FileRoot = dir;
@@ -206,12 +206,12 @@ public sealed class StyleTests : IDisposable
             Assert.Contains("No stylesheets found", none.ToString());
 
             var e = new StringWriter();
-            Assert.Equal(1, CssCommand.Run(new[] { "--out" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "--var", "x" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "--var" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "--watch" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "missing" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "site/sub/b.scss" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "--out" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "--var", "x" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "--var" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "--watch" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "missing" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "site/sub/b.scss" }, output, e));
             Assert.Contains("--out needs a folder", e.ToString());
             Assert.Contains("--var needs name=value", e.ToString());
             Assert.Contains("Unknown option '--watch'", e.ToString());

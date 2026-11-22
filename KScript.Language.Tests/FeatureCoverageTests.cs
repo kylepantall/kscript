@@ -40,18 +40,18 @@ namespace KScript.Language.Tests
             Assert.DoesNotContain("elif", Labels("<if test=\"true\"></if>text <‸"));
             Assert.Empty(Labels("<on event=\"click\" target=\"‸\"></on>", "page.html"));
             Assert.NotEmpty(Labels("<let name=\"total\" value=\"1\" /><echo>$‸</echo>"));
-            Assert.Contains("to_upper", Labels("<echo>@‸</echo>"));
-            Assert.Empty(Labels("<import src=\"‸\" />", null));
+            Assert.Contains("today", Labels("<echo>@‸</echo>"));
+            Assert.Empty(Labels("<import path=\"‸\" />", null));
             Assert.Empty(Labels("<echo>{ foo.‸ }</echo>"));
             Assert.DoesNotContain("elif", Labels("<if test=\"true\"></if>text <el‸"));
             Assert.NotEmpty(Labels("<let name=\"total\" value=\"1\" /><echo>Hi $to‸</echo>"));
-            Assert.Contains("to_upper", Labels("<echo>Hi @to‸</echo>"));
+            Assert.Contains("today", Labels("<echo>Hi @to‸</echo>"));
             Assert.Contains("total", Labels("<let name=\"total\" value=\"1\" /><echo>{1} $to‸</echo>"));
             Assert.Contains("total", Labels("<let name=\"total\" value=\"1\" /><echo>{1} $‸</echo>"));
-            Assert.Contains("to_upper", Labels("<echo>{1} @to‸</echo>"));
+            Assert.Contains("today", Labels("<echo>{1} @to‸</echo>"));
             Assert.Null(Service.ComponentFile(null, "x"));
             Assert.Empty(Service.ComponentProps(Path.Combine(AnalyzerCoverageTests.Folder, "missing.html")));
-            Assert.Equal("Function ok", Service.GetCompletions(At("<import src=\"nameless.ks.xml\" as=\"lib\" /><echo>{ lib.‸ }</echo>").Analysis, At("<import src=\"nameless.ks.xml\" as=\"lib\" /><echo>{ lib.‸ }</echo>").Offset).First(c => c.Label == "ok").ToString());
+            Assert.Equal("Function ok", Service.GetCompletions(At("<import path=\"nameless.ks.xml\" as=\"lib\" /><echo>{ lib.‸ }</echo>").Analysis, At("<import path=\"nameless.ks.xml\" as=\"lib\" /><echo>{ lib.‸ }</echo>").Offset).First(c => c.Label == "ok").ToString());
         }
 
         [Fact]
@@ -72,7 +72,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Inlay_hints_skip_what_is_already_written()
         {
-            var (a, _) = At("<fn name=\"f\"><return value=\"1\" /></fn><for each=\"x\" index=\"i\" in=\"[1]\"><echo>{$i}</echo></for><let>y = 3</let><echo>{$y}</echo>‸");
+            var (a, _) = At("<fn name=\"f\"><return value=\"1\" /></fn><for each=\"x\" at=\"i\" in=\"[1]\"><echo>{$i}</echo></for><let>y = 3</let><echo>{$y}</echo>‸");
             List<InlayHint> hints = Service.GetInlayHints(a);
             InlayHint fn = Assert.Single(hints, h => h.Label == " → number");
             Assert.Contains("returns", fn.Tooltip);
@@ -91,7 +91,7 @@ namespace KScript.Language.Tests
             var (named, at2) = At("<import package=\"KScript.Math\" /><echo>{ @round(1, nope: ‸) }</echo>");
             Assert.NotNull(Service.GetSignatureHelp(named, at2));
 
-            var (import, at3) = At("<import src=\"nameless.ks.xml\" as=\"lib\" /><echo>{ lib.zz‸z() }</echo>");
+            var (import, at3) = At("<import path=\"nameless.ks.xml\" as=\"lib\" /><echo>{ lib.zz‸z() }</echo>");
             SourceLocation file = Assert.Single(Service.GetDefinition(import, at3));
             Assert.True(file.HasLinePositions);
             Assert.Equal(new LinePosition(0, 0), file.Start);

@@ -14,10 +14,10 @@ internal sealed class OddPackage : KScriptPackage
 
     protected override void Register(PackageBuilder p)
     {
-        p.Element(new ElementInfo("page-only", "Only in pages, with no handler.", ContentKind.Empty) { Context = ElementContext.Page }, null);
+        p.Element(new ElementInfo("page_only", "Only in pages, with no handler.", ContentKind.Empty) { Context = ElementContext.Page }, null);
         p.Element(new ElementInfo("described", "Described, but nothing runs it.", ContentKind.Empty), null);
         p.Element(new ElementInfo("panel", "Holds output markup.", ContentKind.Markup) { AllowsExtraAttributes = false }, run => { run.Host.Write("panel"); return null; });
-        p.Element(new ElementInfo("disk-full", "Fails the way file code does.", ContentKind.Empty), run => throw new IOException("The disk is full."));
+        p.Element(new ElementInfo("disk_full", "Fails the way file code does.", ContentKind.Empty), run => throw new IOException("The disk is full."));
         p.Element(new ElementInfo("loose", "Takes any attribute.", ContentKind.Empty) { AllowsExtraAttributes = true }, run => null);
     }
 }
@@ -31,7 +31,7 @@ public sealed class ScriptErrorTests : IDisposable
     {
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><fn name=\"helper\" value=\"1\" /></kscript>");
-        File.WriteAllText(Path.Combine(dir, "self.ks.xml"), "<kscript><import src=\"self.ks.xml\" /></kscript>");
+        File.WriteAllText(Path.Combine(dir, "self.ks.xml"), "<kscript><import path=\"self.ks.xml\" /></kscript>");
     }
 
     public void Dispose() => Directory.Delete(dir, recursive: true);
@@ -49,8 +49,8 @@ public sealed class ScriptErrorTests : IDisposable
     [InlineData("<!-- only a comment -->", "Syntax", "The script is empty.")]
     [InlineData("<kscript><KScript.nothing /></kscript>", "Import", "No KScript package has an element called <nothing>")]
     [InlineData("<kscript><import package=\"KScript.Math\" as=\"1x\" /></kscript>", "Import", "as=\"1x\" isn't a name.")]
-    [InlineData("<kscript><import src=\"self.ks.xml\" /></kscript>", "Import", "imports this script back")]
-    [InlineData("<kscript><import src=\"missing.ks.xml\" /></kscript>", "FileNotFound", "There is no script at missing.ks.xml")]
+    [InlineData("<kscript><import path=\"self.ks.xml\" /></kscript>", "Import", "imports this script back")]
+    [InlineData("<kscript><import path=\"missing.ks.xml\" /></kscript>", "FileNotFound", "There is no script at missing.ks.xml")]
     [InlineData("<kscript version=\"1\"></kscript>", "Retired", "version=\"...\" was removed in KScript 2.")]
     [InlineData("<kscript foo=\"1\"></kscript>", "Syntax", "<kscript> has no attributes, but this one has foo=\"...\".")]
     [InlineData("<kscript><case is=\"1\" /></kscript>", "Syntax", "<case> must be inside <match>.")]
@@ -68,10 +68,10 @@ public sealed class ScriptErrorTests : IDisposable
     [InlineData("<kscript><import package=\"KScript.Web\" /><live id=\"x\" /></kscript>", "Context", "<live> only works in pages served by kscript serve")]
     [InlineData("<kscript><break>x</break></kscript>", "Syntax", "<break> has no content; write it as <break ... />.")]
     [InlineData("<kscript><echo format=\"weird\">x</echo></kscript>", "Syntax", "format=\"weird\" isn't one of: text, json, markdown.")]
-    [InlineData("<kscript><echo newline=\"maybe\">x</echo></kscript>", "Syntax", "newline=\"maybe\" should be yes or no.")]
+    [InlineData("<kscript><echo newline=\"maybe\">x</echo></kscript>", "Syntax", "newline=\"maybe\" should be true or false.")]
     [InlineData("<kscript><if><echo>x</echo></if></kscript>", "Syntax", "<if> needs a test attribute")]
-    [InlineData("<kscript><import src=\"lib.ks.xml\" names=\"nope\" /></kscript>", "Import", "lib.ks.xml doesn't export 'nope'. Scripts export")]
-    [InlineData("<kscript><import src=\"lib.ks.xml\" names=\"helpr\" /></kscript>", "Import", "Did you mean helper?")]
+    [InlineData("<kscript><import path=\"lib.ks.xml\" names=\"nope\" /></kscript>", "Import", "lib.ks.xml doesn't export 'nope'. Scripts export")]
+    [InlineData("<kscript><import path=\"lib.ks.xml\" names=\"helpr\" /></kscript>", "Import", "Did you mean helper?")]
     [InlineData("<kscript><echo>{@f()}</echo><fn name=\"f\" params=\"x = \" /></kscript>", "Syntax", "The default value of 'x' isn't a valid expression")]
     public void Errors_have_a_type_and_say_what_to_do(string script, string type, string message)
     {
@@ -110,11 +110,11 @@ public sealed class ScriptErrorTests : IDisposable
             return output.ToString();
         }
 
-        Assert.Contains("<page-only> only works in web pages", Assert.Throws<KScriptException>(() => Run("<page-only />")).Message);
+        Assert.Contains("<page_only> only works in web pages", Assert.Throws<KScriptException>(() => Run("<page_only />")).Message);
         Assert.Contains("<described> only works in web pages", Assert.Throws<KScriptException>(() => Run("<described />")).Message);
         Assert.Equal("panel", Run("<panel on-click=\"x\"><div>text</div><let name=\"a\" value=\"1\" /></panel><loose anything=\"1\" />"));
         Assert.Contains("Expected an expression", Assert.Throws<KScriptException>(() => Run("<panel><let name=\"a\" value=\"1 +\" /></panel>")).Message);
-        var disk = Assert.Throws<KScriptException>(() => Run("<disk-full />"));
+        var disk = Assert.Throws<KScriptException>(() => Run("<disk_full />"));
         Assert.Equal("IO", disk.Type);
         Assert.Equal(1, disk.Line);
         Assert.Contains("KScript.Ghost isn't installed in this copy of kscript", Assert.Throws<KScriptException>(() => Run("<import package=\"Ghost\" />")).Message);

@@ -1,0 +1,53 @@
+<kscript>
+  <!-- Whole scripts can be tested too: @run_script runs one on its own and returns its output and exit code. -->
+
+  <test name="oldest.ks.xml finds Joan">
+    <let name="result" value="@run_script('../oldest.ks.xml')" />
+    <expect value="$result.code" equals="0" />
+    <expect
+      value="$result.output->lines()"
+      equals="['Joan is the oldest at 82 years old.', 'Joan again.']" />
+  </test>
+
+  <test name="imports.ks.xml prints the slug twice">
+    <let name="result" value="@run_script('../imports.ks.xml')" />
+    <expect value="$result.output->lines()" count="2" />
+    <expect value="$result.output" contains="'hello-world'" />
+  </test>
+
+  <describe name="a shopping cart">
+    <let name="cart" value="[]" />
+    <fn name="add" params="item: string">
+      <set name="cart" value="$cart->push($item)" />
+    </fn>
+
+    <before_each>
+      <set name="cart" value="['apple']" />
+    </before_each>
+
+    <test name="starts with one item">
+      <expect value="$cart" count="1" />
+    </test>
+
+    <test name="adds items">
+      <call fn="add" args="'pear'" />
+      <expect value="$cart" equals="['apple', 'pear']" />
+    </test>
+
+    <test name="rejects an empty item">
+      <expect_error type="Validation" contains="empty" as="err">
+        <throw type="Validation" message="An item can't be empty" />
+      </expect_error>
+      <expect value="$err.type" equals="'Validation'" />
+    </test>
+
+    <test name="prints the cart">
+      <capture into="out">
+        <for each="item" in="$cart">
+          <echo>- {$item}</echo>
+        </for>
+      </capture>
+      <expect value="$out" equals="'- apple'" />
+    </test>
+  </describe>
+</kscript>

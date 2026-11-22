@@ -1,0 +1,44 @@
+// Tests for how the pages call the API (lib/notes-client{{ ext }}).
+import "../lib/notes-client{{ ext }}"
+{{#if auth}}
+
+test(name: "the list is null when nobody is signed in, so the page asks them to sign in") {
+  expect(value: @list_notes(), equals: null)
+}
+{{else}}
+
+describe(name: "notes client") {
+  before_each {
+    for note in @list_notes() {
+      @delete_note($note.id)
+    }
+  }
+
+  test(name: "adding, ticking and deleting a note") {
+    expect(value: @add_note('  Buy milk  '), equals: null)
+    notes = @list_notes()
+    expect(value: $notes->map(fn(n) => $n.title), equals: ['Buy milk'])
+    @toggle_note($notes[0])
+    expect(value: @list_notes()[0].done, equals: true)
+    @delete_note($notes[0].id)
+    expect(value: @list_notes(), equals: [])
+  }
+
+  test(name: "a blank title gives a problem to show") {
+    expect(value: @add_note('   '), equals: 'Give the note a title.')
+  }
+}
+{{/if}}
+
+counts = [
+  { done: 0, text: '2 notes left' },
+  { done: 1, text: '1 note left' },
+  { done: 2, text: '0 notes left' },
+]
+
+for case in $counts {
+  test(name: "'{$case.text}' when {$case.done} of 2 are done") {
+    notes = [{ done: $case.done >= 1 }, { done: $case.done >= 2 }]
+    expect(value: @notes_left($notes), equals: $case.text)
+  }
+}

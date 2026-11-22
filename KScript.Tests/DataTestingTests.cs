@@ -23,7 +23,7 @@ public sealed class DataTestingTests : DataFixture
           code: uuid
           secret: password
           verified: bool
-          nickname: string?
+          nickname?: string
           posts: Post[]
         }
         """;
@@ -60,33 +60,33 @@ public sealed class DataTestingTests : DataFixture
     {
         TestFileResult file = RunTests("""
             test(name: 'one') {
-              post = $Post->fake()
-              expect(value: $post.author.name->length(), equals: 30)
-              expect(value: $Author->count(), equals: 1)
+              post = Post->fake()
+              expect(value: $post.author.name->count(), equals: 30)
+              expect(value: Author->count(), equals: 1)
               expect(value: @queries(), count_at_most: 4)
             }
 
             test(name: 'two') {
-              expect(value: $Post->count(), equals: 0)
+              expect(value: Post->count(), equals: 0)
               expect(value: @queries(), count: 1)
-              @transaction(fn() => $Author->fake())
-              expect(value: $Author->count(), equals: 1)
+              $db->transaction(fn() => Author->fake())
+              expect(value: Author->count(), equals: 1)
             }
 
             test(name: 'three') {
-              expect(value: $Author->count(), equals: 0)
-              joan = $Author->fake(name: 'Joan Joan Joan Joan Joan Joan Joan', nickname: 'Jo')
-              posts = $Post->fake_many(2, author: $joan)
+              expect(value: Author->count(), equals: 0)
+              joan = Author->fake(name: 'Joan Joan Joan Joan Joan Joan Joan', nickname: 'Jo')
+              posts = Post->fake_many(2, author: $joan)
               expect(value: $posts, count: 2)
-              expect(value: $posts[1].title->length() <= 12, equals: true)
+              expect(value: $posts[1].title->count() <= 12, equals: true)
               expect(value: $joan.level, equals: 'reader')
               expect(value: $joan.score >= 5, equals: true)
               expect(value: $joan.email->ends_with('@example.com'), equals: true)
-              expect(value: $Author->fake().verified, equals: false)
+              expect(value: Author->fake().verified, equals: false)
             }
 
             test(name: 'fails') {
-              $Post->fake_many(5)
+              Post->fake_many(5)
               expect(value: @queries(), count_at_most: 2)
             }
             """);
@@ -102,11 +102,11 @@ public sealed class DataTestingTests : DataFixture
     [Fact]
     public void MigrationsMakeTheTestDatabaseWhenThereAreSome()
     {
-        FileOf("database/migrations/2026_01_01_000000_notes.kscript", "KScript.Migration {\n  CreateTable(name: notes) {\n    Field(name: id, type: int, key, auto)\n    Field(name: body, type: string)\n  }\n}\n");
+        FileOf("database/migrations/2026_01_01_000000_notes.kscript", "import KScript.Data\n\nMigration {\n  CreateTable(name: 'notes') {\n    Field(name: 'id', type: int, key, auto)\n    Field(name: 'body', type: string)\n  }\n}\n");
         TestFileResult file = RunTests("""
             test(name: 'the migrations ran') {
               expect(value: $db->tables(), contains: 'notes')
-              expect(value: $db->tables(), not-contains: 'posts')
+              expect(value: $db->tables(), not_contains: 'posts')
             }
             """);
         Passed(file);
@@ -118,20 +118,20 @@ public sealed class DataTestingTests : DataFixture
         if (Server == null) FileOf("config.yaml", "database:\n  connections:\n    main:\n      url: sqlite:data/test.sqlite\n");
         Keep();
         TestFileResult file = RunTests("""
-            $db->create_table($Author)
-            $db->create_table($Post)
+            $db->create_table(Author)
+            $db->create_table(Post)
 
             test(name: 'adds') {
-              $Author->fake()
-              expect(value: $Author->count(), equals: 1)
-              expect-error(type: UniqueViolation) {
+              Author->fake()
+              expect(value: Author->count(), equals: 1)
+              expect_error(type: UniqueViolation) {
                 $db->sql("INSERT INTO authors (id, name, email, handle, level, born, score, tags, code, secret, verified) SELECT id, name, email, handle, level, born, score, tags, code, secret, verified FROM authors")
               }
-              expect(value: $Author->count(), equals: 1)
+              expect(value: Author->count(), equals: 1)
             }
 
             test(name: 'sees nothing') {
-              expect(value: $Author->count(), equals: 0)
+              expect(value: Author->count(), equals: 0)
             }
             """, "{ \"name\": \"testing\", \"test\": { \"database\": \"config\" } }");
         Passed(file);
@@ -145,16 +145,16 @@ public sealed class DataTestingTests : DataFixture
     {
         TestFileResult file = RunTests("""
             test(name: 'count') {
-              expect-error(contains: whole) {
-                $Post->fake_many(-1)
+              expect_error(contains: "whole") {
+                Post->fake_many(-1)
               }
-              expect-error(contains: count) {
-                $Post->fake_many(1, 'x')
+              expect_error(contains: "count") {
+                Post->fake_many(1, 'x')
               }
-              expect(value: $Post->fake_many(0), count: 0)
-              expect(value: $Post->fake_many(1, { title: 'Mapped' })[0].title, equals: 'Mapped')
-              expect-error(contains: needs) {
-                $Post->create(title: 'x', author: $Post->fake())
+              expect(value: Post->fake_many(0), count: 0)
+              expect(value: Post->fake_many(1, { title: 'Mapped' })[0].title, equals: 'Mapped')
+              expect_error(contains: "needs") {
+                Post->create(title: 'x', author: Post->fake())
               }
             }
             """);
@@ -169,8 +169,8 @@ public sealed class DataTestingTests : DataFixture
             import "../models/node.kscript"
 
             test(name: 'circle') {
-              expect-error(contains: circle) {
-                $Node->fake()
+              expect_error(contains: "circle") {
+                Node->fake()
               }
             }
             """);
@@ -180,10 +180,10 @@ public sealed class DataTestingTests : DataFixture
     [Fact]
     public void AMigrationThatFailsStopsTheTestFile()
     {
-        FileOf("database/migrations/2026_01_01_000000_bad.kscript", "KScript.Migration {\n  DropTable(name: nothing_here)\n}\n");
+        FileOf("database/migrations/2026_01_01_000000_bad.kscript", "import KScript.Data\n\nMigration {\n  DropTable(name: 'nothing_here')\n}\n");
         TestFileResult file = RunTests("""
             test(name: 'never runs') {
-              expect(value: $Post->count(), equals: 0)
+              expect(value: Post->count(), equals: 0)
             }
             """);
         Assert.NotNull(file.Error ?? file.Tests.FirstOrDefault(t => t.Outcome != TestOutcome.Passed)?.Message);
@@ -221,8 +221,8 @@ public sealed class DataTestingTests : DataFixture
             model Thing {
               name: string
             }
-            $db->create_table($Thing)
-            $Thing->create(name: 'a')
+            $db->create_table(Thing)
+            Thing->create(name: 'a')
             q = @queries()
             echo $q->count() > 1
             echo $q->last().sql->contains('INSERT')

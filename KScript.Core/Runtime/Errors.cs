@@ -1,3 +1,5 @@
+using KScript.Syntax;
+
 namespace KScript.Runtime
 {
     /// <summary>
@@ -6,9 +8,29 @@ namespace KScript.Runtime
     /// </summary>
     public class KScriptException : Exception
     {
-        public KScriptException(string message, string type = "Error", Exception inner = null) : base(message, inner)
+        private readonly Wording wording;
+        private bool? inCode;
+
+        /// <summary>
+        /// An error with a message. A message written as an interpolated string (<c>$"&lt;{name}&gt; needs a value."</c>)
+        /// is a <see cref="Wording"/>: in a .kscript file it reads in that file's terms. A plain string is final text.
+        /// </summary>
+        public KScriptException(Wording message, string type = "Error", Exception inner = null) : base(message?.Xml, inner)
         {
+            wording = message;
             Type = string.IsNullOrEmpty(type) ? "Error" : type;
+        }
+
+        /// <summary>The message, in the terms of the file the error is in: statements and arguments in .kscript, elements and attributes in XML.</summary>
+        public override string Message => inCode == true && wording != null ? wording.Code : base.Message;
+
+        /// <summary>The message for either form of script, to give to an error that wraps or repeats this one.</summary>
+        public Wording Words => wording ?? Wording.Final(base.Message);
+
+        /// <summary>Says which form of script the error is in, the first time that is known.</summary>
+        internal void InFile(Module module)
+        {
+            if (inCode == null && module != null) inCode = module.IsCode;
         }
 
         /// <summary>The error type, such as Error, Syntax, Type, Name, FileNotFound or a name from &lt;throw type&gt;.</summary>
@@ -89,7 +111,7 @@ namespace KScript.Runtime
         public object Value { get; }
     }
 
-    /// <summary>Thrown by &lt;exit&gt; and @exit() to end the script with an exit code.</summary>
+    /// <summary>Thrown by &lt;exit&gt; to end the script with an exit code.</summary>
     public sealed class ExitSignal : ControlSignal
     {
         public ExitSignal(int code) : base("exit") { Code = code; }

@@ -8,7 +8,7 @@ namespace KScript.Syntax.Markup
     /// Parses the brace-and-newline KScript format (<c>.kscript</c> files) into the same <see cref="MarkupDocument"/>
     /// that <see cref="MarkupParser"/> builds from XML, so the analyzer, the interpreter and every package run it
     /// unchanged. Keywords such as <c>let</c>, <c>if</c>, <c>for</c> and <c>fn</c> become the elements of the same name;
-    /// any other name, such as <c>input(to: name) "Prompt: "</c>, is an element written as
+    /// any other name, such as <c>input(into: name) "Prompt: "</c>, is an element written as
     /// <c>name(attribute: value, ...) "text" { children }</c>. Expressions are kept as the exact source text, so
     /// positions in errors and in the editor point into the file.
     /// </summary>
@@ -66,6 +66,9 @@ namespace KScript.Syntax.Markup
 
             /// <summary>Inside parentheses, such as a function's parameters: ends at the closing ')'.</summary>
             Group,
+
+            /// <summary>The pattern of a match arm: ends at its '=&gt;' (or the end of the line).</summary>
+            Arm,
         }
 
         #region Driver
@@ -84,10 +87,10 @@ namespace KScript.Syntax.Markup
 
             ParseBody(root, braced: false);
 
-            // A file that is a single package element, such as KScript.Window { ... }, or an explicit kscript { ... },
-            // uses it as the root, as an XML script would.
+            // A file that is an explicit kscript { ... } uses it as the root, as an XML script would. A package's element
+            // is a statement like any other (import KScript.UI, then Window { ... }): there is no KScript.Window { } root.
             List<MarkupElement> top = root.ChildElements.ToList();
-            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && (top[0].Name.StartsWith("KScript.", StringComparison.Ordinal) || top[0].Name == "kscript"))
+            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && top[0].Name == "kscript")
             {
                 foreach (MarkupNode node in root.Children.Where(n => !(n is MarkupText)))
                 {
@@ -204,7 +207,8 @@ namespace KScript.Syntax.Markup
             }
 
             // SendWelcome(user_id: 7)->dispatch(): a call on a value made by a job or error type, not an element.
-            if (char.IsUpper(word[0]) && CallThenArrow(pos + word.Length))
+            // User->create(name: 'Joan'): a call on a type, which is named bare.
+            if (char.IsUpper(word[0]) && (CallThenArrow(pos + word.Length) || string.CompareOrdinal(text, pos + word.Length, "->", 0, 2) == 0))
             {
                 ParseDo(parent, start);
                 return;
@@ -253,7 +257,6 @@ namespace KScript.Syntax.Markup
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
                 case "error" when StartsDeclaration(5): ParseError(parent, start, doc); return;
                 case "job" when StartsDeclaration(3): ParseJob(parent, start, doc); return;
-                case "dispatch" when StartsDispatch(): ParseDispatch(parent, start); return;
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
@@ -275,7 +278,7 @@ namespace KScript.Syntax.Markup
                         {
                             "elif" or "else" => $"'{word}' goes straight after the }} of an if (or for).",
                             "catch" or "finally" => $"'{word}' goes straight after the }} of a try.",
-                            _ => $"'{word}' goes inside a match {{ }} block.",
+                            _ => $"'{word}' isn't a statement. The branches of a match are arms inside its {{ }}: 1, 2 => ... and _ => ... for anything else.",
                         });
                         return;
                     }
@@ -284,7 +287,7 @@ namespace KScript.Syntax.Markup
             ParseGenericElement(parent, start);
         }
 
-        /// <summary><c>$x += 1</c>, <c>@greet('Hi')</c>: assignments and calls become &lt;do&gt;.</summary>
+        /// <summary><c>x += 1</c>, <c>@greet('Hi')</c>: assignments and calls become &lt;do&gt;.</summary>
         private void ParseDo(MarkupElement parent, int start)
         {
             MarkupElement e = Begin(parent, "do", start, new TextSpan(start, 0));
@@ -310,7 +313,7 @@ namespace KScript.Syntax.Markup
             if (Peek(0) == '"')
             {
                 (DecodedText path, TextSpan span) = ReadString();
-                AddAttribute(e, "src", path, span);
+                AddAttribute(e, "path", path, span);
             }
             else
             {
@@ -330,7 +333,7 @@ namespace KScript.Syntax.Markup
                     if (Peek(0) == '"')
                     {
                         (DecodedText path, TextSpan span) = ReadString();
-                        AddAttribute(e, "src", path, span);
+                        AddAttribute(e, "path", path, span);
                     }
                     else
                     {
@@ -547,6 +550,7 @@ namespace KScript.Syntax.Markup
                     {
                         SkipSpaces();
                         pos += 2;
+                        Spelling(TextSpan.FromBounds(start, pos), "Write elif: 'else if' is spelled elif in a .kscript file.", "Change to elif", "elif");
                     }
                     AddExpressionAttribute(elif, "test", Stop.Header);
                     ParseBlock(elif);
@@ -604,7 +608,7 @@ namespace KScript.Syntax.Markup
                 TextSpan index = ReadNameSpan(allowDash: false);
                 if (index.Length > 0)
                 {
-                    AddRawAttribute(e, "index", index);
+                    AddRawAttribute(e, "at", index);
                 }
                 SkipSpaces();
             }
@@ -622,7 +626,12 @@ namespace KScript.Syntax.Markup
             ParseElseChain(parent, allowElif: false);
         }
 
-        /// <summary><c>match $x { case 1, 2 { } when $x > 9 { } default { } }</c>.</summary>
+        /// <summary>
+        /// <c>match $x { 1, 2 => echo "low"; _ when $x > 9 => { } _ => { } }</c>: each arm is
+        /// <c>pattern => statement</c> or <c>pattern => { block }</c>, the way a match expression writes
+        /// <c>pattern => value</c>. Arms are separated by a new line or a comma. They become the &lt;case&gt; and
+        /// &lt;default&gt; elements of the XML form.
+        /// </summary>
         private void ParseMatch(MarkupElement parent, int start)
         {
             MarkupElement e = Begin(parent, "match", start);
@@ -630,11 +639,13 @@ namespace KScript.Syntax.Markup
             SkipSpaces();
             if (Peek(0) != '{')
             {
-                Error(new TextSpan(pos, 0), DiagnosticCodes.MarkupSyntax, "Write { after the value, then the cases.");
+                Error(new TextSpan(pos, 0), DiagnosticCodes.MarkupSyntax, "Write { after the value, then the arms: match $x { 1 => ... _ => ... }.");
                 Finish(e, start);
                 return;
             }
             int open = pos++;
+            bool wasArm = inArm;
+            inArm = false;
             while (true)
             {
                 commentTarget = e;
@@ -649,32 +660,216 @@ namespace KScript.Syntax.Markup
                     pos++;
                     break;
                 }
-                int caseStart = pos;
-                string word = Lexer.IsIdentStart(text[pos]) ? PeekName() : null;
-                if (word == "case" || word == "when")
+                if (text[pos] is ',' or ';')
                 {
-                    MarkupElement c = Begin(e, "case", caseStart);
-                    AddExpressionAttribute(c, word == "case" ? "is" : "when", Stop.Header);
-                    ParseBlock(c);
-                    Finish(c, caseStart);
+                    pos++;
+                    continue;
                 }
-                else if (word == "default")
-                {
-                    MarkupElement d = Begin(e, "default", caseStart);
-                    ParseBlock(d);
-                    Finish(d, caseStart);
-                }
-                else
-                {
-                    while (pos < text.Length && text[pos] != '\n' && text[pos] != '}')
-                    {
-                        pos++;
-                    }
-                    Error(TextSpan.FromBounds(caseStart, pos), DiagnosticCodes.MisplacedElement, "Inside match, write 'case value { }', 'when test { }' or 'default { }'.");
-                }
+                ParseArm(e);
             }
+            inArm = wasArm;
             e.ContentSpan = TextSpan.FromBounds(open + 1, Math.Max(open + 1, pos - 1));
             Finish(e, start);
+        }
+
+        /// <summary>True while reading the single statement of a match arm, which a comma ends.</summary>
+        private bool inArm;
+
+        private const string ArmForms = "1, 2 => ... for values, _ when $n > 9 => ... for a test, and _ => ... for anything else";
+
+        private const string ArmFix = "Write it as an arm";
+
+        /// <summary>
+        /// True for the error on a match arm written the old way (<c>case 1 { }</c>, <c>default { }</c>): its fix writes
+        /// the arm, and is always safe, so <c>kscript check --fix</c> applies it.
+        /// </summary>
+        public static bool IsArmFix(Diagnostic d) => d.Fixes != null && d.Fixes.Count > 0 && d.Fixes[0].Title == ArmFix;
+
+        /// <summary>One arm of a match statement: <c>1, 2 => { }</c>, <c>'a' when $ready => echo "a"</c>, <c>_ => { }</c>.</summary>
+        private void ParseArm(MarkupElement match)
+        {
+            int armStart = pos;
+            string word = Lexer.IsIdentStart(text[pos]) ? PeekName() : null;
+            (int headStart, int headEnd) = ReadExpression(Stop.Arm);
+            if (!Lookahead("=>"))
+            {
+                if (word is "case" or "when" or "default" && armStart + word.Length < text.Length && !Lexer.IsIdentChar(text[armStart + word.Length]))
+                {
+                    pos = armStart;
+                    ParseRetiredArm(match, word, armStart);
+                    return;
+                }
+                if (pos == armStart)
+                {
+                    pos++;
+                }
+                Error(TextSpan.FromBounds(armStart, Math.Max(pos, armStart + 1)), DiagnosticCodes.MisplacedElement, $"Inside match, write arms: {ArmForms}.");
+                return;
+            }
+            int arrow = pos;
+            pos += 2;
+
+            // pattern [when test]
+            int when = FindWord(headStart, headEnd, "when");
+            TextSpan pattern = Trimmed(headStart, when < 0 ? headEnd : when);
+            TextSpan guard = when < 0 ? new TextSpan(headEnd, 0) : Trimmed(when + 4, headEnd);
+            string patternText = text.Substring(pattern.Start, pattern.Length);
+            bool any = patternText == "_";
+            if (patternText == "default" && when < 0)
+            {
+                Error(pattern, DiagnosticCodes.RetiredElement, "Write _ for the arm that matches anything: _ => ...",
+                    new QuickFix(ArmFix, new TextChange(pattern, "_")));
+                any = true;
+            }
+            else if (patternText.StartsWith("case ", StringComparison.Ordinal))
+            {
+                TextSpan keyword = TextSpan.FromBounds(pattern.Start, Trimmed(pattern.Start + 4, pattern.End).Start);
+                Error(new TextSpan(pattern.Start, 4), DiagnosticCodes.RetiredElement, "Drop 'case': an arm starts with its values, as in 1, 2 => ...",
+                    new QuickFix(ArmFix, new TextChange(keyword, string.Empty)));
+                pattern = TextSpan.FromBounds(keyword.End, pattern.End);
+            }
+            else if (pattern.Length == 0 && when >= 0)
+            {
+                Error(new TextSpan(when, 4), DiagnosticCodes.MarkupSyntax, "Write the test after a pattern: _ when $n > 9 => ...",
+                    new QuickFix(ArmFix, new TextChange(new TextSpan(when, 0), "_ ")));
+                any = true;
+            }
+            else if (pattern.Length == 0)
+            {
+                Error(new TextSpan(arrow, 2), DiagnosticCodes.MissingAttribute, $"Write what this arm matches before =>: {ArmForms}.");
+                any = true;
+            }
+            if (when >= 0 && guard.Length == 0)
+            {
+                Error(new TextSpan(when, 4), DiagnosticCodes.MissingAttribute, "Write the test after 'when', such as _ when $n > 9 => ...");
+            }
+
+            bool fallback = any && guard.Length == 0;
+            MarkupElement arm = Begin(match, fallback ? "default" : "case", armStart, new TextSpan(pattern.Start, any ? pattern.Length : 0), consumeName: false);
+            if (!any)
+            {
+                AddRawAttribute(arm, "is", pattern);
+            }
+            if (guard.Length > 0)
+            {
+                AddRawAttribute(arm, "when", guard);
+            }
+
+            SkipSpaces();
+            if (Peek(0) == '{')
+            {
+                ParseBlock(arm);
+            }
+            else if (AtStatementEnd())
+            {
+                arm.StartTagSpan = TextSpan.FromBounds(armStart, pos);
+                Error(new TextSpan(arrow, 2), DiagnosticCodes.MarkupSyntax, "Write what this arm does after =>, on the same line: 1 => echo \"one\", or 1 => { } for several statements.");
+            }
+            else
+            {
+                arm.StartTagSpan = TextSpan.FromBounds(armStart, pos);
+                int bodyStart = pos;
+                inArm = true;
+                ParseStatement(arm);
+                inArm = false;
+                arm.ContentSpan = TextSpan.FromBounds(bodyStart, pos);
+            }
+            Finish(arm, armStart);
+
+            SkipSpaces();
+            if (Peek(0) == ',')
+            {
+                pos++;
+                return;
+            }
+            commentTarget = match;
+            EndStatement();
+        }
+
+        /// <summary>
+        /// <c>case 1, 2 { }</c>, <c>when test { }</c> and <c>default { }</c>: how the arms of a match statement were
+        /// written before they shared the match expression's <c>pattern => result</c>. Read as the arm it was meant to
+        /// be, and reported with the new spelling.
+        /// </summary>
+        private void ParseRetiredArm(MarkupElement match, string word, int armStart)
+        {
+            MarkupElement arm = Begin(match, word == "default" ? "default" : "case", armStart, new TextSpan(armStart, word.Length));
+            TextSpan head = new TextSpan(pos, 0);
+            if (word != "default")
+            {
+                (int s, int end) = ReadExpression(Stop.Header);
+                head = TextSpan.FromBounds(s, end);
+                if (end > s)
+                {
+                    AddRawAttribute(arm, word == "case" ? "is" : "when", head);
+                }
+            }
+            SkipSpaces();
+            var changes = new List<TextChange>
+            {
+                word switch
+                {
+                    "case" => new TextChange(TextSpan.FromBounds(armStart, head.Start), string.Empty),
+                    "when" => new TextChange(new TextSpan(armStart, 0), "_ "),
+                    _ => new TextChange(new TextSpan(armStart, word.Length), "_ =>"),
+                },
+            };
+            if (word != "default" && Peek(0) == '{')
+            {
+                changes.Add(new TextChange(new TextSpan(pos, 0), "=> "));
+            }
+            string now = word switch
+            {
+                "case" => "an arm starts with its values: 1, 2 => { }",
+                "when" => "a test follows a pattern: _ when $n > 9 => { }",
+                _ => "the arm that matches anything is _ => { }",
+            };
+            Error(new TextSpan(armStart, word.Length), DiagnosticCodes.RetiredElement,
+                $"'{word}' is the XML form. In a .kscript file {now}.",
+                new QuickFix(ArmFix, changes.ToArray()));
+            ParseBlock(arm);
+            Finish(arm, armStart);
+            commentTarget = match;
+            EndStatement();
+        }
+
+        /// <summary>Where a word stands on its own between two offsets, outside strings and brackets; -1 if nowhere.</summary>
+        private int FindWord(int start, int end, string word)
+        {
+            int depth = 0;
+            for (int i = start; i < end; i++)
+            {
+                char c = text[i];
+                if (c == '\'' || c == '"')
+                {
+                    for (i++; i < end && text[i] != c; i++)
+                    {
+                        if (Quotes.IsEscape(text, i, end, c)) i++;
+                    }
+                    continue;
+                }
+                if (c is '(' or '[' or '{') depth++;
+                else if (c is ')' or ']' or '}') depth--;
+                else if (depth == 0 && c == word[0] && string.CompareOrdinal(text, i, word, 0, word.Length) == 0
+                    && (i == start || !(Lexer.IsIdentChar(text[i - 1]) || text[i - 1] is '$' or '@' or '.' or '>'))
+                    && (i + word.Length >= end || !Lexer.IsIdentChar(text[i + word.Length]))
+                    && !(i + word.Length < end && text[i + word.Length] is ':' or '('))
+                {
+                    return i;
+                }
+                else if (Lexer.IsIdentStart(c))
+                {
+                    while (i + 1 < end && Lexer.IsIdentChar(text[i + 1])) i++;
+                }
+            }
+            return -1;
+        }
+
+        private TextSpan Trimmed(int start, int end)
+        {
+            while (start < end && char.IsWhiteSpace(text[start])) start++;
+            while (end > start && char.IsWhiteSpace(text[end - 1])) end--;
+            return TextSpan.FromBounds(start, end);
         }
 
         /// <summary><c>fn greet(who, greeting = 'Hello') { }</c> or <c>fn double(x: int) => $x * 2</c>.</summary>
@@ -804,7 +999,7 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary>
-        /// <c>type Repo(sample: "repo.json") { name: string; stars: int from stargazers_count }</c>: a &lt;type&gt;
+        /// <c>type Repo(path: "repo.json") { name: string; stars: int from stargazers_count }</c>: a &lt;type&gt;
         /// whose block holds one field per line.
         /// </summary>
         private void ParseType(MarkupElement parent, int start, string doc, string keyword = "type")
@@ -945,30 +1140,6 @@ namespace KScript.Syntax.Markup
                 pos = save;
                 e.StartTagSpan = TextSpan.FromBounds(start, pos);
             }
-            Finish(e, start);
-        }
-
-        /// <summary>True at <c>dispatch SendWelcome(...)</c> or <c>dispatch $job</c>; <c>dispatch(value: ...)</c> stays an element.</summary>
-        private bool StartsDispatch()
-        {
-            int p = pos + 8;
-            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t'))
-            {
-                return false;
-            }
-            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
-            {
-                p++;
-            }
-            return p < text.Length && (Lexer.IsIdentStart(text[p]) || text[p] is '$' or '@');
-        }
-
-        /// <summary><c>dispatch SendWelcome(user_id: 1)</c>: a &lt;dispatch value="..."&gt; that queues the job.</summary>
-        private void ParseDispatch(MarkupElement parent, int start)
-        {
-            MarkupElement e = Begin(parent, "dispatch", start);
-            SkipSpaces();
-            AddExpressionAttribute(e, "value", Stop.Line);
             Finish(e, start);
         }
 
@@ -1357,8 +1528,13 @@ namespace KScript.Syntax.Markup
                 SkipSpaces();
                 if (Peek(0) is '|' or ',')
                 {
+                    bool comma = Peek(0) == ',';
                     pos++;
                     SkipSpaces();
+                    if (comma)
+                    {
+                        Spelling(TextSpan.FromBounds(last, pos), "Join error types with |: catch NotFound | Conflict as e.", "Change to |", " | ");
+                    }
                     if (Lexer.IsIdentStart(Peek(0)))
                     {
                         continue;
@@ -1478,10 +1654,22 @@ namespace KScript.Syntax.Markup
         /// Any other element: <c>name</c>, <c>name(attr: value, other: "text, with commas")</c>, then optional
         /// <c>"text"</c> and an optional <c>{ children }</c> block.
         /// </summary>
+        private const string PackagePrefix = "KScript.";
+
         private void ParseGenericElement(MarkupElement parent, int start)
         {
             int nameStart = pos;
             string name = ReadName();
+            if (name.Length > PackagePrefix.Length && name.StartsWith(PackagePrefix, StringComparison.Ordinal))
+            {
+                // KScript.Window { }: a package is named only in an import, never on a statement.
+                string bare = name.Substring(PackagePrefix.Length);
+                Error(new TextSpan(nameStart, name.Length), DiagnosticCodes.MarkupSyntax,
+                    $"Write {bare}, not {name}: a package is named only in an import at the top of the file (import KScript...), never on a statement.",
+                    new QuickFix($"Write {bare}", new TextChange(new TextSpan(nameStart, PackagePrefix.Length), string.Empty)));
+                nameStart += PackagePrefix.Length;
+                name = bare;
+            }
             MarkupElement e = Begin(parent, name, start, new TextSpan(nameStart, name.Length), consumeName: false);
             if (Peek(0) == '(')
             {
@@ -1551,7 +1739,7 @@ namespace KScript.Syntax.Markup
                 string name = ReadName();
                 if (name.Length == 0)
                 {
-                    Error(new TextSpan(pos, 1), DiagnosticCodes.InvalidAttribute, $"Expected an attribute name, such as to: name, not '{text[pos]}'.");
+                    Error(new TextSpan(pos, 1), DiagnosticCodes.InvalidAttribute, $"Expected an argument's name, such as into: name, not '{text[pos]}'.");
                     while (pos < text.Length && text[pos] != ',' && text[pos] != ')' && text[pos] != '\n')
                     {
                         pos++;
@@ -1566,12 +1754,19 @@ namespace KScript.Syntax.Markup
                 SkipSpaces();
                 if (Peek(0) == ':' || Peek(0) == '=')
                 {
+                    if (Peek(0) == '=')
+                    {
+                        int after = pos + 1;
+                        while (after < text.Length && (text[after] == ' ' || text[after] == '\t')) after++;
+                        Spelling(TextSpan.FromBounds(nameSpan.End, after), $"Write {name}: value. An argument's name and value are joined by a colon.", "Change to :", ": ");
+                    }
                     pos++;
                     SkipTrivia(newlines: true);
                     if (Peek(0) == '"')
                     {
                         (DecodedText value, TextSpan span) = ReadString();
                         AddAttribute(e, name, value, TextSpan.FromBounds(nameStart, span.End), nameSpan, '"');
+                        e.Attributes[e.Attributes.Count - 1].IsArgument = true;
                     }
                     else
                     {
@@ -1581,6 +1776,7 @@ namespace KScript.Syntax.Markup
                             Error(new TextSpan(pos, 0), DiagnosticCodes.InvalidAttribute, $"Write a value for {name}.");
                         }
                         AddAttribute(e, name, DecodedText.Plain(text.Substring(s, end - s), s), TextSpan.FromBounds(nameStart, end), nameSpan, '\0');
+                        e.Attributes[e.Attributes.Count - 1].IsArgument = true;
                     }
                 }
                 else
@@ -1602,7 +1798,10 @@ namespace KScript.Syntax.Markup
                 return;
             }
             int open = pos++;
+            bool wasArm = inArm;
+            inArm = false;
             ParseBody(e, braced: true, fields);
+            inArm = wasArm;
             e.ContentSpan = TextSpan.FromBounds(open + 1, Math.Max(open + 1, text[Math.Max(0, pos - 1)] == '}' ? pos - 1 : pos));
         }
 
@@ -1744,8 +1943,17 @@ namespace KScript.Syntax.Markup
                 }
                 if (brackets.Count == 0)
                 {
-                    if (c == ';' && stop is Stop.Line or Stop.Header)
+                    if (c == ';' && stop is Stop.Line or Stop.Header or Stop.Arm)
                     {
+                        break;
+                    }
+                    if (c == '=' && Peek(1) == '>' && stop == Stop.Arm)
+                    {
+                        break;
+                    }
+                    if (c == ',' && stop == Stop.Line && inArm)
+                    {
+                        // 1 => echo "one", 2 => echo "two": a comma ends an arm's statement.
                         break;
                     }
                     if (c == ',' && stop == Stop.Argument)
@@ -1927,7 +2135,7 @@ namespace KScript.Syntax.Markup
             int start = pos++;
             while (pos < text.Length && text[pos] != quote)
             {
-                if (text[pos] == '\\' && pos + 1 < text.Length)
+                if (Quotes.IsEscape(text, pos, text.Length, quote))
                 {
                     pos++;
                 }
@@ -2118,7 +2326,7 @@ namespace KScript.Syntax.Markup
                 char c = text[i];
                 if (quote != '\0')
                 {
-                    if (c == '\\')
+                    if (Quotes.IsEscape(text, i, text.Length, quote))
                     {
                         i++;
                     }
@@ -2200,6 +2408,7 @@ namespace KScript.Syntax.Markup
                 p++;
             }
             return p >= text.Length || text[p] == '\n' || text[p] == '\r' || text[p] == ';' || text[p] == '}'
+                || (inArm && text[p] == ',')
                 || (text[p] == '/' && p + 1 < text.Length && text[p + 1] == '/' && !Lexer.AfterUrlScheme(text, p))
                 || TrailingCommentAt(p);
         }
@@ -2376,6 +2585,11 @@ namespace KScript.Syntax.Markup
 
         private void Error(TextSpan span, string code, string message, params QuickFix[] fixes) =>
             document.Diagnostics.Add(new Diagnostic(span, DiagnosticSeverity.Error, code, message, fixes));
+
+        /// <summary>A second spelling the parser still reads (KS6012): says which one is the language's, with the fix.</summary>
+        private void Spelling(TextSpan span, string message, string fixTitle, string replacement) =>
+            document.Diagnostics.Add(new Diagnostic(span, DiagnosticSeverity.Warning, DiagnosticCodes.OneSpelling, message,
+                new[] { new QuickFix(fixTitle, new TextChange(span, replacement)) }));
 
         #endregion
     }

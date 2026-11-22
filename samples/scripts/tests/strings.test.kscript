@@ -1,0 +1,19 @@
+// Run with: kscript test (from samples/scripts), or kscript test
+// tests/strings.test.kscript
+import "../lib/strings.kscript"
+
+describe(name: "slugify") {
+  test(name: "lower-cases and joins words with dashes") {
+    expect(value: @slugify('Hello World'), equals: 'hello-world')
+  }
+
+  for case in [
+    { text: 'One', slug: 'one' },
+    { text: 'Two Words', slug: 'two-words' },
+    { text: 'ALREADY-SLUG', slug: 'already-slug' },
+  ] {
+    test(name: "slug of '{$case.text}'") {
+      expect(value: @slugify($case.text), equals: $case.slug)
+    }
+  }
+}

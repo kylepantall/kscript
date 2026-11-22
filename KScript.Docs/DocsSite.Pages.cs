@@ -5,7 +5,7 @@ namespace KScript.Docs
     /// <summary>The home, command line, playground and not-found pages, and the layout every page uses.</summary>
     public sealed partial class DocsSite
     {
-        internal const string HelloExample = "<let name=\"name\" value=\"'World'\" />\n<echo>Hello, $name!</echo>\n\n<let name=\"people\" value=\"[{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }]\" />\n<for each=\"p\" in=\"$people->sort_by(fn($p) => $p.age)\">\n  <echo>{ $p.name } is { $p.age }</echo>\n</for>\n";
+        internal const string HelloExample = "<let name=\"name\" value=\"'World'\" />\n<echo>Hello, $name!</echo>\n\n<let name=\"people\" value=\"[{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }]\" />\n<for each=\"p\" in=\"$people->sort_by(fn(p) => $p.age)\">\n  <echo>{ $p.name } is { $p.age }</echo>\n</for>\n";
 
         private void AddHome()
         {

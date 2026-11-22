@@ -35,9 +35,9 @@ namespace KScript.Docs
                 {
                     case "--help":
                     case "-h":
-                        output.WriteLine("Usage: kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open] | kscript docs --project");
+                        output.WriteLine("Usage: kscript docs [search words] [--port 4180] [--syntax kscript|xml] [--no-open] | kscript docs --project");
                         output.WriteLine("Opens the KScript docs in your browser: guides, the reference for every package, and examples you can run.");
-                        output.WriteLine("Examples show in the project's make.format (kscript.json), or .kscript outside a project; --format picks one.");
+                        output.WriteLine("Examples show in the project's make.syntax (kscript.json), or .kscript outside a project; --syntax picks one.");
                         output.WriteLine("kscript docs --project writes .kscript/docs/project.md, the docs of this project's own code, and keeps it up to date from then on.");
                         return 0;
                     case "--port":
@@ -45,17 +45,16 @@ namespace KScript.Docs
                         if (i + 1 >= args.Length || !int.TryParse(args[++i], out int p) || p < 1 || p > 65535)
                         {
                             error.WriteLine("--port needs a number, e.g. --port 4180");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         port = p;
                         break;
-                    case "--format":
-                    case "-f":
+                    case CliFlags.Syntax:
                         format = i + 1 < args.Length ? NormalizeFormat(args[++i]) : null;
                         if (format == null)
                         {
-                            error.WriteLine("--format needs kscript or xml, e.g. --format xml");
-                            return 1;
+                            error.WriteLine("--syntax needs kscript or xml, e.g. --syntax xml");
+                            return ExitCodes.Usage;
                         }
                         break;
                     case "--no-open":
@@ -64,10 +63,15 @@ namespace KScript.Docs
                     case "--project":
                         return ProjectDocsOutput.Start(KScript.Runtime.WorkingFolder.Current, output, error);
                     default:
+                        if (CliFlags.Retired("docs", args[i]) is string renamed)
+                        {
+                            error.WriteLine(renamed);
+                            return ExitCodes.Usage;
+                        }
                         if (args[i].StartsWith("-", StringComparison.Ordinal) && !args[i].StartsWith("->", StringComparison.Ordinal))
                         {
                             error.WriteLine($"Unknown option '{args[i]}'. Run kscript docs --help for usage.");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         words.Add(args[i]);
                         break;
@@ -194,13 +198,13 @@ namespace KScript.Docs
         {
             switch ((format ?? string.Empty).Trim().ToLowerInvariant())
             {
-                case "kscript": case ".kscript": case "ks": case "code": return "kscript";
-                case "xml": case "ks.xml": case ".ks.xml": return "xml";
+                case "kscript": return "kscript";
+                case "xml": return "xml";
                 default: return null;
             }
         }
 
-        /// <summary>The make.format of the project a folder is in, or .kscript outside a project (or if kscript.json can't be read).</summary>
+        /// <summary>The make.syntax of the project a folder is in, or .kscript outside a project (or if kscript.json can't be read).</summary>
         internal static string ProjectFormat(string folder)
         {
             try

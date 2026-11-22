@@ -25,21 +25,21 @@ public class CodeFormatTests
     [InlineData("errors")]
     public void SamplesPrintTheSameAsTheirXmlVersions(string name)
     {
-        string xml = RunFile(ScriptRunner.RepoFile("samples", "kscript2", name + ".ks.xml"));
-        Assert.Equal(xml, RunFile(ScriptRunner.RepoFile("samples", "code-format", name + ".kscript")));
+        string xml = RunFile(ScriptRunner.RepoFile("samples", "xml", name + ".ks.xml"));
+        Assert.Equal(xml, RunFile(ScriptRunner.RepoFile("samples", "scripts", name + ".kscript")));
     }
 
     [Fact]
     public void ImportsWorkAcrossFormats()
     {
-        Assert.Equal("hello-world\nhello-world\n", RunFile(ScriptRunner.RepoFile("samples", "code-format", "imports.kscript")));
+        Assert.Equal("hello-world\nhello-world\n", RunFile(ScriptRunner.RepoFile("samples", "scripts", "imports.kscript")));
 
         string dir = Path.Combine(Path.GetTempPath(), "kscript-code-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             File.WriteAllText(Path.Combine(dir, "lib.kscript"), "fn shout(s) => $s->upper() + '!'\nconst greeting = 'hi'");
-            File.WriteAllText(Path.Combine(dir, "main.ks.xml"), "<kscript><import src=\"lib.kscript\" /><echo>{ @shout($greeting) }</echo></kscript>");
+            File.WriteAllText(Path.Combine(dir, "main.ks.xml"), "<kscript><import path=\"lib.kscript\" /><echo>{ @shout($greeting) }</echo></kscript>");
             Assert.Equal("HI!\n", RunFile(Path.Combine(dir, "main.ks.xml")));
         }
         finally
@@ -59,7 +59,7 @@ public class CodeFormatTests
         {
             File.WriteAllText(Path.Combine(from, "a.txt"), "a");
             File.WriteAllText(Path.Combine(from, "c.log"), "c");
-            string output = RunFile(ScriptRunner.RepoFile("samples", "code-format", "move-files.kscript"), $"{from}\n{to}\ntxt\n");
+            string output = RunFile(ScriptRunner.RepoFile("samples", "scripts", "move-files.kscript"), $"{from}\n{to}\ntxt\n");
             Assert.Contains("Moved", output);
             Assert.True(File.Exists(Path.Combine(to, "a.txt")));
             Assert.True(File.Exists(Path.Combine(from, "c.log")));
@@ -92,9 +92,9 @@ public class CodeFormatTests
             echo $total
             for x in [] { echo "never" } else { echo "empty" }
             match 'b' {
-              case 'a' { echo "A" }
-              case 'b', 'c' { echo "B or C" }
-              default { echo "?" }
+              'a' => echo "A"
+              'b', 'c' => { echo "B or C" }
+              _ => echo "?"
             }
             """;
         Assert.Equal("-2 is negative\n0 is zero\n5 is positive\n7\nempty\nB or C\n", Run(code));
@@ -116,37 +116,39 @@ public class CodeFormatTests
             }
             echo $count
             label: string = 42
-            echo $label->length()
+            echo $label->count()
             """;
         Assert.Equal("5\n2\n", Run(code));
         Assert.Contains("const", Assert.Throws<KScriptException>(() => Run("const k = 1\nk = 2")).Message);
     }
 
-    /// <summary>XML to .kscript to XML: every version runs the same, and converting again changes nothing.</summary>
+    /// <summary>One syntax to the other and back: every version runs the same, and converting again changes nothing.</summary>
     [Theory]
-    [InlineData("samples/kscript2/tour.ks.xml")]
-    [InlineData("samples/kscript2/oldest.ks.xml")]
-    [InlineData("samples/kscript2/imports.ks.xml")]
-    [InlineData("samples/kscript2/types/repo.ks.xml")]
-    [InlineData("samples/kscript2/errors/out-of-stock.ks.xml")]
-    [InlineData("samples/life-lab/lib/life.ks.xml")]
-    [InlineData("samples/life-lab/life.ks.xml")]
-    [InlineData("samples/life-lab/desktop.ks.xml")]
-    [InlineData("Example Scripts/Find Oldest Person.xml")]
+    [InlineData("samples/xml/tour.ks.xml")]
+    [InlineData("samples/xml/oldest.ks.xml")]
+    [InlineData("samples/xml/imports.ks.xml")]
+    [InlineData("samples/xml/types/repo.ks.xml")]
+    [InlineData("samples/xml/errors/out-of-stock.ks.xml")]
+    [InlineData("samples/life-lab/lib/life.kscript")]
+    [InlineData("samples/life-lab/life.kscript")]
+    [InlineData("samples/life-lab/desktop.kscript")]
+    [InlineData("samples/scripts/move-files.kscript")]
     public void ConvertRoundTrips(string file)
     {
         string original = ScriptRunner.RepoFile(file.Split('/'));
         string dir = Path.GetDirectoryName(original);
+        // A .kscript sample starts from its XML version, so every row takes the same three steps.
         string xml = File.ReadAllText(original);
+        if (file.EndsWith(".kscript")) xml = KScript.Syntax.Markup.ScriptConverter.Convert(xml, original).Text;
 
-        string code = KScript.Syntax.Markup.ScriptConverter.Convert(xml, original).Text;
+        string code = KScript.Syntax.Markup.ScriptConverter.Convert(xml, "x.ks.xml").Text;
         string back = KScript.Syntax.Markup.ScriptConverter.Convert(code, "x.kscript").Text;
-        string again = KScript.Syntax.Markup.ScriptConverter.Convert(back, original).Text;
+        string again = KScript.Syntax.Markup.ScriptConverter.Convert(back, "x.ks.xml").Text;
         Assert.Equal(code, again);
 
-        if (file.Contains("desktop"))
+        if (file.Contains("desktop") || file.Contains("move-files"))
         {
-            return; // a window: checked by shape in the language tests
+            return; // a window, and a script that asks questions: checked by shape
         }
         string codePath = Path.Combine(dir, "_rt_" + Guid.NewGuid().ToString("N") + ".kscript");
         string xmlPath = Path.Combine(dir, "_rt_" + Guid.NewGuid().ToString("N") + ".ks.xml");
@@ -154,7 +156,7 @@ public class CodeFormatTests
         {
             File.WriteAllText(codePath, code);
             File.WriteAllText(xmlPath, back);
-            string[] args = file.EndsWith("life.ks.xml") && !file.Contains("lib") ? new[] { "glider", "3" } : Array.Empty<string>();
+            string[] args = Path.GetFileName(file).StartsWith("life.") && !file.Contains("lib") ? new[] { "glider", "3" } : Array.Empty<string>();
             string expected = RunWithArgs(original, args);
             Assert.Equal(expected, RunWithArgs(codePath, args));
             Assert.Equal(expected, RunWithArgs(xmlPath, args));
@@ -311,7 +313,7 @@ public class CodeFormatTests
         {
             Assert.StartsWith("type Odd(fields: ", Code($"<type name=\"Odd\" fields=\"{odd}\" />").Trim());
         }
-        Assert.Equal(new[] { "a: string = 'it\\'s, ok'", "b: int" }, KScript.Syntax.Markup.ScriptConverter.FieldsAsLines("a: string = 'it\\'s, ok', b: int"));
+        Assert.Equal(new[] { "a: string = \"it's, ok\"", "b: int" }, KScript.Syntax.Markup.ScriptConverter.FieldsAsLines("a: string = \"it's, ok\", b: int"));
         Assert.Null(KScript.Syntax.Markup.ScriptConverter.FieldsAsLines(" "));
     }
 

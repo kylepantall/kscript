@@ -25,6 +25,6 @@ Resource(path: "{{ route_path }}", to: {{ alias }})
 {{#if view}}
 Get(path: "{{ route_path }}", view: "{{ view }}"{{#if route_name}}, name: "{{ route_name }}"{{/if}})
 {{else}}
-{{ method }}(path: "{{ route_path }}", to: {{ alias }}.{{ action }}{{#if route_name}}, name: "{{ route_name }}"{{/if}}{{#if where}}, where: "{{ where }}"{{/if}})
+{{ method }}(path: "{{ route_path }}", to: @{{ alias }}.{{ action }}{{#if route_name}}, name: "{{ route_name }}"{{/if}}{{#if where}}, where: "{{ where }}"{{/if}})
 {{/if}}
 {{/if}}

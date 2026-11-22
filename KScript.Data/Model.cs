@@ -397,7 +397,7 @@ namespace KScript.Data
         {
             string raw = run.Raw(name)?.Trim();
             if (raw == null) return false;
-            return Values.ParseBool(raw) ?? throw run.Error($"{name} is yes or no, not '{raw}'.", name, "Syntax");
+            return Values.ParseBool(raw) ?? throw run.Error($"{name} is true or false, not '{raw}'.", name, "Syntax");
         }
 
         /// <summary>The names of a list setting: <c>[a, b]</c> or <c>a, b</c>.</summary>

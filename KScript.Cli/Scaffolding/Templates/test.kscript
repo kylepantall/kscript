@@ -1,8 +1,8 @@
 --- make
 description: A test file in tests/, run with kscript test
 category: Tests
-usage: <name> [--format kscript|xml]
---format: kscript or xml (default the project's make.format)
+usage: <name> [--syntax kscript|xml]
+--syntax: kscript or xml (default the project's make.syntax)
 example: kscript make test checkout
 example: kscript make test api/people
 base: project
@@ -19,6 +19,6 @@ describe(name: "{{ title }}") {
   }
 
   test(name: "joins text") {
-    assert(test: ['a', 'b']->join('-') == 'a-b')
+    @assert(['a', 'b']->join('-') == 'a-b')
   }
 }

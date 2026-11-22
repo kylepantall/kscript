@@ -5,7 +5,7 @@ using KScript.Runtime;
 
 namespace KScript.Tests;
 
-/// <summary>$config, @config(), &lt;config&gt;, YAML and .env. Tests in one class run one at a time, so the environment variables they set don't collide.</summary>
+/// <summary>$config, &lt;config&gt;, YAML and .env. Tests in one class run one at a time, so the environment variables they set don't collide.</summary>
 public sealed class ConfigTests : IDisposable
 {
     private readonly string dir = Path.Combine(Path.GetTempPath(), "kscript-config-" + Guid.NewGuid().ToString("N"));
@@ -79,8 +79,8 @@ public sealed class ConfigTests : IDisposable
     {
         FileOf("staging.yaml", "theme: dark\n");
         FileOf(".env.stage", "REGION=eu\n");
-        Assert.Equal("dark\n", Run("<config env=\"staging\" export-env=\"no\" /><echo>{$config.theme}</echo>"));
-        Assert.Equal("eu\n", Run("<config env=\"stage\" export-env=\"no\" /><echo>{$config.region}</echo>"));
+        Assert.Equal("dark\n", Run("<config env=\"staging\" export_env=\"no\" /><echo>{$config.theme}</echo>"));
+        Assert.Equal("eu\n", Run("<config env=\"stage\" export_env=\"no\" /><echo>{$config.region}</echo>"));
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class ConfigTests : IDisposable
         FileOf("settings/app.yaml", "name: Shop\n");
         FileOf("settings/app.production.yaml", "name: Shop (live)\n");
         string output = Run("<config root=\"settings\" files=\"app, secrets.json?\" env=\"production\" defaults=\"{ name: 'x', port: 80 }\" require=\"name\" />" +
-            "<echo>{$config.name} {$config.port} {@config('port')} {@config('missing', 'd')} {@config()->count()}</echo>");
+            "<echo>{$config.name} {$config.port} {$config->get('port')} {$config->get('missing', 'd')} {$config->all()->count()}</echo>");
         Assert.Equal("Shop (live) 80 80 d 2\n", output);
     }
 
@@ -136,7 +136,7 @@ public sealed class ConfigTests : IDisposable
     {
         FileOf("config.yaml", "who: main\n");
         FileOf("other.yaml", "who: other\n");
-        Assert.Equal("other main\n", Run("<config files=\"other.yaml\" to=\"o\" /><echo>{$o.who} {$config.who}</echo>"));
+        Assert.Equal("other main\n", Run("<config files=\"other.yaml\" into=\"o\" /><echo>{$o.who} {$config.who}</echo>"));
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public sealed class ConfigTests : IDisposable
         FileOf("config.yaml", "");
         FileOf("config.json", "{ \"a\": { \"b\": 1 } }");
         Assert.Equal("{\n  \"a\": {\n    \"b\": 1\n  }\n}\n", Run("<echo>{$config}</echo>"));
-        Assert.Equal("config.json config.yaml\n", Run("<echo>{ $config->sources()->map(fn($s) => $s.name)->join(' ') }</echo>"));
+        Assert.Equal("config.json config.yaml\n", Run("<echo>{ $config->sources()->map(fn(s) => $s.name)->join(' ') }</echo>"));
     }
 
     [Fact]
@@ -292,8 +292,8 @@ public sealed class ConfigTests : IDisposable
     [Fact]
     public void Yaml_and_env_commands()
     {
-        Assert.Equal("Ann 2\n", Run("<echo>{ @yaml('name: Ann').name } { @yaml('[1, 2]')->count() }</echo>"));
-        Assert.Equal("a: 1\nb:\n  - x\n", Run("<echo>{ @to_yaml({ a: 1, b: ['x'] }) }</echo>"));
+        Assert.Equal("Ann 2\n", Run("<echo>{ 'name: Ann'->yaml().name } { '[1, 2]'->yaml()->count() }</echo>"));
+        Assert.Equal("a: 1\nb:\n  - x\n", Run("<echo>{ { a: 1, b: ['x'] }->to_yaml() }</echo>"));
         Assert.Equal("8080 Ann\n", Run("<echo>{ @parse_env('PORT=8080').PORT } { @parse_env('N=Ann').N }</echo>"));
 
         FileOf("data.yaml", "items: [a, b]\n");

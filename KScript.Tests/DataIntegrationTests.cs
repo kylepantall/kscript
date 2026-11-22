@@ -14,14 +14,11 @@ public sealed class DataIntegrationTests : DataFixture
     private const string PostModel = """
         import KScript.Data
 
-        model Post {
-          timestamps: yes
-          soft_deletes: yes
-          hidden: [secret]
+        model Post(timestamps, soft_deletes, hidden: [secret]) {
           title: string(max: 200)
           views: int = 0
           secret: string = 'x'
-          author: User?
+          author?: User
         }
         """;
 
@@ -52,7 +49,7 @@ public sealed class DataIntegrationTests : DataFixture
 
             /// The posts, a page at a time.
             /// @returns Post[] the page
-            fn index(query: map) => $Post->latest()->paginate(page: $query.page ?? 1)
+            fn index(query: map) => Post->latest()->paginate(page: $query.page ?? 1)
             fn views(post: Post, id: int) => { id: $id, views: $post.views }
             fn remove(post: Post) {
               $post->delete()
@@ -60,16 +57,17 @@ public sealed class DataIntegrationTests : DataFixture
             }
             """);
         FileOf("routes/api.kscript", """
-            KScript.Routes {
-              import "../controllers/posts.kscript" as posts
+            import KScript.Http
+            import "../controllers/posts.kscript" as posts
 
-              Get(path: "/posts", to: posts.index)
-              Get(path: "/posts/{post}", to: posts.show)
-              Get(path: "/posts/{post}/views/{id}", to: posts.views)
-              Delete(path: "/posts/{post}", to: posts.remove)
+            Routes {
+              Get(path: "/posts", to: @posts.index)
+              Get(path: "/posts/{post}", to: @posts.show)
+              Get(path: "/posts/{post}/views/{id}", to: @posts.views)
+              Delete(path: "/posts/{post}", to: @posts.remove)
             }
             """);
-        Keep("$db->create_table($User)\n$db->create_table($Post)\n$Post->create(title: 'Hello', views: 3)\n$Post->create(title: 'Second')");
+        Keep("$db->create_table(User)\n$db->create_table(Post)\nPost->create(title: 'Hello', views: 3)\nPost->create(title: 'Second')");
         return new HttpApp(Project, ProjectConfig.FindAndLoad(Project), null);
     }
 
@@ -142,13 +140,11 @@ public sealed class DataIntegrationTests : DataFixture
     private const string Member = """
         import KScript.Data
 
-        model User {
-          timestamps: yes
-          hidden: [password]
+        model User(timestamps, hidden: [password]) {
           email: email
           password: password
           name: string = 'Someone'
-          nickname: string?
+          nickname?: string
           posts: Post[]
         }
         """;
@@ -170,7 +166,7 @@ public sealed class DataIntegrationTests : DataFixture
             fn sign_in(json) => { user: @attempt($json.email, $json.password) }
             fn me() {
               me = @user()
-              return { name: $me.name, posts: $me.posts->count(), json: @json($me) }
+              return { name: $me.name, posts: $me.posts->count(), json: $me->to_json() }
             }
             fn people(json) {
               u = @users()
@@ -181,20 +177,21 @@ public sealed class DataIntegrationTests : DataFixture
             fn remove(json) => { first: @users()->delete($json.id), second: @users()->delete($json.id) }
             """);
         FileOf("routes/api.kscript", """
-            KScript.Routes {
-              import "../controllers/members.kscript" as m
+            import KScript.Http
+            import "../controllers/members.kscript" as m
 
-              Post(path: "/reg", to: m.reg)
-              Post(path: "/colour", to: m.colour)
-              Post(path: "/attempt", to: m.sign_in)
-              Get(path: "/me", to: m.me, middleware: auth)
-              Post(path: "/users", to: m.people)
-              Post(path: "/update", to: m.update)
-              Post(path: "/renew", to: m.renew)
-              Post(path: "/remove", to: m.remove)
+            Routes {
+              Post(path: "/reg", to: @m.reg)
+              Post(path: "/colour", to: @m.colour)
+              Post(path: "/attempt", to: @m.sign_in)
+              Get(path: "/me", to: @m.me, middleware: auth)
+              Post(path: "/users", to: @m.people)
+              Post(path: "/update", to: @m.update)
+              Post(path: "/renew", to: @m.renew)
+              Post(path: "/remove", to: @m.remove)
             }
             """);
-        if (model == Member) Keep("$db->create_table($User)\n$db->create_table($Post)");
+        if (model == Member) Keep("$db->create_table(User)\n$db->create_table(Post)");
         return new Browser(new HttpApp(Project, ProjectConfig.FindAndLoad(Project), new StringWriter()));
     }
 
@@ -217,8 +214,8 @@ public sealed class DataIntegrationTests : DataFixture
         Assert.Contains("User has no field 'colour'", b.Send("POST", "/api/colour", json: "{ \"email\": \"amy@example.com\", \"password\": \"correct horse battery\" }").Body);
 
         // The user is a row of the users table, with a hash in its password field.
-        Assert.Equal("1 Joan true", Keep("u = $User->find(1)\nok = $u.password->verify('correct horse battery')\necho \"$u.id $u.name $ok\""));
-        Keep("$Post->create(title: 'Mine', author_id: 1)");
+        Assert.Equal("1 Joan true", Keep("u = User->find(1)\nok = $u.password->verify('correct horse battery')\necho \"$u.id $u.name $ok\""));
+        Keep("Post->create(title: 'Mine', author_id: 1)");
 
         Assert.Equal(401, b.Send("GET", "/api/me", headers: new Dictionary<string, object> { ["accept"] = "application/json" }).Status);
         Assert.Equal("Joan@example.com", ((Dictionary<string, object>)Json(b.Send("POST", "/api/attempt", json: joan))["user"])["email"]);
@@ -240,11 +237,11 @@ public sealed class DataIntegrationTests : DataFixture
         Json(b.Send("POST", "/api/renew", json: "{ \"id\": \"1\", \"password\": \"a new long password\" }"));
         Assert.Null(Json(b.Send("POST", "/api/users", json: "{ \"id\": \"1\", \"password\": \"correct horse battery\" }"))["ok"]);
 
-        Keep("$Post->query()->delete()");
+        Keep("Post->query()->delete()");
         Dictionary<string, object> removed = Json(b.Send("POST", "/api/remove", json: "{ \"id\": \"1\" }"));
         Assert.Equal(true, removed["first"]);
         Assert.Equal(false, removed["second"]);
-        Assert.Equal("0", Keep("echo $User->count()"));
+        Assert.Equal("0", Keep("echo User->count()"));
     }
 
     [Fact]

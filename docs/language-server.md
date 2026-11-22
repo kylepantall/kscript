@@ -1,7 +1,7 @@
 # KScript 2 language server
 
 The language server gives editors diagnostics, completion, hover, signature help, go to definition, find references,
-rename, an outline, semantic highlighting, quick fixes, document links and formatting for KScript 2 scripts (`.ks.xml`, `.ks`),
+rename, an outline, semantic highlighting, quick fixes, document links and formatting for KScript 2 scripts (`.kscript`, and `.ks.xml` for the XML form),
 pages (`.html`) and Markdown pages (`.md`). It targets KScript 2 only: v1 elements, attributes and commands are
 reported as retired, with the KScript 2 replacement and a quick fix where one is mechanical.
 
@@ -10,7 +10,7 @@ reported as retired, with the KScript 2 replacement and a quick fix where one is
 | Command | What it does |
 | --- | --- |
 | `kscript lsp` | Runs the server over stdio (LSP 3.17). Any LSP client can use it. |
-| `kscript check [file-or-folder]... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. With no path it checks the project the current folder is in. A folder with `_layout.html`, `_components/`, `_layouts/` or `kscript.json` is a site, so its `.html` and `.md` pages are checked too. |
+| `kscript check [file-or-folder]... [--warnings-as-errors]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. With no path it checks the project the current folder is in. A folder with `_layout.html`, `_components/`, `_layouts/` or `kscript.json` is a site, so its `.html` and `.md` pages are checked too. |
 | `kscript check --print-config [file-or-folder]` | Prints the lint and format settings that apply, after the project's [standards](standards.md) and `kscript.json` are combined, with the layer that set each one. |
 | `kscript fmt [file-or-folder]... [--check]` | Tidies scripts and pages in place, or with `--check` lists the files that aren't formatted and exits 1. The server's `textDocument/formatting` uses the same formatter (`KScript.Language/Formatting`). See [Formatting](formatting.md). |
 
@@ -120,7 +120,7 @@ always in the description the package registers.
 | KS2xxx | Expressions (syntax, assignment outside `let`/`set`/`do`, bare identifiers), KS2005 `'single quotes'` around text that names a variable (only `"double quotes"` fill it in) |
 | KS3xxx | Elements and attributes (unknown, retired, missing, invalid values, placement), imports (KS3009 missing import, KS3010 unknown package) |
 | KS4xxx | Names (undefined variables and functions, constants, duplicates) |
-| KS5xxx | Calls (unknown or retired commands and methods, argument counts, type mismatches), KS5010 a field a `<type>`'s records don't have or a misspelt field of a map, KS5011 an error type in `catch`, `throw`, `extends` or `expect-error` that isn't declared or built in, KS5012 a literal that doesn't fit its declared type (`a: Age = 200`, `e: email = bob@`), KS5013 a column a KScript.Data model doesn't have (`$User->where(nmae: 'x')`), KS5014 a model the migrations don't match |
+| KS5xxx | Calls (unknown or retired commands and methods, argument counts, type mismatches), KS5010 a field a `<type>`'s records don't have or a misspelt field of a map, KS5011 an error type in `catch`, `throw`, `extends` or `expect_error` that isn't declared or built in, KS5012 a literal that doesn't fit its declared type (`a: Age = 200`, `e: email = bob@`), KS5013 a column a KScript.Data model doesn't have (`User->where(nmae: 'x')`), KS5014 a model the migrations don't match |
 | KS6xxx | Style: rules that keep code easy to read. They are only on when a standard turns them on; `kscript:recommended`, the default, makes them warnings. KS6001 flags `else` and `elif` in scripts, where an early `return`, `continue` or `break` reads better (see [Early returns instead of else](language.md#early-returns-instead-of-else)). KS6002 to KS6005 flag unused functions, variables, parameters and imports, counting uses from the rest of the project, and are sent with the `Unnecessary` tag so editors fade the code (see [Unused code](language.md#unused-code)). KS6006 suggests `[a, b]` for a list of names written as one string in a `.kscript` file |
 
 Every code is explained for users in [Error codes](errors.md), and the server sends that page as each diagnostic's `codeDescription`, so the code in the editor is a link. `DiagnosticCodeDocsTests` fails when a code has no section there.

@@ -35,7 +35,7 @@ namespace KScript.Language.Analysis
                 if (kind == RegionKind.Expression)
                 {
                     Report(attribute != null ? attribute.Span : element.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax,
-                        attribute != null ? $"'{attribute.Name}' needs an expression." : $"<{element.Name}> needs a value.");
+                        attribute != null ? $"'{attribute.Name}' needs an expression." : Wording.Of($"<{element.Name}> needs a value."));
                 }
             }
             else
@@ -87,7 +87,7 @@ namespace KScript.Language.Analysis
                     // Point at something visible: the character before an "expected more" error.
                     span = span.Start > region.SourceSpan.Start ? new TextSpan(span.Start - 1, 1) : new TextSpan(span.Start, Math.Min(1, source.Length - span.Start));
                 }
-                Report(span, DiagnosticSeverity.Error, error.Code, error.Message);
+                Report(span, DiagnosticSeverity.Error, error.Code, error.Words);
             }
         }
 
@@ -185,7 +185,7 @@ namespace KScript.Language.Analysis
                 result.References.Add(new SymbolReference(symbol, span, false, isWrite));
                 if (mustBeMutable && symbol.IsConst)
                 {
-                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.AssignConst, $"${name} is a constant (const=\"yes\") and can't be changed.");
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.AssignConst, $"${name} is a constant (const=\"true\") and can't be changed.");
                 }
                 else if (mustBeMutable && (symbol.Kind == SymbolKind.BuiltIn || symbol.Kind == SymbolKind.FrontMatter))
                 {
@@ -293,7 +293,7 @@ namespace KScript.Language.Analysis
             {
                 IEnumerable<string> aliases = result.Symbols.Where(s => s.Kind == SymbolKind.Import).Select(s => s.Name);
                 Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
-                    $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode ? $"import \"...\" as {aliasName}." : $"<import src=\"...\" as=\"{aliasName}\" />."),
+                    $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode ? $"import \"...\" as {aliasName}." : $"<import path=\"...\" as=\"{aliasName}\" />."),
                     SuggestFix(aliasSpan, aliasName, aliases, n => n));
                 return;
             }
@@ -337,7 +337,11 @@ namespace KScript.Language.Analysis
                 char c = i < text.Length ? text[i] : ',';
                 if (quote != '\0')
                 {
-                    if (c == quote)
+                    if (Quotes.IsEscape(text, i, text.Length, quote))
+                    {
+                        i++;
+                    }
+                    else if (c == quote)
                     {
                         quote = '\0';
                     }
@@ -439,7 +443,7 @@ namespace KScript.Language.Analysis
                 ParseResult parsed = ExpressionParser.ParseExpression(def);
                 if (!parsed.Success)
                 {
-                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax, $"The default for '{name}' isn't a valid expression: {parsed.Errors[0].Message}");
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax, $"The default for '{name}' isn't a valid expression: {parsed.Errors[0].Words}");
                 }
             }
 
@@ -485,7 +489,7 @@ namespace KScript.Language.Analysis
         private string siteRoot;
 
         /// <summary>
-        /// kscript serve resolves &lt;layout src&gt; and &lt;include src&gt; against the site's root folder, not the page's
+        /// kscript serve resolves &lt;layout path&gt; and &lt;include path&gt; against the site's root folder, not the page's
         /// folder, so people/[id].html still uses _layout.html. The root is the nearest folder above the page with
         /// kscript.json, _layout.html, _components/ or _layouts/; without one, the page's own folder.
         /// </summary>
@@ -541,8 +545,13 @@ namespace KScript.Language.Analysis
             return value.ToSource(TextSpan.FromBounds(start, end));
         }
 
-        private void Report(TextSpan span, DiagnosticSeverity severity, string code, string message, IReadOnlyList<QuickFix> fixes = null)
+        /// <summary>
+        /// Reports a problem. A message written as an interpolated string is a <see cref="Wording"/>, so a .kscript file
+        /// reads it in its own terms (statements and arguments, no tags).
+        /// </summary>
+        private void Report(TextSpan span, DiagnosticSeverity severity, string code, Wording wording, IReadOnlyList<QuickFix> fixes = null)
         {
+            string message = wording?.For(IsCode);
             if (result.Diagnostics.Any(d => d.Span.Equals(span) && d.Code == code))
             {
                 return;
