@@ -287,6 +287,6 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 **A list of names written as one string.** In a `.kscript` file write an array: `use: [log, cors]`.
 
-## KS6007
+## KS6008
 
 **A second type in one file.** In a project, each type, model, enum and error type goes in its own file (`types/`, `models/`, `errors/`, or `requests/` for request bodies) and is imported where it is used. The message names the file to move it to. See [One type per file](projects.md#where-files-go-the-recommended-layout).

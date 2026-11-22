@@ -92,7 +92,7 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>
-        /// KS6007: a script in a project that declares more than one type. Each type, model, enum and error type goes
+        /// KS6008: a script in a project that declares more than one type. Each type, model, enum and error type goes
         /// in its own file (types/, models/, errors/), and the files that use it import it. The first declaration is
         /// one the file is named after (or else the first) is left alone; the others are flagged. Scripts outside a project (one-off scripts) are not checked.
         /// </summary>

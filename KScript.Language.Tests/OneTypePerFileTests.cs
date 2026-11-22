@@ -5,7 +5,7 @@ using static KScript.Language.Tests.AnalyzerCoverageTests;
 
 namespace KScript.Language.Tests
 {
-    /// <summary>KS6007: in a project, each type, model, enum and error type has its own file.</summary>
+    /// <summary>KS6008: in a project, each type, model, enum and error type has its own file.</summary>
     public class OneTypePerFileTests
     {
         private static readonly Files Project = new Files(("kscript.json", "{ \"paths\": { \"errors\": \"app/errors\" } }"));

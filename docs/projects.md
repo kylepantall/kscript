@@ -298,7 +298,7 @@ model Order {
 }
 ```
 
-The generators and project templates all work this way, and in a project `kscript check` warns (KS6007) about a file that declares a second type, saying where to move it. A script outside a project, run on its own, can keep its types with it.
+The generators and project templates all work this way, and in a project `kscript check` warns (KS6008) about a file that declares a second type, saying where to move it. A script outside a project, run on its own, can keep its types with it.
 
 Pages stay where they are, because a page's path is its URL. Desktop windows (`make window`) go at the top, next to `desktop.kscript`. Move any folder with `paths` in `kscript.json`:
 

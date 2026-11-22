@@ -132,7 +132,7 @@ namespace KScript.Syntax
         public const string PreferArrayList = "KS6006";
 
         /// <summary>A script in a project that declares more than one type, model, enum or error type: each goes in its own file.</summary>
-        public const string OneTypePerFile = "KS6007";
+        public const string OneTypePerFile = "KS6008";
 
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>

@@ -526,7 +526,7 @@ namespace KScript.Language.Agents
             - Calling your own fn without `@`, or calling a package command without its `import` (`@read_json` needs `import KScript.IO`).
             - Inventing methods from other languages (`.length`, `.push()` on a string, `len()`): methods use `->` and are listed per package.
             - `else` after a branch that returns, breaks or continues: return early instead (KS6001).
-            - Declaring a type in the file that uses it, or several in one file: each type, model, enum and error type gets its own file (`types/`, `models/`, `errors/`, request bodies in `requests/`), named after it in kebab-case, and the files that use it import it (KS6007).
+            - Declaring a type in the file that uses it, or several in one file: each type, model, enum and error type gets its own file (`types/`, `models/`, `errors/`, request bodies in `requests/`), named after it in kebab-case, and the files that use it import it (KS6008).
 
             """;
 

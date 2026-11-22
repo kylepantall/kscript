@@ -125,7 +125,7 @@ reported).
 | KS6004 | A function parameter the body never reads. For a lambda, only the parameters after the last one it reads, since the caller decides what it is passed: write `fn($_y) => ...` to keep the position. |
 | KS6005 | An import nothing uses: an `as` alias, a name in `names="..."`, a whole script, or a package none of whose elements, commands, methods or variables appear. |
 | KS6006 | Not unused code, but a style hint: a list of names written as one string in a `.kscript` file (`Middleware(use: "log, cors")`). Write it as an array, `use: [log, cors]`; the quick fix does it for you. XML attributes are text, so `use="log, cors"` is fine there. |
-| KS6007 | Not unused code either: a script in a project that declares a second type, model, enum or error type. Each goes in its own file, named after it, and is imported where it is used; the warning says where to move it (`types/order-status.kscript`). The type the file is named after stays. Scripts outside a project aren't checked. |
+| KS6008 | Not unused code either: a script in a project that declares a second type, model, enum or error type. Each goes in its own file, named after it, and is imported where it is used; the warning says where to move it (`types/order-status.kscript`). The type the file is named after stays. Scripts outside a project aren't checked. |
 
 The project is the folder with the nearest `kscript.json` and everything under it (hidden folders, `bin`, `obj` and
 `node_modules` are skipped). A script outside a project is checked against the other files in its own folder. A
