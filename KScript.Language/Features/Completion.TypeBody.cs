@@ -238,12 +238,12 @@ namespace KScript.Language.Features
             Add("id", "int", "The key the database numbers, added when the model doesn't declare it.");
             if (IsYesText(model.GetAttributeValue("timestamps")))
             {
-                Add("created_at", "date", "When the record was first saved (timestamps: yes).");
-                Add("updated_at", "date", "When the record was last saved (timestamps: yes).");
+                Add("created_at", "date", "When the record was first saved (the timestamps option).");
+                Add("updated_at", "date", "When the record was last saved (the timestamps option).");
             }
             if (IsYesText(model.GetAttributeValue("soft_deletes")))
             {
-                Add("deleted_at", "date?", "When the record was deleted (soft_deletes: yes).");
+                Add("deleted_at", "date?", "When the record was deleted (the soft_deletes option).");
             }
             return fields;
         }
