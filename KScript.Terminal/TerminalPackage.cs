@@ -94,7 +94,7 @@ namespace KScript.Terminal
                 return null;
             });
 
-            p.Command("color", "text, colour", "Text in a colour: red, green, yellow, blue, magenta, cyan, white, gray (or a bright_ one). Plain text when the output isn't a terminal.", KType.String,
+            p.Command("color", "text, color", "Text in a colour: red, green, yellow, blue, magenta, cyan, white, gray (or a bright_ one). Plain text when the output isn't a terminal.", KType.String,
                 c => Ansi.Style(c.Host, c.Str(0), Ansi.Colour(c.Str(1)) ?? throw c.Error($"Unknown colour '{c.Str(1)}'. Use one of: {string.Join(", ", Ansi.ColourNames)}.", "Argument")),
                 "<echo>{ @color('Done', 'green') }</echo>");
             p.Command("bold", "text", "Bold text.", KType.String, c => Ansi.Style(c.Host, c.Str(0), "1"));

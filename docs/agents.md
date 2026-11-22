@@ -119,7 +119,7 @@ show them under each entry:
 ```
 
 A package written in C# adds them with `p.AgentNotes(("list->push", new AgentNotes(pitfall: "...")))`, keyed like
-`p.Examples` (`"@api"`, `"list->push"`, or `"<download>"` for an element). Keep each note to one short line,
+`p.Examples` (`"@api"`, `"list->push"`, or `"<input>"` for an element). Keep each note to one short line,
 since agents read all of them.
 
 ## JSON diagnostics

@@ -33,6 +33,15 @@ namespace KScript.Runtime
             ("cache", "flush", "Use ->clear().", "clear"),
             ("session", "put", "Use ->set(key, value).", "set"),
             ("session", "forget", "Use ->remove(key).", "remove"),
+            // One name per thing: these were a second name for another method, or for an operator.
+            ("list", "where", "Use ->filter(fn).", "filter"),
+            ("list", "append", "Use ->push(items).", "push"),
+            ("list", "length", "Use ->count().", "count"),
+            ("map", "length", "Use ->count().", "count"),
+            ("string", "length", "Use ->count().", "count"),
+            ("json", "parse", "Use ->json().", "json"),
+            ("number", "pow", "Use the ** operator: $n ** 2.", null),
+            ("color", "contrast", "Use ->contrast_ratio(other).", "contrast_ratio"),
             // One word for the mean everywhere: $list->average(), @average() and a query's ->average(column).
             ("query", "avg", "Use ->average(column).", "average"),
             ("model", "avg", "Use ->average(column).", "average"));

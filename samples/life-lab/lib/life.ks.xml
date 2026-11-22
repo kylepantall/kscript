@@ -68,7 +68,7 @@
   <fn
     name="width"
     params="grid: string[]"
-    value="$grid->is_empty() ? 0 : $grid[0]->length()"
+    value="$grid->is_empty() ? 0 : $grid[0]->count()"
     description="How many cells wide a grid is." />
 
   <fn
@@ -86,7 +86,7 @@
   <fn
     name="population"
     params="grid: string[]"
-    value="$grid->sum(fn(row) => $row->count($alive_cell))"
+    value="$grid->sum(fn(row) => $row->count_of($alive_cell))"
     description="How many cells are alive." />
 
   <fn
@@ -142,7 +142,7 @@
     <let
       name="lines"
       value="$text->lines()->map(fn(l) => $l->trim_end())->reject(fn(l) => $l->starts_with('!'))" />
-    <let name="w" value="$lines->map(fn(l) => $l->length())->max() ?? 0" />
+    <let name="w" value="$lines->map(fn(l) => $l->count())->max() ?? 0" />
     <if $w eq 0>
       <throw type="Pattern" message="That pattern has no cells in it." />
     </if>
@@ -269,14 +269,14 @@
       <let name="after" value="$next->join('')" />
       <let
         name="born"
-        value="(0..$after->length())->count(fn(k) => $after[$k] eq $alive_cell and $before[$k] ne $alive_cell)" />
+        value="(0..$after->count())->count_of(fn(k) => $after[$k] eq $alive_cell and $before[$k] ne $alive_cell)" />
       <let
         name="died"
-        value="(0..$after->length())->count(fn(k) => $before[$k] eq $alive_cell and $after[$k] ne $alive_cell)" />
+        value="(0..$after->count())->count_of(fn(k) => $before[$k] eq $alive_cell and $after[$k] ne $alive_cell)" />
       <set name="w" value="$w->merge({
           grid: $next,
           generation: $w.generation + 1,
-          history: $w.history->append($after)->slice(start: -$history_size),
+          history: $w.history->push($after)->slice(start: -$history_size),
           births: $w.births + $born,
           deaths: $w.deaths + $died })" />
     </for>

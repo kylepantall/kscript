@@ -289,7 +289,7 @@ public class StdlibBehaviourConventionTests
     public void A_duration_is_written_without_quotes_and_a_plain_number_is_seconds(string written, double seconds)
     {
         string path = Path.Combine(Path.GetTempPath(), "durations.kscript");
-        Assert.Equal($"duration {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}\n", ScriptRunner.Run($"d = {written}\necho \"{{ @type($d) }} {{ $d.seconds }}\"\n", path: path));
+        Assert.Equal($"duration {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}\n", ScriptRunner.Run($"d = {written}\necho \"{{ $d->type() }} {{ $d.seconds }}\"\n", path: path));
         Assert.True(Duration.TrySeconds(seconds, out double plain));
         Assert.Equal(seconds, plain);
     }

@@ -50,7 +50,7 @@ if $big->count() > 0 {
   confirm(into: ok) "Move them to an archive folder?"
   if $ok {
     for f in $big {
-      move(from: $f, to: @join_path(base: $folder, ['archive', $f.name]))
+      @move($f, @join_path(base: $folder, ['archive', $f.name]))
     }
   }
 }
@@ -128,7 +128,7 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
 | `KScript.Data` | Models, a query builder whose conditions are lambdas, transactions and safe raw SQL, on SQLite, Postgres, MySQL and MariaDB |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
-| `KScript.Queue` | Background jobs: `job`, `dispatch`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
+| `KScript.Queue` | Background jobs: `job`, `->dispatch()`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
 | `KScript.Document` | Papers, reports, letters and invoices with LaTeX maths, tables, figures and citations, saved as PDF, Word, LaTeX, Markdown or HTML |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.

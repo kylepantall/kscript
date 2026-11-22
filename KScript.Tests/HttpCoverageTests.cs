@@ -45,7 +45,7 @@ public class HttpCoverageTests
               <import package="KScript.Math" as="m" />
               <let name="hello" value="fn(request) => 'Hello ' + $request.path" />
               <Get path="/lambda" to="hello" />
-              <Get path="/command" to="to_json" />
+              <Get path="/command" to="response" />
               <Get path="/package" to="m.round" />
               <Get path="/silent"><let name="x" value="1" /></Get>
               <Get path="/object"><return value="$log" /></Get>

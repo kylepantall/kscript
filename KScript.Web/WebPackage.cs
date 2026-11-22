@@ -55,16 +55,11 @@ namespace KScript.Web
             Page(p, new ElementInfo("respond", "Ends the request with this response.", ContentKind.Template,
                 new A("status", K.Expression, "The HTTP status code."),
                 new A("json", K.Expression, "Send this value as JSON."),
+                new A("redirect", K.Template, "Send the visitor to this address instead. The status is 302 unless status says otherwise."),
                 new A("type", K.Text, "The Content-Type."))
             {
                 Context = ElementContext.Page,
-                Example = "<respond status=\"404\">Not found</respond>\n<respond json=\"$people\" />",
-            });
-            Page(p, new ElementInfo("redirect", "Redirects the visitor.", ContentKind.Empty,
-                new A("to", K.Template, "Where to send the visitor.", true),
-                new A("status", K.Expression, "The status code, 302 by default."))
-            {
-                Context = ElementContext.Page,
+                Example = "<respond status=\"404\">Not found</respond>\n<respond json=\"$people\" />\n<respond redirect=\"/thanks\" />",
             });
             Page(p, new ElementInfo("markdown", "Renders its Markdown text (with `{ }` values, escaped) to HTML.", ContentKind.Template)
             {

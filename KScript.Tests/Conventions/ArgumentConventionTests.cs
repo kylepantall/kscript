@@ -63,7 +63,7 @@ public class ArgumentConventionTests
     public void EveryPackageIsWalked()
     {
         List<string> packages = Elements().Select(x => x.Package).Distinct().ToList();
-        foreach (string name in new[] { "KScript.Core", "KScript.Terminal", "KScript.Test", "KScript.UI", "KScript.Http", "KScript.Document", "KScript.AI", "KScript.Queue", "KScript.Web", "KScript.Style", "KScript.IO", "KScript.Net", "KScript.Data" })
+        foreach (string name in new[] { "KScript.Core", "KScript.Terminal", "KScript.Test", "KScript.UI", "KScript.Http", "KScript.Document", "KScript.AI", "KScript.Queue", "KScript.Web", "KScript.Style", "KScript.Data" })
         {
             Assert.Contains(name, packages);
         }

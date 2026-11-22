@@ -30,15 +30,15 @@ public sealed class TypeConstructionTests : DataFixture
     private static KScriptException Fails(string code) => Assert.Throws<KScriptException>(() => Runs(code));
 
     [Theory]
-    [InlineData("r = Repo({ name: 'k', stars: '3' })\necho \"$r.name { $r.stars + 1 } { @type($r) }\"", "k 4 Repo\n")]
+    [InlineData("r = Repo({ name: 'k', stars: '3' })\necho \"$r.name { $r.stars + 1 } { $r->type() }\"", "k 4 Repo\n")]
     [InlineData("r = Repo(name: 'k')\necho \"$r.name $r.stars\"", "k 0\n")]
     [InlineData("r = Repo('{\"name\": \"j\"}')\necho $r.name", "j\n")]
     [InlineData("rs = Repo([{ name: 'a' }, { name: 'b' }])\necho $rs->map(fn($r) => $r.name)->join(',')", "a,b\n")]
     [InlineData("r = { name: 'p' } |> Repo()\necho $r.name", "p\n")]
     [InlineData("echo Age('7') + 1", "8\n")]
     [InlineData("echo Size('small')", "small\n")]
-    [InlineData("t = Repo\necho $t.name\necho @json('{\"name\": \"v\"}', as: $t).name", "Repo\nv\n")]
-    [InlineData("echo @json('{\"name\": \"x\"}', as: Repo).name", "x\n")]
+    [InlineData("t = Repo\necho $t.name\necho '{\"name\": \"v\"}'->json(as: $t).name", "Repo\nv\n")]
+    [InlineData("echo '{\"name\": \"x\"}'->json(as: Repo).name", "x\n")]
     [InlineData("try {\n  throw Missing(what: 'key')\n} catch Missing as e {\n  echo $e.what\n}", "key\n")]
     public void CallingATypeMakesAValue(string code, string printed)
     {

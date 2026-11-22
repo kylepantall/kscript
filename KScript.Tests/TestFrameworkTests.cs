@@ -44,7 +44,7 @@ public class TestFrameworkTests
             <let name="shared" value="1" />
             <test name="passes"><expect value="$shared" equals="1" /></test>
             <test name="fails"><expect value="$shared" equals="2" /></test>
-            <test name="still runs"><assert test="$shared eq 1" /></test>
+            <test name="still runs"><do>@assert($shared eq 1)</do></test>
             """);
         Assert.Null(file.Error);
         Assert.Equal(new[] { TestOutcome.Passed, TestOutcome.Failed, TestOutcome.Passed }, file.Tests.Select(t => t.Outcome));
@@ -109,15 +109,15 @@ public class TestFrameworkTests
         TestFileResult file = RunTests("""
             <test name="a" skip="needs a network"><do>@fail()</do></test>
             <describe name="group" skip="yes"><test name="b"><do>@fail()</do></test></describe>
-            <test name="c" skip="no"><assert test="true" /></test>
+            <test name="c" skip="no"><do>@assert(true)</do></test>
             """);
         Assert.Equal(new[] { TestOutcome.Skipped, TestOutcome.Skipped, TestOutcome.Passed }, file.Tests.Select(t => t.Outcome));
         Assert.Equal("needs a network", file.Tests[0].Message);
 
         file = RunTests("""
             <test name="a"><do>@fail()</do></test>
-            <describe name="focus" only="yes"><test name="b"><assert test="true" /></test></describe>
-            <test name="c" only="yes"><assert test="true" /></test>
+            <describe name="focus" only="yes"><test name="b"><do>@assert(true)</do></test></describe>
+            <test name="c" only="yes"><do>@assert(true)</do></test>
             """);
         Assert.Equal(new[] { TestOutcome.Skipped, TestOutcome.Passed, TestOutcome.Passed }, file.Tests.Select(t => t.Outcome));
     }
@@ -126,8 +126,8 @@ public class TestFrameworkTests
     public void FilterMatchesTheFullName()
     {
         TestFileResult file = RunTests("""
-            <describe name="Cart"><test name="adds"><assert test="true" /></test></describe>
-            <test name="other"><assert test="true" /></test>
+            <describe name="Cart"><test name="adds"><do>@assert(true)</do></test></describe>
+            <test name="other"><do>@assert(true)</do></test>
             """, new TestRunSettings { Filter = "cart › ADD" });
         Assert.Equal("Cart › adds", Assert.Single(file.Tests).FullName);
     }
@@ -135,12 +135,12 @@ public class TestFrameworkTests
     [Fact]
     public void AssertShowsBothSidesOfAComparison()
     {
-        Assert.Equal("Expected $total eq 30 to be true.\n  $total is 25", Failure("<let name=\"total\" value=\"25\" /><assert test=\"$total eq 30\" />"));
+        Assert.Equal("Expected $total eq 30 to be true.\n  $total is 25", Failure("<let name=\"total\" value=\"25\" /><do>@assert($total eq 30)</do>"));
         Assert.Equal("Expected $a->count() gt $b to be true.\n  $a->count() is 1\n  $b is 2",
-            Failure("<let name=\"a\" value=\"['x']\" /><let name=\"b\" value=\"2\" /><assert test=\"$a->count() gt $b\" />"));
+            Failure("<let name=\"a\" value=\"['x']\" /><let name=\"b\" value=\"2\" /><do>@assert($a->count() gt $b)</do>"));
         Assert.Equal("Expected $name->starts_with('J') to be true.\n  $name->starts_with('J') is false",
-            Failure("<let name=\"name\" value=\"'Ellie'\" /><assert test=\"$name->starts_with('J')\" />"));
-        Assert.Equal("The cart should have 2 items", Failure("<let name=\"n\" value=\"1\" /><assert test=\"$n eq 2\" message=\"The cart should have { $n + 1 } items\" />"));
+            Failure("<let name=\"name\" value=\"'Ellie'\" /><do>@assert($name->starts_with('J'))</do>"));
+        Assert.Equal("The cart should have 2 items", Failure("<let name=\"n\" value=\"1\" /><do>@assert($n eq 2, \"The cart should have { $n + 1 } items\")</do>"));
     }
 
     [Fact]
@@ -246,7 +246,7 @@ public class TestFrameworkTests
     {
         TestFileResult file = RunTests("""
             <test name="forever" timeout="0.2s"><while test="true"><do>@assert(true)</do></while></test>
-            <test name="next one still runs"><assert test="true" /></test>
+            <test name="next one still runs"><do>@assert(true)</do></test>
             """);
         Assert.Equal(TestOutcome.Failed, file.Tests[0].Outcome);
         Assert.StartsWith("Timed out: the test ran for more than 0.2 seconds.", file.Tests[0].Message);
@@ -261,7 +261,7 @@ public class TestFrameworkTests
         Assert.Contains("Unknown element <nope>", file.Error);
         Assert.True(file.Failed);
 
-        file = RunTests("<echo>before</echo><throw message=\"setup broke\" /><test name=\"t\"><assert test=\"true\" /></test>");
+        file = RunTests("<echo>before</echo><throw message=\"setup broke\" /><test name=\"t\"><do>@assert(true)</do></test>");
         Assert.Contains("Error: setup broke", file.Error);
         Assert.Equal("before", file.Output);
     }
@@ -269,7 +269,7 @@ public class TestFrameworkTests
     [Fact]
     public void TestElementsNeedKScriptTest()
     {
-        var e = ScriptRunner.Fails("<test name=\"t\"><assert test=\"true\" /></test>", "KScript.Test");
+        var e = ScriptRunner.Fails("<test name=\"t\"><do>@assert(true)</do></test>", "KScript.Test");
         Assert.Contains("<test> only works in a test file run by kscript test", e.Message);
 
         TestResult nested = Only("<test name=\"outer\"><test name=\"inner\" /></test>");
@@ -279,7 +279,7 @@ public class TestFrameworkTests
     [Fact]
     public void ChecksWorkOutsideTestsToo()
     {
-        // <expect> and <assert> stop any script with an Assertion error, so a script can check itself.
+        // <expect> and @assert() stop any script with an Assertion error, so a script can check itself.
         var e = ScriptRunner.Fails("<expect value=\"1\" equals=\"2\" />", "KScript.Test");
         Assert.Equal("Assertion", e.Type);
         Assert.Equal("ok\n", ScriptRunner.RunBody("<capture into=\"out\"><echo>ok</echo></capture><echo>$out</echo>", "", "KScript.Test"));
@@ -416,7 +416,7 @@ public class TestFrameworkTests
     public void JUnitReport()
     {
         using var site = new TempSite(
-            ("a.test.ks.xml", "<kscript><test name=\"ok\"><assert test=\"true\" /></test><test name=\"no\"><assert test=\"false\" /></test><test name=\"err\"><echo>{ $x }</echo></test><test name=\"s\" skip=\"later\" /></kscript>"),
+            ("a.test.ks.xml", "<kscript><test name=\"ok\"><do>@assert(true)</do></test><test name=\"no\"><do>@assert(false)</do></test><test name=\"err\"><echo>{ $x }</echo></test><test name=\"s\" skip=\"later\" /></kscript>"),
             ("b.test.ks.xml", "<kscript><bad /></kscript>"));
         string report = Path.Combine(site.Root, "out", "junit.xml");
         var (code, output, _) = Command(site.Root, "--junit", report);

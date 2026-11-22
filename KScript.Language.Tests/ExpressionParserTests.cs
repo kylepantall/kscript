@@ -49,7 +49,7 @@ namespace KScript.Language.Tests
         [InlineData("$person['age']", "([] $person 'age')")]
         [InlineData("$s->trim()->upper()", "(-> (-> $s trim) upper)")]
         [InlineData("($price * $qty)->round(2)", "(-> (* $price $qty) round 2)")]
-        [InlineData("'abc'->length()", "(-> 'abc' length)")]
+        [InlineData("'abc'->count()", "(-> 'abc' count)")]
         [InlineData("str.slugify($x)", "(call (. str slugify) $x)")]
         // Ranges
         [InlineData("0..10", "(.. 0 10)")]
@@ -67,11 +67,11 @@ namespace KScript.Language.Tests
         [InlineData("fn() => 1", "(fn [] 1)")]
         [InlineData("$people->filter(fn(p) => $p.age ge 18)", "(-> $people filter (fn [p] (>= (. $p age) 18)))")]
         [InlineData("$x |> upper()", "(|> $x (call upper))")]
-        [InlineData("$title |> @to_lower() |> slugify()", "(|> (|> $title @to_lower()) (call slugify))")]
+        [InlineData("$title |> lower() |> slugify()", "(|> (|> $title (call lower)) (call slugify))")]
         [InlineData("$a + 1 |> round()", "(|> (+ $a 1) (call round))")]
         [InlineData("$x |> f() == 3", "(== (|> $x (call f)) 3)")]
         [InlineData("$x |> fn(v) => $v + 1", "(|> $x (fn [v] (+ $v 1)))")]
-        [InlineData("@read_text($path) |> @json()", "(|> @read_text($path) @json())")]
+        [InlineData("@read_text($path) |> json()", "(|> @read_text($path) (call json))")]
         // Named arguments
         [InlineData("@chat(system: 'You are a tutor.')", "@chat(system:'You are a tutor.')")]
         [InlineData("@range(1, step: 2)", "@range(1 step:2)")]

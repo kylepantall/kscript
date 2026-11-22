@@ -17,7 +17,7 @@ public class SemanticTypesTests
     [InlineData("echo \"{ { e: joan@example.com }->to_json() }\"", "{\"e\":\"joan@example.com\"}")]
     // handle
     [InlineData("h: handle = @Joan_S\necho \"$h { $h.name } { $h == @joan_s } { $h != @sam } { @joan_s == $h }\"", "@joan_s joan_s true true true")]
-    [InlineData("h: handle = '@a.b-c'\necho $h->length()", "6")]
+    [InlineData("h: handle = '@a.b-c'\necho $h->count()", "6")]
     // uuid
     [InlineData("u: uuid = '{3F2A8C1E-9B7D-4C2A-8E1F-0A9B8C7D6E5F}'\necho \"$u { $u.version }\"", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f 4")]
     [InlineData("u: uuid = 'urn:uuid:3f2a8c1e9b7d4c2a8e1f0a9b8c7d6e5f'\necho $u", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f")]
@@ -35,7 +35,7 @@ public class SemanticTypesTests
     [InlineData("echo \"{ 10 / 2 / 5 }\"", "1")]
     [InlineData("a = 10\nb = 2\necho \"{ $a / $b }\"", "5")]
     // password
-    [InlineData("p: password = 'correct horse battery staple'\necho \"$p { { p: $p }->to_json() } { $p->type() } { $p->reveal()->length() }\"", "******** {\"p\":\"********\"} password 28")]
+    [InlineData("p: password = 'correct horse battery staple'\necho \"$p { { p: $p }->to_json() } { $p->type() } { $p->reveal()->count() }\"", "******** {\"p\":\"********\"} password 28")]
     [InlineData("p: password = 'correct horse battery staple'\nh = $p->hash(algorithm: 'bcrypt')\necho \"{ $p->verify($h) } { $h->starts_with('$2') } { $p->needs_rehash($h) }\"", "true true true")]
     [InlineData("p: password = 'correct horse battery staple'\nh = $p->hash()\nq: password = 'Correct horse battery staple'\necho \"{ $q->verify($h) } { $p->needs_rehash($h) }\"", "false false")]
     [InlineData("p: password = 'password1'\ns = $p->strength(min: 12, upper: true, symbol: true, not: ['pass'])\necho \"{ $s.ok } { $s.label } { $s.problems->count() }\"", "false very weak 5")]
@@ -137,7 +137,7 @@ public class SemanticTypesTests
         Assert.Contains("updated must not be before created",
             CodeFails(types + "a = Admin({ name: 'J', email: 'j@example.com', created: '2026-02-01', updated: '2026-01-01' })").Message);
         Assert.Contains("updated must not be before created",
-            CodeFails(types + "a = Admin({ name: 'J', email: 'j@example.com', created: '2026-01-01', updated: '2026-02-01' })\n$a.updated = @date('2025-01-01')").Message);
+            CodeFails(types + "a = Admin({ name: 'J', email: 'j@example.com', created: '2026-01-01', updated: '2026-02-01' })\n$a.updated = '2025-01-01'->to_date()").Message);
         Assert.Equal("Hi J", Code(types + "u = User({ name: 'J', email: 'j@example.com' })\necho $u->hello()"));
         Assert.Contains("A User has no method ->nope()", CodeFails(types + "u = User({ name: 'J', email: 'j@example.com' })\necho $u->nope()").Message);
     }
@@ -255,8 +255,8 @@ public class SemanticTypesTests
     [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->upper()->slice(0, 8)", "3F2A8C1E")]
     [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->starts_with('3f2a')", "true")]
     [InlineData("echo joan@example.com->split('@')", "joan, example.com")]
-    [InlineData("h: handle = @joan\necho $h->length()", "5")]
-    [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->to_string()->length()", "36")]
+    [InlineData("h: handle = @joan\necho $h->count()", "5")]
+    [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f->to_string()->count()", "36")]
     public void NativeValuesKeepTheStringMethodsThatMakeSense(string code, string expected) => Assert.Equal(expected, Code(code));
 
     [Theory]

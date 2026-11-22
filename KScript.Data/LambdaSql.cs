@@ -243,13 +243,11 @@ namespace KScript.Data
             switch (call.Name)
             {
                 case "count":
-                case "length":
                     Most(1);
                     result = owner.Wrap(rel.Subquery(Call, from, alias, "COUNT(*)", condition: Inner(0, true)), null);
                     return true;
                 case "any":
                 case "is_empty":
-                case "none":
                 {
                     Most(call.Name == "is_empty" ? 0 : 1);
                     SqlExpr exists = new SqlUnary("EXISTS", rel.Subquery(Call, from, alias, "1", condition: Inner(0, true)));
@@ -387,9 +385,11 @@ namespace KScript.Data
                 case "lower":
                 case "upper":
                 case "trim":
-                case "length":
                     Count(0);
                     return new SqlCall(call.Name.ToUpperInvariant(), target);
+                case "count":
+                    Count(0);
+                    return new SqlCall("LENGTH", target);
                 case "matches":
                 case "test":
                 {
@@ -398,7 +398,7 @@ namespace KScript.Data
                     return new SqlMatch(target, regex);
                 }
                 default:
-                    throw Cannot(call, $"->{call.Name}() has no SQL form. Use ->contains(), ->starts_with(), ->ends_with(), ->lower(), ->upper(), ->trim(), ->length() or ->matches().");
+                    throw Cannot(call, $"->{call.Name}() has no SQL form. Use ->contains(), ->starts_with(), ->ends_with(), ->lower(), ->upper(), ->trim(), ->count() or ->matches().");
             }
         }
 

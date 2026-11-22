@@ -23,7 +23,7 @@ namespace KScript.Docs
             [KType.Bool] = "true and false.",
             [KType.List] = "Lists such as `[1, 2, 3]`. Methods that change a list return a new one.",
             [KType.Map] = "Maps such as `{ name: 'Joan', age: 82 }`.",
-            [KType.Date] = "Dates and times, from `@now()`, `@date('2026-11-19')` or `->to_date()`.",
+            [KType.Date] = "Dates and times, from `@now()`, `'2026-11-19'->to_date()` or `->to_date()`.",
             [KType.Fn] = "Functions: lambdas `fn(x) => $x * 2` and `<fn>` functions.",
             [KType.Any] = "Methods every value has.",
             [KType.Type] = "A `<type>` declared by a script, such as `Repo`.",
@@ -432,7 +432,7 @@ namespace KScript.Docs
         {
             ["<import>"] = "imports a script file of yours",
             ["<picker>"] = "browses the folders of your computer",
-            ["<stylesheet>"] = "compiles a stylesheet file of yours",
+            ["@stylesheet"] = "compiles a stylesheet file of yours",
             ["<translations>"] = "reads a folder of translation files",
             ["@locale_path"] = "is for web pages",
             ["@read_markdown"] = "reads a Markdown file of yours",

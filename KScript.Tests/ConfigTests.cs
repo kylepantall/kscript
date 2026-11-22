@@ -292,8 +292,8 @@ public sealed class ConfigTests : IDisposable
     [Fact]
     public void Yaml_and_env_commands()
     {
-        Assert.Equal("Ann 2\n", Run("<echo>{ @yaml('name: Ann').name } { @yaml('[1, 2]')->count() }</echo>"));
-        Assert.Equal("a: 1\nb:\n  - x\n", Run("<echo>{ @to_yaml({ a: 1, b: ['x'] }) }</echo>"));
+        Assert.Equal("Ann 2\n", Run("<echo>{ 'name: Ann'->yaml().name } { '[1, 2]'->yaml()->count() }</echo>"));
+        Assert.Equal("a: 1\nb:\n  - x\n", Run("<echo>{ { a: 1, b: ['x'] }->to_yaml() }</echo>"));
         Assert.Equal("8080 Ann\n", Run("<echo>{ @parse_env('PORT=8080').PORT } { @parse_env('N=Ann').N }</echo>"));
 
         FileOf("data.yaml", "items: [a, b]\n");

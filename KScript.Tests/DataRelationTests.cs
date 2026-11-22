@@ -115,6 +115,9 @@ public sealed class DataRelationTests : DataFixture
         Assert.Equal("average", RetiredMembers.Method("model", "avg").Rename);
         Assert.Contains("->average(column)", Fails(Blog + "$ada->posts()->avg('views')").Message);
         Assert.Contains("no SQL form", Fails(Blog + "User->where(fn(u) => $u.posts->avg(fn(p) => $p.views) > 25)->get()").Message);
+        // A relation in a condition has the methods a list has: no second names.
+        Assert.Contains("no SQL form", Fails(Blog + "User->where(fn(u) => $u.posts->none())->get()").Message);
+        Assert.Contains("no SQL form", Fails(Blog + "User->where(fn(u) => $u.posts->length() > 1)->get()").Message);
     }
 
     [Fact]
@@ -214,7 +217,7 @@ public sealed class DataRelationTests : DataFixture
             echo User->where(fn(u) => $u.posts->count(fn(p) => $p.published) == 1)->order_by(name)->pluck(name)
             echo User->where(fn(u) => $u.posts->any())->order_by(name)->pluck(name)
             echo User->where(fn(u) => $u.posts->is_empty())->pluck(name)
-            echo User->where(fn(u) => $u.posts->none(fn(p) => $p.published))->order_by(name)->pluck(name)
+            echo User->where(fn(u) => not $u.posts->any(fn(p) => $p.published))->order_by(name)->pluck(name)
             echo User->where(fn(u) => $u.posts->any() and $u.posts->all(fn(p) => $p.published))->pluck(name)
             echo User->where(fn(u) => $u.posts->sum(fn(p) => $p.views) > 50)->pluck(name)
             echo User->where(fn(u) => $u.posts->max(fn(p) => $p.views) == 20)->pluck(name)
@@ -232,7 +235,7 @@ public sealed class DataRelationTests : DataFixture
             echo Post->where(fn(p) => $p.author_id in [$ben])->pluck(title)
             echo User->where(fn(u) => $u.profile == null)->order_by(name)->pluck(name)
             echo User->where(fn(u) => $u.profile != null)->pluck(name)
-            echo Comment->where(fn(c) => $c.post.author.name == 'Ada' and $c.body->length() > 2)->order_by(body)->pluck(body)
+            echo Comment->where(fn(c) => $c.post.author.name == 'Ada' and $c.body->count() > 2)->order_by(body)->pluck(body)
             echo Post->where(fn(p) => $p.tags->any(fn(t) => $t.posts->count() > 1 and $p.views > 40))->pluck(title)
             """);
         Assert.Equal("Ada", lines[0]);

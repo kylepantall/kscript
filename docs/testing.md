@@ -107,14 +107,14 @@ describe(name: a shopping cart) {
 
 `message: …` on any check replaces the usual message.
 
-`assert(test: …)` checks a condition. When a comparison fails it shows the value of each side:
+`@assert(condition, message?)` checks a condition, on a line of its own or inside an expression such as a lambda. When a comparison fails it shows the value of each side:
 
 ```text
 Expected $order.total eq 30 to be true.
   $order.total is 25
 ```
 
-`@assert(condition, message?)` does the same inside an expression, such as a lambda, and `@fail(message?)` fails the test straight away.
+`@fail(message?)` fails the test straight away.
 
 ### Errors
 
@@ -137,7 +137,7 @@ fn find_person(id: int) {
 }
 
 expect(value: @find_person(99), throws: PersonNotFound)
-expect(value: @json('nope'), throws: Format) // Json extends Format
+expect(value: 'nope'->json(), throws: Format) // Json extends Format
 ```
 
 A failed check inside the body is still reported as a failure, not taken as the expected error.
@@ -228,4 +228,4 @@ test(name: "a note is saved") {
 
 The language server treats `*.test.kscript` and `*.test.ks.xml` files as importing KScript.Test, so `test`, `expect` and the rest get completion, hover and checking, and `$case` from `each` is known inside the test. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.
 
-`expect`, `assert` and `capture` also work in ordinary scripts that `import KScript.Test`: a failed check stops the script with an `Assertion` error. `test` and `describe` only work under `kscript test`.
+`expect`, `@assert` and `capture` also work in ordinary scripts that `import KScript.Test`: a failed check stops the script with an `Assertion` error. `test` and `describe` only work under `kscript test`.

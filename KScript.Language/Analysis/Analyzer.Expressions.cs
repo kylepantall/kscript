@@ -507,7 +507,7 @@ namespace KScript.Language.Analysis
 
                 default:
                     Report(region.Source.ToSource(pipe.Right.Span), DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax,
-                        "A pipe needs a method, function, command or lambda on its right, as in |> upper() or |> @json().");
+                        "A pipe needs a method, function, command or lambda on its right, as in |> upper() or |> json().");
                     return;
             }
         }
@@ -633,7 +633,7 @@ namespace KScript.Language.Analysis
             {
                 KeepBareWords(args);
             }
-            if (ChecksImports && !IsJobValue(receiver) && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
+            if (ChecksImports && !applicable.Any(m => m.Package == null || importedPackages.Contains(m.Package)))
             {
                 RequirePackage(applicable[0].Package, nameSpan, $"{arrow}{name}()");
                 return;

@@ -19,6 +19,6 @@ describe(name: "{{ title }}") {
   }
 
   test(name: "joins text") {
-    assert(test: ['a', 'b']->join('-') == 'a-b')
+    @assert(['a', 'b']->join('-') == 'a-b')
   }
 }

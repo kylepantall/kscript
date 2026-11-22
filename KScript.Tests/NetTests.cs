@@ -54,7 +54,7 @@ public sealed class NetTests : IDisposable
         string output = Run(
             $"<let name=\"r\" value=\"@api('{server.Url}/json')\" />" +
             "<echo>{ $r.status } { $r.is_ok } { $r.reason } { $r->json().name } { $r->json().tags[1] } { $r->header('content-type') } { $r->header('X-None') ?? 'none' }</echo>" +
-            "<echo>{ $r.status } { $r.is_ok } { $r.text->length() } { $r.headers['Content-Type'] } { $r.url == $r.url } { $r.text == $r.text } { $r.headers->count() > 0 } { $r.nothing ?? 'n' }</echo>" +
+            "<echo>{ $r.status } { $r.is_ok } { $r.text->count() } { $r.headers['Content-Type'] } { $r.url == $r.url } { $r.text == $r.text } { $r.headers->count() > 0 } { $r.nothing ?? 'n' }</echo>" +
             "<echo>{ $r->check().status } {$r}</echo>");
         Assert.Equal("200 true OK Ann 2 application/json none\n200 true 33 application/json true true true n\n200 { \"name\": \"Ann\", \"tags\": [1, 2] }\n", output);
     }
@@ -114,24 +114,24 @@ public sealed class NetTests : IDisposable
     [Fact]
     public void Url_helpers()
     {
-        Assert.Equal("a%20b%26c a b&c a=1&b=two%20words\n", Run("<echo>{ @url_encode('a b&amp;c') } { @url_decode('a%20b%26c') } { @query_string({ a: 1, b: 'two words', c: null }) }</echo>"));
+        Assert.Equal("a%20b%26c a b&c a=1&b=two%20words\n", Run("<echo>{ 'a b&amp;c'->url_encode() } { 'a%20b%26c'->url_decode() } { @query_string({ a: 1, b: 'two words', c: null }) }</echo>"));
     }
 
     [Fact]
     public void Download_saves_files_and_respects_overwrite_and_the_sandbox()
     {
-        Run($"<download url=\"'{server.Url}/file.txt'\" to=\"'out/a.txt'\" />");
+        Run($"<do>@download('{server.Url}/file.txt', 'out/a.txt')</do>");
         Assert.Equal("file body", File.ReadAllText(Path.Combine(dir, "out", "a.txt")));
         File.WriteAllText(Path.Combine(dir, "keep.txt"), "mine");
-        Run($"<download url=\"'{server.Url}/file.txt'\" to=\"'keep.txt'\" overwrite=\"no\" />");
+        Run($"<do>@download('{server.Url}/file.txt', 'keep.txt', overwrite: false)</do>");
         Assert.Equal("mine", File.ReadAllText(Path.Combine(dir, "keep.txt")));
-        Run($"<download url=\"'{server.Url}/file.txt'\" to=\"'keep.txt'\" />");
+        Run($"<do>@download('{server.Url}/file.txt', 'keep.txt')</do>");
         Assert.Equal("file body", File.ReadAllText(Path.Combine(dir, "keep.txt")));
 
-        Assert.Contains("answered 404", Fails($"<download url=\"'{server.Url}/missing'\" to=\"'x.txt'\" />").Message);
-        Assert.Contains("isn't an http:// or https:// address", Fails("<download url=\"'file:///etc/passwd'\" to=\"'x.txt'\" />").Message);
-        Assert.Contains("can't change files", Fails($"<download url=\"'{server.Url}/file.txt'\" to=\"'y.txt'\" />", h => h.CanWriteFiles = false).Message);
-        Assert.Contains("is outside", Fails($"<download url=\"'{server.Url}/file.txt'\" to=\"'../y.txt'\" />", h => h.FileRoot = dir).Message);
+        Assert.Contains("answered 404", Fails($"<do>@download('{server.Url}/missing', 'x.txt')</do>").Message);
+        Assert.Contains("isn't an http:// or https:// address", Fails("<do>@download('file:///etc/passwd', 'x.txt')</do>").Message);
+        Assert.Contains("can't change files", Fails($"<do>@download('{server.Url}/file.txt', 'y.txt')</do>", h => h.CanWriteFiles = false).Message);
+        Assert.Contains("is outside", Fails($"<do>@download('{server.Url}/file.txt', '../y.txt')</do>", h => h.FileRoot = dir).Message);
     }
 
     [Fact]

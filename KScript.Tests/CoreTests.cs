@@ -61,7 +61,7 @@ public class CoreTests
     [Fact]
     public void LetTypeConverts()
     {
-        Assert.Equal("number 42\n", RunBody("<let name=\"n\" value=\"'42'\" type=\"int\" /><echo>{ @type($n) } $n</echo>"));
+        Assert.Equal("number 42\n", RunBody("<let name=\"n\" value=\"'42'\" type=\"int\" /><echo>{ $n->type() } $n</echo>"));
         Assert.Throws<KScriptException>(() => RunBody("<let name=\"n\" value=\"'abc'\" type=\"int\" />"));
     }
 

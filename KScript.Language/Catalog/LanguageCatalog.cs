@@ -20,7 +20,7 @@ namespace KScript.Language.Catalog
 
         private readonly Dictionary<string, ElementInfo> elements = new Dictionary<string, ElementInfo>(StringComparer.OrdinalIgnoreCase);
 
-        // Names as written, so KScript.Http's <Delete> and KScript.IO's <delete> are both known: an exact match wins.
+        // Names as written, so KScript.Http's <Delete> and a script's own <delete> are both known: an exact match wins.
         private readonly Dictionary<string, ElementInfo> exactElements = new Dictionary<string, ElementInfo>(StringComparer.Ordinal);
         private readonly Dictionary<string, RetiredInfo> retiredElements = new Dictionary<string, RetiredInfo>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, RetiredInfo> retiredAttributes = new Dictionary<string, RetiredInfo>(StringComparer.OrdinalIgnoreCase);
@@ -154,7 +154,9 @@ namespace KScript.Language.Catalog
         public RetiredInfo GetRetiredMethod(string type, string name) => RetiredMembers.Method(type, name);
 
         /// <summary>A method of this name that was renamed on some type, for a value whose type is not known, or null.</summary>
-        public RetiredInfo GetRetiredMethod(string name) => RetiredMembers.Named(name).FirstOrDefault();
+        public RetiredInfo GetRetiredMethod(string name) =>
+            // ->where() left lists but is still a query's: an unknown value may be one, so only names nothing has any more.
+            methods.Any(m => !m.Planned && m.Name == name) ? null : RetiredMembers.Named(name).FirstOrDefault();
 
         private static readonly IReadOnlyDictionary<string, ValueFieldInfo> NoFields = new Dictionary<string, ValueFieldInfo>();
 

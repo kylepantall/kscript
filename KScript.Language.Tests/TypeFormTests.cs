@@ -57,7 +57,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("r = @json('{}', as: Repo)\necho $r.name")]
+        [InlineData("r = '{}'->json(as: Repo)\necho $r.name")]
         [InlineData("r = Repo({ name: 'k' })\necho $r.name")]
         [InlineData("r = Repo(name: 'k', stars: 3)\necho $r.stars")]
         [InlineData("r = { name: 'k' } |> Repo()\necho $r.name")]
@@ -74,7 +74,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("r = @json('{}', as: $Repo)\necho $r.name", "r = @json('{}', as: Repo)\necho $r.name")]
+        [InlineData("r = '{}'->json(as: $Repo)\necho $r.name", "r = '{}'->json(as: Repo)\necho $r.name")]
         [InlineData("r = $Repo({ name: 'k' })\necho $r.name", "r = Repo({ name: 'k' })\necho $r.name")]
         [InlineData("echo $Repo->check({ name: 'k' }).ok", "echo Repo->check({ name: 'k' }).ok")]
         [InlineData("s = $Size('small')\necho $s", "s = Size('small')\necho $s")]

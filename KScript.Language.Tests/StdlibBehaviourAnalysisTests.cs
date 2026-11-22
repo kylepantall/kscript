@@ -25,26 +25,26 @@ namespace KScript.Language.Tests
         [Fact]
         public void A_field_of_a_built_in_value_is_known_and_typed()
         {
-            AssertClean(Code("d = @date('2026-11-19')\ny: int = $d.year\necho $y\n"));
+            AssertClean(Code("d = '2026-11-19'->to_date()\ny: int = $d.year\necho $y\n"));
             AssertClean(Code("import KScript.IO\nf = @file('a.txt')\necho \"{ $f.name } { $f.size } { $f.exists }\"\n"));
         }
 
         [Fact]
         public void Calling_a_field_says_to_drop_the_brackets_and_fixes_it()
         {
-            const string code = "d = @date('2026-11-19')\necho $d->year()\n";
+            const string code = "d = '2026-11-19'->to_date()\necho $d->year()\n";
             Diagnostic d = AssertSingle(Code(code), DiagnosticCodes.UnknownMethod);
             Assert.Contains("year is a field of a date, not a method", d.Message);
-            Assert.Equal("d = @date('2026-11-19')\necho $d.year\n", Fixed(d, code));
+            Assert.Equal("d = '2026-11-19'->to_date()\necho $d.year\n", Fixed(d, code));
         }
 
         [Fact]
         public void Reading_a_method_as_a_field_says_to_call_it()
         {
-            const string code = "d = @date('2026-11-19')\necho $d.format\n";
+            const string code = "d = '2026-11-19'->to_date()\necho $d.format\n";
             Diagnostic d = AssertSingle(Code(code), DiagnosticCodes.UnknownField);
             Assert.Contains("format is a method of a date, not a field", d.Message);
-            Assert.Equal("d = @date('2026-11-19')\necho $d->format()\n", Fixed(d, code));
+            Assert.Equal("d = '2026-11-19'->to_date()\necho $d->format()\n", Fixed(d, code));
         }
 
         [Theory]
@@ -63,7 +63,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Fields_are_offered_after_a_dot()
         {
-            (string text, int offset) = WithCaret("d = @date('2026-11-19')\necho $d.‸\n");
+            (string text, int offset) = WithCaret("d = '2026-11-19'->to_date()\necho $d.‸\n");
             List<string> labels = Service.GetCompletions(Service.Analyze(text, "behaviour.kscript"), offset).Select(i => i.Label).ToList();
             Assert.Contains("year", labels);
             Assert.Contains("weekday", labels);
@@ -73,7 +73,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Hovering_a_field_shows_its_type_and_description()
         {
-            (string text, int offset) = WithCaret("d = @date('2026-11-19')\necho $d.ye‸ar\n");
+            (string text, int offset) = WithCaret("d = '2026-11-19'->to_date()\necho $d.ye‸ar\n");
             HoverResult hover = Service.GetHover(Service.Analyze(text, "behaviour.kscript"), offset);
             Assert.NotNull(hover);
             Assert.Contains("date.year", hover.Markdown);

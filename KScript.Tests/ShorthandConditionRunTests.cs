@@ -70,13 +70,13 @@ public class ShorthandConditionRunTests
     }
 
     [Fact]
-    public void AssertTakesItsConditionInTheStartTag()
+    public void AssertShowsTheSidesOfItsCondition()
     {
         using var site = new TempSite();
         site.Write("example.test.ks.xml", """
             <kscript>
-              <test name="passes"><let name="total" value="30" /><assert $total eq 30 /></test>
-              <test name="fails"><let name="total" value="25" /><assert $total eq 30 /></test>
+              <test name="passes"><let name="total" value="30" /><do>@assert($total eq 30)</do></test>
+              <test name="fails"><let name="total" value="25" /><do>@assert($total eq 30)</do></test>
             </kscript>
             """);
         TestFileResult file = TestRunner.RunFile(Path.Combine(site.Root, "example.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root });

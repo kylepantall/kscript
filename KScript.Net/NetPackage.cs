@@ -4,9 +4,6 @@ using System.Text;
 using KScript.Metadata;
 using KScript.Runtime;
 
-using A = KScript.Metadata.AttributeInfo;
-using K = KScript.Metadata.AttributeKind;
-
 namespace KScript.Net
 {
     /// <summary>The answer to <c>@api()</c>: <c>.status</c>, <c>.is_ok</c>, <c>.text</c>, <c>->json()</c>, <c>->header(name)</c>.</summary>
@@ -124,28 +121,20 @@ namespace KScript.Net
                 "Makes an HTTP request and returns the response. options is a map: method, headers, body (a map is sent as JSON), timeout (how long to wait for the answer, such as 30s; default 100s). A path such as '/api/notes' asks the project's own routes, in this process.",
                 KType.Response, Api,
                 "<let name=\"repo\" value=\"@api('https://api.github.com/repos/kylepantall/kscript')->check()->json()\" />");
-            p.Command("url_encode", "text", "Escapes text for use in a URL.", KType.String, c => Uri.EscapeDataString(c.Str(0)));
-            p.Command("url_decode", "text", "Reverses @url_encode().", KType.String, c => Uri.UnescapeDataString(c.Str(0)));
             p.Command("query_string", "map", "A map as a URL query: a=1&b=two.", KType.String, c =>
                 string.Join("&", c.Map(0).Where(kv => kv.Value != null).Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(Values.ToStr(kv.Value)))));
 
-            p.Element(new ElementInfo("download", "Downloads a URL to a file. Folders are created as needed.", ContentKind.Empty,
-                new A("url", K.Expression, "The address to download.", true),
-                new A("to", K.Expression, "The file to save to. Relative paths are from the script's folder.", true),
-                new A("overwrite", K.Bool, "false keeps a file that is already there (the default is true)."))
+            p.Command("download", "url, to, overwrite?: bool", "Downloads a URL to a file and returns the file's full path. Folders are created as needed, and a relative path is from the script's folder. overwrite: false keeps a file that is already there.", KType.String, c =>
             {
-                Context = ElementContext.Script,
-                Example = "<download url=\"'https://example.com/data.csv'\" to=\"'data/data.csv'\" />",
-            }, run =>
-            {
-                string url = Values.ToStr(run.Eval("url"));
-                string to = run.Host.ResolvePath(Values.ToStr(run.Eval("to")), run.Module.Directory);
-                run.Host.CheckWrite("<download>");
-                if (File.Exists(to) && !run.Flag("overwrite", true)) return null;
-                CheckUrl(url, run.Error);
-                using HttpResponseMessage response = Client.Value.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, run.Interpreter.Options.Cancellation).GetAwaiter().GetResult();
+                string url = c.Str(0);
+                string to = c.Host.ResolvePath(c.Str(1), c.Module?.Directory ?? c.Host.WorkingDirectory);
+                c.Host.CheckWrite("@download()");
+                if (File.Exists(to) && c.Has(2, "overwrite") && !Values.Truthy(c.Arg(2, "overwrite"))) return to;
+                if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                    throw c.Error($"'{url}' isn't an http:// or https:// address.", "Argument");
+                using HttpResponseMessage response = Client.Value.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, c.Interpreter.Options.Cancellation).GetAwaiter().GetResult();
                 if (!response.IsSuccessStatusCode)
-                    throw run.Error($"{url} answered {(int)response.StatusCode} {response.ReasonPhrase}.", "url", "Network");
+                    throw c.Error($"{url} answered {(int)response.StatusCode} {response.ReasonPhrase}.", "Network");
                 string dir = Path.GetDirectoryName(to);
                 if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                 using (Stream body = response.Content.ReadAsStream())
@@ -153,18 +142,12 @@ namespace KScript.Net
                 {
                     body.CopyTo(file);
                 }
-                return null;
-            });
+                return to;
+            }, "<do>@download('https://example.com/data.csv', 'data/data.csv')</do>");
 
             p.AgentNotes(
                 ("@api", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test .is_ok.",
                     prefer: "@api($url)->check()->json(as: Type) to fail fast and check the data's shape.")));
-        }
-
-        private static void CheckUrl(string url, Func<string, string, string, KScriptException> error)
-        {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-                throw error($"'{url}' isn't an http:// or https:// address.", "url", "Argument");
         }
 
         private static object Api(CallContext c)

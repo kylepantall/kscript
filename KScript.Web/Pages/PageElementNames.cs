@@ -12,7 +12,7 @@ namespace KScript.Pages
         public static readonly IReadOnlySet<string> KScript = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "case", "default", "do", "elif", "else", "for", "if", "import", "include", "layout", "let", "live", "markdown",
-            "match", "redirect", "respond", "set", "slot", "state", "while",
+            "match", "respond", "set", "slot", "state", "while",
         };
 
         public static readonly IReadOnlySet<string> Html = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
