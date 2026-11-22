@@ -62,6 +62,7 @@ The `format` section of `kscript.json` sets the formatting style (`"indent": 4`,
 - **KScript: Run Tests**: runs `kscript test` for the workspace folder in a task.
 - **KScript: Run Tests in This File**: runs the open test file. Test files (`*.test.kscript`, `*.test.ks.xml`) also get a run button in the editor title bar, and every test is listed in the Testing view, where it can be run on its own.
 - **KScript: Serve Site**: runs `kscript serve` in the project's folder.
+- **KScript: Check This File** saves the current script, runs `kscript check <file>` and lists its diagnostics in Problems. It also works on a standalone file. Find it in the Command Palette or the editor context menu.
 - **KScript: Check Project**: runs `kscript check` and lists what it finds in Problems.
 - **KScript: Format Project**: runs `kscript fmt` on the whole project.
 - **KScript: New Project…**: asks for a name and a folder, runs `kscript make project`, and offers to open it.

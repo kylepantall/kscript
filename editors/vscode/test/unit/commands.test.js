@@ -26,7 +26,7 @@ function setup() {
     commands: { registerCommand: (id, handler) => commands.set(id, handler) },
     TaskGroup: { Test: {} }, TaskScope: { Workspace: 1, Global: 2 }, TaskRevealKind: { Always: 1 },
     ProcessExecution: class { constructor(command, args, options) { Object.assign(this, { command, args, options }); } },
-    Task: class { constructor(definition, scope, name, source, execution) { Object.assign(this, { definition, scope, execution }); } },
+    Task: class { constructor(definition, scope, name, source, execution, matchers) { Object.assign(this, { definition, scope, execution, matchers }); } },
     tasks: {
       executeTask: async (task) => { tasks.push(task); return task; },
       onDidEndTaskProcess: (callback) => {
@@ -87,4 +87,22 @@ test('project tests require a folder and standalone files run in their own direc
   assert.match(messages.pop(), /Open your project's folder/);
   assert.equal(await commands.get('kscript.openDocs')('echo'), 0);
   assert.deepEqual(tasks[1].execution.args, ['docs', 'echo']);
+});
+
+test('Check This File saves its target and passes its path and matcher to the CLI', async () => {
+  const { commands, document, window, tasks } = setup();
+  const folder = path.resolve('scripts with spaces');
+  let saves = 0;
+  const target = document(folder, 'draft.kscript', async () => { saves++; return true; });
+  window.activeTextEditor = { document: document(folder, 'other.kscript', () => assert.fail('saved the active file')) };
+  assert.equal(await commands.get('kscript.checkFile')(target.uri), 0);
+  assert.equal(saves, 1);
+  assert.deepEqual(tasks[0].execution.args, ['check', target.fileName]);
+  assert.equal(tasks[0].execution.options.cwd, folder);
+  assert.deepEqual(tasks[0].matchers, ['$kscript-check']);
+  target.save = async () => false;
+  await commands.get('kscript.checkFile')(target.uri);
+  target.uri.scheme = 'untitled';
+  await commands.get('kscript.checkFile')(target.uri);
+  assert.equal(tasks.length, 1);
 });

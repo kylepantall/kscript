@@ -208,6 +208,11 @@
         "category": "KScript"
       },
       {
+        "command": "kscript.checkFile",
+        "title": "Check This File",
+        "category": "KScript"
+      },
+      {
         "command": "kscript.check",
         "title": "Check Project",
         "category": "KScript"
@@ -282,7 +287,18 @@
           "group": "navigation"
         }
       ],
+      "editor/context": [
+        {
+          "command": "kscript.checkFile",
+          "when": "resourceScheme == file && (editorLangId == kscript || editorLangId == kscript-code)",
+          "group": "1_modification"
+        }
+      ],
       "commandPalette": [
+        {
+          "command": "kscript.checkFile",
+          "when": "resourceScheme == file && (editorLangId == kscript || editorLangId == kscript-code)"
+        },
         {
           "command": "kscript.onEnter",
           "when": "false"

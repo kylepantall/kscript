@@ -106,6 +106,22 @@ function registerCommands(vscode, context, server) {
     });
   }
 
+  async function checkFile(target) {
+    const doc = await documentFor(target);
+    if (!doc || doc.uri.scheme !== 'file' || !KSCRIPT_LANGUAGES.includes(doc.languageId)) {
+      vscode.window.showInformationMessage('Open a saved .kscript or .ks.xml file to check it.');
+      return undefined;
+    }
+    const found = kscript('check the file');
+    if (!found) return undefined;
+    const file = await fileFor(doc);
+    if (!file) return undefined;
+    const folder = folderOf(doc.uri);
+    return runTask(found, `check ${path.basename(file)}`, 'check', ['check', file], {
+      folder, cwd: folder ? folder.uri.fsPath : path.dirname(file), file, matcher: '$kscript-check',
+    });
+  }
+
   /** Runs `kscript test`: every test in the folder, one file, or the tests of a file whose name contains filter. */
   async function runTests(target, filter) {
     if (!target) return runProjectTests();
@@ -184,6 +200,7 @@ function registerCommands(vscode, context, server) {
     }),
     vscode.commands.registerCommand('kscript.runTest', (target, filter) => runTests(target, filter)),
     vscode.commands.registerCommand('kscript.serve', inProject('serve', 'serve the site', ['serve'], { background: true })),
+    vscode.commands.registerCommand('kscript.checkFile', checkFile),
     vscode.commands.registerCommand('kscript.check', inProject('check', 'check the project', ['check'], { matcher: '$kscript-check' })),
     vscode.commands.registerCommand('kscript.formatProject', inProject('fmt', 'format the project', ['fmt'])),
     // "Open docs" in a hover passes the name it is about, and the docs open on what they have for it.

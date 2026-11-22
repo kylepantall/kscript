@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Check This File** saves and checks a single script and reports its diagnostics in Problems, including when no project is open.
+
 - Project commands use the active workspace folder and stop if its files cannot be saved. Standalone scripts and tests run from their own directory. Workspace symbol search follows folders added or removed during the session.
 - Open the install guide from an empty window, or select a custom CLI by its name on `PATH`. Both script forms have valid editor word patterns, and selecting a name before `->` in code leaves the arrow intact.
 
