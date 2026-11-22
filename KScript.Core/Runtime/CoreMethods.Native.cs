@@ -29,70 +29,6 @@ namespace KScript.Runtime
             foreach (NativeType type in NativeTypeRegistry.BuiltIn) type.Members(p);
             ListFilters.Register(p);
 
-            // url
-            p.Field("url", "scheme", S, "The scheme, in lower case: https.", (t, _) => Part(t, "scheme"));
-            p.Field("url", "host", S, "The host name, in lower case: example.com.", (t, _) => Part(t, "host"));
-            p.Field("url", "port", N, "The port: the one written, or the scheme's usual one (443 for https).", (t, _) => Part(t, "port"));
-            p.Field("url", "path", S, "The path, starting with /: /docs/start.", (t, _) => Part(t, "path"));
-            p.Field("url", "query", M, "The query string as a map: ?page=2&q=cats gives { page: '2', q: 'cats' }.", (t, _) => new Dictionary<string, object>((Dictionary<string, object>)Part(t, "query")));
-            p.Field("url", "fragment", S, "The part after #, without it.", (t, _) => Part(t, "fragment"));
-            p.Field("url", "origin", S, "The scheme, host and any port written: https://example.com.", (t, _) => Part(t, "origin"));
-            p.Method("url", "with_query", "values: map", "The url with these query values added or replaced (null removes one).", "url", (t, c) =>
-            {
-                var query = new Dictionary<string, object>((Dictionary<string, object>)Part(t, "query"));
-                foreach (var kv in (Dictionary<string, object>)c.Arg(0) ?? new Dictionary<string, object>())
-                {
-                    if (kv.Value == null) query.Remove(kv.Key);
-                    else query[kv.Key] = Values.ToStr(kv.Value);
-                }
-                string text = T(t).Text;
-                int hash = text.IndexOf('#');
-                string fragment = hash >= 0 ? text.Substring(hash) : string.Empty;
-                string head = (hash >= 0 ? text.Substring(0, hash) : text).Split('?')[0];
-                string qs = string.Join("&", query.Select(kv => Uri.EscapeDataString(kv.Key) + (Values.ToStr(kv.Value).Length > 0 ? "=" + Uri.EscapeDataString(Values.ToStr(kv.Value)) : string.Empty)));
-                return Native("url", head + (qs.Length > 0 ? "?" + qs : string.Empty) + fragment);
-            });
-            p.Method("url", "join", "path: string", "The url a link to path leads to from here: ../img/a.png or /about.", "url", (t, c) =>
-                Native("url", new Uri((Uri)Part(t, "uri"), c.Str(0)).ToString()));
-
-            // domain
-            p.Field("domain", "tld", S, "The last part: com, or uk for example.co.uk.", (t, _) => Part(t, "tld"));
-            p.Field("domain", "labels", L, "Its parts: ['api', 'example', 'com'].", (t, _) => new List<object>((List<object>)Part(t, "labels")));
-            p.Method("domain", "is_subdomain_of", "other: string", "True when it is the other domain or under it: api.example.com is under example.com.", B, (t, c) =>
-            {
-                string other = c.Str(0).Trim().TrimEnd('.').ToLowerInvariant();
-                try
-                {
-                    other = new System.Globalization.IdnMapping().GetUnicode(other);
-                }
-                catch (ArgumentException)
-                {
-                    return false;
-                }
-                return T(t).Text == other || T(t).Text.EndsWith("." + other, StringComparison.Ordinal);
-            });
-            p.Method("domain", "ascii", "", "The form DNS uses, with international labels as xn--: xn--bcher-kva.example for bücher.example.", S, (t, c) => Part(t, "ascii"));
-
-            // ip and cidr
-            static IPAddress A(object t) => (IPAddress)Part(t, "address");
-            p.Field("ip", "version", N, "4 or 6.", (t, _) => Part(t, "version"));
-            p.Method("ip", "in", "block: cidr", "True when the address is in the block, such as '10.0.0.0/8'.", B, (t, c) =>
-                NativeParsers.InBlock((NativeText)(c.Arg(0) is NativeText block && block.TypeName == "cidr" ? block : Native("cidr", c.Str(0))), A(t)));
-            p.Field("ip", "is_private", B, "True for addresses that only work inside a network: 10.x, 172.16-31.x, 192.168.x, fc00::/7, and loopback and link-local ones.", (t, _) =>
-            {
-                IPAddress ip = A(t);
-                if (IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal || ip.IsIPv6UniqueLocal || ip.IsIPv6SiteLocal) return true;
-                if (ip.AddressFamily != AddressFamily.InterNetwork) return false;
-                byte[] b = ip.GetAddressBytes();
-                return b[0] == 10 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31) || (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254) || (b[0] == 100 && b[1] >= 64 && b[1] <= 127);
-            });
-            p.Field("ip", "is_loopback", B, "True for 127.x.x.x and ::1.", (t, _) => IPAddress.IsLoopback(A(t)));
-            p.Method("cidr", "contains", "address: ip", "True when the address is in the block.", B, (t, c) =>
-                NativeParsers.InBlock(T(t), A(c.Arg(0) is NativeText ip && ip.TypeName == "ip" ? ip : Native("ip", c.Str(0)))));
-            p.Field("cidr", "network", "ip", "The first address of the block.", (t, _) => NativeParsers.IpValue((IPAddress)Part(t, "network")));
-            p.Field("cidr", "prefix", N, "The prefix length: 8 for 10.0.0.0/8.", (t, _) => Part(t, "prefix"));
-            p.Field("cidr", "size", N, "How many addresses the block holds: 256 for a /24.", (t, _) => Math.Pow(2, (int)Part(t, "bits") - (double)Part(t, "prefix")));
-
             // phone, country, currency, locale, timezone
             p.Field("phone", "country_code", S, "The country calling code without +: 44 for a UK number.", (t, _) => Part(t, "country_code"));
             p.Field("phone", "national", S, "The number after the country code.", (t, _) => Part(t, "national"));
@@ -134,27 +70,6 @@ namespace KScript.Runtime
             p.Method("card", "reveal", "", "The whole number. Only use it to pass the card on to a payment provider; never store or log it.", S, (t, c) => T(t).Text);
 
             p.Examples(
-                ("url.scheme", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x.scheme }</echo>"),
-                ("url.host", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x.host }</echo>"),
-                ("url.port", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x.port }</echo>"),
-                ("url.path", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x.path }</echo>"),
-                ("url.query", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x.query }</echo>"),
-                ("url.fragment", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x.fragment }</echo>"),
-                ("url.origin", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x.origin }</echo>"),
-                ("url->with_query", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x->with_query({ page: 3, q: 'tea' }) }</echo>"),
-                ("url->join", "<let name=\"x\" type=\"url\" value=\"'https://example.com:8443/docs?page=2#intro'\" />\n<echo>{ $x->join('../blog/') }</echo>"),
-                ("domain->ascii", "<let name=\"x\" type=\"domain\" value=\"'Bücher.example'\" />\n<echo>{ $x } { $x->ascii() }</echo>"),
-                ("domain.tld", "<let name=\"x\" type=\"domain\" value=\"'api.example.co.uk'\" />\n<echo>{ $x.tld }</echo>"),
-                ("domain.labels", "<let name=\"x\" type=\"domain\" value=\"'api.example.co.uk'\" />\n<echo>{ $x.labels }</echo>"),
-                ("domain->is_subdomain_of", "<let name=\"x\" type=\"domain\" value=\"'api.example.co.uk'\" />\n<echo>{ $x->is_subdomain_of('example.co.uk') }</echo>"),
-                ("ip.version", "<let name=\"x\" type=\"ip\" value=\"'192.168.0.12'\" />\n<echo>{ $x.version }</echo>"),
-                ("ip->in", "<let name=\"x\" type=\"ip\" value=\"'192.168.0.12'\" />\n<echo>{ $x->in('192.168.0.0/16') }</echo>"),
-                ("ip.is_private", "<let name=\"x\" type=\"ip\" value=\"'192.168.0.12'\" />\n<echo>{ $x.is_private }</echo>"),
-                ("ip.is_loopback", "<let name=\"x\" type=\"ip\" value=\"'192.168.0.12'\" />\n<echo>{ $x.is_loopback }</echo>"),
-                ("cidr->contains", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x->contains('10.20.30.40') }</echo>"),
-                ("cidr.network", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x.network }</echo>"),
-                ("cidr.prefix", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x.prefix }</echo>"),
-                ("cidr.size", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x.size }</echo>"),
                 ("phone.country_code", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x.country_code }</echo>"),
                 ("phone.national", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x.national }</echo>"),
                 ("phone->tel", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x->tel() }</echo>"),

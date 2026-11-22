@@ -27,6 +27,12 @@ namespace KScript.Runtime
             new Base64Type(),
             new JwtType(),
             new JsonType(),
+            new UrlType(),
+            new DomainType(),
+            new IpType(),
+            new CidrType(),
+            new MacType(),
+            new PortType(),
         };
 
         static NativeTypeRegistry()

@@ -112,12 +112,6 @@ namespace KScript.Runtime
         {
             public static void Register()
             {
-                Add("url", new NativeParser(Url, UrlOptions));
-                Add("domain", new NativeParser(Domain));
-                Add("ip", new NativeParser(Ip, IpOptions));
-                Add("cidr", new NativeParser(Cidr));
-                Add("mac", new NativeParser(Mac));
-                Add("port", new NativeParser(Port) { TakesNumbers = true });
                 Add("phone", new NativeParser(Phone, PhoneOptions));
                 Add("country", new NativeParser(Country));
                 Add("currency", new NativeParser(Currency));
@@ -128,184 +122,6 @@ namespace KScript.Runtime
 
             private static List<string> Texts(object value) =>
                 value is List<object> list ? list.Select(v => Values.ToStr(v).Trim()).ToList() : new List<string> { Values.ToStr(value).Trim() };
-
-            // ---- url ------------------------------------------------------------------------------------------
-
-            private static readonly string[] UrlSchemes = { "http", "https", "ftp", "ws", "wss" };
-
-            private static (object, string) Url(string s)
-            {
-                s = s.Trim();
-                if (s.Length == 0) return No("it is empty");
-                if (s.Any(char.IsWhiteSpace)) return No("it has a space in it (write it as %20)");
-                int colon = s.IndexOf("://", StringComparison.Ordinal);
-                if (colon <= 0) return No("it needs a scheme, as in https://" + s.TrimStart('/'));
-                string scheme = s.Substring(0, colon).ToLowerInvariant();
-                if (!UrlSchemes.Contains(scheme)) return No($"{scheme}: isn't a web scheme (use {string.Join(", ", UrlSchemes)})");
-                if (!Uri.TryCreate(s, UriKind.Absolute, out Uri uri) || string.IsNullOrEmpty(uri.Host)) return No("it has no host after " + scheme + "://");
-                int rest = s.IndexOfAny(new[] { '/', '?', '#' }, colon + 3);
-                string authority = rest < 0 ? s.Substring(colon + 3) : s.Substring(colon + 3, rest - colon - 3);
-                int at = authority.LastIndexOf('@');
-                string userInfo = at >= 0 ? authority.Substring(0, at + 1) : string.Empty;
-                string hostPort = (at >= 0 ? authority.Substring(at + 1) : authority).ToLowerInvariant();
-                string text = scheme + "://" + userInfo + hostPort + (rest < 0 ? string.Empty : s.Substring(rest));
-                var query = new Dictionary<string, object>();
-                foreach (string pair in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    int eq = pair.IndexOf('=');
-                    string key = Uri.UnescapeDataString((eq < 0 ? pair : pair.Substring(0, eq)).Replace('+', ' '));
-                    query[key] = eq < 0 ? string.Empty : Uri.UnescapeDataString(pair.Substring(eq + 1).Replace('+', ' '));
-                }
-                return Ok(new NativeText("url", text, new Dictionary<string, object>
-                {
-                    ["scheme"] = scheme,
-                    ["host"] = uri.IdnHost,
-                    ["port"] = (double)uri.Port,
-                    ["path"] = uri.AbsolutePath,
-                    ["query"] = query,
-                    ["fragment"] = uri.Fragment.TrimStart('#'),
-                    ["origin"] = scheme + "://" + hostPort,
-                    ["uri"] = uri,
-                }));
-            }
-
-            private static IEnumerable<string> UrlOptions(object value, IReadOnlyDictionary<string, object> options)
-            {
-                if (value is not NativeText url) yield break;
-                if (options.TryGetValue("schemes", out object s))
-                {
-                    List<string> schemes = Texts(s).Select(x => x.TrimEnd(':').ToLowerInvariant()).ToList();
-                    if (!schemes.Contains((string)url.Part("scheme"))) yield return $"must use {string.Join(" or ", schemes)}";
-                }
-                if (options.TryGetValue("hosts", out object h))
-                {
-                    List<string> hosts = Texts(h).Select(x => x.ToLowerInvariant()).ToList();
-                    string host = (string)url.Part("host");
-                    if (!hosts.Any(a => host == a || host.EndsWith("." + a, StringComparison.Ordinal))) yield return $"must be on {string.Join(" or ", hosts)}";
-                }
-            }
-
-            // ---- network ------------------------------------------------------------------------------------------
-
-            private static string DomainProblem(string d)
-            {
-                if (d.Length == 0) return "it is empty";
-                if (d.Length > 253) return "it is longer than 253 characters";
-                string[] labels = d.Split('.');
-                if (labels.Length < 2) return "it needs a dot, as in example.com";
-                foreach (string label in labels)
-                {
-                    if (label.Length == 0) return "it has two dots in a row";
-                    if (label.Length > 63) return $"'{label}' is longer than 63 characters";
-                    if (label[0] == '-' || label[^1] == '-') return $"'{label}' can't start or end with -";
-                    char bad = label.FirstOrDefault(c => !(char.IsAsciiLetterOrDigit(c) || c == '-'));
-                    if (bad != default) return $"'{bad}' can't be used in a domain";
-                }
-                if (labels[^1].All(char.IsAsciiDigit)) return "its last part can't be a number (that is an IP address)";
-                return null;
-            }
-
-            private static (object, string) Domain(string s)
-            {
-                string d = s.Trim().TrimEnd('.').ToLowerInvariant();
-                try
-                {
-                    d = new IdnMapping().GetAscii(d);
-                }
-                catch (ArgumentException)
-                {
-                    return No("it isn't a valid domain name");
-                }
-                string problem = DomainProblem(d);
-                if (problem != null) return No(problem);
-                // Kept as it is written (bücher.example); ->ascii() gives the form DNS uses (xn--bcher-kva.example).
-                string ascii = d;
-                d = new IdnMapping().GetUnicode(ascii);
-                string[] labels = d.Split('.');
-                return Ok(new NativeText("domain", d, new Dictionary<string, object>
-                {
-                    ["tld"] = labels[^1],
-                    ["labels"] = labels.Cast<object>().ToList(),
-                    ["ascii"] = ascii,
-                }));
-            }
-
-            private static (object, string) Ip(string s)
-            {
-                s = s.Trim();
-                if (s.StartsWith('[') && s.EndsWith(']')) s = s.Substring(1, s.Length - 2);
-                if (s.Length == 0) return No("it is empty");
-                if (!IPAddress.TryParse(s, out IPAddress ip) || (ip.AddressFamily == AddressFamily.InterNetwork && s.Count(c => c == '.') != 3))
-                    return No("it isn't an IPv4 address (such as 192.168.0.1) or an IPv6 address (such as 2001:db8::1)");
-                if (ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.ScopeId != 0) return No("an IPv6 zone (%...) can't be kept");
-                return Ok(IpValue(ip));
-            }
-
-            internal static NativeText IpValue(IPAddress ip) =>
-                new NativeText("ip", ip.ToString(), new Dictionary<string, object> { ["address"] = ip, ["version"] = ip.AddressFamily == AddressFamily.InterNetwork ? 4.0 : 6.0 });
-
-            private static IEnumerable<string> IpOptions(object value, IReadOnlyDictionary<string, object> options)
-            {
-                if (value is NativeText ip && options.TryGetValue("version", out object v) && Values.ToStr(v) is string want && want != "any"
-                    && want != ((double)ip.Part("version")).ToString(CultureInfo.InvariantCulture))
-                    yield return $"must be an IPv{want} address";
-            }
-
-            private static (object, string) Cidr(string s)
-            {
-                s = s.Trim();
-                int slash = s.IndexOf('/');
-                if (slash < 0) return No("it needs / and a prefix length, as in 10.0.0.0/8");
-                if (Ip(s.Substring(0, slash)) is not (NativeText address, null)) return No($"'{s.Substring(0, slash)}' isn't an IP address");
-                IPAddress ip = (IPAddress)address.Part("address");
-                int bits = ip.AddressFamily == AddressFamily.InterNetwork ? 32 : 128;
-                if (!int.TryParse(s.AsSpan(slash + 1), NumberStyles.None, CultureInfo.InvariantCulture, out int prefix) || prefix > bits)
-                    return No($"the prefix length must be 0 to {bits}");
-                byte[] bytes = ip.GetAddressBytes();
-                for (int i = 0; i < bytes.Length; i++)
-                {
-                    int keep = Math.Clamp(prefix - i * 8, 0, 8);
-                    bytes[i] &= (byte)(0xFF << (8 - keep));
-                }
-                var network = new IPAddress(bytes);
-                return Ok(new NativeText("cidr", network + "/" + prefix, new Dictionary<string, object>
-                {
-                    ["network"] = network,
-                    ["prefix"] = (double)prefix,
-                    ["bits"] = bits,
-                }));
-            }
-
-            /// <summary>True if <paramref name="ip"/> is in the block.</summary>
-            internal static bool InBlock(NativeText cidr, IPAddress ip)
-            {
-                IPAddress network = (IPAddress)cidr.Part("network");
-                if (ip.IsIPv4MappedToIPv6 && network.AddressFamily == AddressFamily.InterNetwork) ip = ip.MapToIPv4();
-                if (ip.AddressFamily != network.AddressFamily) return false;
-                byte[] a = ip.GetAddressBytes(), n = network.GetAddressBytes();
-                int prefix = (int)(double)cidr.Part("prefix");
-                for (int i = 0; i < a.Length; i++)
-                {
-                    int keep = Math.Clamp(prefix - i * 8, 0, 8);
-                    byte mask = (byte)(0xFF << (8 - keep));
-                    if ((a[i] & mask) != n[i]) return false;
-                }
-                return true;
-            }
-
-            private static (object, string) Mac(string s)
-            {
-                string hex = new string(s.Trim().Where(c => c is not (':' or '-' or '.')).ToArray()).ToLowerInvariant();
-                if (hex.Length != 12 || !hex.All(Uri.IsHexDigit)) return No("it needs 12 hex digits, as in 00:1a:2b:3c:4d:5e");
-                return Ok(new NativeText("mac", string.Join(":", Enumerable.Range(0, 6).Select(i => hex.Substring(i * 2, 2)))));
-            }
-
-            private static (object, string) Port(string s)
-            {
-                if (!int.TryParse(s.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port)) return No("it must be a whole number from 1 to 65535");
-                if (port < 1 || port > 65535) return No("it must be from 1 to 65535");
-                return Ok((double)port);
-            }
 
             // ---- people and places ------------------------------------------------------------------------------
 
@@ -456,8 +272,6 @@ namespace KScript.Runtime
         }
 
         // Methods use these.
-        internal static bool InBlock(NativeText cidr, IPAddress ip) => BuiltIn.InBlock(cidr, ip);
-        internal static NativeText IpValue(IPAddress ip) => BuiltIn.IpValue(ip);
         internal static NativeText DurationOf(double seconds) => DurationType.Of(seconds);
     }
 }
