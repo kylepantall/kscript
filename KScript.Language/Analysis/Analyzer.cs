@@ -28,6 +28,7 @@ namespace KScript.Language.Analysis
             this.catalog = catalog ?? LanguageCatalog.Default;
             directory = path != null ? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) : null;
             result = new DocumentAnalysis(source, path, kind, MarkupParser.Parse(source, kind, path));
+            CodeArguments.Normalise(result.Markup, this.catalog.GetElement);
         }
 
         private DocumentKind Kind => result.Kind;
@@ -472,6 +473,7 @@ namespace KScript.Language.Analysis
 
             SourceText other = new SourceText(text);
             MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
+            CodeArguments.Normalise(doc, catalog.GetElement);
             Dictionary<string, (ExternalLocation, string)> constants = new Dictionary<string, (ExternalLocation, string)>(StringComparer.Ordinal);
             MarkupElement root = doc.RootElements.FirstOrDefault();
             if (root == null)
@@ -510,6 +512,7 @@ namespace KScript.Language.Analysis
 
             SourceText other = new SourceText(text);
             MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
+            CodeArguments.Normalise(doc, catalog.GetElement);
             Dictionary<string, (FunctionParameter[], ExternalLocation, string)> exports = new Dictionary<string, (FunctionParameter[], ExternalLocation, string)>(StringComparer.Ordinal);
             foreach (MarkupElement fn in doc.DescendantElements().Where(x => x.Name == "fn" && x.Parent?.Name != "extend"))
             {
@@ -1122,6 +1125,7 @@ namespace KScript.Language.Analysis
         private void AnalyzeAttribute(MarkupElement e, MarkupAttribute attr, AttributeInfo a, Scope scope)
         {
             CheckNameListString(e, attr, a);
+            CheckArgumentForm(e, attr, a);
             switch (a.Kind)
             {
                 case AttributeKind.Expression:
@@ -1131,6 +1135,8 @@ namespace KScript.Language.Analysis
                     AnalyzeExpressionRegion(attr.Value, RegionKind.ExpressionList, scope, e, attr);
                     break;
                 case AttributeKind.Template:
+                    AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: true);
+                    break;
                 case AttributeKind.Text when attr.ValueText.Contains('{') && !a.Literal:
                     AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: false);
                     break;

@@ -87,7 +87,7 @@ namespace KScript.UI
                         node.Props[attr.Name] = Values.ParseBool(attr.ValueText) ?? Values.Truthy(run.Interpreter.InterpolateValue(attr.Value, scope, run.Module));
                         break;
                     default:
-                        node.Props[attr.Name] = run.Interpreter.Interpolate(attr.Value, scope, run.Module, bareReferences: false);
+                        node.Props[attr.Name] = run.Interpreter.Interpolate(attr.Value, scope, run.Module, bareReferences: true);
                         break;
                 }
             }

@@ -1,3 +1,4 @@
+using KScript.Syntax.Text;
 namespace KScript.Syntax.Markup
 {
     /// <summary>
@@ -76,7 +77,7 @@ namespace KScript.Syntax.Markup
                 char c = text[i];
                 if (c == '\'' || c == '"')
                 {
-                    int close = text.IndexOf(c, i + 1);
+                    int close = Quotes.Close(text, i, text.Length);
                     i = close < 0 ? text.Length : close + 1;
                     continue;
                 }

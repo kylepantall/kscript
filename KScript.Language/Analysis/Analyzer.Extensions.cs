@@ -127,6 +127,7 @@ namespace KScript.Language.Analysis
             }
             SourceText other = new SourceText(text);
             MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
+            CodeArguments.Normalise(doc, catalog.GetElement);
             HashSet<string> declaredHere = new HashSet<string>(doc.DescendantElements().Where(x => x.Name is "type" or "model").Select(x => x.GetAttributeValue("name")?.Trim()).Where(n => n != null), StringComparer.Ordinal);
             foreach (MarkupElement e in doc.DescendantElements().Where(x => x.Name == "extend"))
             {

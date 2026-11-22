@@ -285,4 +285,54 @@ namespace KScript.Syntax.Text
             return sb.ToString();
         }
     }
+
+    /// <summary>
+    /// The one rule for quoted strings, shared by everything that reads them. In "double quotes" <c>\"</c> is a quote
+    /// and <c>\\</c> is a backslash; any other backslash is kept, so <c>"\d+"</c> is a pattern as written. 'Single
+    /// quotes' have no escapes at all: the string ends at the next <c>'</c>. In both, a backslash at the end of a line
+    /// joins it to the next line.
+    /// </summary>
+    public static class Quotes
+    {
+        /// <summary>True when the backslash at <paramref name="pos"/> escapes the character after it in a string opened with <paramref name="quote"/>.</summary>
+        public static bool IsEscape(string text, int pos, int limit, char quote) =>
+            quote == '"' && pos + 1 < limit && text[pos] == '\\' && (text[pos + 1] == '"' || text[pos + 1] == '\\');
+
+        /// <summary>The offset of the quote that closes the string opened at <paramref name="open"/>, or -1.</summary>
+        public static int Close(string text, int open, int limit)
+        {
+            char quote = text[open];
+            for (int i = open + 1; i < limit; i++)
+            {
+                if (IsEscape(text, i, limit, quote)) i++;
+                else if (text[i] == quote) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>The value of the string between <paramref name="start"/> and <paramref name="end"/> (the quotes left out).</summary>
+        public static string Decode(string text, int start, int end, char quote)
+        {
+            string raw = text.Substring(start, end - start);
+            if (raw.IndexOf('\\') < 0) return raw;
+            if (quote != '"') return LineJoins.Join(raw);
+            StringBuilder sb = new StringBuilder(raw.Length);
+            for (int i = 0; i < raw.Length; i++)
+            {
+                if (IsEscape(raw, i, raw.Length, quote))
+                {
+                    sb.Append(raw[++i]);
+                }
+                else if (LineJoins.At(raw, i, raw.Length, out int after))
+                {
+                    i = after - 1;
+                }
+                else
+                {
+                    sb.Append(raw[i]);
+                }
+            }
+            return sb.ToString();
+        }
+    }
 }

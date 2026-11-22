@@ -154,7 +154,7 @@ namespace KScript.Language.Tests
         [InlineData("x = (//c\n  1)\necho $x")]
         [InlineData("x = 1 +\n  /* c */\n  2\necho $x")]
         [InlineData("x = /* c */\n  2\necho $x")]
-        [InlineData("type User { a: int }\ntype A with [User, 'it\\'s'] {}")]
+        [InlineData("type User { a: int }\ntype A with [User, 'its'] {}")]
         public void TypeBodiesParse(string code)
         {
             MarkupDocument doc = CodeParser.Parse(code);

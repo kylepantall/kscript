@@ -218,7 +218,7 @@ namespace KScript.Language.Formatting
                     case State.Single:
                     case State.Double:
                         s.States[i] = state;
-                        if (c == '\\' && i + 1 < text.Length)
+                        if (c == '\\' && i + 1 < text.Length && (text[i + 1] == '\n' || text[i + 1] == '\r' || Quotes.IsEscape(text, i, text.Length, state == State.Single ? '\'' : '"')))
                         {
                             if (text[i + 1] == '\n') s.Joined[i + 1] = true;
                             s.States[++i] = state;
@@ -289,7 +289,7 @@ namespace KScript.Language.Formatting
                     i++;
                     while (i < end && text[i] != c)
                     {
-                        if (text[i] == '\\') i++;
+                        if (Quotes.IsEscape(text, i, end, c)) i++;
                         i++;
                     }
                     continue;

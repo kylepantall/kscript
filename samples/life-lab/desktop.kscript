@@ -36,20 +36,20 @@ KScript.Window(
   }
 
   Row(gap: 8, wrap) {
-    Button(variant: primary, width: 80, on-click: "playing = not $playing") "{ $playing ? 'Pause' : 'Play' }"
-    Button(on-click: "world = @advance($world, 1); playing = false") "Step"
-    Button(on-click: "world = @advance($world, 10)") "+10"
-    Button(on-click: "world = @advance($world, 50)") "+50"
+    Button(variant: primary, width: 80, on-click: { playing = not $playing }) "{ $playing ? 'Pause' : 'Play' }"
+    Button(on-click: { world = @advance($world, 1); playing = false }) "Step"
+    Button(on-click: { world = @advance($world, 10) }) "+10"
+    Button(on-click: { world = @advance($world, 50) }) "+50"
     Spacer(size: 8)
     Text(color: "#94a3b8") "Speed"
     Select(bind: speed, options: { Slow: 400, Normal: 150, Fast: 40 })
     Text(color: "#94a3b8") "Pattern"
     Select(bind: pattern, options: $pattern_choices,
-      on-change: "world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false")
+      on-change: { world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false })
   }
 
   Row(gap: 8, wrap) {
-    Button(on-click: "world = @new_world(@random_grid($cols, $rows, $soup), $world.wrap, 'random soup'); playing = false") "Random soup"
+    Button(on-click: { world = @new_world(@random_grid($cols, $rows, $soup), $world.wrap, 'random soup'); playing = false }) "Random soup"
     Slider(
       bind: soup,
       min: 5,
@@ -61,9 +61,9 @@ KScript.Window(
     Text(color: "#94a3b8", width: 40) "{$soup}%"
     CheckBox(
       bind: wrap,
-      on-change: "world = $world->merge({ wrap: $event.value })"
+      on-change: { world = $world->merge({ wrap: $event.value }) }
     ) "Wrap edges"
-    Button(on-click: "world = @new_world(@blank($cols, $rows), $world.wrap); playing = false") "Clear"
+    Button(on-click: { world = @new_world(@blank($cols, $rows), $world.wrap); playing = false }) "Clear"
   }
 
   Text(color: "#cbd5e1", wrap) "{ $patterns->has($world.pattern) ? $patterns[$world.pattern].about : 'Your own pattern.' }"
@@ -74,7 +74,7 @@ KScript.Window(
         for c at x in $row {
           Box(width: 16, height: 16, radius: 2,
             background: "{ $c == $alive_cell ? '#4ade80' : '#0b1220' }",
-            on-click: "world = @flip($world, $x + ',' + $y)")
+            on-click: { world = @flip($world, $x + ',' + $y) })
         }
       }
     }

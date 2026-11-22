@@ -18,13 +18,13 @@ namespace KScript.LanguageServer
         /// each problem has its file, 1-based line and column range, severity, code, message and fixes, and each fix
         /// has a title and exact text edits. Usage and settings errors are <c>{ "error": "..." }</c>.
         /// </param>
-        public static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors = false, bool json = false)
+        public static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors = false, bool json = false, bool fix = false)
         {
             if (json)
             {
                 var text = new StringWriter();
                 var report = new JsonReport();
-                int code = Run(paths, text, warningsAsErrors, report);
+                int code = Run(paths, text, warningsAsErrors, report, fix);
                 System.Text.Json.Nodes.JsonArray problems = report.Problems;
                 var result = new System.Text.Json.Nodes.JsonObject();
                 if (code == 2)
@@ -43,7 +43,7 @@ namespace KScript.LanguageServer
                 output.WriteLine(result.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
                 return code;
             }
-            return Run(paths, output, warningsAsErrors, null);
+            return Run(paths, output, warningsAsErrors, null, fix);
         }
 
         /// <summary>What a check found, for --format json.</summary>
@@ -53,7 +53,7 @@ namespace KScript.LanguageServer
             public int Files { get; set; }
         }
 
-        private static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors, JsonReport report)
+        private static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors, JsonReport report, bool fix = false)
         {
             var cli = new KScript.Output.CliOutput(output);
             List<string> given = paths.ToList();
@@ -106,6 +106,7 @@ namespace KScript.LanguageServer
 
             int errors = 0;
             int warnings = 0;
+            int fixedCount = 0, fixedFiles = 0;
             bool anyWarningsAsErrors = warningsAsErrors;
             foreach (var (file, isExplicit) in files.DistinctBy(f => Path.GetFullPath(f.File)).OrderBy(f => f.File, StringComparer.Ordinal))
             {
@@ -121,7 +122,20 @@ namespace KScript.LanguageServer
                 }
                 anyWarningsAsErrors |= config?.Lint.WarningsAsErrors == true;
 
-                DocumentAnalysis analysis = Analyzer.Analyze(File.ReadAllText(file), file);
+                string fileText = File.ReadAllText(file);
+                if (fix)
+                {
+                    // Rewrite the spellings that have one right form, then report what is left.
+                    (string fixedText, int count) = Fixer.Apply(fileText, file, isExplicit ? null : config);
+                    if (count > 0 && fixedText != fileText)
+                    {
+                        File.WriteAllText(file, fixedText);
+                        fileText = fixedText;
+                        fixedCount += count;
+                        fixedFiles++;
+                    }
+                }
+                DocumentAnalysis analysis = Analyzer.Analyze(fileText, file);
                 // A file named on the command line is checked even if lint.exclude covers it.
                 LintRules.Apply(analysis.Diagnostics, config, isExplicit ? null : file);
                 foreach (Diagnostic d in analysis.Diagnostics.OrderBy(d => d.Span.Start))
@@ -161,6 +175,8 @@ namespace KScript.LanguageServer
             if (report != null) output.WriteLine(summary);
             else
             {
+                if (fixedCount > 0) cli.Info($"Fixed {fixedCount} spelling{(fixedCount == 1 ? string.Empty : "s")} in {fixedFiles} file{(fixedFiles == 1 ? string.Empty : "s")}.");
+
                 if (errors + warnings > 0) cli.NewLine();
                 if (failed) cli.Error(summary);
                 else if (warnings > 0) cli.Warn(summary);

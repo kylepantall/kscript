@@ -153,7 +153,7 @@ namespace KScript.Language.Formatting
                     int start = i++;
                     while (i < value.Length && value[i] != c)
                     {
-                        if (value[i] == '\\') i++;
+                        if (Quotes.IsEscape(value, i, value.Length, c)) i++;
                         i++;
                     }
                     i = Math.Min(value.Length, i + 1);

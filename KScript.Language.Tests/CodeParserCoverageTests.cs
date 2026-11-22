@@ -50,7 +50,8 @@ namespace KScript.Language.Tests
         [InlineData("x =\n  2", "do")]
         [InlineData("x = $a\n  and $b", "do")]
         [InlineData("x = $a and\n $b", "do")]
-        [InlineData("x = 'a\\'b'", "do")]
+        [InlineData("x = \"a\\\"b\"", "do")]
+        [InlineData("x = 'C:\\temp\\'", "do")]
         [InlineData("try { } catch(type: \"Io\") err { }", "try")]
         public void Accepts(string code, string element)
         {

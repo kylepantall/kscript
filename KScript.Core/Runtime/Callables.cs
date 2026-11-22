@@ -1,3 +1,4 @@
+using KScript.Syntax.Text;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
 
@@ -93,7 +94,7 @@ namespace KScript.Runtime
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (quote != '\0') { if (c == quote) quote = '\0'; continue; }
+                if (quote != '\0') { if (Quotes.IsEscape(text, i, text.Length, quote)) i++; else if (c == quote) quote = '\0'; continue; }
                 if (c == '\'' || c == '"') quote = c;
                 else if (c == '(' || c == '[' || c == '{') depth++;
                 else if (c == ')' || c == ']' || c == '}') depth--;
@@ -113,7 +114,7 @@ namespace KScript.Runtime
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (quote != '\0') { if (c == quote) quote = '\0'; continue; }
+                if (quote != '\0') { if (Quotes.IsEscape(text, i, text.Length, quote)) i++; else if (c == quote) quote = '\0'; continue; }
                 if (c == '\'' || c == '"') quote = c;
                 else if (c == '(' || c == '[' || c == '{') depth++;
                 else if (c == ')' || c == ']' || c == '}') depth--;

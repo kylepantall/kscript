@@ -216,16 +216,16 @@ namespace KScript.Syntax
 
             if (c == '\'' || c == '"')
             {
-                int close = text.IndexOf(c, start + 1, end - start - 1);
+                int close = Quotes.Close(text, start, end);
                 if (close < 0)
                 {
                     Position = end;
-                    return new Token(TokenKind.String, LineJoins.Join(text.Substring(start + 1, end - start - 1)), TextSpan.FromBounds(start, end),
+                    return new Token(TokenKind.String, Quotes.Decode(text, start + 1, end, c), TextSpan.FromBounds(start, end),
                         $"This string is missing its closing {c}.");
                 }
                 Position = close + 1;
                 // A backslash at the end of a line joins it to the next one: the break isn't part of the string.
-                return new Token(TokenKind.String, LineJoins.Join(text.Substring(start + 1, close - start - 1)), TextSpan.FromBounds(start, Position));
+                return new Token(TokenKind.String, Quotes.Decode(text, start + 1, close, c), TextSpan.FromBounds(start, Position));
             }
 
             if (c == '`' && StringBlock.Read(text, start, end) is StringBlock block)

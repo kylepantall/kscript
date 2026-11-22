@@ -1,3 +1,4 @@
+using KScript.Syntax.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -811,7 +812,7 @@ namespace KScript.Pages
                 char c = text[i];
                 if (quote != '\0')
                 {
-                    if (c == '\\') i++;
+                    if (Quotes.IsEscape(text, i, text.Length, quote)) i++;
                     else if (c == quote) quote = '\0';
                     continue;
                 }

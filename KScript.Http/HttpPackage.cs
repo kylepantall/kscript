@@ -128,7 +128,7 @@ namespace KScript.Http
 
             p.Element(new ElementInfo("Resource", "The usual routes of a JSON resource, answered by the functions a controller script exports: index (GET path), store (POST path), show (GET path/{id}), update (PUT and PATCH path/{id}) and destroy (DELETE path/{id}). Functions the controller doesn't have get no route.", ContentKind.Empty,
                 new A("path", K.Text, "The resource's path, such as /people.", true) { Literal = true },
-                new A("to", K.Text, "The controller: the name a script is imported as (<import src=\"...\" as=\"people\" />).", true),
+                new A("to", K.Text, "The controller: the name a script is imported as (<import src=\"...\" as=\"people\" />).", true) { IsName = true },
                 new A("only", K.Text, "Only these actions: [index, show].") { NameList = true },
                 new A("except", K.Text, "All actions but these: [destroy].") { NameList = true },
                 new A("name", K.Text, "The route name prefix (people gives people.index, people.show...). The default is the controller's name."),

@@ -283,7 +283,7 @@ namespace KScript.Language.Tests
         public void CoversTheRarerCases()
         {
             // Escapes in strings, and a string before a comparison (not an assignment) on a block's line.
-            Assert.Equal("if 'a\\'b' == $x {\n  echo \"q\\\"q\"\n}\n", Fmt("if 'a\\'b' == $x {\necho \"q\\\"q\"\n}\n"));
+            Assert.Equal("if 'a\\' == $x {\n  echo \"q\\\"q\"\n}\n", Fmt("if 'a\\' == $x {\necho \"q\\\"q\"\n}\n"));
             // ??= is an assignment.
             Assert.Equal("x ??= 1\n", Fmt("x??=1\n"));
             // An = after echo is text, not an assignment.
