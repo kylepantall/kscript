@@ -39,6 +39,10 @@ namespace KScript.Runtime
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             const string Let = "<let name=\"pw\" type=\"password\" value=\"'correct horse battery staple'\" />\n";

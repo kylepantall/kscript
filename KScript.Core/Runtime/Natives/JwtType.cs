@@ -32,6 +32,10 @@ namespace KScript.Runtime
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             const string Let = "<let name=\"x\" type=\"jwt\" value=\"'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig'\" />\n";

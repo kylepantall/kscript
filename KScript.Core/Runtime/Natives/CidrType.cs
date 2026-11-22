@@ -47,6 +47,10 @@ namespace KScript.Runtime
                  Prefix(a) >= Prefix(b) && Contains((NativeText)b, Network(a)));
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             const string B = KType.Bool, N = KType.Number;

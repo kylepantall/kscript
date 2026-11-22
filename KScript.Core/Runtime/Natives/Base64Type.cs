@@ -36,6 +36,10 @@ namespace KScript.Runtime
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             const string Let = "<let name=\"x\" type=\"base64\" value=\"'aGVsbG8gd29ybGQ='\" />\n";

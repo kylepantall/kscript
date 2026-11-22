@@ -23,7 +23,7 @@ namespace KScript.Runtime
         /// <summary>The methods of url, ip, country and the other native types that have no class of their own.</summary>
         private static void RegisterNativeMethods(PackageBuilder p)
         {
-            const string S = KType.String, N = KType.Number, B = KType.Bool, M = KType.Map, L = KType.List;
+            const string S = KType.String, N = KType.Number;
 
             // The types on the NativeType contract declare their own fields and methods.
             foreach (NativeType type in NativeTypeRegistry.BuiltIn) type.Members(p);

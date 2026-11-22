@@ -48,6 +48,10 @@ namespace KScript.Runtime
              .Range(I, N, "The addresses from the start up to (not including) the end, a step apart: $first..$last step 2. Without a step, every address.", AddressRange);
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             const string B = KType.Bool, N = KType.Number;

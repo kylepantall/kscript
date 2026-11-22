@@ -38,6 +38,10 @@ namespace KScript.Runtime
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             m.Field("version", KType.Number, "The UUID's version: 4 for random ones, 8 for custom ones (0 for the nil UUID).", (t, _) => (double)((UuidValue)t).Version,

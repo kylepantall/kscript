@@ -47,6 +47,10 @@ namespace KScript.Runtime
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             const string S = KType.String, N = KType.Number;

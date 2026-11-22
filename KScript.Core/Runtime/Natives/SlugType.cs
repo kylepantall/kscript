@@ -34,6 +34,10 @@ namespace KScript.Runtime
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             m.Field("words", KType.List, "The words: ['my', 'first', 'post'].", (t, _) => new List<object>((List<object>)((NativeText)t).Part("words")),

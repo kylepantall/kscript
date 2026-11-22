@@ -36,6 +36,21 @@ namespace KScript.Runtime
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+            static string Pre(object v) => (string)Part(v, "prerelease");
+            static bool Tagged(object v, string tag) => Pre(v).Split('.')[0].StartsWith(tag, StringComparison.OrdinalIgnoreCase);
+            const string Let = "<let name=\"x\" type=\"semver[]\" value=\"[1.0.0, 1.1.0-rc.1, 1.1.0-beta.2, 1.0.10]\" />\n";
+            l.Filter("releases", "Versions without a prerelease: 1.0.0 but not 1.1.0-rc.1.", v => Pre(v).Length == 0)
+             .Filter("prereleases", "Versions with a prerelease, such as 1.1.0-rc.1 or 2.0.0-beta.", v => Pre(v).Length > 0)
+             .Filter("release_candidates", "Versions whose prerelease starts with rc: 1.1.0-rc.1.", v => Tagged(v, "rc"))
+             .Filter("betas", "Versions whose prerelease starts with beta: 1.1.0-beta.2.", v => Tagged(v, "beta"))
+             .Filter("alphas", "Versions whose prerelease starts with alpha: 2.0.0-alpha.", v => Tagged(v, "alpha"));
+            l.Method("latest", "", "The highest release, leaving out prereleases (null when there is none). ->max() includes prereleases.", "semver",
+                (items, c) => items.Where(v => Pre(v).Length == 0).OrderBy(v => v, Comparer<object>.Create((x, y) => Ordering.Compare(x, y))).LastOrDefault(),
+                Let + "<echo>{ $x->latest() }</echo>");
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             const string S = KType.String, N = KType.Number, B = KType.Bool;

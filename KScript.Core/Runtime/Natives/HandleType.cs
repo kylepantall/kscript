@@ -33,6 +33,10 @@ namespace KScript.Runtime
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         protected override void DeclareMembers(NativeMembers m)
         {
             m.Field("name", KType.String, "The handle without its @.", (t, _) => ((HandleName)t).Name,
