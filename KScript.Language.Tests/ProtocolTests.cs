@@ -112,6 +112,23 @@ namespace KScript.Language.Tests
             return published["params"]["diagnostics"].AsArray();
         }
 
+        private void WaitForDiagnostics(string uri, int version)
+        {
+            bool Published(JsonObject n) => n["method"]?.GetValue<string>() == "textDocument/publishDiagnostics"
+                && n["params"]["uri"].GetValue<string>() == uri && n["params"]["version"]?.GetValue<int>() == version;
+
+            Task wait = Task.Run(() =>
+            {
+                while (!notifications.Any(Published))
+                {
+                    JsonObject message = Read();
+                    Assert.NotNull(message);
+                    notifications.Add(message);
+                }
+            });
+            Assert.True(wait.Wait(TimeSpan.FromSeconds(20)), $"No diagnostics for {uri} version {version}.");
+        }
+
         private static JsonObject Doc(string uri = Uri) => new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = uri } };
 
         private static JsonObject At(int line, int character, string uri = Uri) => new JsonObject
@@ -172,7 +189,32 @@ namespace KScript.Language.Tests
                     new JsonObject { ["range"] = Range(1, 1, 1, 5), ["text"] = "echo" },
                 },
             });
+            WaitForDiagnostics(Uri, 2);
             Assert.Empty(Diagnostics());
+        }
+
+        [Fact]
+        public void AnEditBurstPublishesOnlyTheLastVersionAndRequestsSeeTheEdits()
+        {
+            Initialize();
+            Open("<kscript></kscript>");
+            Diagnostics();
+            notifications.Clear();
+
+            for (int version = 2; version <= 8; version++)
+            {
+                Notify("textDocument/didChange", new JsonObject
+                {
+                    ["textDocument"] = new JsonObject { ["uri"] = Uri, ["version"] = version },
+                    ["contentChanges"] = new JsonArray { new JsonObject { ["text"] = $"<kscript><let name=\"item{version}\" value=\"1\" /></kscript>" } },
+                });
+            }
+
+            JsonArray symbols = Request("textDocument/documentSymbol", Doc())["result"].AsArray();
+            Assert.Contains(symbols, s => s["name"].GetValue<string>() == "$item8");
+            WaitForDiagnostics(Uri, 8);
+            JsonObject published = Assert.Single(notifications, n => n["method"]?.GetValue<string>() == "textDocument/publishDiagnostics");
+            Assert.Equal(8, published["params"]["version"].GetValue<int>());
         }
 
         [Fact]
@@ -393,6 +435,7 @@ namespace KScript.Language.Tests
                 ["textDocument"] = new JsonObject { ["uri"] = config, ["version"] = 2 },
                 ["contentChanges"] = new JsonArray { new JsonObject { ["text"] = "{ \"lint\": { \"exclude\": [] } }" } },
             });
+            WaitForDiagnostics(config, 2);
             Assert.Equal(2, Diagnostics().Count);
             Assert.NotEmpty(Diagnostics(template));
         }
@@ -417,6 +460,7 @@ namespace KScript.Language.Tests
                 ["textDocument"] = new JsonObject { ["uri"] = standard, ["version"] = 2 },
                 ["contentChanges"] = new JsonArray { new JsonObject { ["text"] = "{ \"lint\": { \"rules\": { \"KS3001\": \"off\" } } }" } },
             });
+            WaitForDiagnostics(standard, 2);
             Assert.Empty(Diagnostics());
         }
 
