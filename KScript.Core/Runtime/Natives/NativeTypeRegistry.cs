@@ -17,6 +17,13 @@ namespace KScript.Runtime
         public static IReadOnlyList<NativeType> BuiltIn { get; } = new NativeType[]
         {
             new DurationType(),
+            new SlugType(),
+            new SemverType(),
+            new MimeType(),
+            new HexType(),
+            new Base64Type(),
+            new JwtType(),
+            new JsonType(),
         };
 
         static NativeTypeRegistry()
@@ -77,7 +84,8 @@ namespace KScript.Runtime
         {
             if (TypeOf(value) == type) return value;
             NativeType native = Get(type);
-            return native != null && value is string or ISemanticText or double ? native.Coerce(value) : null;
+            // Only text and numbers are read as the type: another type's value (json '1', hex '10') is never re-read as a duration.
+            return native != null && value is string or double ? native.Coerce(value) : null;
         }
 
         private static bool Involves(object a, object b) => Of(a) != null || Of(b) != null;
