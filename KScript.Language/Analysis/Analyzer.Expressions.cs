@@ -787,6 +787,7 @@ namespace KScript.Language.Analysis
 
         private static string Plural(string type) => type switch
         {
+            _ when type.EndsWith("[]", StringComparison.Ordinal) => $"lists of {type[..^2]} values",
             _ => type + "s",
         };
 

@@ -206,7 +206,7 @@ namespace KScript.Language.Features
             {
                 return new HoverResult(SymbolMarkdown(analysis, extension), region.Source.ToSource(nameSpan));
             }
-            CallableInfo method = Catalog.GetMethods(name, receiver.Type).FirstOrDefault();
+            CallableInfo method = Catalog.GetMethods(name, new TypeInference(Catalog, analysis).ReceiverType(name, receiver)).FirstOrDefault();
             if (method == null)
             {
                 return null;

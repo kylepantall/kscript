@@ -80,6 +80,12 @@ namespace KScript.Metadata
         /// <summary>Values the editor offers where the type is expected, such as UTC and Europe/London for a timezone.</summary>
         public IReadOnlyList<string> Completions { get; init; } = Array.Empty<string>();
 
+        /// <summary>
+        /// The named filters a list of the type takes in ->only(name) and ->without(name), such as releases and
+        /// prereleases for semver, each with one sentence on what it keeps. Set once the type's members register.
+        /// </summary>
+        public IReadOnlyList<(string Name, string Summary)> ListFilters { get; internal set; } = Array.Empty<(string, string)>();
+
         public string WithArticle => (Article ?? ("aeiou".Contains(Name[0]) && Name != "uuid" && Name != "url" ? "an" : "a")) + " " + Name;
     }
 

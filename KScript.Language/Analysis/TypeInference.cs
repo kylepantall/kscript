@@ -8,7 +8,7 @@ namespace KScript.Language.Analysis
     /// <summary>Works out the shape of an expression's value from the source (literals, declarations, return types).</summary>
     public sealed class TypeInference
     {
-        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip" };
+        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip", "only", "without" };
         private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "max_by", "min_by", "pop" };
 
         private readonly LanguageCatalog catalog;
@@ -514,7 +514,16 @@ namespace KScript.Language.Analysis
         /// <c>User->where()</c>, <c>$user->save()</c>) when it has that method, otherwise its plain type's.
         /// </summary>
         internal string ReceiverType(string name, TypeShape receiver) =>
-            receiver.Kind != null && catalog.GetMethods(name, receiver.Kind).Any(m => m.ReceiverType == receiver.Kind) ? receiver.Kind : receiver.Type;
+            receiver.Kind != null && catalog.GetMethods(name, receiver.Kind).Any(m => m.ReceiverType == receiver.Kind) ? receiver.Kind
+            : TypedListReceiver(receiver) is string list && catalog.GetMethods(name, list).Any(m => m.ReceiverType == list) ? list
+            : receiver.Type;
+
+        /// <summary>
+        /// "semver[]" for a list whose items are all one native type, whose methods (->latest()) it has on top of a
+        /// list's; null for any other value.
+        /// </summary>
+        internal static string TypedListReceiver(TypeShape receiver) =>
+            receiver?.Type == KType.List && NativeTypes.IsNative(receiver.Element?.Type) ? receiver.Element.Type + "[]" : null;
 
         /// <summary>
         /// What a KScript.Data method gives, in terms of the model's records: a query on User is a query of Users,
@@ -559,7 +568,7 @@ namespace KScript.Language.Analysis
                     return receiver.Element ?? TypeShape.Unknown;
                 }
             }
-            return new TypeShape(method.ReturnType);
+            return ShapeOfTypeName(method.ReturnType);
         }
 
         /// <summary>A model's scope called on the model or one of its queries: <c>User->admins()</c>, <c>$q->admins()</c>.</summary>
@@ -592,7 +601,7 @@ namespace KScript.Language.Analysis
             {
                 return records;
             }
-            return method != null ? new TypeShape(method.ReturnType) : TypeShape.Unknown;
+            return method != null ? ShapeOfTypeName(method.ReturnType) : TypeShape.Unknown;
         }
 
     }

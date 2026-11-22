@@ -82,7 +82,8 @@ namespace KScript.Language.Features
                 case MethodCallNode m:
                 {
                     TypeShape receiver = InferAt(analysis, region, m.Target);
-                    foreach (CallableInfo method in Catalog.GetMethods(m.Name, receiver.Type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)))
+                    string type = new TypeInference(Catalog, analysis).ReceiverType(m.Name, receiver);
+                    foreach (CallableInfo method in Catalog.GetMethods(m.Name, type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, type)))
                     {
                         AddCallable(method);
                     }
@@ -102,7 +103,8 @@ namespace KScript.Language.Features
                     {
                         piped = 0; // A method's receiver isn't one of its parameters.
                         TypeShape receiver = InferAt(analysis, region, pipe.Left);
-                        foreach (CallableInfo method in Catalog.GetMethods(id.Name, receiver.Type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)))
+                        string type = new TypeInference(Catalog, analysis).ReceiverType(id.Name, receiver);
+                        foreach (CallableInfo method in Catalog.GetMethods(id.Name, type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, type)))
                         {
                             AddCallable(method);
                         }
@@ -357,6 +359,50 @@ namespace KScript.Language.Features
                 .GroupBy(item => item.Label)
                 .Select(g => g.First())
                 .ToList();
+        }
+
+        /// <summary>
+        /// The word in <c>$versions->only(‸)</c>, <c>->without(‸)</c> or <c>$x->is_a(‸)</c>: on a list of one native
+        /// type, the filters it declares (releases, prereleases for semver), then the type names.
+        /// </summary>
+        private List<CompletionItem> WordArgumentCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)
+        {
+            string text = region.Source.Value;
+            int p = wordStart;
+            while (p > 0 && char.IsWhiteSpace(text[p - 1]))
+            {
+                p--;
+            }
+            if (p == 0 || "(,:".IndexOf(text[p - 1]) < 0 || InnermostCall(region, wordStart).Node is not MethodCallNode { Name: "only" or "without" or "is_a" } call)
+            {
+                return new List<CompletionItem>();
+            }
+            var items = new List<CompletionItem>();
+            if (call.Name != "is_a" && TypeInference.TypedListReceiver(InferAt(analysis, region, call.Target)) is string list
+                && NativeTypes.Get(list[..^2]) is NativeTypeInfo native)
+            {
+                items.AddRange(native.ListFilters.Select(f => new CompletionItem
+                {
+                    Label = f.Name,
+                    Kind = CompletionKind.Value,
+                    Detail = $"{list} filter",
+                    Documentation = f.Summary,
+                    ReplaceSpan = replace,
+                    SortText = "000" + f.Name,
+                }));
+            }
+            IEnumerable<string> typeNames = new[] { KType.Number, KType.String, "int", "float", KType.Bool, KType.Date, KType.List, KType.Map, KType.Null, KType.Error }
+                .Concat(NativeTypes.Names).Distinct(StringComparer.Ordinal);
+            items.AddRange(typeNames.Select(t => new CompletionItem
+            {
+                Label = t,
+                Kind = CompletionKind.Value,
+                Detail = "type",
+                Documentation = call.Name == "is_a" ? $"True when the value is {(NativeTypes.Get(t)?.WithArticle ?? "a " + t)}." : $"The items that are {(NativeTypes.Get(t)?.WithArticle ?? "a " + t)}.",
+                ReplaceSpan = replace,
+                SortText = "001" + t,
+            }));
+            return items;
         }
 
         /// <summary>The values a native type offers where it is expected (1h, 30m for a duration), or null for none.</summary>

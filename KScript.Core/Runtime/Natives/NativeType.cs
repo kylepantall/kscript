@@ -121,6 +121,7 @@ namespace KScript.Runtime
             var list = new NativeListMembers(p, this);
             DeclareListMembers(list);
             ListFilters = list.Filters.Select(f => (f.Name, f.Summary)).ToList();
+            Info.ListFilters = ListFilters; // the editor offers them in ->only( and ->without(
             filterList = list;
         }
 

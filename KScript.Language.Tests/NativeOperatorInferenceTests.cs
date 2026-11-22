@@ -207,5 +207,85 @@ namespace KScript.Language.Tests
             Assert.Contains("30s", labels);
             Assert.Contains("1w", labels);
         }
+
+        // ---- Lists of one native type -----------------------------------------------------------------------
+
+        private const string Versions = "v: semver[] = [1.0.0, 1.1.0-rc.1, 1.0.10]\n";
+
+        [Theory]
+        [InlineData("echo [1, 'two']->only(number)\n")]
+        [InlineData("echo [1, 'two']->without(string)\n")]
+        [InlineData("echo 1h->is_a(duration)\n")]
+        [InlineData(Versions + "echo $v->only(releases)\n")]
+        [InlineData(Versions + "echo $v->without(prereleases)->latest()\n")]
+        public void AWordParameterTakesABareWord(string text)
+        {
+            Assert.Empty(Check(text));
+        }
+
+        [Theory]
+        [InlineData(Versions + "echo $v\n")]
+        [InlineData("names: domain[] = [example.com, api.example.co.uk]\necho $names\n")]
+        [InlineData("<kscript><let name=\"v\" type=\"semver[]\" value=\"[1.0.0, 1.0.1-rc]\" /><echo>$v</echo></kscript>")]
+        public void RawItemsInATypedListAreValues(string text)
+        {
+            string file = text.StartsWith('<') ? "native-ops.ks.xml" : "native-ops.kscript";
+            Assert.DoesNotContain(Service.Analyze(text, Path.Combine(Path.GetTempPath(), file)).Diagnostics, d => d.Code != DiagnosticCodes.UnusedVariable);
+        }
+
+        [Fact]
+        public void AListWithAVariableInItIsAnExpression()
+        {
+            Assert.Empty(Check("a: semver = 1.0.0\nv: semver[] = [$a, '2.0.0']\necho $v\n"));
+            Assert.Contains(Check("v: semver[] = [$missing, '2.0.0']\necho $v\n"), d => d.Message.Contains("missing", StringComparison.Ordinal));
+
+            // Raw and evaluated items together, as the runtime reads them.
+            Assert.DoesNotContain(Analyze("a: semver = 1.0.0\nv: semver[] = [$a, 1.1.0-rc.1]\necho $v\n").Diagnostics, d => true);
+            Assert.Contains(Check("v: semver[] = [1.0.0, $missing]\necho $v\n"), d => d.Message.Contains("missing", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void AListOfOneNativeTypeHasItsListMethods()
+        {
+            Assert.Equal("semver", ShapeOf(Versions + "x = $v->latest()\necho $x\n", "x").Type);
+            Assert.Equal("money", ShapeOf("m: money[] = ['GBP 9.50', 'GBP 0.50']\nx = $m->total()\necho $x\n", "x").Type);
+            TypeShape kept = ShapeOf(Versions + "x = $v->only(releases)\necho $x\n", "x");
+            Assert.Equal("semver", kept.Element?.Type);
+
+            List<string> labels = Complete(Versions + "echo $v->‸\n").Select(i => i.Label).ToList();
+            Assert.Contains("latest", labels);
+            Assert.Contains("filter", labels); // and every list's methods
+            Assert.DoesNotContain("total", labels);
+            Assert.DoesNotContain("latest", Complete("n = [1, 2]\necho $n->‸\n").Select(i => i.Label));
+
+            HoverResult hover = HoverAt(Versions + "echo $v->lat‸est()\n");
+            Assert.Contains("highest release", hover.Markdown);
+        }
+
+        [Fact]
+        public void APlainListDoesNotHaveATypedListsMethods()
+        {
+            Diagnostic d = Assert.Single(Check("n = [1, 2]\necho $n->latest()\n"));
+            Assert.Equal("->latest() works on lists of semver values, but this value is a list.", d.Message);
+        }
+
+        [Fact]
+        public void OnlyAndWithoutOfferTheItemsFiltersAndTypeNames()
+        {
+            List<CompletionItem> items = Complete(Versions + "echo $v->only(‸)\n");
+            CompletionItem releases = Assert.Single(items, i => i.Label == "releases");
+            Assert.Equal("Versions without a prerelease: 1.0.0 but not 1.1.0-rc.1.", releases.Documentation);
+            Assert.Contains(items, i => i.Label == "prereleases");
+            Assert.Contains(items, i => i.Label == "number");
+            Assert.Contains(items, i => i.Label == "semver");
+            Assert.Contains(Complete(Versions + "echo $v->without(‸)\n"), i => i.Label == "betas");
+
+            // A plain list has no filters, only type names; is_a takes type names.
+            List<string> plain = Complete("n = [1, 'a']\necho $n->only(‸)\n").Select(i => i.Label).ToList();
+            Assert.DoesNotContain("releases", plain);
+            Assert.Contains("string", plain);
+            Assert.Contains("duration", Complete("echo 1h->is_a(‸)\n").Select(i => i.Label));
+            Assert.Equal(new[] { "releases", "prereleases", "release_candidates", "betas", "alphas" }, NativeTypes.Get("semver").ListFilters.Select(f => f.Name));
+        }
     }
 }
