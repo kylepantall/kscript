@@ -176,58 +176,6 @@ namespace KScript.Runtime
                     null => string.Empty,
                 };
             });
-            static TimeZoneInfo Z(object t) => (TimeZoneInfo)Part(t, "zone");
-            p.Method("timezone", "offset", "at?: date", "Its offset from UTC, such as +01:00, now or at a date.", S, (t, c) =>
-            {
-                DateTime at = c.Arg(0) is DateTime d ? d : DateTime.UtcNow;
-                TimeSpan offset = Z(t).GetUtcOffset(at);
-                return (offset < TimeSpan.Zero ? "-" : "+") + offset.ToString(@"hh\:mm", CultureInfo.InvariantCulture);
-            });
-            p.Method("timezone", "now", "", "The time now in this zone.", KType.Date, (t, c) => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Z(t)));
-            p.Method("timezone", "convert", "time: date", "The same moment as the local time in this zone.", KType.Date, (t, c) =>
-                TimeZoneInfo.ConvertTime(c.Arg(0) is DateTime d ? d : throw new KScriptException("convert needs a date.", "Type"), Z(t)));
-            p.Method("timezone", "is_dst", "at?: date", "True when summer time is in effect, now or at a date.", B, (t, c) => Z(t).IsDaylightSavingTime(c.Arg(0) is DateTime d ? d : DateTime.UtcNow));
-
-            // cron, color
-            p.Method("cron", "next", "after?: date", "The next time the schedule runs, after a date or after now.", KType.Date, (t, c) =>
-                NativeParsers.CronNext(T(t), c.Arg(0) is DateTime d ? d : DateTime.Now));
-            p.Method("cron", "next_times", "count: int, after?: date", "The next few times it runs.", L, (t, c) =>
-            {
-                var times = new List<object>();
-                DateTime at = c.Arg(1) is DateTime d ? d : DateTime.Now;
-                for (int i = 0; i < Math.Clamp(c.Int(0), 0, 1000); i++) times.Add(at = NativeParsers.CronNext(T(t), at));
-                return times;
-            });
-            static double Ch(object t, string n) => (double)Part(t, n);
-            p.Method("color", "rgb", "", "Its red, green, blue (0-255) and alpha (0-1): { r, g, b, a }.", M, (t, c) =>
-                new Dictionary<string, object> { ["r"] = Ch(t, "r"), ["g"] = Ch(t, "g"), ["b"] = Ch(t, "b"), ["a"] = Ch(t, "a") });
-            p.Method("color", "hex", "", "Its #rrggbb form, without the alpha.", S, (t, c) => T(t).Text.Substring(0, 7));
-            p.Method("color", "css", "", "Its CSS form: #rrggbb, or rgb(r g b / a) with transparency.", S, (t, c) =>
-                Ch(t, "a") < 1 ? FormattableString.Invariant($"rgb({Ch(t, "r")} {Ch(t, "g")} {Ch(t, "b")} / {Math.Round(Ch(t, "a"), 3)})") : T(t).Text);
-            p.Method("color", "mix", "other: color, amount?: number", "The colour part way to the other: amount 0.5 (the default) is halfway.", "color", (t, c) =>
-            {
-                NativeText o = (NativeText)(c.Arg(0) is NativeText n && n.TypeName == "color" ? n : Native("color", c.Str(0)));
-                double w = c.Arg(1, "amount") is double a ? Math.Clamp(a, 0, 1) : 0.5;
-                double Mix(string ch) => Ch(t, ch) + (Ch(o, ch) - Ch(t, ch)) * w;
-                return NativeParsers.ColorOf(Mix("r"), Mix("g"), Mix("b"), Mix("a"));
-            });
-            p.Method("color", "lighten", "amount?: number", "Mixed with white: amount 0.2 (the default) is a fifth of the way.", "color", (t, c) =>
-            {
-                double w = c.Arg(0, "amount") is double a ? Math.Clamp(a, 0, 1) : 0.2;
-                return NativeParsers.ColorOf(Ch(t, "r") + (255 - Ch(t, "r")) * w, Ch(t, "g") + (255 - Ch(t, "g")) * w, Ch(t, "b") + (255 - Ch(t, "b")) * w, Ch(t, "a"));
-            });
-            p.Method("color", "darken", "amount?: number", "Mixed with black: amount 0.2 (the default) is a fifth of the way.", "color", (t, c) =>
-            {
-                double w = 1 - (c.Arg(0, "amount") is double a ? Math.Clamp(a, 0, 1) : 0.2);
-                return NativeParsers.ColorOf(Ch(t, "r") * w, Ch(t, "g") * w, Ch(t, "b") * w, Ch(t, "a"));
-            });
-            p.Field("color", "luminance", N, "How light it looks, from 0 (black) to 1 (white), as WCAG measures it.", (t, _) => Luminance(T(t)));
-            p.Method("color", "contrast_ratio", "other: color", "The WCAG contrast ratio with the other colour, from 1 to 21. Text needs 4.5 or more.", N, (t, c) =>
-            {
-                double a = Luminance(T(t)), b = Luminance((NativeText)(c.Arg(0) is NativeText n && n.TypeName == "color" ? n : Native("color", c.Str(0))));
-                return Math.Round((Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05), 2);
-            });
-
             // iban, card
             p.Field("iban", "country", "country", "The country the account is in: GB.", (t, _) => Native("country", (string)Part(t, "country")));
             p.Method("iban", "formatted", "", "The IBAN in groups of four, the way it is printed: GB82 WEST 1234 5698 7654 32.", S, (t, c) => Part(t, "formatted"));
@@ -295,36 +243,12 @@ namespace KScript.Runtime
                 ("locale.name", "<let name=\"x\" type=\"locale\" value=\"'de-DE'\" />\n<echo>{ $x.name }</echo>"),
                 ("locale.native_name", "<let name=\"x\" type=\"locale\" value=\"'de-DE'\" />\n<echo>{ $x.native_name }</echo>"),
                 ("locale->format", "<let name=\"x\" type=\"locale\" value=\"'de-DE'\" />\n<echo>{ $x->format(1234.5) }</echo>"),
-                ("timezone->offset", "<let name=\"x\" type=\"timezone\" value=\"'Europe/London'\" />\n<echo>{ $x->offset('2026-07-01'->to_date()) }</echo>"),
-                ("timezone->now", "<let name=\"x\" type=\"timezone\" value=\"'Europe/London'\" />\n<echo>{ $x->now()->type() }</echo>"),
-                ("timezone->convert", "<let name=\"x\" type=\"timezone\" value=\"'Europe/London'\" />\n<echo>{ $x->convert('2026-07-01T12:00:00Z'->to_date()) }</echo>"),
-                ("timezone->is_dst", "<let name=\"x\" type=\"timezone\" value=\"'Europe/London'\" />\n<echo>{ $x->is_dst('2026-01-15'->to_date()) }</echo>"),
-                ("cron->next", "<let name=\"x\" type=\"cron\" value=\"'0 9 * * mon-fri'\" />\n<echo>{ $x->next('2026-11-21T10:00:00'->to_date()) }</echo>"),
-                ("cron->next_times", "<let name=\"x\" type=\"cron\" value=\"'0 9 * * mon-fri'\" />\n<echo>{ $x->next_times(3, '2026-11-21T10:00:00'->to_date()) }</echo>"),
-                ("color->rgb", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->rgb() }</echo>"),
-                ("color->hex", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->hex() }</echo>"),
-                ("color->css", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->css() }</echo>"),
-                ("color->mix", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->mix('blue') }</echo>"),
-                ("color->lighten", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->lighten(0.5) }</echo>"),
-                ("color->darken", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->darken() }</echo>"),
-                ("color.luminance", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x.luminance }</echo>"),
-                ("color->contrast_ratio", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->contrast_ratio('white') }</echo>"),
                 ("iban.country", "<let name=\"x\" type=\"iban\" value=\"'GB82 WEST 1234 5698 7654 32'\" />\n<echo>{ $x.country }</echo>"),
                 ("iban->formatted", "<let name=\"x\" type=\"iban\" value=\"'GB82 WEST 1234 5698 7654 32'\" />\n<echo>{ $x->formatted() }</echo>"),
                 ("iban.bban", "<let name=\"x\" type=\"iban\" value=\"'GB82 WEST 1234 5698 7654 32'\" />\n<echo>{ $x.bban }</echo>"),
                 ("card.last4", "<let name=\"x\" type=\"card\" value=\"'4242 4242 4242 4242'\" />\n<echo>{ $x.last4 }</echo>"),
                 ("card.brand", "<let name=\"x\" type=\"card\" value=\"'4242 4242 4242 4242'\" />\n<echo>{ $x.brand }</echo>"),
                 ("card->reveal", "<let name=\"x\" type=\"card\" value=\"'4242 4242 4242 4242'\" />\n<echo>{ $x->reveal()->count() }</echo>"));
-        }
-
-        private static double Luminance(NativeText color)
-        {
-            double Channel(string n)
-            {
-                double v = (double)color.Part(n) / 255;
-                return v <= 0.03928 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
-            }
-            return Math.Round(0.2126 * Channel("r") + 0.7152 * Channel("g") + 0.0722 * Channel("b"), 4);
         }
     }
 }

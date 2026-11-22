@@ -17,6 +17,9 @@ namespace KScript.Runtime
         public static IReadOnlyList<NativeType> BuiltIn { get; } = new NativeType[]
         {
             new DurationType(),
+            new TimezoneType(),
+            new CronType(),
+            new ColorType(),
         };
 
         static NativeTypeRegistry()
