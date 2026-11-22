@@ -11,7 +11,7 @@ patterns = [
   { name: 'Pulsar', period: 3, speed: '0', cells: 48 },
 ]
 
-KScript.Document(
+Document(
   template: paper,
   title: "How Gliders Move",
   subtitle: "A note on Conway's Game of Life",

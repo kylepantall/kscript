@@ -215,15 +215,15 @@ public class MoreNativeTypesTests
     {
         // email and the first types ignore case; the newer ones are lowercase only, so a script's Color is its own.
         Assert.Equal("green", Code("enum Color { red, green }\nc: Color = green\necho $c"));
-        Assert.Equal("5", Code("type Duration { minutes: int }\nd = $Duration->from({ minutes: 5 })\necho $d.minutes"));
+        Assert.Equal("5", Code("type Duration { minutes: int }\nd = Duration({ minutes: 5 })\necho $d.minutes"));
         Assert.Equal("#008000", Code("c: color = green\necho $c"));
     }
 
     [Fact]
     public void ValuesTurnIntoNativeTypesForJsonAndArguments()
     {
-        Assert.Equal("example.com", Code("type Link { href: url }\nl = $Link->from({ href: 'https://example.com' })\necho $l.href.host"));
-        Assert.Contains("$.href: needs a url", Fails("type Link { href: url }\nl = $Link->from({ href: 'nope' })\necho 1"));
+        Assert.Equal("example.com", Code("type Link { href: url }\nl = Link({ href: 'https://example.com' })\necho $l.href.host"));
+        Assert.Contains("$.href: needs a url", Fails("type Link { href: url }\nl = Link({ href: 'nope' })\necho 1"));
         Assert.Equal("\"https://example.com/\"", Code("u: url = 'https://example.com/'\necho $u->to_json()"));
     }
 

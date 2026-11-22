@@ -25,7 +25,7 @@ import KScript.Http
 {{#if item is index}}
 /// GET /{{ url }}: the list.
 fn index() {
-  // TODO: Load the list, e.g. from a model: return $Post->all()
+  // TODO: Load the list, e.g. from a model: return Post->all()
   return []
 }
 

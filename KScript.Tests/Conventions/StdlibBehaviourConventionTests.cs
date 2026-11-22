@@ -39,7 +39,7 @@ public class StdlibBehaviourConventionTests
         "between",                                         // $n->between(1, 10)
         "any", "all",                                      // $list->any(fn), $list->all(fn)
         "in",                                              // $ip->in(block)
-        "is",                                              // $error->is(NotFound), $mime->is('text/*'), $Type->is(value)
+        "is",                                              // $error->is(NotFound), $mime->is('text/*'), Type->is(value)
         "test",                                            // $regex->test(text)
         "satisfies",                                       // $version->satisfies('^1.2')
         "verify",                                          // $password->verify(hash): is this the password?

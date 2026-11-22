@@ -8,7 +8,7 @@ using K = KScript.Metadata.AttributeKind;
 namespace KScript.Documents
 {
     /// <summary>
-    /// KScript.Document: scientific and professional documents. A <c>KScript.Document { }</c> block holds sections,
+    /// KScript.Document: scientific and professional documents. A <c>Document { }</c> block holds sections,
     /// paragraphs, lists, tables, figures, LaTeX maths, citations and footnotes, and saves them as PDF, LaTeX, Word,
     /// Markdown or HTML, with templates for papers, reports, letters and invoices. PDFs are made in-process, so
     /// nothing else (TeX, Word, a browser) needs to be installed.
@@ -67,7 +67,7 @@ namespace KScript.Documents
             {
                 Context = ElementContext.Script,
                 DeclaresType = KType.Document,
-                Example = "KScript.Document(template: paper, title: \"Gliders\", author: \"Ada Lovelace\", to: \"gliders.pdf\") {\n  Section(title: Introduction) {\n    Paragraph \"A glider moves one cell every \\( 4 \\) generations.\"\n  }\n}",
+                Example = "<KScript.Document template=\"paper\" title=\"Gliders\" author=\"Ada Lovelace\" to=\"gliders.pdf\">\n  <Section title=\"Introduction\">\n    <Paragraph>A glider moves one cell every \\( 4 \\) generations.</Paragraph>\n  </Section>\n</KScript.Document>",
             }, DocumentElements.Document);
 
             p.Element(Info("Author", "An author, with an affiliation and email. Its text is the name.", ContentKind.Template,

@@ -69,10 +69,10 @@ namespace KScript.Language.Tests
         public void RecordsAndListsOfThemAreWrittenByName()
         {
             string text = "type Task {\n  title: string\n}\nfn one(t) => $t.title\nfn all(ts) => $ts->count()\n"
-                + "t = $Task->from({ title: 'a' })\necho @one($t)\necho @all([$t])\n";
+                + "t = Task({ title: 'a' })\necho @one($t)\necho @all([$t])\n";
             Assert.Equal(new[] { ": Task", ": map[]" }, Warnings(text).Select(w => w.Fixes[0].Changes[0].NewText));
             Assert.Equal(": list", Warnings("fn f(grid) => $grid\necho @f([[1]])\n")[0].Fixes[0].Changes[0].NewText);
-            Assert.Empty(Warnings("type Task {\n  title: string\n}\nfn f(t) => $t\necho @f($Task)\n")[0].Fixes);
+            Assert.Empty(Warnings("type Task {\n  title: string\n}\nfn f(t) => $t\necho @f(Task)\n")[0].Fixes);
         }
 
         [Fact]

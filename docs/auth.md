@@ -45,7 +45,7 @@ import KScript.Auth
 import "../requests/sign-up.kscript"
 
 fn sign_up(form: map) {
-  data = $SignUp->from($form)
+  data = SignUp($form)
   user = @register($data.email, $data.password, name: $data.name)
   @login($user)
   return @redirect(@intended())
@@ -93,10 +93,11 @@ fn sign_in(form: map) {
 The `auth` middleware lets signed-in users through and sets `$request.user`. A browser is sent to `http.auth.login` (`/login`) and comes back afterwards. A request that wants JSON (an API route, an `Authorization` header, or `Accept: application/json`) gets a 401 instead. The `guest` middleware is the other way round: it sends people who are signed in to `http.auth.home`.
 
 ```kscript
-KScript.Routes {
-  import KScript.Auth
-  import "controllers/accounts.kscript" as accounts
+import KScript.Http
+import KScript.Auth
+import "controllers/accounts.kscript" as accounts
 
+Routes {
   Group(middleware: guest) {
     Get(path: "/login", to: @accounts.show_login, name: "login")
     Post(path: "/login", to: @accounts.sign_in)

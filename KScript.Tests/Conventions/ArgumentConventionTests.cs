@@ -196,7 +196,7 @@ public class ArgumentConventionTests
     [InlineData("import KScript.Terminal\ninput(to: name) \"Name? \"\necho $name", "import KScript.Terminal\ninput(into: name) \"Name? \"\necho $name")]
     [InlineData("import KScript.Terminal\npicker(into: f, must-exist: false) \"File? \"\necho $f", "import KScript.Terminal\npicker(into: f, must_exist: false) \"File? \"\necho $f")]
     [InlineData("import KScript.Terminal\nmenu(into: c, options: ['a'], index: i) \"Pick\"\necho \"$c $i\"", "import KScript.Terminal\nmenu(into: c, options: ['a'], at: i) \"Pick\"\necho \"$c $i\"")]
-    [InlineData("import KScript.UI\nKScript.Window(title: \"t\") {\n  n = 0\n  Button(on-click: { n += 1 }) \"{$n}\"\n}", "import KScript.UI\nKScript.Window(title: \"t\") {\n  n = 0\n  Button(on_click: { n += 1 }) \"{$n}\"\n}")]
+    [InlineData("import KScript.UI\nWindow(title: \"t\") {\n  n = 0\n  Button(on-click: { n += 1 }) \"{$n}\"\n}", "import KScript.UI\nWindow(title: \"t\") {\n  n = 0\n  Button(on_click: { n += 1 }) \"{$n}\"\n}")]
     public void CheckFixRenamesAnOldArgument(string code, string expected)
     {
         Assert.Contains(Check(code), d => d.Code == DiagnosticCodes.RetiredAttribute && d.Severity == DiagnosticSeverity.Error && d.Message.Contains("is now"));
@@ -226,7 +226,7 @@ public class ArgumentConventionTests
     [InlineData("fn job() {\n  echo \"hi\"\n}\nspawn(fn: job)", "fn job() {\n  echo \"hi\"\n}\nspawn(fn: @job)")]
     [InlineData("fn note(entry: map) {\n  echo $entry.message\n}\nlog_provider(fn: note, level: error)", "fn note(entry: map) {\n  echo $entry.message\n}\nlog_provider(fn: @note, level: error)")]
     [InlineData("import KScript.AI\nfn a() => 'a'\nfn b() => 'b'\nllm(into: r, tools: [a, @b]) \"Hi\"\necho $r", "import KScript.AI\nfn a() => 'a'\nfn b() => 'b'\nllm(into: r, tools: [@a, @b]) \"Hi\"\necho $r")]
-    [InlineData("import KScript.Http\nKScript.Routes {\n  fn show() => 'x'\n  Get(path: \"/x\", to: show)\n}", "import KScript.Http\nKScript.Routes {\n  fn show() => 'x'\n  Get(path: \"/x\", to: @show)\n}")]
+    [InlineData("import KScript.Http\nRoutes {\n  fn show() => 'x'\n  Get(path: \"/x\", to: show)\n}", "import KScript.Http\nRoutes {\n  fn show() => 'x'\n  Get(path: \"/x\", to: @show)\n}")]
     public void ABareFunctionNameIsFlaggedAndFixed(string code, string expected)
     {
         Diagnostic d = Assert.Single(OneSpelling(code));
@@ -241,9 +241,9 @@ public class ArgumentConventionTests
 
     [Theory]
     // Middleware lists hold built-ins, groups and functions under one kind of name, and an import lists names to bring in.
-    [InlineData("import KScript.Http\nKScript.Routes {\n  fn check(request, next) => $next($request)\n  Middleware(use: [log, check, throttle:30])\n  Get(path: \"/x\", view: \"x.html\", middleware: check)\n}")]
+    [InlineData("import KScript.Http\nRoutes {\n  fn check(request, next) => $next($request)\n  Middleware(use: [log, check, throttle:30])\n  Get(path: \"/x\", view: \"x.html\", middleware: check)\n}")]
     // A controller is the name a script is imported as, not a function.
-    [InlineData("import KScript.Http\nKScript.Routes {\n  Resource(path: \"/people\", to: people)\n}")]
+    [InlineData("import KScript.Http\nRoutes {\n  Resource(path: \"/people\", to: people)\n}")]
     public void NamesThatAreNotFunctionsStayBare(string code) => Assert.Empty(OneSpelling(code));
 
     [Fact]

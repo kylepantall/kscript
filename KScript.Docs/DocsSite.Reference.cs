@@ -26,7 +26,7 @@ namespace KScript.Docs
             [KType.Date] = "Dates and times, from `@now()`, `'2026-11-19'->to_date()` or `->to_date()`.",
             [KType.Fn] = "Functions: lambdas `fn(x) => $x * 2` and `<fn>` functions.",
             [KType.Any] = "Methods every value has.",
-            [KType.Type] = "A `<type>` declared by a script, such as `$Repo`.",
+            [KType.Type] = "A `<type>` declared by a script, such as `Repo`.",
             [KType.File] = "File values, from `@file()`, `@files()` and `@folders()`.",
             [KType.Config] = "`$config`: settings from config files, `.env` files and the environment.",
             [KType.Logger] = "`$log`: structured logging.",
@@ -67,7 +67,7 @@ namespace KScript.Docs
         };
 
         /// <summary>How an element is written in a .kscript file: <c>break</c>, <c>name = value</c>, <c>KScript.Window</c>.</summary>
-        internal static string CodeName(ElementInfo e) => CodeForms.TryGetValue(e.Name, out string form) ? form : ElementName(e);
+        internal static string CodeName(ElementInfo e) => CodeForms.TryGetValue(e.Name, out string form) ? form : e.Name;
 
         /// <summary>An element's name as code, in both formats: the page shows the reader's.</summary>
         internal static string DualName(ElementInfo e) =>
@@ -131,7 +131,7 @@ namespace KScript.Docs
                 sb.Append("<p>Import it at the top of a script:</p>");
                 sb.Append(Html.Code($"<import package=\"{package}\" />", "xml"));
                 if (root != null) sb.Append(Html.Dual($"<p>A file whose root element is <code>&lt;{Html.H(root)}&gt;</code> imports it for you.</p>",
-                    $"<p>A file made of a <code>{Html.H(root)} {{ }}</code> block imports it for you.</p>"));
+                    $"<p>A .kscript file names a package only in its import: write <code>{Html.H(root.Substring(8))} {{ }}</code>, never <code>{Html.H(root)} {{ }}</code>.</p>"));
                 var brings = Catalog.WithRequired(package).Skip(1).ToList();
                 if (brings.Count > 0) sb.Append($"<p>It brings {string.Join(", ", brings.Select(b => $"<a href=\"{PackageSlug(b)}\">{Html.H(b)}</a>"))} with it.</p>");
                 if (!CanRun(package) && Playground.Unavailable.TryGetValue(package, out string why))

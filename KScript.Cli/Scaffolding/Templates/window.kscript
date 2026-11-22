@@ -12,7 +12,9 @@ hint: Open it: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }}. Build 
 ---
 // {{ title }}: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }} opens
 // it, and the script ends when the window closes.
-KScript.Window(title: "{{ title }}", width: {{ width ?? 480 }}, height: {{ height ?? 360 }}, theme: system) {
+import KScript.UI
+
+Window(title: "{{ title }}", width: {{ width ?? 480 }}, height: {{ height ?? 360 }}, theme: system) {
   count = 0
 
   Text(size: 24, weight: bold) "{{ title }}"

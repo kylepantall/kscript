@@ -50,8 +50,10 @@ public class OpenApiTests
         """;
 
     private const string Api = """
-        KScript.Routes {
-          import "controllers/people.kscript" as people
+        import KScript.Http
+        import "controllers/people.kscript" as people
+
+        Routes {
           Get(path: "/people", to: @people.index)
           Get(path: "/people/{id}", to: @people.show, name: "people.show")
           Get(path: "/files/{path*}", where: "path: '[a-z/]+'") {
@@ -68,7 +70,7 @@ public class OpenApiTests
 
     private static TempSite Site(params (string Path, string Content)[] more)
     {
-        var files = new List<(string, string)> { ("controllers/people.kscript", Controller), ("api.kscript", Api), ("routes.kscript", "KScript.Routes {\n  import \"controllers/people.kscript\" as people\n  Get(path: \"/\", to: @people.page)\n}\n"), ("views/home.html", "<h1>Home</h1>") };
+        var files = new List<(string, string)> { ("controllers/people.kscript", Controller), ("api.kscript", Api), ("routes.kscript", "import KScript.Http\nimport \"controllers/people.kscript\" as people\n\nRoutes {\n  Get(path: \"/\", to: @people.page)\n}\n"), ("views/home.html", "<h1>Home</h1>") };
         files.AddRange(more);
         return new TempSite(files.ToArray());
     }
@@ -245,8 +247,10 @@ public class OpenApiTests
             }
             """;
         const string api = """
-            KScript.Routes {
-              import "controllers/other.kscript" as other
+            import KScript.Http
+            import "controllers/other.kscript" as other
+
+            Routes {
               Get(path: "/rules/{a}/{b}/{c}", where: "a: int, b: number, c: uuid") {
                 return 'x'
               }

@@ -52,9 +52,10 @@ echo "Visit $count today, { $store->ttl('today') } left"
 KScript.Http uses KScript.Cache for HTTP caching. A route can tag its answers with an ETag, answer `304 Not Modified` when the browser already has them, set `Cache-Control`, and keep whole answers in the memory cache:
 
 ```kscript
-KScript.Routes {
-  import "controllers/people.kscript" as people
+import KScript.Http
+import "controllers/people.kscript" as people
 
+Routes {
   Get(path: /people, to: @people.index, etag: true, cache: 60)
   Get(path: /stats, to: @people.stats, middleware: "cache_response:5m")
 }

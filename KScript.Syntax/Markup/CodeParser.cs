@@ -87,10 +87,10 @@ namespace KScript.Syntax.Markup
 
             ParseBody(root, braced: false);
 
-            // A file that is a single package element, such as KScript.Window { ... }, or an explicit kscript { ... },
-            // uses it as the root, as an XML script would.
+            // A file that is an explicit kscript { ... } uses it as the root, as an XML script would. A package's element
+            // is a statement like any other (import KScript.UI, then Window { ... }): there is no KScript.Window { } root.
             List<MarkupElement> top = root.ChildElements.ToList();
-            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && (top[0].Name.StartsWith("KScript.", StringComparison.Ordinal) || top[0].Name == "kscript"))
+            if (top.Count == 1 && root.Children.All(c => c is MarkupElement || c is MarkupComment || (c is MarkupText t && t.IsWhitespace)) && top[0].Name == "kscript")
             {
                 foreach (MarkupNode node in root.Children.Where(n => !(n is MarkupText)))
                 {
@@ -207,7 +207,8 @@ namespace KScript.Syntax.Markup
             }
 
             // SendWelcome(user_id: 7)->dispatch(): a call on a value made by a job or error type, not an element.
-            if (char.IsUpper(word[0]) && CallThenArrow(pos + word.Length))
+            // User->create(name: 'Joan'): a call on a type, which is named bare.
+            if (char.IsUpper(word[0]) && (CallThenArrow(pos + word.Length) || string.CompareOrdinal(text, pos + word.Length, "->", 0, 2) == 0))
             {
                 ParseDo(parent, start);
                 return;
@@ -1653,10 +1654,22 @@ namespace KScript.Syntax.Markup
         /// Any other element: <c>name</c>, <c>name(attr: value, other: "text, with commas")</c>, then optional
         /// <c>"text"</c> and an optional <c>{ children }</c> block.
         /// </summary>
+        private const string PackagePrefix = "KScript.";
+
         private void ParseGenericElement(MarkupElement parent, int start)
         {
             int nameStart = pos;
             string name = ReadName();
+            if (name.Length > PackagePrefix.Length && name.StartsWith(PackagePrefix, StringComparison.Ordinal))
+            {
+                // KScript.Window { }: a package is named only in an import, never on a statement.
+                string bare = name.Substring(PackagePrefix.Length);
+                Error(new TextSpan(nameStart, name.Length), DiagnosticCodes.MarkupSyntax,
+                    $"Write {bare}, not {name}: a package is named only in an import at the top of the file (import KScript...), never on a statement.",
+                    new QuickFix($"Write {bare}", new TextChange(new TextSpan(nameStart, PackagePrefix.Length), string.Empty)));
+                nameStart += PackagePrefix.Length;
+                name = bare;
+            }
             MarkupElement e = Begin(parent, name, start, new TextSpan(nameStart, name.Length), consumeName: false);
             if (Peek(0) == '(')
             {

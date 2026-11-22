@@ -135,10 +135,12 @@ If you use something without importing its package, the error and the editor bot
 
 ## Desktop apps, still just KScript
 
-A `KScript.Window { }` block opens a native window on macOS, Windows or Linux. It works like `<live>`: the variables hold the state, the rest is the layout, and the window is redrawn after every handler.
+After `import KScript.UI`, a `Window { }` block opens a native window on macOS, Windows or Linux. It works like `<live>`: the variables hold the state, the rest is the layout, and the window is redrawn after every handler.
 
 ```kscript
-KScript.Window(title: Counter, width: 320, height: 200) {
+import KScript.UI
+
+Window(title: Counter, width: 320, height: 200) {
   count = 0
   Text(size: 32) "{$count}"
   Button(variant: primary, on_click: count += 1) "Add one"

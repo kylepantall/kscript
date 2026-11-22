@@ -92,13 +92,13 @@ public class SemanticTypesTests
     [InlineData("type Slug with [string] { pattern: '^[a-z]+$' }\ns: Slug = abc\necho $s", "abc")]
     [InlineData("type Size with [string] { one_of: [small, large] }\ns: Size = small\necho $s", "small")]
     [InlineData("type Tags with [string[]] { max: 2 }\nt: Tags = ['a']\necho $t", "a")]
-    [InlineData("type Username with [handle] {\n  not: [@admin, @root]\n  max: 8\n}\ntype Staff with [Username] { pattern: /^@staff_/ }\ns: Staff = @Staff_Jo\necho \"$s { $s.name } { $Staff.name } { $Staff.base } { $Staff->check('@admin')->count() }\"", "@staff_jo staff_jo Staff Username 1")]
-    [InlineData("type Even with [int] { validate: $value % 2 == 0, 'must be even' }\necho \"{ $Even->check(3)[0].message } { $Even->check(4)->count() } { $Even->from('6') }\"", "must be even. 0 6")]
-    [InlineData("type Even with [int] { validate: $value % 2 == 0 }\necho $Even->check(3)[0].message", "doesn't pass the rule $value % 2 == 0.")]
-    [InlineData("/// A short code.\ntype Code with [string] { max: 3 }\necho \"{ $Code.description } { $Code->type() }\"", "A short code. type")]
+    [InlineData("type Username with [handle] {\n  not: [@admin, @root]\n  max: 8\n}\ntype Staff with [Username] { pattern: /^@staff_/ }\ns: Staff = @Staff_Jo\necho \"$s { $s.name } { Staff.name } { Staff.base } { Staff->check('@admin')->count() }\"", "@staff_jo staff_jo Staff Username 1")]
+    [InlineData("type Even with [int] { validate: $value % 2 == 0, 'must be even' }\necho \"{ Even->check(3)[0].message } { Even->check(4)->count() } { Even('6') }\"", "must be even. 0 6")]
+    [InlineData("type Even with [int] { validate: $value % 2 == 0 }\necho Even->check(3)[0].message", "doesn't pass the rule $value % 2 == 0.")]
+    [InlineData("/// A short code.\ntype Code with [string] { max: 3 }\necho \"{ Code.description } { Code->type() }\"", "A short code. type")]
     [InlineData("type Work with [email] { validate: $value.domain == 'example.com', 'must be at example.com' }\nfn f(e: Work) => $e.local\necho @f('Joan@example.com')", "Joan")]
-    [InlineData("type Tiny with [int] { max: 3 }\ntype T { n: Tiny; m: int(min: 1) = 1 }\necho $T->schema().properties->to_json()", "{\"n\":{\"type\":\"integer\",\"maximum\":3},\"m\":{\"type\":\"integer\",\"minimum\":1}}")]
-    [InlineData("type Mail with [email] {}\ntype T { e: Mail; u: uuid; p: password; h: handle; r: regex }\necho $T->schema().properties->to_json()", "{\"e\":{\"type\":\"string\",\"format\":\"email\"},\"u\":{\"type\":\"string\",\"format\":\"uuid\"},\"p\":{\"type\":\"string\",\"format\":\"password\",\"writeOnly\":true},\"h\":{\"type\":\"string\",\"pattern\":\"^@[A-Za-z0-9_][A-Za-z0-9_.-]{0,29}$\"},\"r\":{\"type\":\"string\",\"format\":\"regex\"}}")]
+    [InlineData("type Tiny with [int] { max: 3 }\ntype T { n: Tiny; m: int(min: 1) = 1 }\necho T->schema().properties->to_json()", "{\"n\":{\"type\":\"integer\",\"maximum\":3},\"m\":{\"type\":\"integer\",\"minimum\":1}}")]
+    [InlineData("type Mail with [email] {}\ntype T { e: Mail; u: uuid; p: password; h: handle; r: regex }\necho T->schema().properties->to_json()", "{\"e\":{\"type\":\"string\",\"format\":\"email\"},\"u\":{\"type\":\"string\",\"format\":\"uuid\"},\"p\":{\"type\":\"string\",\"format\":\"password\",\"writeOnly\":true},\"h\":{\"type\":\"string\",\"pattern\":\"^@[A-Za-z0-9_][A-Za-z0-9_.-]{0,29}$\"},\"r\":{\"type\":\"string\",\"format\":\"regex\"}}")]
     public void RefinementTypes(string code, string expected) => Assert.Equal(expected, Code(code));
 
     [Theory]
@@ -132,14 +132,14 @@ public class SemanticTypesTests
             + "type Admin with [User, Auditable] {\n  level: int = 1\n  fn hello() => 'Hello admin ' + $this.name\n}\n"
             + "fn welcome(u: User) => 'Welcome ' + $u.name\n";
         Assert.Equal("Welcome Joan true true false 1 Hello admin Joan",
-            Code(types + "a = $Admin->from({ name: 'Joan', email: 'j@example.com', created: '2026-01-01', updated: '2026-02-01' })\n"
-                + "echo \"{ @welcome($a) } { $User->is($a) } { $User->is($Admin) } { $Admin->is($User) } { $a.level } { $a->hello() }\""));
+            Code(types + "a = Admin({ name: 'Joan', email: 'j@example.com', created: '2026-01-01', updated: '2026-02-01' })\n"
+                + "echo \"{ @welcome($a) } { User->is($a) } { User->is(Admin) } { Admin->is(User) } { $a.level } { $a->hello() }\""));
         Assert.Contains("updated must not be before created",
-            CodeFails(types + "a = $Admin->from({ name: 'J', email: 'j@example.com', created: '2026-02-01', updated: '2026-01-01' })").Message);
+            CodeFails(types + "a = Admin({ name: 'J', email: 'j@example.com', created: '2026-02-01', updated: '2026-01-01' })").Message);
         Assert.Contains("updated must not be before created",
-            CodeFails(types + "a = $Admin->from({ name: 'J', email: 'j@example.com', created: '2026-01-01', updated: '2026-02-01' })\n$a.updated = '2025-01-01'->to_date()").Message);
-        Assert.Equal("Hi J", Code(types + "u = $User->from({ name: 'J', email: 'j@example.com' })\necho $u->hello()"));
-        Assert.Contains("A User has no method ->nope()", CodeFails(types + "u = $User->from({ name: 'J', email: 'j@example.com' })\necho $u->nope()").Message);
+            CodeFails(types + "a = Admin({ name: 'J', email: 'j@example.com', created: '2026-01-01', updated: '2026-02-01' })\n$a.updated = '2025-01-01'->to_date()").Message);
+        Assert.Equal("Hi J", Code(types + "u = User({ name: 'J', email: 'j@example.com' })\necho $u->hello()"));
+        Assert.Contains("A User has no method ->nope()", CodeFails(types + "u = User({ name: 'J', email: 'j@example.com' })\necho $u->nope()").Message);
     }
 
     [Theory]
@@ -154,16 +154,16 @@ public class SemanticTypesTests
     [Fact]
     public void JoinsThatResolveTheirConflicts()
     {
-        Assert.Equal("5", Code("type A { x: int }\ntype B { x: string }\ntype C with [A, B] { x: int }\nc = $C->from({ x: 5 })\necho $c.x"));
-        Assert.Equal("2", Code("type A { x: int; fn f() => 1 }\ntype B { y: int; fn f() => 2 }\ntype C with [A, B] { fn f() => 2 }\nc = $C->from({ x: 1, y: 1 })\necho $c->f()"));
-        Assert.Equal("3", Code("type Small with [int] { max: 9 }\ntype A { x: int }\ntype C with [A] { x: Small }\nc = $C->from({ x: 3 })\necho $c.x"));
+        Assert.Equal("5", Code("type A { x: int }\ntype B { x: string }\ntype C with [A, B] { x: int }\nc = C({ x: 5 })\necho $c.x"));
+        Assert.Equal("2", Code("type A { x: int; fn f() => 1 }\ntype B { y: int; fn f() => 2 }\ntype C with [A, B] { fn f() => 2 }\nc = C({ x: 1, y: 1 })\necho $c->f()"));
+        Assert.Equal("3", Code("type Small with [int] { max: 9 }\ntype A { x: int }\ntype C with [A] { x: Small }\nc = C({ x: 3 })\necho $c.x"));
     }
 
     [Theory]
-    [InlineData("type Size {\n  pattern: /^(?<w>\\d+)x(?<h>\\d+)$/\n  w: int\n  h: int\n  fn area() => $w * $h\n}\ns: Size = 1920x1080\necho \"{ $s.w } { $s->area() } { $Size->from('2x3')->area() }\"", "1920 2073600 6")]
-    [InlineData("type Pair {\n  pattern: /^(?<a>\\w+)=(?<b>\\w+)$/\n  parse: { a: $match.groups.b, b: $match.groups.a }\n  a: string\n  b: string\n}\np = $Pair->from('x=y')\necho \"$p.a $p.b\"", "y x")]
-    [InlineData("type Csv {\n  parse: { items: $value->split(',') }\n  items: string[]\n}\nc = $Csv->from('a,b')\necho $c.items->count()", "2")]
-    [InlineData("type Size {\n  pattern: /^(?<w>\\d+)x(?<h>\\d+)$/\n  w: int\n  h: int\n}\necho $Size->check('big')[0].message", "needs text matching /^(?<w>\\d+)x(?<h>\\d+)$/ to make a Size, but got the string 'big'.")]
+    [InlineData("type Size {\n  pattern: /^(?<w>\\d+)x(?<h>\\d+)$/\n  w: int\n  h: int\n  fn area() => $w * $h\n}\ns: Size = 1920x1080\necho \"{ $s.w } { $s->area() } { Size('2x3')->area() }\"", "1920 2073600 6")]
+    [InlineData("type Pair {\n  pattern: /^(?<a>\\w+)=(?<b>\\w+)$/\n  parse: { a: $match.groups.b, b: $match.groups.a }\n  a: string\n  b: string\n}\np = Pair('x=y')\necho \"$p.a $p.b\"", "y x")]
+    [InlineData("type Csv {\n  parse: { items: $value->split(',') }\n  items: string[]\n}\nc = Csv('a,b')\necho $c.items->count()", "2")]
+    [InlineData("type Size {\n  pattern: /^(?<w>\\d+)x(?<h>\\d+)$/\n  w: int\n  h: int\n}\necho Size->check('big')[0].message", "needs text matching /^(?<w>\\d+)x(?<h>\\d+)$/ to make a Size, but got the string 'big'.")]
     public void TypesReadFromText(string code, string expected) => Assert.Equal(expected, Code(code));
 
     [Theory]
@@ -192,7 +192,7 @@ public class SemanticTypesTests
                 + "try { p: password = 'short' } catch err { echo $err.message }\n"
                 + "p: password = 'a long passphrase'\necho $p->hash()->starts_with('$2')\n"
                 + "e: email = joan@example.com\necho $e\n"
-                + "type T { e: email }\ntry { t = $T->from({ e: 'joan@other.com' }) } catch err { echo $err.message }";
+                + "type T { e: email }\ntry { t = T({ e: 'joan@other.com' }) } catch err { echo $err.message }";
             string path = Path.Combine(dir, "main.kscript");
             File.WriteAllText(path, script);
             string output = ScriptRunner.Run(File.ReadAllText(path), path: path);
@@ -234,7 +234,7 @@ public class SemanticTypesTests
             + "<type name=\"Tag\" with=\"string\" one_of=\"['a', 'b']\" />"
             + "<type name=\"T\"><field name=\"n\" type=\"int\" min=\"1\" /><field name=\"tag\" type=\"Tag\" /></type>"
             + "<let name=\"u\" type=\"Username\" value=\"@Joan\" />"
-            + "<echo>$u { $T->check({ n: 0, tag: 'c' })->count() }</echo>"
+            + "<echo>$u { T->check({ n: 0, tag: 'c' })->count() }</echo>"
             + "<try><let name=\"x\" type=\"Username\" value=\"@a--b\" /><catch as=\"err\"><echo>$err.message</echo></catch></try>"
             + "</kscript>";
         Assert.Equal("@joan 2\n$x doesn't fit Username: can't have two dashes in a row.", ScriptRunner.Run(xml).TrimEnd('\n'));

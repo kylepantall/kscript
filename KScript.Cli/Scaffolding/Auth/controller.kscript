@@ -35,7 +35,7 @@ fn show_register() => @view('auth/register', data: {})
 fn sign_up(form: map) {
   user = null
   try {
-    data = $SignUp->from($form)
+    data = SignUp($form)
     user = @register($data.email, $data.password, name: $data.name->trim())
   } catch err when $err.type == 'Shape' or $err.type == 'Validation' {
     return @view('auth/register', data: { problems: $err.problems ?? [], name: $form.name, email: $form.email })->with_status(422)

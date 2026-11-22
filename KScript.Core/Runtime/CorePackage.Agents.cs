@@ -21,7 +21,7 @@ namespace KScript.Runtime
                 ("any->or", new AgentNotes(pitfall: "0, '' and [] count as missing too. Use $x ?? fallback to replace only null.")),
                 ("date->format", new AgentNotes(pitfall: ".NET patterns: 'yyyy-MM-dd HH:mm' (MM is the month, mm the minutes).")),
                 ("@range", new AgentNotes(pitfall: "The end is left out: @range(1, 11) is 1 to 10. So is 1..11.")),
-                ("string->json", new AgentNotes(prefer: "$text->json(as: $Type) to check the shape and get a typed record.")),
+                ("string->json", new AgentNotes(prefer: "$text->json(as: Type) to check the shape and get a typed record.")),
                 ("string->to_number", new AgentNotes(prefer: "n: int = $text when a bad value should stop with a clear error; ->to_number(0) gives the default instead.")));
         }
     }

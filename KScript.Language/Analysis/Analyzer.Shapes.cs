@@ -6,7 +6,7 @@ using KScript.Syntax.Text;
 namespace KScript.Language.Analysis
 {
     /// <summary>
-    /// &lt;type&gt; declarations: the shape of some data, such as an API response. Each one is a constant (<c>$Repo</c>)
+    /// &lt;type&gt; declarations: the shape of some data, such as an API response. Each one is a constant (<c>Repo</c>)
     /// whose records have the fields it lists, so <c>->json(as: Repo)</c>, <c>&lt;let type="Repo"&gt;</c> and
     /// <c>repo: Repo</c> parameters complete <c>$repo.</c> with them.
     /// </summary>
@@ -280,6 +280,7 @@ namespace KScript.Language.Analysis
         {
             // parse="..." sees the text being read, so it is analyzed below with $value and $match.
             AnalyzeAttributes(e, info, scope, skip: "parse");
+            CheckOptionsAreInBrackets(e);
             var seen = new HashSet<string>(StringComparer.Ordinal);
             MarkupAttribute fields = e.GetAttribute("fields");
             if (fields?.Value != null)
@@ -441,6 +442,8 @@ namespace KScript.Language.Analysis
                 string type = head.Substring(colon + 1);
                 int typeStart = start + colon + 1 + (type.Length - type.TrimStart().Length);
                 CheckTypeText(type.Trim(), value.ToSource(new TextSpan(typeStart, Math.Max(type.Trim().Length, 1))), value.ToSource(typeStart));
+                string written = namePart.Trim();
+                CheckOptionalIsOnName(written, value.ToSource(new TextSpan(at, written.Length)), type.Trim(), value.ToSource(new TextSpan(typeStart, type.Trim().Length)));
             }
         }
 
@@ -459,6 +462,10 @@ namespace KScript.Language.Analysis
                 {
                     Report(TrimmedSpan(name.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                         $"'{n}' can't be a field name: use letters, digits and _, starting with a letter. To read a key like '{n}', use from=\"{n}\".");
+                }
+                else if (e.GetAttribute("type")?.Value is DecodedText fieldType && fieldType.Value.Trim().Length > 0)
+                {
+                    CheckOptionalIsOnName(name.ValueText.Trim(), TrimmedSpan(name.Value), fieldType.Value.Trim(), TrimmedSpan(fieldType));
                 }
             }
             MarkupAttribute from = e.GetAttribute("from");
@@ -557,19 +564,6 @@ namespace KScript.Language.Analysis
             result.Symbols.Where(s => s.EnumValues != null || s.Shape.Type == KType.Type).Select(s => s.Name).Concat(DeclaredEnums()).Distinct();
 
         private TypeShape TypeNamed(string text, int offset) => (types ??= new TypeInference(catalog, result)).TypeNamed(text, offset);
-
-        /// <summary>A bare type name in a call (<c>as: Repo</c>) is the type, not a word: a reference to it.</summary>
-        private bool ReferenceBareType(IdentifierNode node, ExpressionRegion region, Scope scope)
-        {
-            TextSpan span = region.Source.ToSource(node.Span);
-            Symbol symbol = scope.Lookup(node.Name, span.Start);
-            if (symbol?.Shape.Type != KType.Type)
-            {
-                return false;
-            }
-            result.References.Add(new SymbolReference(symbol, span, false, false));
-            return true;
-        }
 
         /// <summary>A field a record's type doesn't have: <c>$repo.stras</c>.</summary>
         private void CheckRecordField(TypeShape target, MemberNode member, ExpressionRegion region)

@@ -3,7 +3,9 @@
 KScript.Document writes scientific and professional documents: papers, reports, letters and invoices. One script can save the same document as **PDF**, **Word** (.docx), **LaTeX** (.tex), **Markdown** and **HTML**. It has LaTeX maths, numbered sections, tables and figures, citations from BibTeX, footnotes and cross-references. The PDF is written by KScript itself, so you don't need TeX, Word or anything else installed.
 
 ```kscript
-KScript.Document(template: paper, title: "How Gliders Move", author: "Ada Lovelace", to: "gliders.pdf") {
+import KScript.Document
+
+Document(template: paper, title: "How Gliders Move", author: "Ada Lovelace", to: "gliders.pdf") {
   Abstract "A glider returns to its own shape every \( p = 4 \) generations, one cell further on."
 
   Section(title: Introduction) {
@@ -20,7 +22,7 @@ KScript.Document(template: paper, title: "How Gliders Move", author: "Ada Lovela
 }
 ```
 
-A `KScript.Document` block imports the package itself. Everything inside it is ordinary KScript, so `for`, `if`, variables and functions work between the elements: a table can come from data, and a section can repeat for each item of a list.
+`import KScript.Document` brings in `Document` and the elements that go inside it. Everything inside a `Document` block is ordinary KScript, so `for`, `if`, variables and functions work between the elements: a table can come from data, and a section can repeat for each item of a list.
 
 The [samples/documents](https://github.com/kylepantall/kscript/tree/master/samples/documents) folder has a full paper, a report, a letter and an invoice. `kscript make document` starts a new one.
 
@@ -29,7 +31,9 @@ The [samples/documents](https://github.com/kylepantall/kscript/tree/master/sampl
 `to:` saves the document when the block ends. The extension picks the format, and a list of paths saves several formats:
 
 ```kscript
-KScript.Document(title: "Notes", to: [notes.pdf, notes.docx, notes.tex]) {
+import KScript.Document
+
+Document(title: "Notes", to: [notes.pdf, notes.docx, notes.tex]) {
   Paragraph "Saved three ways."
 }
 ```
@@ -45,7 +49,9 @@ KScript.Document(title: "Notes", to: [notes.pdf, notes.docx, notes.tex]) {
 `into:` keeps the document in a variable instead (or as well), so you can save it later or turn it into text:
 
 ```kscript
-KScript.Document(title: "Report", into: doc) {
+import KScript.Document
+
+Document(title: "Report", into: doc) {
   Paragraph "Hello."
 }
 $doc->save('report.pdf')
@@ -97,7 +103,9 @@ A blank line in the text starts a new paragraph. `{ }` puts in a value as anywhe
 ## Structure
 
 ```kscript
-KScript.Document(template: report, title: "Annual Report", author: "The team", to: "report.pdf") {
+import KScript.Document
+
+Document(template: report, title: "Annual Report", author: "The team", to: "report.pdf") {
   Contents
 
   Section(title: Summary, id: summary) {
@@ -139,7 +147,9 @@ KScript.Document(template: report, title: "Annual Report", author: "The team", t
 `Math` is an equation on its own line. Its text is LaTeX, kept exactly as written, so braces and backslashes need no escaping. A long equation can go in a ```` ```latex ```` block over several lines, and a long `Paragraph` can end its lines with `\` (see [Long strings and blocks of text](code-format.md#long-strings-and-blocks-of-text)). Equations are numbered, and `id:` lets the text refer to the number with `[#id]`:
 
 ```kscript
-KScript.Document(title: "Maths", to: "maths.pdf") {
+import KScript.Document
+
+Document(title: "Maths", to: "maths.pdf") {
   Math(id: eq-gauss) "\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}"
   Math(numbered: false) "\sum_{k=1}^{n} k = \frac{n(n+1)}{2}"
   Math "A = \begin{pmatrix} a & b \\\\ c & d \end{pmatrix}, \quad \det A = ad - bc"
@@ -149,7 +159,9 @@ KScript.Document(title: "Maths", to: "maths.pdf") {
 In a `"..."` string `\\` is how you write one backslash, so a LaTeX row break `\\` is written `\\\\`. A new line inside an environment also ends a row:
 
 ```kscript
-KScript.Document(title: "Cases", to: "cases.pdf") {
+import KScript.Document
+
+Document(title: "Cases", to: "cases.pdf") {
   Math "|x| = \begin{cases}
     x & \text{if } x \ge 0
     -x & \text{otherwise}
@@ -176,7 +188,9 @@ A table can come from data, which is usually a list of maps:
 ```kscript
 people = [{ name: 'Ada', born: 1815 }, { name: 'Alan', born: 1912 }]
 
-KScript.Document(title: "People", to: "people.pdf") {
+import KScript.Document
+
+Document(title: "People", to: "people.pdf") {
   Table(caption: "Two mathematicians.", id: tab-people, rows: $people, columns: { Name: 'name', Born: 'born' }, align: ['left', 'right'])
 }
 ```
@@ -186,7 +200,9 @@ KScript.Document(title: "People", to: "people.pdf") {
 Or write the rows with `Tr`, cells separated by `|`:
 
 ```kscript
-KScript.Document(title: "Scores", to: "scores.pdf") {
+import KScript.Document
+
+Document(title: "Scores", to: "scores.pdf") {
   Table(caption: "Scores.", align: ['left', 'right', 'right'], widths: [3, 1, 1], rules: grid) {
     Tr(header: true) "Team | Played | Points"
     Tr "Red | 3 | 7"
@@ -200,7 +216,9 @@ KScript.Document(title: "Scores", to: "scores.pdf") {
 ## Figures
 
 ```kscript
-KScript.Document(title: "Gliders", to: "gliders.pdf") {
+import KScript.Document
+
+Document(title: "Gliders", to: "gliders.pdf") {
   Figure(path: "glider.png", caption: "A glider over four generations.", id: fig-glider, width: 0.8)
 }
 ```
@@ -212,7 +230,9 @@ KScript.Document(title: "Gliders", to: "gliders.pdf") {
 Cite with `[@key]`. Sources come from a BibTeX file, from `Source` elements, or both:
 
 ```kscript
-KScript.Document(template: paper, title: "Cited", to: "cited.pdf") {
+import KScript.Document
+
+Document(template: paper, title: "Cited", to: "cited.pdf") {
   Paragraph "Life is universal [@berlekamp1982; @rendell2002]."
 
   Bibliography(path: "refs.bib") {
@@ -234,7 +254,9 @@ A citation or cross-reference to an id that doesn't exist is an error, as is the
 `Markdown` adds Markdown as document content: `#` headings become sections (nested by level), with paragraphs, lists, tables, code blocks, quotes, `---` rules and `![caption](image.png){#id}` figures. Headings and maths can take ids: `## Results {#results}`, `\[ E = mc^2 \] {#eq-energy}`.
 
 ```kscript
-KScript.Document(title: "From Markdown", to: "notes.pdf") {
+import KScript.Document
+
+Document(title: "From Markdown", to: "notes.pdf") {
   Markdown(path: "chapters/introduction.md")
   Markdown "
     ## Summary
@@ -252,7 +274,9 @@ In Markdown files, `$x$` and `$$ ... $$` are maths too. In text inside a script,
 `Letter` lays out a letter around the paragraphs inside it. In addresses, `\n` starts a new line:
 
 ```kscript
-KScript.Document(template: letter, to: "letter.pdf") {
+import KScript.Document
+
+Document(template: letter, to: "letter.pdf") {
   Letter(from: "Life Lab\n12 Grid Street\nCambridge", to: "Dr Ada Lovelace\nExample University", subject: "Invitation to speak", opening: "Dear Dr Lovelace,", closing: "Yours sincerely,", signature: "Alan Turing") {
     Paragraph "We would be delighted if you would give the opening talk."
   }
@@ -264,7 +288,9 @@ KScript.Document(template: letter, to: "letter.pdf") {
 ```kscript
 items = [{ description: 'Consulting', quantity: 3, price: 450 }, { description: 'Travel', price: 64.2 }]
 
-KScript.Document(template: invoice, to: "invoice.pdf") {
+import KScript.Document
+
+Document(template: invoice, to: "invoice.pdf") {
   Invoice(number: "INV-042", from: "Life Lab Ltd\n12 Grid Street", to: "Example University", due: "20 December 2026", items: $items, currency: GBP, tax: 20, notes: "Please pay within 30 days.")
 }
 ```
@@ -273,7 +299,7 @@ KScript.Document(template: invoice, to: "invoice.pdf") {
 
 ## Page and style
 
-These go on `KScript.Document` and change what the template set:
+These go on `Document` and change what the template set:
 
 | Attribute | What it does |
 | --- | --- |

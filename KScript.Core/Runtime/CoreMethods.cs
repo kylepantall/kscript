@@ -358,10 +358,10 @@ namespace KScript.Runtime
             p.Method(s, "yaml", "", "Parses the text as YAML.", KType.Any, (t, c) => Yaml.Parse(S(t)));
             foreach (var f in RecordType.ValueFields)
                 p.Field(KType.Type, f.Name, f.Type, f.Description, (t, _) => ((IKObject)t).TryGetMember(f.Name, out object v)
-                    ? v : throw new KScriptException($"{((IKObject)t).ToText()} is made from another type, so it has no .{f.Name}. It has ->from(), ->check() and .name.", "Name"));
+                    ? v : throw new KScriptException($"{((IKObject)t).ToText()} is made from another type, so it has no .{f.Name}. It has ->check() and .name.", "Name"));
             foreach (var m in RecordType.Methods)
                 p.Method(KType.Type, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((IKObject)t).TryCallMethod(c, m.Name, out object r)
-                    ? r : throw c.Error($"{((IKObject)t).ToText()} is made from another type, so it has no ->{m.Name}(). It has ->from(), ->check() and .name.", "Name"));
+                    ? r : throw c.Error($"{((IKObject)t).ToText()} is made from another type, so it has no ->{m.Name}(). It has ->check() and .name.", "Name"));
             p.Method(s, "to_number", "default?", "The text as a number, or default when it isn't one.", KType.Number, (t, c) =>
                 Values.TryNumber(S(t), out double d) ? d : c.Has(0) ? c.Arg(0) : throw c.Error($"'{S(t)}' is not a number. Pass a default: ->to_number(0).", "Type"));
             p.Method(s, "to_int", "default?", "The text as a whole number, or default when it isn't one.", KType.Number, (t, c) =>

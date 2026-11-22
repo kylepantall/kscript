@@ -129,7 +129,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData(Pack + "<echo>{ @pack(large) } { @pack(size: small, gift) } { @pack('medium', not gift) } { $Size.small }</echo>")]
+        [InlineData(Pack + "<echo>{ @pack(large) } { @pack(size: small, gift) } { @pack('medium', not gift) } { Size.small }</echo>")]
         [InlineData(IO + "<echo>{ @known_folder(downloads) } { @known_folder(name: home) } { @files('.', pattern: '*', recursive) }</echo>")]
         [InlineData(IO + "<echo>{ @join_path(base: '/a', ['b', 'c']) }</echo>")]
         [InlineData("<const name=\"max\" value=\"3\" /><echo>$max</echo>")]
@@ -211,7 +211,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void EnumsCompleteTheirValuesAsFields()
         {
-            (DocumentAnalysis a, int offset) = At(Script(Pack + "<echo>{ $Size.‸ }</echo>"));
+            (DocumentAnalysis a, int offset) = At(Script(Pack + "<echo>{ Size.‸ }</echo>"));
             Assert.Contains("medium", Service.GetCompletions(a, offset).Select(c => c.Label));
         }
     

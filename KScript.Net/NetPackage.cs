@@ -147,7 +147,7 @@ namespace KScript.Net
 
             p.AgentNotes(
                 ("@api", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test .is_ok.",
-                    prefer: "@api($url)->check()->json(as: $Type) to fail fast and check the data's shape.")));
+                    prefer: "@api($url)->check()->json(as: Type) to fail fast and check the data's shape.")));
         }
 
         private static object Api(CallContext c)

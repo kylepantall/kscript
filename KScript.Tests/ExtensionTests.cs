@@ -46,7 +46,7 @@ public class ExtensionTests
         string output = RunCode(
             "type User {\n  name: string\n}\n"
             + "extend User {\n  fn hello(greeting = 'Hi') => $greeting + ' ' + $this.name\n}\n"
-            + "u = $User->from({ name: 'Kyle' })\n"
+            + "u = User({ name: 'Kyle' })\n"
             + "echo \"{ $u->hello() } { $u->hello(greeting: 'Hey') } { $u->keys()->join(',') }\"\n");
         Assert.Equal("Hi Kyle Hey Kyle name\n", output);
     }

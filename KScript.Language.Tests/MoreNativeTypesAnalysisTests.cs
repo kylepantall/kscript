@@ -44,7 +44,7 @@ namespace KScript.Language.Tests
         [InlineData("ip: ip = 10.0.0.1\necho $ip->in('10.0.0.0/8')")]
         [InlineData("c: country = gb\necho $c.currency.symbol")]
         [InlineData("enum Color { red, green }\nc: Color = green\necho $c")]
-        [InlineData("type Duration { minutes: int }\nd = $Duration->from({ minutes: 1 })\necho $d.minutes")]
+        [InlineData("type Duration { minutes: int }\nd = Duration({ minutes: 1 })\necho $d.minutes")]
         [InlineData("type Site with [url] { validate: $value.host->ends_with('example.com'), 'Use a company site' }\ns: Site = https://www.example.com\necho $s.host")]
         public void ValuesThatFitAreClean(string code) => AssertClean(WithoutUnused(Code(code)));
 

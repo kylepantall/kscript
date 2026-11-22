@@ -58,11 +58,6 @@ namespace KScript.Language.Analysis
                     ElementInfo info = catalog.GetElement(e.Name.Substring(8));
                     if (info?.Package != null) ImportPackage(info.Package);
                 }
-                else if (ImpliedPackages.ByElement.TryGetValue(e.Name, out string implied) && catalog.FindPackage(implied) is string impliedPackage)
-                {
-                    // job is a keyword whose package comes with it, as at run time.
-                    ImportPackage(impliedPackage);
-                }
                 else if (e.Name == "import" && e.GetAttribute("package") is MarkupAttribute packageAttr && packageAttr.Value != null)
                 {
                     HoistPackageImport(e, packageAttr, root);
@@ -217,19 +212,12 @@ namespace KScript.Language.Analysis
             SourceText source = result.Source;
             if (result.Markup.Syntax == SourceSyntax.Code)
             {
-                // After the last import line; else at the top of the file, or inside a KScript.Window { } root.
+                // After the last import line; else at the top of the file. Imports are never inside a block.
                 MarkupElement top = result.Markup.RootElements.FirstOrDefault();
                 MarkupElement last = top?.ChildElements.LastOrDefault(c => c.Name == "import");
                 if (last != null)
                 {
                     return new TextChange(new TextSpan(last.Span.End, 0), $"\nimport {package}");
-                }
-                if (top != null && top.Name != "kscript" && top.ContentSpan.Length > 0)
-                {
-                    // A block's content starts at its '{': the import goes on the line after it.
-                    int brace = source.Text.IndexOf('{', top.ContentSpan.Start);
-                    int insertAt = brace >= 0 && brace < top.ContentSpan.End ? brace + 1 : top.ContentSpan.Start;
-                    return new TextChange(new TextSpan(insertAt, 0), $"\n  import {package}");
                 }
                 return new TextChange(new TextSpan(0, 0), $"import {package}\n");
             }

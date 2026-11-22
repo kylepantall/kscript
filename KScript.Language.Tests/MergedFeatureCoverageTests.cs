@@ -79,13 +79,13 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void A_missing_import_in_a_window_goes_inside_the_window()
+        public void A_missing_import_in_a_window_goes_with_the_imports_at_the_top()
         {
-            const string text = "KScript.Window(title: \"Tests\") {\n  describe(name: x) {\n  }\n}\n";
+            const string text = "import KScript.UI\n\nWindow(title: \"Tests\") {\n  describe(name: x) {\n  }\n}\n";
             var files = new LanguageService(files: EmptyFileSystem.Instance);
             Diagnostic d = files.Analyze(text, Path.Combine(Path.GetTempPath(), "w.kscript")).Diagnostics
                 .First(x => x.Code == DiagnosticCodes.MissingImport && x.Message.Contains("KScript.Test"));
-            Assert.Equal("KScript.Window(title: \"Tests\") {\n  import KScript.Test\n  describe(name: x) {\n  }\n}\n",
+            Assert.Equal("import KScript.UI\nimport KScript.Test\n\nWindow(title: \"Tests\") {\n  describe(name: x) {\n  }\n}\n",
                 AnalyzerTests.Apply(text, d.Fixes[0].Changes));
         }
 

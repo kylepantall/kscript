@@ -457,8 +457,10 @@ public class HttpAppTests
     public void CodeFormatRouteFilesWork()
     {
         using var site = Site(null, ("routes.kscript", """
-            KScript.Routes {
-              import "controllers/people.ks.xml" as people
+            import KScript.Http
+            import "controllers/people.ks.xml" as people
+
+            Routes {
               Get(path: "/people/{id}", to: @people.show, where: "id: int")
               Group(prefix: "/v2") {
                 Get(path: "/people", to: @people.index)
@@ -476,9 +478,11 @@ public class HttpAppTests
         // Kyle's case: middleware from an imported .kscript file, named in an array.
         using var site = Site(null,
             ("routes.kscript", """
-                KScript.Routes {
-                  import "middleware.kscript"
-                  import "controllers/people.ks.xml" as people
+                import KScript.Http
+                import "middleware.kscript"
+                import "controllers/people.ks.xml" as people
+
+                Routes {
                   Middleware(use: [stamp, log])
                   Resource(path: "/people", to: people, only: [index, show])
                   Route(methods: [get, post], path: "/both", redirect: "/people")
@@ -507,7 +511,7 @@ public class HttpAppTests
     }
 
     [Theory]
-    [InlineData("<kscript><echo>hi</echo></kscript>", "starts with <KScript.Routes>")]
+    [InlineData("<kscript><echo>hi</echo></kscript>", "is a route file, so it holds Routes { }")]
     [InlineData("<KScript.Routes><Get path=\"/a\" /></KScript.Routes>", "needs something to answer with")]
     [InlineData("<KScript.Routes><Get path=\"/a\" view=\"x\" redirect=\"/b\" /></KScript.Routes>", "more than one answer")]
     [InlineData("<KScript.Routes><Get path=\"/a\" to=\"nope\" /></KScript.Routes>", "No function named 'nope'")]

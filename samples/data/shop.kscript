@@ -4,10 +4,10 @@ import KScript.Data
 import "models/product.kscript"
 import "models/order.kscript"
 
-$db->create_table($Product)
-$db->create_table($Order)
+$db->create_table(Product)
+$db->create_table(Order)
 
-$Product->insert([
+Product->insert([
   { sku: 'TEA-1', name: 'Green tea', price: 4.5, stock: 20, tags: ['drinks'] },
   { sku: 'MUG-1', name: 'Blue mug', price: 12, stock: 3, tags: ['kitchen'] },
   { sku: 'POT-1', name: 'Tea pot', price: 30, stock: 1, tags: ['kitchen'] },
@@ -16,13 +16,13 @@ $Product->insert([
 /// Takes stock and records the order, together or not at all.
 fn place(sku: string, customer: email, quantity: int) {
   transaction {
-    product = $Product->where(sku: $sku)->first_or_fail()
+    product = Product->where(sku: $sku)->first_or_fail()
     if $product.stock < $quantity {
       throw Conflict(message: 'Only ' + $product.stock + ' ' + $product.name + ' left')
     }
     product.stock = $product.stock - $quantity
     $product->save()
-    return $Order->create(
+    return Order->create(
       product_id: $product.id,
       customer: $customer,
       quantity: $quantity
@@ -38,18 +38,18 @@ try {
   echo "Not placed: { $e.message }"
 }
 
-$Order->where(customer: 'ben@example.com')->update(status: paid)
+Order->where(customer: 'ben@example.com')->update(status: paid)
 
 echo 'Kitchen things under 20:'
 cheap = 20
-for p in $Product->where(fn(p) =>
+for p in Product->where(fn(p) =>
   $p.price < $cheap and $p.sku->starts_with('MUG'))->order_by(name)->get() {
     echo "- { $p.name }: { $p.price } ({ $p.stock } left)"
   }
 
-echo "Open orders: { $Order->where(status: open)->count() }"
-echo "Paid orders: { $Order->where(status: paid)->count() }"
-echo "Stock left: { $Product->sum(stock) }"
+echo "Open orders: { Order->where(status: open)->count() }"
+echo "Paid orders: { Order->where(status: paid)->count() }"
+echo "Stock left: { Product->sum(stock) }"
 
 low = 5
 echo 'Low on stock:'

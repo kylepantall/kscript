@@ -3,6 +3,8 @@
 A job is a piece of work you hand off to run later, away from the script or request that asked for it: sending an email, resizing a picture, calling a slow API. `->dispatch()` puts a job on a queue and returns at once. `kscript worker` takes jobs off the queue and runs them, tries again when one fails, and keeps the ones that keep failing so you can see why.
 
 ```kscript
+import KScript.Queue
+
 /// Sends the welcome email to a new user.
 job SendWelcome(queue: "mail", tries: 5, backoff: [10s, 1m, 5m]) {
   user_id: int
@@ -21,6 +23,7 @@ job SendWelcome(queue: "mail", tries: 5, backoff: [10s, 1m, 5m]) {
 Save it as `jobs/send-welcome.kscript` (`kscript make job SendWelcome` writes one for you). In the editor, a job without `fn handle()` has a quick fix that writes it, and the lightbulb on a job adds `fn failed(err)`. Then, anywhere in the project:
 
 ```kscript
+import KScript.Queue
 import "jobs/send-welcome.kscript"
 
 SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
@@ -32,7 +35,7 @@ And in another terminal:
 kscript worker
 ```
 
-`job` brings in KScript.Queue by itself, and a job carries its own `->dispatch()`, so a script that only declares or dispatches jobs needs no `import KScript.Queue`. The commands below (`@chain`, `@queue`, `@fake_queue`, `@release_job`, `@fail_job`) need the import.
+`job`, `->dispatch()` and the commands below (`@chain`, `@queue`, `@fake_queue`, `@release_job`, `@fail_job`) are part of KScript.Queue, so the file that declares a job and the file that dispatches it both start with `import KScript.Queue`. Nothing is imported silently: without the import, `kscript check` says `job is part of KScript.Queue. Add import KScript.Queue` and the editor offers to add it.
 
 ## Declaring a job
 
@@ -70,6 +73,7 @@ Times are durations, written as a number and a unit with no quotes: `500ms`, `30
 ## Dispatching
 
 ```kscript
+import KScript.Queue
 import "jobs/send-welcome.kscript"
 
 SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
@@ -204,7 +208,7 @@ import "jobs/send-welcome.kscript"
 queue = @fake_queue()
 SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
 
-echo "{$queue->count_of($SendWelcome)} welcome email queued for user {$queue->pushed($SendWelcome)[0].user_id}"
+echo "{$queue->count()} welcome email queued for user {$queue->pushed(SendWelcome)[0].user_id}"
 $queue->run_all()
 ```
 

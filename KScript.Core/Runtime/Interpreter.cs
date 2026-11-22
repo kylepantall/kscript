@@ -69,6 +69,11 @@ namespace KScript.Runtime
                 if (root.Name.StartsWith("KScript.", StringComparison.Ordinal))
                 {
                     module.IsPackageRoot = true;
+                    module.MainElement = root;
+                }
+                else if (root.ChildElements.Where(e => char.IsUpper(e.Name[0])).Take(2).ToList() is { Count: 1 } things)
+                {
+                    module.MainElement = things[0];
                 }
                 else if (root.Name != "kscript")
                 {
@@ -124,7 +129,8 @@ namespace KScript.Runtime
                 Add(GetPackage(name, module, null), null);
             }
 
-            // <KScript.Window> (as the root or anywhere) brings in the package that defines Window.
+            // In an XML file, <KScript.Window> (as the root or anywhere) brings in the package that defines Window. A
+            // .kscript file never has one: its packages are named only by import.
             foreach (MarkupElement e in module.Document.DescendantElements().Where(e => e.Name.StartsWith("KScript.", StringComparison.Ordinal)))
             {
                 string bare = e.Name.Substring(8);
@@ -134,12 +140,6 @@ namespace KScript.Runtime
                     throw Located(new KScriptException($"No KScript package has an element called <{bare}>, so <{e.Name}> can't be used." + SuggestElement(bare, Packages.LoadAll().SelectMany(p => p.Elements.Keys)), "Import"), module, e.NameSpan.Start);
                 }
                 Add(owner, null);
-            }
-
-            // job and dispatch are keywords whose package comes with them.
-            foreach (string implied in module.Document.DescendantElements().Select(e => Metadata.ImpliedPackages.ByElement.TryGetValue(e.Name, out string p) ? p : null).Where(p => p != null).Distinct())
-            {
-                Add(GetPackage(implied, module, null), null);
             }
 
             foreach (MarkupElement import in module.Root.ChildElements.Where(e => e.Name == "import"))

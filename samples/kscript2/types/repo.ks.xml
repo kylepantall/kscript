@@ -12,7 +12,7 @@
       description="How many people starred it." />
     <field name="owner" type="Owner" />
     <field name="topics" type="string[]" default="[]" />
-    <field name="license" type="string?" from="license.name" />
+    <field name="license?" type="string" from="license.name" />
     <field name="visibility" type="Visibility" />
     <field name="updated" type="date" from="updated_at" />
     <field name="label" value="$name + ' (' + $stars + ' stars)'" />

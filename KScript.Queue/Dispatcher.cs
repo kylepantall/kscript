@@ -6,6 +6,16 @@ namespace KScript.Queueing
     internal static class Dispatcher
     {
         /// <summary>
+        /// A job is queued from a file that imports KScript.Queue, as @chain() and @queue() are: one rule for the
+        /// whole package, whichever way the job is dispatched.
+        /// </summary>
+        internal static void NeedsImport(CallContext call, string what)
+        {
+            if (call.Module == null || call.Module.Packages.Any(p => p.Name == "KScript.Queue")) return;
+            throw new KScriptException($"{what} on a job is part of {"KScript.Queue"}. Add {call.Module.ImportHint("KScript.Queue")} at the top of the script.", "Import");
+        }
+
+        /// <summary>
         /// Queues the first job, with the rest as its chain, and returns what was queued: id, job, queue, connection,
         /// available_at. A unique job that is already queued returns null.
         /// </summary>

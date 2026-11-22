@@ -217,11 +217,11 @@ namespace KScript.Language.Tests
         [Fact]
         public void PagesReadTheShorthandAndKeepItsCase()
         {
-            const string text = "<ul><IF $User.isLoggedIn><li><a href=\"/profile\">Profile</a></li></IF></ul>";
+            const string text = "<ul><IF User.isLoggedIn><li><a href=\"/profile\">Profile</a></li></IF></ul>";
             MarkupDocument doc = MarkupParser.Parse(text, DocumentKind.Page);
             Assert.Empty(doc.Diagnostics);
             MarkupElement e = doc.RootElements.Single().ChildElements.Single();
-            Assert.Equal("$User.isLoggedIn", e.GetAttributeValue("test"));
+            Assert.Equal("User.isLoggedIn", e.GetAttributeValue("test"));
             Assert.Equal("li", e.ChildElements.Single().Name);
         }
 

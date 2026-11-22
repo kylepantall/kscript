@@ -6,7 +6,7 @@ using KScript.Runtime;
 namespace KScript.Data
 {
     /// <summary>
-    /// A query being built: <c>$User->where(role: admin)->latest()->limit(10)</c>. Each method returns a new query and
+    /// A query being built: <c>User->where(role: admin)->latest()->limit(10)</c>. Each method returns a new query and
     /// leaves the old one as it was, so a query kept in a variable can be the start of several others. Nothing runs
     /// until a method that reads or writes rows, such as <c>->get()</c>, <c>->count()</c> or <c>->update()</c>.
     /// </summary>

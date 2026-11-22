@@ -5,9 +5,10 @@ when: desktop
 // Compile it into a program with: kscript compile (the "app" section of
 // kscript.json names this file). The rules come from lib/tasks{{ ext }}, the
 // same file the web page (tasks.html) uses.
-KScript.Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
-  import "lib/tasks{{ ext }}"
+import KScript.UI
+import "lib/tasks{{ ext }}"
 
+Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
   tasks = @starter_tasks()
   draft = ''
 

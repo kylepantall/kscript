@@ -53,7 +53,7 @@ public sealed class ReleaseFeatureCoverageTests
     {
         using var site = new TempSite(
             ("kscript.json", "{}"),
-            ("routes/web.kscript", "KScript.Routes {\n  import \"../lib/a.kscript\" as users\n  import \"../lib/b.kscript\" as admin_users\n  import \"../lib/c.kscript\" as admin_users2\n}\n"));
+            ("routes/web.kscript", "import KScript.Http\nimport \"../lib/a.kscript\" as users\nimport \"../lib/b.kscript\" as admin_users\nimport \"../lib/c.kscript\" as admin_users2\n\nRoutes {\n}\n"));
         var (code, _, err) = Make(site.Root, "route", "admin/users", "--controller", "admin/users");
         Assert.True(code == 0, err);
         string routes = File.ReadAllText(Path.Combine(site.Root, "routes", "web.kscript")).Replace("\r\n", "\n");

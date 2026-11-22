@@ -93,17 +93,14 @@ public sealed class DatabaseServerTests : DataFixture
         FileOf("config.yaml", $"database:\n  connections:\n    main:\n      url: \"{url}\"\n");
         Environment.SetEnvironmentVariable("DATABASE_URL", null);
         string output = Run("""
-            model User {
-              timestamps: yes
-              unique: [email]
-              index: [[name, age]]
+            model User(timestamps, unique: [email], index: [[name, age]]) {
               name: string(max: 40)
               email: email
-              age: int?
+              age?: int
               active: bool = true
-              bio: string?
+              bio?: string
               tags: string[] = []
-              born: date?
+              born?: date
             }
 
             """ + code);
@@ -112,10 +109,10 @@ public sealed class DatabaseServerTests : DataFixture
     }
 
     private const string Queries = """
-        echo $User->where(fn(u) => $u.age > 18 and $u.name->contains('50%'))->order_by(name: desc)->limit(5)->offset(10)->sql().sql
-        echo $User->where(fn(u) => $u.name->matches(/^a.b$/im) or $u.email->ends_with('.org'))->offset(3)->sql().sql
-        echo $User->where(fn(u) => ($u.name + '!')->count() > 3)->lock_for_update()->skip_locked()->sql().sql
-        echo $User->where(fn(u) => $u.name->test(/x/sx))->order_by(age)->sql().sql
+        echo User->where(fn(u) => $u.age > 18 and $u.name->contains('50%'))->order_by(name: desc)->limit(5)->offset(10)->sql().sql
+        echo User->where(fn(u) => $u.name->matches(/^a.b$/im) or $u.email->ends_with('.org'))->offset(3)->sql().sql
+        echo User->where(fn(u) => ($u.name + '!')->count() > 3)->lock_for_update()->skip_locked()->sql().sql
+        echo User->where(fn(u) => $u.name->test(/x/sx))->order_by(age)->sql().sql
         echo @db(visits)->where(n: 1)->sql().sql
         """;
 
@@ -334,27 +331,26 @@ public sealed class DatabaseServerTests : DataFixture
     {
         if (Server == null) return;
         string[] lines = Lines("""
-            model Person {
-              unique: [email]
+            model Person(unique: [email]) {
               name: string
               email: email
-              note: string?
+              note?: string
             }
-            $db->create_table($Person)
-            $Person->create(name: 'Ada', email: 'Ada@Example.com', note: '"two\nlines"'->json())
-            echo $Person->where(name: 'ada')->count()
-            echo $Person->where(email: 'ADA@example.com')->count()
-            echo $Person->where(fn(p) => $p.name->contains('AD'))->count()
-            echo $Person->where(fn(p) => $p.email->starts_with('ada'))->count()
-            echo $Person->where(fn(p) => $p.name->matches(/^ada$/i))->count()
-            echo $Person->where(fn(p) => $p.name->matches(/^ada$/))->count()
-            echo $Person->where(fn(p) => $p.note->matches(/^lines/m))->count()
-            echo $Person->where(fn(p) => $p.note->matches(/two.lines/))->count()
-            echo $Person->where(fn(p) => $p.note->matches(/two.lines/s))->count()
-            echo $Person->where(fn(p) => $p.name + '!' == 'Ada!')->count()
-            echo $Person->where(fn(p) => $p.name->count() == 3)->count()
+            $db->create_table(Person)
+            Person->create(name: 'Ada', email: 'Ada@Example.com', note: '"two\nlines"'->json())
+            echo Person->where(name: 'ada')->count()
+            echo Person->where(email: 'ADA@example.com')->count()
+            echo Person->where(fn(p) => $p.name->contains('AD'))->count()
+            echo Person->where(fn(p) => $p.email->starts_with('ada'))->count()
+            echo Person->where(fn(p) => $p.name->matches(/^ada$/i))->count()
+            echo Person->where(fn(p) => $p.name->matches(/^ada$/))->count()
+            echo Person->where(fn(p) => $p.note->matches(/^lines/m))->count()
+            echo Person->where(fn(p) => $p.note->matches(/two.lines/))->count()
+            echo Person->where(fn(p) => $p.note->matches(/two.lines/s))->count()
+            echo Person->where(fn(p) => $p.name + '!' == 'Ada!')->count()
+            echo Person->where(fn(p) => $p.name->count() == 3)->count()
             try {
-              $Person->create(name: 'Ada 2', email: 'ADA@example.com')
+              Person->create(name: 'Ada 2', email: 'ADA@example.com')
             } catch UniqueViolation as e {
               echo $e.message
             }

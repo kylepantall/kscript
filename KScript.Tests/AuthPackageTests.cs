@@ -44,7 +44,7 @@ public sealed class AuthPackageTests : IDisposable
           return { ok: true }
         }
         fn t_private_key() => $session->set('_user', 1)
-        fn t_keep_password(json) => $session->set('p', [{ secret: $Secret->from($json).password }])
+        fn t_keep_password(json) => $session->set('p', [{ secret: Secret($json).password }])
         fn t_users(json) {
           u = @users()
           joan = $u->find_email('JOAN@example.com')
@@ -53,7 +53,7 @@ public sealed class AuthPackageTests : IDisposable
         fn t_update(json) => @users()->update($json.id, nickname: 'Jo', name: null)
         fn t_update_email(json) => @users()->update($json.id, email: $json.email)
         fn t_update_kept(json) => @users()->update($json.id, password_hash: 'x')
-        fn t_update_password(json) => @users()->update($json.id, secret: $Secret->from($json).password)
+        fn t_update_password(json) => @users()->update($json.id, secret: Secret($json).password)
         fn t_set_password(json) => @users()->set_password($json.id, $json.password)
         fn t_delete(json) => { first: @users()->delete($json.id), second: @users()->delete($json.id) }
         fn t_find_number() => @users()->find(42)
@@ -73,10 +73,11 @@ public sealed class AuthPackageTests : IDisposable
         """;
 
     private const string Api = """
-        KScript.Routes {
-          import KScript.Http
-          import KScript.Auth
-          import "c.kscript" as c
+        import KScript.Http
+        import KScript.Auth
+        import "c.kscript" as c
+
+        Routes {
           Post(path: "/reg", to: @c.t_reg)
           Post(path: "/attempt", to: @c.t_attempt)
           Get(path: "/me", to: @c.t_me)
@@ -117,10 +118,11 @@ public sealed class AuthPackageTests : IDisposable
         """;
 
     private const string Web = """
-        KScript.Routes {
-          import KScript.Http
-          import KScript.Auth
-          import "c.kscript" as c
+        import KScript.Http
+        import KScript.Auth
+        import "c.kscript" as c
+
+        Routes {
           Get(path: "/form", to: @c.t_csrf)
           Post(path: "/post", to: @c.t_ok)
           Get(path: "/private", to: @c.t_ok, middleware: auth)

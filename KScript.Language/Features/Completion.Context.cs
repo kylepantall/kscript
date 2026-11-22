@@ -117,12 +117,6 @@ namespace KScript.Language.Features
                 return null;
             }
 
-            // KScript.R‸ at the start of a statement: a package element such as KScript.Routes { }.
-            if (code && wordStart >= 8 && string.CompareOrdinal(text, wordStart - 8, "KScript.", 0, 8) == 0 && AtStatementBoundary(analysis, wordStart - 8))
-            {
-                return PackageElementCompletions(TextSpan.FromBounds(wordStart, offset), xml: false, snippets: true);
-            }
-
             if (AtStatementBoundary(analysis, wordStart))
             {
                 return StatementCompletions(analysis, wordStart, offset);

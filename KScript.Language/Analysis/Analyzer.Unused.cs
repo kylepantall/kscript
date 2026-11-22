@@ -384,7 +384,7 @@ namespace KScript.Language.Analysis
                 return;
             }
             // In a route file, importing KScript.Auth turns on the CSRF check for its web routes.
-            if (package == "KScript.Auth" && result.Markup.RootElements.Any(r => r.Name == "KScript.Routes"))
+            if (package == "KScript.Auth" && result.Markup.RootElements.Any(r => r.Name == "KScript.Routes" || r.ChildElements.Any(c => c.Name == "Routes")))
             {
                 return;
             }

@@ -14,7 +14,7 @@ kscript openapi samples/http-app    # the OpenAPI document, made from the routes
 
 ## Route files
 
-A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a route file, the same way `KScript.Window` makes a desktop app. The block imports KScript.Http for you. `kscript serve` loads these files from the site folder:
+A file that imports KScript.Http and holds a `Routes { }` block (`<KScript.Routes>` in XML) is a route file, the same way `Window { }` makes a desktop app. Its imports go at the top of the file, above the block. `kscript serve` loads these files from the site folder:
 
 | File | Routes |
 | --- | --- |
@@ -25,10 +25,11 @@ A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a rou
 
 ```kscript
 // routes.kscript
-KScript.Routes {
-  import "controllers/people.kscript" as people
-  import "middleware/security.kscript"
+import KScript.Http
+import "controllers/people.kscript" as people
+import "middleware/security.kscript"
 
+Routes {
   Middleware(use: secure_headers)
 
   Get(path: /, view: home, name: home)
@@ -200,7 +201,7 @@ kscript {
 Middleware applies at four levels, and it runs outermost first:
 
 1. `http.middleware` in `kscript.json`, for every route.
-2. `KScript.Routes(middleware: …)`, for every route in the file. `Middleware(use: …)` adds more for the routes after it.
+2. `Routes(middleware: …)`, for every route in the file. `Middleware(use: …)` adds more for the routes after it.
 3. `Group(middleware: …)`, for the routes inside the group.
 4. `Get(…, middleware: …)`, for one route.
 
@@ -208,9 +209,10 @@ A middleware list is an array of names: `[log, secure_headers, throttle:30]`. Ea
 
 ```kscript
 // routes.kscript
-KScript.Routes {
-  import "middleware/security.kscript"
+import KScript.Http
+import "middleware/security.kscript"
 
+Routes {
   Middleware(use: [secure_headers, json_only])
 }
 ```
@@ -240,9 +242,10 @@ Browsers and proxies can keep an answer and ask again only when it may have chan
 **ETags.** `etag: true` on a route (or the `etag` middleware) adds an `ETag` header to every `200` answer to `GET` and `HEAD`: a hash of the body. When the browser asks again with `If-None-Match` and the tag still matches, it gets `304 Not Modified` with no body, so nothing is sent twice.
 
 ```kscript
-KScript.Routes {
-  import "controllers/people.kscript" as people
+import KScript.Http
+import "controllers/people.kscript" as people
 
+Routes {
   Get(path: /people, to: @people.index, etag: true, cache: 60)
   Get(path: /people/{id}, to: @people.show, etag: true, cache: "private, max-age=0, must-revalidate")
 }
@@ -391,7 +394,7 @@ Route files get the same checking and completion as scripts:
 - `to` completes the functions of imported controllers (`@people.show`). A name that doesn't exist is an error with a did-you-mean.
 - `middleware` and `use` complete the built-ins too, and accept `http.groups` names.
 - Names in a list are checked and completed one by one, inside `[ ]` too.
-- Route elements are only offered inside `KScript.Routes` or `Group`.
+- Route elements are only offered inside `Routes` or `Group`.
 - `{id}` in `path` isn't read as a `{ }` expression.
 - Doc comments on controllers show in hover, and also become the [API docs](#api-docs-openapi).
 

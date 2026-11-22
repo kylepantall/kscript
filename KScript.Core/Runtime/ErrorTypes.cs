@@ -9,7 +9,7 @@ namespace KScript.Runtime
     /// <c>catch NotFound</c> catches it and every error type that extends it, <c>NotFound(id: 42)</c> makes one, and a
     /// <c>status</c> (its own or a parent's) is the HTTP status KScript.Http answers with when a route doesn't catch it.
     /// </summary>
-    public sealed class ErrorType : IKObject
+    public sealed class ErrorType : IKObject, IDeclaredType
     {
         private readonly string parentName;
         private ErrorType parent;
@@ -207,8 +207,7 @@ namespace KScript.Runtime
             switch (name)
             {
                 case "new":
-                    result = Create(call.Interpreter, call.Args, call.Named).ToValue();
-                    return true;
+                    throw new KScriptException($"->new() is gone: call the error type to make an error, {Name}(...).", "Retired");
                 default:
                     result = null;
                     return false;
@@ -225,7 +224,6 @@ namespace KScript.Runtime
 
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("new", "fields...", "Makes an error of this type without throwing it: $NotFound->new(id: 42). Throw it later with throw $e.", "error"),
         };
 
         internal static readonly (string Name, string Type, string Description)[] ValueFields =

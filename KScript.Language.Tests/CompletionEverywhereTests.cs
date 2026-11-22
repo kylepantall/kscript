@@ -58,7 +58,7 @@ namespace KScript.Language.Tests
             new object[] { Code, "echo \"hi $‸\"", "args" },
             new object[] { Code, "x = @‸", "now" },
             new object[] { Code, "x = $‸", "x" },
-            new object[] { Code, "enum E { a, b }\nx = $E.‸", "a" },
+            new object[] { Code, "enum E { a, b }\nx = E.‸", "a" },
 
             // .kscript: types, imports and packages.
             new object[] { Code, "fn f(a: ‸) {\n}", "string" },
@@ -74,18 +74,18 @@ namespace KScript.Language.Tests
             new object[] { Code, "import \"lib.kscript\" as lib\nx = lib.‸", "limit" },
             new object[] { Code, "import \"lib.kscript\"\nx = @‸", "add" },
             new object[] { Code, "import \"lib.kscript\"\nx = $‸", "limit" },
-            new object[] { Code, "import \"lib.kscript\"\nx = $Size.‸", "m" },
-            new object[] { Code, "KScript.‸", "Routes" },
-            new object[] { Code, "KScript.R‸", "Routes" },
+            new object[] { Code, "import \"lib.kscript\"\nx = Size.‸", "m" },
+            new object[] { Code, "import KScript.Http\n‸", "Routes" },
+            new object[] { Code, "import KScript.Http\nR‸", "Routes" },
 
             // .kscript: routes.
-            new object[] { Code, "KScript.Routes {\n  ‸\n}", "Get" },
-            new object[] { Code, "KScript.Routes {\n  G‸\n}", "Group" },
-            new object[] { Code, "KScript.Routes {\n  Get(‸)\n}", "path" },
-            new object[] { Code, "KScript.Routes {\n  import \"lib.ks.xml\" as people\n  Get(path: \"/x\", to: ‸)\n}", "people.twice" },
-            new object[] { Code, "KScript.Routes {\n  Get(path: \"/people/{id}\") {\n    return ‸\n  }\n}", "$id" },
-            new object[] { Code, "KScript.Routes {\n  Get(path: \"/x\") {\n    return $request.‸\n  }\n}", "query" },
-            new object[] { Code, "KScript.Routes {\n  Post(path: \"/x\") {\n    return $‸\n  }\n}", "json" },
+            new object[] { Code, "import KScript.Http\n\nRoutes {\n  ‸\n}", "Get" },
+            new object[] { Code, "import KScript.Http\n\nRoutes {\n  G‸\n}", "Group" },
+            new object[] { Code, "import KScript.Http\n\nRoutes {\n  Get(‸)\n}", "path" },
+            new object[] { Code, "import KScript.Http\nimport \"lib.ks.xml\" as people\n\nRoutes {\n  Get(path: \"/x\", to: ‸)\n}", "people.twice" },
+            new object[] { Code, "import KScript.Http\n\nRoutes {\n  Get(path: \"/people/{id}\") {\n    return ‸\n  }\n}", "$id" },
+            new object[] { Code, "import KScript.Http\n\nRoutes {\n  Get(path: \"/x\") {\n    return $request.‸\n  }\n}", "query" },
+            new object[] { Code, "import KScript.Http\n\nRoutes {\n  Post(path: \"/x\") {\n    return $‸\n  }\n}", "json" },
 
             // XML scripts.
             new object[] { Xml, "<kscript>\n‸\n</kscript>", "echo" },
@@ -151,7 +151,7 @@ namespace KScript.Language.Tests
             Assert.Contains(Complete("import KScript.Terminal\n‸", Code), i => i.Label == "input");
             Assert.DoesNotContain(Complete("<kscript>\n  <echo>hi</echo>\n  <‸\n</kscript>", Xml), i => i.Label == "picker");
             Assert.Contains(Complete("<kscript>\n  <import package=\"KScript.Terminal\" />\n  <‸\n</kscript>", Xml), i => i.Label == "picker");
-            Assert.DoesNotContain(Complete("KScript.Routes {\n  Get(path: \"/x\") {\n    return @‸\n  }\n}", Code), i => i.Label == "read_text");
+            Assert.DoesNotContain(Complete("import KScript.Http\n\nRoutes {\n  Get(path: \"/x\") {\n    return @‸\n  }\n}", Code), i => i.Label == "read_text");
 
             // Inside a function too: KScript.Document's Section and Paragraph need the import.
             List<string> inFn = Complete("fn report() {\n  ‸\n}", Code).Select(i => i.Label).ToList();
@@ -180,11 +180,11 @@ namespace KScript.Language.Tests
             Assert.Equal("enum ${1:Name} { ${2:a}, ${3:b} }", Assert.Single(code, i => i.Label == "enum").InsertText);
             Assert.StartsWith("describe(name: \"${1}\") {", Assert.Single(Complete("import KScript.Test\n‸", Code), i => i.Label == "describe").InsertText, StringComparison.Ordinal);
 
-            List<CompletionItem> routes = Complete("KScript.‸", Code);
+            List<CompletionItem> routes = Complete("import KScript.Http\n‸", Code);
             Assert.Equal("Routes {\n\t$0\n}", Assert.Single(routes, i => i.Label == "Routes").InsertText);
-            Assert.Equal("KScript.Http", Assert.Single(routes, i => i.Label == "Routes").Detail);
+            Assert.Equal("statement", Assert.Single(routes, i => i.Label == "Routes").Detail);
             Assert.DoesNotContain(routes, i => i.Label == "Get");
-            Assert.StartsWith("Get(path: \"${1}\") {", Assert.Single(Complete("KScript.Routes {\n  ‸\n}", Code), i => i.Label == "Get").InsertText, StringComparison.Ordinal);
+            Assert.StartsWith("Get(path: \"${1}\") {", Assert.Single(Complete("import KScript.Http\n\nRoutes {\n  ‸\n}", Code), i => i.Label == "Get").InsertText, StringComparison.Ordinal);
             Assert.Equal("KScript.Routes>\n\t$0\n</KScript.Routes>", Assert.Single(Complete("<KScript.‸", Xml), i => i.Label == "KScript.Routes").InsertText);
             Assert.Null(Assert.Single(Complete("<KScript.R‸ a=\"1\">", Xml), i => i.Label == "KScript.Routes").InsertText);
 

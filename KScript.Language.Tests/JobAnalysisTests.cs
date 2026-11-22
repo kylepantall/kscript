@@ -21,12 +21,14 @@ namespace KScript.Language.Tests
 
         private static readonly LanguageService Service = new LanguageService(files: new FakeFiles(new Dictionary<string, string>
         {
-            ["/tmp/jobs/jobs/remind.kscript"] = "job Remind(queue: \"mail\") {\n  user_id: int\n\n  fn handle() {\n    echo $user_id\n  }\n}\n",
+            ["/tmp/jobs/jobs/remind.kscript"] = "import KScript.Queue\n\njob Remind(queue: \"mail\") {\n  user_id: int\n\n  fn handle() {\n    echo $user_id\n  }\n}\n",
         }));
 
         private const string DocPath = "/tmp/jobs/main.kscript";
 
         private const string Welcome = """
+            import KScript.Queue
+
             /// Says welcome.
             job Welcome(queue: "mail", tries: 3, backoff: ['10s', '1m'], retry_on: [Network]) {
               user_id: int
@@ -63,8 +65,10 @@ namespace KScript.Language.Tests
         [Fact]
         public void JobsFromOtherFilesCanBeMade()
         {
-            AssertClean(Open("import \"jobs/remind.kscript\"\nRemind(user_id: 4)->dispatch()\n"));
-            Assert.Contains("takes its fields by name", Messages("import \"jobs/remind.kscript\"\nRemind(4)->dispatch()\n"));
+            AssertClean(Open("import KScript.Queue\nimport \"jobs/remind.kscript\"\nRemind(user_id: 4)->dispatch()\n"));
+            Assert.Contains("takes its fields by name", Messages("import KScript.Queue\nimport \"jobs/remind.kscript\"\nRemind(4)->dispatch()\n"));
+            // Queuing a job needs the import, as @chain() and @queue() do.
+            Assert.Contains("->dispatch() is part of KScript.Queue", Messages("import \"jobs/remind.kscript\"\nRemind(user_id: 4)->dispatch()\n"));
         }
 
         [Theory]
