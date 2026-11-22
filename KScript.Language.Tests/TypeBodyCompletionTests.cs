@@ -48,6 +48,24 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void AListInAModelsBracketsSuggestsItsFields()
+        {
+            const string import = "import KScript.Data\n\n";
+            Assert.Equal(new[] { "title", "body", "id", "created_at", "updated_at", "deleted_at" },
+                Labels(import + "model Note(timestamps, soft_deletes, hidden: [‸]) {\n  title: string\n  body?: string\n}\n"));
+            // Fields already listed aren't offered again, and a word typed is replaced.
+            List<CompletionItem> items = Complete(import + "model Note(index: [title, bo‸]) {\n  title: string\n  body: string\n}\n");
+            Assert.Equal(new[] { "body", "id" }, items.Select(i => i.Label));
+            Assert.Equal(2, items[0].ReplaceSpan.Length);
+            Assert.Equal("string", items[0].Detail);
+            // A set of fields that is unique together is a list in the list.
+            Assert.Equal(new[] { "slug", "id" }, Labels(import + "model Post(unique: [[team, ‸]]) {\n  slug: string\n  team: int\n}\n"));
+            // After the list, the next option.
+            Assert.Contains("timestamps", Labels(import + "model Note(hidden: [title], ‸) {\n  title: string\n}\n"));
+            Assert.DoesNotContain("title", Labels(import + "model Note(hidden: [title], ‸) {\n  title: string\n}\n"));
+        }
+
+        [Fact]
         public void ALineInAModelSuggestsRulesAndFnNotOptions()
         {
             // Options go in the brackets, so a line of the block is a field, validate or fn.

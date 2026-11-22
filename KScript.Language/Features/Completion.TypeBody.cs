@@ -28,6 +28,9 @@ namespace KScript.Language.Features
         /// <summary>The start of an option in a model's brackets: model User(‸ or model User(timestamps, un‸.</summary>
         private static readonly Regex ModelOptionWord = new Regex(@"^[ \t]*model[ \t]+\w+[ \t]*\(((?:[^()\[\]]|\[[^\[\]]*\])*?)(?<=[(,][ \t]*)(\w*)$", RestrictOptions);
 
+        /// <summary>Inside a list of fields in a model's brackets: model User(hidden: [‸ or model User(unique: [email, [team, sl‸.</summary>
+        private static readonly Regex ModelOptionList = new Regex(@"^[ \t]*model[ \t]+(\w+)[ \t]*\(.*\b(unique|index|hidden|guarded)[ \t]*:[ \t]*(\[(?:[^\[\]]|\[[^\[\]]*\])*(?:\[[^\[\]]*)?)$", RestrictOptions);
+
         private const RegexOptions RestrictOptions = RegexOptions.Compiled | RegexOptions.CultureInvariant;
 
         /// <summary>The type or model whose block holds this offset directly (not inside one of its fns). Callers check the file is .kscript.</summary>
@@ -51,6 +54,11 @@ namespace KScript.Language.Features
             if (TypeArgumentAt(analysis, offset) is (string typeName, TextSpan replace, HashSet<string> written))
             {
                 return TypeArgumentCompletions(typeName, replace, written);
+            }
+
+            if (ModelOptionList.Match(before) is { Success: true } list && ModelNamed(analysis, list.Groups[1].Value, offset) is MarkupElement listed)
+            {
+                return ModelSettingValueCompletions(listed, list.Groups[2].Value, list.Groups[3].Value, offset);
             }
 
             if (ModelOptionWord.Match(before) is { Success: true } option)
@@ -87,6 +95,14 @@ namespace KScript.Language.Features
             items.Add(BodyRuleItem("validate", replace, "1"));
             items.Add(BodyFnItem(replace));
             return items;
+        }
+
+        /// <summary>The model of this name whose header holds the offset (or the first of that name, while the line is half-written).</summary>
+        private static MarkupElement ModelNamed(DocumentAnalysis analysis, string name, int offset)
+        {
+            List<MarkupElement> models = analysis.Markup.RootElements.SelectMany(r => new[] { r }.Concat(r.ChildElements))
+                .Where(e => e.Name == "model" && e.GetAttributeValue("name")?.Trim() == name).ToList();
+            return models.FirstOrDefault(e => offset >= e.Span.Start && offset <= e.Span.End) ?? models.FirstOrDefault();
         }
 
         /// <summary>The options a model takes in its brackets and doesn't have yet: model User(timestamps, unique: [email]).</summary>
