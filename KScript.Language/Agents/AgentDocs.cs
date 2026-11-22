@@ -468,14 +468,14 @@ namespace KScript.Language.Agents
             import KScript.IO // packages go at the top; KScript.Core is always there. Scripts: import "lib/x.kscript" as x
 
             const limit = 3
-            enum Size { small, large }
+            // In a project, each type has its own file (types/task.kscript), and the scripts that use it import it.
             type Task {
               title: string
               done: bool = false
             }
 
             /// What the fn does, shown in hover. Tags: @param @returns @example @llm @prefer @avoid @pitfall
-            fn label(task: Task, size: Size = small) => $task.title->upper() + ' (' + $size + ')'
+            fn label(task: Task, mark: string = '-') => $mark + ' ' + $task.title->upper()
 
             fn open_tasks(tasks) {
               if $tasks->is_empty() {
@@ -488,7 +488,7 @@ namespace KScript.Language.Agents
             count = 0 // declare or change: no $ on the left
             for task in @open_tasks($tasks) {
               count += 1
-              echo "{ $count }. { @label($task, size: large) }" // read with $, call with @
+              echo "{ $count }. { @label($task, mark: '*') }" // read with $, call with @
             }
             match $count {
               case 0 {
@@ -515,7 +515,7 @@ namespace KScript.Language.Agents
             - `$name` reads a variable; `name = value` sets it. `@name(...)` calls a fn or command; `$x->name(...)` calls a method; `$x |> name()` pipes.
             - Text: `"Hi { $name }"` or `"Hi $name"`; `{{ }}` for literal braces. Lambdas: `fn($x) => $x * 2`.
             - Operators: `== !=` (loose) `=== !==` (strict) `lt le gt ge eq ne` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
-            - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enum values are bare: `@known_folder(downloads)`.
+            - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enums are `enum Size { small, large }`, and their values are bare: `@known_folder(downloads)`.
             - Lists of names are arrays: `use: [log, cors]`, never `"log, cors"`.
 
             """;
@@ -526,6 +526,7 @@ namespace KScript.Language.Agents
             - Calling your own fn without `@`, or calling a package command without its `import` (`@read_json` needs `import KScript.IO`).
             - Inventing methods from other languages (`.length`, `.push()` on a string, `len()`): methods use `->` and are listed per package.
             - `else` after a branch that returns, breaks or continues: return early instead (KS6001).
+            - Declaring a type in the file that uses it, or several in one file: each type, model, enum and error type gets its own file (`types/`, `models/`, `errors/`, request bodies in `requests/`), named after it in kebab-case, and the files that use it import it (KS6007).
 
             """;
 

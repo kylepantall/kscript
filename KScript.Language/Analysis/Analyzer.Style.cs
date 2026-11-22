@@ -1,3 +1,4 @@
+using KScript.Projects;
 using System.Text;
 
 using KScript.Syntax.Markup;
@@ -88,6 +89,94 @@ namespace KScript.Language.Analysis
                 : null;
             Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Warning, DiagnosticCodes.PreferArrayList,
                 $"Write the list as an array: {attr.Name}: {array}.", fix != null ? new[] { fix } : null);
+        }
+
+        /// <summary>
+        /// KS6007: a script in a project that declares more than one type. Each type, model, enum and error type goes
+        /// in its own file (types/, models/, errors/), and the files that use it import it. The first declaration is
+        /// one the file is named after (or else the first) is left alone; the others are flagged. Scripts outside a project (one-off scripts) are not checked.
+        /// </summary>
+        private void CheckOneTypePerFile()
+        {
+            if (Kind != DocumentKind.Script || directory == null)
+            {
+                return;
+            }
+            MarkupElement root = result.Markup.RootElements.FirstOrDefault();
+            if (root == null)
+            {
+                return;
+            }
+            List<MarkupElement> declared = root.ChildElements
+                .Where(e => IsTypeElement(e) || IsKScriptElementName(e, "enum") || IsKScriptElementName(e, "error"))
+                .Where(e => !string.IsNullOrWhiteSpace(e.GetAttributeValue("name")))
+                .ToList();
+            if (declared.Count < 2)
+            {
+                return;
+            }
+            ProjectConfig config = ProjectFor(out string projectDir);
+            if (projectDir == null)
+            {
+                return;
+            }
+            string ext = result.Path.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) ? ".ks.xml"
+                : System.IO.Path.GetExtension(result.Path);
+            // The one the file is named after stays (models/order.kscript keeps Order); otherwise the first.
+            string stem = System.IO.Path.GetFileName(result.Path);
+            stem = stem.Substring(0, stem.Length - ext.Length);
+            MarkupElement kept = declared.FirstOrDefault(e => KebabName(e.GetAttributeValue("name").Trim().TrimStart('$')) == stem) ?? declared[0];
+            string first = kept.GetAttributeValue("name").Trim().TrimStart('$');
+            foreach (MarkupElement e in declared.Where(e => e != kept))
+            {
+                string name = e.GetAttributeValue("name").Trim().TrimStart('$');
+                string folder = IsModelElement(e) ? "models" : IsKScriptElementName(e, "error") ? "errors" : "types";
+                string target = (config?.PathFor(folder) ?? folder).Trim('/', '\\') + "/" + KebabName(name) + ext;
+                string what = IsModelElement(e) ? "model" : IsKScriptElementName(e, "enum") ? "enum" : IsKScriptElementName(e, "error") ? "error type" : "type";
+                Report(TrimmedSpan(e.GetAttribute("name").Value), DiagnosticSeverity.Warning, DiagnosticCodes.OneTypePerFile,
+                    $"This file already declares {first}. Give each type its own file: move the {what} {name} to {target} and import it where it is used.");
+            }
+        }
+
+        /// <summary>The project this file is in (the nearest kscript.json), and its folder; null when it isn't in one.</summary>
+        private ProjectConfig ProjectFor(out string projectDir)
+        {
+            for (string dir = directory; dir != null; dir = System.IO.Path.GetDirectoryName(dir))
+            {
+                string file = System.IO.Path.Combine(dir, ProjectConfig.FileName);
+                if (!files.FileExists(file))
+                {
+                    continue;
+                }
+                projectDir = dir;
+                try
+                {
+                    string text = files.ReadText(file);
+                    return text == null ? null : ProjectConfig.Parse(text, file);
+                }
+                catch (ProjectConfigException)
+                {
+                    return null;
+                }
+            }
+            projectDir = null;
+            return null;
+        }
+
+        /// <summary>OrderStatus -> order-status, the name kscript make gives a type's file.</summary>
+        private static string KebabName(string name)
+        {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < name.Length; i++)
+            {
+                char c = name[i];
+                if (char.IsUpper(c) && i > 0 && (char.IsLower(name[i - 1]) || char.IsDigit(name[i - 1]) || (i + 1 < name.Length && char.IsLower(name[i + 1]))))
+                {
+                    sb.Append('-');
+                }
+                sb.Append(c == '_' ? '-' : char.ToLowerInvariant(c));
+            }
+            return sb.ToString();
         }
 
         private static string Capital(string s) => s.StartsWith("<", StringComparison.Ordinal) ? s : char.ToUpperInvariant(s[0]) + s.Substring(1);

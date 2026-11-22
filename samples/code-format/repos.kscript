@@ -1,6 +1,6 @@
 // Typed JSON: the data is checked against Repo, and $repo. completes its fields.
 import KScript.IO
-import "lib/github.kscript"
+import "types/repo.kscript"
 
 repos = @read_json('../kscript2/data/repos.json', as: Repo)
 for repo in $repos {

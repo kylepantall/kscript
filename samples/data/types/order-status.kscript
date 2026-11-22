@@ -1,0 +1,2 @@
+/// Where an order is: placed, paid for, on its way or called off.
+enum OrderStatus { open, paid, shipped, cancelled }

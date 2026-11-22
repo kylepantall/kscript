@@ -125,6 +125,7 @@ reported).
 | KS6004 | A function parameter the body never reads. For a lambda, only the parameters after the last one it reads, since the caller decides what it is passed: write `fn($_y) => ...` to keep the position. |
 | KS6005 | An import nothing uses: an `as` alias, a name in `names="..."`, a whole script, or a package none of whose elements, commands, methods or variables appear. |
 | KS6006 | Not unused code, but a style hint: a list of names written as one string in a `.kscript` file (`Middleware(use: "log, cors")`). Write it as an array, `use: [log, cors]`; the quick fix does it for you. XML attributes are text, so `use="log, cors"` is fine there. |
+| KS6007 | Not unused code either: a script in a project that declares a second type, model, enum or error type. Each goes in its own file, named after it, and is imported where it is used; the warning says where to move it (`types/order-status.kscript`). The type the file is named after stays. Scripts outside a project aren't checked. |
 
 The project is the folder with the nearest `kscript.json` and everything under it (hidden folders, `bin`, `obj` and
 `node_modules` are skipped). A script outside a project is checked against the other files in its own folder. A
@@ -251,7 +252,7 @@ type Repo {
 | `=> value` | Works the field out from the other fields (they are `$name`, `$stars` and so on) instead of reading it. |
 | `///` above the line | Shown on hover and in completion. |
 
-The type itself takes options in brackets: `type Repo(extra: error) { … }`. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. `sample: data/repo.json` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. Lines in the block replace the sampled fields they name. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file.
+The type itself takes options in brackets: `type Repo(extra: error) { … }`. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. `sample: data/repo.json` takes the fields from a saved example of the data: objects become nested types, and keys only some list items have become optional. Lines in the block replace the sampled fields they name. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file. In a project, give each type its own file (`types/repo.kscript`, `types/owner.kscript`) and import the ones it uses: `import "owner.kscript"` at the top of `types/repo.kscript` (see [One type per file](projects.md#where-files-go-the-recommended-layout)).
 
 A small type can also go on one line, with the fields written like `fn` parameters: `type Point(fields: "x: int, y: int")`. `kscript convert` writes it as a block.
 

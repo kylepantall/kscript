@@ -131,6 +131,9 @@ namespace KScript.Syntax
         /// <summary>A list of names written as one string in a .kscript file (<c>use: "log, cors"</c>) rather than an array (<c>use: [log, cors]</c>).</summary>
         public const string PreferArrayList = "KS6006";
 
+        /// <summary>A script in a project that declares more than one type, model, enum or error type: each goes in its own file.</summary>
+        public const string OneTypePerFile = "KS6007";
+
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>
             "https://github.com/kylepantall/kscript/blob/master/docs/errors.md#" + (code ?? string.Empty).ToLowerInvariant();

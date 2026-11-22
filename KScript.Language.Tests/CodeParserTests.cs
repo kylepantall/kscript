@@ -191,7 +191,11 @@ namespace KScript.Language.Tests
         [InlineData("samples/kscript2/move-files.ks.xml", "samples/code-format/move-files.kscript")]
         [InlineData("samples/kscript2/lib/strings.ks.xml", "samples/code-format/lib/strings.kscript")]
         [InlineData("samples/life-lab/desktop.ks.xml", "samples/life-lab/desktop.kscript")]
-        [InlineData("samples/kscript2/lib/github.ks.xml", "samples/code-format/lib/github.kscript")]
+        [InlineData("samples/kscript2/types/repo.ks.xml", "samples/code-format/types/repo.kscript")]
+        [InlineData("samples/kscript2/types/owner.ks.xml", "samples/code-format/types/owner.kscript")]
+        [InlineData("samples/kscript2/types/visibility.ks.xml", "samples/code-format/types/visibility.kscript")]
+        [InlineData("samples/kscript2/errors/order-not-found.ks.xml", "samples/code-format/errors/order-not-found.kscript")]
+        [InlineData("samples/kscript2/errors/out-of-stock.ks.xml", "samples/code-format/errors/out-of-stock.kscript")]
         [InlineData("samples/kscript2/repos.ks.xml", "samples/code-format/repos.kscript")]
         public void SameTreeAsTheXmlVersion(string xmlFile, string codeFile)
         {

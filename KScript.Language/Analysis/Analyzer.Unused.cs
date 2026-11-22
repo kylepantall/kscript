@@ -309,6 +309,8 @@ namespace KScript.Language.Analysis
 
         private void CheckUnusedImports()
         {
+            HashSet<string> documented = TypesNamedInDocs();
+            bool Used(Symbol s) => IsRead(s) || documented.Contains(s.Name);
             foreach (MarkupElement e in result.Markup.DescendantElements().Where(x => IsKScriptElementName(x, "import")).ToList())
             {
                 if (e.GetAttribute("package")?.Value is DecodedText package)
@@ -325,7 +327,7 @@ namespace KScript.Language.Analysis
                 string src = e.GetAttributeValue("src")?.Trim();
 
                 bool aliasUnused = alias != null && alias.Shape.Fields.Count > 0 && !uses[alias].Any();
-                List<Symbol> unusedNames = named.Where(s => !IsRead(s) && !result.Diagnostics.Any(d => d.Span.Equals(s.DeclarationSpan) && d.Code == DiagnosticCodes.UndefinedFunction)).ToList();
+                List<Symbol> unusedNames = named.Where(s => !Used(s) && !result.Diagnostics.Any(d => d.Span.Equals(s.DeclarationSpan) && d.Code == DiagnosticCodes.UndefinedFunction)).ToList();
                 bool nothingUsed = (alias == null || aliasUnused) && unusedNames.Count == named.Count;
 
                 if (aliasUnused)
@@ -339,11 +341,34 @@ namespace KScript.Language.Analysis
                     fix ??= nothingUsed ? RemoveElementFix(e, "Remove the import") : RemoveAttributeFix(e.GetAttribute("names"), $"Remove names=\"{s.Name}\"");
                     Report(s.DeclarationSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnusedImport, $"{s.Name} is imported but never used.", new[] { fix });
                 }
-                if (alias == null && named.Count == 0 && all.Count > 0 && !all.Any(IsRead) && e.GetAttribute("src")?.Value is DecodedText srcValue)
+                if (alias == null && named.Count == 0 && all.Count > 0 && !all.Any(Used) && e.GetAttribute("src")?.Value is DecodedText srcValue)
                 {
                     Report(TrimmedSpan(srcValue), DiagnosticSeverity.Warning, DiagnosticCodes.UnusedImport, $"Nothing from {src} is used.", new[] { RemoveElementFix(e, "Remove the import") });
                 }
             }
+        }
+
+        /// <summary>
+        /// The type names functions' docs give as what they return (<c>@returns Person[]</c>), so a type imported only
+        /// for the docs (and the OpenAPI document made from them) counts as used.
+        /// </summary>
+        private HashSet<string> TypesNamedInDocs()
+        {
+            HashSet<string> names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (MarkupElement fn in result.Markup.DescendantElements().Where(x => x.Name == "fn" && x.Documentation != null))
+            {
+                string returns = DocComment.Parse(fn.Documentation)?.Returns;
+                if (string.IsNullOrWhiteSpace(returns))
+                {
+                    continue;
+                }
+                string word = new string(returns.TrimStart().TakeWhile(c => char.IsLetterOrDigit(c) || c == '_').ToArray());
+                if (word.Length > 0)
+                {
+                    names.Add(word);
+                }
+            }
+            return names;
         }
 
         private void CheckPackageImport(MarkupElement e, DecodedText value)

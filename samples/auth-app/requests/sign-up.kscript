@@ -1,0 +1,6 @@
+/// What the sign-up form sends. The email and password types check it: the password rules are in kscript.json.
+type SignUp {
+  name: string
+  email: email
+  password: password
+}

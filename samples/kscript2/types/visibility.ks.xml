@@ -1,0 +1,4 @@
+<kscript>
+  <!--- Who can see a GitHub repository. -->
+  <enum name="Visibility" values="public, private, internal" />
+</kscript>

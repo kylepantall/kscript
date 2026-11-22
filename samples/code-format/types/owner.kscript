@@ -1,0 +1,5 @@
+/// The account a GitHub repository belongs to.
+type Owner {
+  login: string
+  id: int
+}

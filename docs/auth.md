@@ -18,6 +18,7 @@ Then `kscript serve`, open `/register` to make an account, and `/account` to see
 | `routes/web.kscript` (added to) | The sign-in routes: a `guest` group for the forms and an `auth` group for the account page. |
 | `routes/api.kscript` (with `--api`, added to) | `POST /api/tokens` and `GET /api/me`. |
 | `controllers/accounts.kscript` | The controller: sign up, sign in, sign out, resets, the account page and tokens. |
+| `requests/sign-up.kscript` | The `SignUp` type the sign-up form is checked against, imported by the controller. |
 | `views/auth/*.html` | The pages: login, register, forgot-password, reset-password and account. |
 | `_layout.html` | A plain layout, only when the site has none. |
 | `kscript.json` (added to) | `"types": { "password": { "min": 10 } }`, the rule new passwords must meet. |
@@ -29,14 +30,19 @@ It respects `make.format` and `--format xml`, the folders in `paths`, and the ro
 A controller imports KScript.Auth. `@register` adds a user, `@attempt` checks an email and password and signs them in, and `@logout` signs them out.
 
 ```kscript
-import KScript.Http
-import KScript.Auth
-
+// requests/sign-up.kscript
 type SignUp {
   name: string
   email: email
   password: password
 }
+```
+
+```kscript
+// controllers/accounts.kscript
+import KScript.Http
+import KScript.Auth
+import "../requests/sign-up.kscript"
 
 fn sign_up(form) {
   data = $SignUp->from($form)
