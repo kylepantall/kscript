@@ -70,7 +70,7 @@ namespace KScript.Language.Tests
         public void NativeTypeTrailingCommaFailsTheProjectCheckAtTheComma()
         {
             Write("kscript.json", "{}");
-            string path = Write("natives/passkey-session-key.kscript", """
+            string path = Write(Path.Combine("natives", "passkey-session-key.kscript"), """
                 type PasskeySessionKey with [string] {
                   min: 8,
                   normalize: $value->trim()

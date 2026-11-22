@@ -112,13 +112,13 @@ public sealed class BuiltInTests : IDisposable
     [Fact]
     public void PluckSelectsValuesAndProjectsMapsInBothSyntaxes()
     {
-        const string expected = """
+        string expected = """
             ["Joan",null]
             [{"age":82,"name":"Joan"},{"age":0,"name":null}]
             [{"name":"Joan"},{"name":null}]
             [{},{}]
             []
-            """;
+            """.ReplaceLineEndings("\n") + "\n";
         string[] expressions =
         [
             "$rows->pluck($key)->to_json()",
@@ -130,11 +130,11 @@ public sealed class BuiltInTests : IDisposable
         const string rows = "[{ name: 'Joan', age: 82 }, { age: 0 }]";
         string xml = $"<let name=\"rows\" value=\"{rows}\" /><let name=\"key\" value=\"'name'\" />" +
             string.Concat(expressions.Select(e => $"<echo value=\"{e}\" />"));
-        Assert.Equal(expected + "\n", Body(xml));
+        Assert.Equal(expected, Body(xml));
         var output = new StringWriter { NewLine = "\n" };
         string code = $"rows = {rows}\nkey = 'name'\n" + string.Join("\n", expressions.Select(e => "echo " + e));
         new Interpreter(KScriptHost.ForText(output)).RunText(code, Path.Combine(dir, "pluck.kscript"));
-        Assert.Equal(expected + "\n", output.ToString());
+        Assert.Equal(expected, output.ToString());
         Assert.Equal("Argument", Fails("<echo value=\"[]->pluck([12])\" />").Type);
         Assert.Equal("Name", Fails("""
             <type name="Point" fields="x: number" />
