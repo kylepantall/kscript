@@ -32,14 +32,12 @@
           "kscript"
         ],
         "extensions": [
-          ".ks.xml",
-          ".ks"
+          ".ks.xml"
         ],
         "icon": {
           "light": "./icons/kscript-light.svg",
           "dark": "./icons/kscript-dark.svg"
         },
-        "firstLine": "^\\s*(<\\?xml[^>]*>\\s*)?<kscript\\b",
         "configuration": "./language-configuration.json"
       },
       {

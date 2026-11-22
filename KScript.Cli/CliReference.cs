@@ -37,16 +37,17 @@ namespace KScript
                     O("--env name", "The environment for $config: reads <name>.yaml, .env.<name> and sets KSCRIPT_ENV."),
                     O("--debug", "Show the .NET exception and stack trace behind an error (also KSCRIPT_DEBUG=1). Works with every command."),
                 },
-                "kscript hello.ks.xml Joan\nkscript --env staging deploy.kscript", "language") { Group = "run" },
-            new CliCommand("check", "kscript check [file-or-folder]... [--warnaserror] [--format text|json]",
+                "kscript hello.kscript Joan\nkscript --env staging deploy.kscript", "language") { Group = "run" },
+            new CliCommand("check", "kscript check [file-or-folder]... [--fix] [--warnings-as-errors] [--output text|json]",
                 "Check scripts and pages without running them (no path: the current project).",
                 new[]
                 {
-                    O("--warnaserror", "Fail on warnings too, for CI."),
-                    O("--format json", "Print the problems as JSON, with each one's range and its fixes as exact text edits (for coding agents and tools)."),
+                    O("--fix", "Apply the fixes that are always safe (text in quotes, true and false, lists as arrays), then check what is left."),
+                    O("--warnings-as-errors", "Fail on warnings too, for CI (lint.warnings_as_errors in kscript.json does the same)."),
+                    O("--output text|json", "How to print the problems: text (the default), or json with each one's range and its fixes as exact text edits (for coding agents and tools)."),
                     O("--print-config [path]", "Show the lint and format settings that apply, and which standard set each."),
                 },
-                "kscript check\nkscript check scripts/ --warnaserror", "standards") { Group = "code" },
+                "kscript check\nkscript check scripts/ --warnings-as-errors\nkscript check --fix", "standards") { Group = "code" },
             new CliCommand("agents", "kscript agents [folder] [--check] [--print]",
                 "Write AGENTS.md and .kscript/agents: compact docs for coding agents, made from the project's code and packages.",
                 new[]
@@ -66,7 +67,7 @@ namespace KScript
             new CliCommand("fmt", "kscript fmt [file-or-folder]... [--check]",
                 "Tidy scripts and pages.",
                 new[] { O("--check", "Only report files that would change, and fail if any would (for CI).") },
-                "kscript fmt\nkscript fmt --check", "formatting") { Group = "code", Details = "Tidies .kscript, .ks.xml and .xml scripts and kscript serve .html pages. With no path, formats the current project." },
+                "kscript fmt\nkscript fmt --check", "formatting") { Group = "code", Details = "Tidies .kscript and .ks.xml scripts and kscript serve .html pages. With no path, formats the current project." },
             new CliCommand("test", "kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]",
                 "Run *.test.kscript and *.test.ks.xml tests.",
                 new[]
@@ -75,9 +76,9 @@ namespace KScript
                     O("--timeout s", "Stop a test that runs longer than this many seconds (default 10)."),
                     O("--junit file", "Also write a JUnit XML report, for CI."),
                 },
-                "kscript test\nkscript test tests/cart.test.ks.xml --filter total", "testing") { Group = "run", Details = "Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests." },
+                "kscript test\nkscript test tests/cart.test.kscript --filter total", "testing") { Group = "run", Details = "Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests." },
             new CliCommand("serve", "kscript serve [site folder] [--port 8080] [--host localhost] [--env name] [--with-docs [--docs-port 4180]] [--with-worker]",
-                "Serve pages, and routes.ks.xml / api.ks.xml routes.",
+                "Serve pages, and routes.kscript / api.kscript routes.",
                 new[]
                 {
                     O("--port, -p N", "The port to listen on (default 8080, or serve.port in kscript.json)."),
@@ -102,7 +103,7 @@ namespace KScript
                     O("--sleep t", "How long to wait when the queues are empty (default 1s)."),
                 },
                 "kscript worker\nkscript worker --queue high,default --concurrency 4\nkscript worker --stop-when-empty", "queues") { Group = "queue", Details = "Settings come from the queue section of kscript.json." },
-            new CliCommand("queue", "kscript queue status|list [queue]|failed|retry <id>|forget <id>|clear [queue] [--all] [--connection name] [--format json]",
+            new CliCommand("queue", "kscript queue status|list [queue]|failed|retry <id>|forget <id>|clear [queue] [--all] [--connection name] [--output text|json]",
                 "Look after the queues: what is waiting, what failed and why, and run failed jobs again.",
                 new[]
                 {
@@ -113,35 +114,35 @@ namespace KScript
                     O("forget <id> | --all", "Delete failed jobs."),
                     O("clear [queue]", "Remove the waiting jobs of a queue (or of every queue)."),
                     O("--connection, -c name", "The connection to look at (default queue.default)."),
-                    O("--format json", "Print JSON instead of a table."),
+                    O("--output text|json", "How to print: text (a table, the default) or json."),
                 },
                 "kscript queue status\nkscript queue failed\nkscript queue retry --all", "queues") { Group = "queue" },
             new CliCommand("routes", "kscript routes [site folder] [-v]",
                 "List the routes of a site.", new[] { O("-v, --verbose", "Also show each route's middleware, and the file and line it is declared on.") }, "kscript routes\nkscript routes samples/http-app -v", "http") { Group = "web" },
-            new CliCommand("openapi", "kscript openapi [site folder] [--yaml] [--out file]",
+            new CliCommand("openapi", "kscript openapi [site folder] [--output json|yaml] [--out file]",
                 "Write the OpenAPI 3.1 document for a site's routes, made from the code. kscript serve also answers /_openapi.json, /_openapi.yaml and /_api.",
                 new[]
                 {
-                    O("--yaml", "Write YAML instead of JSON (also chosen by an --out file ending in .yaml or .yml)."),
+                    O("--output json|yaml", "How to print the document: json (the default) or yaml (also chosen by an --out file ending in .yaml or .yml)."),
                     O("--out file", "Write to a file instead of the terminal."),
                 },
-                "kscript openapi\nkscript openapi --yaml --out openapi.yaml", "http") { Group = "web" },
-            new CliCommand("docs", "kscript docs [search words] [--port 4180] [--format kscript|xml] [--no-open] [--project]",
+                "kscript openapi\nkscript openapi --output yaml --out openapi.yaml", "http") { Group = "web" },
+            new CliCommand("docs", "kscript docs [search words] [--port 4180] [--syntax kscript|xml] [--no-open] [--project]",
                 "Open these docs: a local website with every package, element, command and method, and examples you can run.",
                 new[]
                 {
                     O("--port N", "The port to serve the docs on (default 4180, or a free port if that one is taken)."),
-                    O("--format kscript|xml", "Show examples as .kscript or XML (default: the project's make.format, else .kscript)."),
+                    O("--syntax kscript|xml", "Show examples as .kscript or XML (default: the project's make.syntax, else .kscript)."),
                     O("--no-open", "Don't open a browser; just print the address."),
                     O("--project", "Write .kscript/docs/project.md, the docs of this project's own code (its conventions, routes, functions and types). From then on kscript watch, kscript serve and saving in the editor keep it up to date."),
                 },
-                "kscript docs\nkscript docs replace\nkscript docs --format xml\nkscript docs --project") { Group = "docs", Details = "Examples show in the project's make.format (kscript.json), or .kscript outside a project; --format picks one." },
-            new CliCommand("mcp", "kscript mcp [--format kscript|xml] [--dir folder] [--http [--port 4181]]",
+                "kscript docs\nkscript docs replace\nkscript docs --syntax xml\nkscript docs --project") { Group = "docs", Details = "Examples show in the project's make.syntax (kscript.json), or .kscript outside a project; --syntax picks one." },
+            new CliCommand("mcp", "kscript mcp [--syntax kscript|xml] [--dir folder] [--http [--port 4181]]",
                 "Serve these docs to AI coding assistants (Claude Code, Cursor, VS Code...) over MCP, offline.",
                 new[]
                 {
-                    O("--format kscript|xml", "Show examples as .kscript or XML (default: the project's make.format, else .kscript)."),
-                    O("--dir folder", "The project whose kscript.json sets the format and the check and fmt rules (default: the current folder)."),
+                    O("--syntax kscript|xml", "Show examples as .kscript or XML (default: the project's make.syntax, else .kscript)."),
+                    O("--dir folder", "The project whose kscript.json sets the syntax and the check and fmt rules (default: the current folder)."),
                     O("--http", "Serve on http://localhost:4181/mcp instead of stdin and stdout."),
                     O("--port N", "The port for --http (default 4181)."),
                 },
@@ -154,16 +155,16 @@ namespace KScript
                     O("--var name=value", "Set a stylesheet variable; repeat for more."),
                 },
                 "kscript css styles/ --out public", "stylesheets") { Group = "web" },
-            new CliCommand("convert", "kscript convert <file-or-folder>... [--to xml|kscript] [--stdout]",
+            new CliCommand("convert", "kscript convert <file-or-folder>... [--syntax kscript|xml] [--stdout]",
                 "Write the .kscript version of an XML script, or the reverse.",
                 new[]
                 {
-                    O("--to xml|kscript", "The format to write (default: the other one)."),
+                    O("--syntax kscript|xml", "The syntax to write (default: the other one)."),
                     O("--out file", "Where to write the result, for one file (default: next to it, with the new extension)."),
                     O("--stdout", "Print the result instead of writing a file."),
                     O("--force", "Replace a file that is already there."),
                 },
-                "kscript convert hello.ks.xml\nkscript convert hello.kscript --to xml --stdout", "code-format") { Group = "code", Details = "The original is left as it is. A folder converts every script in it (*.ks.xml, *.ks, *.kscript, tests too).\nImports, and file names in comments and strings, that point at a converted script are changed to its new name." },
+                "kscript convert hello.ks.xml\nkscript convert hello.kscript --syntax xml --stdout", "code-format") { Group = "code", Details = "The original is left as it is. A folder converts every script in it (*.kscript and *.ks.xml, tests too).\nImports, and file names in comments and strings, that point at a converted script are changed to its new name." },
             new CliCommand("compile", "kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist]",
                 "Build programs that run without kscript.",
                 new[]
@@ -173,7 +174,7 @@ namespace KScript
                     O("--name \"My App\"", "The program's name (default: the app section of kscript.json, or the script's name)."),
                     O("--runtime file", "A kscript release binary or archive for the target, instead of downloading one."),
                 },
-                "kscript compile hello.ks.xml\nkscript compile --target all", "compile") { Group = "build", Details = "It holds the script, its imports and files, and only the packages it uses: a terminal script, a KScript.Window desktop app, or a kscript serve site.\nWith no script, kscript.json names it: { \"app\": { \"main\": \"app.kscript\", \"name\": \"My App\", \"icon\": \"icon.png\" } }. A project without app.main but with pages compiles to a program that serves the site." },
+                "kscript compile hello.kscript\nkscript compile --target all", "compile") { Group = "build", Details = "It holds the script, its imports and files, and only the packages it uses: a terminal script, a KScript.Window desktop app, or a kscript serve site.\nWith no script, kscript.json names it: { \"app\": { \"main\": \"app.kscript\", \"name\": \"My App\", \"icon\": \"icon.png\" } }. A project without app.main but with pages compiles to a program that serves the site." },
             new CliCommand("make", "kscript make project [folder] [--template web|api|fullstack|bare] [--db sqlite] [--auth] [--docker]\nkscript make <type> <name> [--key value]\nkscript make auth [--api]\nkscript make --list",
                 "Start a new project, or generate a file: a route (added to the routes file), controller, request, middleware, view, page, component, stylesheet, type, enum, window, config, test and more. kscript make --list shows them all, with their options.",
                 new[]
@@ -181,7 +182,7 @@ namespace KScript
                     O("--list", "Every type of file kscript make can make, with its options and examples. kscript make <type> --help shows one."),
                     O("--template name", "kscript make project: web (the default), api (a JSON API), fullstack (pages and their API) or bare. With no options at a terminal, a setup wizard asks."),
                     O("-n, --no-interaction", "kscript make project: ask nothing, and take the defaults."),
-                    O("--format kscript|xml", "Write .kscript (the default) or .ks.xml files."),
+                    O("--syntax kscript|xml", "Write .kscript (the default) or .ks.xml files."),
                     O("--dry-run", "Show what would be made, and make nothing."),
                     O("--force", "Replace a file that is already there."),
                     O("--key value", "Values for the template, such as --resource or --fields \"name: string\"."),
@@ -225,6 +226,9 @@ namespace KScript
             O("--ansi | --no-ansi", "Force colours on, or turn them off. NO_COLOR and FORCE_COLOR do the same."),
         };
 
+        /// <summary>What kscript's exit code means, the same for every command.</summary>
+        public static IReadOnlyList<(int Code, string Meaning)> ExitCodeMeanings => ExitCodes.All;
+
         /// <summary>The command called <paramref name="name"/>, or null.</summary>
         public static CliCommand Find(string name) => Commands.FirstOrDefault(c => c.Name == name);
 
@@ -250,6 +254,9 @@ namespace KScript
                 o.Definitions(names.Select(Find).Where(c => c != null).Select(c => (c.Name, FirstSentence(c.Summary))), nameWidth: width);
                 first = false;
             }
+            o.NewLine();
+            o.Heading("Exit codes:");
+            o.Definitions(ExitCodes.All.Select(c => (c.Code.ToString(), c.Meaning)), nameWidth: width);
             o.NewLine();
             o.Comment("  kscript help <command> shows a command's options and examples.");
         }

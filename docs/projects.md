@@ -31,13 +31,13 @@ What it makes:
 | `.vscode/extensions.json`, `.gitignore` | Asks VS Code to install the KScript extension; keeps built apps (`dist/`) out of git. |
 | `AGENTS.md`, `CLAUDE.md`, `.kscript/agents/` | Docs for coding agents, made from the project's code and kept up to date by the editor (see [Coding agents](agents.md)). |
 
-Scripts, tests, routes and the desktop app are written in the [.kscript format](code-format.md). `--format xml` writes them as XML (`.ks.xml`) instead, and records `"make": { "format": "xml" }` in `kscript.json` so that later `kscript make script` and `kscript make test` follow suit. Pages stay HTML either way.
+Scripts, tests, routes and the desktop app are written in the [.kscript format](code-format.md). `--syntax xml` writes them as XML (`.ks.xml`) instead, and records `"make": { "syntax": "xml" }` in `kscript.json` so that later `kscript make script` and `kscript make test` follow suit. Pages stay HTML either way.
 
 `--no-desktop` leaves out `desktop.kscript` and the `app` section, for a web site only. `--no-http` leaves out the API. `kscript make project .` sets up the current folder; existing files are never replaced without `--force`. `kscript make project --help` lists the template's options.
 
 ### A bare project: --bare
 
-`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.yaml`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation and the [agent docs](agents.md) (`AGENTS.md`): no pages, desktop app or API. Use it for command-line tools and scripts. `--format xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
+`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.yaml`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation and the [agent docs](agents.md) (`AGENTS.md`): no pages, desktop app or API. Use it for command-line tools and scripts. `--syntax xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
 
 Add pieces to a bare project with options, in any mix:
 
@@ -119,7 +119,7 @@ kscript make project my-app --template ../starters/api   # any folder
 
 `--template` takes a folder or a template name. A name such as `bare` (or your own, such as `api`) is looked up as `project-<name>` in the same places as the default template, which lives in `project`, and then among the built-in templates (`web`, `api`, `bare` and `fullstack`). `kscript make project` uses the first template it finds: the `--template` folder, then `_templates/project` in the project the new one is made inside (handy for a folder of several apps), then `~/.kscript/templates/project` (or `$KSCRIPT_TEMPLATES/project`), then the built-in one. Edit, add or delete files in the template folder to change what new projects get.
 
-- Write scripts as `.kscript` files and refer to other scripts with `{{ ext }}` (`import "lib/tasks{{ ext }}"`). With `--format xml`, each `.kscript` file is converted to XML and named `.ks.xml`, and `{{ ext }}` is `.ks.xml`; `{{#if xml}}` tells the formats apart. A `.ks.xml` file in the template is copied as it is.
+- Write scripts as `.kscript` files and refer to other scripts with `{{ ext }}` (`import "lib/tasks{{ ext }}"`). With `--syntax xml`, each `.kscript` file is converted to XML and named `.ks.xml`, and `{{ ext }}` is `.ks.xml`; `{{#if xml}}` tells the formats apart. A `.ks.xml` file in the template is copied as it is.
 - Each file is a template with the same `{{ }}` placeholders as [`kscript make` templates](#your-own-templates): `{{ title }}` is the project name as a title (`My App`), `{{ kebab }}` is `my-app`, and every option is a value (`{{ port }}`, `{{#if desktop}} … {{/if}}`).
 - A file can start with a `--- make` header. `when: desktop` copies it only when the option is on, `unless: desktop` only when it is off, and `to: docs/{{ kebab }}.md` writes it somewhere else. `when` and `unless` take the same tests as `{{#if}}`: `when: db is none`, `unless: db in sqlite, none`. Two files can write the same path when only one of them is copied (`controllers/notes-file.kscript` with `when: db is none` and `to: controllers/notes.kscript`).
 - A name ending in `.stub` loses the ending: the template keeps `kscript.json.stub` so that editors and `kscript check` don't read it as a real project.
@@ -161,13 +161,13 @@ kscript make project my-app --template ../starters/api   # any folder
     "groups": { "api": ["cors", "throttle"] }
   },
   "lint": {
-    "include": ["**/*.html", "**/*.md", "**/*.ks.xml"],   // what `kscript check` looks at
+    "include": ["**/*.html", "**/*.md", "**/*.kscript"],  // what `kscript check` looks at
     "exclude": ["_templates", "node_modules", "drafts/**"], // never checked, on the command line or in the editor
     "rules": { "KS3003": "off", "KS4*": "error" },          // off, hint, info, warning or error, by code or prefix
-    "warningsAsErrors": false                               // same as kscript check --warnaserror
+    "warnings_as_errors": false                               // same as kscript check --warnings-as-errors
   },
   "test": {
-    "include": ["tests/**/*.test.kscript"],  // what `kscript test` runs (default: **/*.test.kscript, **/*.test.ks.xml and **/*.test.xml)
+    "include": ["tests/**/*.test.kscript"],  // what `kscript test` runs (default: **/*.test.kscript and **/*.test.ks.xml)
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
     "packages": ["KScript.Terminal"],       // imported by test files only
@@ -175,12 +175,12 @@ kscript make project my-app --template ../starters/api   # any folder
   },
   "format": {
     "indent": 2,           // spaces per level, or "tab"; used by kscript fmt and Format Document
-    "printWidth": 80,      // the longest a line should be; longer lines are wrapped
-    "rules": { "statementPerLine": false },  // any rule can be turned off
+    "print_width": 80,      // the longest a line should be; longer lines are wrapped
+    "rules": { "statement_per_line": false },  // any rule can be turned off
     "exclude": ["vendor"]  // see docs/formatting.md for every format setting
   },
   "app": {
-    "main": "app.ks.xml",       // what `kscript compile` builds (see Programs)
+    "main": "app.kscript",      // what `kscript compile` builds (see Programs)
     "name": "My App",           // shown in the Dock, Start menu or launcher (default: the project's name)
     "id": "com.example.myapp",  // the macOS bundle id
     "version": "1.0.0",
@@ -310,9 +310,9 @@ Pages stay where they are, because a page's path is its URL. Desktop windows (`m
 
 The names are `routes`, `controllers`, `middleware`, `requests`, `views`, `components`, `layouts`, `partials`, `styles`, `lib`, `types`, `models`, `errors`, `storage`, `jobs`, `windows`, `config`, `locales`, `logging`, `data`, `scripts` and `tests`. `paths.views` is also where `@view()` looks, unless `http.views` says otherwise. `kscript serve` finds `routes/web.kscript` and `routes/api.kscript` by itself; a route file anywhere else needs listing in `http.routes`. Settings files go where `config.root` points, because that's where `$config` reads them. Without `config.root`, they go at the top of the project, unless it already has a `config/` folder. Pages only find components in `_components/`.
 
-`kscript make:component Hero` works too. Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
+Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
 
-Scripts and tests are written as `.kscript` files. `--format xml` writes `.ks.xml` instead, and `"make": { "format": "xml" }` in `kscript.json` makes that the project's default.
+Scripts and tests are written as `.kscript` files. `--syntax xml` writes `.ks.xml` instead, and `"make": { "syntax": "xml" }` in `kscript.json` makes that the project's default.
 
 <a id="your-own-templates"></a>**Your own templates.** Templates live in the project's `_templates/` folder, which `kscript serve` never serves. `kscript make templates` copies the built-in ones there to edit. A file there replaces the built-in template of the same name (`_templates/component.html`), and any other file adds a type: `_templates/card.html` gives `kscript make card Profile`.
 
@@ -338,3 +338,18 @@ hint: Use it in a page: <{{ kebab }}-card />
 - `{{ value | kebab }}` applies a filter (`kebab snake pascal camel title var lower upper trim`; `var` turns `sub-title` into the `sub_title` a component sees), and `{{ value ?? fallback }}` gives a default.
 - `{{#if value}} … {{else}} … {{/if}}`, `{{#unless value}}`, `{{#if value is text}}`, `{{#if value in a, b}}`, `{{#if list has text}}`, and `{{#each value}} … {{ item }} … {{/each}}` over a comma-separated list (`{{ index }}`, `{{ first }}` and `{{ last }}` are set). A block tag on its own line leaves no blank line behind.
 - Single braces are left alone, so KScript's `{$value}` is written as is.
+
+## Exit codes
+
+Every `kscript` command ends with one of these, so a CI job can tell "the checks failed" from "the command was wrong":
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Everything worked. |
+| 1 | The command ran and found problems: `kscript check` found errors (or warnings, with `--warnings-as-errors`), tests failed, or a `--check` (`fmt`, `agents`, `watch`) found something out of date. |
+| 2 | The command line or the settings are wrong: an unknown command or option, a missing value, a file or folder that is not there, or a `kscript.json` or standard that can't be used. |
+| 3 | A script stopped with an error (or the code the script gave to `exit`). |
+| 70 | An error inside `kscript` itself. |
+| 130 | Stopped with Ctrl+C. |
+
+Options are written one way on every command: `--output text|json|yaml` chooses how results are printed (`check`, `queue`, `openapi`), and `--syntax kscript|xml` chooses the script syntax (`make`, `docs`, `mcp`, `convert`). Flags are kebab-case (`--warnings-as-errors`, `--stop-when-empty`), and settings in `kscript.json` are snake_case (`warnings_as_errors`).

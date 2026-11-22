@@ -53,7 +53,7 @@ public sealed class MergedFeatureCoverageTests : IDisposable
     public void Make_templates_copies_one_project_template_at_a_time()
     {
         var (code, _, err) = Make(dir, "templates", "project", "web", "bare");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("Copy one project template at a time", err);
     }
 
@@ -61,7 +61,7 @@ public sealed class MergedFeatureCoverageTests : IDisposable
     public void Make_test_without_a_name_shows_an_example_name()
     {
         var (code, _, err) = Make(dir, "test");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("kscript make test checkout.", err);
     }
 
@@ -69,7 +69,7 @@ public sealed class MergedFeatureCoverageTests : IDisposable
     public void Unknown_make_settings_are_warnings()
     {
         var config = ProjectConfig.Parse("""{ "make": { "nope": 1 } }""", Path.Combine(dir, ProjectConfig.FileName));
-        Assert.Contains("unknown setting 'make.nope' (expected format).", config.Warnings);
+        Assert.Contains("unknown setting 'make.nope' (expected syntax).", config.Warnings);
     }
 
     [Fact]

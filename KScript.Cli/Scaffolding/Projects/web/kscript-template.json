@@ -3,8 +3,8 @@
 {
   "description": "A web app: pages, a layout, a live Tasks page, a script and tests, plus the same app as a desktop window",
   "options": {
-    "format": {
-      "question": "Which file format for scripts?",
+    "syntax": {
+      "question": "Which syntax for scripts?",
       "default": "kscript",
       "choices": ["kscript", "xml"],
       "description": "kscript writes scripts, tests, routes and the desktop app as .kscript files; xml writes them as .ks.xml. Pages stay HTML."

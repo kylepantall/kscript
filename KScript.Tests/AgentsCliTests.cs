@@ -1,6 +1,6 @@
 namespace KScript.Tests;
 
-/// <summary>kscript agents and kscript check --format from the command line, and where agent docs are kept out.</summary>
+/// <summary>kscript agents and kscript check --output from the command line, and where agent docs are kept out.</summary>
 public sealed class AgentsCliTests : IDisposable
 {
     private readonly string dir = Directory.CreateTempSubdirectory("kscript-agents-cli").FullName;
@@ -40,13 +40,13 @@ public sealed class AgentsCliTests : IDisposable
     public void CheckTakesAFormat()
     {
         string file = Write("main.kscript", "import KScript.Math\necho \"hi\"\n");
-        Assert.Contains("warning KS6005", Kscript("check", file, "--format", "text").Out);
-        Assert.Contains("\"code\": \"KS6005\"", Kscript("check", "--format", "json", file).Out);
-        Assert.Contains("\"code\": \"KS6005\"", Kscript("check", file, "--format=json").Out);
-        var bad = Kscript("check", file, "--format", "xml");
+        Assert.Contains("warning KS6005", Kscript("check", file, "--output", "text").Out);
+        Assert.Contains("\"code\": \"KS6005\"", Kscript("check", "--output", "json", file).Out);
+        Assert.Contains("\"code\": \"KS6005\"", Kscript("check", file, "--output=json").Out);
+        var bad = Kscript("check", file, "--output", "xml");
         Assert.Equal(2, bad.Code);
-        Assert.Contains("Unknown --format 'xml'", bad.Err);
-        Assert.Contains("\"errors\": 0", Kscript("check", file, "--warnaserror", "--format", "json").Out);
+        Assert.Contains("Unknown --output 'xml'", bad.Err);
+        Assert.Contains("\"errors\": 0", Kscript("check", file, "--warnings-as-errors", "--output", "json").Out);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class AgentsCliTests : IDisposable
         Write("lib/a.kscript", "fn one() => 1\n");
         Assert.Equal(0, Kscript("agents", dir).Code);
         var o = new StringWriter();
-        Assert.Equal(0, KScript.Conversion.ConvertCommand.Run(new[] { dir, "--to", "xml" }, o, new StringWriter()));
+        Assert.Equal(0, KScript.Conversion.ConvertCommand.Run(new[] { dir, "--syntax", "xml" }, o, new StringWriter()));
         Assert.Contains("AGENTS.md: updated for the converted files", o.ToString());
         string agents = File.ReadAllText(Path.Combine(dir, "AGENTS.md"));
         Assert.Contains("```xml", agents);

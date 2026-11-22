@@ -30,21 +30,18 @@ namespace KScript.Syntax.Markup
             return ToCode(MarkupParser.Parse(text, DocumentKind.Script), importPath, nameList, elements);
         }
 
-        /// <summary>The path a converted file gets: x.ks.xml or x.xml becomes x.kscript, and x.kscript becomes x.ks.xml.</summary>
+        /// <summary>The path a converted file gets: x.ks.xml becomes x.kscript, and x.kscript becomes x.ks.xml.</summary>
         public static string ConvertedPath(string path)
         {
             if (MarkupParser.IsCodePath(path))
             {
                 return path.Substring(0, path.Length - ".kscript".Length) + ".ks.xml";
             }
-            foreach (string ext in new[] { ".ks.xml", ".xml", ".ks" })
+            if (ScriptFiles.IsXml(path))
             {
-                if (path.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
-                {
-                    return path.Substring(0, path.Length - ext.Length) + ".kscript";
-                }
+                return path.Substring(0, path.Length - ScriptFiles.Xml.Length) + ScriptFiles.Code;
             }
-            return path + ".kscript";
+            return path + ScriptFiles.Code;
         }
 
         /// <param name="importPath">

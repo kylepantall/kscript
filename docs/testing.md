@@ -36,14 +36,14 @@ Files: 1 failed, 1 total
 Time:  0.08s
 ```
 
-The exit code is 0 when every test passed and 1 when any test failed, a test file couldn't run, or no tests were found, so `kscript test` can gate a CI job.
+The exit code is 0 when every test passed, 1 when any test failed, a test file couldn't run or no tests matched, and 2 when the command line or `kscript.json` is wrong (an unknown option, a path that is not there, no test files in the folder), so `kscript test` can gate a CI job. [Exit codes](projects.md#exit-codes) are the same for every command.
 
 ## Test files and folders
 
-- A test file is a normal script named `name.test.kscript` or `name.test.ks.xml` (or `name.test.xml`). The examples here use the `.kscript` format; switch them to XML to see `<describe>`, `<test>` and `<expect>`. Test files can use KScript.Test without an `import`, and so can the editor.
+- A test file is a normal script named `name.test.kscript` or `name.test.ks.xml`. The examples here use the `.kscript` format; switch them to XML to see `<describe>`, `<test>` and `<expect>`. Test files can use KScript.Test without an `import`, and so can the editor.
 - `kscript test` with no paths runs every test file in the current project: the folder of the nearest `kscript.json`, or the current folder if there isn't one. Folders whose names start with `.`, and `node_modules`, `bin` and `obj`, are skipped.
 - `kscript test tests/cart` runs the test files in a folder, and `kscript test tests/cart.test.kscript` (or just `kscript tests/cart.test.kscript`) runs one file. You can give several paths.
-- `kscript make test checkout` creates `tests/checkout.test.kscript` in the project (`--format xml` for `.test.ks.xml`), and `kscript make project` starts new projects with the rules of a small to-do app in `lib/`, a script, and tests for both.
+- `kscript make test checkout` creates `tests/checkout.test.kscript` in the project (`--syntax xml` for `.test.ks.xml`), and `kscript make project` starts new projects with the rules of a small to-do app in `lib/`, a script, and tests for both.
 
 ## How a test file runs
 
@@ -184,7 +184,7 @@ Colours are used when the output is a terminal; set `NO_COLOR` to turn them off 
 {
   "packages": ["KScript.IO"],            // imported by every script, including tests
   "test": {
-    "include": ["tests/**/*.test.kscript"],  // default: **/*.test.kscript, **/*.test.ks.xml and **/*.test.xml
+    "include": ["tests/**/*.test.kscript"],  // default: **/*.test.kscript and **/*.test.ks.xml
     "exclude": ["tests/slow"],              // default: _templates, node_modules, .git
     "timeout": 10,                          // seconds per test; 0 for no limit (default 10)
     "packages": ["KScript.Terminal"],       // imported by test files only

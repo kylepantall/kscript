@@ -20,8 +20,8 @@ The formatter only touches whitespace that can't change what a file does.
 - Each statement goes on its own line: a one-line block such as `for i in 1..3 { echo $i }` is opened up, and statements joined with `;` are split.
 - `else`, `elif`, `catch` and `finally` go on the line of the `}` before them: `} else {`.
 - Spacing inside a line: one space after commas and colons (`add(1, 2)`, `{ a: 1 }`), around `=` and `=>`, before a block's `{` and before a `//` comment at the end of a line.
-- A line that runs past `printWidth` (80 columns unless you [set it](#settings)) is wrapped, as described in [Long lines](#long-lines).
-- Trailing spaces are removed, runs of blank lines shrink to `maxBlankLines` (and go entirely at the start and end of a block), and the file ends with exactly one newline.
+- A line that runs past `print_width` (80 columns unless you [set it](#settings)) is wrapped, as described in [Long lines](#long-lines).
+- Trailing spaces are removed, runs of blank lines shrink to `max_blank_lines` (and go entirely at the start and end of a block), and the file ends with exactly one newline.
 
 ```kscript
 x=[3 ,1,2]
@@ -50,7 +50,7 @@ if $x->count() > 2 {
 
 #### Long lines
 
-A line longer than `printWidth` is broken where the code joins most loosely, one step at a time, until it fits, the way
+A line longer than `print_width` is broken where the code joins most loosely, one step at a time, until it fits, the way
 Prettier and dart format do. Each step is tried in this order:
 
 1. **A one-line function's body** moves to the next line, after the `=>`.
@@ -60,9 +60,9 @@ Prettier and dart format do. Each step is tried in this order:
 3. **A call, array or map** puts one item per line.
 4. **A lambda** that is a call's only argument breaks after its `=>`.
 5. **A string** is broken between words, with a `\` at the end of the line so the break isn't part of it (the
-   [`wrapStrings`](#turning-rules-off) rule).
+   [`wrap_strings`](#turning-rules-off) rule).
 
-A `//` or `///` comment that runs past `printWidth` is broken between words, and the words that move down join the next
+A `//` or `///` comment that runs past `print_width` is broken between words, and the words that move down join the next
 comment line when it carries on the same paragraph. In a doc comment, the rest of a tag (`@param`) or a list item hangs
 under its text. `@example` code, ``` fences, tables, headings and words too long to fit (like links) are left alone.
 
@@ -105,7 +105,7 @@ names = $people
   |> sort()
 ```
 
-Lines are only broken, never joined, so a short line you split on purpose stays split. Set `printWidth` in
+Lines are only broken, never joined, so a short line you split on purpose stays split. Set `print_width` in
 `kscript.json` (or your [standard](standards.md)) to choose the width, and turn any step off with the rules below.
 
 Text in quotes, `/* */` comments, enum values and match cases written on one line (`label = match $n { 1 => 'one', _ => 'many' }`) are kept as they are, apart from the long-line wrapping above. After formatting, `kscript fmt` reads the file again and checks that it is the same program, statement for statement; if it isn't, the file is left alone with an error (please report it).
@@ -113,8 +113,8 @@ Text in quotes, `/* */` comments, enum values and match cases written on one lin
 ### XML scripts and pages
 
 - Elements are indented by how deeply they're nested, and each statement in a script goes on its own line.
-- Start tags are tidied: one space between attributes, and `<let name="x"/>` becomes `<let name="x" />`. A tag with several attributes that would run past `printWidth` gets one attribute per line, and so does a tag you already wrote that way.
-- Trailing spaces are removed, runs of blank lines shrink to `maxBlankLines`, and the file ends with exactly one newline.
+- Start tags are tidied: one space between attributes, and `<let name="x"/>` becomes `<let name="x" />`. A tag with several attributes that would run past `print_width` gets one attribute per line, and so does a tag you already wrote that way.
+- Trailing spaces are removed, runs of blank lines shrink to `max_blank_lines`, and the file ends with exactly one newline.
 
 ```xml
 <kscript>
@@ -141,7 +141,7 @@ becomes
 - **Comments** are kept; a multi-line comment moves as a block.
 - **Raw content** is kept exactly, trailing spaces included: CDATA sections, and in pages the content of `<pre>`, `<textarea>`, `<script>` and `<style>`. `<markdown>` keeps its trailing spaces (two spaces at the end of a line are a line break in Markdown). Add your own elements to `format.preserve`, or use the [ignore comments](#leaving-part-of-a-file-alone).
 - **Pages render the same.** In a page, a line break only goes where there was already whitespace or next to a block-level element such as `<div>` or `<li>`, so inline elements written side by side (`<b>a</b><i>b</i>`) stay together. An inline row written on one line, like a `<nav>` of links, stays on one line. In script elements whose content is text, such as `<echo>`, no whitespace is added between child elements either.
-- `<!doctype>`, `<?xml ?>`, a byte order mark and the file's line endings (unless `endOfLine` says otherwise) are kept.
+- `<!doctype>`, `<?xml ?>`, a byte order mark and the file's line endings (unless `end_of_line` says otherwise) are kept.
 
 A file with markup errors (an unclosed element, a stray `<`) is left alone: `kscript fmt` reports the first error and exits 1, and the editor makes no change. Fix the error, which `kscript check` and the editor also show, and format again.
 
@@ -153,12 +153,12 @@ Put style settings under `"format"` in `kscript.json`. Every setting is optional
 {
   "format": {
     "indent": 2,              // spaces per level, or "tab"
-    "tabWidth": 2,            // with "indent": "tab", the columns a tab counts as
-    "printWidth": 80,         // the longest a line should be; longer lines are wrapped
-    "maxBlankLines": 1,       // blank lines kept in a row
-    "endOfLine": "auto",      // auto (keep each file's), lf or crlf
+    "tab_width": 2,            // with "indent": "tab", the columns a tab counts as
+    "print_width": 80,         // the longest a line should be; longer lines are wrapped
+    "max_blank_lines": 1,       // blank lines kept in a row
+    "end_of_line": "auto",      // auto (keep each file's), lf or crlf
     "preserve": ["pre-like"], // elements whose content is kept exactly
-    "rules": {},              // turn rules off, e.g. { "statementPerLine": false }; see below
+    "rules": {},              // turn rules off, e.g. { "statement_per_line": false }; see below
     "enabled": true,          // false: no formatting anywhere in this project
     "include": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html"],
     "exclude": ["_templates", "node_modules", ".git"]
@@ -177,25 +177,25 @@ Each thing the formatter does is a rule you can turn off under `format.rules` (`
 | Rule | What it does | When it's off |
 | --- | --- | --- |
 | `indent` | Indents elements by nesting. | Lines keep the indentation they have. |
-| `statementPerLine` | Puts each statement (and block-level element) on its own line. | Line breaks only change where there already was whitespace, so one-liners like `<for ...><echo>$i</echo></for>` stay. |
-| `tidyTags` | One space between attributes, `<x />` for self-closing tags. | Start tags are kept exactly as written. |
-| `wrapAttributes` | One attribute per line for long start tags, and for tags already written that way. | Tags are never wrapped or joined. |
-| `trimTrailingWhitespace` | Removes spaces at the ends of lines of text. | They're kept. |
-| `collapseBlankLines` | Shrinks runs of blank lines to `maxBlankLines`. | Blank lines are kept. |
-| `finalNewline` | Ends the file with exactly one newline. | The file ends as it did. |
+| `statement_per_line` | Puts each statement (and block-level element) on its own line. | Line breaks only change where there already was whitespace, so one-liners like `<for ...><echo>$i</echo></for>` stay. |
+| `tidy_tags` | One space between attributes, `<x />` for self-closing tags. | Start tags are kept exactly as written. |
+| `wrap_attributes` | One attribute per line for long start tags, and for tags already written that way. | Tags are never wrapped or joined. |
+| `trim_trailing_whitespace` | Removes spaces at the ends of lines of text. | They're kept. |
+| `collapse_blank_lines` | Shrinks runs of blank lines to `max_blank_lines`. | Blank lines are kept. |
+| `final_newline` | Ends the file with exactly one newline. | The file ends as it did. |
 | `spacing` | `.kscript` files: one space after commas and colons, around `=` and `=>`, and before a block's `{`. | Spacing inside lines is kept. |
-| `braceStyle` | `.kscript` files: `} else {`, `} catch {` on one line. | `else` and `catch` stay on the line they're on. |
-| `wrapChains` | `.kscript` files: puts each call of a `->` chain or `\|>` pipe that runs past `printWidth` on its own line. | Chains stay on one line. |
-| `wrapBodies` | `.kscript` files: moves a long one-line function's body (and a long lambda's, when it is a call's only argument) to the line after its `=>`. | Bodies stay on the `=>` line. |
-| `wrapComments` | `.kscript` files: breaks a `//` or `///` comment line that runs past `printWidth` between words. | Comments stay as written. |
-| `wrapStrings` | `.kscript` files: breaks a string that runs past `printWidth` at a space, ending the line with `\` so the break isn't part of the string. | Long strings stay on one line. |
+| `brace_style` | `.kscript` files: `} else {`, `} catch {` on one line. | `else` and `catch` stay on the line they're on. |
+| `wrap_chains` | `.kscript` files: puts each call of a `->` chain or `\|>` pipe that runs past `print_width` on its own line. | Chains stay on one line. |
+| `wrap_bodies` | `.kscript` files: moves a long one-line function's body (and a long lambda's, when it is a call's only argument) to the line after its `=>`. | Bodies stay on the `=>` line. |
+| `wrap_comments` | `.kscript` files: breaks a `//` or `///` comment line that runs past `print_width` between words. | Comments stay as written. |
+| `wrap_strings` | `.kscript` files: breaks a string that runs past `print_width` at a space, ending the line with `\` so the break isn't part of the string. | Long strings stay on one line. |
 
-In `.kscript` files, `tidyTags` does nothing, `wrapAttributes` puts one item per line in long calls, arrays and maps, and `statementPerLine` opens up one-line blocks and splits `;`.
+In `.kscript` files, `tidy_tags` does nothing, `wrap_attributes` puts one item per line in long calls, arrays and maps, and `statement_per_line` opens up one-line blocks and splits `;`.
 
 ```jsonc
 {
   "format": {
-    "rules": { "statementPerLine": false, "wrapAttributes": false }
+    "rules": { "statement_per_line": false, "wrap_attributes": false }
   }
 }
 ```

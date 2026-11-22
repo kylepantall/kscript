@@ -27,7 +27,7 @@
   });
 
   // ---------- Example format ----------
-  // Examples show in .kscript or XML. The default comes from kscript docs (the project's make.format); the reader's
+  // Examples show in .kscript or XML. The default comes from kscript docs (the project's make.syntax); the reader's
   // pick lasts for this browser tab and switches every example that hasn't been edited.
   var FORMAT_KEY = 'kscript-docs-format';
   var formatListeners = [];

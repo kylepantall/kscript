@@ -228,13 +228,13 @@ public class HttpCoverageTests
         var o = new StringWriter();
         var e = new StringWriter();
         using var empty = new TempSite(("index.html", "x"));
-        Assert.Equal(1, HttpServer.ListRoutes(empty.Root, null, o, e));
+        Assert.Equal(2, HttpServer.ListRoutes(empty.Root, null, o, e));
         Assert.Contains("There are no route files", e.ToString());
 
         using var missing = new TempSite(("index.html", "x"));
         ProjectConfig project = ProjectConfig.Parse("""{ "http": { "routes": ["nope.ks.xml"] } }""", Path.Combine(missing.Root, "kscript.json"));
         e = new StringWriter();
-        Assert.Equal(1, HttpServer.ListRoutes(missing.Root, project, o, e));
+        Assert.Equal(2, HttpServer.ListRoutes(missing.Root, project, o, e));
         Assert.Contains("there is no route file nope.ks.xml", e.ToString());
 
         using var broken = new TempSite(("routes.ks.xml", "<KScript.Routes><Get path=\"/hi\" to=\"missing\" /></KScript.Routes>"));

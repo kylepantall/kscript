@@ -107,10 +107,23 @@ namespace KScript.Testing
                 paths.Add(project?.Directory ?? cwd);
             }
 
+            // A kscript.json that can't be used is a settings error, not a test that failed.
+            foreach (string given in paths.Where(p => Directory.Exists(p) || File.Exists(p)))
+            {
+                try
+                {
+                    ProjectConfig.FindAndLoad(Directory.Exists(given) ? given : Path.GetDirectoryName(Path.GetFullPath(given)));
+                }
+                catch (ProjectConfigException ex)
+                {
+                    return Fail(error, ex);
+                }
+            }
+
             var missing = new List<string>();
             List<string> files = TestRunner.Discover(paths, missing);
             foreach (string m in missing) new CliOutput(error).Error($"There is no file or folder at '{m}'.");
-            if (missing.Count > 0) return 1;
+            if (missing.Count > 0) return ExitCodes.Usage;
             if (files.Count == 0)
             {
                 new CliOutput(error).Error($"No test files found in {string.Join(", ", paths)}. Test files are named like greet.test.kscript (or greet.test.ks.xml); create one with kscript make test greet.");
@@ -228,16 +241,18 @@ namespace KScript.Testing
             return string.Join("\n", (text ?? string.Empty).Replace("\r\n", "\n").Split('\n').Select(l => pad + l));
         }
 
+        /// <summary>A kscript.json that can't be used.</summary>
         private static int Fail(TextWriter error, Exception ex)
         {
             KScript.Runtime.ErrorReport.Write(error, ex);
-            return 1;
+            return ExitCodes.Usage;
         }
 
+        /// <summary>A command line that can't be run as written.</summary>
         private static int Fail(TextWriter error, string message)
         {
             new KScript.Output.CliOutput(error).Error(message);
-            return 1;
+            return ExitCodes.Usage;
         }
 
         /// <summary>Writes the results as JUnit XML, which most CI systems (GitHub Actions, GitLab, Jenkins, Azure) can show.</summary>

@@ -126,7 +126,7 @@ namespace KScript.Compile
                 catch (CompileException ex)
                 {
                     KScript.Runtime.ErrorReport.Write(error, ex);
-                    return 1;
+                    return ExitCodes.Usage;
                 }
             }
 
@@ -162,7 +162,7 @@ namespace KScript.Compile
             catch (ProjectConfigException ex)
             {
                 KScript.Runtime.ErrorReport.Write(error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
             catch (KScriptException ex)
             {
@@ -441,7 +441,7 @@ namespace KScript.Compile
         private static string StemOf(string script)
         {
             string stem = Path.GetFileName(script);
-            string ext = new[] { ".app.ks.xml", ".ks.xml", ".xml", ".kscript", ".ks" }.FirstOrDefault(e => stem.EndsWith(e, StringComparison.OrdinalIgnoreCase));
+            string ext = new[] { ".app.ks.xml", ".ks.xml", ".kscript" }.FirstOrDefault(e => stem.EndsWith(e, StringComparison.OrdinalIgnoreCase));
             return ext != null && stem.Length > ext.Length ? stem[..^ext.Length] : stem;
         }
 

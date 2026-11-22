@@ -291,7 +291,7 @@ namespace KScript.Tests
             FakeHost host = LinuxWith("/usr/bin/code");
             Assert.Contains("kscript ide install", Run(host, "--help").Out);
             (int code, _, string error) = Run(host, "frobnicate");
-            Assert.Equal(1, code);
+            Assert.Equal(2, code);
             Assert.Contains("Unknown ide command 'frobnicate'", error);
             Assert.Contains("Usage: kscript ide", error);
 

@@ -113,7 +113,7 @@ namespace KScript.Docs
 
         /// <summary>
         /// The format examples show in until the reader picks the other: "kscript" (the default) or "xml", from
-        /// <c>kscript docs --format</c> or the project's <c>make.format</c>. The reader's pick lasts for the browser tab.
+        /// <c>kscript docs --syntax</c> or the project's <c>make.syntax</c>. The reader's pick lasts for the browser tab.
         /// </summary>
         public string Format { get; set; } = "kscript";
 

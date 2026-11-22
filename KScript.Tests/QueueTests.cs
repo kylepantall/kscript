@@ -752,12 +752,12 @@ public sealed class QueueTests : StorageFixture
         Assert.Equal(0, status.Code);
         Assert.Matches(@"Connection \.+ file \(file\)", status.Out);
         Assert.Matches(@"│ mail +│ +1 │ +1 │ +0 │ +0 │", status.Out);
-        Assert.Contains("\"waiting\": 1", Cli("status", "--format", "json").Out);
+        Assert.Contains("\"waiting\": 1", Cli("status", "--output", "json").Out);
         var list = Cli("list", "mail");
         Assert.Contains("now", list.Out);
         Assert.Contains("in 5m", list.Out);
         Assert.Contains("\"user_id\":13", list.Out);
-        Assert.Contains("\"job\": \"Welcome\"", Cli("list", "--format", "json").Out);
+        Assert.Contains("\"job\": \"Welcome\"", Cli("list", "--output", "json").Out);
         Assert.Equal("   INFO  No jobs are waiting on [other].\n", Cli("list", "other").Out);
         Assert.Equal("   DONE  No failed jobs.\n", Cli("failed").Out);
 
@@ -774,7 +774,7 @@ public sealed class QueueTests : StorageFixture
         var failed = Cli("failed");
         Assert.Contains("Validation: unlucky", failed.Out);
         Assert.Contains("3/3", failed.Out);
-        Assert.Contains("\"failed_at\"", Cli("failed", "--format", "json").Out);
+        Assert.Contains("\"failed_at\"", Cli("failed", "--output", "json").Out);
         string id = Driver().Failed()[0].Id;
         Assert.Equal("   DONE  1 failed job is back on its queue.\n", Cli("retry", id).Out);
         Assert.Contains("There is no failed job", Cli("retry", id).Error);
@@ -797,14 +797,14 @@ public sealed class QueueTests : StorageFixture
     [InlineData(new[] { "--connection" }, "--connection needs a name")]
     [InlineData(new[] { "--connection", "nope", "status" }, "There is no queue connection 'nope'")]
     [InlineData(new[] { "--project" }, "--project needs a folder")]
-    [InlineData(new[] { "--format", "xml" }, "--format needs json or text")]
+    [InlineData(new[] { "--output", "xml" }, "--output needs text or json")]
     [InlineData(new[] { "--bogus" }, "Unknown option '--bogus'")]
     [InlineData(new string[0], "Usage: kscript queue")]
     [InlineData(new[] { "dance" }, "Unknown queue command 'dance'")]
     public void TheQueueCommandRefusesBadArguments(string[] args, string message)
     {
         var result = Cli(args);
-        Assert.Equal(1, result.Code);
+        Assert.Equal(2, result.Code);
         Assert.Contains(message, result.Error);
     }
 
@@ -821,7 +821,7 @@ public sealed class QueueTests : StorageFixture
     public void TheWorkerRefusesBadArguments(string[] args, string message)
     {
         var result = Cli(new[] { "worker" }.Concat(args).ToArray());
-        Assert.Equal(1, result.Code);
+        Assert.Equal(2, result.Code);
         Assert.Contains(message, result.Error);
     }
 
@@ -847,8 +847,8 @@ public sealed class QueueTests : StorageFixture
         FileOf("kscript.json", "{ \"queue\": 5 }");
         Assert.Contains("queue should be an object", Cli("status").Error);
         FileOf("kscript.json", "{ broken");
-        Assert.Equal(1, Cli("status").Code);
-        Assert.Equal(1, Cli("worker").Code);
+        Assert.Equal(2, Cli("status").Code);
+        Assert.Equal(2, Cli("worker").Code);
     }
 
     // ---- the database driver ------------------------------------------------------------------------------------

@@ -531,20 +531,22 @@ public sealed class DocsTests
         Assert.Contains(":root[data-format=\"kscript\"] .code-pair > .code[data-lang=\"xml\"]", css);
         Assert.Contains("setPreferredFormat", DocsSite.ReadAsset("docs.js"));
 
-        Assert.Equal("kscript", DocsCommand.NormalizeFormat(" .KScript "));
-        Assert.Equal("kscript", DocsCommand.NormalizeFormat("ks"));
-        Assert.Equal("xml", DocsCommand.NormalizeFormat("ks.xml"));
+        Assert.Equal("kscript", DocsCommand.NormalizeFormat(" KScript "));
+        Assert.Equal("xml", DocsCommand.NormalizeFormat("xml"));
+        // One spelling each: the extensions and old short names are not syntax names.
+        Assert.Null(DocsCommand.NormalizeFormat("ks"));
+        Assert.Null(DocsCommand.NormalizeFormat("ks.xml"));
         Assert.Null(DocsCommand.NormalizeFormat("yaml"));
         Assert.Null(DocsCommand.NormalizeFormat(null));
 
-        // kscript docs takes the default from the project it runs in: make.format, else .kscript.
+        // kscript docs takes the default from the project it runs in: make.syntax, else .kscript.
         string root = Path.Combine(Path.GetTempPath(), "kscript-docs-format-" + Guid.NewGuid().ToString("N"));
         try
         {
             Directory.CreateDirectory(Path.Combine(root, "xml-project", "src"));
             Directory.CreateDirectory(Path.Combine(root, "plain-project"));
             Directory.CreateDirectory(Path.Combine(root, "broken"));
-            File.WriteAllText(Path.Combine(root, "xml-project", "kscript.json"), "{ \"make\": { \"format\": \"xml\" } }");
+            File.WriteAllText(Path.Combine(root, "xml-project", "kscript.json"), "{ \"make\": { \"syntax\": \"xml\" } }");
             File.WriteAllText(Path.Combine(root, "plain-project", "kscript.json"), "{ }");
             File.WriteAllText(Path.Combine(root, "broken", "kscript.json"), "{ nope");
             Assert.Equal("xml", DocsCommand.ProjectFormat(Path.Combine(root, "xml-project", "src")));
@@ -558,9 +560,11 @@ public sealed class DocsTests
 
         var output = new StringWriter();
         var error = new StringWriter();
-        Assert.Equal(1, DocsCommand.Run(new[] { "--format", "yaml" }, output, error));
-        Assert.Contains("--format needs kscript or xml", error.ToString());
-        Assert.Equal(1, DocsCommand.Run(new[] { "--format" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--syntax", "yaml" }, output, error));
+        Assert.Contains("--syntax needs kscript or xml", error.ToString());
+        Assert.Equal(2, DocsCommand.Run(new[] { "--syntax" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--format", "xml" }, output, error));
+        Assert.Contains("--format was renamed. Use --syntax kscript|xml.", error.ToString());
     }
 
     [Fact]
@@ -570,10 +574,10 @@ public sealed class DocsTests
         var error = new StringWriter();
         Assert.Equal(0, DocsCommand.Run(new[] { "--help" }, output, error));
         Assert.Contains("Usage: kscript docs", output.ToString());
-        Assert.Equal(1, DocsCommand.Run(new[] { "--port" }, output, error));
-        Assert.Equal(1, DocsCommand.Run(new[] { "--port", "70000" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--port" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--port", "70000" }, output, error));
         Assert.Contains("--port needs a number", error.ToString());
-        Assert.Equal(1, DocsCommand.Run(new[] { "--nope" }, output, error));
+        Assert.Equal(2, DocsCommand.Run(new[] { "--nope" }, output, error));
         Assert.Contains("Unknown option '--nope'", error.ToString());
 
         var busy = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
@@ -642,7 +646,7 @@ public sealed class DocsTests
         string opened = null;
         int port = DocsCommand.FreePort(DocsCommand.DefaultPort + 7);
         var before = Directory.GetDirectories(Path.GetTempPath(), "kscript-docs-*").ToHashSet();
-        var server = Task.Run(() => DocsCommand.Run(new[] { "--port", port.ToString(), "--format", "xml", "string", "replace" }, output, TextWriter.Null, stop.Token, url => opened = url));
+        var server = Task.Run(() => DocsCommand.Run(new[] { "--port", port.ToString(), "--syntax", "xml", "string", "replace" }, output, TextWriter.Null, stop.Token, url => opened = url));
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
         var deadline = DateTime.UtcNow.AddSeconds(60);

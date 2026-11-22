@@ -15,7 +15,7 @@ namespace KScript.Language.Tests
             Write("tour.kscript", "echo \"hi\"");
             Write("lib/strings.ks.xml", "<kscript />");
             Write("lib/maths.kscript", "fn double(x) => $x * 2");
-            Write("lib/deep/util.ks", "<kscript />");
+            Write("lib/deep/util.ks.xml", "<kscript />");
             Write("lib/notes.txt", "not a script");
             Write("node_modules/pkg/x.ks.xml", "<kscript />");
         }
@@ -49,7 +49,7 @@ namespace KScript.Language.Tests
             List<string> labels = Labels(text, file);
             Assert.Contains("lib/strings.ks.xml", labels);
             Assert.Contains("lib/maths.kscript", labels);
-            Assert.Contains("lib/deep/util.ks", labels);
+            Assert.Contains("lib/deep/util.ks.xml", labels);
             Assert.Contains("lib/", labels);
             Assert.DoesNotContain("lib/notes.txt", labels);
             Assert.DoesNotContain(labels, l => l.Contains("node_modules"));
@@ -73,7 +73,7 @@ namespace KScript.Language.Tests
         {
             List<string> labels = Labels("import \"‸\"", "lib/maths.kscript");
             Assert.Contains("strings.ks.xml", labels);
-            Assert.Contains("deep/util.ks", labels);
+            Assert.Contains("deep/util.ks.xml", labels);
             Assert.Contains("../tour.kscript", labels);
             Assert.Contains("../main.ks.xml", labels);
         }

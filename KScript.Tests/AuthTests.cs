@@ -148,7 +148,7 @@ public sealed class AuthKitTests : AuthSiteFixture
 
         // Running it again would add the routes twice.
         var again = Make(Dir, "auth");
-        Assert.Equal(1, again.Code);
+        Assert.Equal(2, again.Code);
         Assert.Contains("already has controllers/accounts.kscript", again.Err);
     }
 
@@ -322,12 +322,12 @@ public sealed class AuthMakeTests : AuthSiteFixture
     public void XmlProjectsGetXmlRoutesAndControllers()
     {
         File.Delete(Path.Combine(Dir, "routes/web.kscript"));
-        var made = Make(Dir, "auth", "--format", "xml", "--dry-run");
+        var made = Make(Dir, "auth", "--syntax", "xml", "--dry-run");
         Assert.Equal(0, made.Code);
         Assert.Contains("Would: created routes/web.ks.xml", made.Out);
         Assert.False(File.Exists(Path.Combine(Dir, "controllers/accounts.ks.xml")));
 
-        made = Make(Dir, "auth", "--format", "xml");
+        made = Make(Dir, "auth", "--syntax", "xml");
         Assert.True(made.Code == 0, made.Err);
         string routes = Read("routes/web.ks.xml");
         Assert.Contains("<import package=\"KScript.Auth\" />", routes);
@@ -349,7 +349,7 @@ public sealed class AuthMakeTests : AuthSiteFixture
 
         Write("routes/web.kscript", "KScript.Routes {\n  Get(path: \"/login\", view: login)\n}\n");
         var taken = Make(Dir, "auth");
-        Assert.Equal(1, taken.Code);
+        Assert.Equal(2, taken.Code);
         Assert.Contains("routes/web.kscript already has a /login route", taken.Err);
         Assert.Equal(0, Make(Dir, "auth", "--force").Code);
 

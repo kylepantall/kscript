@@ -26,7 +26,7 @@ namespace KScript.Language.Analysis
         /// <summary>The most files looked at in one project, so a huge folder can't stall the editor.</summary>
         internal static int MaxFiles = 2000;
 
-        private static readonly string[] Extensions = { ".kscript", ".ks", ".xml", ".html", ".htm", ".md" };
+        private static readonly string[] Extensions = { ".kscript", ".ks.xml", ".html", ".htm", ".md" };
 
         private static readonly HashSet<string> SkippedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "bin", "obj", "node_modules" };
 

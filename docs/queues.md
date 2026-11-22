@@ -191,7 +191,7 @@ kscript queue forget <id>         # delete a failed job (or --all)
 kscript queue clear mail          # remove every waiting job on a queue
 ```
 
-Add `--format json` to read the output from another program. From a script, `@queue('mail')` does the same: `->size()`, `->waiting()`, `->failed()`, `->retry(id)` and `->clear()`.
+Add `--output json` to read the output from another program. From a script, `@queue('mail')` does the same: `->size()`, `->waiting()`, `->failed()`, `->retry(id)` and `->clear()`.
 
 ## Testing jobs
 

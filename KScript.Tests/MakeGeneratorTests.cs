@@ -34,7 +34,7 @@ public sealed class MakeGeneratorTests : IDisposable
     {
         var o = new StringWriter();
         var e = new StringWriter();
-        int code = MakeCommand.Run(new[] { "project", name, "--bare", "--web", "--api", "--format", format, "--dir", parent.Root }, o, e);
+        int code = MakeCommand.Run(new[] { "project", name, "--bare", "--web", "--api", "--syntax", format, "--dir", parent.Root }, o, e);
         Assert.True(code == 0, e.ToString());
         return Path.Combine(parent.Root, name);
     }
@@ -113,7 +113,7 @@ public sealed class MakeGeneratorTests : IDisposable
         // The same route again is refused, and nothing changes.
         string before = Read(app, "routes/web.kscript");
         (code, _, err) = Make(app, "route", "users");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("already has", err);
         Assert.Equal(before, Read(app, "routes/web.kscript"));
     }
@@ -200,7 +200,7 @@ public sealed class MakeGeneratorTests : IDisposable
             ("controllers/home.kscript", "kscript {\n  fn index() => 'home'\n}\n"));
 
         var (code, output, err) = Make(site.Root, "route", "/", "--action", "about", "--method", "get", "--dry-run");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("already has a GET / route", err);
 
         (code, output, err) = Make(site.Root, "route", "about", "--controller", "home", "--action", "about", "--dry-run");

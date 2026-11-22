@@ -143,7 +143,7 @@ namespace KScript.Updates
                     if (i + 1 >= args.Length)
                     {
                         error.WriteLine($"{args[i]} needs a release tag, e.g. {args[i]} v0.1.0");
-                        return 1;
+                        return ExitCodes.Usage;
                     }
                     tag = args[++i];
                     if (!tag.StartsWith("v", StringComparison.Ordinal))

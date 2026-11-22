@@ -103,7 +103,7 @@ namespace KScript.Scaffolding
             if (view != null) options["view"] = view;
             if (options.TryGetValue("name", out var routeName)) { options["route_name"] = routeName; options.Remove("name"); }
             // The template is rendered as .kscript; for an XML route file the lines are converted below.
-            var routeOptions = new Dictionary<string, string>(options, StringComparer.OrdinalIgnoreCase) { ["format"] = ScriptFormat.KScript };
+            var routeOptions = new Dictionary<string, string>(options, StringComparer.OrdinalIgnoreCase) { [ScriptFormat.Option] = ScriptFormat.KScript };
             var route = Scaffolder.Make(new MakeRequest { Type = "route", Name = controller, Root = root, Options = routeOptions, Rendering = true });
             string line = route.Content.Trim();
             var lines = new List<string>();
@@ -125,7 +125,7 @@ namespace KScript.Scaffolding
             if (view == null)
             {
                 string full = Path.Combine(root, controllerFile);
-                var controllerOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["format"] = xml ? "xml" : "kscript" };
+                var controllerOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [ScriptFormat.Option] = xml ? "xml" : "kscript" };
                 if (resource) controllerOptions["resource"] = "true";
                 else controllerOptions["actions"] = action;
                 if (parameters.Count > 0) controllerOptions["params"] = string.Join(",", parameters);
@@ -254,7 +254,7 @@ namespace KScript.Scaffolding
 
         private static string Normalise(string line) => Regex.Replace(line.Trim(), @"\s+", " ");
 
-        /// <summary>The import and route lines as XML elements, converted the way --format xml converts a script.</summary>
+        /// <summary>The import and route lines as XML elements, converted the way --syntax xml converts a script.</summary>
         internal static List<string> ToXmlLines(List<string> lines)
         {
             string code = "KScript.Routes {\n" + string.Join("\n", lines.Select(l => "  " + l)) + "\n}\n";

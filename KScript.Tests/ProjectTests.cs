@@ -33,7 +33,7 @@ public class ProjectConfigTests
                 "include": ["**/*.html"],
                 "exclude": ["drafts/**"],
                 "rules": { "KS3003": "off", "KS4*": "error", "KS5001": "Information" },
-                "warningsAsErrors": true,
+                "warnings_as_errors": true,
               },
             }
             """);
@@ -149,20 +149,20 @@ public class ProjectConfigTests
         Assert.Equal("api_prefix,auth,cors,groups,middleware,openapi,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
         Assert.Equal("credentials,headers,methods,origins", Keys(props.GetProperty("http").GetProperty("properties").GetProperty("cors").GetProperty("properties")));
         Assert.Equal("icon,id,main,name,version", Keys(props.GetProperty("app").GetProperty("properties")));
-        Assert.Equal("format", Keys(props.GetProperty("make").GetProperty("properties")));
+        Assert.Equal("syntax", Keys(props.GetProperty("make").GetProperty("properties")));
         Assert.Equal("environment,files,prefix,required,root,user", Keys(props.GetProperty("config").GetProperty("properties")));
         Assert.Equal(props.GetProperty("config").GetProperty("properties").GetProperty("files").GetProperty("default").EnumerateArray().Select(e => e.GetString()), KScript.Runtime.ConfigOptions.DefaultFiles);
         Assert.Equal("docs,docs_port,host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
-        Assert.Equal("exclude,include,rules,warningsAsErrors", Keys(props.GetProperty("lint").GetProperty("properties")));
+        Assert.Equal("exclude,include,rules,warnings_as_errors", Keys(props.GetProperty("lint").GetProperty("properties")));
         Assert.Equal("env,exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
-        Assert.Equal("enabled,endOfLine,exclude,include,indent,maxBlankLines,preserve,printWidth,rules,tabWidth", Keys(props.GetProperty("format").GetProperty("properties")));
+        Assert.Equal("enabled,end_of_line,exclude,include,indent,max_blank_lines,preserve,print_width,rules,tab_width", Keys(props.GetProperty("format").GetProperty("properties")));
 
         // Every key the schema allows is one ProjectConfig reads.
-        var c = Parse("""{ "$schema": "x", "name": "n", "standard": "kscript:recommended", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warningsAsErrors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] }, "app": { "main": "a.ks.xml", "name": "A", "id": "x.a", "version": "1", "icon": "a.png" }, "make": { "format": "xml" }, "format": { "enabled": true, "rules": { "indent": true, "statementPerLine": false, "tidyTags": "on", "wrapAttributes": "off", "trimTrailingWhitespace": true, "collapseBlankLines": true, "finalNewline": true }, "indent": 4, "tabWidth": 4, "printWidth": 100, "maxBlankLines": 1, "endOfLine": "lf", "preserve": ["echo"], "include": [], "exclude": [] }, "config": { "environment": "e", "files": [], "prefix": "P_", "root": ".", "required": [] } }""");
+        var c = Parse("""{ "$schema": "x", "name": "n", "standard": "kscript:recommended", "serve": { "root": ".", "port": 1, "host": "h" }, "lint": { "include": [], "exclude": [], "rules": {}, "warnings_as_errors": false }, "test": { "include": [], "exclude": [], "timeout": 5, "packages": ["KScript.IO"] }, "app": { "main": "a.ks.xml", "name": "A", "id": "x.a", "version": "1", "icon": "a.png" }, "make": { "syntax": "xml" }, "format": { "enabled": true, "rules": { "indent": true, "statement_per_line": false, "tidy_tags": "on", "wrap_attributes": "off", "trim_trailing_whitespace": true, "collapse_blank_lines": true, "final_newline": true }, "indent": 4, "tab_width": 4, "print_width": 100, "max_blank_lines": 1, "end_of_line": "lf", "preserve": ["echo"], "include": [], "exclude": [] }, "config": { "environment": "e", "files": [], "prefix": "P_", "root": ".", "required": [] } }""");
         Assert.Empty(c.Warnings);
         Assert.Equal("a.ks.xml", c.App.Main);
         Assert.Equal("xml", c.Make.Format);
-        Assert.Contains("make.format", string.Join(" ", Parse("""{ "make": { "format": "yaml" } }""").Warnings));
+        Assert.Contains("make.syntax", string.Join(" ", Parse("""{ "make": { "syntax": "yaml" } }""").Warnings));
         Assert.Equal(5, c.Test.Timeout);
         Assert.Equal(
             props.GetProperty("test").GetProperty("properties").GetProperty("include").GetProperty("default").EnumerateArray().Select(e => e.GetString()),
@@ -368,7 +368,7 @@ public class MakeProjectTests : IDisposable
     public void FormatXmlWritesEveryScriptAsXml()
     {
         using var parent = new TempSite();
-        var (code, output, err) = Make(parent.Root, "site", "--format", "xml");
+        var (code, output, err) = Make(parent.Root, "site", "--syntax", "xml");
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "site");
         Assert.DoesNotContain(".kscript", output.Replace(".kscript/agents/", string.Empty));
@@ -390,10 +390,10 @@ public class MakeProjectTests : IDisposable
         Assert.True(KScript.Testing.TestCommand.Run(new[] { root }, o, e, color: false) == 0, o.ToString() + e);
         Assert.Contains("Tests:    14 passed, 14 total", o.ToString());
 
-        // kscript make in the project follows its make.format.
+        // kscript make in the project follows its make.syntax.
         Assert.Equal(0, MakeCommandRun("script", "tidy", "--dir", root).Code);
         Assert.True(File.Exists(Path.Combine(root, "scripts", "tidy.ks.xml")));
-        Assert.Contains("--format should be kscript or xml", Make(parent.Root, "other", "--format", "yaml").Err);
+        Assert.Contains("--syntax should be kscript or xml", Make(parent.Root, "other", "--syntax", "yaml").Err);
     }
 
     [Fact]
@@ -420,8 +420,8 @@ public class MakeProjectTests : IDisposable
         Assert.True(KScript.Testing.TestCommand.Run(new[] { root }, o, e, color: false) == 0, o.ToString() + e);
         Assert.Contains("Tests:    2 passed, 2 total", o.ToString());
 
-        // --template bare is the same, and works with --format xml.
-        Assert.Equal(0, Make(parent.Root, "xml-tool", "--template", "bare", "--format", "xml").Code);
+        // --template bare is the same, and works with --syntax xml.
+        Assert.Equal(0, Make(parent.Root, "xml-tool", "--template", "bare", "--syntax", "xml").Code);
         Assert.True(File.Exists(Path.Combine(parent.Root, "xml-tool", "main.ks.xml")));
         Assert.True(File.Exists(Path.Combine(parent.Root, "xml-tool", "tests", "main.test.ks.xml")));
         Assert.Equal(0, KScript.Testing.TestCommand.Run(new[] { Path.Combine(parent.Root, "xml-tool") }, new StringWriter(), new StringWriter(), color: false));
@@ -647,7 +647,7 @@ public class MakeProjectTests : IDisposable
     {
         using var parent = new TempSite(("blog/index.html", "<h1>Mine</h1>"));
         var (code, output, err) = Make(Path.Combine(parent.Root, "blog"), ".");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("already has index.html", err);
         Assert.Equal("<h1>Mine</h1>", File.ReadAllText(Path.Combine(parent.Root, "blog", "index.html")));
         Assert.False(File.Exists(Path.Combine(parent.Root, "blog", "kscript.json")));

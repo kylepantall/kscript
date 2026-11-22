@@ -160,7 +160,7 @@ namespace KScript.Queueing
             };
         }
 
-        /// <summary>The job as a script sees it: in @queue()->waiting(), ->failed() and kscript queue list --format json.</summary>
+        /// <summary>The job as a script sees it: in @queue()->waiting(), ->failed() and kscript queue list --output json.</summary>
         public Dictionary<string, object> ToValue() => new Dictionary<string, object>(StringComparer.Ordinal)
         {
             ["id"] = Id,

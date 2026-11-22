@@ -18,7 +18,7 @@ namespace KScript.Docs
                 Description = "Every file kscript make generates (routes, controllers, requests, views, stylesheets, types and more) with its options and an example.",
             };
             var sb = new StringBuilder();
-            sb.Append("<h1>kscript make commands</h1><p class=\"lead\"><code>kscript make &lt;type&gt; &lt;name&gt;</code> makes a file where the project keeps that kind of file, and makes any folder it needs. Scripts are written in the project's format (<code>.kscript</code> unless <code>make.format</code> in kscript.json says <code>xml</code>). <code>kscript make --list</code> prints this list, and <code>kscript make &lt;type&gt; --help</code> prints one entry.</p>");
+            sb.Append("<h1>kscript make commands</h1><p class=\"lead\"><code>kscript make &lt;type&gt; &lt;name&gt;</code> makes a file where the project keeps that kind of file, and makes any folder it needs. Scripts are written in the project's format (<code>.kscript</code> unless <code>make.syntax</code> in kscript.json says <code>xml</code>). <code>kscript make --list</code> prints this list, and <code>kscript make &lt;type&gt; --help</code> prints one entry.</p>");
             sb.Append("<p>Every type comes from a template. <code>kscript make templates</code> copies them to the project's <code>_templates</code> folder, where you can change what they make or add types of your own. Add <code>--dry-run</code> to any command to see what it would make, and <code>--force</code> to replace a file. In a new project, <code>make route name=users</code> runs <code>kscript make route users</code> (see <a href=\"/guide/projects\">Projects</a>).</p>");
 
             var groups = MakeCommand.Grouped(Scaffolder.BuiltInTemplates());

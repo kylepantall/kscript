@@ -351,10 +351,11 @@ public class TestFrameworkTests
     {
         using var site = new TempSite(
             ("a.test.ks.xml", "<kscript />"),
-            ("b.test.xml", "<kscript />"),
+            ("b.test.kscript", "echo \"hi\""),
+            ("old.test.xml", "<kscript />"),
             ("c.ks.xml", "<kscript />"),
             (".hidden/d.test.ks.xml", "<kscript />"));
-        Assert.Equal(new[] { "a.test.ks.xml", "b.test.xml" }, TestRunner.Discover(new[] { site.Root }).Select(Path.GetFileName));
+        Assert.Equal(new[] { "a.test.ks.xml", "b.test.kscript" }, TestRunner.Discover(new[] { site.Root }).Select(Path.GetFileName));
     }
 
     private static (int Code, string Out, string Err) Command(params string[] args)
@@ -392,11 +393,11 @@ public class TestFrameworkTests
         Assert.Contains("No tests match 'nothing like this'.", err);
 
         (code, _, err) = Command(Path.Combine(site.Root, "missing"));
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("There is no file or folder at", err);
 
         (code, _, err) = Command(site.Root, "--timeout", "soon");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("--timeout needs a number of seconds", err);
     }
 
@@ -462,7 +463,7 @@ public class TestFrameworkTests
         Assert.All(run.Tests, t => Assert.Equal(TestOutcome.Passed, t.Outcome));
 
         // A project can ask for XML instead.
-        File.WriteAllText(Path.Combine(site.Root, "kscript.json"), """{ "serve": { "root": "site" }, "make": { "format": "xml" } }""");
+        File.WriteAllText(Path.Combine(site.Root, "kscript.json"), """{ "serve": { "root": "site" }, "make": { "syntax": "xml" } }""");
         var xml = Scaffolder.Make(new MakeRequest { Type = "test", Name = "cart/Checkout", Root = Path.Combine(site.Root, "site") });
         Assert.Equal("tests/cart/checkout.test.ks.xml", xml.RelativePath);
         Assert.Contains("<describe name=\"Checkout\">", xml.Content);

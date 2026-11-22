@@ -1,6 +1,6 @@
 # KScript for VS Code
 
-Language support for [KScript](https://github.com/kylepantall/kscript): scripts (`.ks.xml` and `.ks`, plus the brace-style `.kscript` format) and the HTML and Markdown pages that `kscript serve` runs.
+Language support for [KScript](https://github.com/kylepantall/kscript): scripts (`.kscript`, and `.ks.xml` for the XML form) and the HTML and Markdown pages that `kscript serve` runs.
 
 - Errors and warnings as you type, with quick fixes
 - Completion for elements, attributes, `$variables`, `@commands` and `->methods`
@@ -49,7 +49,7 @@ You can also install this extension from the command line with `kscript ide inst
 
 A `kscript.json` at the top of a project (created by `kscript make project`) sets the lint rules the editor uses: `lint.rules` changes or turns off a diagnostic by code (`"KS3003": "off"`), and `lint.exclude` silences files and folders such as `_templates`. The extension validates `kscript.json` and completes its settings. See [Project settings](https://github.com/kylepantall/kscript/blob/master/docs/projects.md#project-settings-kscriptjson) for every setting.
 
-The `format` section of `kscript.json` sets the formatting style (`"indent": 4`, `"indent": "tab"`, `"printWidth": 100` and more); without it, Format Document follows your editor's tab settings. The extension is the default formatter for KScript scripts. For `.html` pages, choose **KScript** when VS Code asks which formatter to use. See [Formatting](https://github.com/kylepantall/kscript/blob/master/docs/formatting.md).
+The `format` section of `kscript.json` sets the formatting style (`"indent": 4`, `"indent": "tab"`, `"print_width": 100` and more); without it, Format Document follows your editor's tab settings. The extension is the default formatter for KScript scripts. For `.html` pages, choose **KScript** when VS Code asks which formatter to use. See [Formatting](https://github.com/kylepantall/kscript/blob/master/docs/formatting.md).
 
 ## Commands
 

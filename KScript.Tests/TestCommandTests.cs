@@ -63,7 +63,7 @@ public class TestCommandTests
     {
         using var site = new TempSite(("kscript.json", "{ not json"), ("a.test.ks.xml", "<kscript />"));
         var (code, _, error) = Command(site.Root);
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("kscript.json", error);
 
         TestFileResult file = TestRunner.RunFile(Path.Combine(site.Root, "a.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root });

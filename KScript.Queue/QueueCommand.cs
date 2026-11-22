@@ -14,7 +14,7 @@ namespace KScript.Queueing
     {
         public const string WorkerUsage = "kscript worker [--connection name] [--queue a,b] [--concurrency n] [--once] [--stop-when-empty] [--max-jobs n] [--max-time 1h] [--sleep 1s] [--env name]";
 
-        public const string QueueUsage = "kscript queue status|list [queue]|failed|retry <id>|--all|forget <id>|--all|clear [queue] [--connection name] [--format json]";
+        public const string QueueUsage = "kscript queue status|list [queue]|failed|retry <id>|--all|forget <id>|--all|clear [queue] [--connection name] [--output text|json]";
 
         /// <summary>kscript worker. Returns 0, or 1 when a job failed with --stop-when-empty or --once, so scripts can tell.</summary>
         public static int RunWorker(string[] args, TextWriter output, TextWriter error, CancellationToken stop, string workingDirectory = null, string environment = null, Func<KScriptHost> host = null)
@@ -77,11 +77,21 @@ namespace KScript.Queueing
             }
 
             QueueContext context = Context(project ?? workingDirectory ?? KScript.Runtime.WorkingFolder.Current, environment, error);
-            if (context == null) return 1;
+            if (context == null) return ExitCodes.Usage;
             var worker = new Worker(context, options, output);
+            QueueSettings.Connection connection;
             try
             {
-                QueueSettings.Connection connection = context.Connection(options.Connection);
+                connection = context.Connection(options.Connection);
+            }
+            catch (KScriptException ex)
+            {
+                // A connection that isn't in queue.connections: the command line (or kscript.json) is wrong.
+                Fail(error, ex);
+                return ExitCodes.Usage;
+            }
+            try
+            {
                 if (connection.Driver == "memory")
                     new CliOutput(error).Warn("The memory connection only holds jobs dispatched in this process, so this worker won't see jobs from other runs. Use kscript serve --with-worker, or a file connection.");
                 if (!options.Once && !options.StopWhenEmpty)
@@ -123,8 +133,8 @@ namespace KScript.Queueing
                         if (i + 1 >= args.Length) return Fail(error, "--project needs a folder");
                         project = args[++i];
                         break;
-                    case "--format":
-                        if (i + 1 >= args.Length || args[i + 1] is not ("json" or "text")) return Fail(error, "--format needs json or text");
+                    case "--output":
+                        if (i + 1 >= args.Length || args[i + 1] is not ("json" or "text")) return Fail(error, "--output needs text or json, e.g. --output json");
                         json = args[++i] == "json";
                         break;
                     case "--all":
@@ -135,6 +145,7 @@ namespace KScript.Queueing
                         output.WriteLine("Usage: " + QueueUsage);
                         return 0;
                     default:
+                        if (CliFlags.Retired("queue", args[i]) is string renamed) return Fail(error, renamed);
                         if (args[i].StartsWith("--", StringComparison.Ordinal)) return Fail(error, $"Unknown option '{args[i]}'. Usage: {QueueUsage}");
                         rest.Add(args[i]);
                         break;
@@ -143,7 +154,7 @@ namespace KScript.Queueing
             if (rest.Count == 0) return Fail(error, "Usage: " + QueueUsage);
 
             QueueContext context = Context(project ?? workingDirectory ?? KScript.Runtime.WorkingFolder.Current, environment, error);
-            if (context == null) return 1;
+            if (context == null) return ExitCodes.Usage;
             IQueueDriver driver;
             try
             {
@@ -151,7 +162,9 @@ namespace KScript.Queueing
             }
             catch (KScriptException ex)
             {
-                return Fail(error, ex);
+                // A connection that isn't in queue.connections, or one whose settings are wrong.
+                Fail(error, ex);
+                return ExitCodes.Usage;
             }
             if (driver == null) return Fail(error, "The sync connection runs jobs as they are dispatched, so it has no queue to look at. Name another with --connection.");
             string target = rest.Count > 1 ? rest[1] : null;
@@ -305,10 +318,11 @@ namespace KScript.Queueing
             return 1;
         }
 
+        /// <summary>A command line that can't be run as written.</summary>
         private static int Fail(TextWriter error, string message)
         {
             new CliOutput(error).Error(message);
-            return 1;
+            return ExitCodes.Usage;
         }
     }
 }

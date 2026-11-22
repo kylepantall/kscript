@@ -17,7 +17,7 @@
   },
   // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
   "make": {
-    "format": "kscript"
+    "syntax": "kscript"
   },
   "lint": {
     "include": ["**/*.html", "**/*.kscript", "**/*.ks.xml"],

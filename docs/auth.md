@@ -23,7 +23,7 @@ Then `kscript serve`, open `/register` to make an account, and `/account` to see
 | `_layout.html` | A plain layout, only when the site has none. |
 | `kscript.json` (added to) | `"types": { "password": { "min": 10 } }`, the rule new passwords must meet. |
 
-It respects `make.format` and `--format xml`, the folders in `paths`, and the route files `http.routes` lists. It won't replace files or routes you already have unless you add `--force`, and `--dry-run` shows what it would do.
+It respects `make.syntax` and `--syntax xml`, the folders in `paths`, and the route files `http.routes` lists. It won't replace files or routes you already have unless you add `--force`, and `--dry-run` shows what it would do.
 
 ## Signing up and in
 

@@ -290,7 +290,7 @@ namespace KScript.Language.Tests
             Assert.Equal("echo x=1\n", Fmt("echo x=1\n"));
             // A comment that opens and closes on one line.
             Assert.Equal("x = 1 /* one */\n/* two\n   three */\n", Fmt("x = 1 /* one */\n/* two\n   three */\n"));
-            // With finalNewline off, the file keeps its own ending (shrunk to maxBlankLines).
+            // With final_newline off, the file keeps its own ending (shrunk to max_blank_lines).
             Assert.Equal("a = 1\n\n", Fmt("a = 1\n\n\n\n", Without(o => o.FinalNewline = false)));
             // An explicit lf turns CRLF into LF.
             Assert.Equal("a = 1\n", Fmt("a = 1\r\n", new FormatOptions { EndOfLine = EndOfLine.Lf }));

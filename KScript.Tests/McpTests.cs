@@ -616,16 +616,17 @@ public sealed class McpTests : IDisposable
         Assert.EndsWith("}\n", output);
         Assert.NotEqual(0xEF, Encoding.UTF8.GetBytes(output)[0]);
 
-        // The project's make.format decides how examples are shown.
-        Write("xmlproj/kscript.json", "{ \"make\": { \"format\": \"xml\" } }");
+        // The project's make.syntax decides how examples are shown.
+        Write("xmlproj/kscript.json", "{ \"make\": { \"syntax\": \"xml\" } }");
         Assert.Contains("as XML unless", Command("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n", "--dir", Path.Combine(dir, "xmlproj")).Out);
-        Assert.Contains("as XML unless", Command("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n", "--format", "xml").Out);
+        Assert.Contains("as XML unless", Command("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n", "--syntax", "xml").Out);
 
         Assert.Contains("Usage: kscript mcp", Command("", "--help").Log);
-        Assert.Equal(1, Command("", "--port", "nope").Code);
-        Assert.Equal(1, Command("", "--port").Code);
-        Assert.Equal(1, Command("", "--format", "yaml").Code);
-        Assert.Equal(1, Command("", "--format").Code);
+        Assert.Equal(2, Command("", "--port", "nope").Code);
+        Assert.Equal(2, Command("", "--port").Code);
+        Assert.Equal(2, Command("", "--syntax", "yaml").Code);
+        Assert.Equal(2, Command("", "--syntax").Code);
+        Assert.Equal(2, Command("", "--format", "xml").Code);
         Assert.Contains("--dir needs a folder", Command("", "--dir").Log);
         Assert.Contains("There is no folder", Command("", "--dir", Path.Combine(dir, "nope")).Log);
         Assert.Contains("Unknown option '--nope'", Command("", "--nope").Log);

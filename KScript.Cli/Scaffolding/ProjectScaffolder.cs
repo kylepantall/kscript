@@ -78,13 +78,13 @@ namespace KScript.Scaffolding
                 if (o.Default != null) values[o.Name.Replace('-', '_')] = o.Default;
             foreach (var kv in given) values[kv.Key] = kv.Value;
 
-            // Scripts are .kscript unless --format xml, or the project this one is made inside says otherwise.
+            // Scripts are .kscript unless --syntax xml, or the project this one is made inside says otherwise.
             string outerConfig = ProjectConfig.Find(Path.GetDirectoryName(dir));
             ProjectConfig outerProject = null;
             if (outerConfig != null) { try { outerProject = ProjectConfig.Load(outerConfig); } catch (ProjectConfigException) { } }
             var formatOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (given.TryGetValue("format", out string givenFormat)) formatOptions["format"] = givenFormat;
-            else if (outerProject?.Make.Format == null && values.TryGetValue("format", out string templateFormat)) formatOptions["format"] = templateFormat;
+            if (given.TryGetValue(ScriptFormat.Option, out string givenFormat)) formatOptions[ScriptFormat.Option] = givenFormat;
+            else if (outerProject?.Make.Format == null && values.TryGetValue(ScriptFormat.Option, out string templateFormat)) formatOptions[ScriptFormat.Option] = templateFormat;
             ScriptFormat.AddValues(values, ScriptFormat.Resolve(formatOptions, outerProject));
 
             if (given.TryGetValue("port", out string port) && !(int.TryParse(port, out int p) && p > 0 && p < 65536))
@@ -108,7 +108,7 @@ namespace KScript.Scaffolding
                 var known = template.Options.Select(o => o.Name.Replace('-', '_')).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 foreach (string key in given.Keys.Where(k => !known.Contains(k)).OrderBy(k => k, StringComparer.Ordinal))
                 {
-                    if (key is "type" or "input" or "name" or "kebab" or "snake" or "pascal" or "camel" or "title" or "format") continue;
+                    if (key is "type" or "input" or "name" or "kebab" or "snake" or "pascal" or "camel" or "title" or ScriptFormat.Option) continue;
                     notes.Add($"Note: the project template has no '{key.Replace('_', '-')}' option, so --{key.Replace('_', '-')} was not used. Its options: {string.Join(", ", template.Options.Select(o => o.Name))}.");
                 }
             }
@@ -151,7 +151,7 @@ namespace KScript.Scaffolding
                     notes.Add("Note: --dry-run leaves out the sign-in files (kscript make auth), which are made once the project is.");
                     continue;
                 }
-                AuthResult auth = AuthMaker.Make(dir, new Dictionary<string, string> { ["format"] = values["format"] }, force, dryRun: false);
+                AuthResult auth = AuthMaker.Make(dir, new Dictionary<string, string> { [ScriptFormat.Option] = values[ScriptFormat.Option] }, force, dryRun: false);
                 foreach (var (_, path) in auth.Files) if (!files.Contains(path) && File.Exists(Path.Combine(dir, path))) files.Add(path);
             }
 

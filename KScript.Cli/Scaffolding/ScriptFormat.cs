@@ -8,8 +8,8 @@ using KScript.Syntax.Markup;
 namespace KScript.Scaffolding
 {
     /// <summary>
-    /// The format <c>kscript make</c> writes scripts in: .kscript (the default) or XML (.ks.xml). Templates are written
-    /// once, as .kscript; with <c>--format xml</c> (or <c>"make": { "format": "xml" }</c> in kscript.json) a .kscript
+    /// The syntax <c>kscript make</c> writes scripts in: .kscript (the default) or XML (.ks.xml). Templates are written
+    /// once, as .kscript; with <c>--syntax xml</c> (or <c>"make": { "syntax": "xml" }</c> in kscript.json) a .kscript
     /// template's output is converted to XML and its .kscript ending becomes .ks.xml. Templates refer to other scripts
     /// with <c>{{ ext }}</c> (".kscript" or ".ks.xml"), and <c>{{#if xml}}</c> tells the formats apart.
     /// </summary>
@@ -18,23 +18,24 @@ namespace KScript.Scaffolding
         public const string KScript = MakeSettings.KScriptFormat;
         public const string Xml = MakeSettings.XmlFormat;
 
-        /// <summary>--format if given, else the project's make.format, else .kscript.</summary>
+        /// <summary>The option templates and <c>kscript make</c> name the syntax by: <c>--syntax</c>, <c>{{ syntax }}</c>.</summary>
+        public const string Option = "syntax";
+
+        /// <summary>--syntax if given, else the project's make.syntax, else .kscript.</summary>
         public static string Resolve(IReadOnlyDictionary<string, string> options, ProjectConfig project)
         {
-            string format = options != null && options.TryGetValue("format", out var f) ? f : null;
+            string format = options != null && options.TryGetValue(Option, out var f) ? f : null;
             format = (format ?? project?.Make.Format ?? KScript).Trim().ToLowerInvariant();
-            if (format == "ks" || format == "code") format = KScript;
-            if (format == "ks.xml") format = Xml;
             if (format != KScript && format != Xml)
-                throw new StubException($"--format should be kscript or xml, not '{format}'.");
+                throw new StubException($"--syntax should be kscript or xml, not '{format}'.");
             return format;
         }
 
-        /// <summary>Sets format, ext, xml and kscript for templates.</summary>
+        /// <summary>Sets syntax, ext, xml and kscript for templates.</summary>
         public static void AddValues(IDictionary<string, string> values, string format)
         {
             bool xml = format == Xml;
-            values["format"] = format;
+            values[Option] = format;
             values["ext"] = xml ? ".ks.xml" : ".kscript";
             values["xml"] = xml ? "true" : "false";
             values["kscript"] = xml ? "false" : "true";
@@ -62,7 +63,7 @@ namespace KScript.Scaffolding
         public static string Tidy(string path, string content, FormatOptions options = null)
         {
             string name = path.ToLowerInvariant();
-            bool script = name.EndsWith(".kscript", StringComparison.Ordinal) || name.EndsWith(".ks.xml", StringComparison.Ordinal) || name.EndsWith(".ks", StringComparison.Ordinal);
+            bool script = name.EndsWith(".kscript", StringComparison.Ordinal) || name.EndsWith(".ks.xml", StringComparison.Ordinal);
             if (!script) return content;
             FormatResult formatted = Formatter.Format(content, path, options);
             return formatted.Succeeded ? formatted.Text : content;

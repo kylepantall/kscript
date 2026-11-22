@@ -1,10 +1,10 @@
 --- make
 description: A KScript script in scripts/, run with kscript <file>
 category: Scripts and data
-usage: <name> [--format kscript|xml]
---format: kscript or xml (default the project's make.format)
+usage: <name> [--syntax kscript|xml]
+--syntax: kscript or xml (default the project's make.syntax)
 example: kscript make script tidy-downloads
-example: kscript make script tools/backup --format xml
+example: kscript make script tools/backup --syntax xml
 to: {{ paths.scripts }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Run it: kscript {{ paths.scripts }}/{{ dir }}{{ kebab }}{{ ext }}
 ---

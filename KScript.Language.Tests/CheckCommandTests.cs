@@ -77,13 +77,15 @@ namespace KScript.Language.Tests
         [Fact]
         public void FoldersFindScriptsAndSkipOtherXml()
         {
+            // Scripts are .kscript and .ks.xml: a .ks or plain .xml file is not picked up, whatever it holds.
             Write("a.ks.xml", "<kscript></kscript>");
-            Write("sub/b.ks", "<kscript></kscript>");
-            Write("legacy.xml", "<kscript></kscript>");
+            Write("c.kscript", "echo \"hi\"\n");
+            Write("sub/b.ks", "<kscript><ehco /></kscript>");
+            Write("legacy.xml", "<kscript><ehco /></kscript>");
             Write("config.xml", "<configuration><ehco /></configuration>");
             (int code, string output) = Run(false, dir);
             Assert.Equal(0, code);
-            Assert.Contains("3 files checked", output);
+            Assert.Contains("2 files checked", output);
         }
 
         [Fact]
@@ -171,7 +173,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void ProjectsCheckPagesAndCanFailOnWarnings()
         {
-            Write("kscript.json", "{ \"lint\": { \"warningsAsErrors\": true } }");
+            Write("kscript.json", "{ \"lint\": { \"warnings_as_errors\": true } }");
             Write("index.html", "<p>{$nope}</p>");
             (int code, string output) = Run(false, dir);
             Assert.Equal(1, code);
@@ -204,7 +206,7 @@ namespace KScript.Language.Tests
         public void PrintConfigShowsWhereEachSettingCameFrom()
         {
             Write("shared/acme/kscript-standard.json", "{ \"name\": \"acme\", \"description\": \"Acme house style.\", \"extends\": \"kscript:recommended\", \"format\": { \"indent\": 4 }, \"lint\": { \"rules\": { \"KS6001\": \"error\" } } }");
-            Write("app/kscript.json", "{ \"standard\": \"../shared/acme\", \"format\": { \"printWidth\": 100 } }");
+            Write("app/kscript.json", "{ \"standard\": \"../shared/acme\", \"format\": { \"print_width\": 100 } }");
             Write("app/a.ks.xml", "<kscript></kscript>");
             var output = new StringWriter();
             Assert.Equal(0, CheckCommand.PrintConfig(Path.Combine(dir, "app", "a.ks.xml"), output));
@@ -217,8 +219,8 @@ namespace KScript.Language.Tests
             Assert.EndsWith("../shared/acme/kscript-standard.json", Row("lint.rules.KS6001").TrimEnd());
             Assert.EndsWith("kscript:recommended", Row("lint.rules.KS6*").TrimEnd());
             Assert.Contains(" 4 ", Row("format.indent"));
-            Assert.EndsWith("kscript.json", Row("format.printWidth").TrimEnd());
-            Assert.EndsWith("default", Row("lint.warningsAsErrors").TrimEnd());
+            Assert.EndsWith("kscript.json", Row("format.print_width").TrimEnd());
+            Assert.EndsWith("default", Row("lint.warnings_as_errors").TrimEnd());
 
             Write("app/kscript.json", "{ \"standard\": \"kscript:nope\" }");
             output = new StringWriter();

@@ -70,7 +70,7 @@ public sealed class CommandLineTests : IDisposable
     public void Usage_version_and_unknown_options()
     {
         var none = Kscript();
-        Assert.Equal(1, none.Code);
+        Assert.Equal(2, none.Code);
         Assert.Contains("kscript <command> [options] [arguments]", none.Out);
         foreach (string help in new[] { "--help", "-h", "help", "-?", "/?" })
         {
@@ -78,7 +78,7 @@ public sealed class CommandLineTests : IDisposable
         }
         Assert.Equal(0, Kscript("version").Code);
         var unknown = Kscript("--frobnicate");
-        Assert.Equal(1, unknown.Code);
+        Assert.Equal(2, unknown.Code);
         Assert.Contains("Unknown option '--frobnicate'", unknown.Err);
         Assert.Contains("--env needs a name", Kscript("--env").Err);
         Assert.Contains("--env needs a name", Kscript("--env=").Err);
@@ -100,9 +100,9 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("kscript [--env name] <script>", Kscript("help", "run").Out);
         Assert.Contains("kscript serve [site folder]", Kscript("serve", "--help").Out);
         Assert.Contains("kscript serve [site folder]", Kscript("serve", "-h").Out);
-        Assert.Contains("kscript make project", Kscript("help", "make:").Out);
+        Assert.Contains("kscript make project", Kscript("help", "make").Out);
         var unknown = Kscript("help", "nope");
-        Assert.Equal(1, unknown.Code);
+        Assert.Equal(2, unknown.Code);
         Assert.Contains("ERROR  There is no command 'nope'", unknown.Err);
         Assert.Contains("kscript --help lists the commands", Kscript("serv").Err);
     }
@@ -165,12 +165,12 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("kscript ide install", Kscript("ide", "help").Out);
         Assert.Contains("  kscript compile ", Kscript("compile", "--help").Out);
         Assert.Contains("  kscript docs ", Kscript("docs", "--help").Out);
-        Assert.Contains("1 file checked: 0 errors", Kscript("check", script, "--warnaserror").Out);
+        Assert.Contains("1 file checked: 0 errors", Kscript("check", script, "--warnings-as-errors").Out);
         Assert.Contains("kscript:recommended", Kscript("check", "--print-config", dir).Out);
         Assert.Contains("1 file checked: all formatted", Kscript("fmt", script, "--check").Out);
         Assert.Equal(0, Kscript("css", Write("site.ks.css", "a { color: red; }")).Code);
         Assert.Equal(0, Kscript("make", "--dir", dir).Code);
-        Assert.Contains("Created", Kscript("make:component", "Hero", "--dir", dir).Out);
+        Assert.Contains("Created", Kscript("make", "component", "Hero", "--dir", dir).Out);
 
         string test = Write("t.test.ks.xml", "<kscript><test name=\"adds\"><expect value=\"1 + 1\" equals=\"2\" /></test></kscript>");
         Assert.Equal(0, Kscript("test", test).Code);
@@ -203,7 +203,7 @@ public sealed class CommandLineTests : IDisposable
         Assert.Equal("staging", Environment.GetEnvironmentVariable("KSCRIPT_ENV"));
 
         Write("proj/kscript.json", "{ nope");
-        Assert.Equal(1, Kscript(script).Code);
+        Assert.Equal(2, Kscript(script).Code);
     }
 
     [Fact]
@@ -266,10 +266,10 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("--port needs a number", Kscript("serve", "--port", "x").Err);
         Assert.Contains("--port needs a number", Kscript("serve", "-p").Err);
         Assert.Contains("--host needs a value", Kscript("serve", "--host").Err);
-        Assert.Equal(1, Kscript("serve", Path.Combine(dir, "missing")).Code);
+        Assert.Equal(2, Kscript("serve", Path.Combine(dir, "missing")).Code);
 
         Write("site/kscript.json", "{ nope");
-        Assert.Equal(1, Kscript("serve", Path.Combine(dir, "site")).Code);
+        Assert.Equal(2, Kscript("serve", Path.Combine(dir, "site")).Code);
 
         // A port that is taken.
         using var taken = new TcpListener(IPAddress.Loopback, 0);
@@ -307,12 +307,12 @@ public sealed class CommandLineTests : IDisposable
 
         Assert.Contains("Site folder not found", Kscript("routes", Path.Combine(dir, "nowhere")).Err);
         Write("broken/kscript.json", "{ nope");
-        Assert.Equal(1, Kscript("routes", Path.Combine(dir, "broken")).Code);
+        Assert.Equal(2, Kscript("routes", Path.Combine(dir, "broken")).Code);
 
         // A route file kscript.json names but that isn't there stops kscript serve.
         Write("missing/kscript.json", "{ \"http\": { \"routes\": [\"nope.ks.xml\"] } }");
         var serve = Kscript("serve", Path.Combine(dir, "missing"));
-        Assert.Equal(1, serve.Code);
+        Assert.Equal(2, serve.Code);
         Assert.Contains("there is no route file nope.ks.xml", serve.Err);
     }
 
@@ -322,10 +322,10 @@ public sealed class CommandLineTests : IDisposable
         Write("site/api.kscript", "KScript.Routes {\n  Get(path: \"/hi\") {\n    return 'hi'\n  }\n}\n");
         string site = Path.Combine(dir, "site");
 
-        var json = Kscript("openapi", site, "--json");
+        var json = Kscript("openapi", site, "--output", "json");
         Assert.True(json.Code == 0, json.Err);
         Assert.Contains("\"/api/hi\"", json.Out);
-        var yaml = Kscript("openapi", site, "--yaml");
+        var yaml = Kscript("openapi", site, "--output", "yaml");
         Assert.True(yaml.Code == 0, yaml.Err);
         Assert.Contains("  /api/hi:\n", yaml.Out);
 
@@ -342,16 +342,16 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("Unknown option '--nope' for kscript openapi", Kscript("openapi", "--nope").Err);
         Assert.Contains("Site folder not found", Kscript("openapi", Path.Combine(dir, "nowhere")).Err);
         Write("badproject/kscript.json", "{ nope");
-        Assert.Equal(1, Kscript("openapi", Path.Combine(dir, "badproject")).Code);
+        Assert.Equal(2, Kscript("openapi", Path.Combine(dir, "badproject")).Code);
 
         // No routes, a route file kscript.json names that isn't there, and a broken route file.
         Write("plain/index.html", "<h1>Hi</h1>");
         var none = Kscript("openapi", Path.Combine(dir, "plain"));
-        Assert.Equal(1, none.Code);
+        Assert.Equal(2, none.Code);
         Assert.Contains("There are no route files in", none.Err);
         Write("missing/kscript.json", "{ \"http\": { \"routes\": [\"nope.ks.xml\"] } }");
         var missing = Kscript("openapi", Path.Combine(dir, "missing"));
-        Assert.Equal(1, missing.Code);
+        Assert.Equal(2, missing.Code);
         Assert.Contains("nope.ks.xml", missing.Err);
         Write("broken/api.kscript", "KScript.Routes {\n  Get(path: \"/hi\", to: nowhere.fn)\n}\n");
         var broken = Kscript("openapi", Path.Combine(dir, "broken"));
@@ -404,14 +404,14 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("/hi", output);
         Assert.Contains("Site folder not found", Kscript("routes", Path.Combine(dir, "nowhere")).Err);
         Write("badproject/kscript.json", "{ nope");
-        Assert.Equal(1, Kscript("routes", Path.Combine(dir, "badproject")).Code);
+        Assert.Equal(2, Kscript("routes", Path.Combine(dir, "badproject")).Code);
         Assert.NotEqual(0, Kscript("convert").Code);
 
         // A route file kscript.json names but that isn't there stops serve.
         Write("broken/kscript.json", "{ \"http\": { \"routes\": [ { \"file\": \"gone.ks.xml\" } ] } }");
         Write("broken/index.html", "<h1>Hi</h1>");
         (code, _, error) = Kscript("serve", Path.Combine(dir, "broken"), "--port", "0");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("gone.ks.xml", error);
     }
 

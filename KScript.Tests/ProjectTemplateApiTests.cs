@@ -117,7 +117,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     [Theory]
     [InlineData("--db", "none")]
     [InlineData("--no-auth", "--no-cache")]
-    [InlineData("--format", "xml")]
+    [InlineData("--syntax", "xml")]
     public void EveryApiOptionMixPassesItsTests(string option, string value)
     {
         using var parent = new TempSite();
@@ -159,7 +159,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var parent = new TempSite();
         var (code, _, err) = Make(parent.Root, "x", "--template", "api", "--db", "oracle");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("--db should be sqlite, postgres, mysql or none, not 'oracle'.", err);
         Assert.Equal("a", ProjectScaffolder.Either(new[] { "a" }));
     }
@@ -231,7 +231,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     public void FullstackWithAuthAddsTheSignInPages()
     {
         using var parent = new TempSite();
-        var (code, output, err) = Make(parent.Root, "app", "--template", "fullstack", "--auth", "--format", "xml");
+        var (code, output, err) = Make(parent.Root, "app", "--template", "fullstack", "--auth", "--syntax", "xml");
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "app");
         foreach (string f in new[] { "routes/web.ks.xml", "controllers/accounts.ks.xml", "views/auth/login.html", "views/auth/register.html" })
@@ -330,7 +330,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
 
         // Input that ends before the wizard is done stops it.
         var (stopped, _, stoppedErr) = Make(parent.Root);
-        Assert.Equal(1, stopped);
+        Assert.Equal(2, stopped);
         Assert.Contains("The input ended", stoppedErr);
 
         // Not at a terminal, a missing folder is still an error.
@@ -542,7 +542,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         KScript.Testing.TestCommand.Run(new[] { Path.Combine(broken.Root, "a.test.kscript") }, new StringWriter(), new StringWriter(), color: false);
         Assert.Null(Environment.GetEnvironmentVariable("KSCRIPT_ENV"));
         // --filter's value isn't a folder, so it isn't looked in for a project.
-        Assert.Equal(1, KScript.Testing.TestCommand.Run(new[] { "--filter", "a", Path.Combine(broken.Root, "nowhere") }, new StringWriter(), new StringWriter(), color: false));
+        Assert.Equal(2, KScript.Testing.TestCommand.Run(new[] { "--filter", "a", Path.Combine(broken.Root, "nowhere") }, new StringWriter(), new StringWriter(), color: false));
     }
 
     [Fact]
