@@ -53,7 +53,7 @@ namespace KScript.Language.Tests
         {
             Diagnostic d = Assert.Single(Ks6007("type A {\n  x: int\n}\n\nerror Bad {\n}\n", "a.kscript", new Files(("kscript.json", "{ nope"))));
             Assert.Contains("errors/bad.kscript", d.Message);
-            Assert.Empty(Analyzer.Analyze("type A {\n  x: int\n}\n\ntype B {\n  y: int\n}\n", null, Project).Diagnostics.Where(x => x.Code == DiagnosticCodes.OneTypePerFile));
+            Assert.DoesNotContain(Analyzer.Analyze("type A {\n  x: int\n}\n\ntype B {\n  y: int\n}\n", null, Project).Diagnostics, x => x.Code == DiagnosticCodes.OneTypePerFile);
         }
 
         [Fact]

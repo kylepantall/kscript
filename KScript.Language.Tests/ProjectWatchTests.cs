@@ -130,7 +130,7 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void TheWatcherRebuildsWhenAFileChanges()
+        public async Task TheWatcherRebuildsWhenAFileChanges()
         {
             Write("count.on", "");
             // The watcher may be writing out.txt at the moment it is read (on Windows that read fails), so try again.
@@ -158,7 +158,7 @@ namespace KScript.Language.Tests
             File.Delete(Path.Combine(dir, "three.kscript"));
             Assert.True(SpinWait.SpinUntil(() => Output() == "1", 10_000));
             stop.Cancel();
-            running.Wait(10_000);
+            await running.WaitAsync(TimeSpan.FromSeconds(10));
             Assert.True(running.IsCompletedSuccessfully);
             lock (lines) Assert.Contains("count: updated out.txt", lines);
         }
