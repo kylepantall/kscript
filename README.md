@@ -9,7 +9,7 @@ KScript is an open source language for scripts, web pages and desktop apps. You 
 ```kscript
 import KScript.Terminal
 
-input(to: name) "What's your name? "
+input(into: name) "What's your name? "
 echo "Hello, { $name->trim()->title() }!"
 ```
 
@@ -37,26 +37,26 @@ import KScript.Terminal
 
 folder = $args[0] ?? @known_folder(downloads)
 big = @files($folder, pattern: '*', recursive)
-  |> filter(fn($f) => $f->size() gt 1000000)
-  |> sort_by(fn($f) => -$f->size())
+  |> filter(fn(f) => $f.size > 1000000)
+  |> sort_by(fn(f) => -$f.size)
 
 for f in $big {
-  echo "{ @bold($f->name()) }  { ($f->size() / 1000000)->round(digits: 1) } MB"
+  echo "{ @bold($f.name) }  { ($f.size / 1000000)->round(digits: 1) } MB"
 } else {
   echo "Nothing over 1 MB in {$folder}."
 }
 
-if $big->count() gt 0 {
-  confirm(to: ok) "Move them to an archive folder?"
+if $big->count() > 0 {
+  confirm(into: ok) "Move them to an archive folder?"
   if $ok {
     for f in $big {
-      move(from: $f, to: @join_path(base: $folder, ['archive', $f->name()]))
+      move(from: $f, to: @join_path(base: $folder, ['archive', $f.name]))
     }
   }
 }
 ```
 
-You get real values (strings, numbers, lists, maps, dates, files), methods on all of them with `->`, pipes with `|>`, lambdas with `fn($x) => …`, `try`/`catch`, and functions you call like commands. Calling an API takes one line too:
+You get real values (strings, numbers, lists, maps, dates, files), methods on all of them with `->`, pipes with `|>`, lambdas with `fn(x) => …`, `try`/`catch`, and functions you call like commands. Calling an API takes one line too:
 
 ```kscript
 import KScript.Net
@@ -135,13 +135,15 @@ If you use something without importing its package, the error and the editor bot
 
 ## Desktop apps, still just KScript
 
-A `KScript.Window { }` block opens a native window on macOS, Windows or Linux. It works like `<live>`: the variables hold the state, the rest is the layout, and the window is redrawn after every handler.
+After `import KScript.UI`, a `Window { }` block opens a native window on macOS, Windows or Linux. It works like `<live>`: the variables hold the state, the rest is the layout, and the window is redrawn after every handler.
 
 ```kscript
-KScript.Window(title: Counter, width: 320, height: 200) {
+import KScript.UI
+
+Window(title: Counter, width: 320, height: 200) {
   count = 0
   Text(size: 32) "{$count}"
-  Button(variant: primary, on-click: count += 1) "Add one"
+  Button(variant: primary, on_click: count += 1) "Add one"
 }
 ```
 

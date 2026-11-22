@@ -218,11 +218,11 @@ namespace KScript.Scaffolding
                 ? "API routes, served by kscript serve under /api with JSON errors (see the Routes"
                 : "Web routes, served by kscript serve (see the Routes and APIs guide). kscript";
             string second = api ? "and APIs guide). kscript routes lists them." : "routes lists them.";
-            return xml ? $"<!-- {first} {second} -->\n<KScript.Routes>\n</KScript.Routes>\n" : $"// {first}\n// {second}\nKScript.Routes {{\n}}\n";
+            return xml ? $"<!-- {first} {second} -->\n<KScript.Routes>\n</KScript.Routes>\n" : $"// {first}\n// {second}\nimport KScript.Http\n\nRoutes {{\n}}\n";
         }
 
         private static readonly Regex CodeImport = new Regex(@"^\s*import\s+""(?<src>[^""]+)""(\s+as\s+(?<as>\w+))?", RegexOptions.Multiline);
-        private static readonly Regex XmlImport = new Regex(@"<import\s+[^>]*?src=""(?<src>[^""]+)""[^>]*?>", RegexOptions.Multiline);
+        private static readonly Regex XmlImport = new Regex(@"<import\s+[^>]*?path=""(?<src>[^""]+)""[^>]*?>", RegexOptions.Multiline);
 
         /// <summary>The name a route file already imports this script as, or null.</summary>
         private static string ImportedAs(string text, string src)
@@ -257,7 +257,7 @@ namespace KScript.Scaffolding
         /// <summary>The import and route lines as XML elements, converted the way --syntax xml converts a script.</summary>
         internal static List<string> ToXmlLines(List<string> lines)
         {
-            string code = "KScript.Routes {\n" + string.Join("\n", lines.Select(l => "  " + l)) + "\n}\n";
+            string code = "import KScript.Http\n\nRoutes {\n" + string.Join("\n", lines.Select(l => "  " + l)) + "\n}\n";
             var (_, xml) = ScriptFormat.Apply("route.kscript", "routes.kscript", code, ScriptFormat.Xml);
             var all = xml.Replace("\r\n", "\n").Split('\n').ToList();
             int open = all.FindIndex(l => l.TrimStart().StartsWith("<KScript.Routes", StringComparison.Ordinal));
@@ -267,13 +267,14 @@ namespace KScript.Scaffolding
         }
 
         /// <summary>
-        /// Adds the imports after the route file's last import (or at the top of the routes block) and the route at the
-        /// end of the block, indented like the block's other lines.
+        /// Adds the imports after the route file's last import and the route at the end of the routes block, indented
+        /// like the block's other lines. A .kscript file's imports are at the top, above Routes { }; an XML file's are
+        /// inside &lt;KScript.Routes&gt;.
         /// </summary>
         internal static string Insert(string text, List<string> imports, List<string> routes, bool xml, string file)
         {
             var lines = text.Split('\n').ToList();
-            int open = lines.FindIndex(l => xml ? l.TrimStart().StartsWith("<KScript.Routes", StringComparison.Ordinal) : Regex.IsMatch(l, @"^\s*KScript\.Routes\b.*\{\s*(//.*)?$"));
+            int open = lines.FindIndex(l => xml ? l.TrimStart().StartsWith("<KScript.Routes", StringComparison.Ordinal) : Regex.IsMatch(l, @"^Routes\b.*\{\s*(//.*)?$"));
             int close = -1;
             if (open >= 0)
             {
@@ -281,7 +282,7 @@ namespace KScript.Scaffolding
                 close = lines.FindLastIndex(l => xml ? l.Trim() == "</KScript.Routes>" : l.TrimEnd() == indent + "}");
             }
             if (open < 0 || close <= open)
-                throw new StubException($"{file} has no {(xml ? "<KScript.Routes> … </KScript.Routes>" : "KScript.Routes { … }")} block to add the route to.");
+                throw new StubException($"{file} has no {(xml ? "<KScript.Routes> … </KScript.Routes>" : "Routes { … }")} block to add the route to.");
 
             string inner = Regex.Match(lines[open], @"^\s*").Value + "  ";
             var body = lines.Skip(open + 1).Take(close - open - 1).ToList();
@@ -293,17 +294,26 @@ namespace KScript.Scaffolding
             if (body.Any(l => l.Trim().Length > 0) && lines[close - 1].Trim().Length > 0 && !IsRouteLine(lines[close - 1])) routeLines.Insert(0, "");
             lines.InsertRange(close, routeLines);
 
-            if (imports.Count > 0)
+            if (imports.Count > 0 && !xml)
+            {
+                // After the last import at the top of the file, or as a block of their own above Routes { }.
+                int lastImport = -1;
+                for (int i = 0; i < open; i++)
+                    if (Regex.IsMatch(lines[i], @"^import\b")) lastImport = i;
+                if (lastImport >= 0) lines.InsertRange(lastImport + 1, imports);
+                else lines.InsertRange(open, imports.Append(""));
+            }
+            else if (imports.Count > 0)
             {
                 int lastImport = -1;
                 for (int i = open + 1; i < close; i++)
-                    if (Regex.IsMatch(lines[i], xml ? @"^\s*<import\b" : @"^\s*import\b")) lastImport = i;
+                    if (Regex.IsMatch(lines[i], @"^\s*<import\b")) lastImport = i;
                 var importLines = imports.Select(l => inner + l).ToList();
                 if (lastImport >= 0) lines.InsertRange(lastImport + 1, importLines);
                 else
                 {
                     // A new import at the top of the block, apart from the routes below it.
-                    bool routesFollow = lines[open + 1].Trim().Length > 0 && lines[open + 1].Trim() != (xml ? "</KScript.Routes>" : "}");
+                    bool routesFollow = lines[open + 1].Trim().Length > 0 && lines[open + 1].Trim() != "</KScript.Routes>";
                     if (routesFollow) importLines.Add("");
                     lines.InsertRange(open + 1, importLines);
                 }

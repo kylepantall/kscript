@@ -74,7 +74,7 @@ namespace KScript.Syntax
         public const string StatementSyntax = "KS2003";
         public const string BareIdentifier = "KS2004";
 
-        /// <summary>Text used as a value that holds <c>$name</c> or <c>{ }</c>: only templates (after echo, element text) fill those in.</summary>
+        /// <summary>A 'single quoted' string that holds <c>$name</c> or <c>{ }</c>: single quotes keep text as written, double quotes fill it in.</summary>
         public const string TextNotFilledIn = "KS2005";
 
         public const string UnknownElement = "KS3001";
@@ -155,6 +155,9 @@ namespace KScript.Syntax
 
         /// <summary>A type name written with <c>$</c> (<c>$Repo</c>), or an optional field marked on its type (<c>age: int?</c>) rather than its name.</summary>
         public const string TypeForm = "KS6014";
+
+        /// <summary>A length of time written without its unit (<c>timeout: 30</c>) or in quotes (<c>ttl: '10m'</c>); a duration is <c>30s</c>.</summary>
+        public const string DurationUnit = "KS6018";
 
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>

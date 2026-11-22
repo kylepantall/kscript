@@ -219,8 +219,8 @@ public sealed class McpTests : IDisposable
         Assert.Contains("`$args`", docs.Page("/reference/variables", "kscript"));
 
         string withFields = docs.Catalog.Methods.Where(m => !m.Planned).Select(m => m.ReceiverType).First(t => docs.Catalog.FieldsOf(t).Count > 0);
-        Assert.Contains("Fields: ", docs.Page("/reference/methods/" + withFields, "kscript"));
-        Assert.DoesNotContain("Fields: ", docs.Page("/reference/methods/string", "kscript"));
+        Assert.Contains("## Fields", docs.Page("/reference/methods/" + withFields, "kscript"));
+        Assert.DoesNotContain("## Fields", docs.Page("/reference/methods/string", "kscript"));
 
         string cli = docs.Page("/cli", "kscript");
         Assert.Contains("## kscript mcp", cli);
@@ -505,7 +505,7 @@ public sealed class McpTests : IDisposable
         Assert.Contains("Exit code 0", ran);
         Assert.Contains("Output:\nn is 3\n", ran);
 
-        Assert.Contains("Joan", Call(server, "run_code", new { code = "<import package=\"KScript.Terminal\" />\n<input to=\"name\">Name? </input><echo>$name</echo>", input = "Joan\n" }).Text);
+        Assert.Contains("Joan", Call(server, "run_code", new { code = "<import package=\"KScript.Terminal\" />\n<input into=\"name\">Name? </input><echo>$name</echo>", input = "Joan\n" }).Text);
         Assert.Contains("It printed nothing.", Call(server, "run_code", new { code = "n = 1" }).Text);
         Assert.Contains("cut short", Call(server, "run_code", new { code = "for i in 1..20000 {\n  echo \"0123456789\"\n}" }).Text);
 

@@ -17,7 +17,7 @@ public class ScriptFileTests
     [Fact]
     public void FindOldestPerson()
     {
-        Assert.Equal("Joan is the oldest at 82 years old.\n", RunFile(ScriptRunner.RepoFile("Example Scripts", "Find Oldest Person.xml")));
+        Assert.Equal("Joan is the oldest at 82 years old.\n", RunFile(ScriptRunner.RepoFile("samples", "kscript2", "find-oldest-person.ks.xml")));
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class ScriptFileTests
             File.WriteAllText(Path.Combine(from, "a.txt"), "a");
             File.WriteAllText(Path.Combine(from, "b.pdf"), "b");
             File.WriteAllText(Path.Combine(from, "c.log"), "c");
-            string output = RunFile(ScriptRunner.RepoFile("Example Scripts", "File Move Script.xml"), $"{from}\n{to}\ntxt, .pdf\n");
+            string output = RunFile(ScriptRunner.RepoFile("samples", "kscript2", "file-move-script.ks.xml"), $"{from}\n{to}\ntxt, .pdf\n");
             Assert.Contains("Moved a.txt", output);
             Assert.Contains("Moved b.pdf", output);
             Assert.True(File.Exists(Path.Combine(to, "a.txt")));

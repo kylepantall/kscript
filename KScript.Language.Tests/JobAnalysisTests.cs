@@ -21,12 +21,14 @@ namespace KScript.Language.Tests
 
         private static readonly LanguageService Service = new LanguageService(files: new FakeFiles(new Dictionary<string, string>
         {
-            ["/tmp/jobs/jobs/remind.kscript"] = "job Remind(queue: \"mail\") {\n  user_id: int\n\n  fn handle() {\n    echo $user_id\n  }\n}\n",
+            ["/tmp/jobs/jobs/remind.kscript"] = "import KScript.Queue\n\njob Remind(queue: \"mail\") {\n  user_id: int\n\n  fn handle() {\n    echo $user_id\n  }\n}\n",
         }));
 
         private const string DocPath = "/tmp/jobs/main.kscript";
 
         private const string Welcome = """
+            import KScript.Queue
+
             /// Says welcome.
             job Welcome(queue: "mail", tries: 3, backoff: ['10s', '1m'], retry_on: [Network]) {
               user_id: int
@@ -53,7 +55,7 @@ namespace KScript.Language.Tests
         {
             AssertClean(Open(Welcome + """
                 dispatch Welcome(user_id: 1, email: 'a@example.com')
-                Welcome(user_id: 2, email: 'b@example.com', name: 'Bo')->dispatch(delay: '5m', queue: 'later')
+                Welcome(user_id: 2, email: 'b@example.com', name: 'Bo')->dispatch(delay: 5m, queue: 'later')
                 job = Welcome(user_id: 3, email: 'c@example.com')
                 $job->run()
                 echo $job.email
@@ -63,8 +65,8 @@ namespace KScript.Language.Tests
         [Fact]
         public void JobsFromOtherFilesCanBeMade()
         {
-            AssertClean(Open("import \"jobs/remind.kscript\"\ndispatch Remind(user_id: 4)\n"));
-            Assert.Contains("takes its fields by name", Messages("import \"jobs/remind.kscript\"\ndispatch Remind(4)\n"));
+            AssertClean(Open("import KScript.Queue\nimport \"jobs/remind.kscript\"\ndispatch Remind(user_id: 4)\n"));
+            Assert.Contains("takes its fields by name", Messages("import KScript.Queue\nimport \"jobs/remind.kscript\"\ndispatch Remind(4)\n"));
         }
 
         [Theory]

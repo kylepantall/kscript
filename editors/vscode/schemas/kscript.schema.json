@@ -221,7 +221,7 @@
       "description": "Used by kscript compile, which builds a script, desktop app or site into a program for macOS, Windows and Linux.",
       "additionalProperties": false,
       "properties": {
-        "main": { "type": "string", "description": "The script the app runs, relative to kscript.json. Usually one whose root is <KScript.Window>." },
+        "main": { "type": "string", "description": "The script the app runs, relative to kscript.json. Usually one that imports KScript.UI and holds a Window { } (<KScript.Window> as the root of an XML file)." },
         "name": { "type": "string", "description": "The app's name in the Dock, Start menu or launcher. Defaults to the project's name." },
         "id": { "type": "string", "description": "A reverse-DNS id such as com.example.lifelab (the macOS bundle id)." },
         "version": { "type": "string", "description": "The app's version, such as 1.0.0." },

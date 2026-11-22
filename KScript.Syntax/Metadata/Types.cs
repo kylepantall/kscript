@@ -41,7 +41,7 @@ namespace KScript.Metadata
         public const string Users = "users";
         public const string Document = "document";
 
-        // KScript.Data: a model (<c>$User</c>), one of its records, a query, and a database connection.
+        // KScript.Data: a model (<c>User</c>), one of its records, a query, and a database connection.
         public const string Model = "model";
         public const string Record = "record";
         public const string Query = "query";
@@ -55,7 +55,7 @@ namespace KScript.Metadata
         public const string Queue = "queue";
         public const string FakeQueue = "fake_queue";
 
-        /// <summary>A &lt;type&gt; declared by a script: <c>$Repo</c>.</summary>
+        /// <summary>A &lt;type&gt; declared by a script: <c>Repo</c>.</summary>
         public const string Type = "type";
 
         /// <summary>An error type: <c>NotFound</c> from <c>error NotFound { id: int }</c>, or a built-in such as Validation.</summary>

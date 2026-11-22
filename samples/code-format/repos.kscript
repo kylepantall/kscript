@@ -11,7 +11,7 @@ for repo in $repos {
 // The same works for a live API: @api($url)->check()->json(as: Repo) with
 // KScript.Net.
 try {
-  bad = $Repo->from({
+  bad = Repo({
     name: 'x',
     stargazers_count: 'lots',
     visibility: 'secret'

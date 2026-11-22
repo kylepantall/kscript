@@ -19,9 +19,9 @@ public class EnumAndFlagTests
     [InlineData("@pack(large, not gift)", "large")]
     [InlineData("@pack(size: large, gift)", "large+gift")]
     [InlineData("@pack(gift, small)", "small+gift")]
-    [InlineData("$Size.medium", "medium")]
-    [InlineData("'large' in $Size", "true")]
-    [InlineData("$Size->keys()->join(',')", "small,medium,large")]
+    [InlineData("Size.medium", "medium")]
+    [InlineData("'large' in Size", "true")]
+    [InlineData("Size->keys()->join(',')", "small,medium,large")]
     public void EnumsAndFlags(string expression, string expected)
     {
         Assert.Equal(expected + "\n", RunBody(Pack + $"<echo>{{ {expression} }}</echo>"));

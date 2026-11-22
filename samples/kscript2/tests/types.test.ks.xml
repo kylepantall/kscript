@@ -1,6 +1,6 @@
 <kscript>
   <import package="KScript.IO" />
-  <import src="../types/repo.ks.xml" />
+  <import path="../types/repo.ks.xml" />
 
   <describe name="Repo">
     <test name="maps the saved response">
@@ -14,7 +14,7 @@
 
     <test name="reports every problem">
       <expect
-        value="$Repo->check({ stargazers_count: 'lots' })->count()"
+        value="Repo->check({ stargazers_count: 'lots' })->count()"
         equals="5" />
     </test>
   </describe>

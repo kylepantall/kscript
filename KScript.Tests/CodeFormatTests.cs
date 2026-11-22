@@ -39,7 +39,7 @@ public class CodeFormatTests
         try
         {
             File.WriteAllText(Path.Combine(dir, "lib.kscript"), "fn shout(s) => $s->upper() + '!'\nconst greeting = 'hi'");
-            File.WriteAllText(Path.Combine(dir, "main.ks.xml"), "<kscript><import src=\"lib.kscript\" /><echo>{ @shout($greeting) }</echo></kscript>");
+            File.WriteAllText(Path.Combine(dir, "main.ks.xml"), "<kscript><import path=\"lib.kscript\" /><echo>{ @shout($greeting) }</echo></kscript>");
             Assert.Equal("HI!\n", RunFile(Path.Combine(dir, "main.ks.xml")));
         }
         finally
@@ -92,9 +92,9 @@ public class CodeFormatTests
             echo $total
             for x in [] { echo "never" } else { echo "empty" }
             match 'b' {
-              case 'a' { echo "A" }
-              case 'b', 'c' { echo "B or C" }
-              default { echo "?" }
+              'a' => echo "A"
+              'b', 'c' => { echo "B or C" }
+              _ => echo "?"
             }
             """;
         Assert.Equal("-2 is negative\n0 is zero\n5 is positive\n7\nempty\nB or C\n", Run(code));
@@ -132,7 +132,7 @@ public class CodeFormatTests
     [InlineData("samples/life-lab/lib/life.ks.xml")]
     [InlineData("samples/life-lab/life.ks.xml")]
     [InlineData("samples/life-lab/desktop.ks.xml")]
-    [InlineData("Example Scripts/Find Oldest Person.xml")]
+    [InlineData("samples/kscript2/find-oldest-person.ks.xml")]
     public void ConvertRoundTrips(string file)
     {
         string original = ScriptRunner.RepoFile(file.Split('/'));

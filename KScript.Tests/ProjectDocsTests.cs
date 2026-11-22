@@ -376,7 +376,7 @@ public sealed class ProjectDocsTests : IDisposable
         Assert.Contains("`KS6001` off", md);
         Assert.Contains("- Every script can use `KScript.IO` without importing it.", md);
         Assert.Contains("| GET | `/hi` | `hi` | inline |", md);
-        Assert.Contains("```xml\n<import src=\"lib/strings.kscript\" />\n```", md);
+        Assert.Contains("```xml\n<import path=\"lib/strings.kscript\" />\n```", md);
         Assert.Contains("### @slugify(text: string): string (fn)", md);
         Assert.Contains("- `text`: What to turn into a slug.", md);
         Assert.Contains("Returns The slug.", md);

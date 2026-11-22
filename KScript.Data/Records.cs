@@ -94,7 +94,7 @@ namespace KScript.Data
         public static Dictionary<string, object> Fillable(ModelInfo model, Dictionary<string, object> values) =>
             model.Guarded.Count == 0 ? values : values.Where(kv => !model.Guarded.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
 
-        /// <summary><c>$User->create({...})</c>: checks the values against the model, saves them and returns the record.</summary>
+        /// <summary><c>User->create({...})</c>: checks the values against the model, saves them and returns the record.</summary>
         public static Record Create(CallContext call, ModelInfo model, Dictionary<string, object> values)
         {
             Dictionary<string, object> fill = Fillable(model, values).ToDictionary(kv => kv.Key, kv => kv.Value is BareWord w ? w.Name : kv.Value, StringComparer.Ordinal);
@@ -103,7 +103,7 @@ namespace KScript.Data
             return record;
         }
 
-        /// <summary>A record made with <c>$User->from()</c>, or a new one, as a row of the table.</summary>
+        /// <summary>A record made with <c>User()</c>, or a new one, as a row of the table.</summary>
         private static void Insert(CallContext call, ModelInfo model, Record record)
         {
             Database db = Database.For(call, model);
@@ -245,7 +245,7 @@ namespace KScript.Data
         public static Record Restore(CallContext call, Record record)
         {
             ModelInfo model = ModelInfo.Of(record);
-            if (!model.SoftDeletes) throw new KScriptException($"->restore() is for models with soft_deletes: yes, and {model.Name} doesn't have it.", "Argument");
+            if (!model.SoftDeletes) throw new KScriptException($"->restore() is for models with soft_deletes: true, and {model.Name} doesn't have it.", "Argument");
             ThisRow(call, model, record);
             record[ModelInfo.DeletedAt] = null;
             return Save(call, record);

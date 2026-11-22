@@ -122,6 +122,7 @@ namespace KScript.Language.Features
                         switch (t.Kind)
                         {
                             case TokenKind.Number:
+                            case TokenKind.Duration:
                                 tokens.Add(new SemanticToken(span, SemanticTokenType.Number, SemanticTokenModifiers.None));
                                 break;
                             case TokenKind.String:

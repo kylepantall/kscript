@@ -13,7 +13,7 @@ items = [
   { description: 'Travel', price: 64.2 },
 ]
 
-KScript.Document(template: invoice, to: ['invoice.pdf', 'invoice.docx']) {
+Document(template: invoice, to: ['invoice.pdf', 'invoice.docx']) {
   Invoice(
     number: "INV-2026-042",
     date: "20 November 2026",

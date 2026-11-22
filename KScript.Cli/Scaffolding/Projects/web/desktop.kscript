@@ -5,9 +5,10 @@ when: desktop
 // Compile it into a program with: kscript compile (the "app" section of
 // kscript.json names this file). The rules come from lib/tasks{{ ext }}, the
 // same file the web page (tasks.html) uses.
-KScript.Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
-  import "lib/tasks{{ ext }}"
+import KScript.UI
+import "lib/tasks{{ ext }}"
 
+Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
   tasks = @starter_tasks()
   draft = ''
 
@@ -15,8 +16,8 @@ KScript.Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
 
   Row(gap: 8) {
     TextBox(bind: draft, placeholder: "What needs doing?", width: 320,
-      on-enter: { tasks = @add_task($tasks, title: $draft); draft = '' })
-    Button(variant: primary, on-click: { tasks = @add_task($tasks, title: $draft); draft = '' }) "Add"
+      on_enter: { tasks = @add_task($tasks, title: $draft); draft = '' })
+    Button(variant: primary, on_click: { tasks = @add_task($tasks, title: $draft); draft = '' }) "Add"
   }
 
   Column(gap: 4, scroll) {
@@ -25,14 +26,14 @@ KScript.Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
       // done flag.
       done = $t.done
       Row(gap: 8) {
-        CheckBox(bind: done, on-change: { tasks = @toggle_task($tasks, id: $t.id) }) "{$t.title}"
-        Button(on-click: { tasks = @remove_task($tasks, id: $t.id) }, tooltip: "Remove") "✕"
+        CheckBox(bind: done, on_change: { tasks = @toggle_task($tasks, id: $t.id) }) "{$t.title}"
+        Button(on_click: { tasks = @remove_task($tasks, id: $t.id) }, tooltip: "Remove") "✕"
       }
     }
   }
 
   Row(gap: 8) {
     Text "{ @tasks_left($tasks) }"
-    Button(on-click: { tasks = @clear_done($tasks) }, disabled: not $tasks->any(fn($t) => $t.done)) "Clear done"
+    Button(on_click: { tasks = @clear_done($tasks) }, disabled: not $tasks->any(fn(t) => $t.done)) "Clear done"
   }
 }

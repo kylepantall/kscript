@@ -1,6 +1,6 @@
 <let name="people" value="@read_json('data/people.json')" />
 
-<layout src="_layout.html" title="Live demo">
+<layout path="_layout.html" title="Live demo">
   <h1>Live demo</h1>
   <p class="lead">Everything on this page reacts as you use it, and none of it is JavaScript. Each box is a
     <code>&lt;live&gt;</code> block: KScript handlers like <code>on-click="count += 1"</code> run on the server,
@@ -27,7 +27,7 @@
       <let name="q" value="$query->trim()->lower()" />
       <let
         name="found"
-        value="$people |> filter(fn($p) => $p.name->lower()->contains($q) or $p.role->lower()->contains($q))" />
+        value="$people |> filter(fn(p) => $p.name->lower()->contains($q) or $p.role->lower()->contains($q))" />
       <input
         bind="query"
         placeholder="Search by name or role…"
@@ -59,18 +59,18 @@
       <ul class="todos">
         <for each="t" in="$todos">
           <li class="{ $t.done ? 'done' : '' }">
-            <label><input type="checkbox" checked="{$t.done}" on-change="todos = $todos->map(fn($x) => $x.id == $t.id ? $x->set(key: 'done', value: not $x.done) : $x)"> {$t.text}</label>
+            <label><input type="checkbox" checked="{$t.done}" on-change="todos = $todos->map(fn(x) => $x.id == $t.id ? $x->set(key: 'done', value: not $x.done) : $x)"> {$t.text}</label>
             <button
               class="remove"
               title="Remove"
-              on-click="todos = $todos->reject(fn($x) => $x.id == $t.id)">✕</button>
+              on-click="todos = $todos->reject(fn(x) => $x.id == $t.id)">✕</button>
           </li>
         </for>
       </ul>
-      <p class="note">{$todos->count(fn($t) => not $t.done)} left</p>
+      <p class="note">{$todos->count(fn(t) => not $t.done)} left</p>
       <button
-        on-click="todos = $todos->reject(fn($t) => $t.done)"
-        disabled="{ not $todos->any(fn($t) => $t.done) }">Clear done</button>
+        on-click="todos = $todos->reject(fn(t) => $t.done)"
+        disabled="{ not $todos->any(fn(t) => $t.done) }">Clear done</button>
     </live>
   </section>
 

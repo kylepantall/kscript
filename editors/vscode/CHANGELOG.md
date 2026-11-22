@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- One spelling for each piece of syntax in `.kscript` files. A `match` statement writes its arms like a match expression, `1, 2 => echo "low"`, `_ when $n > 9 => { }` and `_ => { }`, and typing inside a match offers those three; `case`, `when` and `default` blocks are reported with a quick fix that writes the arm. The second spellings that still run are underlined with a quick fix: `$x = 3` and `fn($n)` (names are declared bare), `lt`/`gt`/`eq` and the other comparison words (symbols in `.kscript`; XML keeps the words), `else if`, `key = value` in arguments and `catch A, B`. Highlighting follows: `_` is a keyword in a match, and the comparison words are no longer coloured as operators in `.kscript`.
+- Plain facts about a value are fields: after a dot, `$response.` offers `status`, `is_ok` and `text`, `$file.` offers `name` and `size`, and `$date.` offers `year` and `weekday`, each with its type on hover. Calling one (`$file->size()`) or using a renamed method (`$cache->put()`, now `->set()`) is marked with a quick fix that rewrites it.
+- A length of time is highlighted as one value (`30s`, `500ms`, `1h30m`), and a time written without its unit or in quotes (`timeout: 30`, `ttl: '10m'`) gets a **Write 30s** quick fix (KS6018).
 - Help writing types and jobs, like C#'s "implement missing members" and "generate overrides": a job without `fn handle()` gets an **Add fn handle()** quick fix, and the lightbulb on a job offers **Add fn failed(err)**. On a joined type (`type Admin with [User]`) it offers **Override fn greet(who: string) from User** for each method a base gives it. A method two bases both give is an error with a **Declare fn label in C** fix, as at run time. Each fix writes a stub in the file's own format.
 - A **Get Started with KScript** walkthrough on the Welcome page: install, write a first script, run it, fix a mistake, find out what you can write, and start a project.
 - **KScript: New Script** (also in **File > New File…**) opens a short script that runs as it is, with a variable, a function, a list and a loop to change.
@@ -52,7 +55,7 @@
 
 - Tests: **KScript: Run Tests** runs `kscript test` for the workspace, and test files (`*.test.ks.xml`) get a Run Tests button in the editor title bar. Test files know the KScript.Test elements (`<test>`, `<describe>`, `<expect>`, `<assert>`, `<expect-error>`, `<capture>`) without an import, and `kscript.json` completes the new `test` settings.
 - Completion knows more about your data: `@read_json('data/people.json')` reads the file, so `$person.` offers `name`, `age` and so on, and nested objects and lists work too.
-- Lambda parameters take the type of the list's items: in `$people->filter(fn($p) => $p.age gt 18)`, `$p.` completes its fields. This also works for `|>` pipes, `reduce` and `sort`, and `->map(fn($p) => $p.name)` is known to be a list of text.
+- Lambda parameters take the type of the list's items: in `$people->filter(fn(p) => $p.age gt 18)`, `$p.` completes its fields. This also works for `|>` pipes, `reduce` and `sort`, and `->map(fn(p) => $p.name)` is known to be a list of text.
 - Components: `<person-card ` offers the component's props, which are the variables its file uses without declaring. Completing a component name fills in every prop.
 - `.html` pages get KScript `{ }` highlighting again. VS Code opens `.html` files with its `text.html.derivative` grammar, which the page grammar wasn't injected into, so only plain HTML colours showed.
 - `<slot />`, `<hero />` and other self-closing elements in pages are no longer marked as errors by the HTML grammar.

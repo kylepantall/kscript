@@ -1,8 +1,8 @@
 --- make
 unless: auth
 ---
-<import src="lib/notes-client{{ ext }}" />
-<layout src="_layout.html" title="Notes">
+<import path="lib/notes-client{{ ext }}" />
+<layout path="_layout.html" title="Notes">
   <h1>Notes</h1>
   <p>This page gets its notes from the app's own JSON API: <code>lib/notes-client{{ ext }}</code> calls <code>@api('/api/notes')</code>, which <code>routes/api{{ ext }}</code> answers. Each click runs KScript on the server, with no JavaScript to write.</p>
 

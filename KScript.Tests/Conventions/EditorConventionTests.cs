@@ -77,13 +77,18 @@ public sealed class EditorConventionTests
         foreach (string gone in new[] { "++", "--", "%=", "&&", "||" }) Assert.DoesNotContain(gone, coloured);
     }
 
+    /// <summary>The comparison words of an XML script, where a raw &lt; can't be written. A .kscript file uses the symbols.</summary>
+    private static readonly string[] XmlSpellings = { "eq", "ne", "lt", "le", "gt", "ge" };
+
     [Fact]
     public void Every_word_operator_and_constant_the_grammar_colours_is_a_keyword_of_the_lexer()
     {
         string[] operators = Patterns("operators").Where(p => p.GetProperty("name").GetString() == "keyword.operator.word.kscript")
             .SelectMany(p => Regex.Match(p.GetProperty("match").GetString(), @"\(((?:[a-z]+\|)*[a-z]+)\)").Groups[1].Value.Split('|')).ToArray();
-        Assert.Equal(new[] { "and", "eq", "ge", "gt", "in", "le", "lt", "ne", "not", "or", "step" }, operators.OrderBy(w => w, StringComparer.Ordinal));
-        Assert.All(operators, w => Assert.Contains(w, Lexer.Keywords));
+        // Logic and "in" are words; comparisons are symbols in a .kscript file (eq, lt and the rest are the XML
+        // spellings, which KS6012 reports there). "is" is the word of a match arm (case is ...), read by the code parser.
+        Assert.Equal(new[] { "and", "in", "is", "not", "or", "step" }, operators.OrderBy(w => w, StringComparer.Ordinal));
+        Assert.All(operators.Where(w => w != "is"), w => Assert.Contains(w, Lexer.Keywords));
 
         string constants = Patterns("constants").Single(p => p.GetProperty("name").GetString() == "constant.language.kscript").GetProperty("match").GetString();
         string[] values = Regex.Match(constants, @"\(((?:[a-z]+\|)+[a-z]+)\)").Groups[1].Value.Split('|');
@@ -92,7 +97,8 @@ public sealed class EditorConventionTests
 
         // Every keyword of the lexer is coloured somewhere in the grammar.
         string all = Grammar().GetRawText();
-        Assert.All(Lexer.Keywords, k => Assert.Matches(@"[(|]" + k + @"[|)]", all));
+        Assert.All(Lexer.Keywords.Where(k => !XmlSpellings.Contains(k)), k => Assert.Matches(@"[(|]" + k + @"[|)]", all));
+        Assert.All(XmlSpellings, k => Assert.Contains(k, Lexer.Keywords));
     }
 
     [Fact]

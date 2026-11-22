@@ -34,7 +34,7 @@ namespace KScript.Runtime
 
         #region Elements
 
-        private static readonly A Test = new A("test", K.Expression, "The condition, for example `$n lt 10 and $name ne ''`.", true);
+        private static readonly A Test = new A("test", K.Expression, "The condition, for example `$n < 10 and $name != ''` (in an XML attribute, `$n lt 10 and $name ne ''`).", true);
 
         private static void RegisterElements(PackageBuilder p)
         {
@@ -52,12 +52,12 @@ namespace KScript.Runtime
                 new A("name", K.DeclareVariable, "The variable to declare."),
                 new A("value", K.Expression, "The initial value. Can be written as the element's text instead."),
                 new A("type", K.TypeName, "Convert the value to this type, or fail early: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes.ToArray()),
-                new A("const", K.Bool, "yes makes a later <set> an error."))
+                new A("const", K.Bool, "true makes a later <set> an error."))
             {
                 Example = "<let name=\"count\" value=\"0\" />\n<let name=\"people\">[{ name: 'Joan', age: 82 }]</let>\n<let>x = 3</let>",
             }, run => Assign(run, declare: true));
 
-            p.Element(new ElementInfo("const", "Declares a value that can't change: the same as <let const=\"yes\">. Top-level consts are exported to scripts that import this one.",
+            p.Element(new ElementInfo("const", "Declares a value that can't change: the same as <let const=\"true\">. Top-level consts are exported to scripts that import this one.",
                 ContentKind.Expression,
                 new A("name", K.DeclareVariable, "The constant to declare.", true),
                 new A("value", K.Expression, "Its value. Can be written as the element's text instead."),
@@ -75,9 +75,9 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("enum", "Declares a set of named values. `$Size.small` is 'small', and a parameter typed with it (`params=\"size: Size\"`) only takes those values, which calls can write bare: `@pack(large)`.",
+            p.Element(new ElementInfo("enum", "Declares a set of named values. `Size.small` is 'small', and a parameter typed with it (`params=\"size: Size\"`) only takes those values, which calls can write bare: `@pack(large)`.",
                 ContentKind.Empty,
-                new A("name", K.DeclareVariable, "The enum's name, used as a parameter type and as $Name.", true),
+                new A("name", K.DeclareVariable, "The enum's name, used as a parameter type and as Name (Size.small).", true),
                 new A("values", K.Text, "The values, comma separated: small, medium, large.", true),
                 new A("description", K.Text, "What the enum is for, shown on hover."))
             {
@@ -95,11 +95,11 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("type", "Declares the shape of some data, such as an API response. `->json(as: Repo)`, `$Repo->from($data)`, `<let type=\"Repo\">` and `repo: Repo` parameters check data against it and turn it into a record: a map whose fields the editor knows. Every problem is reported at once, with its JSON path.",
+            p.Element(new ElementInfo("type", "Declares the shape of some data, such as an API response. `->json(as: Repo)`, `Repo($data)`, `<let type=\"Repo\">` and `repo: Repo` parameters check data against it and turn it into a record: a map whose fields the editor knows. Every problem is reported at once, with its JSON path.",
                 ContentKind.Statements,
-                new A("name", K.DeclareVariable, "The type's name, used as `type=\"Repo\"`, `as: Repo` and $Repo.", true),
+                new A("name", K.DeclareVariable, "The type's name, used as `type=\"Repo\"`, `as: Repo` and Repo.", true),
                 new A("fields", K.Fields, "A short type's fields on one line, like fn params: `login: string, id: int, avatar_url?: string`. Bigger types list their fields one per line instead (<field> elements)."),
-                new A("sample", K.Path, "A JSON file holding an example of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
+                new A("path", K.Path, "A JSON file holding a sample of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
                 new A("extra", K.Enum, "Keys in the data that the type doesn't list: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
                 new A("with", K.TypeNames, "Other types this one is made from. Types with fields are joined: `with=\"User, Auditable\"` has all their fields and rules, and fits wherever they do. One built-in type, such as `with=\"int\"` or `with=\"handle\"`, makes a type with rules instead of fields: min, max, pattern, one_of, not, <validate> and <normalize>.", false, Values.DeclarableTypes.ToArray()),
                 new A("min", K.Text, "The smallest value allowed: a number for numbers, a date for dates, the length for text (a handle's name without its @), the count for lists. Needs with=\"...\" naming one built-in type."),
@@ -110,7 +110,7 @@ namespace KScript.Runtime
                 new A("not", K.Text, "Values that aren't allowed, such as reserved names: `['@admin', '@root']`."),
                 new A("description", K.Text, "What the type is, shown on hover."))
             {
-                Example = "<type name=\"User\">\n  <field name=\"login\" type=\"string\" />\n  <field name=\"id\" type=\"int\" />\n</type>\n<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int\" from=\"stargazers_count\" />\n  <field name=\"owner\" type=\"User\" />\n</type>\n<let name=\"repo\" value=\"$Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })\" />\n<echo>$repo.name has $repo.stars stars</echo>",
+                Example = "<type name=\"User\">\n  <field name=\"login\" type=\"string\" />\n  <field name=\"id\" type=\"int\" />\n</type>\n<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int\" from=\"stargazers_count\" />\n  <field name=\"owner\" type=\"User\" />\n</type>\n<let name=\"repo\" value=\"Repo({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })\" />\n<echo>$repo.name has $repo.stars stars</echo>",
             }, run =>
             {
                 IKObject type = Shapes.Declare(run);
@@ -140,7 +140,7 @@ namespace KScript.Runtime
                 new A("type", K.TypeName, "The field's type: a built-in such as string or int, an <enum>, another <type>, T[] for a list, T? to allow null. Defaults to any.", false, Values.DeclarableTypes.ToArray()),
                 new A("from", K.Text, "Where to read the value, when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`."),
                 new A("default", K.Expression, "The value when the data has none (makes the field optional)."),
-                new A("optional", K.Bool, "yes lets the value be missing or null."),
+                new A("optional", K.Bool, "true lets the value be missing or null."),
                 new A("value", K.Expression, "Works the field out from the others (they are $name) instead of reading it: `$first + ' ' + $last`."),
                 new A("min", K.Text, "The smallest value allowed: a number, a date, or the length of text or a list."),
                 new A("max", K.Text, "The largest value allowed: a number, a date, or the length of text or a list."),
@@ -157,14 +157,14 @@ namespace KScript.Runtime
                 new A("message", K.Text, "What to say when it isn't, such as `must end after it starts`."))
             {
                 MustBeInside = new[] { "type", "model" },
-                Example = "<type name=\"Even\" with=\"int\">\n  <validate test=\"$value % 2 == 0\" message=\"must be even\" />\n</type>\n<echo>{ $Even->from(4) }</echo>",
+                Example = "<type name=\"Even\" with=\"int\">\n  <validate test=\"$value % 2 == 0\" message=\"must be even\" />\n</type>\n<echo>{ Even(4) }</echo>",
             }, run => throw run.Error($"<validate> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("normalize", "Cleans up a value before a <type>'s rules check it, such as trimming or lower-casing. The value is `$value`; the result is converted to the type again.", ContentKind.Empty,
                 new A("value", K.Expression, "The cleaned-up value: `$value->trim()->lower()`.", true))
             {
                 MustBeInside = new[] { "type" },
-                Example = "<type name=\"Slug\" with=\"string\" pattern=\"^[a-z0-9-]+$\">\n  <normalize value=\"$value->trim()->lower()\" />\n</type>\n<echo>{ $Slug->from(' Hello-World ') }</echo>",
+                Example = "<type name=\"Slug\" with=\"string\" pattern=\"^[a-z0-9-]+$\">\n  <normalize value=\"$value->trim()->lower()\" />\n</type>\n<echo>{ Slug(' Hello-World ') }</echo>",
             }, run => throw run.Error($"<normalize> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("set", "Changes an existing variable. Fails if the variable was never declared (a typo guard) or is const. Without `name`, the text is assignment statements.",
@@ -179,7 +179,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("do", "Runs assignment statements and calls, separated by `;`.", ContentKind.AssignmentStatements)
             {
-                Example = "<let name=\"total\" value=\"10\" />\n<do>$total += 5; $total *= 2</do>\n<echo>$total</echo>",
+                Example = "<let name=\"total\" value=\"10\" />\n<do>total += 5; total *= 2</do>\n<echo>$total</echo>",
             }, run =>
             {
                 // In a .kscript file x = 3 declares x if it isn't in scope yet.
@@ -230,7 +230,7 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("for", "Loops over a list, a map or a range such as 0..10 (end exclusive) or 0..100 step 5. `$loop` holds index, first, last and count.", ContentKind.Statements,
                 new A("each", K.DeclareVariables, "The loop variable, or `key, value` for a map.", true),
                 new A("in", K.Expression, "What to loop over: a list, a map, a range, a number (0 up to it) or text (its characters).", true),
-                new A("index", K.DeclareVariable, "A variable for the position, from 0."))
+                new A("at", K.DeclareVariable, "A variable for the position, from 0."))
             {
                 IsLoop = true,
                 Example = "<let name=\"people\" value=\"[{ name: 'Joan' }, { name: 'Sam' }]\" />\n<for each=\"p\" in=\"$people\">\n  <echo>{$p.name}</echo>\n</for>\n<for each=\"i\" in=\"0..10\"><echo>$i</echo></for>\n<let name=\"settings\" value=\"{ host: 'localhost', port: 8080 }\" />\n<for each=\"key, value\" in=\"$settings\"><echo>$key = $value</echo></for>",
@@ -263,14 +263,14 @@ namespace KScript.Runtime
                 Example = "<let name=\"choice\" value=\"3\" />\n<match $choice>\n  <case is=\"1\"><echo>One</echo></case>\n  <case is=\"2, 3\"><echo>Two or three</echo></case>\n  <case when=\"$choice gt 9\"><echo>Big</echo></case>\n  <default><echo>Unknown</echo></default>\n</match>",
             }, Match);
 
-            p.Element(new ElementInfo("case", "A branch of <match>: runs when the value equals one of `is`, or when `when` is true.", ContentKind.Statements,
+            p.Element(new ElementInfo("case", "A branch of <match>: runs when the value equals one of `is`, or when `when` is true (with both, the value must match and `when` must be true). In a .kscript file a branch is an arm: `1, 2 => ...`, `_ when $n > 9 => ...`.", ContentKind.Statements,
                 new A("is", K.ExpressionList, "Values to compare with, comma separated."),
                 new A("when", K.Expression, "A condition."))
             {
                 MustBeInside = new[] { "match" },
             }, run => throw run.Error($"<case> must be directly inside <match>.", null, "Syntax"));
 
-            p.Element(new ElementInfo("default", "The branch of <match> that runs when no case matched.", ContentKind.Statements)
+            p.Element(new ElementInfo("default", "The branch of <match> that runs when no case matched. In a .kscript file it is the arm `_ => ...`.", ContentKind.Statements)
             {
                 MustBeInside = new[] { "match" },
             }, run => throw run.Error($"<default> must be directly inside <match>.", null, "Syntax"));
@@ -291,7 +291,7 @@ namespace KScript.Runtime
                 new A("name", K.DeclareFunction, "The function's name.", true),
                 new A("params", K.Parameters, "Parameters, with optional types and defaults: `who, greeting = 'Hello'` or `count: int = 1`."),
                 new A("value", K.Expression, "For one-line functions: the result, instead of a body."),
-                new A("override", K.Bool, "Inside <extend>: yes replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
+                new A("override", K.Bool, "Inside <extend>: true replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
                 new A("description", K.Text, "What the function does. Shown in hover, and to a model when used as an <llm> tool."))
             {
                 Example = "<fn name=\"greet\" params=\"who, greeting = 'Hello'\">\n  <return value=\"$greeting + ', ' + $who + '!'\" />\n</fn>\n<echo>@greet('World')</echo>",
@@ -309,15 +309,15 @@ namespace KScript.Runtime
             }, run => throw new ReturnSignal(run.Eval("value", null)));
 
             p.Element(new ElementInfo("call", "Calls a function for its effect, optionally keeping the result.", ContentKind.Empty,
-                new A("fn", K.FunctionReference, "The function (or command) to call.", true),
+                new A("fn", K.FunctionReference, "The function (or command) to call: `@greet` (in XML, fn=\"greet\").", true),
                 new A("args", K.ExpressionList, "Arguments, comma separated."),
-                new A("to", K.DeclareVariable, "A variable for the result."))
+                new A("into", K.DeclareVariable, "A variable for the result."))
             {
                 Example = "<fn name=\"greet\" params=\"who\"><echo>Hello, $who!</echo></fn>\n<call fn=\"greet\" args=\"'World'\" />",
             }, Call);
 
             p.Element(new ElementInfo("spawn", "Runs a function in the background. The script waits for it before it ends.", ContentKind.Empty,
-                new A("fn", K.FunctionReference, "The function to run.", true),
+                new A("fn", K.FunctionReference, "The function to run: `@count_to` (in XML, fn=\"count_to\").", true),
                 new A("args", K.ExpressionList, "Arguments, comma separated."))
             {
                 Example = "<fn name=\"count_to\" params=\"n\"><echo>Counted to { @range(1, $n + 1)->last() }</echo></fn>\n<spawn fn=\"count_to\" args=\"1000\" />\n<echo>Started counting</echo>",
@@ -335,7 +335,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("catch", "Handles an error thrown in the <try> around it. `type` picks which errors (and the types that extend them); `as` names the error: $err.type, $err.message, $err.line, $err.status, $err.cause and its fields. A bare <throw /> inside rethrows it.", ContentKind.Statements,
                 new A("as", K.DeclareVariable, "A variable for the error. Defaults to err."),
-                new A("when", K.Expression, "Only handle errors for which this is true, such as `$err.status eq 404`."),
+                new A("when", K.Expression, "Only handle errors for which this is true, such as `$err.status == 404`."),
                 new A("type", K.ErrorType, "Only handle errors of these types, or types that extend them: `NotFound`, `[IO, Network]`. Error catches everything."))
             {
                 MustBeInside = new[] { "try" },
@@ -355,17 +355,17 @@ namespace KScript.Runtime
                 Example = "<let name=\"age\" value=\"-1\" />\n<try>\n  <throw type=\"Validation\" message=\"Age must be positive, got {$age}\" />\n  <catch as=\"err\"><echo>{ $err.type }: { $err.message }</echo></catch>\n</try>",
             }, Throw);
 
-            p.Element(new ElementInfo("import", "Imports a package (`package=\"KScript.Terminal\"`), or the top-level <fn> functions and <let const> values of another script (`src`). Goes at the top of the script.", ContentKind.Empty,
+            p.Element(new ElementInfo("import", "Imports a package (`package=\"KScript.Terminal\"`), or the top-level <fn> functions and <let const> values of another script (`path`). Goes at the top of the script.", ContentKind.Empty,
                 new A("package", K.Text, "A package such as KScript.Terminal, KScript.Math, KScript.IO or KScript.Net."),
-                new A("src", K.Path, "A script to import, relative to this file."),
+                new A("path", K.Path, "A script to import, relative to this file."),
                 new A("as", K.DeclareVariable, "Use the import under a prefix: `@math.sqrt(2)`, `str.slugify()`."),
                 new A("names", K.FunctionReferences, "Import only these names from a script, callable directly: `@slugify()`."))
             {
-                Example = "<import package=\"KScript.Terminal\" />\n<import package=\"KScript.Math\" as=\"math\" />\n<import src=\"lib/strings.ks.xml\" as=\"str\" />",
+                Example = "<import package=\"KScript.Terminal\" />\n<import package=\"KScript.Math\" as=\"math\" />\n<import path=\"lib/strings.ks.xml\" as=\"str\" />",
             }, run =>
             {
-                if (!run.Has("package") && !run.Has("src")) throw run.Error($"<import> needs package=\"...\" (such as KScript.Terminal) or src=\"...\" (a script file).", null, "Syntax");
-                if (run.Has("src")) run.Interpreter.ImportScript(run.Element, run.Scope, run.Module);
+                if (!run.Has("package") && !run.Has("path")) throw run.Error($"<import> needs package=\"...\" (such as KScript.Terminal) or path=\"...\" (a script file).", null, "Syntax");
+                if (run.Has("path")) run.Interpreter.ImportScript(run.Element, run.Scope, run.Module);
                 return null;
             });
 
@@ -376,22 +376,21 @@ namespace KScript.Runtime
             }, run => throw new ExitSignal((int)run.Number("code", 0)));
 
             p.Element(new ElementInfo("wait", "Pauses the script.", ContentKind.Empty,
-                new A("ms", K.Expression, "How long to wait, in milliseconds."),
-                new A("seconds", K.Expression, "How long to wait, in seconds."))
+                new A("duration", K.Expression, "How long to wait: 500ms, 2s, 1m30s. A plain number is seconds.", true) { Type = Duration.TypeName })
             {
-                Example = "<wait seconds=\"1.5\" />",
+                Example = "<wait duration=\"1.5s\" />",
             }, run =>
             {
-                double ms = run.Has("seconds") ? run.Number("seconds", 0) * 1000 : run.Number("ms", 0);
+                double ms = (run.Seconds("duration") ?? 0) * 1000;
                 if (ms > 0) Task.Delay(TimeSpan.FromMilliseconds(ms), run.Interpreter.Options.Cancellation).GetAwaiter().GetResult();
                 return null;
             });
 
-            p.Element(new ElementInfo("marray", "Builds a list or map from nested <item> elements, for data that reads better as markup than as a literal.", ContentKind.Statements,
+            p.Element(new ElementInfo("collection", "Builds a list or map from nested <item> elements, for data that reads better as markup than as a literal.", ContentKind.Statements,
                 new A("name", K.DeclareVariable, "The variable to declare.", true),
-                new A("const", K.Bool, "yes makes a later <set> an error."))
+                new A("const", K.Bool, "true makes a later <set> an error."))
             {
-                Example = "<marray name=\"person\">\n  <item key=\"name\">Joan</item>\n  <item key=\"age\">82</item>\n</marray>",
+                Example = "<collection name=\"person\">\n  <item key=\"name\">Joan</item>\n  <item key=\"age\">82</item>\n</collection>",
             }, run =>
             {
                 object value = Items(run, run.Element);
@@ -399,12 +398,12 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("item", "An entry of <marray>. With `key` it is a map entry, without it a list item. Its text is the value (numbers become numbers); nested items make a list or map.", ContentKind.Template,
+            p.Element(new ElementInfo("item", "An entry of <collection>. With `key` it is a map entry, without it a list item. Its text is the value (numbers become numbers); nested items make a list or map.", ContentKind.Template,
                 new A("key", K.Text, "The key in the enclosing map."),
                 new A("value", K.Expression, "The value as an expression, instead of text."))
             {
-                MustBeInside = new[] { "marray", "item" },
-            }, run => throw run.Error($"<item> must be inside <marray>.", null, "Syntax"), ownsContent: true);
+                MustBeInside = new[] { "collection", "item" },
+            }, run => throw run.Error($"<item> must be inside <collection>.", null, "Syntax"), ownsContent: true);
         }
 
         private static bool? Assign(ElementRun run, bool declare)
@@ -494,7 +493,7 @@ namespace KScript.Runtime
         {
             string[] names = run.RequiredRaw("each").Split(',').Select(n => n.Trim().TrimStart('$')).Where(n => n.Length > 0).ToArray();
             if (names.Length == 0 || names.Length > 2) throw run.Error($"each=\"...\" names the loop variable (each=\"item\"), or a key and value for a map (each=\"key, value\").", "each", "Syntax");
-            string indexName = run.VariableName("index", required: false);
+            string indexName = run.VariableName("at", required: false);
             object source = run.Eval("in");
 
             List<(object Item, object Key)> items = source switch
@@ -559,18 +558,15 @@ namespace KScript.Runtime
                 }
                 else if (kind == "case")
                 {
-                    if (c.GetAttribute("is")?.Value is DecodedText isText)
-                    {
-                        hit = run.Interpreter.EvaluateList(isText, scope, run.Module).Any(o => o is List<object> options ? options.Any(x => Values.LooseEquals(x, value)) : Values.LooseEquals(o, value));
-                    }
-                    else if (c.GetAttribute("when")?.Value is DecodedText whenText)
-                    {
-                        hit = Values.Truthy(run.Interpreter.EvaluateText(whenText, scope, run.Module));
-                    }
-                    else
+                    DecodedText isText = c.GetAttribute("is")?.Value;
+                    DecodedText whenText = c.GetAttribute("when")?.Value;
+                    if (isText == null && whenText == null)
                     {
                         throw new KScriptException($"<case> needs is=\"...\" or when=\"...\".", "Syntax") { Offset = c.Span.Start, OffsetModule = run.Module };
                     }
+                    // With both, the value must be one of `is` and `when` must hold: 1, 2 when $ready => ...
+                    hit = (isText == null || run.Interpreter.EvaluateList(isText, scope, run.Module).Any(o => o is List<object> options ? options.Any(x => Values.LooseEquals(x, value)) : Values.LooseEquals(o, value)))
+                        && (whenText == null || Values.Truthy(run.Interpreter.EvaluateText(whenText, scope, run.Module)));
                 }
                 else
                 {
@@ -607,7 +603,7 @@ namespace KScript.Runtime
             ICallable fn = FindFunction(run, run.RequiredRaw("fn"));
             List<object> args = run.Has("args") ? run.EvalList("args") : new List<object>();
             object result = run.Interpreter.Call(fn, args, null, run.Scope, run.Module);
-            if (run.Has("to")) run.Scope.Declare(run.VariableName("to"), result);
+            if (run.Has("into")) run.Scope.Declare(run.VariableName("into"), result);
             return null;
         }
 
@@ -688,6 +684,11 @@ namespace KScript.Runtime
             var named = new Dictionary<string, object>();
             if (!string.IsNullOrWhiteSpace(message)) named["message"] = message;
             if (cause != null) named["cause"] = cause;
+            if (named.Count == 0 && !type.IsBuiltIn && type.Fields.Fields.Any(f => !f.Optional))
+            {
+                // throw PersonNotFound names the type alone, as a value does: say how to give its fields.
+                throw run.Error($"{type.Name} has fields, so throw it with them: {type.Name}({string.Join(", ", type.Fields.Fields.Where(f => !f.Optional).Select(f => f.Name + ": ..."))}).", "type", "Argument");
+            }
             try
             {
                 throw type.Create(run.Interpreter, Array.Empty<object>(), named);
@@ -833,7 +834,7 @@ namespace KScript.Runtime
                 Values.TryNumber(c.Arg(0), out double n) ? n : c.Has(1) ? c.Arg(1) : throw c.Error($"{Values.Describe(c.Arg(0))} is not a number.", "Type"));
             p.Command("string", "value", "Converts a value to text.", KType.String, c => Values.ToStr(c.Arg(0)));
             p.Command("uuid", "v?: int, name?: string, namespace?: string", "A new UUID. Version 4 (the default) is random. Version 8 is custom: with a name it is a SHA-256 hash of the namespace and the name, so the same name always gives the same UUID; without one it starts with the time, so newer ones sort later.", KType.Uuid,
-                c => UuidValue.New(c.Int(0, 4), c.Arg(1) == null ? null : c.Str(1), c.Arg(2) == null ? null : c.Str(2)), "@uuid()->version()");
+                c => UuidValue.New(c.Int(0, 4), c.Arg(1) == null ? null : c.Str(1), c.Arg(2) == null ? null : c.Str(2)), "@uuid().version");
             p.Command("type", "value", "The type of a value: string, number, bool, list, map, fn, date or null, or the name of the <type> that made a record.", KType.String, c => Shapes.TypeName(c.Arg(0)));
             p.Command("min", "values...", "The smallest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: true));
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));

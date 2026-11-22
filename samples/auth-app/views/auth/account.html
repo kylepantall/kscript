@@ -1,5 +1,5 @@
 <import package="KScript.Auth" />
-<layout src="/_layout.html" title="Your account">
+<layout path="/_layout.html" title="Your account">
   <h1>Your account</h1>
   <if test="$session->has('status')"><p class="status">{ $session->get('status') }</p></if>
   <p>Signed in as <strong>{ $data.user.name ?? $data.user.email }</strong> ({ $data.user.email }).</p>

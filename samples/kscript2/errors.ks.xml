@@ -1,8 +1,8 @@
 <kscript>
   <!-- Error types: declare each in its own file (errors/), throw them with their fields, and catch them by type. -->
 
-  <import src="errors/order-not-found.ks.xml" />
-  <import src="errors/out-of-stock.ks.xml" />
+  <import path="errors/order-not-found.ks.xml" />
+  <import path="errors/out-of-stock.ks.xml" />
 
   <let name="stock" value="{ tea: 2, coffee: 10 }" />
   <let
@@ -10,7 +10,7 @@
     value="[{ id: 1, item: 'tea', qty: 5 }, { id: 2, item: 'coffee', qty: 1 }]" />
 
   <fn name="place" params="id: int">
-    <let name="order" value="$orders->find(fn($o) => $o.id == $id)" />
+    <let name="order" value="$orders->find(fn(o) => $o.id == $id)" />
     <if $order == null>
       <throw value="OrderNotFound(id: $id)" />
     </if>

@@ -2,7 +2,7 @@
 to: {{ paths.views }}/auth/login.html
 ---
 <import package="KScript.Auth" />
-<layout src="{{ layout }}" title="Sign in">
+<layout path="{{ layout }}" title="Sign in">
   <h1>Sign in</h1>
   <if test="$session->has('status')"><p class="status">{ $session->get('status') }</p></if>
   <if test="$data.error != null"><p class="error">{ $data.error }</p></if>

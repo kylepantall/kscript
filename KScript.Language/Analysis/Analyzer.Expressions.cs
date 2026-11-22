@@ -42,7 +42,7 @@ namespace KScript.Language.Analysis
                 case VariableNode v:
                 {
                     TextSpan span = VariableNameSpan(v, region);
-                    ReferenceVariable(v.Name, span, scope, isWrite: false, mustBeMutable: false, offset: span.Start);
+                    CheckTypeIsBare(ReferenceVariable(v.Name, span, scope, isWrite: false, mustBeMutable: false, offset: span.Start), span);
                     return;
                 }
 
@@ -60,6 +60,11 @@ namespace KScript.Language.Analysis
                     AnalyzeExpr(m.Target, region, scope, ExprContext.Value);
                     TypeShape receiver = Infer(m.Target, region);
                     AnalyzeArguments(m.Arguments, region, scope, LambdaParameterShapes(m.Name, receiver));
+                    if (CheckRetiredConstructor(m, receiver, region))
+                    {
+                        FlushBare(m.Arguments, region, scope);
+                        return;
+                    }
                     CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false, m.Arguments, region);
                     if (m.Name == "sql" && receiver.Type == KType.Database)
                     {
@@ -128,7 +133,7 @@ namespace KScript.Language.Analysis
 
         /// <summary>
         /// The shapes of a lambda's parameters when it is passed to a list method: in
-        /// <c>$people-&gt;filter(fn($p) =&gt; $p.age gt 18)</c>, $p is one of $people's items, so $p. completes its fields.
+        /// <c>$people-&gt;filter(fn(p) =&gt; $p.age &gt; 18)</c>, $p is one of $people's items, so $p. completes its fields.
         /// </summary>
         private static TypeShape[] LambdaParameterShapes(string method, TypeShape receiver)
         {
@@ -151,7 +156,7 @@ namespace KScript.Language.Analysis
             argumentTexts.UnionWith(args.Select(a => a.Value).OfType<LiteralNode>());
             foreach (ArgumentNode arg in args)
             {
-                if (BareWord(arg) is (_, false, IdentifierNode typeNode) && (ReferenceBareType(typeNode, region, scope) || ReferenceBareErrorType(typeNode, region, scope)))
+                if (BareWord(arg) is (_, false, IdentifierNode typeNode) && (ReferenceDeclaredType(typeNode, region, scope) || ReferenceBareErrorType(typeNode, region, scope)))
                 {
                     continue;
                 }
@@ -172,7 +177,7 @@ namespace KScript.Language.Analysis
                     foreach (ExprNode item in list.Items)
                     {
                         if (item is IdentifierNode id && id.Name != "_" && scope.Lookup(id.Name, region.Source.ToSource(id.Span.Start)) is not { Kind: SymbolKind.Import }
-                            && !ReferenceBareType(id, region, scope))
+                            && !ReferenceDeclaredType(id, region, scope))
                         {
                             bare.Add(id);
                             continue;
@@ -196,7 +201,7 @@ namespace KScript.Language.Analysis
 
         private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context)
         {
-            if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceBareType(id, region, scope) || ReferenceBareErrorType(id, region, scope))
+            if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceDeclaredType(id, region, scope) || ReferenceBareErrorType(id, region, scope))
             {
                 return;
             }
@@ -218,6 +223,13 @@ namespace KScript.Language.Analysis
             else
             {
                 fixes.Add(new QuickFix($"Quote as '{id.Name}'", new TextChange(span, "'" + id.Name + "'")));
+                if (char.IsUpper(id.Name[0]))
+                {
+                    // A capitalised word reads as a type, model, enum, error or job: one that isn't declared or imported here.
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedVariable,
+                        $"No type named {id.Name} is declared or imported here. Text needs quotes ('{id.Name}').", fixes);
+                    return;
+                }
                 hint = $" Variables start with $ ($" + id.Name + "), and text needs quotes ('" + id.Name + "').";
             }
             Report(span, DiagnosticSeverity.Error, DiagnosticCodes.BareIdentifier, $"'{id.Name}' isn't a value." + hint, fixes);
@@ -354,7 +366,7 @@ namespace KScript.Language.Analysis
                 Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
                     $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode
                         ? $"import KScript.Name as {aliasName} or import \"...\" as {aliasName}."
-                        : $"<import package=\"...\" as=\"{aliasName}\" /> or <import src=\"...\" as=\"{aliasName}\" />."),
+                        : $"<import package=\"...\" as=\"{aliasName}\" /> or <import path=\"...\" as=\"{aliasName}\" />."),
                     SuggestFix(aliasSpan, aliasName, aliases, n => n));
                 return;
             }
@@ -391,11 +403,15 @@ namespace KScript.Language.Analysis
                             }
                             return;
                         }
+                        if (AnalyzeTypeCall(call, id, region, scope, piped: true))
+                        {
+                            return;
+                        }
                         CheckMethod(id.Name, span, left ?? TypeShape.Unknown, call.Arguments.Count, pipe: true, call.Arguments, region);
                         return;
                     }
 
-                    if (AnalyzeErrorCall(call, id, region, scope) || AnalyzeJobCall(call, id, region, scope))
+                    if (AnalyzeErrorCall(call, id, region, scope) || AnalyzeJobCall(call, id, region, scope) || AnalyzeTypeCall(call, id, region, scope, piped: false))
                     {
                         return;
                     }
@@ -405,8 +421,9 @@ namespace KScript.Language.Analysis
                         Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Call functions with @: @{id.Name}(...).",
                             new[] { new QuickFix($"Change to @{id.Name}", new TextChange(new TextSpan(span.Start, 0), "@")) });
                     }
-                    else if (catalog.GetCommand(id.Name) != null)
+                    else if (!char.IsUpper(id.Name[0]) && catalog.GetCommand(id.Name) != null)
                     {
+                        // A capitalised name is a type being called (User($data)), never a command spelt without @.
                         Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Commands start with @: @{id.Name}(...).",
                             new[] { new QuickFix($"Change to @{id.Name}", new TextChange(new TextSpan(span.Start, 0), "@")) });
                     }
@@ -563,6 +580,10 @@ namespace KScript.Language.Analysis
 
             string type = (types ??= new TypeInference(catalog, result)).ReceiverType(name, receiver);
             List<CallableInfo> candidates = catalog.GetMethods(name, type).ToList();
+            if (!pipe && (candidates.Count == 0 || (receiver.Type != KType.Any && !candidates.Any(m => m.ReceiverType == receiver.Type || m.ReceiverType == KType.Any))) && FieldOrRetired(name, nameSpan, receiver))
+            {
+                return;
+            }
             if (candidates.Count == 0)
             {
                 IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Concat(receiver.Kind != null ? catalog.MethodsFor(receiver.Kind) : Enumerable.Empty<CallableInfo>()).Select(m => m.Name).Concat(receiver.Methods.Keys)
@@ -624,6 +645,53 @@ namespace KScript.Language.Analysis
             }
         }
 
+        /// <summary>
+        /// <c>->status()</c> where status is a field (<c>.status</c>), or a method that was renamed (<c>->put()</c> is
+        /// <c>->set()</c>): reports it with a fix and returns true.
+        /// </summary>
+        private bool FieldOrRetired(string name, TextSpan nameSpan, TypeShape receiver)
+        {
+            bool unknown = receiver.Type == KType.Any;
+            // A renamed method of this very type comes first: storage's ->path(name) is ->path_of(name), though .path is a field.
+            RetiredInfo retired = catalog.GetRetiredMethod(receiver.Type, name);
+            ValueFieldInfo field = retired != null ? null
+                : catalog.GetField(receiver.Type, name) ?? catalog.GetField(receiver.Kind, name) ?? (unknown ? catalog.Fields.FirstOrDefault(f => f.Name == name) : null);
+            if (field != null)
+            {
+                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod,
+                    $"{name} is a field of {Article(field.Receiver)}, not a method. Read it with a dot and no brackets: .{name}",
+                    CallToField(nameSpan, name) is TextChange change ? new[] { new QuickFix($"Change to .{name}", change) } : null);
+                return true;
+            }
+            retired ??= unknown ? catalog.GetRetiredMethod(name) : null;
+            if (retired == null)
+            {
+                return false;
+            }
+            QuickFix fix = retired.Rename == null ? null
+                : retired.Rename.StartsWith('.') ? (CallToField(nameSpan, retired.Rename.Substring(1)) is TextChange toField ? new QuickFix($"Change to {retired.Rename}", toField) : null)
+                : new QuickFix($"Change to {retired.Rename}", new TextChange(nameSpan, retired.Rename));
+            Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod, $"->{name}() is no longer part of KScript. {retired.Replacement}", fix != null ? new[] { fix } : null);
+            return true;
+        }
+
+        /// <summary>The edit that turns <c>->name()</c> at <paramref name="nameSpan"/> into <c>.field</c>, or null when it has arguments.</summary>
+        private TextChange CallToField(TextSpan nameSpan, string field)
+        {
+            string text = result.Source.Text;
+            int start = nameSpan.Start;
+            while (start > 0 && char.IsWhiteSpace(text[start - 1])) start--;
+            if (start < 2 || text[start - 2] != '-' || text[start - 1] != '>') return null;
+            start -= 2;
+            int end = nameSpan.End;
+            while (end < text.Length && char.IsWhiteSpace(text[end])) end++;
+            if (end >= text.Length || text[end] != '(') return null;
+            end++;
+            while (end < text.Length && char.IsWhiteSpace(text[end])) end++;
+            if (end >= text.Length || text[end] != ')') return null;
+            return new TextChange(TextSpan.FromBounds(start, end + 1), "." + field);
+        }
+
         private void CheckField(MemberNode member, ExpressionRegion region)
         {
             TypeShape target = Infer(member.Target, region);
@@ -635,6 +703,16 @@ namespace KScript.Language.Analysis
                 Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownMethod,
                     $"{(target.Type == KType.Request ? "$request" : "An error")} has no field '{member.Name}'. It has: {string.Join(", ", target.Fields.Keys)}.",
                     SuggestFix(span, member.Name, target.Fields.Keys, n => n));
+                return;
+            }
+            // $response.json: a method of the value, read as a field.
+            if (member.Name.Length > 0 && !target.Fields.ContainsKey(member.Name) && catalog.FieldsOf(target.Type) is { Count: > 0 } builtIn && !builtIn.ContainsKey(member.Name)
+                && target.Type != KType.Type && catalog.GetMethods(member.Name, target.Type).Any(m => m.ReceiverType == target.Type))
+            {
+                TextSpan at = region.Source.ToSource(TextSpan.FromBounds(member.NameSpan.Start - 1, member.NameSpan.End));
+                Report(at, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownField,
+                    $"{member.Name} is a method of {Article(target.Type)}, not a field. Call it with ->{member.Name}().",
+                    member.NullSafe ? null : new[] { new QuickFix($"Change to ->{member.Name}()", new TextChange(at, "->" + member.Name + "()")) });
             }
         }
 

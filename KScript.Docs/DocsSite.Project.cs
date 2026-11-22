@@ -129,7 +129,7 @@ namespace KScript.Docs
 
         /// <summary>How another script imports the file, in both formats.</summary>
         private static string ImportExample(string path) =>
-            Html.Code($"<import src=\"{path}\" />", "xml");
+            Html.Code($"<import path=\"{path}\" />", "xml");
 
         private static void Entry(ProjectGuide.ScriptFile file, ProjectGuide.Declaration d, StringBuilder sb)
         {

@@ -10,7 +10,7 @@ namespace KScript.Runtime
     /// <c>catch NotFound</c> catches it and every error type that extends it, <c>NotFound(id: 42)</c> makes one, and a
     /// <c>status</c> (its own or a parent's) is the HTTP status KScript.Http answers with when a route doesn't catch it.
     /// </summary>
-    public sealed class ErrorType : IKObject
+    public sealed class ErrorType : IKObject, IDeclaredType
     {
         private readonly string parentName;
         private ErrorType parent;
@@ -208,11 +208,7 @@ namespace KScript.Runtime
             switch (name)
             {
                 case "new":
-                    result = Create(call.Interpreter, call.Args, call.Named).ToValue();
-                    return true;
-                case "fields":
-                    result = FieldList();
-                    return true;
+                    throw new KScriptException($"->new() is gone: call the error type to make an error, {Name}(...).", "Retired");
                 default:
                     result = null;
                     return false;
@@ -229,13 +225,20 @@ namespace KScript.Runtime
 
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("new", "fields...", "Makes an error of this type without throwing it: $NotFound->new(id: 42). Throw it later with throw $e.", "error"),
-            ("fields", "", "The error's fields (its own and the ones it inherits): name, type, optional and description.", "list"),
+        };
+
+        internal static readonly (string Name, string Type, string Description)[] ValueFields =
+        {
+            ("name", "string", "The error type's name."),
+            ("extends", "string", "The error type it extends, or null."),
+            ("status", "number", "The HTTP status errors of this type carry, such as 404, or null."),
+            ("description", "string", "What the error type is for, or null."),
+            ("fields", "list", "The error's fields (its own and the ones it inherits): name, type, optional and description."),
         };
     }
 
     /// <summary>
-    /// A caught error: what <c>catch NotFound as e</c> and <c>&lt;expect-error as&gt;</c> declare. It is a map
+    /// A caught error: what <c>catch NotFound as e</c> and <c>&lt;expect_error as&gt;</c> declare. It is a map
     /// (<c>$e.type</c>, <c>$e.message</c>, <c>$e.status</c>, <c>$e.cause</c>, its fields), so it prints and converts to
     /// JSON like one, and it remembers the error so <c>throw $e</c> rethrows it unchanged.
     /// </summary>

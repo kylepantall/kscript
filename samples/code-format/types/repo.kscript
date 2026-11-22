@@ -10,7 +10,7 @@ type Repo {
   stars: int from stargazers_count
   owner: Owner
   topics: string[] = []
-  license: string? from license.name
+  license?: string from license.name
   visibility: Visibility
   updated: date from updated_at
   label => $name + ' (' + $stars + ' stars)'

@@ -268,11 +268,20 @@ namespace KScript.Runtime
     }
 
     /// <summary>
-    /// The value of <c>&lt;type name="Repo"&gt;</c>: the shape some data must have. <c>$Repo->from($data)</c> checks the
-    /// data and makes a <see cref="Record"/> of it; <c>$Repo->check($data)</c> lists the problems instead; and
-    /// <c>$Repo->schema()</c> describes it as JSON Schema.
+    /// A value that is a declared type: a type, model, enum, error type or job. Scripts name it bare (<c>Repo</c>,
+    /// never <c>Repo</c>), and calling it makes a value of it: <c>Repo($data)</c>, <c>OutOfStock(item: 'tea')</c>.
     /// </summary>
-    public sealed class RecordType : IKObject
+    public interface IDeclaredType
+    {
+        string Name { get; }
+    }
+
+    /// <summary>
+    /// The value of <c>&lt;type name="Repo"&gt;</c>: the shape some data must have. <c>Repo($data)</c> checks the
+    /// data and makes a <see cref="Record"/> of it; <c>Repo->check($data)</c> lists the problems instead; and
+    /// <c>Repo->schema()</c> describes it as JSON Schema.
+    /// </summary>
+    public sealed class RecordType : IKObject, IDeclaredType
     {
         internal RecordType(string name, string description, ExtraKeys extra, Scope closure, Module module)
         {
@@ -350,6 +359,22 @@ namespace KScript.Runtime
 
         public string ToText() => Name;
 
+        /// <summary>
+        /// <c>Repo($data)</c> or <c>Repo(name: 'x', stars: 2)</c>: checks the data (a map, a list of maps, or JSON text)
+        /// or the fields given by name, and returns it as this type. Fails with every problem it finds.
+        /// </summary>
+        internal object Construct(Interpreter interpreter, IReadOnlyList<object> args, IReadOnlyDictionary<string, object> named)
+        {
+            if (args.Count > 1 || (args.Count == 1 && named.Count > 0))
+            {
+                throw new KScriptException($"{Name}() takes the data to check ({Name}($data)) or its fields by name ({Name}({Example()})).", "Argument");
+            }
+            object data = args.Count == 1 ? (ReadsText ? args[0] : Shapes.ParseIfText(args[0])) : new Dictionary<string, object>(named, StringComparer.Ordinal);
+            return Shapes.MapAs(interpreter, data, this, "The data");
+        }
+
+        private string Example() => fields.Count == 0 ? "..." : string.Join(", ", fields.Take(2).Select(f => f.Name + ": ..."));
+
         public bool TryGetMember(string name, out object value)
         {
             value = name switch
@@ -367,8 +392,7 @@ namespace KScript.Runtime
             switch (name)
             {
                 case "from":
-                    result = Shapes.MapAs(call.Interpreter, ReadsText ? call.Arg(0) : Shapes.ParseIfText(call.Arg(0)), this, $"The data");
-                    return true;
+                    throw new KScriptException($"->from() is gone: call the type to make a value of it, {Name}($data) or {Name}(field: value).", "Retired");
                 case "check":
                     result = Shapes.Problems(call.Interpreter, ReadsText ? call.Arg(0) : Shapes.ParseIfText(call.Arg(0)), this);
                     return true;
@@ -377,12 +401,6 @@ namespace KScript.Runtime
                     return true;
                 case "schema":
                     result = Shapes.Schema(this);
-                    return true;
-                case "fields":
-                    result = FieldList();
-                    return true;
-                case "name":
-                    result = Name;
                     return true;
                 default:
                     result = null;
@@ -402,12 +420,16 @@ namespace KScript.Runtime
 
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("from", "data", "Checks the data (a map, a list of maps, or JSON text) and returns it as this type. Fails with every problem it finds.", "any"),
             ("check", "data", "The problems that stop the data fitting this type, as { path, field, message } maps. Empty when it fits.", "list"),
-            ("is", "value", "yes if the value is a record of this type, or of a type built on it with with [...]. Given a type, yes if that type is this one or is built on it.", "bool"),
+            ("is", "value", "True when the value is a record of this type, or of a type built on it with with [...]. Given a type, true when that type is this one or is built on it.", "bool"),
             ("schema", "", "The type as a JSON Schema map.", "map"),
-            ("fields", "", "The type's fields: name, type, optional, from, computed and description.", "list"),
-            ("name", "", "The type's name.", "string"),
+        };
+
+        internal static readonly (string Name, string Type, string Description)[] ValueFields =
+        {
+            ("name", "string", "The type's name."),
+            ("description", "string", "What the type is for, or null."),
+            ("fields", "list", "The type's fields: name, type, optional, from, computed and description."),
         };
     }
 
@@ -488,7 +510,7 @@ namespace KScript.Runtime
         }
 
         /// <summary>
-        /// Maps data to a type given as an argument (<c>as: Repo</c>, <c>$Repo->from()</c>): a type value, or a type
+        /// Maps data to a type given as an argument (<c>as: Repo</c>, <c>Repo()</c>): a type value, or a type
         /// written as text ('Repo[]'). A list given to a record type is mapped item by item.
         /// </summary>
         public static object MapAs(Interpreter interpreter, object value, object type, string what, Scope scope = null, Module module = null)
@@ -665,11 +687,11 @@ namespace KScript.Runtime
             }
             if (run.Element.GetAttribute("parse")?.Value is DecodedText parse) type.Parse = parse;
 
-            string sample = run.Raw("sample");
+            string sample = run.Raw("path");
             if (sample != null)
             {
                 string path = run.Host.ResolvePath(sample, run.Module.Directory);
-                if (!File.Exists(path)) throw run.Error($"The sample file '{sample}' doesn't exist.", "sample", "FileNotFound");
+                if (!File.Exists(path)) throw run.Error($"The sample file '{sample}' doesn't exist.", "path", "FileNotFound");
                 object data;
                 try
                 {
@@ -677,7 +699,7 @@ namespace KScript.Runtime
                 }
                 catch (KScriptException ex)
                 {
-                    throw run.Error($"The sample file '{sample}' isn't JSON: {ex.Message}", "sample", "Json");
+                    throw run.Error($"The sample file '{sample}' isn't JSON: {ex.Message}", "path", "Json");
                 }
                 SampleTypes.Fill(type, data, sample, run);
             }
@@ -762,8 +784,8 @@ namespace KScript.Runtime
         {
             TypeRef baseType = TypeRef.Parse(baseName);
             if (baseType.Optional) throw run.Error($"with=\"{baseName}\": a type's base can't allow null. Write {name}? where the type is used instead.", "with", "Syntax");
-            if (run.Has("fields") || run.Has("sample"))
-                throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it has rules (min, max, pattern, validate...) rather than fields.", run.Has("fields") ? "fields" : "sample", "Syntax");
+            if (run.Has("fields") || run.Has("path"))
+                throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it has rules (min, max, pattern, validate...) rather than fields.", run.Has("fields") ? "fields" : "path", "Syntax");
             if (!baseType.IsBuiltIn && baseType.Args == null && baseType.ListDepth == 0 && run.Scope.TryGet(baseType.Name, out object found) && found is RefinedType inner) baseType = TypeRef.Of(inner);
             TypeRules rules = TypeRules.Read(run.Element, run);
             foreach (MarkupElement e in run.ChildElements)
@@ -1395,7 +1417,7 @@ namespace KScript.Runtime
         }
     }
 
-    /// <summary>Fields taken from a sample of the data: <c>&lt;type name="Repo" sample="repo.json" /&gt;</c>.</summary>
+    /// <summary>Fields taken from a sample of the data: <c>&lt;type name="Repo" path="repo.json" /&gt;</c>.</summary>
     internal static class SampleTypes
     {
         public static void Fill(RecordType type, object data, string file, ElementRun run)
@@ -1404,7 +1426,7 @@ namespace KScript.Runtime
             {
                 Dictionary<string, object> m => m,
                 List<object> list when list.Count > 0 && list.All(i => i is Dictionary<string, object>) => MergeMaps(list.Cast<Dictionary<string, object>>().ToList()),
-                _ => throw run.Error($"The sample file '{file}' must hold a JSON object, or a list of objects.", "sample", "Syntax"),
+                _ => throw run.Error($"The sample file '{file}' must hold a JSON object, or a list of objects.", "path", "Syntax"),
             };
             HashSet<string> partial = data is List<object> items ? KeysNotInAll(items.Cast<Dictionary<string, object>>().ToList()) : new HashSet<string>();
             foreach (FieldDefinition f in FieldsOf(map, partial, type.Name, type, 0)) type.SetField(f);

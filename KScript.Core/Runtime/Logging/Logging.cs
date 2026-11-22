@@ -111,7 +111,7 @@ namespace KScript.Runtime
         void Flush();
     }
 
-    /// <summary>What a provider is made from: its options (from config or &lt;log-provider&gt;) and the script.</summary>
+    /// <summary>What a provider is made from: its options (from config or &lt;log_provider&gt;) and the script.</summary>
     public sealed class LogProviderContext
     {
         public Dictionary<string, object> Options { get; init; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -505,7 +505,7 @@ namespace KScript.Runtime
                 if (c.Module?.Globals == null || !c.Module.Globals.TryGet(clean, out fn))
                     throw new KScriptException($"{c.Where}: there is no function called {clean}. Declare it with <fn name=\"{clean}\" params=\"entry\" ...>.", "Config");
             }
-            function = fn as ICallable ?? throw new KScriptException($"{c.Where}: fn should be a function, such as fn($entry) => ..., but got {Values.Describe(fn)}.", "Config");
+            function = fn as ICallable ?? throw new KScriptException($"{c.Where}: fn should be a function, such as fn(entry) => ..., but got {Values.Describe(fn)}.", "Config");
         }
 
         public void Write(LogEntry entry) =>
@@ -622,8 +622,8 @@ namespace KScript.Runtime
                     result = new LoggerValue(Interpreter, Module, Category == null ? category : Category + "." + category, Fields);
                     return true;
                 }
-                case "enabled":
-                    result = Hub.IsEnabled(LogLevels.Parse(call.Need(0), "$log->enabled()"), Category);
+                case "is_enabled":
+                    result = Hub.IsEnabled(LogLevels.Parse(call.Need(0), "$log->is_enabled()"), Category);
                     return true;
                 case "entries":
                     result = Hub.Entries().Select(e => (object)e.ToMap()).ToList();

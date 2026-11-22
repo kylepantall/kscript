@@ -98,7 +98,7 @@ public sealed class ConvertProjectTests : IDisposable
     public void ImportsFollowFilesConvertedInTheSameRun()
     {
         Write("lib/a.ks.xml", "<kscript>\n  <fn name=\"a\" value=\"1\" />\n</kscript>");
-        Write("main.ks.xml", "<kscript>\n  <!-- Uses lib/a.ks.xml: <import src=\"lib/a.ks.xml\" /> -->\n  <import src=\"lib/a.ks.xml\" />\n  <import src=\"other.ks.xml\" />\n  <echo value=\"@run_script('lib/a.ks.xml')\" />\n</kscript>");
+        Write("main.ks.xml", "<kscript>\n  <!-- Uses lib/a.ks.xml: <import path=\"lib/a.ks.xml\" /> -->\n  <import path=\"lib/a.ks.xml\" />\n  <import path=\"other.ks.xml\" />\n  <echo value=\"@run_script('lib/a.ks.xml')\" />\n</kscript>");
         Write("other.ks.xml", "<kscript />");
 
         // Only main.ks.xml and the library: other.ks.xml stays XML, and the import of it is kept with a note.
@@ -116,7 +116,7 @@ public sealed class ConvertProjectTests : IDisposable
     public void ImportsOfScriptsConvertedEarlierFollowThem()
     {
         Write("lib/a.kscript", "fn a() => 1");
-        Write("main.ks.xml", "<kscript>\n  <import src=\"lib/a.ks.xml\" />\n</kscript>");
+        Write("main.ks.xml", "<kscript>\n  <import path=\"lib/a.ks.xml\" />\n</kscript>");
         Assert.Equal(0, Convert(Path.Combine(dir, "main.ks.xml")).Code);
         Assert.Equal("import \"lib/a.kscript\"\n", Read("main.kscript"));
 
@@ -124,7 +124,7 @@ public sealed class ConvertProjectTests : IDisposable
         Write("b.kscript", "import \"lib/a.kscript\"");
         Write("lib/a.ks.xml", "<kscript />");
         Assert.Equal(0, Convert(Path.Combine(dir, "b.kscript")).Code);
-        Assert.Contains("<import src=\"lib/a.ks.xml\" />", Read("b.ks.xml"));
+        Assert.Contains("<import path=\"lib/a.ks.xml\" />", Read("b.ks.xml"));
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public sealed class ConvertProjectTests : IDisposable
     public void TestFilesConvertAndRunAsKscript()
     {
         Write("lib/m.ks.xml", "<kscript>\n  <fn name=\"double\" params=\"x\" value=\"$x * 2\" />\n</kscript>");
-        Write("tests/m.test.ks.xml", "<kscript>\n  <import src=\"../lib/m.ks.xml\" />\n  <describe name=\"double\">\n    <test name=\"doubles\">\n      <expect value=\"@double(2)\" equals=\"4\" />\n    </test>\n  </describe>\n</kscript>");
+        Write("tests/m.test.ks.xml", "<kscript>\n  <import path=\"../lib/m.ks.xml\" />\n  <describe name=\"double\">\n    <test name=\"doubles\">\n      <expect value=\"@double(2)\" equals=\"4\" />\n    </test>\n  </describe>\n</kscript>");
         Assert.Equal(0, Convert(dir).Code);
         string test = Read("tests/m.test.kscript");
         Assert.Contains("describe(name: \"double\") {", test);

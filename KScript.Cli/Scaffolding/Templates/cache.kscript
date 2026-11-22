@@ -24,7 +24,7 @@ fn saved() => @exists($file) ? @read_json($file) : {}
 fn remember(key: string, make: fn, minutes = {{ minutes ?? 10 }}) {
   entries = @saved()
   entry = $entries[$key]
-  if $entry != null and @date($entry.expires) gt @now() {
+  if $entry != null and @date($entry.expires) > @now() {
     return $entry.value
   }
   value = $make()

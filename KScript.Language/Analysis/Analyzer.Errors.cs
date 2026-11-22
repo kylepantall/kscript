@@ -8,7 +8,7 @@ namespace KScript.Language.Analysis
 {
     /// <summary>
     /// Error types: &lt;error&gt; declarations (<c>error NotFound(status: 404) extends Validation { id: int }</c>), the
-    /// names in <c>catch</c>, <c>throw</c>, <c>extends</c> and <c>expect-error</c>, and calls that make errors
+    /// names in <c>catch</c>, <c>throw</c>, <c>extends</c> and <c>expect_error</c>, and calls that make errors
     /// (<c>NotFound(id: 42)</c>). A caught error completes the fields of the types its catch names.
     /// </summary>
     public sealed partial class Analyzer
@@ -234,7 +234,7 @@ namespace KScript.Language.Analysis
             }
         }
 
-        /// <summary>Checks the names in a catch's, throw's, extends' or expect-error's type: each must be an error type.</summary>
+        /// <summary>Checks the names in a catch's, throw's, extends' or expect_error's type: each must be an error type.</summary>
         private void CheckErrorTypeAttribute(MarkupElement e, MarkupAttribute attr, Scope scope)
         {
             string text = attr.ValueText.Trim();
@@ -310,7 +310,7 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>
-        /// What a catch (or expect-error) declares: an error with the fields of the types it names, so
+        /// What a catch (or expect_error) declares: an error with the fields of the types it names, so
         /// <c>catch NotFound as e</c> completes <c>$e.id</c>. With no types, any error.
         /// </summary>
         private TypeShape CaughtErrorShape(MarkupElement e, Scope scope)

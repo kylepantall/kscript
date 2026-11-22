@@ -3,7 +3,7 @@ type Username with [handle] {
   min: 3
   max: 16
   not: [@admin, @root]
-  validate: not $value->name()->contains('--'), "can't have two dashes in a row"
+  validate: not $value.name->contains('--'), "can't have two dashes in a row"
 }
 
 type Signup {
@@ -17,9 +17,9 @@ fn sign_up(form: Signup) {
   return { handle: $form.handle, email: $form.email, stored: $stored->starts_with('$argon2id$') }
 }
 
-echo @sign_up($Signup->from({ handle: '@Joan_S', email: ' Joan@Example.COM ', password: 'correct horse battery staple' }))
+echo @sign_up(Signup({ handle: '@Joan_S', email: ' Joan@Example.COM ', password: 'correct horse battery staple' }))
 try {
-  @sign_up($Signup->from({ handle: '@a--b', email: 'joan@', password: 'short' }))
+  @sign_up(Signup({ handle: '@a--b', email: 'joan@', password: 'short' }))
 } catch err {
   echo $err.message
 }

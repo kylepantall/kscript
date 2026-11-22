@@ -89,6 +89,16 @@ namespace KScript.Runtime
         /// <summary>True when the root is a package element (&lt;KScript.Window&gt;) rather than &lt;kscript&gt;.</summary>
         public bool IsPackageRoot { get; internal set; }
 
+        /// <summary>
+        /// The thing a file describes, when it describes one: the root of an XML file (<c>&lt;KScript.Routes&gt;</c>), or
+        /// the one PascalCase statement at the top level of a script (<c>Routes { }</c> after its imports). Null for a
+        /// plain script.
+        /// </summary>
+        public MarkupElement MainElement { get; internal set; }
+
+        /// <summary>The name of <see cref="MainElement"/> without a package prefix (<c>Routes</c>, <c>Window</c>), or null.</summary>
+        public string MainElementName => MainElement == null ? null : Metadata.ElementInfo.BareName(MainElement.Name);
+
         /// <summary>The packages this script can use, KScript.Core first.</summary>
         public IReadOnlyList<KScriptPackage> Packages => packages;
 
@@ -102,6 +112,8 @@ namespace KScript.Runtime
         internal readonly Dictionary<string, ElementDefinition> Elements = new Dictionary<string, ElementDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, CommandDefinition> Commands = new Dictionary<string, CommandDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, MethodDefinition> Methods = new Dictionary<string, MethodDefinition>(StringComparer.Ordinal);
+        /// <summary>Fields the imported packages add to values, by "receiver:name".</summary>
+        internal readonly Dictionary<string, ValueFieldDefinition> Fields = new Dictionary<string, ValueFieldDefinition>(StringComparer.Ordinal);
         /// <summary>Methods this script's extend blocks add, and those of the scripts it imports, by "receiver:name".</summary>
         internal readonly Dictionary<string, ExtensionMethod> Extensions = new Dictionary<string, ExtensionMethod>(StringComparer.Ordinal);
 
@@ -114,7 +126,7 @@ namespace KScript.Runtime
         /// <summary>Each element's definition, found when the script was checked.</summary>
         internal readonly Dictionary<MarkupElement, ElementDefinition> Resolved = new Dictionary<MarkupElement, ElementDefinition>(ReferenceEqualityComparer.Instance);
 
-        /// <summary>Scripts imported with &lt;import src&gt;, by their import element.</summary>
+        /// <summary>Scripts imported with &lt;import path&gt;, by their import element.</summary>
         internal readonly Dictionary<MarkupElement, Module> ScriptImports = new Dictionary<MarkupElement, Module>(ReferenceEqualityComparer.Instance);
 
         internal readonly Dictionary<object, ParseResult> ParseCache = new Dictionary<object, ParseResult>(ReferenceEqualityComparer.Instance);

@@ -126,7 +126,7 @@ namespace KScript.LanguageServer
                 if (fix)
                 {
                     // Rewrite the spellings that have one right form, then report what is left.
-                    (string fixedText, int count) = Fixer.Apply(fileText, file, isExplicit ? null : config);
+                    (string fixedText, int count) = Fixer.Apply(fileText, file, isExplicit ? null : config, KScript.Syntax.Markup.CodeParser.IsArmFix);
                     if (count > 0 && fixedText != fileText)
                     {
                         File.WriteAllText(file, fixedText);

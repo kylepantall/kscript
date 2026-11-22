@@ -1,12 +1,13 @@
 // API routes: everything here is under /api and answers errors with JSON.
-KScript.Routes(middleware: api) {
-  import "controllers/people.ks.xml" as people
-  import "middleware/security.ks.xml"
+import KScript.Http
+import "controllers/people.ks.xml" as people
+import "middleware/security.ks.xml"
 
+Routes(middleware: api) {
   // Every API response gets the security headers.
   Middleware(use: [secure_headers])
 
-  Get(path: "/health", to: people.health)
+  Get(path: "/health", to: @people.health)
   Resource(path: "/people", to: people, only: [index, show])
 
   Group(middleware: [auth, json_only]) {

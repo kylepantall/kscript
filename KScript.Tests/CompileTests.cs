@@ -536,7 +536,7 @@ public sealed class CompileTests : IDisposable
     public void Terminal_programs_are_built_for_this_computer_from_the_running_kscript()
     {
         string runtime = RuntimeFile("kscript", ElfHost());
-        string script = Write("tool/hello.ks.xml", "<kscript>\n  <import package=\"KScript.Math\" />\n  <import src=\"lib/util.ks.xml\" />\n  <echo>@sqrt(4)</echo>\n</kscript>\n");
+        string script = Write("tool/hello.ks.xml", "<kscript>\n  <import package=\"KScript.Math\" />\n  <import path=\"lib/util.ks.xml\" />\n  <echo>@sqrt(4)</echo>\n</kscript>\n");
         Write("tool/lib/util.ks.xml", "<kscript />");
         Write("tool/hello.test.ks.xml", "<kscript />");
         Write("tool/.env", "SECRET=1");
@@ -676,7 +676,7 @@ public sealed class CompileTests : IDisposable
         Assert.Contains("The script has an error", Compile(Env(current: runtime), broken).Err);
 
         Write("shared/lib.ks.xml", "<kscript />");
-        string importer = Write("p5/main.ks.xml", "<kscript>\n  <import src=\"../shared/lib.ks.xml\" />\n</kscript>\n");
+        string importer = Write("p5/main.ks.xml", "<kscript>\n  <import path=\"../shared/lib.ks.xml\" />\n</kscript>\n");
         Assert.Contains("which is outside", Compile(Env(current: runtime), importer).Err);
 
         // A script outside its project's folder takes its own folder.

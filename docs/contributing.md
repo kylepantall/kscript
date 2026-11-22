@@ -41,14 +41,13 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | `samples/kscript2/` | Sample scripts. |
 | `samples/life-lab/` | Life Lab: one KScript program that runs in a terminal, in the browser and as a desktop app. |
 | `samples/auth-app/` | A site with accounts, made by `kscript make auth --api` (see [Sign-in](auth.md)). |
-| `Example Scripts/` | More sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 
 ## Tests and CI
 
 `KScript.Tests` covers the interpreter, every package, `kscript serve` pages, `kscript make`, `kscript.json` and the sample scripts; `KScript.Language.Tests` covers the analyzer, the editor features and the language server. Run them with `dotnet test KScript.sln`.
 
-Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `Example Scripts/Find Oldest Person.xml`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
+Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/kscript2/oldest.ks.xml`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
 
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
@@ -85,6 +84,22 @@ The first text says why and the second is what to use instead, as written in a s
 `Deprecate` throws if the key names nothing, so removing a parameter later can't leave a stale deprecation behind.
 
 The guides in `docs/` and the README are written by hand, so a test keeps them honest: `DocsTests.Every_example_in_the_guides_and_readme_matches_the_code` checks every `kscript` and `xml` example with the analyzer. It fails if an example uses an element, attribute, command, method or parameter that no longer exists, passes the wrong number of arguments, or uses something deprecated.
+
+## How the standard packages behave
+
+Every package follows the same rules, so what you learn in one works in the next. `StdlibBehaviourConventionTests` walks the whole catalog and fails when a package breaks one.
+
+**A name that answers true or false starts with `is_` or `has_`.** `$ip.is_private`, `$response.is_ok`, `$password->is_strong()`, `@is_signed_in()`, `$cache->has(key)`. The only other names allowed are verbs that ask a question about an argument, such as `->contains(x)`, `->starts_with(x)`, `->matches(x)` and `@exists(path)`, and actions that report whether they worked, such as `->remove(key)`. Both lists are short and are written out in the test. Descriptions say "True when ...".
+
+**A plain fact is a field; a method takes arguments or does work.** A field is read with a dot and no brackets: `$response.status`, `$file.name`, `$file.size`, `$date.year`, `$e.status`. A method is called with `->`: `$response->json()`, `$file->read_text()`, `$date->format('yyyy')`. A package adds a field with `p.Field(receiver, name, type, description)`. Calling a field (`$response->status()`) is an error that says to drop the brackets. A value whose fields are the user's own (a record's columns, a map's keys, `$config`'s settings) keeps its own facts as methods, so they can't clash with a column or setting of the same name.
+
+**Settings are read one way.** `$config.database.host`, and `$config->get('database.host', 'localhost')` when the path is built at run time or needs a default.
+
+**Things kept by key use `get`, `set`, `has` and `remove`.** `clear` empties the whole thing. `delete` is for files and records (`$storage->delete(name)`, `$record->delete()`, `kscript queue delete`). `flush` only ever means "write out what is being held back" (`$log->flush()`). Storage reads and writes files, so it keeps `read`, `write` and `delete`.
+
+**A length of time is a duration.** `wait(duration: 500ms)`, `Timer(every: 100ms)`, `test(timeout: 5s)`, `@api($url, timeout: 30s)`, `job(timeout: 5m)`, `$cache->set(key, value, ttl: 10m)`. A duration is written as a number and a unit with no quotes: `ms`, `s`, `m`, `h`, `d` or `w`, and they can be joined (`1h30m`). A plain number is always seconds. There are no `ms:` or `seconds:` arguments. Declare an attribute as a duration with `new A(name, K.Expression, ...) { Type = Duration.TypeName }` and a parameter as `name?: duration`, and read it with `run.Seconds(name)` or `Duration.Seconds(value, what)`.
+
+**A table takes the same arguments everywhere.** The terminal's `table` and a document's `Table` both take `rows` (a list of maps, or a list of lists whose first row is the headings), `columns` (a list of keys, or a map from heading to key), `align` (a list of `left`, `center` or `right`) and `header: false` for no heading row. Both read them with `TableArguments`.
 
 ## Writing an error message
 

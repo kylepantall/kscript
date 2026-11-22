@@ -17,7 +17,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void CallsGiveUntypedParametersTheirTypes()
         {
-            string text = "fn cached(key, compute) => $compute($key)\nx = @cached('a', fn($k) => 1)\ny = @cached('b', fn($k) => 2)\necho $x + $y\n";
+            string text = "fn cached(key, compute) => $compute($key)\nx = @cached('a', fn(k) => 1)\ny = @cached('b', fn(k) => 2)\necho $x + $y\n";
             DocumentAnalysis a = Analyze(text);
             Symbol key = a.Symbols.Single(s => s.Name == "key");
             Assert.True(key.TypeFromCalls);
@@ -69,10 +69,10 @@ namespace KScript.Language.Tests
         public void RecordsAndListsOfThemAreWrittenByName()
         {
             string text = "type Task {\n  title: string\n}\nfn one(t) => $t.title\nfn all(ts) => $ts->count()\n"
-                + "t = $Task->from({ title: 'a' })\necho @one($t)\necho @all([$t])\n";
+                + "t = Task({ title: 'a' })\necho @one($t)\necho @all([$t])\n";
             Assert.Equal(new[] { ": Task", ": map[]" }, Warnings(text).Select(w => w.Fixes[0].Changes[0].NewText));
             Assert.Equal(": list", Warnings("fn f(grid) => $grid\necho @f([[1]])\n")[0].Fixes[0].Changes[0].NewText);
-            Assert.Empty(Warnings("type Task {\n  title: string\n}\nfn f(t) => $t\necho @f($Task)\n")[0].Fixes);
+            Assert.Empty(Warnings("type Task {\n  title: string\n}\nfn f(t) => $t\necho @f(Task)\n")[0].Fixes);
         }
 
         [Fact]
@@ -80,7 +80,7 @@ namespace KScript.Language.Tests
         {
             Assert.Empty(Warnings("fn f(a: int, b = 2, c: string = 'x') => $a + $b\necho @f(1)\n"));
             Assert.Empty(Warnings("import KScript.Queue\njob Send {\n  to: string\n  fn handle() {\n  }\n  fn failed(err) {\n    echo $err.message\n  }\n}\n"));
-            Assert.Empty(Warnings("echo [1]->map(fn($x) => $x * 2)\n"));
+            Assert.Empty(Warnings("echo [1]->map(fn(x) => $x * 2)\n"));
             // XML scripts are checked the same way.
             Assert.Single(Warnings("<kscript><fn name=\"f\" params=\"x\" value=\"$x\" /><echo>@f(1)</echo></kscript>", "a.ks.xml"));
             Assert.Equal(": number", Warnings("<kscript><fn name=\"f\" params=\"x\" value=\"$x\" /><echo>@f(1)</echo></kscript>", "a.ks.xml")[0].Fixes[0].Changes[0].NewText);

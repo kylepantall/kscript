@@ -360,7 +360,7 @@ public sealed class DocsTests
         Assert.Equal("hi\n", Playground.Run("<kscript>\n  <echo>hi</echo>\n</kscript>").Output);
         Assert.Equal("hi\n", Playground.Run("<!-- a comment -->\n<kscript><echo>hi</echo></kscript>").Output);
         Assert.Equal("6\n", Playground.Run("x = 2\necho \"{ $x * 3 }\"", "kscript").Output);
-        Assert.EndsWith("Joan\n", Playground.Run("<import package=\"KScript.Terminal\" />\n<input to=\"n\">Name? </input>\n<echo>$n</echo>", input: "Joan\n").Output);
+        Assert.EndsWith("Joan\n", Playground.Run("<import package=\"KScript.Terminal\" />\n<input into=\"n\">Name? </input>\n<echo>$n</echo>", input: "Joan\n").Output);
 
         Assert.True(Playground.IsWholeScript("<?xml version=\"1.0\"?><kscript/>"));
         Assert.True(Playground.IsWholeScript("<KScript.Window/>"));
@@ -418,7 +418,7 @@ public sealed class DocsTests
         Assert.NotNull(loop.Error);
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30));
 
-        PlaygroundResult wait = Playground.Run("<wait seconds=\"10\" />", timeout: TimeSpan.FromMilliseconds(300));
+        PlaygroundResult wait = Playground.Run("<wait duration=\"10s\" />", timeout: TimeSpan.FromMilliseconds(300));
         Assert.NotNull(wait.Error);
 
         PlaygroundResult big = Playground.Run("<for each=\"i\" in=\"0..2000\"><echo>{ 'x'->repeat(60) }</echo></for>");
@@ -866,8 +866,8 @@ public sealed class DocsTests
         Assert.Contains("<span class=\"f-xml\">A branch of &lt;match&gt;:", core.Body);
         Assert.Contains("<a href=\"#el-break\"><span class=\"f-xml\">&lt;break&gt;</span><span class=\"f-ks\">break</span></a>", html);
         Assert.Contains("<a href=\"#elements\"><span class=\"f-xml\">Elements</span><span class=\"f-ks\">Statements</span></a>", html);
-        Assert.Equal("KScript.Window", DocsSite.CodeName(site.Catalog.GetElement("Window")));
-        Assert.Contains("A file made of a <code>KScript.Window { }</code> block imports it for you.", site.Find("/reference/ui").Body);
+        Assert.Equal("Window", DocsSite.CodeName(site.Catalog.GetElement("Window")));
+        Assert.Contains("A .kscript file names a package only in its import: write <code>Window { }</code>, never <code>KScript.Window { }</code>.", site.Find("/reference/ui").Body);
 
         string css = DocsSite.ReadAsset("docs.css");
         Assert.Contains(":root[data-format=\"kscript\"] .f-xml, :root:not([data-format=\"kscript\"]) .f-ks { display: none; }", css);

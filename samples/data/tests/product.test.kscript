@@ -3,19 +3,19 @@ import "../models/product.kscript"
 
 describe(name: 'Product') {
   test(name: 'is saved and found again') {
-    $db->create_table($Product)
-    tea = $Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
-    expect(value: $Product->find($tea.id).name, equals: 'Black tea')
+    $db->create_table(Product)
+    tea = Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
+    expect(value: Product->find($tea.id).name, equals: 'Black tea')
     expect(value: $tea.stock, equals: 0)
-    $db->drop_table($Product)
+    $db->drop_table(Product)
   }
 
   test(name: 'keeps skus unique') {
-    $db->create_table($Product)
-    $Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
-    expect-error(type: UniqueViolation) {
-      $Product->create(sku: 'TEA-9', name: 'Other tea', price: 6)
+    $db->create_table(Product)
+    Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
+    expect_error(type: UniqueViolation) {
+      Product->create(sku: 'TEA-9', name: 'Other tea', price: 6)
     }
-    $db->drop_table($Product)
+    $db->drop_table(Product)
   }
 }

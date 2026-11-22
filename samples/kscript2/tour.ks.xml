@@ -14,7 +14,7 @@
   <set name="total" op="+=" value="1" />
   <let>x = 3</let>
   <set>x += 1</set>
-  <do>$x = 3; $total += $price * $qty</do>
+  <do>x = 3; total += $price * $qty</do>
   <echo>$x $total</echo>
   <let name="config" const="yes">{ debug: false, retries: 3 }</let>
   <echo>Hello, $name! Total: { ($price * $qty)->round(digits: 2) }. Use {{ and }} for braces.</echo>
@@ -28,10 +28,10 @@
     name="people"
     value="[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]" />
   <let name="names" value="$people
-      |> filter(fn($p) => $p.age ge 18)
-      |> map(fn($p) => $p.name)
+      |> filter(fn(p) => $p.age ge 18)
+      |> map(fn(p) => $p.name)
       |> join(', ')" />
-  <let name="by_age" value="fn($a, $b) => $a.age - $b.age" />
+  <let name="by_age" value="fn(a, b) => $a.age - $b.age" />
   <let name="sorted" value="$people->sort($by_age)" />
   <echo>Youngest: {$sorted[0].name}</echo>
   <echo>{ $names |> @to_lower() |> @greet(greeting: 'Hi') }</echo>
@@ -43,7 +43,7 @@
   <for each="i" in="0..100 step 5">
     <echo>$i</echo>
   </for>
-  <for each="item" index="k" in="$colours">
+  <for each="item" at="k" in="$colours">
     <echo>$k: $item</echo>
   </for>
   <for each="key, value" in="$config">

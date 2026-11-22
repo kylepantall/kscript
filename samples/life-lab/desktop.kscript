@@ -1,33 +1,34 @@
 // Life Lab as a desktop app, in the .kscript format: kscript desktop.kscript
 // opens it in a window. The rules come from lib/life.ks.xml, the same script
 // the terminal and browser versions use.
-KScript.Window(
+import KScript.UI
+import "lib/life.ks.xml"
+
+Window(
   title: "Life Lab",
   width: 760,
   height: 720,
   theme: dark,
   background: "#0f172a"
 ) {
-  import "lib/life.ks.xml"
-
   cols = 40
   rows = 24
   world = @pattern_world('glider_gun', $cols, $rows)
   playing = false
-  speed = 150
+  speed = 0.15
   pattern = 'glider_gun'
   soup = 30
   wrap = true
   pattern_choices = $patterns
     ->keys()
-    ->map(fn($k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
+    ->map(fn(k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
 
   fn tick() {
     world = @advance($world, 1)
     playing = @population($world.grid) > 0
   }
 
-  Timer(every: $speed, when: $playing, on-tick: @tick())
+  Timer(every: $speed, when: $playing, on_tick: @tick())
 
   Column(gap: 4) {
     Text(size: 26, weight: bold, color: "#e2e8f0") "Life Lab"
@@ -36,20 +37,20 @@ KScript.Window(
   }
 
   Row(gap: 8, wrap) {
-    Button(variant: primary, width: 80, on-click: { playing = not $playing }) "{ $playing ? 'Pause' : 'Play' }"
-    Button(on-click: { world = @advance($world, 1); playing = false }) "Step"
-    Button(on-click: { world = @advance($world, 10) }) "+10"
-    Button(on-click: { world = @advance($world, 50) }) "+50"
+    Button(variant: primary, width: 80, on_click: { playing = not $playing }) "{ $playing ? 'Pause' : 'Play' }"
+    Button(on_click: { world = @advance($world, 1); playing = false }) "Step"
+    Button(on_click: { world = @advance($world, 10) }) "+10"
+    Button(on_click: { world = @advance($world, 50) }) "+50"
     Spacer(size: 8)
     Text(color: "#94a3b8") "Speed"
-    Select(bind: speed, options: { Slow: 400, Normal: 150, Fast: 40 })
+    Select(bind: speed, options: { Slow: 0.4, Normal: 0.15, Fast: 0.04 })
     Text(color: "#94a3b8") "Pattern"
     Select(bind: pattern, options: $pattern_choices,
-      on-change: { world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false })
+      on_change: { world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false })
   }
 
   Row(gap: 8, wrap) {
-    Button(on-click: { world = @new_world(@random_grid($cols, $rows, $soup), $world.wrap, 'random soup'); playing = false }) "Random soup"
+    Button(on_click: { world = @new_world(@random_grid($cols, $rows, $soup), $world.wrap, 'random soup'); playing = false }) "Random soup"
     Slider(
       bind: soup,
       min: 5,
@@ -61,9 +62,9 @@ KScript.Window(
     Text(color: "#94a3b8", width: 40) "{$soup}%"
     CheckBox(
       bind: wrap,
-      on-change: { world = $world->merge({ wrap: $event.value }) }
+      on_change: { world = $world->merge({ wrap: $event.value }) }
     ) "Wrap edges"
-    Button(on-click: { world = @new_world(@blank($cols, $rows), $world.wrap); playing = false }) "Clear"
+    Button(on_click: { world = @new_world(@blank($cols, $rows), $world.wrap); playing = false }) "Clear"
   }
 
   Text(color: "#cbd5e1", wrap) "{ $patterns->has($world.pattern) ? $patterns[$world.pattern].about : 'Your own pattern.' }"
@@ -74,7 +75,7 @@ KScript.Window(
         for c at x in $row {
           Box(width: 16, height: 16, radius: 2,
             background: "{ $c == $alive_cell ? '#4ade80' : '#0b1220' }",
-            on-click: { world = @flip($world, $x + ',' + $y) })
+            on_click: { world = @flip($world, $x + ',' + $y) })
         }
       }
     }

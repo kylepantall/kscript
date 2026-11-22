@@ -25,6 +25,12 @@ namespace KScript.Language.Features
         private static readonly Regex BodyWordLine = new Regex(@"^[ \t]*(\w*)$", RestrictOptions);
         private static readonly Regex BodySettingLine = new Regex(@"^[ \t]*(\w+)[ \t]*:[ \t]*(.*)$", RestrictOptions);
 
+        /// <summary>The start of an option in a model's brackets: model User(‸ or model User(timestamps, un‸.</summary>
+        private static readonly Regex ModelOptionWord = new Regex(@"^[ \t]*model[ \t]+\w+[ \t]*\(((?:[^()\[\]]|\[[^\[\]]*\])*?)(?<=[(,][ \t]*)(\w*)$", RestrictOptions);
+
+        /// <summary>Inside a list of fields in a model's brackets: model User(hidden: [‸ or model User(unique: [email, [team, sl‸.</summary>
+        private static readonly Regex ModelOptionList = new Regex(@"^[ \t]*model[ \t]+(\w+)[ \t]*\(.*\b(unique|index|hidden|guarded)[ \t]*:[ \t]*(\[(?:[^\[\]]|\[[^\[\]]*\])*(?:\[[^\[\]]*)?)$", RestrictOptions);
+
         private const RegexOptions RestrictOptions = RegexOptions.Compiled | RegexOptions.CultureInvariant;
 
         /// <summary>The type or model whose block holds this offset directly (not inside one of its fns). Callers check the file is .kscript.</summary>
@@ -50,6 +56,16 @@ namespace KScript.Language.Features
                 return TypeArgumentCompletions(typeName, replace, written);
             }
 
+            if (ModelOptionList.Match(before) is { Success: true } list && ModelNamed(analysis, list.Groups[1].Value, offset) is MarkupElement listed)
+            {
+                return ModelSettingValueCompletions(listed, list.Groups[2].Value, list.Groups[3].Value, offset);
+            }
+
+            if (ModelOptionWord.Match(before) is { Success: true } option)
+            {
+                return ModelOptionCompletions(option.Groups[1].Value, TextSpan.FromBounds(offset - option.Groups[2].Length, offset));
+            }
+
             MarkupElement owner = BlockOwnerAt(analysis, offset);
             if (owner == null)
             {
@@ -69,34 +85,48 @@ namespace KScript.Language.Features
             return null;
         }
 
-        /// <summary>A new line in a model: the settings it doesn't have yet, then validate and fn.</summary>
+        /// <summary>
+        /// A new line in a model: validate and fn. Its options (table, timestamps, unique...) go in the brackets,
+        /// model User(timestamps) { }, so they aren't offered as lines.
+        /// </summary>
         private List<CompletionItem> ModelLineCompletions(DocumentAnalysis analysis, MarkupElement model, TextSpan replace)
         {
-            ElementInfo info = Catalog.GetElement("model");
             List<CompletionItem> items = new List<CompletionItem>();
-            foreach (string name in CodeParser.ModelSettings)
+            items.Add(BodyRuleItem("validate", replace, "1"));
+            items.Add(BodyFnItem(replace));
+            return items;
+        }
+
+        /// <summary>The model of this name whose header holds the offset (or the first of that name, while the line is half-written).</summary>
+        private static MarkupElement ModelNamed(DocumentAnalysis analysis, string name, int offset)
+        {
+            List<MarkupElement> models = analysis.Markup.RootElements.SelectMany(r => new[] { r }.Concat(r.ChildElements))
+                .Where(e => e.Name == "model" && e.GetAttributeValue("name")?.Trim() == name).ToList();
+            return models.FirstOrDefault(e => offset >= e.Span.Start && offset <= e.Span.End) ?? models.FirstOrDefault();
+        }
+
+        /// <summary>The options a model takes in its brackets and doesn't have yet: model User(timestamps, unique: [email]).</summary>
+        private List<CompletionItem> ModelOptionCompletions(string written, TextSpan replace)
+        {
+            ElementInfo info = Catalog.GetElement("model");
+            HashSet<string> have = new HashSet<string>(Regex.Matches(written, @"(?:^|,)[ \t]*(\w+)").Select(m => m.Groups[1].Value), StringComparer.Ordinal);
+            List<CompletionItem> items = new List<CompletionItem>();
+            foreach (string name in CodeParser.ModelSettings.Where(n => !have.Contains(n)))
             {
-                MarkupAttribute set = model.GetAttribute(name);
-                if (set != null && set.NameSpan.Start != replace.Start)
-                {
-                    continue;
-                }
                 AttributeInfo a = info?.GetAttribute(name);
                 items.Add(new CompletionItem
                 {
                     Label = name,
                     Kind = CompletionKind.Attribute,
-                    Detail = "model setting",
+                    Detail = "model option",
                     Documentation = a?.Description,
-                    InsertText = name + SettingSnippet(name, a),
-                    IsSnippet = true,
+                    // A flag is on by being named: model User(timestamps).
+                    InsertText = a?.Kind == AttributeKind.Bool ? name : FieldListSettings.Contains(name) && name != "key" ? name + ": [$1]" : name + ": \"$1\"",
+                    IsSnippet = a?.Kind != AttributeKind.Bool,
                     ReplaceSpan = replace,
                     SortText = "0" + name,
-                    SuggestAgain = FieldListSettings.Contains(name),
                 });
             }
-            items.Add(BodyRuleItem("validate", replace, "1"));
-            items.Add(BodyFnItem(replace));
             return items;
         }
 
@@ -152,16 +182,6 @@ namespace KScript.Language.Features
             ReplaceSpan = replace,
             SortText = "2fn",
         };
-
-        /// <summary>What a setting's snippet puts after its name: yes/no, a list of fields, or a value to type.</summary>
-        private static string SettingSnippet(string name, AttributeInfo a)
-        {
-            if (a?.Kind == AttributeKind.Bool)
-            {
-                return ": ${1|yes,no|}";
-            }
-            return FieldListSettings.Contains(name) && name != "key" ? ": [$1]" : ": $1";
-        }
 
         /// <summary>After <c>timestamps: </c>, yes and no; after <c>hidden: [</c> and the other field lists, the model's fields.</summary>
         private List<CompletionItem> ModelSettingValueCompletions(MarkupElement model, string setting, string valueBefore, int offset)

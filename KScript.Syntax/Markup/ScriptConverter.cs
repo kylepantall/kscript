@@ -45,7 +45,7 @@ namespace KScript.Syntax.Markup
         }
 
         /// <param name="importPath">
-        /// Rewrites the <c>src</c> of each &lt;import&gt; (given as written, trimmed); null or a function that returns
+        /// Rewrites the <c>path</c> of each &lt;import&gt; (given as written, trimmed); null or a function that returns
         /// its input keeps every import as it is. <c>kscript convert</c> uses it to point imports at converted files.
         /// </param>
         /// <param name="nameList">
@@ -66,7 +66,7 @@ namespace KScript.Syntax.Markup
             elements ??= Elements;
             // What each argument means depends on the element, so read them by the one rule before printing.
             if (elements != null) CodeArguments.Normalise(document, elements);
-            var writer = new XmlWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? NameListFrom(elements) };
+            var writer = new XmlWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? NameListFrom(elements), Elements = elements };
             writer.WriteDocument(document);
             return writer.Result;
         }
@@ -344,14 +344,74 @@ namespace KScript.Syntax.Markup
                             WriteComment(c, 0);
                             break;
                         case MarkupElement e when e.Name == "kscript":
+                            if (WritePackageImports(document, null))
+                            {
+                                sb.Append('\n');
+                            }
                             WriteBody(e.Children, 0);
                             break;
                         case MarkupElement e:
+                            if (WritePackageImports(document, e))
+                            {
+                                sb.Append('\n');
+                            }
                             WriteElement(e, 0, chained: false);
                             break;
                     }
                 }
-                Result.Text = sb.ToString().TrimEnd('\n') + "\n";
+                // XML's own spellings (lt, gt, eq...) are written the .kscript way.
+                Result.Text = CodeSpellings.Normalize(sb.ToString().TrimEnd('\n') + "\n");
+            }
+
+            /// <summary>The imports of a package root (&lt;KScript.Routes&gt;), which are written above it rather than inside.</summary>
+            private readonly HashSet<MarkupNode> hoisted = new HashSet<MarkupNode>();
+
+            /// <summary>The packages of the elements best known as XML roots, for when nothing describes the elements.</summary>
+            internal static readonly Dictionary<string, string> RootPackages = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Window"] = "KScript.UI",
+                ["Routes"] = "KScript.Http",
+                ["Document"] = "KScript.Document",
+            };
+
+            /// <summary>
+            /// An XML file names a package in a tag (&lt;KScript.Window&gt;); a .kscript file names it only in an import.
+            /// Writes <c>import KScript.UI</c> for each package a KScript.-prefixed element brings in and the file doesn't
+            /// import, then the root's own imports, which go at the top of a .kscript file. True if anything was written.
+            /// </summary>
+            private bool WritePackageImports(MarkupDocument document, MarkupElement root)
+            {
+                var imported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (MarkupElement import in document.DescendantElements().Where(x => x.Name == "import"))
+                {
+                    if (import.GetAttributeValue("package")?.Trim() is { Length: > 0 } package)
+                    {
+                        imported.Add(ElementInfo.BareName(package));
+                    }
+                }
+                bool wrote = false;
+                foreach (MarkupElement e in document.DescendantElements().Where(x => x.Name.StartsWith("KScript.", StringComparison.Ordinal)))
+                {
+                    string bare = ElementInfo.BareName(e.Name);
+                    string package = Elements?.Invoke(bare)?.Package ?? (RootPackages.TryGetValue(bare, out string known) ? known : null);
+                    if (package == null)
+                    {
+                        Result.Warnings.Add($"<{e.Name}> on line {LineOf(e)} was written as {bare}: add the import of its package at the top.");
+                        continue;
+                    }
+                    if (imported.Add(ElementInfo.BareName(package)))
+                    {
+                        Line(0, "import " + package);
+                        wrote = true;
+                    }
+                }
+                foreach (MarkupElement import in root?.ChildElements.Where(x => x.Name == "import") ?? Enumerable.Empty<MarkupElement>())
+                {
+                    hoisted.Add(import);
+                    WriteElement(import, 0, chained: false);
+                    wrote = true;
+                }
+                return wrote;
             }
 
             private static string Pad(int indent) => new string(' ', indent * 2);
@@ -392,6 +452,8 @@ namespace KScript.Syntax.Markup
                             FlushBlank(ref blankRuns);
                             WriteComment(c, indent);
                             previous = null;
+                            break;
+                        case MarkupElement e when hoisted.Contains(e):
                             break;
                         case MarkupElement e:
                             bool chained = previous != null && sb.Length > 0 && sb[sb.Length - 1] == '\n' && sb.ToString().TrimEnd('\n').EndsWith("}", StringComparison.Ordinal)
@@ -475,7 +537,7 @@ namespace KScript.Syntax.Markup
                 new System.Text.RegularExpressions.Regex(@"<[a-z][\w.\-]*(?:\s+[\w\-:]+=""[^""<>]*"")*\s*/>");
 
             /// <summary>
-            /// One-line XML examples in a comment (<c>&lt;import src="lib/x.ks.xml" /&gt;</c>) are written the .kscript
+            /// One-line XML examples in a comment (<c>&lt;import path="lib/x.ks.xml" /&gt;</c>) are written the .kscript
             /// way (<c>import "lib/x.ks.xml"</c>); anything that doesn't convert to one line is kept as written.
             /// </summary>
             private string XmlExamples(string line) => XmlExample.Replace(line, m =>
@@ -573,16 +635,16 @@ namespace KScript.Syntax.Markup
                     case "else" when e.Attributes.Count == 0:
                         WriteBlock("else", e, indent, chained);
                         return;
-                    case "for" when Only("each", "in", "index") && Attr("each") != null && Attr("in") != null:
+                    case "for" when Only("each", "in", "at") && Attr("each") != null && Attr("in") != null:
                         {
                             scopes.Push();
                             foreach (string v in Attr("each").Split(','))
                             {
                                 scopes.Declare(v);
                             }
-                            scopes.Declare(Attr("index"));
+                            scopes.Declare(Attr("at"));
                             string header = "for " + string.Join(", ", Attr("each").Split(',').Select(x => x.Trim().TrimStart('$')))
-                                + (Attr("index") != null ? " at " + Attr("index").Trim().TrimStart('$') : string.Empty) + " in " + Attr("in").Trim();
+                                + (Attr("at") != null ? " at " + Attr("at").Trim().TrimStart('$') : string.Empty) + " in " + Attr("in").Trim();
                             WriteBlock(header, e, indent, chained, pushScope: false);
                             scopes.Pop();
                             return;
@@ -598,10 +660,7 @@ namespace KScript.Syntax.Markup
                                 }
                                 else if (node is MarkupElement branch)
                                 {
-                                    string head = branch.Name == "default" ? "default"
-                                        : branch.GetAttribute("when") != null ? "when " + branch.GetAttributeValue("when").Trim()
-                                        : "case " + branch.GetAttributeValue("is")?.Trim();
-                                    WriteBlock(head, branch, indent + 1, chained: false);
+                                    WriteArm(branch, indent + 1);
                                 }
                             }
                             Line(indent, "}");
@@ -658,15 +717,9 @@ namespace KScript.Syntax.Markup
                             }
                             // fields="login: string, id: int" becomes one line per field, the way .kscript writes types.
                             List<string> fieldLines = FieldsAsLines(Attr("fields"));
-                            // A model's settings are lines too: table: people, unique: [email].
-                            bool model = e.Name == "model";
-                            if (model)
-                            {
-                                rules.InsertRange(0, ModelSettingLines(e));
-                            }
+                            // The options of every declaration go in its brackets: model User(timestamps, unique: [email]).
                             string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "with") && !RuleAttributes.Contains(a.Name)
-                                && !(model && CodeParser.ModelSettings.Contains(a.Name))
-                                && !(a.Name == "fields" && fieldLines != null)).Select(a => FormatAttribute(e, a)));
+                                && !(a.Name == "fields" && fieldLines != null)).Select(a => ModelOption(e, a) ?? FormatAttribute(e, a)));
                             sb.Append(pad).Append(e.Name).Append(' ').Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
                             if (Attr("with") is string with)
                             {
@@ -725,11 +778,11 @@ namespace KScript.Syntax.Markup
                             Line(indent, "}");
                             return;
                         }
-                    case "call" when Only("fn", "args", "to") && Attr("fn") != null && !e.Children.Any():
+                    case "call" when Only("fn", "args", "into") && Attr("fn") != null && !e.Children.Any():
                         {
-                            // <call fn="greet" args="'x'" to="r" /> is @greet('x'), or r = @greet('x').
+                            // <call fn="greet" args="'x'" into="r" /> is @greet('x'), or r = @greet('x').
                             string call = "@" + Attr("fn").Trim().TrimStart('@') + "(" + (Attr("args")?.Trim() ?? string.Empty) + ")";
-                            if (Attr("to") is string to)
+                            if (Attr("into") is string to)
                             {
                                 scopes.Declare(to);
                                 call = to.Trim().TrimStart('$') + " = " + call;
@@ -838,11 +891,11 @@ namespace KScript.Syntax.Markup
                     case "try" when e.Attributes.Count == 0:
                         WriteTry(e, indent, chained);
                         return;
-                    case "import" when Only("package", "src", "as", "names") && !e.Children.Any():
+                    case "import" when Only("package", "path", "as", "names") && !e.Children.Any():
                         {
                             string line = Attr("package") != null ? "import " + Attr("package").Trim()
-                                : Attr("names") != null ? "import " + Attr("names").Trim() + " from " + Quote(ConvertedImport(Attr("src")))
-                                : "import " + Quote(ConvertedImport(Attr("src") ?? string.Empty));
+                                : Attr("names") != null ? "import " + Attr("names").Trim() + " from " + Quote(ConvertedImport(Attr("path")))
+                                : "import " + Quote(ConvertedImport(Attr("path") ?? string.Empty));
                             Line(indent, line + (Attr("as") != null ? " as " + Attr("as").Trim() : string.Empty));
                             return;
                         }
@@ -853,19 +906,20 @@ namespace KScript.Syntax.Markup
 
             private static readonly string[] RuleAttributes = { "min", "max", "pattern", "one_of", "not", "parse" };
 
-            /// <summary>A model's settings as .kscript lines: <c>table: people</c>, <c>unique: [email, [team, slug]]</c>.</summary>
-            private static IEnumerable<string> ModelSettingLines(MarkupElement e)
+            /// <summary>
+            /// A model's lists of fields as they go in its brackets, names as they are:
+            /// <c>unique: [email, [team, slug]]</c>, <c>hidden: [password]</c>. Null for anything else.
+            /// </summary>
+            private static string ModelOption(MarkupElement e, MarkupAttribute a)
             {
-                foreach (string name in CodeParser.ModelSettings)
+                string value = a.Value?.Value?.Trim();
+                if (e.Name != "model" || string.IsNullOrEmpty(value))
                 {
-                    string value = e.GetAttributeValue(name)?.Trim();
-                    if (value == null)
-                    {
-                        continue;
-                    }
-                    bool list = name is "unique" or "index" or "hidden" or "guarded";
-                    yield return name + ": " + (list && !value.StartsWith('[') ? "[" + string.Join(", ", value.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)) + "]" : value);
+                    return null;
                 }
+                return a.Name is "unique" or "index" or "hidden" or "guarded"
+                    ? a.Name + ": " + (value.StartsWith('[') ? value : "[" + string.Join(", ", value.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)) + "]")
+                    : null;
             }
 
             /// <summary>
@@ -1033,6 +1087,34 @@ namespace KScript.Syntax.Markup
                 Line(indent, "}");
             }
 
+            /// <summary>
+            /// A &lt;case&gt; or &lt;default&gt; as a match arm: <c>1, 2 =&gt; { }</c>, <c>_ when $n &gt; 9 =&gt; { }</c>,
+            /// <c>_ =&gt; { }</c>. An arm that holds one short statement is written on its line: <c>1 =&gt; echo "one"</c>.
+            /// </summary>
+            private void WriteArm(MarkupElement branch, int indent)
+            {
+                string values = branch.Name == "default" ? null : branch.GetAttributeValue("is")?.Trim();
+                string test = branch.Name == "default" ? null : branch.GetAttributeValue("when")?.Trim();
+                string head = (string.IsNullOrEmpty(values) ? "_" : values) + (string.IsNullOrEmpty(test) ? string.Empty : " when " + test) + " =>";
+
+                List<MarkupNode> body = branch.Children.Where(c => !(c is MarkupText t && t.IsWhitespace)).ToList();
+                if (body.Count == 1 && body[0] is MarkupElement)
+                {
+                    int mark = sb.Length;
+                    scopes.Push();
+                    WriteBody(branch.Children, indent);
+                    scopes.Pop();
+                    string statement = sb.ToString(mark, sb.Length - mark).Trim('\n');
+                    sb.Length = mark;
+                    if (statement.IndexOf('\n') < 0 && statement.IndexOf(',') < 0 && statement.IndexOf("//", StringComparison.Ordinal) < 0)
+                    {
+                        Line(indent, head + " " + statement.Trim());
+                        return;
+                    }
+                }
+                WriteBlock(head, branch, indent, chained: false);
+            }
+
             /// <summary>The names in a catch's type: <c>NotFound, Conflict</c>, <c>NotFound | Conflict</c> or <c>[IO, Network]</c>.</summary>
             private static List<string> ErrorTypeNames(string text) =>
                 text.Trim().TrimStart('[').TrimEnd(']').Split(',', '|').Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
@@ -1114,7 +1196,8 @@ namespace KScript.Syntax.Markup
                 {
                     Result.Warnings.Add($"<{e.Name}> on line {LineOf(e)} has a shape the short form can't hold, so it was written as {e.Name}(...).");
                 }
-                sb.Append(pad).Append(e.Name);
+                // A package is named only in an import: <KScript.Window> is Window (see WritePackageImports).
+                sb.Append(pad).Append(ElementInfo.BareName(e.Name));
                 if (e.Attributes.Count > 0)
                 {
                     sb.Append('(').Append(string.Join(", ", e.Attributes.Select(a => FormatAttribute(e, a)))).Append(')');
@@ -1152,6 +1235,11 @@ namespace KScript.Syntax.Markup
                 ElementInfo element = Elements?.Invoke(ElementInfo.BareName(e.Name));
                 AttributeInfo info = element?.GetAttribute(a.Name);
                 bool text = info != null && info.Kind is AttributeKind.Template or AttributeKind.Path;
+                if (CodeArguments.TakesFunctions(ElementInfo.BareName(e.Name), info))
+                {
+                    // <spawn fn="send"> becomes spawn(fn: @send): a function is @name wherever one is named.
+                    return a.Name + ": " + CodeArguments.FunctionNames(a.ValueText, code: true);
+                }
                 if (NameList(e.Name, a.Name) && global::KScript.Metadata.NameList.Names(a.ValueText) is { Count: > 1 } names
                     && names.All(n => IsSafeBare(n)))
                 {
@@ -1173,7 +1261,7 @@ namespace KScript.Syntax.Markup
             {
                 string value = a.ValueText;
                 string trimmed = value.Trim();
-                AttributeKind kind = info?.Kind ?? (a.Name.StartsWith("on-", StringComparison.Ordinal) ? AttributeKind.Statements : AttributeKind.Template);
+                AttributeKind kind = info?.Kind ?? (a.Name.StartsWith("on_", StringComparison.Ordinal) || a.Name.StartsWith("on-", StringComparison.Ordinal) ? AttributeKind.Statements : AttributeKind.Template);
                 switch (kind)
                 {
                     case AttributeKind.Statements:
@@ -1302,6 +1390,9 @@ namespace KScript.Syntax.Markup
             /// <summary>True for an element's attribute that holds a list of names.</summary>
             public Func<string, string, bool> NameList { get; init; }
 
+            /// <summary>Describes an element by name, or null when nothing is known about elements.</summary>
+            public Func<string, ElementInfo> Elements { get; init; }
+
             private readonly StringBuilder sb = new StringBuilder();
             private readonly Scopes scopes = new Scopes();
 
@@ -1312,8 +1403,71 @@ namespace KScript.Syntax.Markup
             public void WriteDocument(MarkupDocument document)
             {
                 source = document.Source;
-                WriteNodes(document.Children, 0);
+                if (!WritePackageRoot(document))
+                {
+                    WriteNodes(document.Children, 0);
+                }
                 Result.Text = sb.ToString().TrimEnd('\n') + "\n";
+            }
+
+            /// <summary>
+            /// A .kscript file that is one thing (<c>import KScript.Http</c>, its other imports, then <c>Routes { }</c>) is
+            /// the XML file whose root names the package: &lt;KScript.Routes&gt;, with the other imports inside it. False
+            /// when the file isn't that shape, and is written as a &lt;kscript&gt; script.
+            /// </summary>
+            private bool WritePackageRoot(MarkupDocument document)
+            {
+                List<MarkupElement> roots = document.RootElements.ToList();
+                if (roots.Count != 1 || roots[0].Name != "kscript" || roots[0].Attributes.Count > 0 || roots[0].Children.Any(n => n is MarkupText t && !t.IsWhitespace))
+                {
+                    return false;
+                }
+                MarkupElement script = roots[0];
+                List<MarkupElement> others = script.ChildElements.Where(e => e.Name != "import").ToList();
+                if (others.Count != 1 || !char.IsUpper(others[0].Name[0]))
+                {
+                    return false;
+                }
+                MarkupElement main = others[0];
+                string package = Elements?.Invoke(main.Name)?.Package ?? (CodeWriter.RootPackages.TryGetValue(main.Name, out string known) ? known : null);
+                List<MarkupElement> imports = script.ChildElements.Where(e => e.Name == "import").ToList();
+                MarkupElement packageImport = package == null ? null : imports.FirstOrDefault(i =>
+                    string.Equals(ElementInfo.BareName(i.GetAttributeValue("package")?.Trim()), ElementInfo.BareName(package), StringComparison.OrdinalIgnoreCase) && i.GetAttribute("as") == null);
+                if (packageImport == null || script.Children.SkipWhile(n => n != main).Skip(1).Any(n => n is MarkupElement))
+                {
+                    return false;
+                }
+                imports.Remove(packageImport);
+
+                var top = new List<MarkupNode>(document.Children.TakeWhile(n => n != script));
+                top.AddRange(script.Children.TakeWhile(n => n != main).Where(n => n is MarkupComment));
+                top.Add(main);
+                top.AddRange(script.Children.SkipWhile(n => n != main).Skip(1).Where(n => n is MarkupComment));
+                top.AddRange(document.Children.SkipWhile(n => n != script).Skip(1));
+
+                string name = main.Name;
+                List<MarkupNode> children = main.Children.ToList();
+                try
+                {
+                    main.Name = "KScript." + name;
+                    if (imports.Count > 0)
+                    {
+                        var moved = new List<MarkupNode>(imports);
+                        if (children.Any(n => n is MarkupElement || n is MarkupComment))
+                        {
+                            moved.Add(new MarkupText { Content = DecodedText.Plain("\n\n", 0) });
+                        }
+                        main.Children.InsertRange(0, moved);
+                    }
+                    WriteNodes(top, 0);
+                }
+                finally
+                {
+                    main.Name = name;
+                    main.Children.Clear();
+                    main.Children.AddRange(children);
+                }
+                return true;
             }
 
             private static string Pad(int indent) => new string(' ', indent * 2);
@@ -1446,9 +1600,14 @@ namespace KScript.Syntax.Markup
                 foreach (MarkupAttribute a in attributes)
                 {
                     sb.Append(' ').Append(a.Name);
-                    if (a.Value != null && e.Name == "import" && a.Name == "src")
+                    if (a.Value != null && e.Name == "import" && a.Name == "path")
                     {
                         sb.Append("=\"").Append(EscapeAttribute(ImportPath(a.ValueText.Trim()))).Append('"');
+                    }
+                    else if (a.Value != null && CodeArguments.TakesFunctions(ElementInfo.BareName(e.Name), Elements?.Invoke(ElementInfo.BareName(e.Name))?.GetAttribute(a.Name)))
+                    {
+                        // spawn(fn: @send) becomes <spawn fn="send">, and tools: [@a, @b] becomes tools="a, b".
+                        sb.Append("=\"").Append(EscapeAttribute(CodeArguments.FunctionNames(a.ValueText, code: false))).Append('"');
                     }
                     else if (a.Value != null && NameList(e.Name, a.Name) && global::KScript.Metadata.NameList.IsArray(a.ValueText))
                     {
@@ -1491,7 +1650,7 @@ namespace KScript.Syntax.Markup
                         {
                             scopes.Declare(name);
                         }
-                        scopes.Declare(e.GetAttributeValue("index"));
+                        scopes.Declare(e.GetAttributeValue("at"));
                         break;
                     case "fn":
                         foreach (string p in ParameterNames(e.GetAttributeValue("params")))

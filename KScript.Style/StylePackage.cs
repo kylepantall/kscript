@@ -32,7 +32,7 @@ namespace KScript.Style
 
         protected override void Register(PackageBuilder p)
         {
-            p.Element(new ElementInfo("css-text", "CSS text in a stylesheet, with {$name} and { @fn() } filled in. kscript writes these for you around the KScript elements in a .ks.css file.", ContentKind.Template), run =>
+            p.Element(new ElementInfo("css_text", "CSS text in a stylesheet, with {$name} and { @fn() } filled in. kscript writes these for you around the KScript elements in a .ks.css file.", ContentKind.Template), run =>
             {
                 run.Host.Write(Stylesheets.Interpolate(run.Content, run.Interpreter, run.Scope, run.Module));
                 return null;
@@ -42,15 +42,15 @@ namespace KScript.Style
                 i.Host.Items.TryGetValue(VarsKey, out object v) ? v : new Dictionary<string, object>());
 
             p.Element(new ElementInfo("stylesheet", "Compiles a stylesheet written in KScript (.ks.css, .ks.scss or .ks.sass) and writes the CSS (or Sass) to a file.", ContentKind.Empty,
-                new A("src", K.Template, "The stylesheet, such as theme.ks.css.", true),
-                new A("to", K.Template, "The file to write. Default: next to src without .ks (theme.css)."),
+                new A("path", K.Template, "The stylesheet, such as theme.ks.css.", true),
+                new A("to", K.Template, "The file to write. Default: next to path without .ks (theme.css)."),
                 new A("vars", K.Expression, "A map of values the stylesheet reads as $vars."))
             {
                 Context = ElementContext.Script,
-                Example = "<stylesheet src=\"theme.ks.css\" to=\"public/theme.css\" vars=\"{ brand: '#3355ff' }\" />",
+                Example = "<stylesheet path=\"theme.ks.css\" to=\"public/theme.css\" vars=\"{ brand: '#3355ff' }\" />",
             }, run =>
             {
-                string src = run.Host.ResolvePath(run.Template("src"), run.Module.Directory);
+                string src = run.Host.ResolvePath(run.Template("path"), run.Module.Directory);
                 string to = run.Has("to") ? run.Host.ResolvePath(run.Template("to"), run.Module.Directory) : Stylesheets.OutputPath(src);
                 run.Host.CheckWrite(run.Module.ElementHint("stylesheet"));
                 string css = Stylesheets.Compile(src, Vars(run.Has("vars") ? run.Eval("vars") : null, run.Module.ArgumentHint("stylesheet", "vars")), Sandbox(run.Host));

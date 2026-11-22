@@ -47,7 +47,7 @@ kscript make project my-api --bare --api         # just the API: routes/api.kscr
 kscript make project my-app --bare --desktop     # a script plus an empty KScript.Window desktop app
 ```
 
-`--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `routes/api.kscript` (a `KScript.Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.
+`--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `routes/api.kscript` (a `Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.
 
 ### An API: --template api
 
@@ -219,10 +219,10 @@ kscript make project my-app --template ../starters/api   # any folder
 `kscript make <type> <name>` creates a file where the project keeps that kind of file, makes any folder it needs, and writes scripts in the project's format. [kscript make commands](/cli/make) lists every type with its options and examples, and so does `kscript make --list`; `kscript make <type> --help` shows one.
 
 ```sh
-kscript make route users                              # adds Get(path: "/users", to: users.index) to routes/web.kscript,
+kscript make route users                              # adds Get(path: "/users", to: @users.index) to routes/web.kscript,
                                                       # and makes controllers/users.kscript with index()
-kscript make route "users/{id}" --where "id: int"     # Get(…, to: users.show), and adds show(id) to the controller
-kscript make route users --method post --api          # Post(…, to: users.store) in routes/api.kscript, served under /api
+kscript make route "users/{id}" --where "id: int"     # Get(…, to: @users.show), and adds show(id) to the controller
+kscript make route users --method post --api          # Post(…, to: @users.store) in routes/api.kscript, served under /api
 kscript make route people --resource --api            # Resource(path: "/people", to: people), with all five functions
 kscript make route about --view about                 # Get(path: "/about", view: "about"), and views/about.html
 kscript make controller people --resource             # controllers/people.kscript: index, show, store, update, destroy

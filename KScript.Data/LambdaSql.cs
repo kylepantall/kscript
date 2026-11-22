@@ -4,7 +4,7 @@ using KScript.Syntax;
 namespace KScript.Data
 {
     /// <summary>
-    /// Turns a query lambda, <c>fn($u) => $u.age >= 18 and $u.email->ends_with('@acme.com')</c>, into a SQL condition.
+    /// Turns a query lambda, <c>fn(u) => $u.age >= 18 and $u.email->ends_with('@acme.com')</c>, into a SQL condition.
     /// The lambda's parameter is the row: <c>$u.age</c> is a column. Every part that doesn't use the row (variables,
     /// calls, literals) is worked out once, as KScript, and sent as a parameter. Anything that can't be SQL is an error
     /// that says why, rather than a query that quietly does something else.
@@ -28,9 +28,9 @@ namespace KScript.Data
         public static SqlExpr Compile(ICallable fn, ModelInfo model, Interpreter interpreter, string method)
         {
             if (fn is not Lambda lambda)
-                throw new KScriptException($"->{method}() needs a condition written as a lambda, such as fn($u) => $u.age >= 18, so it can run in the database. A function declared with fn name() can't be turned into SQL.", "Argument");
+                throw new KScriptException($"->{method}() needs a condition written as a lambda, such as fn(u) => $u.age >= 18, so it can run in the database. A function declared with fn name() can't be turned into SQL.", "Argument");
             if (lambda.Node.Parameters.Count != 1)
-                throw new KScriptException($"The condition in ->{method}() takes one parameter, the row: fn($u) => $u.active.", "Argument");
+                throw new KScriptException($"The condition in ->{method}() takes one parameter, the row: fn(u) => $u.active.", "Argument");
             return new LambdaSql(lambda, model, interpreter).Condition(lambda.Node.Body);
         }
 

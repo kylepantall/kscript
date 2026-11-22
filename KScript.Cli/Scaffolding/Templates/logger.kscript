@@ -6,7 +6,7 @@ usage: <name> [--level warn]
 example: kscript make logger alerts --level error
 example: kscript make logger audit --level info
 to: {{ paths.logging }}/{{ dir }}{{ kebab }}{{ ext }}
-hint: Turn it on in a script that imports it: log-provider(fn: {{ snake }}, level: {{ level ?? warn }}), or in config.yaml under logging.providers as - fn: {{ snake }}
+hint: Turn it on in a script that imports it: log_provider(fn: @{{ snake }}, level: {{ level ?? warn }}), or in config.yaml under logging.providers as - fn: {{ snake }}
 ---
 // {{ title }}: a log provider. Each entry is a map with time, level, category,
 // message and fields.

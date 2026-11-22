@@ -1,7 +1,7 @@
 <kscript>
   <!-- Typed JSON: the data is checked against Repo, and $repo. completes its fields. -->
   <import package="KScript.IO" />
-  <import src="types/repo.ks.xml" />
+  <import path="types/repo.ks.xml" />
 
   <let name="repos" value="@read_json('data/repos.json', as: Repo)" />
   <for each="repo" in="$repos">
@@ -12,7 +12,7 @@
   <try>
     <let
       name="bad"
-      value="$Repo->from({ name: 'x', stargazers_count: 'lots', visibility: 'secret' })" />
+      value="Repo({ name: 'x', stargazers_count: 'lots', visibility: 'secret' })" />
     <echo>Not reached: {$bad.name}</echo>
     <catch as="err">
       <echo>{ $err.problems->count() } problems, the first at { $err.problems[0].path }</echo>

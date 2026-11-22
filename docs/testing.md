@@ -12,11 +12,14 @@ kscript {
       expect(value: @slugify('Hello World'), equals: 'hello-world')
     }
 
-    test(name: slug of '{$case.text}', each: case, in: "[
+    cases = [
       { text: 'One', slug: 'one' },
       { text: 'Two Words', slug: 'two-words' },
-    ]") {
-      expect(value: @slugify($case.text), equals: $case.slug)
+    ]
+    for case in $cases {
+      test(name: "slug of '{$case.text}'") {
+        expect(value: @slugify($case.text), equals: $case.slug)
+      }
     }
   }
 }
@@ -52,7 +55,7 @@ Each file runs in its own interpreter, in two steps:
 1. The file's top-level code runs once: its imports, variables, `fn` functions and `describe` blocks. Each `test` it reaches is noted, not run.
 2. Each test then runs on its own, in a new scope inside the one it was written in. It sees the file's variables and functions, and the variables of the `describe` blocks around it.
 
-A test passes if its body finishes. It fails at the first check that doesn't hold, or at any error, and the remaining tests still run. Variables a test declares belong to that test. Variables declared outside the tests are shared, so reset them in `before-each`.
+A test passes if its body finishes. It fails at the first check that doesn't hold, or at any error, and the remaining tests still run. Variables a test declares belong to that test. Variables declared outside the tests are shared, so reset them in `before_each`.
 
 What a test prints with `echo` is kept, and shown under the test only when it fails.
 
@@ -61,10 +64,10 @@ What a test prints with `echo` is kept, and shown under the test only when it fa
 | Element | Use |
 | --- | --- |
 | `test(name: …) { }` | A test. `name` can use `{ }`. |
-| `test(name: … {$case.x}, each: case, in: $cases, index: i) { }` | One test per item of a list (or of a map, as `{ key, value }`). The item is in `$case`, and `index` names a variable for its position. |
+| `for case at i in $cases { test(name: "… {$case.x}") { } }` | One test per item: a `test` inside a `for` loop, the same loop as anywhere else. The loop's variables can be used in the name and the body. (In XML: `<for each="case" at="i" in="$cases"><test name="…">`.) |
 | `describe(name: …) { }` | A group. Its name is put in front of each test's name (`cart › adds items`), and its hooks apply to every test inside. Groups can nest. |
-| `before-each { }` | Runs before every test in its file or `describe`, in the test's own scope. Outer hooks run first. |
-| `after-each { }` | Runs after every test in its file or `describe`, even when the test failed. Inner hooks run first. Use it to delete files a test made. |
+| `before_each { }` | Runs before every test in its file or `describe`, in the test's own scope. Outer hooks run first. |
+| `after_each { }` | Runs after every test in its file or `describe`, even when the test failed. Inner hooks run first. Use it to delete files a test made. |
 | `skip` or `skip: reason` | On a `test` or `describe`: don't run it. It is reported as skipped, with the reason. |
 | `only` | On a `test` or `describe`: while you work on something, run only the tests marked `only` in that file. |
 | `timeout: 30` | On a `test`: fail it if it runs longer than this many seconds. |
@@ -72,7 +75,7 @@ What a test prints with `echo` is kept, and shown under the test only when it fa
 ```kscript
 describe(name: a shopping cart) {
   cart = []
-  before-each {
+  before_each {
     cart = ['apple']
   }
 
@@ -94,10 +97,10 @@ describe(name: a shopping cart) {
 | Check | Passes when |
 | --- | --- |
 | `expect(value: $x, equals: 5)` | The values are equal, as `==` compares them: `'5'` equals `5`. Lists and maps are compared item by item, and a failure says where they differ. |
-| `not-equals: 5` | They aren't equal. |
+| `not_equals: 5` | They aren't equal. |
 | `same: 5` | They are strictly equal (`===`): same type and value. |
 | `contains: 'Joan'` | A list has the item, text has the text, or a map has the key. |
-| `not-contains: 'Joan'` | The opposite. |
+| `not_contains: 'Joan'` | The opposite. |
 | `matches: '^\d+$'` | Text matches the regular expression. |
 | `type: list` | The value is a `string`, `number`, `bool`, `list`, `map`, `date`, `fn` or `null`. |
 | `count: 3` | A list or map has that many items, or text has that many characters. |
@@ -115,10 +118,10 @@ Expected $order.total eq 30 to be true.
 
 ### Errors
 
-`expect-error { }` fails unless its body stops with an error. `type` checks the error type (an error type that extends it counts too), `contains` checks the message, and `as` keeps the error (`type`, `message`, `line`, `file`, `status`, `cause` and its fields) for more checks:
+`expect_error { }` fails unless its body stops with an error. `type` checks the error type (an error type that extends it counts too), `contains` checks the message, and `as` keeps the error (`type`, `message`, `line`, `file`, `status`, `cause` and its fields) for more checks:
 
 ```kscript
-expect-error(type: Validation, contains: positive, as: err) {
+expect_error(type: Validation, contains: positive, as: err) {
   @set_age(-1)
 }
 expect(value: $err.line, type: number)
@@ -141,10 +144,10 @@ A failed check inside the body is still reported as a failure, not taken as the 
 
 ### Output and input
 
-`capture(to: out) { }` runs its body and puts what it printed in `$out` (lines end in `\n`, without the last one). `input` gives prompts such as `input` their answers, as text or a list of lines:
+`capture(into: out) { }` runs its body and puts what it printed in `$out` (lines end in `\n`, without the last one). `input` gives prompts such as `input` their answers, as text or a list of lines:
 
 ```kscript
-capture(to: out, input: ['Joan', 'yes']) {
+capture(into: out, input: ['Joan', 'yes']) {
   @sign_up()
 }
 expect(value: $out, contains: 'Welcome, Joan')
@@ -216,7 +219,7 @@ import KScript.Net
 
 test(name: "a note is saved") {
   added = @api('/api/notes', options: { method: 'POST', body: { title: 'Ship it' } })
-  expect(value: $added->status(), equals: 201)
+  expect(value: $added.status, equals: 201)
   expect(value: @api('/api/notes/' + $added->json().id)->json().title, equals: 'Ship it')
 }
 ```

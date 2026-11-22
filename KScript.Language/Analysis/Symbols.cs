@@ -51,12 +51,12 @@ namespace KScript.Language.Analysis
         public bool Closed { get; init; }
 
         /// <summary>
-        /// A more exact kind whose methods come first: "model" for a KScript.Data model (<c>$User->where()</c>), "record"
+        /// A more exact kind whose methods come first: "model" for a KScript.Data model (<c>User->where()</c>), "record"
         /// for its records (<c>$user->save()</c>), and for queries on a model. Null for everything else.
         /// </summary>
         public string Kind { get; init; }
 
-        /// <summary>For a &lt;type&gt; value (<c>$Repo</c>): the shape of the records it makes.</summary>
+        /// <summary>For a &lt;type&gt; value (<c>Repo</c>): the shape of the records it makes.</summary>
         public TypeShape Instance { get; init; }
 
         /// <summary>For records of a &lt;type&gt;: the methods its &lt;fn&gt; children declare (<c>$size->width_in(cm)</c>).</summary>

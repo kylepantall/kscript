@@ -27,32 +27,54 @@ namespace KScript.Language.Tests
         private static string Model(string body) => "import KScript.Data\n\nmodel Note {\n" + body + "\n}\n";
 
         [Fact]
-        public void ATypedWordInAModelSuggestsItsSettings()
+        public void AModelsBracketsSuggestItsOptions()
         {
-            List<CompletionItem> items = Complete(Model("  timestamps: yes\n  hi‸\n  user_id: string"));
+            List<CompletionItem> items = Complete("import KScript.Data\n\nmodel Note(timestamps, hi‸) {\n  user_id: string\n}\n");
             CompletionItem hidden = Assert.Single(items, i => i.Label == "hidden");
             Assert.Equal("hidden: [$1]", hidden.InsertText);
             Assert.True(hidden.IsSnippet);
-            Assert.True(hidden.SuggestAgain);
+            Assert.Equal(2, hidden.ReplaceSpan.Length);
             Assert.Contains("left out of JSON", hidden.Documentation);
-            Assert.Equal("model setting", hidden.Detail);
-            // A setting the model already has isn't offered again; validate and fn still are.
+            Assert.Equal("model option", hidden.Detail);
+            // An option the model already has isn't offered again.
             Assert.DoesNotContain(items, i => i.Label == "timestamps");
-            Assert.Contains(items, i => i.Label == "validate");
-            Assert.Contains(items, i => i.Label == "fn");
-            Assert.DoesNotContain(items, i => i.Label == "echo");
+            // A flag is on by being named, and the others take a value.
+            items = Complete("import KScript.Data\n\nmodel Note(‸) {\n}\n");
+            Assert.Equal("timestamps", Assert.Single(items, i => i.Label == "timestamps").InsertText);
+            Assert.Equal("key: \"$1\"", Assert.Single(items, i => i.Label == "key").InsertText);
+            Assert.Equal("table: \"$1\"", Assert.Single(items, i => i.Label == "table").InsertText);
+            // Not where a value goes.
+            Assert.DoesNotContain("timestamps", Labels("import KScript.Data\n\nmodel Note(table: ‸) {\n}\n"));
         }
 
         [Fact]
-        public void ABlankLineInAModelSuggestsSettingsNotStatements()
+        public void AListInAModelsBracketsSuggestsItsFields()
         {
-            List<CompletionItem> items = Complete(Model("  user_id: string\n  ‸"));
-            Assert.Equal("timestamps: ${1|yes,no|}", Assert.Single(items, i => i.Label == "timestamps").InsertText);
-            Assert.Equal("key: $1", Assert.Single(items, i => i.Label == "key").InsertText);
-            Assert.Equal("table: $1", Assert.Single(items, i => i.Label == "table").InsertText);
-            Assert.DoesNotContain(items, i => i.Label is "if" or "echo" or "model");
-            // The setting being retyped is offered, so the word under the cursor can be replaced.
-            Assert.Contains("timestamps", Labels(Model("  time‸stamps: yes")));
+            const string import = "import KScript.Data\n\n";
+            Assert.Equal(new[] { "title", "body", "id", "created_at", "updated_at", "deleted_at" },
+                Labels(import + "model Note(timestamps, soft_deletes, hidden: [‸]) {\n  title: string\n  body?: string\n}\n"));
+            // Fields already listed aren't offered again, and a word typed is replaced.
+            List<CompletionItem> items = Complete(import + "model Note(index: [title, bo‸]) {\n  title: string\n  body: string\n}\n");
+            Assert.Equal(new[] { "body", "id" }, items.Select(i => i.Label));
+            Assert.Equal(2, items[0].ReplaceSpan.Length);
+            Assert.Equal("string", items[0].Detail);
+            // A set of fields that is unique together is a list in the list.
+            Assert.Equal(new[] { "slug", "id" }, Labels(import + "model Post(unique: [[team, ‸]]) {\n  slug: string\n  team: int\n}\n"));
+            // After the list, the next option.
+            Assert.Contains("timestamps", Labels(import + "model Note(hidden: [title], ‸) {\n  title: string\n}\n"));
+            Assert.DoesNotContain("title", Labels(import + "model Note(hidden: [title], ‸) {\n  title: string\n}\n"));
+        }
+
+        [Fact]
+        public void ALineInAModelSuggestsRulesAndFnNotOptions()
+        {
+            // Options go in the brackets, so a line of the block is a field, validate or fn.
+            List<string> typed = Labels(Model("  hi‸\n  user_id: string"));
+            Assert.Equal(new[] { "validate", "fn" }, typed);
+            List<string> blank = Labels(Model("  user_id: string\n  ‸"));
+            Assert.DoesNotContain(blank, l => l is "timestamps" or "hidden" or "if" or "echo" or "model");
+            Assert.Contains("validate", blank);
+            Assert.Contains("fn", blank);
         }
 
         [Fact]

@@ -1,16 +1,17 @@
 // The JSON API, served by kscript serve under /api (see docs/http.md). kscript
 // routes lists the routes, and /_api shows their docs. Each route is answered
 // by a controller function; a map or list it returns is JSON.
-KScript.Routes(middleware: [cors, request_id]) {
+import KScript.Http
 {{#if auth}}
-  import KScript.Auth
+import KScript.Auth
 {{/if}}
-  import "../middleware/request-id{{ ext }}"
+import "../middleware/request-id{{ ext }}"
 {{#if auth}}
-  import "../controllers/accounts{{ ext }}" as accounts
+import "../controllers/accounts{{ ext }}" as accounts
 {{/if}}
-  import "../controllers/notes{{ ext }}" as notes
+import "../controllers/notes{{ ext }}" as notes
 
+Routes(middleware: [cors, request_id]) {
   /// Says the API is up.
   Get(path: "/health") {
     return { ok: true, app: $config.app.name }
@@ -20,12 +21,12 @@ KScript.Routes(middleware: [cors, request_id]) {
   // Sign up, then trade an email and password for a token. Send it as
   // Authorization: Bearer <token>.
   Group(middleware: "throttle:10") {
-    Post(path: "/register", to: accounts.sign_up)
-    Post(path: "/tokens", to: accounts.issue_token)
+    Post(path: "/register", to: @accounts.sign_up)
+    Post(path: "/tokens", to: @accounts.issue_token)
   }
   Group(middleware: auth) {
-    Get(path: "/me", to: accounts.profile)
-    Delete(path: "/me", to: accounts.close_account)
+    Get(path: "/me", to: @accounts.profile)
+    Delete(path: "/me", to: @accounts.close_account)
     Resource(path: "/notes", to: notes{{#if cache}}, middleware: etag{{/if}})
   }
 {{else}}

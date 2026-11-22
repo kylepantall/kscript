@@ -14,7 +14,7 @@ kscript openapi samples/http-app    # the OpenAPI document, made from the routes
 
 ## Route files
 
-A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a route file, the same way `KScript.Window` makes a desktop app. The block imports KScript.Http for you. `kscript serve` loads these files from the site folder:
+A file that imports KScript.Http and holds a `Routes { }` block (`<KScript.Routes>` in XML) is a route file, the same way `Window { }` makes a desktop app. Its imports go at the top of the file, above the block. `kscript serve` loads these files from the site folder:
 
 | File | Routes |
 | --- | --- |
@@ -25,15 +25,16 @@ A file made of a `KScript.Routes { }` block (`<KScript.Routes>` in XML) is a rou
 
 ```kscript
 // routes.kscript
-KScript.Routes {
-  import "controllers/people.kscript" as people
-  import "middleware/security.kscript"
+import KScript.Http
+import "controllers/people.kscript" as people
+import "middleware/security.kscript"
 
+Routes {
   Middleware(use: secure_headers)
 
   Get(path: /, view: home, name: home)
-  Get(path: /people, to: people.list, name: people.list)
-  Get(path: /people/{id}, to: people.page, name: people.page, where: id: int)
+  Get(path: /people, to: @people.list, name: people.list)
+  Get(path: /people/{id}, to: @people.page, name: people.page, where: id: int)
   Get(path: /team, redirect: /people, status: 301)
 
   Get(path: /ping) {
@@ -55,7 +56,7 @@ A route has a `path` and one way to answer:
 | Attribute | Use |
 | --- | --- |
 | `path` | `/people/{id}`. `{name?}` is optional and `{name*}` takes the rest of the path (`/files/{path*}`). |
-| `to` | The controller: a function of an imported script (`people.show`) or an `fn` in the route file (`show`). |
+| `to` | The controller: a function of an imported script (`@people.show`) or an `fn` in the route file (`@show`). In XML: `to="people.show"`. |
 | `view` | Render this view with the path parameters as its variables. |
 | `redirect`, `status` | Redirect, with 302 by default. |
 | a `{ }` block | The route's own body, like an `fn`: `Get(path: /ping) { return 'pong' }`. |
@@ -102,11 +103,11 @@ kscript {
   import KScript.Http
 
   fn all() => @read_json('data/people.json')
-  fn find(id: int) => @all()->find(fn($p) => $p.id == $id)
+  fn find(id: int) => @all()->find(fn(p) => $p.id == $id)
 
   fn index(query: map) {
     // GET /api/people?role=Founder
-    return @all() |> filter(fn($p) => $query.role == null or $p.role == $query.role)
+    return @all() |> filter(fn(p) => $query.role == null or $p.role == $query.role)
   }
 
   fn page(id: int) {
@@ -136,7 +137,7 @@ What a controller returns becomes the response:
 
 | Return | Response |
 | --- | --- |
-| A map, list, number or yes/no | JSON (`application/json`). |
+| A map, list, number or true/false | JSON (`application/json`). |
 | Text | HTML. |
 | `@view('people/show', person: $p)` | The view rendered with its layout. |
 | `@response(body, status: 201, type: 'text/csv', headers: { … })` | Your own status, type and headers. A map or list body is JSON. |
@@ -200,7 +201,7 @@ kscript {
 Middleware applies at four levels, and it runs outermost first:
 
 1. `http.middleware` in `kscript.json`, for every route.
-2. `KScript.Routes(middleware: …)`, for every route in the file. `Middleware(use: …)` adds more for the routes after it.
+2. `Routes(middleware: …)`, for every route in the file. `Middleware(use: …)` adds more for the routes after it.
 3. `Group(middleware: …)`, for the routes inside the group.
 4. `Get(…, middleware: …)`, for one route.
 
@@ -208,9 +209,10 @@ A middleware list is an array of names: `[log, secure_headers, throttle:30]`. Ea
 
 ```kscript
 // routes.kscript
-KScript.Routes {
-  import "middleware/security.kscript"
+import KScript.Http
+import "middleware/security.kscript"
 
+Routes {
   Middleware(use: [secure_headers, json_only])
 }
 ```
@@ -237,14 +239,15 @@ A function with the same name as a built-in wins, so you can replace one.
 
 Browsers and proxies can keep an answer and ask again only when it may have changed. KScript.Http helps at three levels, with [KScript.Cache](cache.md) underneath.
 
-**ETags.** `etag: yes` on a route (or the `etag` middleware) adds an `ETag` header to every `200` answer to `GET` and `HEAD`: a hash of the body. When the browser asks again with `If-None-Match` and the tag still matches, it gets `304 Not Modified` with no body, so nothing is sent twice.
+**ETags.** `etag: true` on a route (or the `etag` middleware) adds an `ETag` header to every `200` answer to `GET` and `HEAD`: a hash of the body. When the browser asks again with `If-None-Match` and the tag still matches, it gets `304 Not Modified` with no body, so nothing is sent twice.
 
 ```kscript
-KScript.Routes {
-  import "controllers/people.kscript" as people
+import KScript.Http
+import "controllers/people.kscript" as people
 
-  Get(path: /people, to: people.index, etag: yes, cache: 60)
-  Get(path: /people/{id}, to: people.show, etag: yes, cache: "private, max-age=0, must-revalidate")
+Routes {
+  Get(path: /people, to: @people.index, etag: true, cache: 60)
+  Get(path: /people/{id}, to: @people.show, etag: true, cache: "private, max-age=0, must-revalidate")
 }
 ```
 
@@ -256,14 +259,14 @@ kscript {
   import KScript.IO
 
   fn show(id: int) {
-    person = @read_json('data/people.json')->find(fn($p) => $p.id == $id) ?? @abort(404)
+    person = @read_json('data/people.json')->find(fn(p) => $p.id == $id) ?? @abort(404)
     @etag($person.updated_at)
     return @view('people/show', person: $person)
   }
 }
 ```
 
-`@etag(value, weak: yes)` makes a weak tag, and a response can be tagged by hand with `->with_etag()` (a hash of its body) or `->with_etag($value)`.
+`@etag(value, weak: true)` makes a weak tag, and a response can be tagged by hand with `->with_etag()` (a hash of its body) or `->with_etag($value)`.
 
 **Cache-Control.** `cache` on a route (or the `cache_control` middleware) sets `Cache-Control` on successful `GET` answers and on `304`s. A number alone is a public max-age in seconds, so `cache: 300` gives `public, max-age=300`. Otherwise list the directives: `public`, `private`, `no-cache`, `no-store`, `no-transform`, `must-revalidate`, `proxy-revalidate`, `must-understand`, `immutable`, `max-age=`, `s-maxage=`, `stale-while-revalidate=` and `stale-if-error=`. A directive the browser wouldn't understand is an error when the route file loads. A header set by the controller (`->with_cache('no-store')`) wins.
 
@@ -308,7 +311,7 @@ Group(middleware: auth) {
 
 `@response()`, `@view()` and `@redirect()` give a response value. Middleware gets one back from `$next($request)`.
 
-- Read it with `->status()`, `->body()`, `->type()`, `->headers()`, `->header(name)`, `->ok()` and `->json()`.
+- Read it with `.status`, `.body`, `.type`, `.headers`, `->header(name)`, `.is_ok` and `->json()`.
 - Change it with `->with_status(code)`, `->with_header(name, value)`, `->with_type(type)`, `->with_etag(value)` and `->with_cache(directives)`. Each returns the response, so the calls chain.
 
 ## Calling your own API
@@ -320,10 +323,10 @@ import KScript.Net
 
 notes = @api('/api/notes')->check()->json()
 added = @api('/api/notes', options: { method: 'POST', body: { title: 'Ship it' } })
-echo $added->status()   // 201
+echo $added.status   // 201
 ```
 
-It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The options and the response are the same as for an address: `method`, `headers` and `body` (a map or list is sent as JSON), then `->status()`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
+It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The options and the response are the same as for an address: `method`, `headers` and `body` (a map or list is sent as JSON), then `.status`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
 
 A request made while answering another one, such as a page calling the API, or a route calling another route, sends on the `Cookie` and `Authorization` headers of the request being answered, so the API sees the same signed-in person. Give your own `headers` to send others. Requests inside one another stop after 8, so a route that calls itself is an error rather than a hang.
 
@@ -388,10 +391,10 @@ To keep the document in your project, for example to commit it or hand it to a c
 
 Route files get the same checking and completion as scripts:
 
-- `to` completes the functions of imported controllers (`people.show`). A name that doesn't exist is an error with a did-you-mean.
+- `to` completes the functions of imported controllers (`@people.show`). A name that doesn't exist is an error with a did-you-mean.
 - `middleware` and `use` complete the built-ins too, and accept `http.groups` names.
 - Names in a list are checked and completed one by one, inside `[ ]` too.
-- Route elements are only offered inside `KScript.Routes` or `Group`.
+- Route elements are only offered inside `Routes` or `Group`.
 - `{id}` in `path` isn't read as a `{ }` expression.
 - Doc comments on controllers show in hover, and also become the [API docs](#api-docs-openapi).
 

@@ -9,7 +9,7 @@ using K = KScript.Metadata.AttributeKind;
 
 namespace KScript.Net
 {
-    /// <summary>The answer to <c>@api()</c>: <c>->status()</c>, <c>->ok()</c>, <c>->text()</c>, <c>->json()</c>, <c>->header(name)</c>.</summary>
+    /// <summary>The answer to <c>@api()</c>: <c>.status</c>, <c>.is_ok</c>, <c>.text</c>, <c>->json()</c>, <c>->header(name)</c>.</summary>
     public sealed class ResponseValue : IKObject
     {
         public ResponseValue(string url, int status, string reason, string body, Dictionary<string, object> headers)
@@ -38,7 +38,8 @@ namespace KScript.Net
             value = name switch
             {
                 "status" => (double)Status,
-                "ok" => Ok,
+                "reason" => Reason,
+                "is_ok" => Ok,
                 "url" => Url,
                 "headers" => Headers,
                 "text" => Body,
@@ -51,12 +52,6 @@ namespace KScript.Net
         {
             switch (name)
             {
-                case "status": result = (double)Status; return true;
-                case "reason": result = Reason; return true;
-                case "ok": result = Ok; return true;
-                case "url": result = Url; return true;
-                case "text": result = Body; return true;
-                case "headers": result = Headers; return true;
                 case "header":
                     string key = call.Str(0);
                     result = Headers.FirstOrDefault(kv => string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)).Value;
@@ -84,15 +79,19 @@ namespace KScript.Net
             }
         }
 
+        internal static readonly (string Name, string Type, string Description)[] Fields =
+        {
+            ("status", KType.Number, "The HTTP status code, such as 200 or 404."),
+            ("reason", KType.String, "The status text, such as OK or Not Found."),
+            ("is_ok", KType.Bool, "True when the status is 2xx."),
+            ("url", KType.String, "The address that was fetched."),
+            ("text", KType.String, "The body as text."),
+            ("headers", KType.Map, "The response headers as a map."),
+        };
+
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("status", "", "The HTTP status code, such as 200 or 404.", KType.Number),
-            ("reason", "", "The status text, such as OK or Not Found.", KType.String),
-            ("ok", "", "True for a 2xx status.", KType.Bool),
-            ("url", "", "The address that was fetched.", KType.String),
-            ("text", "", "The body as text.", KType.String),
             ("json", "as?: type", "The body read as JSON. With as: a <type> (or 'Repo[]'), the data is checked and turned into records; a list is mapped item by item.", KType.Any),
-            ("headers", "", "The response headers as a map.", KType.Map),
             ("header", "name", "One response header (or null).", KType.String),
             ("check", "", "Throws a Network error unless the status is 2xx; otherwise returns the response.", KType.Response),
         };
@@ -114,13 +113,15 @@ namespace KScript.Net
 
         protected override void Register(PackageBuilder p)
         {
+            foreach (var f in ResponseValue.Fields)
+                p.Field(KType.Response, f.Name, f.Type, f.Description);
             foreach (var m in ResponseValue.Methods)
                 p.Method(KType.Response, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((ResponseValue)t).TryCallMethod(c, m.Name, out object r) ? r : null);
 
             p.LogProvider("http", "Sends log entries to a web service as a JSON array (url, headers, batch).", c => new HttpLogProvider(c, Client.Value));
 
             p.Command("api", "url, options?",
-                "Makes an HTTP request and returns the response. options is a map: method, headers, body (a map is sent as JSON), timeout (seconds, default 100). A path such as '/api/notes' asks the project's own routes, in this process.",
+                "Makes an HTTP request and returns the response. options is a map: method, headers, body (a map is sent as JSON), timeout (how long to wait for the answer, such as 30s; default 100s). A path such as '/api/notes' asks the project's own routes, in this process.",
                 KType.Response, Api,
                 "<let name=\"repo\" value=\"@api('https://api.github.com/repos/kylepantall/kscript')->check()->json()\" />");
             p.Command("url_encode", "text", "Escapes text for use in a URL.", KType.String, c => Uri.EscapeDataString(c.Str(0)));
@@ -131,7 +132,7 @@ namespace KScript.Net
             p.Element(new ElementInfo("download", "Downloads a URL to a file. Folders are created as needed.", ContentKind.Empty,
                 new A("url", K.Expression, "The address to download.", true),
                 new A("to", K.Expression, "The file to save to. Relative paths are from the script's folder.", true),
-                new A("overwrite", K.Bool, "no keeps a file that is already there (the default is yes)."))
+                new A("overwrite", K.Bool, "false keeps a file that is already there (the default is true)."))
             {
                 Context = ElementContext.Script,
                 Example = "<download url=\"'https://example.com/data.csv'\" to=\"'data/data.csv'\" />",
@@ -156,8 +157,8 @@ namespace KScript.Net
             });
 
             p.AgentNotes(
-                ("@api", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test ->ok().",
-                    prefer: "@api($url)->check()->json(as: $Type) to fail fast and check the data's shape.")));
+                ("@api", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test .is_ok.",
+                    prefer: "@api($url)->check()->json(as: Type) to fail fast and check the data's shape.")));
         }
 
         private static void CheckUrl(string url, Func<string, string, string, KScriptException> error)
@@ -193,7 +194,7 @@ namespace KScript.Net
                 request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType ?? (json ? "application/json" : "text/plain; charset=utf-8"));
             }
 
-            double seconds = options.TryGetValue("timeout", out object t) && t != null ? Values.ToNumber(t, "timeout") : 100;
+            double seconds = options.TryGetValue("timeout", out object t) && t != null ? Duration.Seconds(t, "timeout") : 100;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(c.Interpreter.Options.Cancellation);
             timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
             try

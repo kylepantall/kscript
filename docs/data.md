@@ -7,23 +7,19 @@ import KScript.Data
 
 enum Role { member, editor, admin }
 
-model User {
-  timestamps: yes
-  unique: [email]
-  hidden: [password]
-  guarded: [role]
+model User(timestamps, unique: [email], hidden: [password], guarded: [role]) {
   name: string(max: 120)
   email: email
-  age: int?
+  age?: int
   role: Role = 'member'
   password: password
 }
 
-$db->create_table($User)
+$db->create_table(User)
 
-joan = $User->create(name: 'Joan', email: 'joan@example.com', age: 34, password: 'correct horse battery')
-adults = $User->where(fn($u) => $u.age >= 18 and $u.email->ends_with('@example.com'))->order_by(name)->get()
-echo $adults->map(fn($u) => $u.name)
+joan = User->create(name: 'Joan', email: 'joan@example.com', age: 34, password: 'correct horse battery')
+adults = User->where(fn(u) => $u.age >= 18 and $u.email->ends_with('@example.com'))->order_by(name)->get()
+echo $adults->map(fn(u) => $u.name)
 echo $joan.id
 ```
 
@@ -37,10 +33,7 @@ A model is declared like a [type](types.md), with `model` instead of `type`. Its
 import KScript.Data
 
 /// A post on the blog.
-model Post {
-  timestamps: yes
-  soft_deletes: yes
-  index: [published]
+model Post(timestamps, soft_deletes, index: [published]) {
   title: string(max: 200)
   body: string
   published: bool = false
@@ -49,24 +42,24 @@ model Post {
   fn excerpt() => $body->truncate(80)
 }
 
-$db->create_table($Post)
-post = $Post->create(title: 'Hello', body: 'The first post.')
+$db->create_table(Post)
+post = Post->create(title: 'Hello', body: 'The first post.')
 echo $post->excerpt()
 ```
 
-Settings go first, one per line:
+A model's options go in the brackets after its name, like the options of every other declaration: `model Post(table: "posts", timestamps, unique: [slug])`. The block holds only fields, `validate` rules and `fn`. An option written as a line of the block still runs, but `kscript check` reports it (KS6014) and `kscript check --fix` moves it into the brackets.
 
-| Setting | What it does |
+| Option | What it does |
 | --- | --- |
-| `table: posts` | The table. Default: the plural of the name in snake case (`User` is `users`, `BlogPost` is `blog_posts`). |
-| `key: slug` | The field that is the key. Default: `id`, an `int` the database numbers, added for you. |
-| `timestamps: yes` | Adds `created_at` and `updated_at`, set when records are saved. |
-| `soft_deletes: yes` | Adds `deleted_at`. `->delete()` sets it instead of removing the row, and queries leave those records out. |
+| `table: "posts"` | The table. Default: the plural of the name in snake case (`User` is `users`, `BlogPost` is `blog_posts`). |
+| `key: "slug"` | The field that is the key. Default: `id`, an `int` the database numbers, added for you. |
+| `timestamps` | Adds `created_at` and `updated_at`, set when records are saved. |
+| `soft_deletes` | Adds `deleted_at`. `->delete()` sets it instead of removing the row, and queries leave those records out. |
 | `unique: [email, [team_id, slug]]` | Fields no two records may share. A list in the list is a set of fields that is unique together. A save that clashes fails with `UniqueViolation`. |
 | `index: [team_id]` | Fields to index, so queries on them stay fast. |
 | `hidden: [password]` | Fields left out of JSON, so they never reach a route's response. |
-| `guarded: [role]` | Fields `->create($form)` and `->update($form)` leave alone, so a form can't set them. Set them on the record: `$user.role = 'admin'`. |
-| `connection: reports` | The [connection](#connections) the table is in. |
+| `guarded: [role]` | Fields `->create($form)` and `->update($form)` leave alone, so a form can't set them. Set them on the record: `user.role = 'admin'`. |
+| `connection: "reports"` | The [connection](#connections) the table is in. |
 
 How each type is stored:
 
@@ -80,41 +73,41 @@ How each type is stored:
 | `password` | The password's hash (Argon2id). It is never stored as typed. |
 | lists, maps and other types | JSON. |
 
-An optional field (`age: int?`) is a column that can be null. A computed field (`label => $first + ' ' + $last`) isn't stored: it is worked out each time a record is read.
+An optional field (`age?: int`) is a column that can be null. A computed field (`label => $first + ' ' + $last`) isn't stored: it is worked out each time a record is read.
 
 ## Adding and saving
 
 ```kscript
 import KScript.Data
 
-model Note {
-  timestamps: yes
+model Note(timestamps) {
   text: string
   pinned: bool = false
 }
 
-$db->create_table($Note)
+$db->create_table(Note)
 
-note = $Note->create(text: 'Buy milk')
-$note.pinned = true
+note = Note->create(text: 'Buy milk')
+note.pinned = true
 $note->save()
 
 $note->update(text: 'Buy oat milk')
 echo $note->is_dirty()
-echo $Note->count()
+echo Note->count()
 ```
 
 | Method | What it does |
 | --- | --- |
-| `$Model->create(values)` | Checks the values, saves a new record and returns it. Takes a map (`->create($form)`) or names and values. |
-| `$Model->first_or_create(match, values)` | The first record matching `match`, or a new one made from both maps. |
+| `Model->create(values)` | Checks the values, saves a new record and returns it. Takes a map (`->create($form)`) or names and values. |
+| `Model(values)` | Calling the model makes a record without saving it, the way calling any type makes a value: `note = Note(text: 'Buy milk')`. `$note->save()` adds it. |
+| `Model->first_or_create(match, values)` | The first record matching `match`, or a new one made from both maps. |
 | `$record->save()` | Saves a record: adds it if it's new, otherwise writes only the fields that changed (and `updated_at`). |
 | `$record->update(values)` | Sets fields and saves. |
 | `$record->delete()` | Deletes it (with `soft_deletes`, marks it deleted). `->force_delete()` always removes it, and `->restore()` brings a soft-deleted one back. |
 | `$record->fresh()` | The record as the database has it now. |
 | `$record->is_dirty(field?)`, `->dirty()` | Whether it has changes that aren't saved, and which fields. |
 
-Values are checked as they are set: `$note.pinned = 'maybe'` fails with a Type error before anything reaches the database.
+Values are checked as they are set: `note.pinned = 'maybe'` fails with a Type error before anything reaches the database.
 
 ## Queries
 
@@ -123,26 +116,25 @@ Every query starts from the model, and each step returns a new query, so a query
 ```kscript
 import KScript.Data
 
-model Order {
-  timestamps: yes
+model Order(timestamps) {
   customer: string
   total: number
   status: string = 'open'
 }
 
-$db->create_table($Order)
-$Order->insert([
+$db->create_table(Order)
+Order->insert([
   { customer: 'Ada', total: 120 },
   { customer: 'Ben', total: 35, status: 'paid' },
   { customer: 'Ada', total: 60, status: 'paid' },
 ])
 
 big = 50
-paid = $Order->where(status: 'paid')
+paid = Order->where(status: 'paid')
 echo $paid->count()
 echo $paid->sum(total)
-echo $Order->where(fn($o) => $o.total > $big)->order_by(total: desc)->pluck(customer)
-echo $Order->where(fn($o) => $o.customer->starts_with('A'))->latest()->first().total
+echo Order->where(fn(o) => $o.total > $big)->order_by(total: desc)->pluck(customer)
+echo Order->where(fn(o) => $o.customer->starts_with('A'))->latest()->first().total
 ```
 
 ### Conditions
@@ -156,7 +148,7 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 | Method | What it does |
 | --- | --- |
 | `->where(...)`, `->or_where(...)`, `->where_not(...)` | Keep the rows that match, or that match these instead, or that don't. |
-| `->when(test, fn($q) => ...)` | Changes the query only when the test is true, for optional filters. |
+| `->when(test, fn(q) => ...)` | Changes the query only when the test is true, for optional filters. |
 | `->order_by(name)`, `->order_by(total: desc)` | Sorts. `->latest()` and `->oldest()` sort by `created_at`. |
 | `->limit(n)`, `->offset(n)` | Reads at most `n` rows, after skipping `n`. |
 | `->select(id, name)`, `->distinct()` | Reads only these columns, and leaves out rows that repeat. |
@@ -167,19 +159,19 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 
 | Method | What it gives |
 | --- | --- |
-| `->get()`, `$Model->all()` | A list of records. |
+| `->get()`, `Model->all()` | A list of records. |
 | `->first()`, `->find(id)` | One record, or null. |
 | `->first_or_fail()`, `->find_or_fail(id)` | One record, or a `ModelNotFound` error, which a route answers with 404. |
 | `->count()`, `->exists()` | How many rows match, and whether any do. |
 | `->sum(col)`, `->avg(col)`, `->min(col)`, `->max(col)` | Totals over the rows that match. |
 | `->pluck(col)`, `->value(col)` | One column of every row, or of the first. |
 | `->paginate(per_page, page)` | One page: `{ items, page, per_page, total, last_page, from, to, has_more }`. `page` may be text, such as `$query.page`. |
-| `->chunk(size, fn($rows, $n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
+| `->chunk(size, fn(rows, n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
 | `->sql()` | The SQL and parameters the query would run, without running it. |
 
 ### Changing many rows
 
-`->update(values)`, `->increment(col, by)`, `->decrement(col, by)`, `->delete()`, `->force_delete()` and `->restore()` change every row that matches, in one statement, and return how many rows changed. `$Model->insert(rows)` adds a list of rows, each checked like `->create()`.
+`->update(values)`, `->increment(col, by)`, `->decrement(col, by)`, `->delete()`, `->force_delete()` and `->restore()` change every row that matches, in one statement, and return how many rows changed. `Model->insert(rows)` adds a list of rows, each checked like `->create()`.
 
 ## Transactions
 
@@ -193,15 +185,15 @@ model Account {
   balance: number = 0
 }
 
-$db->create_table($Account)
-$Account->create(owner: 'Ada', balance: 100)
-$Account->create(owner: 'Ben')
+$db->create_table(Account)
+Account->create(owner: 'Ada', balance: 100)
+Account->create(owner: 'Ben')
 
 fn transfer(from: int, to: int, amount: number) {
   transaction {
-    $Account->where(id: $from)->decrement(balance, by: $amount)
-    $Account->where(id: $to)->increment(balance, by: $amount)
-    if $Account->find($from).balance < 0 {
+    Account->where(id: $from)->decrement(balance, by: $amount)
+    Account->where(id: $to)->increment(balance, by: $amount)
+    if Account->find($from).balance < 0 {
       throw Conflict(message: 'Not enough money')
     }
   }
@@ -213,7 +205,7 @@ try {
 } catch Conflict as e {
   echo $e.message
 }
-echo $Account->pluck(balance)
+echo Account->pluck(balance)
 ```
 
 `@transaction(fn() => ...)` does the same for a function and returns what it returns. A transaction inside another is a savepoint, so only its own changes are undone. `retries: 3` tries again when the database is busy.
@@ -233,7 +225,7 @@ $db->sql("insert into visits (page, at) values ({$page}, {@now()->to_string()})"
 echo @sql("select count(*) as n from visits where page = {$page}")[0].n
 ```
 
-A query gives its rows as maps (or as a type: `@sql(text, as: $User)`), and anything else gives how many rows it changed. `@db('visits')` is a query on a table with no model, whose rows are maps.
+A query gives its rows as maps (or as a type: `@sql(text, as: User)`), and anything else gives how many rows it changed. `@db('visits')` is a query on a table with no model, whose rows are maps.
 
 ## Connections
 

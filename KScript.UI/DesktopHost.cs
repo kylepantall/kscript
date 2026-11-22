@@ -238,14 +238,14 @@ namespace KScript.UI
                 case "Button":
                 {
                     var b = new Button();
-                    b.Click += (s, e) => Fire(b, "on-click");
+                    b.Click += (s, e) => Fire(b, "on_click");
                     return b;
                 }
                 case "TextBox":
                 {
                     var t = new TextBox();
                     t.TextChanged += (s, e) => { if (!patching) session.SetBound(NodeOf(t), t.Text ?? string.Empty); };
-                    t.KeyDown += (s, e) => { if (e.Key == Key.Enter && !NodeOf(t).Flag("multiline")) Fire(t, "on-enter", new Dictionary<string, object> { ["value"] = t.Text ?? string.Empty }); };
+                    t.KeyDown += (s, e) => { if (e.Key == Key.Enter && !NodeOf(t).Flag("multiline")) Fire(t, "on_enter", new Dictionary<string, object> { ["value"] = t.Text ?? string.Empty }); };
                     return t;
                 }
                 case "CheckBox":
@@ -276,10 +276,10 @@ namespace KScript.UI
                     var b = new Border();
                     b.PointerPressed += (s, e) =>
                     {
-                        if (NodeOf(b).Handlers.ContainsKey("on-click") && e.GetCurrentPoint(b).Properties.IsLeftButtonPressed)
+                        if (NodeOf(b).Handlers.ContainsKey("on_click") && e.GetCurrentPoint(b).Properties.IsLeftButtonPressed)
                         {
                             e.Handled = true;
-                            Fire(b, "on-click");
+                            Fire(b, "on_click");
                         }
                     };
                     return b;
@@ -336,7 +336,7 @@ namespace KScript.UI
                         box.BorderBrush = Brush(n.String("border"));
                         box.BorderThickness = new Thickness(1);
                     }
-                    box.Cursor = n.Handlers.ContainsKey("on-click") ? new Cursor(StandardCursorType.Hand) : null;
+                    box.Cursor = n.Handlers.ContainsKey("on_click") ? new Cursor(StandardCursorType.Hand) : null;
                     if (n.Children.Count == 0) box.Child = null;
                     else
                     {
@@ -354,7 +354,7 @@ namespace KScript.UI
                     if (n.Has("background")) text.Background = Brush(n.String("background")); else text.ClearValue(TextBlock.BackgroundProperty);
                     text.Padding = new Thickness(n.Number("padding") ?? 0);
                     text.TextWrapping = n.Flag("wrap") ? TextWrapping.Wrap : TextWrapping.NoWrap;
-                    text.TextAlignment = n.String("text-align") switch { "center" => TextAlignment.Center, "right" => TextAlignment.Right, _ => TextAlignment.Left };
+                    text.TextAlignment = n.String("text_align") switch { "center" => TextAlignment.Center, "right" => TextAlignment.Right, _ => TextAlignment.Left };
                     break;
 
                 case CheckBox check:
@@ -508,7 +508,7 @@ namespace KScript.UI
             for (int i = 0; i < active.Count; i++)
             {
                 UINode node = active[i];
-                double every = Math.Max(15, node.Number("every") ?? 1000);
+                double every = Math.Max(15, node.Prop("every") is object length ? Duration.Seconds(length, "<Timer every>") * 1000 : 1000);
                 if (i < timers.Count)
                 {
                     var (timer, _) = timers[i];
@@ -524,7 +524,7 @@ namespace KScript.UI
                     {
                         // One tick at a time: the next is scheduled when the redraw after this one is done.
                         timer.Stop();
-                        if (index < timers.Count) session.Fire(timers[index].Node, "on-tick");
+                        if (index < timers.Count) session.Fire(timers[index].Node, "on_tick");
                     };
                     timers.Add((timer, node));
                     timer.Start();

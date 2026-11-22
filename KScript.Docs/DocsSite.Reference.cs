@@ -20,13 +20,13 @@ namespace KScript.Docs
         {
             [KType.String] = "Text. A string that holds a number can use number methods too.",
             [KType.Number] = "Whole and decimal numbers.",
-            [KType.Bool] = "yes and no (true and false).",
+            [KType.Bool] = "true and false.",
             [KType.List] = "Lists such as `[1, 2, 3]`. Methods that change a list return a new one.",
             [KType.Map] = "Maps such as `{ name: 'Joan', age: 82 }`.",
             [KType.Date] = "Dates and times, from `@now()`, `@date('2026-11-19')` or `->to_date()`.",
-            [KType.Fn] = "Functions: lambdas `fn($x) => $x * 2` and `<fn>` functions.",
+            [KType.Fn] = "Functions: lambdas `fn(x) => $x * 2` and `<fn>` functions.",
             [KType.Any] = "Methods every value has.",
-            [KType.Type] = "A `<type>` declared by a script, such as `$Repo`.",
+            [KType.Type] = "A `<type>` declared by a script, such as `Repo`.",
             [KType.File] = "File values, from `@file()`, `@files()` and `@folders()`.",
             [KType.Config] = "`$config`: settings from config files, `.env` files and the environment.",
             [KType.Logger] = "`$log`: structured logging.",
@@ -62,11 +62,12 @@ namespace KScript.Docs
             ["field"] = "name: type",
             ["for"] = "for item in list",
             ["catch"] = "catch err",
-            ["case"] = "case value",
+            ["case"] = "value => …",
+            ["default"] = "_ => …",
         };
 
         /// <summary>How an element is written in a .kscript file: <c>break</c>, <c>name = value</c>, <c>KScript.Window</c>.</summary>
-        internal static string CodeName(ElementInfo e) => CodeForms.TryGetValue(e.Name, out string form) ? form : ElementName(e);
+        internal static string CodeName(ElementInfo e) => CodeForms.TryGetValue(e.Name, out string form) ? form : e.Name;
 
         /// <summary>An element's name as code, in both formats: the page shows the reader's.</summary>
         internal static string DualName(ElementInfo e) =>
@@ -76,7 +77,7 @@ namespace KScript.Docs
             Catalog.Packages.Keys.OrderBy(p => p == "KScript.Core" ? 0 : Array.IndexOf(BuiltInNames, p) is int i && i >= 0 ? i : 50).ThenBy(p => p, StringComparer.Ordinal);
 
         private IEnumerable<string> MethodTypes =>
-            Catalog.Methods.Where(m => !m.Planned).Select(m => m.ReceiverType).Distinct()
+            Catalog.MemberTypes
                 .OrderBy(t => Array.IndexOf(TypeOrder, t) is int i && i >= 0 ? i : 50).ThenBy(t => t, StringComparer.Ordinal);
 
         private static bool CanRun(string package) => package == "KScript.Core" || Playground.Packages.Contains(package);
@@ -94,7 +95,8 @@ namespace KScript.Docs
             foreach (string type in MethodTypes)
             {
                 int count = Catalog.Methods.Count(m => !m.Planned && m.ReceiverType == type);
-                index.Append($"<a class=\"card\" href=\"{TypeSlug(type)}\"><strong>{Html.H(type)}</strong><span>{count} method{(count == 1 ? "" : "s")}. {Html.Inline(TypeDescriptions.GetValueOrDefault(type, string.Empty))}</span></a>");
+                int fieldCount = Catalog.FieldsOf(type).Count;
+                index.Append($"<a class=\"card\" href=\"{TypeSlug(type)}\"><strong>{Html.H(type)}</strong><span>{(fieldCount > 0 ? $"{fieldCount} field{(fieldCount == 1 ? "" : "s")}, " : "")}{count} method{(count == 1 ? "" : "s")}. {Html.Inline(TypeDescriptions.GetValueOrDefault(type, string.Empty))}</span></a>");
             }
             index.Append("</div><h2 id=\"variables\">Built-in variables</h2><p>Variables that exist without being declared, such as <code>$args</code>: see <a href=\"/reference/variables\">Built-in variables</a>.</p>");
             var indexPage = new DocPage { Path = "/reference", Title = "Reference", NavTitle = "Overview", Section = "Reference", Description = "Every package, element, command, method and variable.", Body = index.ToString() };
@@ -129,7 +131,7 @@ namespace KScript.Docs
                 sb.Append("<p>Import it at the top of a script:</p>");
                 sb.Append(Html.Code($"<import package=\"{package}\" />", "xml"));
                 if (root != null) sb.Append(Html.Dual($"<p>A file whose root element is <code>&lt;{Html.H(root)}&gt;</code> imports it for you.</p>",
-                    $"<p>A file made of a <code>{Html.H(root)} {{ }}</code> block imports it for you.</p>"));
+                    $"<p>A .kscript file names a package only in its import: write <code>{Html.H(root.Substring(8))} {{ }}</code>, never <code>{Html.H(root)} {{ }}</code>.</p>"));
                 var brings = Catalog.WithRequired(package).Skip(1).ToList();
                 if (brings.Count > 0) sb.Append($"<p>It brings {string.Join(", ", brings.Select(b => $"<a href=\"{PackageSlug(b)}\">{Html.H(b)}</a>"))} with it.</p>");
                 if (!CanRun(package) && Playground.Unavailable.TryGetValue(package, out string why))
@@ -193,14 +195,18 @@ namespace KScript.Docs
             var methods = Catalog.Methods.Where(m => !m.Planned && m.ReceiverType == type).ToList();
             string path = TypeSlug(type);
             var sb = new StringBuilder();
-            sb.Append($"<h1>{Html.H(type)} methods</h1>");
+            sb.Append($"<h1>{Html.H(type)} fields and methods</h1>");
             if (TypeDescriptions.TryGetValue(type, out string description)) sb.Append($"<p class=\"lead\">{Html.Inline(description)}</p>");
-            sb.Append("<p>Call a method with <code>-&gt;</code> on a value: <code>$value-&gt;name(arguments)</code>, or pipe the value in with <code>|&gt;</code>: <code>$value |&gt; name(arguments)</code>.</p>");
+            sb.Append("<p>A field is a plain fact about the value, read with a dot and no brackets: <code>$value.name</code>. A method takes arguments or does work, and is called with <code>-&gt;</code>: <code>$value-&gt;name(arguments)</code>, or with the value piped in: <code>$value |&gt; name(arguments)</code>.</p>");
             var fields = Catalog.FieldsOf(type);
             if (fields.Count > 0)
             {
-                sb.Append("<h2 id=\"fields\">Fields</h2><div class=\"table\"><table><thead><tr><th>Field</th><th>Type</th></tr></thead><tbody>");
-                foreach (var f in fields) sb.Append($"<tr><td><code>.{Html.H(f.Key)}</code></td><td>{Html.H(f.Value)}</td></tr>");
+                sb.Append("<h2 id=\"fields\">Fields</h2><div class=\"table\"><table><thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead><tbody>");
+                foreach (var f in fields.Values.OrderBy(f => f.Name, StringComparer.Ordinal))
+                {
+                    sb.Append($"<tr id=\"field-{Html.Slug(f.Name)}\"><td><code>.{Html.H(f.Name)}</code></td><td>{TypeLink(f.Type)}</td><td>{Html.Inline(f.Description)}</td></tr>");
+                    Search.Add(new SearchEntry { Title = type + "." + f.Name, Url = path + "#field-" + Html.Slug(f.Name), Section = f.Package ?? "KScript.Core", Kind = "field", Text = Shorten(Html.Text(Html.Inline(f.Description))) });
+                }
                 sb.Append("</tbody></table></div>");
             }
             var page = new DocPage { Path = path, Title = type + " methods", NavTitle = type, Section = "Methods by type", Description = description ?? $"Methods of {type} values." };
@@ -253,7 +259,7 @@ namespace KScript.Docs
         private string TypeLink(string type)
         {
             if (string.IsNullOrEmpty(type) || type == KType.Any) return "<span class=\"type\">any</span>";
-            bool hasPage = Catalog.Methods.Any(m => !m.Planned && m.ReceiverType == type);
+            bool hasPage = Catalog.MemberTypes.Contains(type);
             return hasPage ? $"<a class=\"type\" href=\"{TypeSlug(type)}\">{Html.H(type)}</a>" : $"<span class=\"type\">{Html.H(type)}</span>";
         }
 
@@ -333,12 +339,12 @@ namespace KScript.Docs
             AttributeKind.VariableReference => "a variable's name",
             AttributeKind.Parameters => "parameters",
             AttributeKind.DeclareFunction => "a function name",
-            AttributeKind.FunctionReference => "a function",
+            AttributeKind.FunctionReference => "a function: <code>@name</code>",
             AttributeKind.FunctionReferences => "a list of functions: <code>[a, b]</code>",
             AttributeKind.Path => "a file path",
             AttributeKind.Selector => "a CSS selector",
             AttributeKind.Enum => "one of a set of words",
-            AttributeKind.Bool => "<code>yes</code> or <code>no</code>",
+            AttributeKind.Bool => "<code>true</code> or <code>false</code>",
             AttributeKind.Statements => "statements",
             AttributeKind.TypeName => "a type",
             AttributeKind.Fields => "fields",

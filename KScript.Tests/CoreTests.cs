@@ -98,7 +98,7 @@ public class CoreTests
     [Fact]
     public void ForWithIndex()
     {
-        Assert.Equal("0:a\n1:b\n", RunBody("<for each=\"x\" index=\"i\" in=\"['a', 'b']\"><echo>$i:$x</echo></for>"));
+        Assert.Equal("0:a\n1:b\n", RunBody("<for each=\"x\" at=\"i\" in=\"['a', 'b']\"><echo>$i:$x</echo></for>"));
     }
 
     [Fact]
@@ -169,9 +169,9 @@ public class CoreTests
     [Fact]
     public void LambdasAndListMethods()
     {
-        Assert.Equal("2,4,6\n", RunBody("<echo>{ [1, 2, 3]->map(fn($x) => $x * 2)->join(',') }</echo>"));
-        Assert.Equal("Joan\n", RunBody("<let name=\"people\" value=\"[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]\" /><echo>{ $people->max_by(fn($p) => $p.age).name }</echo>"));
-        Assert.Equal("3\n", RunBody("<echo>{ [1, 2, 3, 4, 5] |> filter(fn($x) => $x gt 2) |> count() }</echo>"));
+        Assert.Equal("2,4,6\n", RunBody("<echo>{ [1, 2, 3]->map(fn(x) => $x * 2)->join(',') }</echo>"));
+        Assert.Equal("Joan\n", RunBody("<let name=\"people\" value=\"[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]\" /><echo>{ $people->max_by(fn(p) => $p.age).name }</echo>"));
+        Assert.Equal("3\n", RunBody("<echo>{ [1, 2, 3, 4, 5] |> filter(fn(x) => $x gt 2) |> count() }</echo>"));
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public class CoreTests
     [Fact]
     public void MarrayBuildsNestedValues()
     {
-        Assert.Equal("1 x\n", RunBody("<marray name=\"cfg\"><item key=\"a\">1</item><item key=\"list\"><item>x</item></item></marray><echo>$cfg.a {$cfg.list[0]}</echo>"));
+        Assert.Equal("1 x\n", RunBody("<collection name=\"cfg\"><item key=\"a\">1</item><item key=\"list\"><item>x</item></item></collection><echo>$cfg.a {$cfg.list[0]}</echo>"));
     }
 
     [Fact]

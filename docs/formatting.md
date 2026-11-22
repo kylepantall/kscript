@@ -73,10 +73,10 @@ import KScript.Cache
 /// The value kept under the key, or else what compute gives, kept for cache.ttl, which says how long.
 fn cached(key, compute) => @cache('memory', name: 'app')->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
 
-fn adults(people) => $people->filter(fn($p) => $p.age >= 18)->sort_by(fn($p) => $p.name)->map(fn($p) => $p.name)->take(20)
+fn adults(people) => $people->filter(fn(p) => $p.age >= 18)->sort_by(fn(p) => $p.name)->map(fn(p) => $p.name)->take(20)
 
 people = @read_json('people.json')
-names = $people |> filter(fn($p) => $p.age > 18) |> map(fn($p) => $p.name->upper()) |> sort()
+names = $people |> filter(fn(p) => $p.age > 18) |> map(fn(p) => $p.name->upper()) |> sort()
 ```
 
 becomes
@@ -93,22 +93,22 @@ fn cached(key, compute) =>
 
 fn adults(people) =>
   $people
-    ->filter(fn($p) => $p.age >= 18)
-    ->sort_by(fn($p) => $p.name)
-    ->map(fn($p) => $p.name)
+    ->filter(fn(p) => $p.age >= 18)
+    ->sort_by(fn(p) => $p.name)
+    ->map(fn(p) => $p.name)
     ->take(20)
 
 people = @read_json('people.json')
 names = $people
-  |> filter(fn($p) => $p.age > 18)
-  |> map(fn($p) => $p.name->upper())
+  |> filter(fn(p) => $p.age > 18)
+  |> map(fn(p) => $p.name->upper())
   |> sort()
 ```
 
 Lines are only broken, never joined, so a short line you split on purpose stays split. Set `print_width` in
 `kscript.json` (or your [standard](standards.md)) to choose the width, and turn any step off with the rules below.
 
-Text in quotes, `/* */` comments, enum values and match cases written on one line (`label = match $n { 1 => 'one', _ => 'many' }`) are kept as they are, apart from the long-line wrapping above. After formatting, `kscript fmt` reads the file again and checks that it is the same program, statement for statement; if it isn't, the file is left alone with an error (please report it).
+Text in quotes, `/* */` comments, enum values and the arms of a match used as a value (`label = match $n { 1 => 'one', _ => 'many' }`) are kept as they are, apart from the long-line wrapping above. The arms of a match statement are laid out as statements: each arm keeps its line (`1, 2 => echo "low"`), and an arm's `{ }` block is opened up like any other block. After formatting, `kscript fmt` reads the file again and checks that it is the same program, statement for statement; if it isn't, the file is left alone with an error (please report it).
 
 ### XML scripts and pages
 

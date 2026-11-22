@@ -53,9 +53,9 @@ public sealed class NetTests : IDisposable
     {
         string output = Run(
             $"<let name=\"r\" value=\"@api('{server.Url}/json')\" />" +
-            "<echo>{ $r->status() } { $r->ok() } { $r->reason() } { $r->json().name } { $r->json().tags[1] } { $r->header('content-type') } { $r->header('X-None') ?? 'none' }</echo>" +
-            "<echo>{ $r.status } { $r.ok } { $r.text->length() } { $r.headers['Content-Type'] } { $r->url() == $r.url } { $r->text() == $r.text } { $r->headers()->count() > 0 } { $r.nothing ?? 'n' }</echo>" +
-            "<echo>{ $r->check()->status() } {$r}</echo>");
+            "<echo>{ $r.status } { $r.is_ok } { $r.reason } { $r->json().name } { $r->json().tags[1] } { $r->header('content-type') } { $r->header('X-None') ?? 'none' }</echo>" +
+            "<echo>{ $r.status } { $r.is_ok } { $r.text->length() } { $r.headers['Content-Type'] } { $r.url == $r.url } { $r.text == $r.text } { $r.headers->count() > 0 } { $r.nothing ?? 'n' }</echo>" +
+            "<echo>{ $r->check().status } {$r}</echo>");
         Assert.Equal("200 true OK Ann 2 application/json none\n200 true 33 application/json true true true n\n200 { \"name\": \"Ann\", \"tags\": [1, 2] }\n", output);
     }
 
@@ -63,10 +63,10 @@ public sealed class NetTests : IDisposable
     public void Api_sends_methods_headers_and_bodies()
     {
         string output = Run(
-            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'post', body: {{ a: 1 }}, headers: {{ 'X-Key': 'k' }} }})->text() }}</echo>" +
-            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PUT', body: 'plain' }})->text() }}</echo>" +
-            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PATCH', body: 'a=1', headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }})->text() }}</echo>" +
-            $"<echo>{{ @api('{server.Url}/echo', null)->status() }}</echo>");
+            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'post', body: {{ a: 1 }}, headers: {{ 'X-Key': 'k' }} }}).text }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PUT', body: 'plain' }}).text }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PATCH', body: 'a=1', headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }}).text }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', null).status }}</echo>");
         Assert.Equal("POST application/json {\"a\":1} k\nPUT text/plain; charset=utf-8 plain\nPATCH application/x-www-form-urlencoded a=1\n201\n", output);
     }
 

@@ -67,7 +67,7 @@ namespace KScript.Language.Tests
             ListNode l => "[" + string.Join(" ", l.Items.Select(Print)) + "]",
             MapNode m => "{" + string.Join(" ", m.Entries.Select(e => e.Key + ":" + Print(e.Value))) + "}",
             RangeNode r => "(.. " + Print(r.Start) + " " + Print(r.End) + (r.Step != null ? " " + Print(r.Step) : string.Empty) + ")",
-            MatchNode m => "(match " + Print(m.Subject) + string.Concat(m.Arms.Select(a => " " + (a.Pattern == null ? "_" : Print(a.Pattern)) + "=>" + Print(a.Result))) + ")",
+            MatchNode m => "(match " + Print(m.Subject) + string.Concat(m.Arms.Select(a => " " + (a.Patterns.Count == 0 ? "_" : string.Join(",", a.Patterns.Select(Print))) + (a.Guard == null ? "" : " when " + Print(a.Guard)) + "=>" + Print(a.Result))) + ")",
             AssignmentNode a => "(" + a.Operator + " " + Print(a.Target) + " " + Print(a.Value) + ")",
             ErrorNode _ => "<error>",
             _ => node.GetType().Name,

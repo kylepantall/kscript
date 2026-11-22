@@ -58,7 +58,7 @@ namespace KScript.Language.Tests
             d = One("n = 5\necho $n.size\n");
             Assert.Equal("A number has no fields, so .size stops the script.", d.Message);
             Assert.Empty(d.Fixes);
-            Assert.StartsWith("A yes/no value has no fields", One("ok = true\necho $ok.value\n").Message);
+            Assert.StartsWith("A true/false value has no fields", One("ok = true\necho $ok.value\n").Message);
         }
 
         [Theory]

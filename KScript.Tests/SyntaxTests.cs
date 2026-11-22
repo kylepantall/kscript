@@ -18,7 +18,7 @@ public class SyntaxTests
 
         ParseResult parsed = ExpressionParser.ParseExpression("fn(1) => 2");
         Assert.Equal("fn(1) => 2", parsed.Text);
-        Assert.Contains("Expected a parameter such as $x, found '1'.", parsed.Errors[0].ToString());
+        Assert.Contains("Expected a parameter name such as x, found '1'.", parsed.Errors[0].ToString());
 
         Token token = Lexer.Tokenize("$x")[0];
         Assert.Equal("Variable 'x' [0..2)", token.ToString());

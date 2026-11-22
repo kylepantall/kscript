@@ -54,7 +54,7 @@ public class NamedArgumentTests
     [Fact]
     public void LambdasTakeNamedArguments()
     {
-        Assert.Equal("9\n", RunBody("<let name=\"sub\" value=\"fn($a, $b) => $a - $b\" /><echo>{ $sub->call(b: 1, a: 10) }</echo>"));
+        Assert.Equal("9\n", RunBody("<let name=\"sub\" value=\"fn(a, b) => $a - $b\" /><echo>{ $sub->call(b: 1, a: 10) }</echo>"));
     }
 
     [Theory]

@@ -31,40 +31,40 @@ public class TypedJsonTests
     private static KScriptException FailsWith(string body) => Fails(Types + body);
 
     [Theory]
-    [InlineData("$Repo->from(" + Good + ").label", "kscript (12)")]
-    [InlineData("$Repo->from(" + Good + ").owner_name", "kyle")]
-    [InlineData("$Repo->from(" + Good + ").owner.avatar_url ?? 'none'", "none")]
-    [InlineData("$Repo->from(" + Good + ").topics->count()", "0")]
-    [InlineData("$Repo->from(" + Good + ").visibility", "public")]
-    [InlineData("$Repo->from(" + Good + ").license ?? 'none'", "none")]
-    [InlineData("$Repo->from(" + Good + ")->keys()->join(',')", "name,stars,owner,owner_name,topics,license,visibility,label")]
-    [InlineData("@type($Repo->from(" + Good + "))", "Repo")]
-    [InlineData("$Repo->from(" + Good + ")->type()", "Repo")]
-    [InlineData("@type($Repo->from(" + Good + ").owner)", "User")]
-    [InlineData("@type($Repo)", "type")]
-    [InlineData("$Repo", "Repo")]
-    [InlineData("$Repo.name + ' ' + $Repo->name() + ' ' + $Repo.description", "Repo Repo A repository.")]
-    [InlineData("$Repo.fields->count() + $Repo->fields()->count()", "16")]
-    [InlineData("$Repo.fields[1].from + ' ' + $Repo.fields[1].type + ' ' + $Repo.fields[5].type + ' ' + $Repo.fields[7].computed", "stargazers_count int string? true")]
-    [InlineData("$Repo->from([" + Good + ", " + Good + "])->count()", "2")]
-    [InlineData("$Repo->from([" + Good + "])[0].stars", "12")]
-    [InlineData("$Repo->check(" + Good + ")->count()", "0")]
-    [InlineData("$Repo->check([" + Good + ", {}])->count()", "5")]
-    [InlineData("$Repo->from(" + Good + ") == $Repo->from(" + Good + ")", "true")]
-    [InlineData("$Repo->from(" + Good + ").owner == { login: 'kyle', id: 1, avatar_url: null }", "true")]
-    [InlineData("$User->from('{\"login\": \"kyle\", \"id\": 7}').id", "7")]
+    [InlineData("Repo(" + Good + ").label", "kscript (12)")]
+    [InlineData("Repo(" + Good + ").owner_name", "kyle")]
+    [InlineData("Repo(" + Good + ").owner.avatar_url ?? 'none'", "none")]
+    [InlineData("Repo(" + Good + ").topics->count()", "0")]
+    [InlineData("Repo(" + Good + ").visibility", "public")]
+    [InlineData("Repo(" + Good + ").license ?? 'none'", "none")]
+    [InlineData("Repo(" + Good + ")->keys()->join(',')", "name,stars,owner,owner_name,topics,license,visibility,label")]
+    [InlineData("@type(Repo(" + Good + "))", "Repo")]
+    [InlineData("Repo(" + Good + ")->type()", "Repo")]
+    [InlineData("@type(Repo(" + Good + ").owner)", "User")]
+    [InlineData("@type(Repo)", "type")]
+    [InlineData("Repo", "Repo")]
+    [InlineData("Repo.name + ' ' + Repo.name + ' ' + Repo.description", "Repo Repo A repository.")]
+    [InlineData("Repo.fields->count() + Repo.fields->count()", "16")]
+    [InlineData("Repo.fields[1].from + ' ' + Repo.fields[1].type + ' ' + Repo.fields[5].type + ' ' + Repo.fields[7].computed", "stargazers_count int string? true")]
+    [InlineData("Repo([" + Good + ", " + Good + "])->count()", "2")]
+    [InlineData("Repo([" + Good + "])[0].stars", "12")]
+    [InlineData("Repo->check(" + Good + ")->count()", "0")]
+    [InlineData("Repo->check([" + Good + ", {}])->count()", "5")]
+    [InlineData("Repo(" + Good + ") == Repo(" + Good + ")", "true")]
+    [InlineData("Repo(" + Good + ").owner == { login: 'kyle', id: 1, avatar_url: null }", "true")]
+    [InlineData("User('{\"login\": \"kyle\", \"id\": 7}').id", "7")]
     [InlineData("@json('{\"login\": \"kyle\", \"id\": 7}', as: User).login", "kyle")]
     [InlineData("'{\"login\": \"kyle\", \"id\": 7}'->json(as: User).login", "kyle")]
     [InlineData("'[{\"login\": \"kyle\", \"id\": 7}]'->json(User)[0].login", "kyle")]
     [InlineData("'[{\"login\": \"kyle\", \"id\": 7}]'->json(as: 'User[]')->count()", "1")]
     [InlineData("'[1, 2]'->json(as: 'int[]')->count()", "2")]
-    [InlineData("'\"public\"'->json(as: $Visibility)", "public")]
+    [InlineData("'\"public\"'->json(as: Visibility)", "public")]
     [InlineData("'{\"a\": 1}'->json().a", "1")]
     [InlineData("@json('{\"a\": 1}').a", "1")]
-    [InlineData("($Repo |> from(" + Good + ")).stars", "12")]
-    [InlineData("$User.description ?? 'none'", "none")]
-    [InlineData("$Repo->from(" + Good + ") === 'x'", "false")]
-    [InlineData("$Repo->check({ name: 'a', stargazers_count: 1, owner: { login: 'k', id: 1 }, visibility: 3 })[0].message", "must be a Visibility (public, private, internal), but got a number (3).")]
+    [InlineData("(" + Good + " |> Repo()).stars", "12")]
+    [InlineData("User.description ?? 'none'", "none")]
+    [InlineData("Repo(" + Good + ") === 'x'", "false")]
+    [InlineData("Repo->check({ name: 'a', stargazers_count: 1, owner: { login: 'k', id: 1 }, visibility: 3 })[0].message", "must be a Visibility (public, private, internal), but got a number (3).")]
     public void DataIsMappedToTypes(string expression, string expected)
     {
         Assert.Equal(expected, Echo(expression));
@@ -73,7 +73,7 @@ public class TypedJsonTests
     [Fact]
     public void ProblemsAreAllReportedWithTheirPaths()
     {
-        KScriptException error = FailsWith("<let name=\"r\" value=\"$Repo->from({ name: { a: 1 }, stargazers_count: 'lots', owner: { id: 'x' }, visibility: 'publc', topics: [1, [2]] })\" />");
+        KScriptException error = FailsWith("<let name=\"r\" value=\"Repo({ name: { a: 1 }, stargazers_count: 'lots', owner: { id: 'x' }, visibility: 'publc', topics: [1, [2]] })\" />");
         Assert.Equal("Shape", error.Type);
         Assert.Contains("The data doesn't fit Repo (6 problems):", error.Message);
         Assert.Contains("$.name: needs a string, but got a map", error.Message);
@@ -92,17 +92,17 @@ public class TypedJsonTests
     [Fact]
     public void ProblemsCanBeCaughtAndChecked()
     {
-        string output = RunBody(Types + "<try><let name=\"r\" value=\"$Repo->from({})\" />"
+        string output = RunBody(Types + "<try><let name=\"r\" value=\"Repo({})\" />"
             + "<catch as=\"err\"><echo>{ $err.type } { $err.problems->count() } { $err.problems[0].path } { $err.problems[2].field }</echo></catch></try>"
-            + "<echo>{ $Repo->check({ name: 1 })->map(fn($p) => $p.path)->join(' ') }</echo>"
-            + "<echo>{ $Repo->check(3)[0].message }</echo>");
+            + "<echo>{ Repo->check({ name: 1 })->map(fn(p) => $p.path)->join(' ') }</echo>"
+            + "<echo>{ Repo->check(3)[0].message }</echo>");
         Assert.Equal("Shape 5 $.name owner\n$.stargazers_count $.owner $.owner.login $.visibility\nneeds a Repo (a map), but got a number (3).\n", output);
     }
 
     [Fact]
     public void LongProblemListsAreCutShort()
     {
-        KScriptException error = Fails("<type name=\"N\" fields=\"n: int\" /><echo>{ $N->from(@range(0, 30)->map(fn($i) => { n: 'x' })) }</echo>");
+        KScriptException error = Fails("<type name=\"N\" fields=\"n: int\" /><echo>{ N(@range(0, 30)->map(fn(i) => { n: 'x' })) }</echo>");
         Assert.Contains("(30 problems)", error.Message);
         Assert.Contains("...and 10 more.", error.Message);
         Assert.Equal(30, ((List<object>)error.Fields["problems"]).Count);
@@ -111,7 +111,7 @@ public class TypedJsonTests
     [Fact]
     public void RepeatedProblemsAreListedOnce()
     {
-        KScriptException error = Fails("<type name=\"T\"><field name=\"a\" type=\"string\" from=\"x.y\" /><field name=\"b\" type=\"string\" from=\"x.y\" /></type><echo>{ $T->from({}) }</echo>");
+        KScriptException error = Fails("<type name=\"T\"><field name=\"a\" type=\"string\" from=\"x.y\" /><field name=\"b\" type=\"string\" from=\"x.y\" /></type><echo>{ T({}) }</echo>");
         Assert.Contains("(1 problem):", error.Message);
     }
 
@@ -126,7 +126,7 @@ public class TypedJsonTests
     [InlineData("<fn name=\"stars\" params=\"repo: Repo\" value=\"$repo.stars\" /><echo>{ @stars(" + Good + ") }</echo>", "12")]
     [InlineData("<fn name=\"count\" params=\"repos: Repo[]\" value=\"$repos->count()\" /><echo>{ @count([" + Good + "]) }</echo>", "1")]
     [InlineData("<fn name=\"tag\" params=\"v: Visibility\" value=\"$v\" /><echo>{ @tag(private) }</echo>", "private")]
-    [InlineData("<fn name=\"same\" params=\"r: Repo\" value=\"$r\" /><let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><echo>{ @same($r) === $r }</echo>", "true")]
+    [InlineData("<fn name=\"same\" params=\"r: Repo\" value=\"$r\" /><let name=\"r\" value=\"Repo(" + Good + ")\" /><echo>{ @same($r) === $r }</echo>", "true")]
     public void DeclaredTypesConvertVariablesAndParameters(string body, string expected)
     {
         Assert.Equal(expected + "\n", RunBody(Types + body));
@@ -140,19 +140,19 @@ public class TypedJsonTests
     [InlineData("<let name=\"r\" type=\"[]\" value=\"1\" />", "'[]' isn't a type.")]
     [InlineData("<echo>{ '{}'->json(as: 'Nope[') }</echo>", "'Nope[' isn't a type.")]
     [InlineData("<echo>{ '{}'->json(as: 3) }</echo>", "as: needs a type, such as Repo or 'Repo[]', but got a number (3).")]
-    [InlineData("<echo>{ $Repo->from('[1, 2]') }</echo>", "$[0]: needs a Repo (a map), but got a number (1).")]
+    [InlineData("<echo>{ Repo('[1, 2]') }</echo>", "$[0]: needs a Repo (a map), but got a number (1).")]
     [InlineData("<let name=\"rs\" type=\"Repo[]\" value=\"3\" />", "$rs doesn't fit Repo[]: needs a list of Repo, but got a number (3).")]
     [InlineData("<let name=\"r\" type=\"Repo\" value=\"null\" />", "$r doesn't fit Repo: needs a Repo, but it is null.")]
-    [InlineData("<let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><echo>{ $r.starz }</echo>", "Repo has no field 'starz'. Did you mean stars?")]
-    [InlineData("<let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><echo>{ $r.zzzzzz }</echo>", "Repo has no field 'zzzzzz'. Its fields are: name, stars")]
-    [InlineData("<let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><set>$r.starz = 3</set>", "Repo has no field 'starz'. Did you mean stars?")]
-    [InlineData("<let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><set>$r['stars'] = 'many'</set>", "Repo.stars must be an int, but got the string 'many'.")]
-    [InlineData("<let name=\"r\" value=\"$Repo->from(" + Good + ")\" /><set>$r.owner = { login: 'x' }</set>", "Repo.owner doesn't fit User (1 problem)")]
-    [InlineData("<echo>{ $Repo->nope() }</echo>", "nope")]
-    [InlineData("<echo>{ $Repo.nope }</echo>", "has no field 'nope'")]
+    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><echo>{ $r.starz }</echo>", "Repo has no field 'starz'. Did you mean stars?")]
+    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><echo>{ $r.zzzzzz }</echo>", "Repo has no field 'zzzzzz'. Its fields are: name, stars")]
+    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>$r.starz = 3</set>", "Repo has no field 'starz'. Did you mean stars?")]
+    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>$r['stars'] = 'many'</set>", "Repo.stars must be an int, but got the string 'many'.")]
+    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>$r.owner = { login: 'x' }</set>", "Repo.owner doesn't fit User (1 problem)")]
+    [InlineData("<echo>{ Repo->nope() }</echo>", "nope")]
+    [InlineData("<echo>{ Repo.nope }</echo>", "has no field 'nope'")]
     [InlineData("<fn name=\"f\" params=\"x: 1a\" value=\"1\" />", "Unknown type '1a' for parameter 'x'.")]
-    [InlineData("<type name=\"T\" fields=\"tags: string[]\" /><echo>{ $T->from({}) }</echo>", "$.tags: needs a list of string, but it is missing.")]
-    [InlineData("<type name=\"T\"><field name=\"x\" from=\"a.b[0]\" /></type><echo>{ $T->from({}) }</echo>", "$.a.b[0]: needs a value, but it is missing.")]
+    [InlineData("<type name=\"T\" fields=\"tags: string[]\" /><echo>{ T({}) }</echo>", "$.tags: needs a list of string, but it is missing.")]
+    [InlineData("<type name=\"T\"><field name=\"x\" from=\"a.b[0]\" /></type><echo>{ T({}) }</echo>", "$.a.b[0]: needs a value, but it is missing.")]
     public void MistakesAreExplained(string body, string expected)
     {
         Assert.Contains(expected, FailsWith(body).Message);
@@ -161,7 +161,7 @@ public class TypedJsonTests
     [Fact]
     public void SettingAFieldConvertsTheValue()
     {
-        Assert.Equal("13 number\nmap\n", RunBody(Types + "<let name=\"r\" value=\"$Repo->from(" + Good + ")\" />"
+        Assert.Equal("13 number\nmap\n", RunBody(Types + "<let name=\"r\" value=\"Repo(" + Good + ")\" />"
             + "<set>$r.stars = '13'</set><set>$r['label'] = 'x'</set><echo>{ $r.stars } { @type($r.stars) }</echo>"
             + "<let name=\"m\" value=\"{}\" /><set>$m.a = 1</set><set>$m['b'] = 2</set><echo>{ @type($m) }</echo>"));
     }
@@ -172,15 +172,15 @@ public class TypedJsonTests
     [InlineData("keep", "{ b: 2 }", "a,b")]
     public void ExtraKeysAreDroppedOrKept(string extra, string data, string keys)
     {
-        Assert.Equal(keys + "\n", RunBody($"<type name=\"T\" fields=\"a?: int\" extra=\"{extra}\" /><echo>{{ $T->from({data})->keys()->join(',') }}</echo>"));
+        Assert.Equal(keys + "\n", RunBody($"<type name=\"T\" fields=\"a?: int\" extra=\"{extra}\" /><echo>{{ T({data})->keys()->join(',') }}</echo>"));
     }
 
     [Fact]
     public void ExtraKeysCanBeErrorsOrBeSet()
     {
-        Assert.Contains("$.b: T has no field 'b'.", Fails("<type name=\"T\" fields=\"a: int\" extra=\"error\" /><echo>{ $T->from({ a: 1, b: 2 }) }</echo>").Message);
-        Assert.Contains("$['odd key']: T has no field 'odd key'.", Fails("<type name=\"T\" fields=\"a: int\" extra=\"error\" /><echo>{ $T->from({ a: 1, 'odd key': 2 }) }</echo>").Message);
-        Assert.Equal("5\n", RunBody("<type name=\"T\" fields=\"a: int\" extra=\"keep\" /><let name=\"t\" value=\"$T->from({ a: 1 })\" /><set>$t.z = 5</set><echo>{ $t.z }</echo>"));
+        Assert.Contains("$.b: T has no field 'b'.", Fails("<type name=\"T\" fields=\"a: int\" extra=\"error\" /><echo>{ T({ a: 1, b: 2 }) }</echo>").Message);
+        Assert.Contains("$['odd key']: T has no field 'odd key'.", Fails("<type name=\"T\" fields=\"a: int\" extra=\"error\" /><echo>{ T({ a: 1, 'odd key': 2 }) }</echo>").Message);
+        Assert.Equal("5\n", RunBody("<type name=\"T\" fields=\"a: int\" extra=\"keep\" /><let name=\"t\" value=\"T({ a: 1 })\" /><set>$t.z = 5</set><echo>{ $t.z }</echo>"));
     }
 
     [Theory]
@@ -191,7 +191,7 @@ public class TypedJsonTests
     [InlineData("login = 'x,y=z', tags: list = [{ a: (1) }]", "{}", "x,y=z {\"a\":1}")]
     public void InlineFieldsTakeDefaultsAndOptionalMarks(string fields, string data, string expected)
     {
-        Assert.Equal(expected + "\n", RunBody($"<type name=\"T\" fields=\"{fields}\" /><let name=\"t\" value=\"$T->from({data})\" />"
+        Assert.Equal(expected + "\n", RunBody($"<type name=\"T\" fields=\"{fields}\" /><let name=\"t\" value=\"T({data})\" />"
             + "<echo>{ $t.login } { ($t.tags ?? [$t.id])[0] }</echo>"));
     }
 
@@ -205,14 +205,14 @@ public class TypedJsonTests
     [InlineData("<field name=\"first\" from=\"weird key\" />", "{ 'weird key': 'w' }", "w")]
     public void FieldsReadFromPaths(string field, string data, string expected)
     {
-        Assert.Equal(expected + "\n", RunBody($"<type name=\"T\">{field}</type><echo>{{ $T->from({data}).first }}</echo>"));
+        Assert.Equal(expected + "\n", RunBody($"<type name=\"T\">{field}</type><echo>{{ T({data}).first }}</echo>"));
     }
 
     [Fact]
     public void MissingPathsAreReportedWhereTheyStopped()
     {
-        Assert.Contains("$.items[3]: needs a value, but it is missing.", Fails("<type name=\"T\"><field name=\"x\" from=\"items[3]\" /></type><echo>{ $T->from({ items: [] }) }</echo>").Message);
-        Assert.Contains("$.a.b: needs a value, but it is missing.", Fails("<type name=\"T\"><field name=\"x\" from=\"a.b\" /></type><echo>{ $T->from({ a: 1 }) }</echo>").Message);
+        Assert.Contains("$.items[3]: needs a value, but it is missing.", Fails("<type name=\"T\"><field name=\"x\" from=\"items[3]\" /></type><echo>{ T({ items: [] }) }</echo>").Message);
+        Assert.Contains("$.a.b: needs a value, but it is missing.", Fails("<type name=\"T\"><field name=\"x\" from=\"a.b\" /></type><echo>{ T({ a: 1 }) }</echo>").Message);
     }
 
     [Fact]
@@ -220,22 +220,22 @@ public class TypedJsonTests
     {
         Assert.Equal("Joan Smith 3\n", RunBody("<type name=\"P\"><field name=\"first\" type=\"string\" /><field name=\"last\" type=\"string\" />"
             + "<field name=\"full\" value=\"$first + ' ' + $last\" /><field name=\"n\" type=\"int\" value=\"'3'\" /></type>"
-            + "<let name=\"p\" value=\"$P->from({ first: 'Joan', last: 'Smith' })\" /><echo>{ $p.full } { $p.n }</echo>"));
-        Assert.Contains("$.n: needs an int", Fails("<type name=\"P\"><field name=\"n\" type=\"int\" value=\"'x'\" /></type><echo>{ $P->from({}) }</echo>").Message);
+            + "<let name=\"p\" value=\"P({ first: 'Joan', last: 'Smith' })\" /><echo>{ $p.full } { $p.n }</echo>"));
+        Assert.Contains("$.n: needs an int", Fails("<type name=\"P\"><field name=\"n\" type=\"int\" value=\"'x'\" /></type><echo>{ P({}) }</echo>").Message);
     }
 
     [Fact]
     public void TypesCanReferToEachOtherInAnyOrderAndToThemselves()
     {
-        Assert.Equal("c 2\n", RunBody("<echo>{ $Tree->from({ name: 'a', kids: [{ name: 'b', kids: [{ name: 'c' }] }] }).kids[0].kids[0].name } { @depth() }</echo>"
-            + "<fn name=\"depth\" value=\"$Tree->from({ name: 'x', kids: [{ name: 'y' }, { name: 'z' }] }).kids->count()\" />"
+        Assert.Equal("c 2\n", RunBody("<echo>{ Tree({ name: 'a', kids: [{ name: 'b', kids: [{ name: 'c' }] }] }).kids[0].kids[0].name } { @depth() }</echo>"
+            + "<fn name=\"depth\" value=\"Tree({ name: 'x', kids: [{ name: 'y' }, { name: 'z' }] }).kids->count()\" />"
             + "<type name=\"Tree\" fields=\"name: string, kids: Tree[] = []\" />"));
     }
 
     [Fact]
     public void DeeplyNestedDataStops()
     {
-        Assert.Contains("is nested too deeply", Fails("<type name=\"L\" fields=\"next?: L\" /><let name=\"d\" value=\"{}\" /><for each=\"i\" in=\"1..70\"><set name=\"d\" value=\"{ next: $d }\" /></for><echo>{ $L->from($d) }</echo>").Message);
+        Assert.Contains("is nested too deeply", Fails("<type name=\"L\" fields=\"next?: L\" /><let name=\"d\" value=\"{}\" /><for each=\"i\" in=\"1..70\"><set name=\"d\" value=\"{ next: $d }\" /></for><echo>{ L($d) }</echo>").Message);
     }
 
     [Fact]
@@ -252,13 +252,13 @@ public class TypedJsonTests
             File.WriteAllText(Path.Combine(dir, "scalar.json"), "3");
             string script = Path.Combine(dir, "t.ks.xml");
             File.WriteAllText(script, "<kscript>"
-                + "<type name=\"Repo\" sample=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /><field name=\"name\" type=\"string\" description=\"Mine.\" /></type>"
-                + "<echo>{ $Repo->fields()[0].description }</echo>"
-                + "<type name=\"Item\" sample=\"list.json\" />"
-                + "<echo>{ $Repo->fields()->map(fn($f) => $f.name + ':' + $f.type + ($f.optional ? '?' : ''))->join(' ') }</echo>"
-                + "<echo>{ $Item->fields()->map(fn($f) => $f.name + ($f.optional ? '?' : ''))->join(' ') }</echo>"
-                + "<let name=\"r\" value=\"$Repo->from({ name: 'k', stargazers_count: 5, stars: 9, private: true, owner: { login: 'k' }, topics: [], mixed: [], empty: [], nums: [], flags: [], 'avatar-url': 'y', '2x': 1, items: [{ id: 3 }], deep: { a: { b: { c: { d: { e: { f: { g: { h: { i: 1 } } } } } } } } }, lists: [] })\" />"
-                + "<echo>{ $r.stars } { $r.avatar_url } { $r.items[0].note ?? '-' } { $Item->from({ id: 1 }).tag ?? '-' }</echo>"
+                + "<type name=\"Repo\" path=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /><field name=\"name\" type=\"string\" description=\"Mine.\" /></type>"
+                + "<echo>{ Repo.fields[0].description }</echo>"
+                + "<type name=\"Item\" path=\"list.json\" />"
+                + "<echo>{ Repo.fields->map(fn(f) => $f.name + ':' + $f.type + ($f.optional ? '?' : ''))->join(' ') }</echo>"
+                + "<echo>{ Item.fields->map(fn(f) => $f.name + ($f.optional ? '?' : ''))->join(' ') }</echo>"
+                + "<let name=\"r\" value=\"Repo({ name: 'k', stargazers_count: 5, stars: 9, private: true, owner: { login: 'k' }, topics: [], mixed: [], empty: [], nums: [], flags: [], 'avatar-url': 'y', '2x': 1, items: [{ id: 3 }], deep: { a: { b: { c: { d: { e: { f: { g: { h: { i: 1 } } } } } } } } }, lists: [] })\" />"
+                + "<echo>{ $r.stars } { $r.avatar_url } { $r.items[0].note ?? '-' } { Item({ id: 1 }).tag ?? '-' }</echo>"
                 + "</kscript>");
             string output = RunScriptFile(script);
             Assert.Equal("Mine.\nname:string stargazers_count:number private:bool owner:Repo.owner topics:string[] mixed:any[] empty:any[] nums:number[] flags:bool[] license:any?? avatar_url:string _2x:number "
@@ -266,9 +266,9 @@ public class TypedJsonTests
 
             foreach ((string attrs, string message) in new[]
             {
-                ("sample=\"missing.json\"", "The sample file 'missing.json' doesn't exist."),
-                ("sample=\"bad.json\"", "The sample file 'bad.json' isn't JSON"),
-                ("sample=\"scalar.json\"", "must hold a JSON object, or a list of objects"),
+                ("path=\"missing.json\"", "The sample file 'missing.json' doesn't exist."),
+                ("path=\"bad.json\"", "The sample file 'bad.json' isn't JSON"),
+                ("path=\"scalar.json\"", "must hold a JSON object, or a list of objects"),
             })
             {
                 File.WriteAllText(script, $"<kscript><type name=\"T\" {attrs} /></kscript>");
@@ -297,7 +297,7 @@ public class TypedJsonTests
             File.WriteAllText(Path.Combine(dir, "users.json"), "[{ \"login\": \"a\", \"id\": 1 }, { \"login\": \"b\", \"id\": 2 }]");
             string script = Path.Combine(dir, "t.ks.xml");
             File.WriteAllText(script, "<kscript><import package=\"KScript.IO\" /><type name=\"User\" fields=\"login: string, id: int\" />"
-                + "<echo>{ @read_json('users.json', as: User)->map(fn($u) => $u.login + @type($u))->join(',') } { @read_json('users.json')[0]->type() }</echo></kscript>");
+                + "<echo>{ @read_json('users.json', as: User)->map(fn(u) => $u.login + @type($u))->join(',') } { @read_json('users.json')[0]->type() }</echo></kscript>");
             Assert.Equal("aUser,bUser map\n", RunScriptFile(script));
         }
         finally
@@ -319,7 +319,7 @@ public class TypedJsonTests
     [InlineData("<type name=\"T\"><echo>x</echo></type>", "<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <echo>.")]
     [InlineData("<type name=\"T\"><field type=\"int\" /></type>", "<field> needs a name")]
     [InlineData("<type name=\"T\"><field name=\"a\" from=\"a..b\" /></type>", "from=\"a..b\" on the field 'a' isn't a path")]
-    [InlineData("<type name=\"T\"><field name=\"a\" optional=\"maybe\" /></type>", "optional=\"maybe\" should be yes or no.")]
+    [InlineData("<type name=\"T\"><field name=\"a\" optional=\"maybe\" /></type>", "optional=\"maybe\" should be true or false.")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" from=\"b\" /></type>", "it can't also have from or default")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" default=\"2\" /></type>", "it can't also have from or default")]
     [InlineData("<field name=\"a\" />", "<field> must be inside <type>, <error>, <model> or <job>.")]
@@ -370,7 +370,7 @@ public class TypedJsonTests
         {
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><type name=\"User\" fields=\"login: string\" /></kscript>");
             string script = Path.Combine(dir, "t.ks.xml");
-            File.WriteAllText(script, "<kscript><import src=\"lib.ks.xml\" names=\"Usr\" /></kscript>");
+            File.WriteAllText(script, "<kscript><import path=\"lib.ks.xml\" names=\"Usr\" /></kscript>");
             Assert.Contains("Did you mean User? Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s, <model>s and <job>s.", Assert.Throws<KScriptException>(() => RunScriptFile(script)).Message);
         }
         finally
@@ -387,7 +387,7 @@ public class TypedJsonTests
         {
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><type name=\"User\" fields=\"login: string\" /></kscript>");
             string script = Path.Combine(dir, "t.ks.xml");
-            File.WriteAllText(script, "<kscript><import src=\"lib.ks.xml\" /><echo>{ @json('{\"login\": \"k\"}', as: User)->type() }</echo></kscript>");
+            File.WriteAllText(script, "<kscript><import path=\"lib.ks.xml\" /><echo>{ @json('{\"login\": \"k\"}', as: User)->type() }</echo></kscript>");
             Assert.Equal("User\n", RunScriptFile(script));
         }
         finally
@@ -401,7 +401,7 @@ public class TypedJsonTests
     {
         string json = RunBody(Types + "<type name=\"Node\" fields=\"name: string, next?: Node, any?: any, f?: fn, ok: bool, n: number, x: float, d: date, l: list, m: map, gone?: Gone\" extra=\"keep\" />"
             + "<type name=\"Holder\" fields=\"node: Node, nodes: Node[]\" />"
-            + "<echo value=\"$Repo->schema()->to_json()\" /><echo value=\"$Node->schema()->to_json()\" /><echo value=\"$Holder->schema()->to_json()\" />");
+            + "<echo value=\"Repo->schema()->to_json()\" /><echo value=\"Node->schema()->to_json()\" /><echo value=\"Holder->schema()->to_json()\" />");
         string[] lines = json.Split('\n');
         Assert.Equal("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"title\":\"Repo\",\"description\":\"A repository.\",\"properties\":{"
             + "\"name\":{\"type\":\"string\"},\"stars\":{\"type\":\"integer\",\"description\":\"Stars.\"},\"owner\":{\"$ref\":\"#/$defs/User\"},\"owner_name\":{\"type\":\"string\"},"
@@ -424,7 +424,7 @@ public class TypedJsonTests
         {
             File.WriteAllText(Path.Combine(dir, "s.json"), "{ \"owner\": { \"login\": \"k\" } }");
             string script = Path.Combine(dir, "t.ks.xml");
-            File.WriteAllText(script, "<kscript><type name=\"S\" sample=\"s.json\" /><echo value=\"$S->schema().properties.owner.title\" /></kscript>");
+            File.WriteAllText(script, "<kscript><type name=\"S\" path=\"s.json\" /><echo value=\"S->schema().properties.owner.title\" /></kscript>");
             Assert.Equal("S.owner\n", RunScriptFile(script));
         }
         finally
@@ -464,7 +464,7 @@ public class TypedJsonTests
         {
             string url = $"http://127.0.0.1:{port}";
             string output = RunBody($"<type name=\"User\" fields=\"login: string, id: int\" />"
-                + $"<echo>{{ @api('{url}/list')->json(as: User)->map(fn($u) => $u.login)->join(',') }}</echo>"
+                + $"<echo>{{ @api('{url}/list')->json(as: User)->map(fn(u) => $u.login)->join(',') }}</echo>"
                 + $"<echo>{{ @api('{url}/one')->json().login }}</echo>"
                 + $"<try><echo>{{ @api('{url}/one')->json(as: User) }}</echo><catch as=\"err\"><echo>{{ $err.message->split('\n')[0] }}</echo></catch></try>", "", "KScript.Net");
             Assert.Equal($"a,b\nkyle\nThe response from {url}/one doesn't fit User (1 problem):\n", output);

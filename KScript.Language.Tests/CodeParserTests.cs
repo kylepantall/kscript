@@ -46,18 +46,18 @@ namespace KScript.Language.Tests
         [InlineData("echo(format: json) $data", "kscript { echo(format: json, value: $data) }")]
         [InlineData("echo \"a\" + $b", "kscript { echo(value: \"a\" + $b) }")]
         [InlineData("import KScript.Math as math", "kscript { import(package: KScript.Math, as: math) }")]
-        [InlineData("import \"lib/x.kscript\" as x", "kscript { import(src: lib/x.kscript, as: x) }")]
-        [InlineData("import a, b from \"lib/x.kscript\"", "kscript { import(names: a, b, src: lib/x.kscript) }")]
-        [InlineData("for key, value at i in $map { echo $key }", "kscript { for(each: key, value, index: i, in: $map) { echo(value: $key) } }")]
+        [InlineData("import \"lib/x.kscript\" as x", "kscript { import(path: lib/x.kscript, as: x) }")]
+        [InlineData("import a, b from \"lib/x.kscript\"", "kscript { import(names: a, b, path: lib/x.kscript) }")]
+        [InlineData("for key, value at i in $map { echo $key }", "kscript { for(each: key, value, at: i, in: $map) { echo(value: $key) } }")]
         [InlineData("while true { break }", "kscript { while(test: true) { break } }")]
         [InlineData("fn double(x: int, y = 2) => $x * $y", "kscript { fn(name: double, params: x: int, y = 2, value: $x * $y) }")]
         [InlineData("fn hi() { return }", "kscript { fn(name: hi) { return } }")]
         [InlineData("throw Validation \"Bad {$x}\"", "kscript { throw(type: Validation) \"Bad {$x}\" }")]
         [InlineData("exit 2", "kscript { exit(code: 2) }")]
-        [InlineData("input(to: name) \"Name: \"", "kscript { input(to: name) \"Name:\" }")]
+        [InlineData("input(into: name) \"Name: \"", "kscript { input(into: name) \"Name:\" }")]
         [InlineData("move(from: $a, to: \"x, y\")", "kscript { move(from: $a, to: x, y) }")]
         [InlineData("Row(gap: 8, wrap) { Text \"Hi\" }", "kscript { Row(gap: 8, wrap: yes) { Text \"Hi\" } }")]
-        [InlineData("Button(on-click: \"n = $n + 1\") \"Add\"", "kscript { Button(on-click: n = $n + 1) \"Add\" }")]
+        [InlineData("Button(on_click: \"n = $n + 1\") \"Add\"", "kscript { Button(on_click: n = $n + 1) \"Add\" }")]
         [InlineData("type User { login: string; id: int }", "kscript { type(name: User) { field(name: login, type: string); field(name: id, type: int) } }")]
         [InlineData("type User(fields: \"login: string\", extra: error)", "kscript { type(name: User, fields: login: string, extra: error) }")]
         [InlineData("type Repo {\n  stars: int from stargazers_count\n  owner from \"owner.login\"\n  tags?: string[] = []\n  label => $name + '!'\n}",
@@ -82,7 +82,7 @@ namespace KScript.Language.Tests
         public void IfChainsBecomeSiblings()
         {
             Assert.Equal("kscript { if(test: $a) { echo \"a\" }; elif(test: $b) { echo \"b\" }; elif(test: $c) { echo \"c\" }; else { echo \"d\" } }",
-                Shape(Root("if $a {\n  echo \"a\"\n} elif $b {\n  echo \"b\"\n}\nelse if $c { echo \"c\" } else {\n  echo \"d\"\n}")));
+                Shape(Root("if $a {\n  echo \"a\"\n} elif $b {\n  echo \"b\"\n}\nelif $c { echo \"c\" } else {\n  echo \"d\"\n}")));
         }
 
         [Fact]
@@ -96,17 +96,17 @@ namespace KScript.Language.Tests
         public void MatchCases()
         {
             Assert.Equal("kscript { match(value: $c) { case(is: 1, 2) { echo \"low\" }; case(when: $c > 9) { echo \"high\" }; default { echo \"?\" } } }",
-                Shape(Root("match $c {\n  case 1, 2 { echo \"low\" }\n  when $c > 9 { echo \"high\" }\n  default { echo \"?\" }\n}")));
+                Shape(Root("match $c {\n  1, 2 => echo \"low\"\n  _ when $c > 9 => { echo \"high\" }\n  _ => echo \"?\"\n}")));
         }
 
         [Fact]
         public void ExpressionsContinueOverLines()
         {
-            MarkupElement root = Root("names = $people\n  |> filter(fn($p) => $p.age >= 18)\n  |> map(fn($p) => $p.name)\nm = {\n  a: 1,\n  b: 2\n}\nt = $a and\n  $b");
+            MarkupElement root = Root("names = $people\n  |> filter(fn(p) => $p.age >= 18)\n  |> map(fn(p) => $p.name)\nm = {\n  a: 1,\n  b: 2\n}\nt = $a and\n  $b");
             List<MarkupElement> lets = root.ChildElements.ToList();
             Assert.All(lets, l => Assert.Equal("do", l.Name));
             Assert.Equal(3, lets.Count);
-            Assert.EndsWith("|> map(fn($p) => $p.name)", lets[0].SingleText.Value);
+            Assert.EndsWith("|> map(fn(p) => $p.name)", lets[0].SingleText.Value);
             Assert.Equal("m = {\n  a: 1,\n  b: 2\n}", lets[1].SingleText.Value);
             Assert.Equal("t = $a and\n  $b", lets[2].SingleText.Value);
         }
@@ -143,11 +143,29 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void APackageElementAloneIsTheRoot()
+        public void APackageElementIsAStatementAfterItsImport()
         {
-            MarkupElement root = Root("// a window\nKScript.Window(title: \"Hi\") {\n  Text \"Hello\"\n}");
-            Assert.Equal("KScript.Window(title: Hi) { Text \"Hello\" }", Shape(root));
-            Assert.Null(root.Parent);
+            MarkupElement root = Root("// a window\nimport KScript.UI\n\nWindow(title: \"Hi\") {\n  Text \"Hello\"\n}");
+            Assert.Equal("kscript", root.Name);
+            Assert.Equal(new[] { "import", "Window" }, root.ChildElements.Select(c => c.Name));
+            Assert.Equal("Hi", root.ChildElements.Last().GetAttributeValue("title"));
+        }
+
+        /// <summary>A package is named only in its import: KScript.Window { } is an error whose fix drops the prefix.</summary>
+        [Fact]
+        public void AStatementWithThePackagePrefixIsAnError()
+        {
+            string text = "import KScript.UI\n\nKScript.Window(title: \"Hi\") {\n  Text \"Hello\"\n}\n";
+            MarkupDocument doc = CodeParser.Parse(text);
+            Diagnostic d = Assert.Single(doc.Diagnostics);
+            Assert.Equal("KS1001", d.Code);
+            Assert.Equal(DiagnosticSeverity.Error, d.Severity);
+            Assert.Contains("Write Window", d.Message);
+            Assert.Equal("KScript.Window", text.Substring(d.Span.Start, d.Span.Length));
+            TextChange change = Assert.Single(Assert.Single(d.Fixes).Changes);
+            Assert.Equal(text.Replace("KScript.Window", "Window"), text.Remove(change.Span.Start, change.Span.Length).Insert(change.Span.Start, change.NewText));
+            // The element is still read, under its own name, so the rest of the file is checked as usual.
+            Assert.Equal(new[] { "import", "Window" }, doc.RootElements.Single().ChildElements.Select(c => c.Name));
         }
 
         [Theory]
@@ -201,8 +219,16 @@ namespace KScript.Language.Tests
         {
             MarkupDocument xml = MarkupParser.Parse(File.ReadAllText(RepoFile(xmlFile.Split('/'))), DocumentKind.Script);
             MarkupDocument code = Code(File.ReadAllText(RepoFile(codeFile.Split('/'))));
-            Assert.Equal(Outline(xml.RootElements.Single()), Outline(code.RootElements.Single()));
+            Assert.Equal(SamePackageForm(Outline(xml.RootElements.Single())), SamePackageForm(Outline(code.RootElements.Single())));
         }
+
+        /// <summary>
+        /// An XML file names its package in the root tag (&lt;KScript.Window&gt;, imports inside); a .kscript file imports it
+        /// and writes Window { }. Both are the same script, so the root, the imports and the prefix are left out.
+        /// </summary>
+        private static List<string> SamePackageForm(List<string> outline) =>
+            outline.Where(o => o != "kscript()" && !o.StartsWith("import(", StringComparison.Ordinal))
+                .Select(o => o.StartsWith("KScript.", StringComparison.Ordinal) ? o.Substring("KScript.".Length) : o).ToList();
 
         /// <summary>Element names and attribute names (values differ in spelling, such as lt and &lt;).</summary>
         private static List<string> Outline(MarkupElement root) =>
@@ -210,7 +236,7 @@ namespace KScript.Language.Tests
                 // let, set and do are all "x = value" in .kscript, so they compare as one kind of statement.
                 .Select(e => e.Name is "let" or "set" or "do" && !IsYes(e.GetAttributeValue("const")) && e.GetAttribute("type") == null
                     ? "assign"
-                    : e.Name + "(" + string.Join(",", e.Attributes.Select(a => a.Name).Where(n => n != "description" && n != "src").OrderBy(n => n)) + ")")
+                    : e.Name + "(" + string.Join(",", e.Attributes.Select(a => a.Name).Where(n => n != "description" && n != "path").OrderBy(n => n)) + ")")
                 .ToList();
 
         private static bool IsYes(string v) => v == "yes";
@@ -298,15 +324,15 @@ namespace KScript.Language.Tests
         public void TypesInCodeFilesGetTheSameChecksAndCompletion()
         {
             const string types = "enum Size { s, m }\ntype Repo {\n  name: string\n  stars: int from stargazers_count\n  size: Size = 's'\n}\n";
-            AssertNoDiagnostics(types + "r = $Repo->from({ name: 'k', stargazers_count: 1 })\necho \"$r.name { $r.stars }\"");
+            AssertNoDiagnostics(types + "r = Repo({ name: 'k', stargazers_count: 1 })\necho \"$r.name { $r.stars }\"");
 
-            DocumentAnalysis bad = Analyzer.Analyze(types + "r = $Repo->from({})\necho $r.stras\ntype T { a: Nope }", "test.kscript");
+            DocumentAnalysis bad = Analyzer.Analyze(types + "r = Repo({})\necho $r.stras\ntype T { a: Nope }", "test.kscript");
             Assert.Contains(bad.Diagnostics, d => d.Code == "KS5010" && d.Message.Contains("stars"));
             Diagnostic nope = Assert.Single(bad.Diagnostics, d => d.Message.Contains("Nope"));
-            Assert.Equal("Nope", (types + "r = $Repo->from({})\necho $r.stras\ntype T { a: Nope }").Substring(nope.Span.Start, nope.Span.Length));
+            Assert.Equal("Nope", (types + "r = Repo({})\necho $r.stras\ntype T { a: Nope }").Substring(nope.Span.Start, nope.Span.Length));
 
             var service = new LanguageService();
-            (string text, int offset) = TestHelpers.WithCaret(types + "r = $Repo->from({})\necho \"{ $r.‸ }\"");
+            (string text, int offset) = TestHelpers.WithCaret(types + "r = Repo({})\necho \"{ $r.‸ }\"");
             Assert.Contains(service.GetCompletions(service.Analyze(text, "test.kscript"), offset), i => i.Label == "stars");
             (text, offset) = TestHelpers.WithCaret(types + "type T { a: ‸ }");
             Assert.Contains(service.GetCompletions(service.Analyze(text, "test.kscript"), offset), i => i.Label == "Size");

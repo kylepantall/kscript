@@ -64,7 +64,7 @@ namespace KScript.Language.Tests
         {
             List<CompletionItem> items = Complete(Script("<for each=\"i\" ‸></for>"));
             Assert.Contains(items, i => i.Label == "in" && i.Kind == CompletionKind.Attribute);
-            Assert.Contains(items, i => i.Label == "index");
+            Assert.Contains(items, i => i.Label == "at");
             Assert.DoesNotContain(items, i => i.Label == "each"); // already present
         }
 
@@ -243,7 +243,7 @@ namespace KScript.Language.Tests
         [InlineData("<fn name=\"greet\" params=\"who\" value=\"$w‸ho\" />", "who")]
         [InlineData("<fn name=\"greet\" /><call fn=\"gre‸et\" />", "greet")]
         [InlineData("<for each=\"item\" in=\"0..1\"><echo>$it‸em</echo></for>", "item")]
-        [InlineData("<let name=\"f\" value=\"fn($n) => $‸n\" />", "n")]
+        [InlineData("<let name=\"f\" value=\"fn(n) => $‸n\" />", "n")]
         public void GoesToDefinition(string body, string declared)
         {
             (DocumentAnalysis a, int offset) = At(Script(body));

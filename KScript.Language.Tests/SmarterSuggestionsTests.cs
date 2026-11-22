@@ -33,7 +33,7 @@ namespace KScript.Language.Tests
         public void A_test_file_offers_the_test_statements_before_those()
         {
             List<string> labels = Labels("‸", "cart.test.kscript");
-            Assert.Equal(new[] { "test", "expect", "describe", "expect-error", "echo", "if" }, labels.Take(6));
+            Assert.Equal(new[] { "test", "expect", "describe", "expect_error", "echo", "if" }, labels.Take(6));
         }
 
         [Theory]
@@ -95,7 +95,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Arithmetic_on_a_function_says_what_it_is()
         {
-            DocumentAnalysis a = Service.Analyze("echo 5 - (fn($n) => $n)\n", "test.kscript");
+            DocumentAnalysis a = Service.Analyze("echo 5 - (fn(n) => $n)\n", "test.kscript");
             Assert.Contains(a.Diagnostics, d => d.Message.Contains("this is a function", StringComparison.Ordinal));
         }
 

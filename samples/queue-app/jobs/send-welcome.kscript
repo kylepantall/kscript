@@ -1,8 +1,10 @@
+import KScript.Queue
+
 /// Sends the welcome email to someone who just signed up.
 job SendWelcome(
   queue: "mail",
   tries: 5,
-  backoff: ["10s", "1m", "5m"],
+  backoff: [10s, 1m, 5m],
   retry_on: [Network, Timeout]
 ) {
   user_id: int

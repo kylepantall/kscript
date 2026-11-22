@@ -78,15 +78,15 @@ public class PageExpressionTests
     public void Lists_maps_lambdas_and_pipes()
     {
         var people = Values.ParseJson("[{\"name\":\"Joan\",\"age\":82},{\"name\":\"Ellie\",\"age\":12},{\"name\":\"Simon\",\"age\":42}]");
-        Assert.Equal("Simon, Joan", Eval("$people->filter(fn($p) => $p.age ge 18)->sort_by(fn($p) => $p.age)->map(fn($p) => $p.name)->join(', ')", ("people", people)));
-        Assert.Equal("Joan", Eval("($people |> max_by(fn($p) => $p.age)).name", ("people", people)));
+        Assert.Equal("Simon, Joan", Eval("$people->filter(fn(p) => $p.age ge 18)->sort_by(fn(p) => $p.age)->map(fn(p) => $p.name)->join(', ')", ("people", people)));
+        Assert.Equal("Joan", Eval("($people |> max_by(fn(p) => $p.age)).name", ("people", people)));
         Assert.Equal(3d, Eval("$people |> count()", ("people", people)));
-        Assert.Equal(136d, Eval("$people->sum(fn($p) => $p.age)", ("people", people)));
+        Assert.Equal(136d, Eval("$people->sum(fn(p) => $p.age)", ("people", people)));
         Assert.Equal("Ellie", Eval("$people[1].name", ("people", people)));
         Assert.Equal("Simon", Eval("$people[-1]['name']", ("people", people)));
         Assert.Equal(2d, Eval("{ a: 1, b: { c: 2 } }.b.c"));
-        Assert.Equal("HELLO", Eval("'hello' |> fn($s) => $s->upper()"));
-        Assert.Equal(8d, Eval("@double(4)", ("double", Eval("fn($x) => $x * 2"))));
+        Assert.Equal("HELLO", Eval("'hello' |> fn(s) => $s->upper()"));
+        Assert.Equal(8d, Eval("@double(4)", ("double", Eval("fn(x) => $x * 2"))));
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public class PageExpressionTests
     {
         var scope = new Scope();
         var ctx = new PageContext(Path.GetTempPath());
-        scope.Declare("f", PageEvaluator.Evaluate("fn($n) => @f($n + 1)", scope, ctx));
+        scope.Declare("f", PageEvaluator.Evaluate("fn(n) => @f($n + 1)", scope, ctx));
         var ex = Assert.Throws<PageException>(() => PageEvaluator.Evaluate("@f(0)", scope, ctx));
         Assert.Contains("recursion", ex.Message);
     }
@@ -184,7 +184,7 @@ public class PageRendererTests
     public void For_loops_over_lists_maps_and_have_an_empty_else()
     {
         Assert.Equal("<li>a</li><li>b</li>", Render("<for each=\"x\" in=\"['a', 'b']\"><li>{$x}</li></for>"));
-        Assert.Equal("0:a 1:b ", Render("<for each=\"x\" index=\"i\" in=\"['a', 'b']\">{$i}:{$x} </for>"));
+        Assert.Equal("0:a 1:b ", Render("<for each=\"x\" at=\"i\" in=\"['a', 'b']\">{$i}:{$x} </for>"));
         Assert.Equal("k=1 j=2 ", Render("<for each=\"key, value\" in=\"{ k: 1, j: 2 }\">{$key}={$value} </for>"));
         Assert.Equal("none", Render("<for each=\"x\" in=\"[]\">{$x}</for><else>none</else>"));
     }
@@ -263,7 +263,7 @@ public class PageSiteTests
         using var site = new TempSite(
             ("_layout.html", "<html><title>{$title}</title><main>\n  <slot />\n</main></html>"),
             ("_components/user-card.html", "<div class=\"card\"><b>{$user.name}</b><slot /></div>"),
-            ("index.html", "<let name=\"u\" value=\"{ name: 'Joan' }\" />\n<layout src=\"_layout.html\" title=\"Home\">\n  <user-card user=\"{$u}\"><i>hi</i></user-card>\n</layout>\n"));
+            ("index.html", "<let name=\"u\" value=\"{ name: 'Joan' }\" />\n<layout path=\"_layout.html\" title=\"Home\">\n  <user-card user=\"{$u}\"><i>hi</i></user-card>\n</layout>\n"));
 
         Assert.Equal("<html><title>Home</title><main>\n  <div class=\"card\"><b>Joan</b><i>hi</i></div>\n</main></html>", site.Render("index.html").Body);
     }
@@ -477,7 +477,7 @@ public class PageLiveTests
     {
         const string page = "<live id=\"t\"><state name=\"items\" value=\"['a', 'b', 'c']\" /><state name=\"draft\" value=\"''\" />" +
                             "<input bind=\"draft\"><button on-click=\"items = $items->push($draft); draft = ''\">add</button>" +
-                            "<for each=\"x\" in=\"$items\"><i on-click=\"items = $items->reject(fn($i) => $i == $x)\">{$x}</i></for></live>";
+                            "<for each=\"x\" in=\"$items\"><i on-click=\"items = $items->reject(fn(i) => $i == $x)\">{$x}</i></for></live>";
         using var site = new TempSite(("index.html", page));
         string html = site.Render("index.html").Body;
         Assert.Contains("data-ks-bind=\"draft\" value=\"\" name=\"draft\"", html);
@@ -501,7 +501,7 @@ public class PageLiveTests
     public void Live_handlers_can_call_imported_functions()
     {
         using var site = new TempSite(("lib/math.ks.xml", Lib),
-            ("index.html", "<import src=\"lib/math.ks.xml\" /><live id=\"d\"><state name=\"n\" value=\"@double(1)\" /><p>{$n}</p><button on-click=\"n = @double($n)\">x2</button></live>"));
+            ("index.html", "<import path=\"lib/math.ks.xml\" /><live id=\"d\"><state name=\"n\" value=\"@double(1)\" /><p>{$n}</p><button on-click=\"n = @double($n)\">x2</button></live>"));
         string html = site.Render("index.html").Body;
         Assert.Contains("<p>2</p>", html);
         var doubled = Event(site, "index.html", "d", 0, Attr(html, "data-ks-state"));
@@ -511,7 +511,7 @@ public class PageLiveTests
     [Fact]
     public void On_tick_handlers_carry_their_interval()
     {
-        string html = PageRenderer.RenderString("<live id=\"t\"><state name=\"n\" value=\"0\" /><state name=\"ms\" value=\"'250'\" /><span on-tick=\"n += 1\" every=\"{$ms}\"></span></live>").Body;
+        string html = PageRenderer.RenderString("<live id=\"t\"><state name=\"n\" value=\"0\" /><state name=\"gap\" value=\"'250ms'\" /><span on-tick=\"n += 1\" every=\"{$gap}\"></span></live>").Body;
         Assert.Contains("<span data-ks-on-tick=\"0\" data-ks-every=\"250\"></span>", html);
     }
 
@@ -539,9 +539,9 @@ public class PageRuntimeTests
     {
         using var site = new TempSite(
             ("lib/text.ks.xml", "<kscript>\n  <fn name=\"shout\" params=\"s\" value=\"$s->upper() + '!'\" />\n  <let name=\"greeting\" value=\"'hello'\" const=\"yes\" />\n</kscript>"),
-            ("index.html", "<import src=\"lib/text.ks.xml\" /><p>{ @shout($greeting) }</p>"),
-            ("named.html", "<import src=\"/lib/text.ks.xml\" as=\"text\" /><p>{ @text.shout('hi') }</p>"),
-            ("_components/loud.html", "<import src=\"../lib/text.ks.xml\" names=\"shout\" /><b>{ @shout($word) }</b>"),
+            ("index.html", "<import path=\"lib/text.ks.xml\" /><p>{ @shout($greeting) }</p>"),
+            ("named.html", "<import path=\"/lib/text.ks.xml\" as=\"text\" /><p>{ @text.shout('hi') }</p>"),
+            ("_components/loud.html", "<import path=\"../lib/text.ks.xml\" names=\"shout\" /><b>{ @shout($word) }</b>"),
             ("component.html", "<loud word=\"hey\" />"));
         Assert.Equal("<p>HELLO!</p>", site.Render("index.html").Body);
         Assert.Equal("<p>HI!</p>", site.Render("named.html").Body);
@@ -568,7 +568,7 @@ public class PageRuntimeTests
     [Fact]
     public void Pages_cannot_write_files_or_import_scripts_outside_the_site()
     {
-        using var site = new TempSite(("write.html", "{ @write_text('x.txt', text: 'hi') }"), ("import.html", "<import src=\"../lib.ks.xml\" />"), ("file.html", "{ @file('.')->join('..', 'x')->read_text() }"));
+        using var site = new TempSite(("write.html", "{ @write_text('x.txt', text: 'hi') }"), ("import.html", "<import path=\"../lib.ks.xml\" />"), ("file.html", "{ @file('.')->join('..', 'x')->read_text() }"));
         Assert.Contains("read-only", Assert.Throws<PageException>(() => site.Render("write.html")).Message);
         Assert.False(File.Exists(Path.Combine(site.Root, "x.txt")));
         Assert.Contains("outside the site folder", Assert.Throws<PageException>(() => site.Render("import.html")).Message);
@@ -578,7 +578,7 @@ public class PageRuntimeTests
     [Fact]
     public void Files_are_read_from_the_site_folder()
     {
-        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', pattern: '*.md')->map(fn($f) => $f->name())->join(', ') } { @exists('posts/a.md') }"));
+        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', pattern: '*.md')->map(fn(f) => $f.name)->join(', ') } { @exists('posts/a.md') }"));
         Assert.Equal("a.md, b.md true", site.Render("posts/index.html").Body);
     }
 
@@ -587,7 +587,7 @@ public class PageRuntimeTests
     {
         using var site = new TempSite(
             ("lib.ks.xml", "<kscript>\n  <fn name=\"bad\" value=\"$nope + 1\" />\n</kscript>"),
-            ("index.html", "<import src=\"lib.ks.xml\" />\n<p>{ @bad() }</p>"));
+            ("index.html", "<import path=\"lib.ks.xml\" />\n<p>{ @bad() }</p>"));
         var ex = Assert.Throws<PageException>(() => site.Render("index.html"));
         Assert.Contains("lib.ks.xml:2", ex.Message);
         Assert.Equal("index.html:2", ex.Location);

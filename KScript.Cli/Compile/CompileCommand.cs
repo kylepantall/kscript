@@ -266,7 +266,7 @@ namespace KScript.Compile
                     foreach (KScriptPackage p in m.Packages) plan.Packages.Add(p.Name);
                     if (!IsInside(m.Path, sourceFolder)) throw new CompileException($"{Path.GetFileName(script)} imports {m.Path}, which is outside {sourceFolder}, so it can't go in the program.");
                 }
-                plan.Kind = main.Root.Name == "KScript.Window" ? ProgramKind.Window : ProgramKind.Script;
+                plan.Kind = main.MainElementName == "Window" ? ProgramKind.Window : ProgramKind.Script;
                 plan.Main = Relative(sourceFolder, script);
             }
             else

@@ -12,13 +12,15 @@ hint: Open it: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }}. Build 
 ---
 // {{ title }}: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }} opens
 // it, and the script ends when the window closes.
-KScript.Window(title: "{{ title }}", width: {{ width ?? 480 }}, height: {{ height ?? 360 }}, theme: system) {
+import KScript.UI
+
+Window(title: "{{ title }}", width: {{ width ?? 480 }}, height: {{ height ?? 360 }}, theme: system) {
   count = 0
 
   Text(size: 24, weight: bold) "{{ title }}"
   Text "Clicked {$count} times"
   Row(gap: 8) {
-    Button(variant: primary, on-click: count += 1) "Click"
-    Button(on-click: count = 0, disabled: $count eq 0) "Reset"
+    Button(variant: primary, on_click: count += 1) "Click"
+    Button(on_click: count = 0, disabled: $count == 0) "Reset"
   }
 }

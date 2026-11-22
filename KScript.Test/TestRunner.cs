@@ -77,8 +77,8 @@ namespace KScript.Testing
 
     /// <summary>
     /// Finds test files and runs them. Each file runs in its own interpreter: its top-level code runs once and
-    /// collects the &lt;test&gt; elements, then each test runs in a fresh scope with the &lt;before-each&gt; and
-    /// &lt;after-each&gt; blocks around it, so a test sees the file's variables and functions but not another test's.
+    /// collects the &lt;test&gt; elements, then each test runs in a fresh scope with the &lt;before_each&gt; and
+    /// &lt;after_each&gt; blocks around it, so a test sees the file's variables and functions but not another test's.
     /// </summary>
     public static class TestRunner
     {
@@ -289,7 +289,7 @@ namespace KScript.Testing
                     }
                     finally
                     {
-                        // <after-each> runs even when the test failed; the test's own failure is the one reported.
+                        // <after_each> runs even when the test failed; the test's own failure is the one reported.
                         foreach (TestGroup group in Enumerable.Reverse(chain))
                         {
                             foreach (TestHook hook in group.AfterEach)

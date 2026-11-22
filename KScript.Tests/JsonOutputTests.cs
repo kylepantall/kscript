@@ -45,7 +45,7 @@ public class JsonOutputTests
     [Fact]
     public void LongListsGetOneValuePerLine()
     {
-        string output = RunBody("<echo>{ { xs: (0..40)->map(fn($i) => 'item' + $i) } }</echo>");
+        string output = RunBody("<echo>{ { xs: (0..40)->map(fn(i) => 'item' + $i) } }</echo>");
         Assert.StartsWith("{\n  \"xs\": [\n    \"item0\",\n", output);
     }
 

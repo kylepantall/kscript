@@ -143,7 +143,7 @@ public sealed class StyleTests : IDisposable
     public void Stylesheet_element_and_command_from_scripts()
     {
         FileOf("theme.ks.css", ".a { color: {$vars.c ?? 'red'}; }");
-        string script = FileOf("build.ks.xml", "<kscript><import package=\"KScript.Style\" /><stylesheet src=\"theme.ks.css\" /><stylesheet src=\"theme.ks.css\" to=\"out/blue.css\" vars=\"{ c: 'blue' }\" /><echo>{ @stylesheet('theme.ks.css', { c: 'green' }) }</echo></kscript>");
+        string script = FileOf("build.ks.xml", "<kscript><import package=\"KScript.Style\" /><stylesheet path=\"theme.ks.css\" /><stylesheet path=\"theme.ks.css\" to=\"out/blue.css\" vars=\"{ c: 'blue' }\" /><echo>{ @stylesheet('theme.ks.css', { c: 'green' }) }</echo></kscript>");
         var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
         new Interpreter(KScriptHost.ForText(output)).RunFile(script);
         Assert.Equal(".a { color: green; }\n", output.ToString());
@@ -162,7 +162,7 @@ public sealed class StyleTests : IDisposable
     public void Stylesheets_in_read_only_hosts_cannot_write()
     {
         FileOf("t.ks.css", "a{}");
-        string script = FileOf("b.ks.xml", "<kscript><import package=\"KScript.Style\" /><stylesheet src=\"t.ks.css\" /></kscript>");
+        string script = FileOf("b.ks.xml", "<kscript><import package=\"KScript.Style\" /><stylesheet path=\"t.ks.css\" /></kscript>");
         var host = KScriptHost.ForText(new StringWriter());
         host.CanWriteFiles = false;
         host.FileRoot = dir;

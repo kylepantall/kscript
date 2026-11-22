@@ -40,9 +40,9 @@ namespace KScript.UI
 
         private static readonly A Gap = new A("gap", K.Expression, "Space between items, in pixels.");
         private static readonly A Align = new A("align", K.Enum, "How items line up across the container: start, center, end or stretch.", false, "start", "center", "end", "stretch");
-        private static readonly A Disabled = new A("disabled", K.Expression, "yes greys it out so it can't be used.");
+        private static readonly A Disabled = new A("disabled", K.Expression, "true greys it out so it can't be used.");
         private static readonly A Bind = new A("bind", K.VariableReference, "The variable it shows and changes. Declare it with <let> directly inside <KScript.Window>.", true);
-        private static readonly A OnChange = new A("on-change", K.Statements, "Runs after the person changes the value ($event.value), e.g. on-change=\"saved = false\".");
+        private static readonly A OnChange = new A("on_change", K.Statements, "Runs after the person changes the value ($event.value), e.g. on_change=\"saved = false\".");
 
         protected override void Register(PackageBuilder p)
         {
@@ -57,11 +57,11 @@ namespace KScript.UI
                 new A("resizable", K.Bool, "no fixes the size."))
             {
                 Context = ElementContext.Script,
-                Example = "<KScript.Window title=\"Counter\" width=\"300\" height=\"200\">\n  <let name=\"count\" value=\"0\" />\n  <Text size=\"32\">{$count}</Text>\n  <Button on-click=\"count += 1\">Add one</Button>\n</KScript.Window>",
+                Example = "<KScript.Window title=\"Counter\" width=\"300\" height=\"200\">\n  <let name=\"count\" value=\"0\" />\n  <Text size=\"32\">{$count}</Text>\n  <Button on_click=\"count += 1\">Add one</Button>\n</KScript.Window>",
             }, UIElements.Window);
 
-            Layout(p, "Column", "Stacks its items top to bottom.", Gap, Align, new A("scroll", K.Bool, "yes adds a scroll bar when the items don't fit."));
-            Layout(p, "Row", "Puts its items side by side.", Gap, Align, new A("wrap", K.Bool, "yes moves items to a new line when they don't fit."));
+            Layout(p, "Column", "Stacks its items top to bottom.", Gap, Align, new A("scroll", K.Bool, "true adds a scroll bar when the items don't fit."));
+            Layout(p, "Row", "Puts its items side by side.", Gap, Align, new A("wrap", K.Bool, "true moves items to a new line when they don't fit."));
             Layout(p, "Grid", "Lays its items out in equal columns, filling each row in turn: a board, a keypad, a gallery.", Gap,
                 new A("columns", K.Expression, "How many columns.", true));
 
@@ -69,35 +69,35 @@ namespace KScript.UI
                 new A("size", K.Expression, "Font size in points (default 14)."),
                 new A("weight", K.Enum, "normal, bold or light.", false, "normal", "bold", "light"),
                 new A("color", K.Template, "Text colour: a name or #hex."),
-                new A("wrap", K.Bool, "yes wraps long text onto more lines."),
-                new A("text-align", K.Enum, "left, center or right.", false, "left", "center", "right")))
+                new A("wrap", K.Bool, "true wraps long text onto more lines."),
+                new A("text_align", K.Enum, "left, center or right.", false, "left", "center", "right")))
             {
                 Context = ElementContext.Script,
                 Example = "<Text size=\"24\" weight=\"bold\">Hello, {$name}!</Text>",
             }, run => UIElements.Node(run, "Text", text: true));
 
-            p.Element(new ElementInfo("Button", "A button. Its text is the label; on-click runs when it is pressed.", ContentKind.Template, With(Box,
-                new A("on-click", K.Statements, "Runs when the button is pressed, e.g. on-click=\"count += 1\"."),
+            p.Element(new ElementInfo("Button", "A button. Its text is the label; on_click runs when it is pressed.", ContentKind.Template, With(Box,
+                new A("on_click", K.Statements, "Runs when the button is pressed, e.g. on_click=\"count += 1\"."),
                 new A("variant", K.Enum, "primary makes it stand out.", false, "normal", "primary"),
                 Disabled))
             {
                 Context = ElementContext.Script,
-                Example = "<Button variant=\"primary\" on-click=\"count += 1\">Add one</Button>",
+                Example = "<Button variant=\"primary\" on_click=\"count += 1\">Add one</Button>",
             }, run => UIElements.Node(run, "Button", text: true));
 
             p.Element(new ElementInfo("TextBox", "A box to type in, tied to a variable.", ContentKind.Empty, With(Box,
                 Bind,
                 new A("placeholder", K.Template, "Grey text shown while it is empty."),
-                new A("on-enter", K.Statements, "Runs when Enter is pressed."),
+                new A("on_enter", K.Statements, "Runs when Enter is pressed."),
                 OnChange,
-                new A("multiline", K.Bool, "yes allows several lines."),
+                new A("multiline", K.Bool, "true allows several lines."),
                 Disabled))
             {
                 Context = ElementContext.Script,
-                Example = "<TextBox bind=\"name\" placeholder=\"Your name\" on-enter=\"greeting = 'Hi ' + $name\" />",
+                Example = "<TextBox bind=\"name\" placeholder=\"Your name\" on_enter=\"greeting = 'Hi ' + $name\" />",
             }, run => UIElements.Node(run, "TextBox", text: false));
 
-            p.Element(new ElementInfo("CheckBox", "A tick box tied to a yes/no variable. Its text is the label.", ContentKind.Template, With(Box, Bind, OnChange, Disabled))
+            p.Element(new ElementInfo("CheckBox", "A tick box tied to a true/false variable. Its text is the label.", ContentKind.Template, With(Box, Bind, OnChange, Disabled))
             {
                 Context = ElementContext.Script,
                 Example = "<CheckBox bind=\"wrap\">Wrap around the edges</CheckBox>",
@@ -121,12 +121,12 @@ namespace KScript.UI
                 Example = "<Slider bind=\"volume\" min=\"0\" max=\"10\" step=\"1\" />",
             }, run => UIElements.Node(run, "Slider", text: false));
 
-            p.Element(new ElementInfo("Box", "A rectangle: a coloured cell, a card or a panel. It can hold other items, and on-click makes it clickable.", ContentKind.Statements, With(Box,
-                new A("on-click", K.Statements, "Runs when it is clicked."),
+            p.Element(new ElementInfo("Box", "A rectangle: a coloured cell, a card or a panel. It can hold other items, and on_click makes it clickable.", ContentKind.Statements, With(Box,
+                new A("on_click", K.Statements, "Runs when it is clicked."),
                 new A("border", K.Template, "A border colour.")))
             {
                 Context = ElementContext.Script,
-                Example = "<Box width=\"20\" height=\"20\" background=\"{ $on ? 'lime' : '#222' }\" on-click=\"on = not $on\" />",
+                Example = "<Box width=\"20\" height=\"20\" background=\"{ $on ? 'lime' : '#222' }\" on_click=\"on = not $on\" />",
             }, run => UIElements.Node(run, "Box", text: false));
 
             p.Element(new ElementInfo("Spacer", "Empty space.", ContentKind.Empty,
@@ -135,13 +135,13 @@ namespace KScript.UI
                 Context = ElementContext.Script,
             }, run => UIElements.Node(run, "Spacer", text: false));
 
-            p.Element(new ElementInfo("Timer", "Runs on-tick again and again while it is in the layout (and `when` is true). The next tick is counted from when the last one finished.", ContentKind.Empty,
-                new A("every", K.Expression, "Milliseconds between ticks.", true),
+            p.Element(new ElementInfo("Timer", "Runs on_tick again and again while it is in the layout (and `when` is true). The next tick is counted from when the last one finished.", ContentKind.Empty,
+                new A("every", K.Expression, "How long between ticks: 500ms, 1s. A plain number is seconds.", true) { Type = Duration.TypeName },
                 new A("when", K.Expression, "Only tick while this is true, e.g. when=\"$playing\"."),
-                new A("on-tick", K.Statements, "Runs on every tick.", true))
+                new A("on_tick", K.Statements, "Runs on every tick.", true))
             {
                 Context = ElementContext.Script,
-                Example = "<Timer every=\"100\" when=\"$playing\" on-tick=\"frame += 1\" />",
+                Example = "<Timer every=\"100ms\" when=\"$playing\" on_tick=\"frame += 1\" />",
             }, run => UIElements.Node(run, "Timer", text: false));
 
             p.Command("close_window", "", "Closes the window, so the script carries on after </KScript.Window>.", KType.Null, c =>
