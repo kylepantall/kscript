@@ -52,7 +52,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | --- | --- |
 | `n = 3` (first time) | `<let name="n" value="3" />` |
 | `n = 4`, `total += 1` (after) | `<set name="n" value="4" />`, `<set name="total" op="+=" value="1" />` |
-| `const config = { retries: 3 }` | `<let name="config" const="yes" value="…" />` |
+| `const config = { retries: 3 }` | `<const name="config" value="…" />` |
 | `count: int = $raw` | `<let name="count" type="int" value="$raw" />` |
 | `@greet('Hi')` | `<do>@greet('Hi')</do>` |
 | `echo "Hello, $name"` | `<echo>Hello, $name</echo>` |
@@ -103,7 +103,7 @@ echo "Hello { $name }. KScript reads your whole script, checks it, \
   and only then runs it."
 ```
 
-That prints one line. It works in `"text"` and in `'expression strings'`, and keeps any spaces before the `\`. Write
+That prints one line. It works in `"double-quoted"` and `'single-quoted'` strings, and keeps any spaces before the `\`. Write
 `\\` for a backslash of your own at the end of a line of text. `kscript fmt` uses it to wrap a string that runs past
 `printWidth` (the [`wrapStrings`](formatting.md) rule).
 

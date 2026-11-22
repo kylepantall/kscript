@@ -74,7 +74,7 @@ namespace KScript.Syntax
         public const string StatementSyntax = "KS2003";
         public const string BareIdentifier = "KS2004";
 
-        /// <summary>Text used as a value that holds <c>$name</c> or <c>{ }</c>: only templates (after echo, element text) fill those in.</summary>
+        /// <summary>A 'single quoted' string that holds <c>$name</c> or <c>{ }</c>: single quotes keep text as written, double quotes fill it in.</summary>
         public const string TextNotFilledIn = "KS2005";
 
         public const string UnknownElement = "KS3001";

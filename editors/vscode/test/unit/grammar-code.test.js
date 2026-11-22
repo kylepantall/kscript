@@ -73,7 +73,7 @@ test('assignment targets and constants', async () => {
   assert.match(scopeOf(tokens, '=='), /keyword\.operator\.kscript/);
 });
 
-test('double quotes are text that interpolates; single quotes are expression strings', async () => {
+test('double quotes fill in $name and { }; single quotes are kept as written', async () => {
   const tokens = tokenize(await load(), "echo \"Hi $name, { @upper('x') } \\\" done\"\nx = $s->replace('a', 'b')");
   assert.match(scopeOf(tokens, 'echo'), /support\.function\.builtin\.kscript/);
   assert.match(scopeOf(tokens, '$name'), /string\.quoted\.double\.kscript variable\.other\.kscript/);
