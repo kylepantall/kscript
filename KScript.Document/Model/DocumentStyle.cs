@@ -108,14 +108,14 @@ namespace KScript.Documents
                 case "font":
                     Font = Units.Family(value);
                     break;
-                case "heading-font":
+                case "heading_font":
                     HeadingFont = Units.Family(value);
                     break;
                 case "size":
                     FontSize = Units.Length(value);
                     if (FontSize < 4 || FontSize > 72) throw new KScriptException($"size: {value} is too {(FontSize < 4 ? "small" : "big")} for body text. Use a size from 4pt to 72pt, such as 11.", "Argument");
                     break;
-                case "line-height":
+                case "line_height":
                     LineHeight = Units.Number(value, name);
                     break;
                 case "align":
@@ -127,7 +127,7 @@ namespace KScript.Documents
                 case "numbered":
                     NumberSections = Units.Bool(value, name);
                     break;
-                case "title-page":
+                case "title_page":
                     TitlePage = Units.Bool(value, name);
                     break;
                 case "chapters":
@@ -161,8 +161,8 @@ namespace KScript.Documents
         /// <summary>The style options a document element takes, for its attributes.</summary>
         public static readonly string[] Options =
         {
-            "paper", "landscape", "margin", "font", "heading-font", "size", "line-height", "align", "accent", "numbered",
-            "title-page", "chapters", "citations", "header", "footer", "rules", "language",
+            "paper", "landscape", "margin", "font", "heading_font", "size", "line_height", "align", "accent", "numbered",
+            "title_page", "chapters", "citations", "header", "footer", "rules", "language",
         };
     }
 

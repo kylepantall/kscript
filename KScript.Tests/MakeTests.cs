@@ -142,7 +142,7 @@ public class ScaffolderTests
         using var site = new TempSite(("_layout.html", "<html><title>{$title}</title><body><slot /></body></html>"));
         Assert.Equal(0, Make(site.Root, "page", "AboutUs", "--title", "About the team").Code);
 
-        Assert.Equal("<layout src=\"_layout.html\" title=\"About the team\">\n  <h1>About the team</h1>\n  <!-- TODO: Add what the page shows. -->\n</layout>\n", Read(site, "about-us.html"));
+        Assert.Equal("<layout path=\"_layout.html\" title=\"About the team\">\n  <h1>About the team</h1>\n  <!-- TODO: Add what the page shows. -->\n</layout>\n", Read(site, "about-us.html"));
         string html = site.Render("about-us.html").Body;
         Assert.Contains("<title>About the team</title>", html);
         Assert.Contains("<h1>About the team</h1>", html);
@@ -218,7 +218,7 @@ public class ScaffolderTests
         Assert.Contains("<html lang=\"en-GB\">", layout);
         Assert.Contains("<link rel=\"stylesheet\" href=\"/site.css\">\n    <link rel=\"stylesheet\" href=\"/print.css\">", layout);
 
-        site.Write("index.html", "<layout src=\"_layouts/main.html\" title=\"Home\"><p>hi</p></layout>");
+        site.Write("index.html", "<layout path=\"_layouts/main.html\" title=\"Home\"><p>hi</p></layout>");
         string html = site.Render("index.html").Body;
         Assert.Contains("<title>Home</title>", html);
         Assert.Contains("<p>hi</p>", html);

@@ -49,13 +49,13 @@ namespace KScript.Documents
                 new A("landscape", K.Bool, "yes turns the paper sideways."),
                 new A("margin", K.Template, "Margins: one size (2.5cm), or top/right/bottom/left like CSS ('2cm 2.5cm')."),
                 new A("font", K.Enum, "Body text: serif (Times), sans (Helvetica) or mono (Courier).", false, "serif", "sans", "mono"),
-                new A("heading-font", K.Enum, "Headings: serif, sans or mono.", false, "serif", "sans", "mono"),
+                new A("heading_font", K.Enum, "Headings: serif, sans or mono.", false, "serif", "sans", "mono"),
                 new A("size", K.Template, "Body text size in points, such as 11."),
-                new A("line-height", K.Template, "Baseline to baseline as a multiple of the text size, such as 1.4."),
+                new A("line_height", K.Template, "Baseline to baseline as a multiple of the text size, such as 1.4."),
                 new A("align", K.Enum, "Body text: justify, left, center or right.", false, "justify", "left", "center", "right"),
                 new A("accent", K.Template, "The colour of headings and the title page: #rrggbb or a name such as navy."),
                 new A("numbered", K.Bool, "no leaves sections without numbers."),
-                new A("title-page", K.Bool, "yes puts the title, authors, date and abstract on a page of their own."),
+                new A("title_page", K.Bool, "yes puts the title, authors, date and abstract on a page of their own."),
                 new A("chapters", K.Bool, "yes starts each top-level section on a new page."),
                 new A("citations", K.Enum, "numeric ([1]) or author-year ((Conway, 1970)).", false, "numeric", "author-year"),
                 new A("header", K.Template, "The page header: 'left | centre | right', with [page], [pages], [title], [author] and [date]."),
@@ -80,14 +80,14 @@ namespace KScript.Documents
                 "Section(title: Methods, id: methods) {\n  Paragraph \"We ran each pattern for 1000 generations.\"\n}",
                 new A("title", K.Template, "The heading. It may hold **bold**, *italic* and \\( maths \\).", true), Id,
                 new A("numbered", K.Bool, "no leaves this section without a number."),
-                new A("new-page", K.Bool, "yes starts it on a new page.")), DocumentElements.Section);
+                new A("new_page", K.Bool, "yes starts it on a new page.")), DocumentElements.Section);
             p.Element(Info("Paragraph", "A paragraph. Its text may hold **bold**, *italic*, `code`, [links](https://...), \\( maths \\), [@key] citations, [#id] cross-references and ^[footnotes]. A blank line starts a new paragraph.", ContentKind.Template,
                 "Paragraph \"Gliders travel diagonally [@gardner1970], as Figure [#fig-glider] shows.^[Every four generations.]\"",
                 Id, new A("align", K.Enum, "left, center, right or justify (the document's setting is the default).", false, "left", "center", "right", "justify"),
                 new A("lines", K.Bool, "yes keeps the line breaks in the text, as in an address or a poem.")), DocumentElements.Paragraph);
             p.Element(Info("Markdown", "Markdown, from its text or a file: # headings become sections, with paragraphs, lists, tables, code, quotes, images and maths (\\[ \\] in scripts, also $ $ and $$ $$ in files).", ContentKind.Template,
-                "Markdown(src: \"chapters/results.md\")",
-                new A("src", K.Path, "A Markdown file, relative to the script.")), DocumentElements.Markdown);
+                "Markdown(path: \"chapters/results.md\")",
+                new A("path", K.Path, "A Markdown file, relative to the script.")), DocumentElements.Markdown);
             p.Element(Info("List", "A bulleted or numbered list of Item elements. A List right after an Item is nested in it.", ContentKind.Statements,
                 "List(style: number) {\n  Item \"Measure\"\n  Item \"Compare\"\n}",
                 new A("style", K.Enum, "bullet (the default), number, letter or roman.", false, "bullet", "number", "letter", "roman"),
@@ -118,8 +118,8 @@ namespace KScript.Documents
                 Example = "Tr(header) \"Pattern | Period | Speed\"\nTr \"Glider | 4 | c/4\"",
             }, DocumentElements.Row);
             p.Element(Info("Figure", "An image (PNG or JPEG) with a caption. Figures with a caption are numbered.", ContentKind.Empty,
-                "Figure(src: \"glider.png\", caption: \"A glider\", id: fig-glider, width: 0.5)",
-                new A("src", K.Path, "The image, relative to the script.", true),
+                "Figure(path: \"glider.png\", caption: \"A glider\", id: fig-glider, width: 0.5)",
+                new A("path", K.Path, "The image, relative to the script.", true),
                 new A("caption", K.Template, "The caption, shown below as 'Figure 1: ...'."), Id,
                 new A("width", K.Expression, "The share of the text width, from 0 to 1 (or '60%').")), DocumentElements.Figure);
             p.Element(new ElementInfo("Math", "A displayed equation in LaTeX, numbered unless numbered: no. Its text is used as written, so braces are LaTeX's. Inside matrix, cases and aligned, a new line ends a row.", ContentKind.Template,
@@ -147,8 +147,8 @@ namespace KScript.Documents
                 new A("title", K.Template, "The heading (default Contents)."),
                 new A("depth", K.Expression, "How many levels to list: 2 lists sections and subsections (default 3).")), DocumentElements.Contents);
             p.Element(Info("Bibliography", "The list of works cited with [@key]: from a BibTeX file, Source elements inside it, or both. Without one, the list goes at the end.", ContentKind.Statements,
-                "Bibliography(src: \"refs.bib\")",
-                new A("src", K.Path, "A BibTeX (.bib) file, relative to the script."),
+                "Bibliography(path: \"refs.bib\")",
+                new A("path", K.Path, "A BibTeX (.bib) file, relative to the script."),
                 new A("title", K.Template, "The heading (default References).")), DocumentElements.Bibliography);
             p.Element(new ElementInfo("Source", "A work to cite, written out: id: is the key for [@key], and other attributes are BibTeX fields (author, title, year, journal, volume, pages, publisher, url, doi...).", ContentKind.Empty,
                 new A("id", K.Text, "The citation key, as in [@conway1970].", true),
@@ -185,7 +185,7 @@ namespace KScript.Documents
                 new A("due", K.Template, "When payment is due."),
                 new A("currency", K.Template, "A currency code (GBP, USD, EUR, JPY...) or symbol (default GBP)."),
                 new A("tax", K.Expression, "The tax rate in percent, such as 20. Leave it out for no tax line."),
-                new A("tax-name", K.Template, "What the tax is called (default VAT)."),
+                new A("tax_name", K.Template, "What the tax is called (default VAT)."),
                 new A("paid", K.Expression, "An amount already paid, shown with the balance due."),
                 new A("notes", K.Template, "Payment details or terms, under the table."),
                 new A("title", K.Template, "The heading (default Invoice).")), DocumentElements.Invoice);

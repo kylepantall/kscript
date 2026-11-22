@@ -190,7 +190,7 @@ namespace KScript.Conversion
                 }
             }
 
-            // Pages in a converted folder import the scripts too (<import src="lib/tasks.ks.xml" />), and a project's
+            // Pages in a converted folder import the scripts too (<import path="lib/tasks.ks.xml" />), and a project's
             // Makefile runs them (kscript desktop.ks.xml).
             foreach (string page in roots.SelectMany(r => Directory.EnumerateFiles(r, "*", SearchOption.AllDirectories))
                          .Where(f => f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
@@ -222,7 +222,7 @@ namespace KScript.Conversion
             OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
         /// <summary>
-        /// The src a converted import gets. An import of a script in the other format points at that script's
+        /// The path a converted import gets. An import of a script in the other format points at that script's
         /// converted version when this run writes it or it already exists; anything else is kept as written.
         /// </summary>
         private static string ImportPath(string file, string src, bool toCode, HashSet<string> converting, List<string> notConverted)

@@ -87,7 +87,7 @@ public sealed class ClaudeModelTests : IDisposable
         Answer(Text("Order 42 has shipped."));
         string output = Run(
             "<fn name=\"order_status\" params=\"id: int\" description=\"The status of an order.\" value=\"$id == 42 ? 'shipped' : 'unknown'\" />" +
-            "<llm to=\"answer\" tools=\"order_status\">Where is order 42?</llm><echo>{$answer}</echo>");
+            "<llm into=\"answer\" tools=\"order_status\">Where is order 42?</llm><echo>{$answer}</echo>");
         Assert.Equal("Order 42 has shipped.\n", output);
 
         JsonElement tool = Sent(0).GetProperty("tools")[0];

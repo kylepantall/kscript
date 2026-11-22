@@ -20,12 +20,12 @@ KScript.Routes(middleware: [cors, request_id]) {
   // Sign up, then trade an email and password for a token. Send it as
   // Authorization: Bearer <token>.
   Group(middleware: "throttle:10") {
-    Post(path: "/register", to: accounts.sign_up)
-    Post(path: "/tokens", to: accounts.issue_token)
+    Post(path: "/register", to: @accounts.sign_up)
+    Post(path: "/tokens", to: @accounts.issue_token)
   }
   Group(middleware: auth) {
-    Get(path: "/me", to: accounts.profile)
-    Delete(path: "/me", to: accounts.close_account)
+    Get(path: "/me", to: @accounts.profile)
+    Delete(path: "/me", to: @accounts.close_account)
     Resource(path: "/notes", to: notes{{#if cache}}, middleware: etag{{/if}})
   }
 {{else}}

@@ -111,7 +111,7 @@ namespace KScript.Runtime
         void Flush();
     }
 
-    /// <summary>What a provider is made from: its options (from config or &lt;log-provider&gt;) and the script.</summary>
+    /// <summary>What a provider is made from: its options (from config or &lt;log_provider&gt;) and the script.</summary>
     public sealed class LogProviderContext
     {
         public Dictionary<string, object> Options { get; init; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);

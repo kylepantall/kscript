@@ -351,7 +351,7 @@ namespace KScript.Language.Agents
             {
                 fields.AddRange(inline.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0));
             }
-            string options = string.Concat(type.Attributes.Where(a => a.Name is "extra" or "sample").Select(a => $"({a.Name}: {a.ValueText?.Trim()})"));
+            string options = string.Concat(type.Attributes.Where(a => a.Name is "extra" or "path").Select(a => $"({a.Name}: {a.ValueText?.Trim()})"));
             return fields.Count == 0 ? $"type {s.Name}{options} {{ }}" : $"type {s.Name}{options} {{ {string.Join(", ", fields)} }}";
         }
 

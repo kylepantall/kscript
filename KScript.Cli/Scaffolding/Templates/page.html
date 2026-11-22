@@ -15,7 +15,7 @@ hint: Run kscript serve and open /{{ url }}
 {{/each}}
 
 {{/if}}
-<layout src="{{ layout ?? _layout.html }}" title="{{ title }}">
+<layout path="{{ layout ?? _layout.html }}" title="{{ title }}">
   <h1>{{ title }}</h1>
   <!-- TODO: Add what the page shows. -->
 {{#each params}}

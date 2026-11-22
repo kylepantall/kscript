@@ -505,7 +505,7 @@ public sealed class McpTests : IDisposable
         Assert.Contains("Exit code 0", ran);
         Assert.Contains("Output:\nn is 3\n", ran);
 
-        Assert.Contains("Joan", Call(server, "run_code", new { code = "<import package=\"KScript.Terminal\" />\n<input to=\"name\">Name? </input><echo>$name</echo>", input = "Joan\n" }).Text);
+        Assert.Contains("Joan", Call(server, "run_code", new { code = "<import package=\"KScript.Terminal\" />\n<input into=\"name\">Name? </input><echo>$name</echo>", input = "Joan\n" }).Text);
         Assert.Contains("It printed nothing.", Call(server, "run_code", new { code = "n = 1" }).Text);
         Assert.Contains("cut short", Call(server, "run_code", new { code = "for i in 1..20000 {\n  echo \"0123456789\"\n}" }).Text);
 

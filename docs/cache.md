@@ -55,8 +55,8 @@ KScript.Http uses KScript.Cache for HTTP caching. A route can tag its answers wi
 KScript.Routes {
   import "controllers/people.kscript" as people
 
-  Get(path: /people, to: people.index, etag: yes, cache: 60)
-  Get(path: /stats, to: people.stats, middleware: "cache_response:5m")
+  Get(path: /people, to: @people.index, etag: yes, cache: 60)
+  Get(path: /stats, to: @people.stats, middleware: "cache_response:5m")
 }
 ```
 

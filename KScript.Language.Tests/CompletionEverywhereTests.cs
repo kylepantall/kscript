@@ -100,7 +100,7 @@ namespace KScript.Language.Tests
             new object[] { Xml, "<kscript>\n<echo>$‸</echo>\n</kscript>", "args" },
             new object[] { Xml, "<kscript>\n<echo>‸</echo>\n</kscript>", "$args" },
             new object[] { Xml, "<kscript>\n<import package=\"‸\" />\n</kscript>", "KScript.IO" },
-            new object[] { Xml, "<kscript>\n<import src=\"lib.kscript\" names=\"‸\" />\n</kscript>", "add" },
+            new object[] { Xml, "<kscript>\n<import path=\"lib.kscript\" names=\"‸\" />\n</kscript>", "add" },
             new object[] { Xml, "<kscript>\n<fn name=\"f\" params=\"a: ‸\"></fn>\n</kscript>", "string" },
             new object[] { Xml, "<kscript>\n<fn name=\"f\" params=\"a = ‸\"></fn>\n</kscript>", "@now" },
             new object[] { Xml, "<kscript>\n<for each=\"x\" in=\"‸\"></for>\n</kscript>", "@range" },
@@ -210,19 +210,19 @@ namespace KScript.Language.Tests
         public void Docs_are_written_in_the_files_own_format()
         {
             // A .kscript file shows names and examples as .kscript; element names in the text show as code, not hidden as HTML.
-            CompletionItem code = Assert.Single(Complete("import KScript.Test\n‸", Code), i => i.Label == "after-each");
-            Assert.StartsWith("**after-each**", code.Documentation, StringComparison.Ordinal);
+            CompletionItem code = Assert.Single(Complete("import KScript.Test\n‸", Code), i => i.Label == "after_each");
+            Assert.StartsWith("**after_each**", code.Documentation, StringComparison.Ordinal);
             Assert.Contains("in its file or `describe`, even", code.Documentation, StringComparison.Ordinal);
-            Assert.Contains("```kscript\nafter-each {\n  cart = []\n}\n```", code.Documentation, StringComparison.Ordinal);
+            Assert.Contains("```kscript\nafter_each {\n  cart = []\n}\n```", code.Documentation, StringComparison.Ordinal);
             Assert.Contains("| Argument |", Assert.Single(Complete("import KScript.IO\n‸", Code), i => i.Label == "write").Documentation, StringComparison.Ordinal);
 
-            CompletionItem xml = Assert.Single(Complete("<kscript>\n<import package=\"KScript.Test\" />\n<‸\n</kscript>", Xml), i => i.Label == "after-each");
-            Assert.StartsWith("**<after-each>**", xml.Documentation, StringComparison.Ordinal);
+            CompletionItem xml = Assert.Single(Complete("<kscript>\n<import package=\"KScript.Test\" />\n<‸\n</kscript>", Xml), i => i.Label == "after_each");
+            Assert.StartsWith("**<after_each>**", xml.Documentation, StringComparison.Ordinal);
             Assert.Contains("in its file or `<describe>`, even", xml.Documentation, StringComparison.Ordinal);
-            Assert.Contains("```xml\n<after-each>", xml.Documentation, StringComparison.Ordinal);
+            Assert.Contains("```xml\n<after_each>", xml.Documentation, StringComparison.Ordinal);
 
-            (string text, int offset) = TestHelpers.WithCaret("import KScript.Test\nafter-ea‸ch {\n}");
-            Assert.Contains("```kscript\nafter-each {", Service.GetHover(Service.Analyze(text, Path.Combine(Folder, Code)), offset).Markdown, StringComparison.Ordinal);
+            (string text, int offset) = TestHelpers.WithCaret("import KScript.Test\nafter_ea‸ch {\n}");
+            Assert.Contains("```kscript\nafter_each {", Service.GetHover(Service.Analyze(text, Path.Combine(Folder, Code)), offset).Markdown, StringComparison.Ordinal);
 
             // Text already in backticks stays as it is; an example that isn't a script stays XML.
             Assert.Equal("`<if $x>` or `else`", LanguageService.TagsAsCode("`<if $x>` or <else />", code: true));

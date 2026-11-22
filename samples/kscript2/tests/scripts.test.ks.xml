@@ -21,9 +21,9 @@
       <set name="cart" value="$cart->push($item)" />
     </fn>
 
-    <before-each>
+    <before_each>
       <set name="cart" value="['apple']" />
-    </before-each>
+    </before_each>
 
     <test name="starts with one item">
       <expect value="$cart" count="1" />
@@ -35,14 +35,14 @@
     </test>
 
     <test name="rejects an empty item">
-      <expect-error type="Validation" contains="empty" as="err">
+      <expect_error type="Validation" contains="empty" as="err">
         <throw type="Validation" message="An item can't be empty" />
-      </expect-error>
+      </expect_error>
       <expect value="$err.type" equals="'Validation'" />
     </test>
 
     <test name="prints the cart">
-      <capture to="out">
+      <capture into="out">
         <for each="item" in="$cart">
           <echo>- {$item}</echo>
         </for>

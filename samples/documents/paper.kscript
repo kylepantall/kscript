@@ -59,7 +59,7 @@ KScript.Document(
 
   Section(title: "Gliders") {
     Figure(
-      src: "glider.png",
+      path: "glider.png",
       caption: "A glider over four generations: after \( p = 4 \) steps it has moved one cell down and to the right.",
       id: "fig-glider",
       width: 0.8
@@ -104,5 +104,5 @@ KScript.Document(
     }
   }
 
-  Bibliography(src: "refs.bib")
+  Bibliography(path: "refs.bib")
 }

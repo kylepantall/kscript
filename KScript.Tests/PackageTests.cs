@@ -12,7 +12,7 @@ public class PackageTests
     [Fact]
     public void PackageElementsNeedAnImport()
     {
-        KScriptException ex = Fails("<input to=\"x\">?</input>");
+        KScriptException ex = Fails("<input into=\"x\">?</input>");
         Assert.Equal("Import", ex.Type);
         Assert.Contains("<import package=\"KScript.Terminal\" />", ex.Message);
     }
@@ -67,7 +67,7 @@ public class PackageTests
         {
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><fn name=\"double\" params=\"n\" value=\"$n * 2\" /><let name=\"limit\" value=\"10\" const=\"yes\" /></kscript>");
             string main = Path.Combine(dir, "main.ks.xml");
-            Assert.Equal("8 10 6\n", Run("<kscript><import src=\"lib.ks.xml\" as=\"lib\" /><import src=\"lib.ks.xml\" names=\"double\" /><echo>{ lib.double(4) } { lib.limit } { @double(3) }</echo></kscript>", path: main));
+            Assert.Equal("8 10 6\n", Run("<kscript><import path=\"lib.ks.xml\" as=\"lib\" /><import path=\"lib.ks.xml\" names=\"double\" /><echo>{ lib.double(4) } { lib.limit } { @double(3) }</echo></kscript>", path: main));
         }
         finally
         {
@@ -92,33 +92,33 @@ public class PackageTests
     [Fact]
     public void InputConvertsAndRetries()
     {
-        Assert.Equal("Age: \nPlease enter a whole number.\nAge: \n43\n", RunBody("<input to=\"age\" type=\"int\">Age: </input><echo>{ $age + 1 }</echo>", "abc\n42\n", "KScript.Terminal"));
+        Assert.Equal("Age: \nPlease enter a whole number.\nAge: \n43\n", RunBody("<input into=\"age\" type=\"int\">Age: </input><echo>{ $age + 1 }</echo>", "abc\n42\n", "KScript.Terminal"));
     }
 
     [Fact]
     public void InputDefault()
     {
-        Assert.EndsWith("Kyle\n", RunBody("<input to=\"name\" default=\"'Kyle'\">Name? </input><echo>$name</echo>", "\n", "KScript.Terminal"));
+        Assert.EndsWith("Kyle\n", RunBody("<input into=\"name\" default=\"'Kyle'\">Name? </input><echo>$name</echo>", "\n", "KScript.Terminal"));
     }
 
     [Fact]
     public void InputWithNoMoreInputIsAnError()
     {
-        Assert.Throws<KScriptException>(() => RunBody("<input to=\"name\">Name? </input>", "", "KScript.Terminal"));
+        Assert.Throws<KScriptException>(() => RunBody("<input into=\"name\">Name? </input>", "", "KScript.Terminal"));
     }
 
     [Fact]
     public void MenuPicksByNumberOrLabel()
     {
-        Assert.EndsWith("Exit 1\n", RunBody("<menu to=\"choice\" index=\"i\" options=\"['Settings', 'Exit']\">Next?</menu><echo>$choice $i</echo>", "2\n", "KScript.Terminal"));
-        Assert.EndsWith("Settings\n", RunBody("<menu to=\"choice\" options=\"['Settings', 'Exit']\" /><echo>$choice</echo>", "settings\n", "KScript.Terminal"));
+        Assert.EndsWith("Exit 1\n", RunBody("<menu into=\"choice\" at=\"i\" options=\"['Settings', 'Exit']\">Next?</menu><echo>$choice $i</echo>", "2\n", "KScript.Terminal"));
+        Assert.EndsWith("Settings\n", RunBody("<menu into=\"choice\" options=\"['Settings', 'Exit']\" /><echo>$choice</echo>", "settings\n", "KScript.Terminal"));
     }
 
     [Fact]
     public void ConfirmAndPause()
     {
-        Assert.EndsWith("true\n", RunBody("<confirm to=\"ok\">Sure?</confirm><echo>$ok</echo>", "y\n", "KScript.Terminal"));
-        Assert.EndsWith("false\n", RunBody("<confirm to=\"ok\" default=\"no\">Sure?</confirm><echo>$ok</echo>", "\n", "KScript.Terminal"));
+        Assert.EndsWith("true\n", RunBody("<confirm into=\"ok\">Sure?</confirm><echo>$ok</echo>", "y\n", "KScript.Terminal"));
+        Assert.EndsWith("false\n", RunBody("<confirm into=\"ok\" default=\"no\">Sure?</confirm><echo>$ok</echo>", "\n", "KScript.Terminal"));
         Assert.StartsWith("Press enter", RunBody("<pause>Press enter</pause>", "\n", "KScript.Terminal"));
     }
 

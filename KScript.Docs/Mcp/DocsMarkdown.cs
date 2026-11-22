@@ -302,7 +302,7 @@ namespace KScript.Docs.Mcp
         }
 
         /// <summary>A retired v1 name, with what to write instead.</summary>
-        internal static string Retired(string written, RetiredInfo r) => $"# {written} (retired)\n\n{written} was removed in KScript 2. {r.Replacement}\n";
+        internal static string Retired(string written, RetiredInfo r) => $"# {written} ({(r.Renamed ? "renamed" : "retired")})\n\n{r.Message(written)}\n";
 
         #endregion
 
