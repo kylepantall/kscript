@@ -38,6 +38,12 @@ namespace KScript.Language.Features
         /// </summary>
         public List<CompletionItem> GetCompletions(DocumentAnalysis analysis, int offset, string trigger = null)
         {
+            // Typing the function's opening brace should leave Enter free to start its first statement.
+            if (trigger == "{" && analysis.Markup.Syntax == SourceSyntax.Code && offset > 0 && analysis.Source.Text[offset - 1] == '{'
+                && analysis.Markup.FindElementAt(offset - 1) is { Name: "fn" } fn && fn.StartTagSpan.End == offset - 1)
+            {
+                return new List<CompletionItem>();
+            }
             List<CompletionItem> items = GetCompletionsAt(analysis, offset);
             if ((trigger == "(" || trigger == ",") && !items.Any(i => i.Kind == CompletionKind.Parameter || i.Kind == CompletionKind.Value || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
             {
