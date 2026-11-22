@@ -26,7 +26,27 @@ function registerCommands(vscode, context, server) {
   }
 
   function folderOf(uri) {
-    return (uri && uri.scheme === 'file' && vscode.workspace.getWorkspaceFolder(uri)) || (vscode.workspace.workspaceFolders || [])[0];
+    return uri && uri.scheme === 'file' ? vscode.workspace.getWorkspaceFolder(uri) : undefined;
+  }
+
+  async function projectFolder(what) {
+    const editor = vscode.window.activeTextEditor;
+    const active = folderOf(editor && editor.document.uri);
+    if (active) return active;
+    const folders = vscode.workspace.workspaceFolders || [];
+    if (folders.length > 1) return vscode.window.showWorkspaceFolderPick({ placeHolder: `Choose the folder to ${what}` });
+    if (!folders.length) vscode.window.showInformationMessage(`Open your project's folder to ${what}.`);
+    return folders[0];
+  }
+
+  async function saveFolder(folder) {
+    for (const doc of vscode.workspace.textDocuments) {
+      if (doc.isDirty && folderOf(doc.uri)?.uri.toString() === folder.uri.toString() && !(await doc.save())) {
+        vscode.window.showWarningMessage(`Couldn't save ${doc.fileName}. The KScript task was cancelled.`);
+        return false;
+      }
+    }
+    return true;
   }
 
   /** Starts `kscript <args>` as a task. Resolves with its exit code when it ends (undefined if it was closed). */
@@ -88,32 +108,35 @@ function registerCommands(vscode, context, server) {
 
   /** Runs `kscript test`: every test in the folder, one file, or the tests of a file whose name contains filter. */
   async function runTests(target, filter) {
+    if (!target) return runProjectTests();
     const found = kscript('run tests');
     if (!found) return undefined;
-    const doc = target ? await documentFor(target) : undefined;
-    const file = doc ? await fileFor(doc) : undefined;
-    if (doc && !file) return undefined;
-    const folder = folderOf(doc && doc.uri);
-    const args = ['test', ...(file ? [file] : []), ...(filter ? ['--filter', filter] : [])];
-    const name = file ? `test ${path.basename(file)}${filter ? ` (${filter})` : ''}` : 'test';
-    return runTask(found, name, 'test', args, { folder, cwd: folder ? folder.uri.fsPath : file && path.dirname(file), file, group: vscode.TaskGroup.Test });
+    const doc = await documentFor(target);
+    if (!doc || !isTestFile(doc.uri.fsPath)) {
+      vscode.window.showInformationMessage('Open a .test.kscript or .test.ks.xml file to run its tests.');
+      return undefined;
+    }
+    const file = await fileFor(doc);
+    if (!file) return undefined;
+    const folder = folderOf(doc.uri);
+    const args = ['test', file, ...(filter ? ['--filter', filter] : [])];
+    const name = `test ${path.basename(file)}${filter ? ` (${filter})` : ''}`;
+    return runTask(found, name, 'test', args, { folder, cwd: folder ? folder.uri.fsPath : path.dirname(file), file, group: vscode.TaskGroup.Test });
   }
 
   /** A task in the project's folder, for commands that are about the whole project. */
   function inProject(command, what, args, options = {}) {
     return async () => {
-      const editor = vscode.window.activeTextEditor;
-      const folder = folderOf(editor && editor.document.uri);
-      if (!folder && options.needsFolder !== false) {
-        vscode.window.showInformationMessage(`Open your project's folder to ${what}.`);
-        return undefined;
-      }
+      const folder = await projectFolder(what);
+      if (!folder) return undefined;
       const found = kscript(what);
       if (!found) return undefined;
-      await vscode.workspace.saveAll(false);
+      if (!(await saveFolder(folder))) return undefined;
       return runTask(found, command, command, args, { folder, ...options });
     };
   }
+
+  const runProjectTests = inProject('test', 'run tests', ['test'], { group: vscode.TaskGroup.Test });
 
   /** A new, unsaved .kscript file with a short script that runs as it is, and the first thing to change selected. */
   async function newScript() {
@@ -164,8 +187,11 @@ function registerCommands(vscode, context, server) {
     vscode.commands.registerCommand('kscript.check', inProject('check', 'check the project', ['check'], { matcher: '$kscript-check' })),
     vscode.commands.registerCommand('kscript.formatProject', inProject('fmt', 'format the project', ['fmt'])),
     // "Open docs" in a hover passes the name it is about, and the docs open on what they have for it.
-    vscode.commands.registerCommand('kscript.openDocs', (word) =>
-      inProject('docs', 'open the docs', docsArgs(word), { background: true, needsFolder: false })()),
+    vscode.commands.registerCommand('kscript.openDocs', (word) => {
+      const found = kscript('open the docs');
+      const editor = vscode.window.activeTextEditor;
+      return found && runTask(found, 'docs', 'docs', docsArgs(word), { folder: folderOf(editor && editor.document.uri), background: true });
+    }),
     // "3 uses" above a function: the list every use is shown in, as Find All References does.
     vscode.commands.registerCommand('kscript.showReferences', async (target, position) => {
       if (!target || !position) return;

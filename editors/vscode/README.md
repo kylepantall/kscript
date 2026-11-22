@@ -33,6 +33,8 @@ irm https://raw.githubusercontent.com/kylepantall/kscript/master/install.ps1 | i
 
 The extension finds `kscript` where the installers put it (`~/.kscript/bin`, or `%LOCALAPPDATA%\Programs\kscript` on Windows), then on your `PATH`. Keep it up to date with `kscript update`, which updates this extension too. When the `kscript` binary changes, the extension restarts the language server on its own, so you never keep getting errors from the old version. **KScript: Restart Language Server** does the same by hand.
 
+The **KScript: Open Install Guide** command is available in an empty window. If you use a custom CLI build, set `kscript.server.path` to its full path or its executable name on `PATH`, such as `kscript-dev`.
+
 You can also install this extension from the command line with `kscript ide install`.
 
 ## Settings
@@ -64,6 +66,10 @@ The `format` section of `kscript.json` sets the formatting style (`"indent": 4`,
 - **KScript: Format Project**: runs `kscript fmt` on the whole project.
 - **KScript: New Project…**: asks for a name and a folder, runs `kscript make project`, and offers to open it.
 - **KScript: Open Docs**: runs `kscript docs`, which opens the docs in your browser.
+
+In a multi-root workspace, **Run Tests**, **Check Project**, **Format Project** and **Serve Site** use the folder containing the active file. If no open editor identifies a folder, pick one from the list. These commands save dirty files in the chosen folder first. A standalone script or test file runs from its own directory.
+
+**Go to Symbol in Workspace** picks up folders you add or remove while the language server is running.
 
 ## Troubleshooting
 

@@ -43,11 +43,12 @@ async function startClient(context) {
   const server = resolveServer(config().get('server.path', ''), config().get('server.args', ['lsp']));
   if (server.error) {
     setStatus('$(warning) KScript', 'The KScript language server was not found. Click to set it up.', 'kscript.showSetup');
-    const choice = await vscode.window.showWarningMessage(
+    vscode.window.showWarningMessage(
       `${server.error} Install it to get KScript errors, completion and hover in the editor.`,
-      'Install KScript', 'Set Path…');
-    if (choice === 'Install KScript') vscode.env.openExternal(vscode.Uri.parse(INSTALL_URL));
-    if (choice === 'Set Path…') vscode.commands.executeCommand('workbench.action.openSettings', 'kscript.server.path');
+      'Install KScript', 'Set Path…').then((choice) => {
+        if (choice === 'Install KScript') vscode.env.openExternal(vscode.Uri.parse(INSTALL_URL));
+        if (choice === 'Set Path…') vscode.commands.executeCommand('workbench.action.openSettings', 'kscript.server.path');
+      });
     return;
   }
 
@@ -55,9 +56,11 @@ async function startClient(context) {
   watchServerBinary(context, server, version);
   output.appendLine(`Using ${server.command}${version ? ` (kscript ${version})` : ''}, found via ${server.source}.`);
   if (version && !supportsLsp(version)) {
-    const choice = await vscode.window.showWarningMessage(
-      `kscript ${version} is too old for the editor features. Run "kscript update" to get the latest release.`, 'Open Terminal');
-    if (choice === 'Open Terminal') runUpdate(server);
+    setStatus('$(warning) KScript', `kscript ${version} needs an update. Click for installation help.`, 'kscript.showSetup');
+    vscode.window.showWarningMessage(
+      `kscript ${version} is too old for the editor features. Run "kscript update" to get the latest release.`, 'Open Terminal').then((choice) => {
+        if (choice === 'Open Terminal') runUpdate(server);
+      });
     return;
   }
 
