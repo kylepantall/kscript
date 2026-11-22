@@ -10,7 +10,7 @@ namespace KScript.Docs.Mcp
     {
         public const int DefaultPort = 4181;
 
-        public const string Usage = "Usage: kscript mcp [--format kscript|xml] [--dir folder] [--http [--port 4181]]";
+        public const string Usage = "Usage: kscript mcp [--syntax kscript|xml] [--dir folder] [--http [--port 4181]]";
 
         /// <summary>Runs the server. <paramref name="input"/> and <paramref name="output"/> carry the protocol on stdio; <paramref name="log"/> is stderr.</summary>
         public static int Run(string[] args, Stream input, Stream output, TextWriter log, CancellationToken stop = default)
@@ -27,8 +27,8 @@ namespace KScript.Docs.Mcp
                     case "-h":
                         log.WriteLine(Usage);
                         log.WriteLine("Serves the KScript docs to AI coding assistants (MCP), offline. Clients start it as: kscript mcp");
-                        log.WriteLine("  --format   Show examples as .kscript or XML (default: the project's make.format, else .kscript).");
-                        log.WriteLine("  --dir      The project folder: its kscript.json sets the format and the check/fmt rules (default: this folder).");
+                        log.WriteLine("  --syntax   Show examples as .kscript or XML (default: the project's make.syntax, else .kscript).");
+                        log.WriteLine("  --dir      The project folder: its kscript.json sets the syntax and the check/fmt rules (default: this folder).");
                         log.WriteLine("  --http     Serve on http://localhost:4181/mcp instead of stdin and stdout.");
                         log.WriteLine("Setup for Claude Code, Cursor, VS Code and other clients: the \"AI assistants (MCP)\" page of kscript docs.");
                         return 0;
@@ -40,16 +40,15 @@ namespace KScript.Docs.Mcp
                         if (i + 1 >= args.Length || !int.TryParse(args[++i], out port) || port < 1 || port > 65535)
                         {
                             log.WriteLine("--port needs a number, e.g. --port 4181");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         break;
-                    case "--format":
-                    case "-f":
+                    case CliFlags.Syntax:
                         format = i + 1 < args.Length ? DocsCommand.NormalizeFormat(args[++i]) : null;
                         if (format == null)
                         {
-                            log.WriteLine("--format needs kscript or xml, e.g. --format xml");
-                            return 1;
+                            log.WriteLine("--syntax needs kscript or xml, e.g. --syntax xml");
+                            return ExitCodes.Usage;
                         }
                         break;
                     case "--dir":
@@ -57,12 +56,12 @@ namespace KScript.Docs.Mcp
                         if (folder == null || !Directory.Exists(folder))
                         {
                             log.WriteLine(folder == null ? "--dir needs a folder, e.g. --dir my-app" : $"There is no folder '{folder}'.");
-                            return 1;
+                            return ExitCodes.Usage;
                         }
                         break;
                     default:
-                        log.WriteLine($"Unknown option '{args[i]}'. {Usage}");
-                        return 1;
+                        log.WriteLine(CliFlags.Retired("mcp", args[i]) ?? $"Unknown option '{args[i]}'. {Usage}");
+                        return ExitCodes.Usage;
                 }
             }
 

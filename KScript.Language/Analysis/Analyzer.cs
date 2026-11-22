@@ -586,11 +586,11 @@ namespace KScript.Language.Analysis
             if (roots.Count > 1)
             {
                 Report(roots[1].NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MarkupSyntax,
-                    "A script has one root element. Put everything inside <kscript>.");
+                    $"A script has one root element. Put everything inside <kscript>.");
             }
             if (roots.Count > 0 && roots[0].Name != "kscript" && catalog.GetElement(roots[0].Name) != null)
             {
-                Report(roots[0].NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.MisplacedElement, "Scripts start with <kscript>.");
+                Report(roots[0].NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.MisplacedElement, $"Scripts start with <kscript>.");
             }
         }
 
@@ -621,7 +621,7 @@ namespace KScript.Language.Analysis
                         else if (!text.IsWhitespace)
                         {
                             Report(TrimmedSpan(text.Content), DiagnosticSeverity.Warning, DiagnosticCodes.StrayText,
-                                "Text here is ignored. To print it, put it in <echo>.");
+                                $"Text here is ignored. To print it, put it in <echo>.");
                         }
                         if (!text.IsWhitespace)
                         {
@@ -684,6 +684,13 @@ namespace KScript.Language.Analysis
             else if (Kind == DocumentKind.Script && !info.Context.HasFlag(ElementContext.Script))
             {
                 Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.MisplacedElement, $"<{e.Name}> only works in pages served by kscript serve.");
+            }
+
+            if (info.Planned && Kind == DocumentKind.Script)
+            {
+                // Described in the catalog, but no package runs it: the runtime would call it unknown.
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.PlannedFeature,
+                    $"<{e.Name}> is planned but not built yet, so it can't run.");
             }
 
             // Elements that build their own scopes (fn, catch) must not also get an empty content scope,
@@ -963,7 +970,7 @@ namespace KScript.Language.Analysis
                 {
                     fixes.Add(RenameElementFix(e, retired.Rename, retired.Renamed));
                 }
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredElement, retired.Message(IsCode ? e.Name : $"<{e.Name}>"), fixes);
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredElement, Wording.Prose(retired.Message(IsCode ? e.Name : $"<{e.Name}>")), fixes);
                 return;
             }
 
@@ -1008,7 +1015,7 @@ namespace KScript.Language.Analysis
             IEnumerable<string> known = files.ListFiles(componentDir, "*.html").Select(f => System.IO.Path.GetFileNameWithoutExtension(f));
             string suggestion = Suggestions.Closest(e.Name, known);
             Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownElement,
-                $"No component named <{e.Name}>: _components/{e.Name}.html doesn't exist." + (suggestion != null ? $" Did you mean <{suggestion}>?" : string.Empty),
+                Wording.Of($"No component named <{e.Name}>: _components/{e.Name}.html doesn't exist.") + (suggestion != null ? Wording.Of($" Did you mean <{suggestion}>?") : null),
                 suggestion != null ? new[] { RenameElementFix(e, suggestion) } : null);
         }
 
@@ -1040,7 +1047,7 @@ namespace KScript.Language.Analysis
                 if (retired != null)
                 {
                     Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.RetiredAttribute,
-                        retired.Renamed ? retired.Message($"'{attr.Name}'") : $"The '{attr.Name}' attribute was removed in KScript 2. {retired.Replacement}",
+                        retired.Renamed ? Wording.Prose(retired.Message($"'{attr.Name}'")) : Wording.Of($"The '{attr.Name}' attribute was removed in KScript 2. {Wording.Prose(retired.Replacement)}"),
                         retired.Rename != null && info.GetAttribute(retired.Rename) != null && e.GetAttribute(retired.Rename) == null
                             ? new[] { new QuickFix((retired.Renamed ? Fixer.RenameTitle : "Change to ") + retired.Rename, new TextChange(attr.NameSpan, retired.Rename)) }
                             : null);
@@ -1054,7 +1061,7 @@ namespace KScript.Language.Analysis
 
                 string suggestion = Suggestions.Closest(attr.Name, info.Attributes.Select(x => x.Name));
                 Report(attr.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownAttribute,
-                    $"<{e.Name}> has no '{attr.Name}' attribute." + (suggestion != null ? $" Did you mean '{suggestion}'?" : AttributeList(info)),
+                    Wording.Of($"<{e.Name}> has no '{attr.Name}' attribute.") + (suggestion != null ? $" Did you mean '{suggestion}'?" : AttributeList(info)),
                     suggestion != null ? new[] { new QuickFix($"Change to {suggestion}", new TextChange(attr.NameSpan, suggestion)) } : null);
             }
 
@@ -1062,7 +1069,7 @@ namespace KScript.Language.Analysis
             {
                 if (e.GetAttribute(a.Name) == null && !RequiredSatisfiedOtherwise(e, info, a))
                 {
-                    Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<{e.Name}> needs the '{a.Name}' attribute: {a.Description}");
+                    Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<{e.Name}> needs the '{a.Name}' attribute: {Wording.Prose(a.Description)}");
                 }
             }
         }
@@ -1117,7 +1124,7 @@ namespace KScript.Language.Analysis
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
                         IsCode
                             ? $"'{e.Name}' only works inside {KScript.Runtime.Values.OrList(info.MustBeInside.ToList())}."
-                            : $"<{e.Name}> must be inside {KScript.Runtime.Values.OrList(info.MustBeInside.Select(n => "<" + n + ">").ToList())}.");
+                            : $"<{e.Name}> must be inside {KScript.Runtime.Values.OrList(info.MustBeInside.Select(n => IsCode ? n : "<" + n + ">").ToList())}.");
                 }
             }
 
@@ -1266,8 +1273,8 @@ namespace KScript.Language.Analysis
                 if (!hasText)
                 {
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute,
-                        isLet ? "<let> needs a name and a value: <let name=\"x\" value=\"3\" /> or <let>x = 3</let>."
-                              : "<set> needs a name and a value: <set name=\"x\" value=\"3\" /> or <set>x = 3</set>.");
+                        isLet ? new Wording("<let> needs a name and a value: <let name=\"x\" value=\"3\" /> or <let>x = 3</let>.", "A variable needs a name and a value: x = 3.")
+                              : new Wording("<set> needs a name and a value: <set name=\"x\" value=\"3\" /> or <set>x = 3</set>.", "An assignment needs a name and a value: x = 3."));
                     return;
                 }
                 AnalyzeStatementsContent(e, scope, declare: isLet);
@@ -1300,11 +1307,11 @@ namespace KScript.Language.Analysis
             }
             else if (isLet)
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "<let> needs a value: a value attribute or text.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<let> needs a value: a value attribute or text.");
             }
             else
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, "<set> needs a value: a value attribute or text.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<set> needs a value: a value attribute or text.");
             }
 
             if (region?.Parse?.Root != null)
@@ -1423,7 +1430,7 @@ namespace KScript.Language.Analysis
             {
                 if (e.Name == "do")
                 {
-                    Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.StatementSyntax, "<do> is empty.");
+                    Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.StatementSyntax, $"<do> is empty.");
                 }
                 return;
             }
@@ -1601,7 +1608,7 @@ namespace KScript.Language.Analysis
             bool hasBody = e.Children.Any(c => c is MarkupElement || (c is MarkupText t && !t.IsWhitespace));
             if (e.GetAttribute("value") != null && hasBody)
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttribute, "<fn> has both a value and a body. Use one.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttribute, $"<fn> has both a value and a body. Use one.");
             }
 
             WalkChildren(e.Children, new Scope(body, e.ContentSpan), markupMode);

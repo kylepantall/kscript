@@ -102,16 +102,17 @@ namespace KScript.Syntax
         public const string UnknownMethod = "KS5003";
         public const string ArgumentCount = "KS5004";
         public const string TypeMismatch = "KS5005";
+        /// <summary>An element or command the catalog describes but no package runs yet (render, on, @dom).</summary>
         public const string PlannedFeature = "KS5006";
         public const string UnknownParameter = "KS5007";
         public const string NamedArgument = "KS5008";
         public const string InvalidArgumentValue = "KS5009";
         public const string UnknownField = "KS5010";
-        /// <summary>A literal that can't be the type it is written for: a bad email, an Age of 200, a word not in an enum.</summary>
-        public const string InvalidTypedValue = "KS5012";
-
         /// <summary>A catch, throw or extends that names an error type nobody declared.</summary>
         public const string UnknownErrorType = "KS5011";
+
+        /// <summary>A literal that can't be the type it is written for: a bad email, an Age of 200, a word not in an enum.</summary>
+        public const string InvalidTypedValue = "KS5012";
 
         /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
         public const string PreferEarlyExit = "KS6001";

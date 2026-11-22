@@ -292,15 +292,20 @@ namespace KScript.Syntax
 
     public sealed class SyntaxError
     {
-        public SyntaxError(TextSpan span, string message, string code = DiagnosticCodes.ExpressionSyntax)
+        public SyntaxError(TextSpan span, Wording message, string code = DiagnosticCodes.ExpressionSyntax)
         {
             Span = span;
-            Message = message;
+            Words = message;
             Code = code;
         }
 
         public TextSpan Span { get; }
-        public string Message { get; }
+
+        /// <summary>The message as an XML script reads it.</summary>
+        public string Message => Words?.Xml;
+
+        /// <summary>The message for either form of script: an expression doesn't know which file it is in.</summary>
+        public Wording Words { get; }
         public string Code { get; }
         public override string ToString() => $"{Span}: {Message}";
     }

@@ -3,8 +3,8 @@
 {
   "description": "A bare-bones project: kscript.json, one script and a test. Add --web, --api or --desktop for an empty website, API or desktop app.",
   "options": {
-    "format": {
-      "question": "Which file format for scripts?",
+    "syntax": {
+      "question": "Which syntax for scripts?",
       "default": "kscript",
       "choices": ["kscript", "xml"],
       "description": "kscript writes scripts and tests as .kscript files; xml writes them as .ks.xml."

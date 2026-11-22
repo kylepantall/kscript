@@ -56,7 +56,7 @@ namespace KScript.Runtime
                     IEnumerable<string> wishes = from is List<object> list ? list.Select(Values.ToStr) : Translator.AcceptLanguage(Values.ToStr(from));
                     tr.Locale = tr.Best(wishes) ?? tr.Default;
                 }
-                else throw run.Error("<locale> needs set=\"fr\" or from=\"...\".", null, "Syntax");
+                else throw run.Error($"<locale> needs set=\"fr\" or from=\"...\".", null, "Syntax");
                 return null;
             });
 

@@ -104,13 +104,13 @@ jobs:
         run: dotnet test KScript.sln --configuration Release --no-build --verbosity normal
 
       - name: Run sample script
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll "Example Scripts/Find Oldest Person.xml"
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll samples/kscript2/oldest.ks.xml
 
       - name: Check KScript 2 samples
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data "Example Scripts" --warnaserror
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data --warnings-as-errors
 
       - name: Check KScript formatting
-        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data samples/code-format samples/types "Example Scripts" "Example Sites/team"
+        run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll fmt --check samples/kscript2 samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents samples/queue-app samples/data samples/code-format samples/types "Example Sites/team"
 
       - name: Run KScript tests
         run: dotnet KScriptApp/bin/Release/net8.0/KScript.dll test samples/kscript2 samples/life-lab samples/queue-app samples/data
@@ -121,22 +121,22 @@ jobs:
           k="dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
           cd "$RUNNER_TEMP"
           $k make project new-app
-          $k check new-app --warnaserror
+          $k check new-app --warnings-as-errors
           $k fmt --check new-app
           $k test new-app
           $k agents --check new-app
-          $k make project xml-app --format xml
-          $k check xml-app --warnaserror
+          $k make project xml-app --syntax xml
+          $k check xml-app --warnings-as-errors
           $k fmt --check xml-app
           $k test xml-app
           $k agents --check xml-app
           $k make project bare-tool --bare
-          $k check bare-tool --warnaserror
+          $k check bare-tool --warnings-as-errors
           $k test bare-tool
           $k agents --check bare-tool
           $k bare-tool/main.kscript
           $k make project bare-app --bare --web --api --desktop
-          $k check bare-app --warnaserror
+          $k check bare-app --warnings-as-errors
           $k fmt --check bare-app
           $k test bare-app
           $k agents --check bare-app
@@ -367,12 +367,12 @@ jobs:
 
       - name: Run, check and test scripts
         run: |
-          printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.xml
-          "$K" smoke.xml | tee smoke.out
+          printf '<kscript>\n  <import package="KScript.Math" />\n  <let name="n" value="@sqrt(9)" />\n  <echo>kscript ok: $n</echo>\n</kscript>\n' > smoke.ks.xml
+          "$K" smoke.ks.xml | tee smoke.out
           grep -q "kscript ok: 3" smoke.out
-          "$K" "Example Scripts/Find Oldest Person.xml"
-          "$K" check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data "Example Scripts" --warnaserror
-          "$K" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data "Example Scripts" "Example Sites/team"
+          "$K" samples/kscript2/oldest.ks.xml
+          "$K" check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data --warnings-as-errors
+          "$K" fmt --check samples/kscript2 samples/life-lab samples/http-app samples/storage samples/data "Example Sites/team"
           "$K" test samples/kscript2 samples/life-lab samples/queue-app samples/data
           # KScript.Data's SQLite library ships beside kscript, like the UI's.
           (cd samples/data && "$K" shop.kscript | grep -q "Paid orders: 1")
@@ -404,7 +404,7 @@ jobs:
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=false \
             -p:DebugType=none -p:Version=0.0.0-aot --output runtime > /dev/null
           mkdir -p "$RUNNER_TEMP/hello"
-          cp smoke.xml "$RUNNER_TEMP/hello/hello.ks.xml"
+          cp smoke.ks.xml "$RUNNER_TEMP/hello/hello.ks.xml"
           "$K" compile "$RUNNER_TEMP/hello/hello.ks.xml" --runtime "runtime/KScript${{ matrix.ext }}" --out "$RUNNER_TEMP/out"
           ls -R "$RUNNER_TEMP/out"
           program="$(find "$RUNNER_TEMP/out" -type f -name "hello${{ matrix.ext }}" | head -1)"

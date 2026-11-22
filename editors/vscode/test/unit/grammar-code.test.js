@@ -224,3 +224,31 @@ test('``` blocks: text, a language or a <Type>, closed by a fence of their own',
   assert.match(scopeOf(tokens, '```', 6), /meta\.embedded\.block\.latex/);
   assert.match(scopeOf(tokens, 'z'), /variable\.other\.assignment\.kscript/);
 });
+
+test('only the operators the language has are coloured as operators', async () => {
+  const tokens = tokenize(await load(), [
+    'count += 1',
+    'total = $total % 3',
+    'if $a === $b and $c ?? $d { }',
+    'x = $list?.first',
+    'y = 2 ** 8',
+    'if $a is $b { }',
+    'count++',
+    'total %= 3',
+    'done = yes',
+  ].join('\n'));
+  for (const op of ['+=', '%', '===', '??', '?.', '**']) assert.match(scopeOf(tokens, op), /keyword\.operator\.kscript/, op);
+  assert.match(scopeOf(tokens, 'and'), /keyword\.operator\.word\.kscript/);
+  // Not in the language (the parser reports them): never an operator, a word operator or a constant.
+  // 'is' is the word of a match arm (case is ...), so it is coloured as a word, never as a symbol operator.
+  assert.doesNotMatch(scopeOf(tokens, 'is'), /keyword\.operator\.kscript/);
+  assert.ok(!tokens.some((t) => (t.text === '++' || t.text === '%=' || t.text === '--') && /keyword\.operator/.test(t.scopes)));
+  assert.doesNotMatch(scopeOf(tokens, 'yes'), /constant\.language/);
+});
+
+test('single quotes have no escapes; double quotes have only \\" and \\\\', async () => {
+  const tokens = tokenize(await load(), "a = 'C:\\new\\table'\nb = \"tab\\t \\\\ \\\" end\"");
+  assert.ok(!tokens.some((t) => /string\.quoted\.single\.kscript/.test(t.scopes) && /constant\.character\.escape/.test(t.scopes)), 'an escape in single quotes');
+  const escapes = tokens.filter((t) => /string\.quoted\.double\.kscript/.test(t.scopes) && /constant\.character\.escape\.kscript/.test(t.scopes)).map((t) => t.text);
+  assert.deepStrictEqual(escapes, ['\\\\', '\\"']);
+});

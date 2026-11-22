@@ -54,7 +54,7 @@ namespace KScript.Documents
             }
             catch (KScriptException e) when (e.Line == 0)
             {
-                throw run.Error(e.Message, attribute, e.Type);
+                throw run.Error(e.Words, attribute, e.Type);
             }
         }
 

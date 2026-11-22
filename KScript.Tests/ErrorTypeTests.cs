@@ -230,7 +230,7 @@ public class ErrorTypeTests
     [InlineData("throw Plain(1, 2)", "such as Plain(message: '...')")]
     [InlineData("throw Validation(cause: 3)", "The cause of a Validation is an error")]
     [InlineData("throw PersonNotFound", "PersonNotFound has fields, so throw it with them: PersonNotFound(id: ...).")]
-    [InlineData("n = 42\nthrow $n", "<throw value> needs an error, such as NotFound(id: 42) or a caught $err, not a number (42).")]
+    [InlineData("n = 42\nthrow $n", "throw needs an error, such as NotFound(id: 42) or a caught $err, not a number (42).")]
     public void MistakesInThrowingAreExplained(string code, string message)
     {
         Assert.Contains(message, Fails(Declarations + code).Message);

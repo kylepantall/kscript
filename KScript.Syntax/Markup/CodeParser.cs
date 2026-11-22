@@ -1739,7 +1739,7 @@ namespace KScript.Syntax.Markup
                 string name = ReadName();
                 if (name.Length == 0)
                 {
-                    Error(new TextSpan(pos, 1), DiagnosticCodes.InvalidAttribute, $"Expected an attribute name, such as to: name, not '{text[pos]}'.");
+                    Error(new TextSpan(pos, 1), DiagnosticCodes.InvalidAttribute, $"Expected an argument's name, such as to: name, not '{text[pos]}'.");
                     while (pos < text.Length && text[pos] != ',' && text[pos] != ')' && text[pos] != '\n')
                     {
                         pos++;

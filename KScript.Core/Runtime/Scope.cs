@@ -1,3 +1,5 @@
+using KScript.Syntax;
+
 namespace KScript.Runtime
 {
     /// <summary>
@@ -73,7 +75,7 @@ namespace KScript.Runtime
                 }
             }
             string close = Values.Closest(name, Names());
-            throw new KScriptException($"${name} is not defined, so it can't be set. Declare it first with <let name=\"{name}\" ...>."
+            throw new KScriptException(Wording.Of($"${name} is not defined, so it can't be set. Declare it first with <let name=\"{name}\" value=\"...\" />.")
                 + (close != null ? $" Did you mean ${close}?" : string.Empty), "Name");
         }
 

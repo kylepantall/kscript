@@ -119,7 +119,7 @@ namespace KScript.Queueing
         /// </summary>
         public static bool StoreBusy(Exception ex) =>
             ex is IOException or UnauthorizedAccessException
-            || ex is KScriptException { Type: "ConnectionError" } || ex is KScriptException { InnerException: System.Data.Common.DbException };
+            || ex is KScriptException { Type: "Connection" } || ex is KScriptException { InnerException: System.Data.Common.DbException };
 
         /// <summary>The key KScript.Test keeps its session under: a run with one is a test run.</summary>
         public const string TestSessionKey = "KScript.Test.session";

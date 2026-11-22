@@ -81,7 +81,7 @@ namespace KScript.Style
         private static int Fail(TextWriter error, string message)
         {
             new KScript.Output.CliOutput(error).Error(message);
-            return 1;
+            return ExitCodes.Usage;
         }
 
         private static string Target(string source, string root, string outDir)

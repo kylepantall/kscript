@@ -32,7 +32,7 @@ public class SyntaxConventionTests
     public static IEnumerable<object[]> ScriptFiles()
     {
         string root = ScriptRunner.RepoFile();
-        foreach (string folder in new[] { "samples", Path.Combine("KScript.Cli", "Scaffolding"), "Example Scripts", "Example Sites" })
+        foreach (string folder in new[] { "samples", Path.Combine("KScript.Cli", "Scaffolding"), "Example Sites" })
         {
             string full = Path.Combine(root, folder);
             if (!Directory.Exists(full))
@@ -93,7 +93,7 @@ public class SyntaxConventionTests
     public static IEnumerable<object[]> XmlFiles()
     {
         string root = ScriptRunner.RepoFile();
-        foreach (string folder in new[] { "samples", Path.Combine("KScript.Cli", "Scaffolding"), "Example Scripts" })
+        foreach (string folder in new[] { "samples", Path.Combine("KScript.Cli", "Scaffolding") })
         {
             string full = Path.Combine(root, folder);
             if (!Directory.Exists(full))

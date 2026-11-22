@@ -1,4 +1,5 @@
 using KScript.Metadata;
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 
 namespace KScript.Runtime
@@ -163,7 +164,7 @@ namespace KScript.Runtime
         #region Errors
 
         /// <summary>An error that points at this element, or at one of its attributes.</summary>
-        public KScriptException Error(string message, string attribute = null, string type = "Error")
+        public KScriptException Error(Wording message, string attribute = null, string type = "Error")
         {
             int? offset = attribute != null ? Element.GetAttribute(attribute)?.Span.Start : null;
             return new KScriptException(message, type) { Offset = offset ?? Element.Span.Start, OffsetModule = Module };
@@ -172,7 +173,7 @@ namespace KScript.Runtime
         private KScriptException Missing(string attribute)
         {
             AttributeInfo info = Definition.Info.GetAttribute(attribute);
-            return Error($"<{Name}> needs a {attribute} attribute{(info != null ? ": " + info.Description : ".")}", null, "Syntax");
+            return Error($"<{Name}> needs a {attribute} attribute{(info != null ? Wording.Of($": {Wording.Prose(info.Description)}") : ".")}", null, "Syntax");
         }
 
         #endregion

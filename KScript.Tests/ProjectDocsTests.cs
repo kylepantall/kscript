@@ -56,8 +56,8 @@ public sealed class ProjectDocsTests : IDisposable
         Write("kscript.json", """
             {
               "name": "shop",
-              "make": { "format": "xml" },
-              "format": { "indent": 4, "printWidth": 100 },
+              "make": { "syntax": "xml" },
+              "format": { "indent": 4, "print_width": 100 },
               "lint": { "rules": { "KS6001": "off" }, "exclude": ["drafts"] },
               "packages": ["KScript.IO"],
               "paths": { "lib": "app/lib" }
@@ -112,7 +112,7 @@ public sealed class ProjectDocsTests : IDisposable
         DocPage page = site.Find(DocsSite.ProjectPath);
 
         Assert.Equal(DocsSite.ProjectSection, site.Navigation().First().Section);
-        Assert.Contains("<code>.ks.xml</code> files (<code>make.format</code> in kscript.json)", page.Body);
+        Assert.Contains("<code>.ks.xml</code> files (<code>make.syntax</code> in kscript.json)", page.Body);
         Assert.Contains("4 spaces per indent, lines up to 100 characters", page.Body);
         Assert.Contains("<code>KS6001</code> off", page.Body);
         Assert.Contains("href=\"/reference/io\"", page.Body);
@@ -148,7 +148,7 @@ public sealed class ProjectDocsTests : IDisposable
         string body = site.Find(DocsSite.ProjectPath).Body;
         Assert.Equal("site", guide.Name);
         Assert.Contains("There is no kscript.json", body);
-        Assert.Contains("the default; <code>make.format</code> in kscript.json changes it", body);
+        Assert.Contains("the default; <code>make.syntax</code> in kscript.json changes it", body);
         Assert.Contains("No script in the project declares", body);
         Assert.DoesNotContain("id=\"routes\"", body);
 
@@ -304,9 +304,9 @@ public sealed class ProjectDocsTests : IDisposable
     {
         var error = new StringWriter();
         var cli = new CommandLine { Out = TextWriter.Null, Error = error };
-        Assert.Equal(1, cli.Run(new[] { "serve", "--docs-port", "x" }));
+        Assert.Equal(2, cli.Run(new[] { "serve", "--docs-port", "x" }));
         Assert.Contains("--docs-port needs a number", error.ToString());
-        Assert.Equal(1, cli.Run(new[] { "serve", "--docs-port", "70000" }));
+        Assert.Equal(2, cli.Run(new[] { "serve", "--docs-port", "70000" }));
     }
 
     [Fact]

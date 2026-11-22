@@ -40,7 +40,7 @@ namespace KScript.Runtime
                 if (run.Has("defaults"))
                 {
                     options.Defaults = run.Eval("defaults") as Dictionary<string, object>
-                        ?? throw run.Error("<config defaults> needs a map, such as defaults=\"{ server: { port: 8080 } }\".", "defaults", "Argument");
+                        ?? throw run.Error($"<config defaults> needs a map, such as defaults=\"{{ server: {{ port: 8080 }} }}\".", "defaults", "Argument");
                 }
                 if (run.Has("require")) options.Required = List(run.Raw("require"));
                 options.ExportEnv = run.Flag("export_env", options.ExportEnv);

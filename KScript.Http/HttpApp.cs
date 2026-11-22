@@ -27,7 +27,7 @@ namespace KScript.Http
             public bool Api { get; init; }
         }
 
-        private static readonly string[] RouteExtensions = { ".ks.xml", ".kscript", ".ks", ".xml" };
+        private static readonly string[] RouteExtensions = { ".kscript", ".ks.xml" };
         private static readonly string[] ViewExtensions = { ".html", ".htm", ".md" };
 
         private readonly object gate = new object();

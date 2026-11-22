@@ -132,7 +132,7 @@ public class CodeFormatTests
     [InlineData("samples/life-lab/lib/life.ks.xml")]
     [InlineData("samples/life-lab/life.ks.xml")]
     [InlineData("samples/life-lab/desktop.ks.xml")]
-    [InlineData("Example Scripts/Find Oldest Person.xml")]
+    [InlineData("samples/kscript2/find-oldest-person.ks.xml")]
     public void ConvertRoundTrips(string file)
     {
         string original = ScriptRunner.RepoFile(file.Split('/'));

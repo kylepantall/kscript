@@ -57,6 +57,7 @@ namespace KScript.Scaffolding
                     continue;
                 }
 
+                if (CliFlags.Retired("make", a) is string renamed) return Fail(error, renamed);
                 string key = a.Substring(2), value = null;
                 int eq = key.IndexOf('=');
                 if (eq >= 0) { value = key.Substring(eq + 1); key = key.Substring(0, eq); }
@@ -163,7 +164,7 @@ namespace KScript.Scaffolding
 
                 if (string.Equals(type, "auth", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (positional.Count > 1) return Fail(error, $"kscript make auth takes no name (unexpected '{positional[1]}'). Options: --api, --format, --force, --dry-run.");
+                    if (positional.Count > 1) return Fail(error, $"kscript make auth takes no name (unexpected '{positional[1]}'). Options: --api, --syntax, --force, --dry-run.");
                     AuthResult made = AuthMaker.Make(root, options, force, dryRun);
                     var cli = new CliOutput(output);
                     foreach (var (action, path) in made.Files)
@@ -234,12 +235,13 @@ namespace KScript.Scaffolding
             catch (KScript.Projects.ProjectConfigException ex)
             {
                 KScript.Runtime.ErrorReport.Write(error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
             catch (StubException ex)
             {
+                // What was asked for can't be made: an unknown type, a name that won't do, a file that is already there.
                 KScript.Runtime.ErrorReport.Write(error, ex);
-                return 1;
+                return ExitCodes.Usage;
             }
             catch (CliPromptException ex)
             {
@@ -333,7 +335,7 @@ namespace KScript.Scaffolding
         private static int Fail(TextWriter error, string message)
         {
             new CliOutput(error).Error(message);
-            return 1;
+            return ExitCodes.Usage;
         }
 
         /// <summary>

@@ -110,7 +110,7 @@ public class SemanticTypesTests
     [InlineData("type Size with [string] { one_of: [small, large] }\ns: Size = 'huge'", "must be one of small, large")]
     [InlineData("type Slug with [string] { pattern: /^[a-z]+$/ }\ns: Slug = 'A1'", "must match /^[a-z]+$/")]
     [InlineData("type Bad with [string] { pattern: '([' }", "isn't a regular expression")]
-    [InlineData("type Bad with [int] { min: abc }", "can only hold <validate> and <normalize>")]
+    [InlineData("type Bad with [int] { min: abc }", "can only hold validate and normalize")]
     [InlineData("type Bad with [int, string] { min: 1 }", "")]
         [InlineData("type Bad with [uuid] { v: 9 }", "")]
     [InlineData("type Bad with [Nope] { min: 1 }", "Unknown type 'Nope' in with")]

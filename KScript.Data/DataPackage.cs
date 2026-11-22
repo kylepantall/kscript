@@ -489,7 +489,7 @@ namespace KScript.Data
             {
                 string connection = run.Raw("connection")?.Trim();
                 Database db = Database.For(run.Host, run.Module.Directory, connection);
-                int retries = run.Has("retries") ? Count(run.Eval("retries"), "<transaction retries>") : 0;
+                int retries = run.Has("retries") ? Count(run.Eval("retries"), run.Module.ArgumentHint("transaction", "retries")) : 0;
                 db.InTransaction<object>(run.Interpreter, () =>
                 {
                     run.RunChildren();

@@ -7,11 +7,11 @@
 - a `kscript serve` site, which becomes a program that serves it.
 
 ```sh
-kscript compile hello.ks.xml                         # dist/linux-x64/hello on Linux, dist/mac-arm64/hello on an Apple Silicon Mac
+kscript compile hello.kscript                        # dist/linux-x64/hello on Linux, dist/mac-arm64/hello on an Apple Silicon Mac
 kscript compile                                      # the project's app (the "app" section of kscript.json)
 kscript compile --target all                         # every platform at once
 kscript compile --target mac-arm64,win-x64           # some of them
-kscript compile counter.ks.xml --name "Counter" --out build
+kscript compile counter.kscript --name "Counter" --out build
 ```
 
 Each program is one file. The exception is a Mac desktop app, which is an `.app` folder around one file. The program holds the script, the scripts it imports and every other file in its folder or project, such as data, pages and pictures, so `<import path>`, `@readFile` and pages work as they do with `kscript`. The arguments a program is started with are the script's `$args`.
@@ -21,7 +21,7 @@ Each program is one file. The exception is a Mac desktop app, which is an `.app`
 A program is the release `kscript` for its platform, reduced to what the script needs:
 
 - **Only the packages it imports.** `kscript compile` loads the script and its imports the same way `kscript` does, and keeps the packages they use and the libraries those packages need. A terminal script that imports `KScript.Math` leaves out the desktop toolkit, the web server, the language server, the command line and every other package. Packages listed in `kscript.json` count as imported. A desktop app keeps `KScript.UI` and its toolkit. A site keeps `KScript.Http`, `KScript.Web` and the packages its pages import.
-- **Your files.** Everything in the script's folder (or the project) goes in, except tests (`*.test.ks.xml`), `bin`, `obj`, `dist`, `node_modules`, `.git`, editor folders and earlier `.app` builds.
+- **Your files.** Everything in the script's folder (or the project) goes in, except tests (`*.test.kscript`, `*.test.ks.xml`), `bin`, `obj`, `dist`, `node_modules`, `.git`, editor folders and earlier `.app` builds.
 - **No secrets.** `.env` and `.env.*` files are left out, and `kscript compile` says so. A program you hand to someone shouldn't carry your keys. Set those values as environment variables where the program runs: `APP_` variables and the rest of [`$config`](language.md) work as usual, and `config.json` and `<env>.yaml` files do go in.
 
 For a sense of size: on Linux, a terminal script is about 35 MB, Life Lab about 42 MB and a site about 46 MB, where the whole `kscript` is 60 MB. Most of what remains is .NET itself.
@@ -52,7 +52,7 @@ In a project, the [`app` section of `kscript.json`](projects.md#project-settings
 {
   "name": "life-lab",
   "app": {
-    "main": "desktop.ks.xml",      // what kscript compile builds when you don't name a script
+    "main": "desktop.kscript",     // what kscript compile builds when you don't name a script
     "name": "Life Lab",            // the program's name: the .app, the .exe, the Dock and Task Manager
     "id": "app.kscript.lifelab",   // the Mac bundle id
     "version": "1.2.0",            // shown in Finder's Get Info and in the .exe's details
@@ -61,7 +61,7 @@ In a project, the [`app` section of `kscript.json`](projects.md#project-settings
 }
 ```
 
-`--name` overrides `app.name`. Without either, a desktop app is named after the script's file (`life-lab.ks.xml` becomes `Life Lab`) and a terminal program keeps the file's name (`hello`). Spaces become `-` in file names except for Mac apps and Windows programs.
+`--name` overrides `app.name`. Without either, a desktop app is named after the script's file (`life-lab.kscript` becomes `Life Lab`) and a terminal program keeps the file's name (`hello`). Spaces become `-` in file names except for Mac apps and Windows programs.
 
 The icon can be a PNG, an `.ico` or an `.icns`. `kscript compile` puts it where each platform looks: inside the Windows `.exe` (so Explorer, the taskbar and shortcuts show it), as `AppIcon.icns` inside the Mac app, and as a PNG beside the Linux program. Pictures are carried over unchanged, not resized, so a 1024×1024 PNG gives a sharp icon everywhere. For the best Windows icon, use an `.ico` with several sizes up to 256×256.
 
@@ -75,7 +75,7 @@ Windows programs also get the app's name and version in their file details, whic
 
 ## Sites
 
-A folder (or project) with no `app.main` but with an `index.html`, `index.md`, `routes.ks.xml` or `api.ks.xml` compiles to a program that serves the site, as `kscript serve` does. It takes `--port` and `--host`, and otherwise uses the `serve` settings in `kscript.json`:
+A folder (or project) with no `app.main` but with an `index.html`, `index.md`, `routes.kscript` or `api.kscript` compiles to a program that serves the site, as `kscript serve` does. It takes `--port` and `--host`, and otherwise uses the `serve` settings in `kscript.json`:
 
 ```sh
 kscript compile "Example Sites/team"
@@ -84,4 +84,4 @@ kscript compile "Example Sites/team"
 
 ## And other languages
 
-`--to` picks what `kscript compile` makes. `exe`, a program, is the default and the only choice so far. Compiling KScript to TypeScript and other languages is planned under the same command (`kscript compile lib/pricing.ks.xml --to ts`); see the [roadmap](roadmap.md).
+`--to` picks what `kscript compile` makes. `exe`, a program, is the default and the only choice so far. Compiling KScript to TypeScript and other languages is planned under the same command (`kscript compile lib/pricing.kscript --to ts`); see the [roadmap](roadmap.md).

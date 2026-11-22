@@ -41,14 +41,13 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | `samples/kscript2/` | Sample scripts. |
 | `samples/life-lab/` | Life Lab: one KScript program that runs in a terminal, in the browser and as a desktop app. |
 | `samples/auth-app/` | A site with accounts, made by `kscript make auth --api` (see [Sign-in](auth.md)). |
-| `Example Scripts/` | More sample scripts. |
 | `Example Sites/team` | A sample `kscript serve` site. |
 
 ## Tests and CI
 
 `KScript.Tests` covers the interpreter, every package, `kscript serve` pages, `kscript make`, `kscript.json` and the sample scripts; `KScript.Language.Tests` covers the analyzer, the editor features and the language server. Run them with `dotnet test KScript.sln`.
 
-Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `Example Scripts/Find Oldest Person.xml`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
+Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/kscript2/oldest.ks.xml`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
 
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
@@ -107,6 +106,23 @@ Every package follows the same rules, so what you learn in one works in the next
 **A length of time is a duration.** `wait(duration: 500ms)`, `Timer(every: 100ms)`, `test(timeout: 5s)`, `@api($url, timeout: 30s)`, `job(timeout: 5m)`, `$cache->set(key, value, ttl: 10m)`. A duration is written as a number and a unit with no quotes: `ms`, `s`, `m`, `h`, `d` or `w`, and they can be joined (`1h30m`). A plain number is always seconds. There are no `ms:` or `seconds:` arguments. Declare an attribute as a duration with `new A(name, K.Expression, ...) { Type = Duration.TypeName }` and a parameter as `name?: duration`, and read it with `run.Seconds(name)` or `Duration.Seconds(value, what)`.
 
 **A table takes the same arguments everywhere.** The terminal's `table` and a document's `Table` both take `rows` (a list of maps, or a list of lists whose first row is the headings), `columns` (a list of keys, or a map from heading to key), `align` (a list of `left`, `center` or `right`) and `header: false` for no heading row. Both read them with `TableArguments`.
+
+## Writing an error message
+
+A script is a `.kscript` file or an XML one, and a message is written once for both. Write it in XML terms, as an interpolated string given straight to the error:
+
+```csharp
+throw run.Error($"<{run.Name}> needs a {name} attribute, such as <{run.Name} {name}=\"5\" />.", name, "Syntax");
+```
+
+The compiler turns that string into a `Wording` (`KScript.Syntax/Text/Wording.cs`). An XML script gets it as written. A `.kscript` file gets it in its own terms: tags become statements as the converter writes them, `name="value"` becomes `name: value`, and "element" and "attribute" become "statement" and "argument". Only the words in the source are changed. The values put into the holes are left alone, and so is any plain string, such as a message a script wrote itself.
+
+- `new KScriptException($"...")`, `run.Error($"...")`, `c.Error($"...")` and the analyzer's `Report(..., $"...")` all take a `Wording`.
+- A message joined with `+` or picked with `?:` is a plain string, so wrap each part that has XML wording: `Wording.Of($"Unknown element <{name}>.") + (close != null ? Wording.Of($" Did you mean <{close}>?") : null)`.
+- `Wording.Prose(text)` rewords text that was written elsewhere, such as an attribute's description. `Wording.Snippet(xml)` converts a line of XML script. `new Wording(xml, code)` gives each form its own sentence when rewording wouldn't say it well.
+- To pass an error's message on, use `ex.Words`, not `ex.Message`.
+
+`DiagnosticConventionTests` holds the guards: it runs a list of failing scripts as `.kscript` and fails if a message shows a tag, `name="value"`, "attribute" or "element", and it scans the source for messages with XML wording that are plain strings. The same file checks that every error type the runtime raises is declared in `ErrorTypes.cs` and listed in [the language guide](language.md#errors), and that every diagnostic code is reported somewhere and documented in [errors.md](errors.md) in numeric order.
 
 ## Syntax highlighting on GitHub
 

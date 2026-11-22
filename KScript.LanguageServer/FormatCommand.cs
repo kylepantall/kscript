@@ -83,7 +83,7 @@ namespace KScript.LanguageServer
             files = files.DistinctBy(f => Path.GetFullPath(f)).OrderBy(f => f, StringComparer.Ordinal).ToList();
             if (files.Count == 0)
             {
-                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .ks, .ks.xml or .xml files that start with <kscript>; " +
+                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .kscript or .ks.xml files<kscript>; " +
                                  ".html pages are formatted in folders with _layout.html, _components/, _layouts/ or kscript.json.");
                 return 2;
             }
@@ -184,10 +184,9 @@ namespace KScript.LanguageServer
                     projectByDir[dir] = config = ConfigFor(dir, configs, output);
                 }
 
-                bool xmlScript = f.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) && !IsScriptName(f) && LooksLikeScript(f);
                 if (config != null)
                 {
-                    if (!config.IsFormatExcluded(f) && (config.IsFormatIncluded(f) || xmlScript))
+                    if (!config.IsFormatExcluded(f) && config.IsFormatIncluded(f))
                     {
                         yield return f;
                     }
@@ -199,7 +198,7 @@ namespace KScript.LanguageServer
                 {
                     continue;
                 }
-                if (IsScriptName(f) || xmlScript || (site && f.EndsWith(".html", StringComparison.OrdinalIgnoreCase)))
+                if (IsScriptName(f) || (site && f.EndsWith(".html", StringComparison.OrdinalIgnoreCase)))
                 {
                     yield return f;
                 }
@@ -227,22 +226,6 @@ namespace KScript.LanguageServer
 
         private static readonly string[] SiteMarkers = { "_components", "_layouts", "_layout.html", ProjectConfig.FileName };
 
-        private static bool IsScriptName(string f) =>
-            f.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".ks", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase);
-
-        private static bool LooksLikeScript(string path)
-        {
-            try
-            {
-                using StreamReader reader = new StreamReader(path);
-                char[] buffer = new char[512];
-                int n = reader.Read(buffer, 0, buffer.Length);
-                return new string(buffer, 0, n).Contains("<kscript", StringComparison.Ordinal);
-            }
-            catch (IOException)
-            {
-                return false;
-            }
-        }
+        private static bool IsScriptName(string f) => KScript.Syntax.Markup.ScriptFiles.IsScript(f);
     }
 }

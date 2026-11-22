@@ -361,12 +361,12 @@ public sealed class BuiltInTests : IDisposable
     public void Project_files_warn_about_settings_they_do_not_know()
     {
         string path = Path.Combine(dir, "kscript.json");
-        File.WriteAllText(path, "{ \"lint\": { \"warningsAsErrors\": \"maybe\", \"colour\": 1 }, \"test\": { \"timeout\": \"soon\", \"packages\": [\"Nope\"], \"speed\": 1 }, \"name\": 5, " +
-            "\"app\": { \"colour\": 1 }, \"format\": { \"indent\": 40, \"tabWidth\": 0, \"printWidth\": 5, \"maxBlankLines\": -1, \"endOfLine\": \"cr\", \"enabled\": \"yes\" } }");
+        File.WriteAllText(path, "{ \"lint\": { \"warnings_as_errors\": \"maybe\", \"colour\": 1 }, \"test\": { \"timeout\": \"soon\", \"packages\": [\"Nope\"], \"speed\": 1 }, \"name\": 5, " +
+            "\"app\": { \"colour\": 1 }, \"format\": { \"indent\": 40, \"tab_width\": 0, \"print_width\": 5, \"max_blank_lines\": -1, \"end_of_line\": \"cr\", \"enabled\": \"yes\" } }");
         ProjectConfig config = ProjectConfig.Load(path);
         string warnings = string.Join("\n", config.Warnings);
-        Assert.Contains("lint.warningsAsErrors should be true or false.", warnings);
-        foreach (string expected in new[] { "unknown setting 'app.colour'", "format.indent should be", "format.tabWidth should be", "format.printWidth should be", "format.maxBlankLines should be", "format.endOfLine should be", "format.enabled should be" })
+        Assert.Contains("lint.warnings_as_errors should be true or false.", warnings);
+        foreach (string expected in new[] { "unknown setting 'app.colour'", "format.indent should be", "format.tab_width should be", "format.print_width should be", "format.max_blank_lines should be", "format.end_of_line should be", "format.enabled should be" })
             Assert.Contains(expected, warnings);
         Assert.Contains("unknown setting 'lint.colour'", warnings);
         Assert.Contains("test.timeout should be a number of seconds", warnings);

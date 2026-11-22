@@ -7,7 +7,7 @@ These are ideas KScript is heading towards. None of them is built yet, and the d
 A converter would turn a KScript script into the same program in another language, so a team can write the logic once in KScript and ship it where KScript doesn't run. TypeScript comes first, because it runs in browsers, Node, Deno and Bun, and its types fit KScript's typed values well.
 
 ```sh
-kscript compile lib/pricing.ks.xml --to ts      # writes lib/pricing.ts
+kscript compile lib/pricing.kscript --to ts      # writes lib/pricing.ts
 kscript compile src/ --to ts --out dist/        # a whole folder
 ```
 

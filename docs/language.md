@@ -421,13 +421,17 @@ The built-in error types, which KScript itself raises, form a tree that `catch` 
 | Type | Extends | Raised for |
 | --- | --- | --- |
 | `Error` | | Every error. `catch Error` catches everything. |
-| `Syntax`, `Name`, `Null`, `Argument`, `Value`, `Const` | `Error` | Mistakes in a script: bad syntax, an unknown name, null where a value is needed, wrong arguments, a bad value, changing a const. |
+| `Syntax`, `Name`, `Null`, `Argument`, `Value`, `Const`, `Math` | `Error` | Mistakes in a script: bad syntax, an unknown name, null where a value is needed, wrong arguments, a bad value, changing a const, dividing by zero. `Index` extends `Value`, for a position outside a list. |
 | `Type` | `Error` | A value of the wrong type. `Shape` extends it, for data that doesn't fit a `type` (`$e.problems` lists each problem). |
 | `Format` | `Error` | Text in the wrong format. `Json` and `Yaml` extend it. |
 | `IO` | `Error` | Files. `FileNotFound`, `Permission` and `Access` extend it. |
 | `Network` | `Error` | Requests. `Timeout` extends it, and `$e.status` is the response's status. |
-| `Import`, `Config`, `Input`, `Limit`, `Context`, `Platform`, `Cancelled`, `Retired`, `Http`, `AI`, `Assertion` | `Error` | Imports, settings, input, limits such as recursion, the wrong place, the OS, a stopped script, KScript 1 features, KScript.Http apps, language models, failed test checks. |
-| `Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409) | `Error` | For your own code to throw or extend. The number is the HTTP status. |
+| `Import`, `Config`, `Input`, `Limit`, `Context`, `Platform`, `Cancelled`, `Retired`, `Http`, `AI`, `UI`, `Reference`, `Assertion`, `Internal` | `Error` | Imports, settings, input, limits such as recursion, the wrong place, the OS, a stopped script, retired features, KScript.Http apps, language models, desktop windows, a document's references, failed test checks, a fault in KScript itself. |
+| `Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409), `TooManyRequests` (429) | `Error` | For your own code to throw or extend. The number is the HTTP status. |
+| `Query`, `Connection` (503) | `Error` | [KScript.Data](data.md#errors): a query the database refused, a database that can't be opened. `ModelNotFound` extends `NotFound`; `UniqueViolation` and `ForeignKeyViolation` extend `Conflict`. |
+| `JobFailed` | `Error` | [KScript.Queue](queues.md): a job that used up its tries. `JobTimeout` extends `Timeout`. |
+
+No type's name ends in `Error`: they are all errors. (`QueryError` and `ConnectionError` are now `Query` and `Connection`, and `catch QueryError` says so.)
 
 A name in `catch` or `throw` that is neither declared nor built in still works (as a kind of `Error`), but the editor warns about it (KS5011), since it is usually a typo.
 

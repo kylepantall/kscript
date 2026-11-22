@@ -670,7 +670,7 @@ public sealed class CompileTests : IDisposable
         Assert.Contains("app.icon: there is no file", p2.Err);
 
         Write("p3/kscript.json", "{ nope");
-        Assert.Equal(1, Compile(Env(current: runtime), Path.Combine(dir, "p3")).Code);
+        Assert.Equal(2, Compile(Env(current: runtime), Path.Combine(dir, "p3")).Code);
 
         string broken = Write("p4/broken.ks.xml", "<kscript><echo>");
         Assert.Contains("The script has an error", Compile(Env(current: runtime), broken).Err);

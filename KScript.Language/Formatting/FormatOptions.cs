@@ -108,18 +108,18 @@ namespace KScript.Language.Formatting
                 switch (rule.Key)
                 {
                     case "indent": options.Indent = rule.Value; break;
-                    case "statementPerLine": options.StatementPerLine = rule.Value; break;
-                    case "tidyTags": options.TidyTags = rule.Value; break;
-                    case "wrapAttributes": options.WrapAttributes = rule.Value; break;
-                    case "trimTrailingWhitespace": options.TrimTrailingWhitespace = rule.Value; break;
-                    case "collapseBlankLines": options.CollapseBlankLines = rule.Value; break;
-                    case "finalNewline": options.FinalNewline = rule.Value; break;
+                    case "statement_per_line": options.StatementPerLine = rule.Value; break;
+                    case "tidy_tags": options.TidyTags = rule.Value; break;
+                    case "wrap_attributes": options.WrapAttributes = rule.Value; break;
+                    case "trim_trailing_whitespace": options.TrimTrailingWhitespace = rule.Value; break;
+                    case "collapse_blank_lines": options.CollapseBlankLines = rule.Value; break;
+                    case "final_newline": options.FinalNewline = rule.Value; break;
                     case "spacing": options.Spacing = rule.Value; break;
-                    case "braceStyle": options.BraceStyle = rule.Value; break;
-                    case "wrapStrings": options.WrapStrings = rule.Value; break;
-                    case "wrapChains": options.WrapChains = rule.Value; break;
-                    case "wrapBodies": options.WrapBodies = rule.Value; break;
-                    case "wrapComments": options.WrapComments = rule.Value; break;
+                    case "brace_style": options.BraceStyle = rule.Value; break;
+                    case "wrap_strings": options.WrapStrings = rule.Value; break;
+                    case "wrap_chains": options.WrapChains = rule.Value; break;
+                    case "wrap_bodies": options.WrapBodies = rule.Value; break;
+                    case "wrap_comments": options.WrapComments = rule.Value; break;
                 }
             }
             return options;

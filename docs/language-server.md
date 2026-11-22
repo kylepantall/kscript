@@ -1,7 +1,7 @@
 # KScript 2 language server
 
 The language server gives editors diagnostics, completion, hover, signature help, go to definition, find references,
-rename, an outline, semantic highlighting, quick fixes, document links and formatting for KScript 2 scripts (`.ks.xml`, `.ks`),
+rename, an outline, semantic highlighting, quick fixes, document links and formatting for KScript 2 scripts (`.kscript`, and `.ks.xml` for the XML form),
 pages (`.html`) and Markdown pages (`.md`). It targets KScript 2 only: v1 elements, attributes and commands are
 reported as retired, with the KScript 2 replacement and a quick fix where one is mechanical.
 
@@ -10,7 +10,7 @@ reported as retired, with the KScript 2 replacement and a quick fix where one is
 | Command | What it does |
 | --- | --- |
 | `kscript lsp` | Runs the server over stdio (LSP 3.17). Any LSP client can use it. |
-| `kscript check [file-or-folder]... [--warnaserror]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. With no path it checks the project the current folder is in. A folder with `_layout.html`, `_components/`, `_layouts/` or `kscript.json` is a site, so its `.html` and `.md` pages are checked too. |
+| `kscript check [file-or-folder]... [--warnings-as-errors]` | Prints problems as `file(line,col): error KS4001: ...` and exits 1 on errors, for CI. With no path it checks the project the current folder is in. A folder with `_layout.html`, `_components/`, `_layouts/` or `kscript.json` is a site, so its `.html` and `.md` pages are checked too. |
 | `kscript check --print-config [file-or-folder]` | Prints the lint and format settings that apply, after the project's [standards](standards.md) and `kscript.json` are combined, with the layer that set each one. |
 | `kscript fmt [file-or-folder]... [--check]` | Tidies scripts and pages in place, or with `--check` lists the files that aren't formatted and exits 1. The server's `textDocument/formatting` uses the same formatter (`KScript.Language/Formatting`). See [Formatting](formatting.md). |
 

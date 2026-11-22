@@ -255,11 +255,17 @@ namespace KScript.Language.Analysis
                 {
                     continue;
                 }
+                if (ErrorTypes.Renamed.TryGetValue(name, out string now))
+                {
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownErrorType, ErrorTypes.RenamedMessage(name),
+                        new[] { new QuickFix($"Change to {now}", new TextChange(span, now)) });
+                    continue;
+                }
                 IEnumerable<string> known = KnownErrorNames(scope, span.Start);
                 string close = Suggestions.Closest(name, known);
                 Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownErrorType,
-                    $"Unknown error type '{name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                    + $" Declare it with error {name} {{ }} (<error name=\"{name}\" />), or use a built-in one such as Validation, NotFound or IO.",
+                    Wording.Of($"Unknown error type '{name}'.") + (close != null ? $" Did you mean {close}?" : string.Empty)
+                    + Wording.Of($" Declare it with <error name=\"{name}\" />, or use a built-in one such as Validation, NotFound or IO."),
                     SuggestFix(span, name, known, n => n));
             }
         }

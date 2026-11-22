@@ -5,8 +5,8 @@ every package are the same: the parser (`KScript.Syntax/Markup/CodeParser.cs`) b
 XML parser builds, so `kscript`, `kscript check` and the language server treat both alike. The file extension picks
 the parser; `.ks.xml` scripts are unchanged, and the two kinds can import each other.
 
-`kscript make project`, `kscript make script` and `kscript make test` write `.kscript` files; pass `--format xml`, or set
-`"make": { "format": "xml" }` in `kscript.json`, to get `.ks.xml` instead.
+`kscript make project`, `kscript make script` and `kscript make test` write `.kscript` files; pass `--syntax xml`, or set
+`"make": { "syntax": "xml" }` in `kscript.json`, to get `.ks.xml` instead.
 
 ```kscript try
 import KScript.IO
@@ -105,7 +105,7 @@ echo "Hello { $name }. KScript reads your whole script, checks it, \
 
 That prints one line. It works in `"double-quoted"` and `'single-quoted'` strings, and keeps any spaces before the `\`. Write
 `\\` for a backslash of your own at the end of a line of text. `kscript fmt` uses it to wrap a string that runs past
-`printWidth` (the [`wrapStrings`](formatting.md) rule).
+`print_width` (the [`wrap_strings`](formatting.md) rule).
 
 For text that should keep its new lines, such as a query, a template or an equation, use a block fenced with three
 backticks, as in Markdown:
@@ -214,11 +214,11 @@ before the element, or in its `description` attribute.
 ```
 kscript convert tour.ks.xml          # writes tour.kscript
 kscript convert tour.kscript         # writes tour.ks.xml
-kscript convert scripts/ --to kscript   # every XML script in a folder (tests are skipped)
+kscript convert scripts/ --syntax kscript   # every XML script in a folder (tests are skipped)
 kscript convert tour.ks.xml --stdout    # print instead of writing
 ```
 
-Options: `--to xml|kscript`, `--out file`, `--stdout`, `--force` (replace an existing file). Comments, doc comments
+Options: `--syntax kscript|xml`, `--out file`, `--stdout`, `--force` (replace an existing file). Comments, doc comments
 and blank lines are kept, and expressions are copied as written. Where one meaning has two spellings, the converter
 picks one (`<call fn="greet" args="'x'" />` becomes `@greet('x')`; `x = 3` becomes `<let>` or `<set>`; `const x = 1`
 becomes `<const>`), so the first conversion may tidy a file, and converting back and forth after that changes nothing.
@@ -237,7 +237,7 @@ Converting keeps a project working in the new format:
   each `*.ks.xml` include pattern gains a `*.kscript` twin.
 
 ```
-kscript convert . --to kscript     # the whole project
+kscript convert . --syntax kscript     # the whole project
 ```
 
 Test files can be written in this format: `name.test.kscript` files get KScript.Test without an import and run with

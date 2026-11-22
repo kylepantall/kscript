@@ -62,7 +62,7 @@ kscript serve --with-docs
 
 The project page is built from the project itself, and is rebuilt when a script changes:
 
-- **How code is written here**: the project's format (`make.format`), standard, layout and lint rules, the packages every script gets, and the folders `kscript make` puts files in.
+- **How code is written here**: the project's format (`make.syntax`), standard, layout and lint rules, the packages every script gets, and the folders `kscript make` puts files in.
 - **Routes**: what `kscript routes` lists, with what answers each route and its middleware.
 - **Functions, types and constants**: everything each script declares at its top level, with its `///` doc comment (`@param`, `@returns`, `@example`, `@deprecated`), file by file. Search finds them too.
 

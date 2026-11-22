@@ -1,5 +1,5 @@
-// Tests for how the pages call the API (lib/notes_client{{ ext }}).
-import "../lib/notes_client{{ ext }}"
+// Tests for how the pages call the API (lib/notes-client{{ ext }}).
+import "../lib/notes-client{{ ext }}"
 {{#if auth}}
 
 test(name: "the list is null when nobody is signed in, so the page asks them to sign in") {

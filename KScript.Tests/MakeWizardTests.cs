@@ -72,12 +72,12 @@ public sealed class MakeWizardTests : IDisposable
         using var site = new TempSite();
         MakeCommand.Prompts = w => new CliPrompt(new CliOutput(w, colour: false), new StringReader(""), interactive: false);
         var (code, _, error) = Make(site.Root, "component");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Equal("   ERROR  Give the component a name, e.g. kscript make component Hero.\n          At a terminal, kscript make component asks for it.\n", error);
 
         Answer("Hero\n");
         (code, _, error) = Make(site.Root, "component", "-n");
-        Assert.Equal(1, code);
+        Assert.Equal(2, code);
         Assert.Contains("Give the component a name", error);
     }
 

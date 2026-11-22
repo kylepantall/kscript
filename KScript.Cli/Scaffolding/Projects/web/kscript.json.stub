@@ -24,15 +24,15 @@
   "config": {
     "root": "config"
   },
-  // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
+  // kscript make writes new scripts and tests in this syntax: kscript (.kscript files) or xml (.ks.xml).
   "make": {
-    "format": "{{ format }}"
+    "syntax": "{{ syntax }}"
   },
   "lint": {
     "include": ["**/*.html", "**/*.md", "**/*.kscript", "**/*.ks.xml"],
     "exclude": ["_templates", "node_modules", "dist"],
     "rules": {},
-    "warningsAsErrors": false
+    "warnings_as_errors": false
   },
   "test": {
     "include": ["tests/**/*.test.kscript", "tests/**/*.test.ks.xml"],

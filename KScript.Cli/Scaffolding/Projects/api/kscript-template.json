@@ -3,8 +3,8 @@
 {
   "description": "A JSON API: routes, controllers, middleware, a Note model in a database, sign-in with API tokens, caching and tests",
   "options": {
-    "format": {
-      "question": "Which file format for scripts?",
+    "syntax": {
+      "question": "Which syntax for scripts?",
       "default": "kscript",
       "choices": ["kscript", "xml"],
       "description": "kscript writes scripts, tests and routes as .kscript files; xml writes them as .ks.xml."

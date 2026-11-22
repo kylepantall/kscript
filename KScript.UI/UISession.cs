@@ -51,7 +51,7 @@ namespace KScript.UI
         /// <summary>Runs the window's setup and draws it for the first time.</summary>
         internal static UISession Start(ElementRun run)
         {
-            if (CurrentParent != null) throw run.Error("A <Window> can't be inside another window.", null, "Syntax");
+            if (CurrentParent != null) throw run.Error($"A <Window> can't be inside another window.", null, "Syntax");
             var session = new UISession(run);
             List<MarkupNode> setup = run.Element.Children.Where(n => n is MarkupElement e && SetupElements.Contains(e.Name)).ToList();
             run.Run(setup, session.State);

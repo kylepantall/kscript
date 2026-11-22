@@ -1,3 +1,4 @@
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 
 namespace KScript.Runtime
@@ -93,7 +94,7 @@ namespace KScript.Runtime
             {
                 linked = false;
                 string close = Values.Closest(parentName, ErrorTypes.Names(Closure));
-                throw new KScriptException($"The error {Name} extends '{parentName}', which isn't an error type." + (close != null ? $" Did you mean {close}?" : " Declare it with <error name=\"" + parentName + "\">."), "Name");
+                throw new KScriptException(Wording.Of($"The error {Name} extends '{parentName}', which isn't an error type.") + (close != null ? $" Did you mean {close}?" : Wording.Of($" Declare it with <error name=\"{parentName}\">.")), "Name");
             }
             for (ErrorType t = found; t != null; t = t.parent)
             {
@@ -273,6 +274,8 @@ namespace KScript.Runtime
             Add("Argument", Root, "A call with the wrong arguments.");
             Add("Value", Root, "A value that isn't allowed here.");
             Add("Const", Root, "Changing a const.");
+            Add("Math", Root, "A calculation with no answer, such as dividing by zero, or maths in a document that can't be read.");
+            Add("Index", "Value", "A position outside a list.");
             Add("Format", Root, "Text that isn't in the expected format, such as a date.");
             Add("Json", "Format", "Text that isn't valid JSON.");
             Add("Yaml", "Format", "Text that isn't valid YAML.");
@@ -292,6 +295,9 @@ namespace KScript.Runtime
             Add("Timeout", "Network", "A request that took too long.");
             Add("Http", Root, "A mistake in a KScript.Http app, or a request that failed.");
             Add("AI", Root, "A call to a language model that failed.");
+            Add("UI", Root, "A desktop window that can't be opened, such as on a machine without the window library.");
+            Add("Reference", Root, "A document that refers to a section, figure or source it doesn't have, or uses an id twice.");
+            Add("Internal", Root, "A fault in KScript itself, not in the script.");
             Add("Assertion", Root, "A failed check in a test.");
             Add("Validation", Root, "Input that isn't valid. Answers 422 in a KScript.Http route.", 422);
             Add("BadRequest", Root, "A request that can't be handled as sent. Answers 400.", 400);
@@ -305,9 +311,23 @@ namespace KScript.Runtime
             Add("ModelNotFound", "NotFound", "A KScript.Data record that isn't in the database: ->find_or_fail() and ->first_or_fail(). $err.model and $err.id say which. Answers 404.", 404);
             Add("UniqueViolation", "Conflict", "A save that would give two records the same value in a unique field. $err.fields names them. Answers 409.", 409);
             Add("ForeignKeyViolation", "Conflict", "A save or delete that would leave a record pointing at one that isn't there. Answers 409.", 409);
-            Add("QueryError", Root, "A database query that failed, or a condition that can't be turned into SQL.");
-            Add("ConnectionError", Root, "A database that can't be reached or opened. Answers 503.", 503);
+            Add("Query", Root, "A database query that failed, or a condition that can't be turned into SQL.");
+            Add("Connection", Root, "A database that can't be reached or opened. Answers 503.", 503);
         }
+
+        /// <summary>
+        /// Built-in error types that had another name, with the name each has now. No error type's name ends in
+        /// "Error" (they are all errors), so <c>catch QueryError</c> is told the new name instead of never matching.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> Renamed = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["QueryError"] = "Query",
+            ["ConnectionError"] = "Connection",
+        };
+
+        /// <summary>What to say about a renamed built-in type, or null if <paramref name="name"/> isn't one.</summary>
+        public static string RenamedMessage(string name) =>
+            name != null && Renamed.TryGetValue(name, out string now) ? $"The error type {name} was renamed to {now}." : null;
 
         /// <summary>The built-in error types, by name.</summary>
         public static IReadOnlyDictionary<string, ErrorType> BuiltIn => builtIn;

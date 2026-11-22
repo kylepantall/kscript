@@ -63,7 +63,7 @@ namespace KScript.Docs
             ProjectHeading(page, sb, 2, "conventions", "How code is written here");
             var rows = new List<(string, string)>();
             string ext = guide.Format == "xml" ? ".ks.xml" : ".kscript";
-            rows.Add(("Format", $"New scripts, routes and tests are <code>{ext}</code> files{(guide.Project?.Make.Format == null ? " (the default; <code>make.format</code> in kscript.json changes it)" : " (<code>make.format</code> in kscript.json)")}. Examples on these pages show {(guide.Format == "xml" ? "XML" : ".kscript")} first."));
+            rows.Add(("Format", $"New scripts, routes and tests are <code>{ext}</code> files{(guide.Project?.Make.Format == null ? " (the default; <code>make.syntax</code> in kscript.json changes it)" : " (<code>make.syntax</code> in kscript.json)")}. Examples on these pages show {(guide.Format == "xml" ? "XML" : ".kscript")} first."));
             var project = guide.Project;
             if (project == null)
             {

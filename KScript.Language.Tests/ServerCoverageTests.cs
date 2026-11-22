@@ -264,7 +264,7 @@ namespace KScript.Language.Tests
             Memory files = new Memory();
             string team = Path.Combine(Root, "team.json");
             files.Files[Path.Combine(Root, "kscript.json")] = "{ \"standard\": \"team.json\" }";
-            files.Files[team] = "{ \"format\": { \"printWidth\": 70 } }";
+            files.Files[team] = "{ \"format\": { \"print_width\": 70 } }";
             KScriptLanguageServer server = new KScriptLanguageServer(Stream.Null, Stream.Null, files);
             Assert.Equal(70, server.ProjectFor(Main).Format.PrintWidth);
 

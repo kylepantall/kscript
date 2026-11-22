@@ -137,7 +137,7 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("a.kscript", "a.ks.xml")]
         [InlineData("a.ks.xml", "a.kscript")]
-        [InlineData("a.xml", "a.kscript")]
+        [InlineData("a.test.ks.xml", "a.test.kscript")]
         [InlineData("a.txt", "a.txt.kscript")]
         public void ConvertedPaths(string path, string converted) => Assert.Equal(converted, ScriptConverter.ConvertedPath(path));
     }

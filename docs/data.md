@@ -143,7 +143,7 @@ echo Order->where(fn(o) => $o.customer->starts_with('A'))->latest()->first().tot
 
 `->where()` takes a lambda whose parameter is the row: `$o.total` is a column. The rest of the lambda (variables, function calls, literals) is worked out first and sent to the database as a parameter, so a value can never change the SQL.
 
-These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`. Anything else is a `QueryError` that says which part can't run in the database, rather than a query that quietly does something else.
+These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something else.
 
 Names and values are a shorter way to write equality: `->where(status: 'paid', customer: 'Ada')`. A list means any of them (`status: [open, paid]`), and `null` means the column is empty. Enum words don't need quotes: `->where(role: admin)`.
 
@@ -431,8 +431,8 @@ Raw SQL in `@sql` is given to the database as it is, so it is written in that da
 | `ModelNotFound` (extends `NotFound`) | `->find_or_fail()` and `->first_or_fail()` find nothing. `$e.model` and `$e.id` say what. | 404 |
 | `UniqueViolation` (extends `Conflict`) | A save would give two records the same unique value. `$e.fields` names the fields. | 409 |
 | `ForeignKeyViolation` (extends `Conflict`) | A change would leave a row pointing at one that isn't there. | 409 |
-| `QueryError` | The database refused a query, or a condition can't be turned into SQL. | 500 |
-| `ConnectionError` | The database can't be opened. | 503 |
+| `Query` | The database refused a query, or a condition can't be turned into SQL. | 500 |
+| `Connection` | The database can't be opened. | 503 |
 
 ## Making a model
 

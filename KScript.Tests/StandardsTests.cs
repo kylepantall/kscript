@@ -36,7 +36,7 @@ public class StandardsTests
         Assert.Equal(new[] { Standards.Recommended, Standards.Strict }, Labels(c));
         Assert.Equal("error", c.SeverityFor("KS6001"));
         Assert.True(c.Lint.WarningsAsErrors);
-        Assert.Equal(Standards.Strict, c.Sources["lint.warningsAsErrors"]);
+        Assert.Equal(Standards.Strict, c.Sources["lint.warnings_as_errors"]);
         Assert.Equal(80, c.Format.PrintWidth); // inherited
     }
 
@@ -54,14 +54,14 @@ public class StandardsTests
     [Fact]
     public void ProjectSettingsWinOverTheirStandard()
     {
-        var c = Parse("""{ "standard": "kscript:strict", "lint": { "rules": { "KS6001": "info" }, "warningsAsErrors": false }, "format": { "printWidth": 80 } }""");
+        var c = Parse("""{ "standard": "kscript:strict", "lint": { "rules": { "KS6001": "info" }, "warnings_as_errors": false }, "format": { "print_width": 80 } }""");
         Assert.Equal("info", c.SeverityFor("KS6001"));
         Assert.Equal("error", c.SeverityFor("KS6002"));
         Assert.False(c.Lint.WarningsAsErrors);
         Assert.Equal(80, c.Format.PrintWidth);
         Assert.Equal(ProjectConfig.FileName, c.Sources["lint.rules.KS6001"]);
-        Assert.Equal(ProjectConfig.FileName, c.Sources["format.printWidth"]);
-        Assert.Equal(Standards.Recommended, c.Sources["format.maxBlankLines"]);
+        Assert.Equal(ProjectConfig.FileName, c.Sources["format.print_width"]);
+        Assert.Equal(Standards.Recommended, c.Sources["format.max_blank_lines"]);
     }
 
     [Fact]
@@ -85,10 +85,10 @@ public class StandardsTests
     public void StandardsAreFilesOrFoldersAndExtendPathsAreRelativeToTheStandard()
     {
         using var site = new TempSite(
-            ("shared/base/kscript-standard.json", """{ "name": "base", "extends": "kscript:recommended", "format": { "indent": 4, "maxBlankLines": 2 } }"""),
+            ("shared/base/kscript-standard.json", """{ "name": "base", "extends": "kscript:recommended", "format": { "indent": 4, "max_blank_lines": 2 } }"""),
             ("shared/acme/kscript-standard.json", """
                 // comments are allowed
-                { "name": "acme", "description": "Acme house style.", "extends": "../base", "lint": { "rules": { "KS6*": "error" } }, "format": { "maxBlankLines": 3, }, }
+                { "name": "acme", "description": "Acme house style.", "extends": "../base", "lint": { "rules": { "KS6*": "error" } }, "format": { "max_blank_lines": 3, }, }
                 """),
             ("app/kscript.json", """{ "standard": "../shared/acme" }"""));
         var c = ProjectConfig.Load(Path.Combine(site.Root, "app", ProjectConfig.FileName));
@@ -108,8 +108,8 @@ public class StandardsTests
     public void SeveralStandardsApplyInOrder()
     {
         using var site = new TempSite(
-            ("a.kscript-standard.json", """{ "format": { "printWidth": 90, "indent": "tab" } }"""),
-            ("b.kscript-standard.json", """{ "format": { "printWidth": 100 } }"""),
+            ("a.kscript-standard.json", """{ "format": { "print_width": 90, "indent": "tab" } }"""),
+            ("b.kscript-standard.json", """{ "format": { "print_width": 100 } }"""),
             (ProjectConfig.FileName, """{ "standard": ["kscript:recommended", "a.kscript-standard.json", "b.kscript-standard.json"] }"""));
         var c = ProjectConfig.Load(Path.Combine(site.Root, ProjectConfig.FileName));
         Assert.Equal(100, c.Format.PrintWidth);
@@ -162,7 +162,7 @@ public class StandardsTests
     public void StandardsCanBeReadFromAnEditorsOpenFiles()
     {
         string dir = Path.Combine(Path.GetTempPath(), "proj-in-memory");
-        var files = new Dictionary<string, string> { [Path.Combine(dir, "team.json")] = """{ "format": { "printWidth": 70 } }""" };
+        var files = new Dictionary<string, string> { [Path.Combine(dir, "team.json")] = """{ "format": { "print_width": 70 } }""" };
         var c = ProjectConfig.Parse("""{ "standard": "team.json" }""", Path.Combine(dir, ProjectConfig.FileName), files.ContainsKey, p => files[p]);
         Assert.Equal(70, c.Format.PrintWidth);
         Assert.Equal(new[] { Path.Combine(dir, "team.json") }, c.StandardFiles);
@@ -225,7 +225,7 @@ public class StandardsTests
         var s = standard.RootElement.GetProperty("properties");
 
         Assert.Equal("$schema,description,extends,format,lint,name", Keys(s));
-        Assert.Equal("rules,warningsAsErrors", Keys(s.GetProperty("lint").GetProperty("properties")));
+        Assert.Equal("rules,warnings_as_errors", Keys(s.GetProperty("lint").GetProperty("properties")));
         Assert.Equal(
             Keys(p.GetProperty("format").GetProperty("properties")).Replace("exclude,", "").Replace("include,", ""),
             Keys(s.GetProperty("format").GetProperty("properties")));

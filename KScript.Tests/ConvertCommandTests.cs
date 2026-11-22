@@ -31,8 +31,8 @@ public sealed class ConvertCommandTests : IDisposable
         Assert.Contains("Usage: kscript convert", Run("--help").Out);
         Assert.Contains("Usage: kscript convert", Run("-h").Out);
         Assert.Contains("Usage: kscript convert", Run().Err);
-        Assert.Contains("--to needs xml or kscript", Run("--to", "json", "a").Err);
-        Assert.Contains("--to needs xml or kscript", Run("a", "--to").Err);
+        Assert.Contains("--syntax needs kscript or xml", Run("--syntax", "json", "a").Err);
+        Assert.Contains("--syntax needs kscript or xml", Run("a", "--syntax").Err);
         Assert.Contains("--out needs a file name", Run("a", "--out").Err);
         Assert.Contains("Unknown option '--nope'", Run("--nope").Err);
         var missing = Run(Path.Combine(dir, "missing.ks.xml"));
@@ -48,7 +48,7 @@ public sealed class ConvertCommandTests : IDisposable
         Write("a.test.ks.xml", "<kscript>\n  <echo>t</echo>\n</kscript>\n");
 
         var tooMany = Run(dir, "--out", Path.Combine(dir, "x.kscript"));
-        Assert.Equal(1, tooMany.Code);
+        Assert.Equal(2, tooMany.Code);
         Assert.Contains("--out works with one file", tooMany.Err);
 
         string named = Path.Combine(dir, "named.kscript");
@@ -58,17 +58,17 @@ public sealed class ConvertCommandTests : IDisposable
         Assert.Equal(0, Run(xml, "--out", named, "--force").Code);
         Assert.Equal(0, Run(xml, "--out", named, "-f").Code);
 
-        // --to kscript converts only the XML scripts in a folder (tests too); --to xml only the .kscript files.
-        var toCode = Run(dir, "--to", "kscript", "--stdout");
+        // --syntax kscript converts only the XML scripts in a folder (tests too); --syntax xml only the .kscript files.
+        var toCode = Run(dir, "--syntax", "kscript", "--stdout");
         Assert.Equal(0, toCode.Code);
         Assert.Equal("echo \"hi\"\necho \"t\"\n", toCode.Out);
-        var toXml = Run(dir, "--to", "xml", "--stdout");
+        var toXml = Run(dir, "--syntax", "xml", "--stdout");
         Assert.Contains("<echo>b</echo>", toXml.Out);
         Assert.Contains("<echo>hi</echo>", toXml.Out);
 
         // Naming a file already in the target format skips it.
-        Assert.Contains("is already .kscript; skipped", Run(code, "--to", "kscript").Err);
-        Assert.Contains("is already XML; skipped", Run(xml, "--to", "xml").Err);
+        Assert.Contains("is already .kscript; skipped", Run(code, "--syntax", "kscript").Err);
+        Assert.Contains("is already XML; skipped", Run(xml, "--syntax", "xml").Err);
     }
 
     [Fact]

@@ -31,7 +31,7 @@ namespace KScript.Docs
         /// <summary>The project's kscript.json, or null.</summary>
         public ProjectConfig Project { get; private init; }
 
-        /// <summary>"kscript" or "xml": the project's make.format, else .kscript.</summary>
+        /// <summary>"kscript" or "xml": the project's make.syntax, else .kscript.</summary>
         public string Format { get; private init; }
 
         public List<ScriptFile> Files { get; } = new List<ScriptFile>();
@@ -125,8 +125,7 @@ namespace KScript.Docs
 
         internal static bool IsScript(string path)
         {
-            string p = path.ToLowerInvariant();
-            return p.EndsWith(".kscript") || p.EndsWith(".ks.xml") || p.EndsWith(".ks");
+            return KScript.Syntax.Markup.ScriptFiles.IsScript(path);
         }
 
         internal static ScriptFile ReadScript(string file, string directory)

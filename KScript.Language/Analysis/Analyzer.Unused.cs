@@ -333,7 +333,7 @@ namespace KScript.Language.Analysis
                 if (aliasUnused)
                 {
                     Report(alias.DeclarationSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnusedImport, $"Nothing imported as {alias.Name} is used.",
-                        new[] { nothingUsed ? RemoveElementFix(e, "Remove the import") : RemoveAttributeFix(e.GetAttribute("as"), "Remove as=\"" + alias.Name + "\"") });
+                        new[] { nothingUsed ? RemoveElementFix(e, "Remove the import") : RemoveAttributeFix(e.GetAttribute("as"), IsCode ? $"Remove as {alias.Name}" : $"Remove as=\"{alias.Name}\"") });
                 }
                 foreach (Symbol s in unusedNames)
                 {

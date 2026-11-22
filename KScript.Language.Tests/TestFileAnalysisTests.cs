@@ -30,7 +30,6 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("cart.test.ks.xml")]
-        [InlineData("cart.test.xml")]
         public void TestFilesGetKScriptTestWithoutAnImport(string name)
         {
             AssertClean(Analyze(Script(Tests), name));

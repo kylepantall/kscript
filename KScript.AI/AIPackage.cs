@@ -146,18 +146,18 @@ namespace KScript.AI
                 {
                     if (!run.Scope.TryGet(fn, out object value))
                         throw run.Error($"tools=\"{run.Raw("tools")}\": there is no function called {fn}. Declare it with <fn name=\"{fn}\" ...>.", "tools", "Name");
-                    tools.Add(Schemas.Tool(value, "<llm tools>"));
+                    tools.Add(Schemas.Tool(value, run.Module.ArgumentHint("llm", "tools")));
                 }
                 var request = new AiRequest
                 {
                     Model = ModelName(run.Raw("model")),
                     System = run.Template("system"),
                     Tools = tools,
-                    Schema = run.Has("schema") ? Schemas.FromValue(run.Eval("schema"), "<llm schema>") : null,
+                    Schema = run.Has("schema") ? Schemas.FromValue(run.Eval("schema"), run.Module.ArgumentHint("llm", "schema")) : null,
                     MaxTokens = run.Has("max_tokens") ? MaxTokens(run.Eval("max_tokens")) : 16000,
                 };
                 string prompt = run.Text();
-                if (prompt.Trim().Length == 0) throw run.Error("<llm> needs a prompt: write it inside the element, such as <llm into=\"answer\">What is KScript?</llm>.");
+                if (prompt.Trim().Length == 0) throw run.Error($"<llm> needs a prompt: write it inside the element, such as <llm into=\"answer\">What is KScript?</llm>.");
                 request.Messages.Add(new AiMessage("user", new[] { AiBlock.FromText(prompt) }));
                 run.Scope.Declare(name, Conversation.Ask(ModelFor(run.Host), request, run.Interpreter, run.Scope, run.Module));
                 return null;

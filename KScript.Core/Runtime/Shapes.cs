@@ -636,8 +636,8 @@ namespace KScript.Runtime
             if (scope.TryGet(type.Name, out object found) && (found is RecordType || found is EnumType || found is RefinedType)) return found;
             IEnumerable<string> known = Values.DeclarableTypes.Concat(KnownTypes(scope));
             string close = Values.Closest(type.Name, known);
-            throw new KScriptException($"Unknown type '{type.Name}'." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                + $" Declare it with <type name=\"{type.Name}\" fields=\"...\" /> or <enum name=\"{type.Name}\" values=\"...\" />, or use one of: {string.Join(", ", Values.DeclarableTypes)}.", "Type");
+            throw new KScriptException(Wording.Of($"Unknown type '{type.Name}'.") + (close != null ? $" Did you mean {close}?" : string.Empty)
+                + Wording.Of($" Declare it with <type name=\"{type.Name}\" fields=\"...\" /> or <enum name=\"{type.Name}\" values=\"...\" />, or use one of: {string.Join(", ", Values.DeclarableTypes)}."), "Type");
         }
 
         private static IEnumerable<string> KnownTypes(Scope scope)
@@ -689,8 +689,8 @@ namespace KScript.Runtime
                 if (!Values.IsDeclarable(baseName) && !run.Scope.TryGet(baseName, out _))
                 {
                     string close = Values.Closest(baseName, Values.DeclarableTypes.Concat(KnownTypes(run.Scope)));
-                    throw run.Error($"Unknown type '{baseName}' in with." + (close != null ? $" Did you mean {close}?" : string.Empty)
-                        + " Build on a <type> declared before this one, or on a built-in type such as string, int or email.", "with", "Type");
+                    throw run.Error(Wording.Of($"Unknown type '{baseName}' in with.") + (close != null ? $" Did you mean {close}?" : string.Empty)
+                        + Wording.Of($" Build on a <type> declared before this one, or on a built-in type such as string, int or email."), "with", "Type");
                 }
             }
 
@@ -765,7 +765,7 @@ namespace KScript.Runtime
                 if (rulesAndMethods && e.Name == "fn")
                 {
                     string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
-                    if (string.IsNullOrEmpty(method)) throw run.Error("A method needs a name: <fn name=\"area\" value=\"$width * $height\" />.", null, "Syntax");
+                    if (string.IsNullOrEmpty(method)) throw run.Error($"A method needs a name: <fn name=\"area\" value=\"$width * $height\" />.", null, "Syntax");
                     if (type.Field(method) != null && !type.Bases.Any(b => b.Field(method) != null)) throw run.Error($"{name} has a field and a method both called '{method}'.", null, "Syntax");
                     type.OwnMethods[method] = e;
                     seen.Add("fn " + method);
@@ -773,7 +773,7 @@ namespace KScript.Runtime
                 }
                 if (e.Name != "field")
                 {
-                    throw run.Error(rulesAndMethods ? $"<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <{e.Name}>." : $"<{run.Name}> can only hold <field> elements, not <{e.Name}>.", null, "Syntax");
+                    throw run.Error(rulesAndMethods ? Wording.Of($"<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <{e.Name}>.") : Wording.Of($"<{run.Name}> can only hold <field> elements, not <{e.Name}>."), null, "Syntax");
                 }
                 FieldDefinition field = ParseFieldElement(e, run);
                 if (!seen.Add(field.Name)) throw run.Error($"<{run.Name} name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
@@ -934,7 +934,7 @@ namespace KScript.Runtime
             {
                 ParseResult parsed = ExpressionParser.ParseExpression(text.Substring(eq + 1));
                 if (!parsed.Success)
-                    throw run.Error($"The default of '{text.Substring(0, eq).Trim()}' isn't a valid expression: {parsed.Errors[0].Message}", "fields", "Syntax");
+                    throw run.Error($"The default of '{text.Substring(0, eq).Trim()}' isn't a valid expression: {parsed.Errors[0].Words}", "fields", "Syntax");
                 defaultValue = parsed.Root;
                 text = text.Substring(0, eq).Trim();
             }

@@ -56,7 +56,7 @@ namespace KScript.Language.Agents
 
         public string Name { get; init; }
 
-        /// <summary>kscript or xml: the format the project writes scripts in (make.format).</summary>
+        /// <summary>kscript or xml: the format the project writes scripts in (make.syntax).</summary>
         public string Format { get; init; } = MakeSettings.KScriptFormat;
 
         /// <summary>Every package a script in the project uses, KScript.Core first.</summary>
@@ -131,7 +131,7 @@ namespace KScript.Language.Agents
         #region Reading the project
 
         /// <summary>Reads a project: its settings, its scripts' top-level symbols and the packages they use.</summary>
-        /// <param name="format">kscript or xml, to override make.format (kscript convert passes the format it converted to).</param>
+        /// <param name="format">kscript or xml, to override make.syntax (kscript convert passes the format it converted to).</param>
         /// <param name="skip">Full paths of scripts to leave out, such as the originals kscript convert just replaced.</param>
         public static AgentProject Read(string root, LanguageCatalog catalog = null, string format = null, ISet<string> skip = null)
         {
@@ -241,7 +241,7 @@ namespace KScript.Language.Agents
         }
 
         private static bool IsScriptOrPage(string file) =>
-            new[] { ".kscript", ".ks", ".ks.xml", ".xml", ".html", ".md" }.Any(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+            new[] { ".kscript", ".ks.xml", ".html", ".md" }.Any(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase))
             && !string.Equals(Path.GetFileName(file), AgentsFile, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(Path.GetFileName(file), "README.md", StringComparison.OrdinalIgnoreCase);
 
@@ -414,7 +414,7 @@ namespace KScript.Language.Agents
             }
 
             w.Append("\n## Workflow\n\n");
-            w.Append("1. After each change run `kscript check --format json`. Each problem has `file`, `line`, `column`, `code`, `message` and `fixes` (exact text edits). Repeat until it reports 0 errors.\n");
+            w.Append("1. After each change run `kscript check --output json`. Each problem has `file`, `line`, `column`, `code`, `message` and `fixes` (exact text edits). Repeat until it reports 0 errors.\n");
             w.Append(project.Tests > 0 ? $"2. `kscript test` runs the {project.Tests} test file{(project.Tests == 1 ? string.Empty : "s")}. Add a test for each change.\n" : "2. `kscript test` runs `*.test.kscript` files. Add a test for each change.\n");
             w.Append("3. `kscript fmt` formats files. `kscript agents` refreshes these docs (the editor does it on save).\n");
             w.Append("4. Unsure about a command or method? Read `.kscript/agents/packages/<package>.md`, or call `lookup` / `search_docs` on the `kscript mcp` server (the full reference). Never invent names: `kscript check` rejects unknown ones.\n");

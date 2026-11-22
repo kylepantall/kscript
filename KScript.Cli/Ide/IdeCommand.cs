@@ -92,21 +92,21 @@ namespace KScript.Ide
         public static readonly IReadOnlyDictionary<string, string> OtherEditors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["neovim"] = "Neovim 0.11+ (add to init.lua):\n\n" +
-                "vim.filetype.add({ pattern = { ['.*%.ks%.xml'] = 'kscript' }, extension = { ks = 'kscript', kscript = 'kscript' } })\n" +
+                "vim.filetype.add({ pattern = { ['.*%.ks%.xml'] = 'kscript' }, extension = { kscript = 'kscript' } })\n" +
                 "vim.lsp.config('kscript', { cmd = { 'kscript', 'lsp' }, filetypes = { 'kscript' }, root_markers = { '.git' } })\n" +
                 "vim.lsp.enable('kscript')\n" +
                 "-- Optional: XML highlighting for KScript files\n" +
                 "vim.treesitter.language.register('xml', 'kscript')",
             ["helix"] = "Helix (add to ~/.config/helix/languages.toml):\n\n" +
                 "[language-server.kscript]\ncommand = \"kscript\"\nargs = [\"lsp\"]\n\n" +
-                "[[language]]\nname = \"kscript\"\nscope = \"source.kscript\"\nfile-types = [{ glob = \"*.ks.xml\" }, \"ks\", \"kscript\"]\n" +
+                "[[language]]\nname = \"kscript\"\nscope = \"source.kscript\"\nfile-types = [{ glob = \"*.ks.xml\" }, \"kscript\"]\n" +
                 "roots = [\".git\"]\nlanguage-servers = [\"kscript\"]\ngrammar = \"xml\"",
             ["sublime"] = "Sublime Text (install the LSP package, then Preferences > Package Settings > LSP > Settings):\n\n" +
                 "{\n  \"clients\": {\n    \"kscript\": {\n      \"enabled\": true,\n      \"command\": [\"kscript\", \"lsp\"],\n" +
                 "      \"selector\": \"text.xml\"\n    }\n  }\n}",
             ["emacs"] = "Emacs 29+ with Eglot (add to init.el):\n\n" +
                 "(define-derived-mode kscript-mode nxml-mode \"KScript\")\n" +
-                "(add-to-list 'auto-mode-alist '(\"\\\\.ks\\\\(\\\\.xml\\\\)?\\\\'\" . kscript-mode))\n" +
+                "(add-to-list 'auto-mode-alist '(\"\\\\.\\\\(kscript\\\\|ks\\\\.xml\\\\)\\\\'\" . kscript-mode))\n" +
                 "(with-eval-after-load 'eglot\n  (add-to-list 'eglot-server-programs '(kscript-mode \"kscript\" \"lsp\")))\n" +
                 "(add-hook 'kscript-mode-hook #'eglot-ensure)",
         };
@@ -135,7 +135,7 @@ namespace KScript.Ide
                 default:
                     error.WriteLine($"Unknown ide command '{verb}'.");
                     PrintUsage(error);
-                    return 1;
+                    return ExitCodes.Usage;
             }
         }
 
@@ -170,7 +170,7 @@ namespace KScript.Ide
             if (name == null)
             {
                 error.WriteLine("Usage: kscript ide config <" + string.Join("|", OtherEditors.Keys) + ">");
-                return 1;
+                return ExitCodes.Usage;
             }
             if (name.Equals("nvim", StringComparison.OrdinalIgnoreCase) || name.Equals("vim", StringComparison.OrdinalIgnoreCase))
             {
@@ -186,8 +186,8 @@ namespace KScript.Ide
                 output.WriteLine($"{name} uses the KScript extension. Run: kscript ide install {name}");
                 return 0;
             }
-            error.WriteLine($"No settings for '{name}'. Any editor with LSP support works: run \"kscript lsp\" as the language server over stdio for *.ks.xml files.");
-            return 1;
+            error.WriteLine($"No settings for '{name}'. Any editor with LSP support works: run \"kscript lsp\" as the language server over stdio for *.kscript and *.ks.xml files.");
+            return ExitCodes.Usage;
         }
 
         /// <summary>Finds each supported editor's launcher, on the PATH or in its usual install folder.</summary>
@@ -291,7 +291,7 @@ namespace KScript.Ide
                     if (i + 1 >= args.Length)
                     {
                         error.WriteLine($"{args[i]} needs a value.");
-                        return 1;
+                        return ExitCodes.Usage;
                     }
                     if (args[i] == "--vsix") vsix = args[++i];
                     else tag = args[++i].StartsWith("v", StringComparison.Ordinal) ? args[i] : "v" + args[i];
@@ -314,7 +314,7 @@ namespace KScript.Ide
                 if (!host.FileExists(vsix))
                 {
                     error.WriteLine($"{vsix} doesn't exist.");
-                    return 1;
+                    return ExitCodes.Usage;
                 }
                 vsix = Path.GetFullPath(vsix);
             }

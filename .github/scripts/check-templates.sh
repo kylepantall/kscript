@@ -16,19 +16,19 @@ cd "$work"
 
 cases=(
   "web|"
-  "web|--format xml"
+  "web|--syntax xml"
   "web|--no-desktop --no-http"
   "bare|--bare"
   "bare|--bare --web --api --desktop"
   "api|--template api"
-  "api|--template api --format xml"
+  "api|--template api --syntax xml"
   "api|--template api --db none"
   "api|--template api --no-auth --no-cache"
-  "api|--template api --db none --no-auth --no-cache --format xml"
+  "api|--template api --db none --no-auth --no-cache --syntax xml"
   "api|--template api --db postgres --docker"
   "fullstack|--template fullstack"
   "fullstack|--template fullstack --auth"
-  "fullstack|--template fullstack --format xml --auth"
+  "fullstack|--template fullstack --syntax xml --auth"
   "fullstack|--template fullstack --db none --no-cache"
   "fullstack|--template fullstack --db mysql --docker"
 )
@@ -52,7 +52,7 @@ for c in "${cases[@]}"; do
   echo "::group::$template $options"
   # shellcheck disable=SC2086
   $k make project "$dir" $options
-  $k check "$dir" --warnaserror
+  $k check "$dir" --warnings-as-errors
   $k fmt --check "$dir"
   $k test "$dir"
   $k agents --check "$dir"

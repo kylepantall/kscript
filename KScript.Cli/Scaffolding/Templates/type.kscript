@@ -11,7 +11,7 @@ hint: Import it with import "{{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}", t
 ---
 /// {{ title }}.
 {{#if sample}}
-type {{ pascal }}(path: "{{ sample }}")
+type {{ pascal }}(path: "{{ up }}{{ sample }}")
 {{else}}
 type {{ pascal }} {
 {{#each fields}}

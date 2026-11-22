@@ -124,8 +124,20 @@ namespace KScript.Language.Tests
         [InlineData("<echo><![CDATA[ raw < text ]]></echo>")]
         [InlineData("<import package=\"KScript.IO\" /><let name=\"f\" value=\"@files('.')\" /><for each=\"x\" in=\"$f\"><echo>{ $x.extension }</echo></for>")]
         [InlineData("<let name=\"x\" value=\"'a'\" /><echo format=\"markdown\">**$x**</echo>")]
-        [InlineData("<render target=\"#out\"><li class=\"{ 1 }\">x</li><input type=\"text\"></input></render>")]
         public void AcceptsValidKScript(string body) => AssertClean(Analyze(Script(body)));
+
+        [Fact]
+        public void APlannedElementOrCommandIsReported()
+        {
+            // The catalog describes render, on and @dom, but nothing runs them: KS5006 says so, and HTML inside is still HTML.
+            DocumentAnalysis a = Analyze(Script("<render target=\"#out\"><li class=\"{ 1 }\">x</li><input type=\"text\"></input></render>"));
+            Diagnostic d = Assert.Single(a.Diagnostics);
+            Assert.Equal(DiagnosticCodes.PlannedFeature, d.Code);
+            Assert.Equal("<render> is planned but not built yet, so it can't run.", d.Message);
+
+            a = Analyze(Script("<let name=\"box\" value=\"@dom('#name')\" />"));
+            Assert.Contains(a.Diagnostics, x => x.Code == DiagnosticCodes.PlannedFeature && x.Message.StartsWith("@dom() is planned", StringComparison.Ordinal));
+        }
 
         [Fact]
         public void ScriptsHaveOneRoot()

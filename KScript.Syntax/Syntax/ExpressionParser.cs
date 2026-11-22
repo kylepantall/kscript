@@ -160,8 +160,10 @@ namespace KScript.Syntax
             if (next.Kind == TokenKind.Punctuation && AssignmentOperators.Contains(next.Text))
             {
                 Error(next.Span, next.Text == "="
-                    ? "Assignment isn't allowed here. Use == (or ===) to compare; assign with <let>, <set> or <do>."
-                    : $"'{next.Text}' assigns, which isn't allowed here. Assign with <set> or <do>.", DiagnosticCodes.AssignmentNotAllowed);
+                    ? new Wording("Assignment isn't allowed here. Use == (or ===) to compare; assign with <let>, <set> or <do>.",
+                        "Assignment isn't allowed here. Use == (or ===) to compare; assign on a line of its own: x = 1.")
+                    : new Wording($"'{next.Text}' assigns, which isn't allowed here. Assign with <set> or <do>.",
+                        $"'{next.Text}' assigns, which isn't allowed here. Assign on a line of its own: x += 1."), DiagnosticCodes.AssignmentNotAllowed);
                 Advance();
                 ParseExpr();
             }
@@ -875,7 +877,7 @@ namespace KScript.Syntax
             }
         }
 
-        private void Error(TextSpan span, string message, string code = DiagnosticCodes.ExpressionSyntax)
+        private void Error(TextSpan span, Wording message, string code = DiagnosticCodes.ExpressionSyntax)
         {
             if (errors.Count == 0)
             {

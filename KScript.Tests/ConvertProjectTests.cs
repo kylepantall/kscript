@@ -40,7 +40,7 @@ public sealed class ConvertProjectTests : IDisposable
         Environment.SetEnvironmentVariable("KSCRIPT_TEMPLATES", Path.Combine(dir, "no-user-templates"));
         try
         {
-            KScript.Scaffolding.ProjectScaffolder.Create(dir, "todo", new Dictionary<string, string> { ["format"] = "xml" });
+            KScript.Scaffolding.ProjectScaffolder.Create(dir, "todo", new Dictionary<string, string> { ["syntax"] = "xml" });
         }
         finally
         {
@@ -48,7 +48,7 @@ public sealed class ConvertProjectTests : IDisposable
         }
         string project = Path.Combine(dir, "todo");
 
-        var (code, output, error) = Convert(project, "--to", "kscript");
+        var (code, output, error) = Convert(project, "--syntax", "kscript");
         Assert.True(code == 0, error);
         foreach (string xml in Directory.EnumerateFiles(project, "*.ks.xml", SearchOption.AllDirectories).ToList())
         {
@@ -71,7 +71,7 @@ public sealed class ConvertProjectTests : IDisposable
         AssertCleanAndPassing(project);
 
         // And back again.
-        (code, _, error) = Convert(project, "--to", "xml");
+        (code, _, error) = Convert(project, "--syntax", "xml");
         Assert.True(code == 0, error);
         foreach (string kscript in Directory.EnumerateFiles(project, "*.kscript", SearchOption.AllDirectories).ToList())
         {

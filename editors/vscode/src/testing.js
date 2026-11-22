@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 const { isTestFile, parseJUnit, filterFor, outcomeOf, loadError } = require('./run');
 
-const TEST_FILES = '**/*.test.{kscript,ks.xml,xml}';
+const TEST_FILES = '**/*.test.{kscript,ks.xml}';
 const SKIPPED_FOLDERS = '**/{node_modules,.git,_templates}/**';
 
 /**

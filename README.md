@@ -222,11 +222,11 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Stylesheets](docs/stylesheets.md): `.ks.css`, `.ks.scss` and `.ks.sass`, and `kscript css`
 - [Routes, controllers and middleware](docs/http.md): KScript.Http route files, JSON APIs, views and middleware
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
-- [Desktop apps](docs/desktop.md): `<KScript.Window>` and its elements
+- [Desktop apps](docs/desktop.md): `KScript.Window` and its elements
 - [Programs](docs/compile.md): `kscript compile`, targets, icons and what a program holds
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
-- [Coding agents](docs/agents.md): `kscript agents`, AGENTS.md, agent doc tags and `kscript check --format json`
+- [Coding agents](docs/agents.md): `kscript agents`, AGENTS.md, agent doc tags and `kscript check --output json`
 - [Standards](docs/standards.md): shareable lint and format standards, `kscript:recommended` and `kscript check --print-config`
 - [Error codes](docs/errors.md): what each `KS` code means and how to fix it
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes

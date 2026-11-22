@@ -223,7 +223,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 ## KS5006
 
-**A planned feature is used.** It is described in the docs but not built yet.
+**A planned feature is used.** `render`, `on` and `@dom()` (scripts that run in the browser) are described in the reference but no package runs them yet, so a script that uses one stops there. The check reports each use.
 
 ## KS5007
 
@@ -254,6 +254,8 @@ Text and numbers have no fields at all, so `$name.upper` stops the script. Call 
 ## KS5011
 
 **An error type that isn't declared.** Declare it with `error Name { }`, or use a built-in one such as `Validation`, `NotFound` or `IO`.
+
+A built-in type that was renamed is an error, with a fix that writes the new name: `QueryError` is now `Query`, and `ConnectionError` is now `Connection`.
 
 ## KS5012
 

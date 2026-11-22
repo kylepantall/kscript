@@ -67,7 +67,7 @@ fn destroy({{#each params}}{{ item }}: {{#if item is id}}int{{else}}string{{/if}
 {{/if}}
 {{#unless item in index, show, store, update, destroy}}
 /// {{ item | title }}.
-fn {{ item | snake }}({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{/each}}) {
+fn {{ item | snake }}({{#each params}}{{ item }}: {{#if item is id}}int{{else}}string{{/if}}{{#unless last}}, {{/unless}}{{/each}}) {
   // TODO: Answer the route.
   return { action: '{{ item | snake }}'{{#each params}}, {{ item }}: ${{ item }}{{/each}} }
 }

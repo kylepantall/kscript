@@ -206,12 +206,12 @@ public sealed class StyleTests : IDisposable
             Assert.Contains("No stylesheets found", none.ToString());
 
             var e = new StringWriter();
-            Assert.Equal(1, CssCommand.Run(new[] { "--out" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "--var", "x" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "--var" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "--watch" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "missing" }, output, e));
-            Assert.Equal(1, CssCommand.Run(new[] { "site/sub/b.scss" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "--out" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "--var", "x" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "--var" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "--watch" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "missing" }, output, e));
+            Assert.Equal(2, CssCommand.Run(new[] { "site/sub/b.scss" }, output, e));
             Assert.Contains("--out needs a folder", e.ToString());
             Assert.Contains("--var needs name=value", e.ToString());
             Assert.Contains("Unknown option '--watch'", e.ToString());

@@ -312,6 +312,10 @@ namespace KScript.Language.Analysis
             CallableInfo command = catalog.GetCommand(c.Name);
             if (command != null)
             {
+                if (command.Planned)
+                {
+                    Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.PlannedFeature, $"@{command.Name}() is planned but not built yet, so it can't run.");
+                }
                 RequirePackage(command.Package, full, $"@{command.Name}()");
                 ReportDeprecatedCall(command, $"@{command.Name}", nameSpan, count >= 0 ? c.Arguments : null, piped, region);
                 if (command.KeepsBareWords)
@@ -338,7 +342,7 @@ namespace KScript.Language.Analysis
             RetiredInfo retired = catalog.GetRetiredCommand(c.Name);
             if (retired != null)
             {
-                Report(full, DiagnosticSeverity.Error, DiagnosticCodes.RetiredCommand, $"@{c.Name} was removed in KScript 2. {retired.Replacement}");
+                Report(full, DiagnosticSeverity.Error, DiagnosticCodes.RetiredCommand, $"@{c.Name} was removed in KScript 2. {Wording.Prose(retired.Replacement)}");
                 return;
             }
 
@@ -680,7 +684,7 @@ namespace KScript.Language.Analysis
             QuickFix fix = retired.Rename == null ? null
                 : retired.Rename.StartsWith('.') ? (CallToField(nameSpan, retired.Rename.Substring(1)) is TextChange toField ? new QuickFix($"Change to {retired.Rename}", toField) : null)
                 : new QuickFix($"Change to {retired.Rename}", new TextChange(nameSpan, retired.Rename));
-            Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod, $"->{name}() is no longer part of KScript. {retired.Replacement}", fix != null ? new[] { fix } : null);
+            Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod, $"->{name}() is no longer part of KScript. {Wording.Prose(retired.Replacement)}", fix != null ? new[] { fix } : null);
             return true;
         }
 

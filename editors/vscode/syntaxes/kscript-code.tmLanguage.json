@@ -326,6 +326,7 @@
       ]
     },
     "string": {
+      "comment": "Single quotes keep text as written: no escapes. A backslash at the end of a line still joins it to the next.",
       "name": "string.quoted.single.kscript",
       "begin": "'",
       "end": "'",
@@ -333,10 +334,6 @@
         {
           "match": "\\\\$",
           "name": "constant.character.escape.line-continuation.kscript"
-        },
-        {
-          "match": "\\\\.",
-          "name": "constant.character.escape.kscript"
         }
       ]
     },
@@ -359,7 +356,7 @@
     "constants": {
       "patterns": [
         {
-          "match": "(?<![\\w$.])(true|false|null|yes|no)(?![\\w-])",
+          "match": "(?<![\\w$.])(true|false|null)(?![\\w-])",
           "name": "constant.language.kscript"
         },
         {
@@ -380,11 +377,16 @@
           "name": "keyword.operator.word.kscript"
         },
         {
+          "comment": "1..10 step 2. Not an argument named step (@range(step: 2)).",
+          "match": "(?<![\\w$@.-])(step)(?![\\w-]|\\s*:)",
+          "name": "keyword.operator.word.kscript"
+        },
+        {
           "match": "=>",
           "name": "storage.type.function.arrow.kscript"
         },
         {
-          "match": "->|\\|>|\\?\\?=?|==|!=|<=|>=|\\+=|-=|\\*=|/=|%=|\\+\\+|--|[-+*/%<>=?!]",
+          "match": "->|\\|>|\\?\\?=?|\\?\\.|\\.\\.|===|!==|==|!=|<=|>=|\\+=|-=|\\*=|/=|\\*\\*|[-+*/%<>=?!]",
           "name": "keyword.operator.kscript"
         }
       ]

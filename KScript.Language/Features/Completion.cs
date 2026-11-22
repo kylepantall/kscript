@@ -568,7 +568,7 @@ namespace KScript.Language.Features
         internal static IReadOnlyList<string> TypeNames(DocumentAnalysis analysis) =>
             analysis.Symbols.Where(s => s.EnumValues != null || s.Shape.Type == KType.Type).Select(s => s.Name).Distinct().ToList();
 
-        private static readonly string[] ScriptExtensions = { ".ks.xml", ".ks", ".kscript", ".xml" };
+        private static readonly string[] ScriptExtensions = ScriptFiles.Extensions;
         private static readonly string[] PageExtensions = { ".html", ".md" };
         private static readonly string[] SkippedFolders = { "node_modules", "bin", "obj", "_templates" };
         private const int MaxProjectFiles = 300;
@@ -642,15 +642,7 @@ namespace KScript.Language.Features
         private IEnumerable<string> FilesWith(string folder, string[] extensions) =>
             Files.ListFiles(folder, "*")
                 .Where(f => extensions.Any(x => f.EndsWith(x, StringComparison.OrdinalIgnoreCase)))
-                .Where(f => !f.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) || LooksLikeScript(f))
                 .OrderBy(f => f, StringComparer.Ordinal);
-
-        /// <summary>A plain .xml file is offered only when it is a script (starts with &lt;kscript&gt;).</summary>
-        private bool LooksLikeScript(string path)
-        {
-            string text = Files.ReadText(path);
-            return text != null && text.AsSpan(0, Math.Min(text.Length, 512)).IndexOf("<kscript", StringComparison.Ordinal) >= 0;
-        }
 
         /// <summary>The folder of the nearest kscript.json above <paramref name="dir"/>, or the folder itself.</summary>
         private string ProjectRoot(string dir)
