@@ -25,7 +25,7 @@ namespace KScript.Testing
         public const string AssertionType = "Assertion";
 
         /// <summary>The attributes of &lt;expect&gt; that say what to check, one per element.</summary>
-        internal static readonly string[] Matchers = { "equals", "not-equals", "same", "contains", "not-contains", "matches", "type", "count", "count-at-most", "throws" };
+        internal static readonly string[] Matchers = { "equals", "not-equals", "same", "contains", "not-contains", "matches", "type", "count", "count_at_most", "throws" };
 
         protected override void Register(PackageBuilder p)
         {
@@ -82,7 +82,7 @@ namespace KScript.Testing
                 new A("matches", K.Expression, "Text matches this regular expression, such as '^\\d+$'."),
                 new A("type", K.Enum, "Its type is this.", false, "string", "number", "bool", "list", "map", "date", "fn", "error", "null"),
                 new A("count", K.Expression, "A list, map or text has this many items or characters."),
-                new A("count-at-most", K.Expression, "A list, map or text has at most this many items or characters: `expect(value: @queries(), count-at-most: 4)`."),
+                new A("count_at_most", K.Expression, "A list, map or text has at most this many items or characters: `expect(value: @queries(), count_at_most: 4)`."),
                 new A("throws", K.ErrorType, "Working out the value stops with an error of this type, or one that extends it: throws=\"NotFound\"."),
                 new A("message", K.Template, "What to say when it fails, instead of the usual message."))
             {
@@ -345,9 +345,9 @@ namespace KScript.Testing
                     break;
                 }
                 case "count":
-                case "count-at-most":
+                case "count_at_most":
                 {
-                    bool most = matcher == "count-at-most";
+                    bool most = matcher == "count_at_most";
                     double expected = Values.ToNumber(run.Eval(matcher), $"<expect {matcher}>");
                     int? count = actual switch
                     {

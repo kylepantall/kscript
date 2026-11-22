@@ -101,7 +101,7 @@ describe(name: a shopping cart) {
 | `matches: '^\d+$'` | Text matches the regular expression. |
 | `type: list` | The value is a `string`, `number`, `bool`, `list`, `map`, `date`, `fn` or `null`. |
 | `count: 3` | A list or map has that many items, or text has that many characters. |
-| `count-at-most: 4` | A list or map has at most that many items, or text has at most that many characters. With `@queries()`, it checks how many queries a test sent. |
+| `count_at_most: 4` | A list or map has at most that many items, or text has at most that many characters. With `@queries()`, it checks how many queries a test sent. |
 
 `message: …` on any check replaces the usual message.
 

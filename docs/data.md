@@ -569,13 +569,13 @@ posts = $Post->fake_many(3, author: $joan)
 
 ### Counting queries
 
-`@queries()` is the SQL sent so far in this test (in a script, so far in the run), each as `{ sql, bindings, database }`. `count-at-most` checks a page doesn't send a query per row:
+`@queries()` is the SQL sent so far in this test (in a script, so far in the run), each as `{ sql, bindings, database }`. `count_at_most` checks a page doesn't send a query per row:
 
 ```kscript
 test(name: "the post list loads authors at once") {
   $Post->fake_many(10)
   $Post->with(author)->get()
-  expect(value: @queries(), count-at-most: 2)
+  expect(value: @queries(), count_at_most: 2)
 }
 ```
 

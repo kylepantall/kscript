@@ -25,6 +25,6 @@ describe(name: 'Product') {
     $Product->fake_many(3)
     names = $Product->order_by(name)->pluck(name)
     expect(value: $names, count: 3)
-    expect(value: @queries(), count-at-most: 4)
+    expect(value: @queries(), count_at_most: 4)
   }
 }

@@ -63,7 +63,7 @@ public sealed class DataTestingTests : DataFixture
               post = $Post->fake()
               expect(value: $post.author.name->length(), equals: 30)
               expect(value: $Author->count(), equals: 1)
-              expect(value: @queries(), count-at-most: 4)
+              expect(value: @queries(), count_at_most: 4)
             }
 
             test(name: 'two') {
@@ -87,7 +87,7 @@ public sealed class DataTestingTests : DataFixture
 
             test(name: 'fails') {
               $Post->fake_many(5)
-              expect(value: @queries(), count-at-most: 2)
+              expect(value: @queries(), count_at_most: 2)
             }
             """);
         Assert.Null(file.Error);
