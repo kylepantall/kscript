@@ -777,7 +777,7 @@ public sealed class DataErrorTests : DataFixture
     {
         KScriptException e = Fails($$"""
             $db->sql('create table teams (id integer primary key)')
-            $db->sql('create table members (id {{AutoId}}, team_id integer references teams(id))')
+            $db->sql('create table members (id {{AutoId}}, team_id integer, foreign key (team_id) references teams(id))')
             $db->sql('insert into members (team_id) values (5)')
             """);
         Assert.Equal("ForeignKeyViolation", e.Type);
