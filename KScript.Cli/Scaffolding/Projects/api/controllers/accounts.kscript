@@ -12,21 +12,8 @@ import KScript.Auth
 import KScript.Data
 import "../models/note{{ ext }}"
 {{/unless}}
-
-/// What POST /api/register takes. The email and password types check it
-/// (kscript.json can set password rules).
-type SignUp {
-  name: string(min: 1, max: 120)
-  email: email
-  password: password
-}
-
-/// What POST /api/tokens takes.
-type SignIn {
-  email: string
-  password: string
-  device: string = 'api'
-}
+import "../requests/sign-up{{ ext }}"
+import "../requests/sign-in{{ ext }}"
 
 /// POST /api/register: makes the account and answers with it and its first
 /// token.

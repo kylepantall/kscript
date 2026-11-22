@@ -70,8 +70,12 @@ public sealed class ProjectTemplateApiTests : IDisposable
         {
             ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config/config.test.yaml", "config/config.yaml",
             "controllers/accounts.kscript", "controllers/notes.kscript", "kscript.json", "lib/cache.kscript", "middleware/request_id.kscript",
-            "models/note.kscript", "routes/api.kscript", "tests/accounts.test.kscript", "tests/api.test.kscript", "tests/notes.test.kscript",
+            "models/note.kscript", "requests/note-input.kscript", "requests/sign-in.kscript", "requests/sign-up.kscript", "routes/api.kscript", "tests/accounts.test.kscript", "tests/api.test.kscript", "tests/notes.test.kscript",
         }, Files(root));
+        // Each type has its own file, and the controllers import them.
+        Assert.Contains("import \"../requests/note-input.kscript\"", File.ReadAllText(Path.Combine(root, "controllers", "notes.kscript")));
+        Assert.DoesNotContain("\ntype ", File.ReadAllText(Path.Combine(root, "controllers", "accounts.kscript")));
+        Assert.StartsWith("/// What POST /api/register takes.", File.ReadAllText(Path.Combine(root, "requests", "sign-up.kscript")));
         Assert.Contains("serve the API at http://localhost:8080/api", output);
         Assert.DoesNotContain("Note:", output);
         Assert.DoesNotContain("docker compose", output);
@@ -141,7 +145,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.True(File.Exists(Path.Combine(root, ".dockerignore")));
         Assert.Contains("up:\n\tdocker compose up --build", File.ReadAllText(Path.Combine(root, "Makefile")));
         Assert.Contains("postgres://shop:secret@localhost:5432/shop", File.ReadAllText(Path.Combine(root, "config", "config.yaml")));
-        Assert.Contains("Note: this version of KScript.Data connects to SQLite only. config/config.yaml and compose.yaml are set up for postgres", output);
+        Assert.Contains("Note: the app keeps its data in postgres, at the url in config/config.yaml (DATABASE_URL overrides it), and docker compose up starts the database too.", output);
         Assert.Contains("docker compose up       run the API and its database in containers", output);
 
         Assert.Equal(0, Make(parent.Root, "lite", "--template", "api", "--docker").Code);
@@ -185,7 +189,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         {
             ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_components/site-nav.html", "_layout.html",
             "config/config.test.yaml", "config/config.yaml", "controllers/notes.kscript", "index.html", "kscript.json", "lib/cache.kscript",
-            "lib/notes_client.kscript", "models/note.kscript", "notes.html", "routes/api.kscript", "site.css", "tests/api.test.kscript",
+            "lib/notes_client.kscript", "models/note.kscript", "notes.html", "requests/note-input.kscript", "routes/api.kscript", "site.css", "tests/api.test.kscript",
             "tests/notes_client.test.kscript",
         }, Files(root));
         Assert.Contains("and its API under /api", output);

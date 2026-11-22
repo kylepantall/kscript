@@ -1,0 +1,2 @@
+/// Who can see a GitHub repository.
+enum Visibility { public, private, internal }

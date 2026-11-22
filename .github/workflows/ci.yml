@@ -158,6 +158,67 @@ jobs:
           $k routes .
           $k test .
 
+  # KScript.Data's and the database queue's tests, run again on each database server KScript.Data supports. The
+  # servers are service containers, so this runs on GitHub-hosted Linux, which has Docker.
+  databases:
+    name: Databases (${{ matrix.name }})
+    if: github.event.action != 'closed'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: postgres, image: 'postgres:17-alpine', port: 5432, url: 'postgres://kscript:secret@127.0.0.1:5432/kscript',
+              health: 'pg_isready -U kscript' }
+          - { name: mysql, image: 'mysql:8.4', port: 3306, url: 'mysql://kscript:secret@127.0.0.1:3306/kscript',
+              health: 'mysqladmin ping -h 127.0.0.1 -ukscript -psecret' }
+          - { name: mariadb, image: 'mariadb:11', port: 3306, url: 'mariadb://kscript:secret@127.0.0.1:3306/kscript',
+              health: 'healthcheck.sh --connect --innodb_initialized' }
+    services:
+      db:
+        image: ${{ matrix.image }}
+        ports:
+          - ${{ matrix.port }}:${{ matrix.port }}
+        env:
+          POSTGRES_USER: kscript
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: kscript
+          MYSQL_USER: kscript
+          MYSQL_PASSWORD: secret
+          MYSQL_DATABASE: kscript
+          MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+          MARIADB_USER: kscript
+          MARIADB_PASSWORD: secret
+          MARIADB_DATABASE: kscript
+          MARIADB_RANDOM_ROOT_PASSWORD: 'yes'
+        options: >-
+          --health-cmd "${{ matrix.health }}" --health-interval 5s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.job }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ github.job }}-
+            nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build KScript.Tests --configuration Release
+
+      - name: Test on ${{ matrix.name }}
+        env:
+          KSCRIPT_TEST_DATABASE_URL: ${{ matrix.url }}
+        run: >-
+          dotnet test KScript.Tests --configuration Release --no-build --verbosity normal
+          --filter "FullyQualifiedName~KScript.Tests.Data|FullyQualifiedName~KScript.Tests.DatabaseServer|FullyQualifiedName~KScript.Tests.QueueTests"
+
   compile:
     name: kscript compile (${{ matrix.name }})
     if: github.event.action != 'closed'

@@ -219,7 +219,7 @@ namespace KScript.Data
                 {
                     Count(1);
                     RegexValue regex = RegexValue.From(Arg(0), $"->{call.Name}()");
-                    return new SqlBinary("REGEXP", target, new SqlValue(regex.Text, null));
+                    return new SqlMatch(target, regex);
                 }
                 default:
                     throw Cannot(call, $"->{call.Name}() has no SQL form. Use ->contains(), ->starts_with(), ->ends_with(), ->lower(), ->upper(), ->trim(), ->length() or ->matches().");

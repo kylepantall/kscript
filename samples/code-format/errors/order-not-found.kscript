@@ -1,0 +1,4 @@
+/// An order that can't be found.
+error OrderNotFound(message: "No order {$id}") extends NotFound {
+  id: int
+}

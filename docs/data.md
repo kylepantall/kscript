@@ -27,7 +27,7 @@ echo $adults->map(fn($u) => $u.name)
 echo $joan.id
 ```
 
-The database is SQLite, in `data/app.sqlite` in your project folder (the folder with `kscript.json`, or the script's folder). Nothing needs installing: KScript ships SQLite.
+The database is SQLite, in `data/app.sqlite` in your project folder (the folder with `kscript.json`, or the script's folder). Nothing needs installing: KScript ships SQLite. Postgres, MySQL and MariaDB are a url away: see [Connections](#connections).
 
 ## Models
 
@@ -244,12 +244,44 @@ database:
   default: main
   connections:
     main:
-      url: sqlite:data/app.sqlite
+      url: ${DATABASE_URL:-postgres://app:secret@localhost:5432/app}
     reports:
       url: sqlite:data/reports.sqlite
 ```
 
-`url` is `sqlite:` and a file (relative to the project folder), or `sqlite::memory:` for a database that lasts while kscript runs. A model uses another connection with `connection: reports`, and `@db(connection: reports)` is that database. Postgres and MySQL are coming.
+A model uses another connection with `connection: reports`, and `@db(connection: reports)` is that database.
+
+| Database | url | Notes |
+| --- | --- | --- |
+| SQLite | `sqlite:data/app.sqlite`, or `sqlite::memory:` | A file, relative to the project folder. `:memory:` lasts while kscript runs. |
+| Postgres | `postgres://user:password@host:5432/app` | Also `postgresql://`. Version 12 or later. |
+| MySQL | `mysql://user:password@host:3306/app` | Version 8.0.16 or later. |
+| MariaDB | `mariadb://user:password@host:3306/app` | Version 10.6 or later. |
+
+Anything after `?` goes to the driver as it is, such as `?sslmode=require` for Postgres or `?SslMode=Required` for MySQL. Write characters such as `@` or `:` in a password as `%40` and `%3A`. Instead of a url, a server connection can list its parts:
+
+```yaml
+database:
+  connections:
+    main:
+      driver: postgres
+      host: db.example.com
+      port: 5432
+      database: app
+      username: app
+      password: ${DB_PASSWORD}
+      options: { sslmode: require }
+```
+
+Models, queries, transactions and the database queue work the same on each database:
+
+- Text compares exactly, and emails don't mind case, so `JOAN@example.com` finds `joan@example.com` and a unique email can't be taken twice in different case. On Postgres, `->create_table()` makes a case-insensitive collation for emails, `kscript_nocase`; on MySQL and MariaDB, tables use `utf8mb4_bin` and emails `utf8mb4_unicode_ci`.
+- `->contains()`, `->starts_with()` and `->ends_with()` don't mind case on any database, and `->matches()` reads its flags (`i`, `m`, `s`, `x`) the same everywhere.
+- Nulls sort first going up and last going down.
+- `->lock_for_update()` and `->skip_locked()` lock rows on Postgres, MySQL and MariaDB. SQLite locks the whole database for a transaction's writes instead.
+- Dates are kept to the microsecond.
+
+Raw SQL in `@sql` is given to the database as it is, so it is written in that database's own SQL.
 
 ## Errors
 

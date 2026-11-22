@@ -64,8 +64,36 @@ namespace KScript.Queueing
         /// <summary>The options a retry needs, from the job type.</summary>
         internal JobOptions Options => new JobOptions { Tries = Tries, Backoff = Backoff, Timeout = Timeout, RetryOn = RetryOn, FailOn = FailOn };
 
-        /// <summary>A new id: sortable by time, then random.</summary>
-        public static string NewId() => DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture) + Guid.NewGuid().ToString("N").Substring(0, 8);
+        private static readonly object idLock = new object();
+        private static long lastIdMs;
+        private static int idSequence;
+
+        /// <summary>
+        /// A new id: sortable by time, then by the order this process made them (so two jobs dispatched in the same
+        /// millisecond keep their order), then random.
+        /// </summary>
+        public static string NewId()
+        {
+            DateTime now = DateTime.UtcNow;
+            long ms = now.Ticks / TimeSpan.TicksPerMillisecond;
+            int sequence;
+            lock (idLock)
+            {
+                if (ms <= lastIdMs)
+                {
+                    ms = lastIdMs;
+                    idSequence++;
+                }
+                else
+                {
+                    lastIdMs = ms;
+                    idSequence = 0;
+                }
+                sequence = idSequence;
+            }
+            string time = new DateTime(ms * TimeSpan.TicksPerMillisecond, DateTimeKind.Utc).ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
+            return time + sequence.ToString("D4", CultureInfo.InvariantCulture) + Guid.NewGuid().ToString("N").Substring(0, 8);
+        }
 
         public QueuedJob Copy() => FromMap(ToMap());
 

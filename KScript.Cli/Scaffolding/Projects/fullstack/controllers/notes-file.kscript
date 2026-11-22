@@ -13,14 +13,7 @@ import KScript.Auth
 {{#if cache}}
 import "../lib/cache{{ ext }}"
 {{/if}}
-
-/// What POST and PUT /api/notes take. The type checks the JSON before the
-/// function runs, and answers 422 if it doesn't fit.
-type NoteInput {
-  title: string(min: 1, max: 200)
-  body: string = ''
-  done: bool = false
-}
+import "../requests/note-input{{ ext }}"
 
 /// Every saved note.
 fn all_notes() => @exists($config.notes.file) ? @read_json($config.notes.file) : []

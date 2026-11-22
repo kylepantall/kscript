@@ -63,9 +63,10 @@ kscript test       # 12 tests, against a database in memory
 | File | What it is |
 | --- | --- |
 | `routes/api.kscript` | The routes, under `/api`: `GET /health`, `POST /register` and `/tokens` (throttled), `GET` and `DELETE /me`, and a `Resource` for `/notes` behind the `auth` middleware. |
-| `controllers/notes.kscript` | The notes resource: `index`, `store`, `show`, `update` and `destroy`, each answering with JSON. A `NoteInput` [type](types.md) checks what is posted (422 when it doesn't fit), and a note that isn't there (or isn't yours) is a 404. |
+| `controllers/notes.kscript` | The notes resource: `index`, `store`, `show`, `update` and `destroy`, each answering with JSON. The `NoteInput` [type](types.md) it imports checks what is posted (422 when it doesn't fit), and a note that isn't there (or isn't yours) is a 404. |
 | `controllers/accounts.kscript` | Sign-up, tokens and closing an account, with [KScript.Auth](auth.md). |
 | `models/note.kscript` | The `Note` [model](data.md), whose table is made the first time it is used. |
+| `requests/note-input.kscript`, `requests/sign-up.kscript`, `requests/sign-in.kscript` | The typed request bodies, one [type](types.md) per file, that the controllers import. |
 | `middleware/request_id.kscript` | The app's own middleware: every response gets an `X-Request-Id` header. |
 | `lib/cache.kscript` | The app's [cache](cache.md), whose store and time limit come from `config/config.yaml`. |
 | `config/config.yaml`, `config/config.test.yaml` | Settings: the database (`${DATABASE_URL:-sqlite:data/app.sqlite}`) and cache. `kscript test` lays `config.test.yaml` over them (see `test.env` below), so tests get an empty database in memory. |
@@ -81,7 +82,7 @@ The api and fullstack templates take the same options:
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database the notes are kept in, set up in `config/config.yaml`. `none` keeps them in a JSON file instead (`notes.file` in the config). KScript.Data connects to SQLite only for now, so with `postgres` or `mysql` the settings (and compose file) are ready, the tests still pass on SQLite in memory, and `DATABASE_URL=sqlite:data/app.sqlite` runs the app until that support lands. |
+| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database the notes are kept in, set up in `config/config.yaml`. `none` keeps them in a JSON file instead (`notes.file` in the config). With `postgres` or `mysql` the app connects to that server (`DATABASE_URL` overrides the url, and `--docker` adds it to the compose file), while `kscript test` still uses SQLite in memory. |
 | `--auth`, `--no-auth` | on (api), off (fullstack) | Sign-in. In the api template: `POST /api/register`, `/api/tokens`, `GET /api/me`, and notes that belong to who is signed in. In the fullstack template it also runs [`kscript make auth`](auth.md) for the sign-in pages; the pages call the API as whoever is viewing them. |
 | `--cache`, `--no-cache` | on | Caches the notes list and answers repeat requests with `304 Not Modified` (the `etag` middleware). |
 | `--docker` | off | Adds a `Dockerfile`, `.dockerignore` and `compose.yaml`, with a Postgres or MySQL service for those databases, and `make up` / `make down`. |
@@ -272,6 +273,7 @@ my-app/
   styles/          make css
   lib/             make module, const, cache, storage and logger
   types/           make type, make enum
+  models/          make model
   natives/         make native: types every script gets without an import
   extensions/      make extension: methods every script gets (extend date { … })
   errors/          make error
@@ -284,6 +286,20 @@ my-app/
   tests/           make test
 ```
 
+**One type per file.** Each type, model, enum and error type has a file of its own, named after it (`OrderStatus` in `types/order-status.kscript`), and the files that use it import it:
+
+```kscript
+// models/order.kscript
+import KScript.Data
+import "../types/order-status.kscript"
+
+model Order {
+  status: OrderStatus = 'open'
+}
+```
+
+The generators and project templates all work this way, and in a project `kscript check` warns (KS6008) about a file that declares a second type, saying where to move it. A script outside a project, run on its own, can keep its types with it.
+
 Pages stay where they are, because a page's path is its URL. Desktop windows (`make window`) go at the top, next to `desktop.kscript`. Move any folder with `paths` in `kscript.json`:
 
 ```jsonc
@@ -292,7 +308,7 @@ Pages stay where they are, because a page's path is its URL. Desktop windows (`m
 }
 ```
 
-The names are `routes`, `controllers`, `middleware`, `requests`, `views`, `components`, `layouts`, `partials`, `styles`, `lib`, `types`, `storage`, `jobs`, `windows`, `config`, `locales`, `logging`, `data`, `scripts` and `tests`. `paths.views` is also where `@view()` looks, unless `http.views` says otherwise. `kscript serve` finds `routes/web.kscript` and `routes/api.kscript` by itself; a route file anywhere else needs listing in `http.routes`. Settings files go where `config.root` points, because that's where `$config` reads them. Without `config.root`, they go at the top of the project, unless it already has a `config/` folder. Pages only find components in `_components/`.
+The names are `routes`, `controllers`, `middleware`, `requests`, `views`, `components`, `layouts`, `partials`, `styles`, `lib`, `types`, `models`, `errors`, `storage`, `jobs`, `windows`, `config`, `locales`, `logging`, `data`, `scripts` and `tests`. `paths.views` is also where `@view()` looks, unless `http.views` says otherwise. `kscript serve` finds `routes/web.kscript` and `routes/api.kscript` by itself; a route file anywhere else needs listing in `http.routes`. Settings files go where `config.root` points, because that's where `$config` reads them. Without `config.root`, they go at the top of the project, unless it already has a `config/` folder. Pages only find components in `_components/`.
 
 `kscript make:component Hero` works too. Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
 

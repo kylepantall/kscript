@@ -23,6 +23,7 @@ public sealed class QueueTests : StorageFixture
         jobWriter = TextWriter.Synchronized(jobOutput);
         QueueRuntime.Clock = () => now;
         QueueContext.ForgetProjects();
+        if (DataFixture.Server != null) DatabaseServer.Reset(DataFixture.Server);
         UseProject("{ \"name\": \"" + app + "\" }");
         FileOf("jobs/welcome.kscript", WelcomeJob);
     }
@@ -31,6 +32,7 @@ public sealed class QueueTests : StorageFixture
     {
         KScript.Data.Database.CloseAll();
         DatabaseQueueDriver.ForgetTables();
+        if (DataFixture.Server != null) Environment.SetEnvironmentVariable("DATABASE_URL", null);
         QueueRuntime.Clock = () => DateTime.UtcNow;
         QueueContext.ForgetProjects();
         MemoryQueueDriver.ResetAll();
@@ -879,7 +881,7 @@ public sealed class QueueTests : StorageFixture
         Assert.Equal("database", driver.Kind);
         Assert.Equal(new[] { 2.0, 3.0, 4.0 }, driver.Waiting("mail").Select(j => (double)j.Fields["user_id"]));
         Assert.Equal(new[] { "mail" }, driver.QueueNames());
-        Assert.True(File.Exists(Path.Combine(Project, "data", "app.sqlite")));
+        if (DataFixture.Server == null) Assert.True(File.Exists(Path.Combine(Project, "data", "app.sqlite")));
         Assert.Equal(3L, Sql("SELECT COUNT(*) AS n FROM kscript_jobs")[0]["n"]);
 
         string log = Work();
@@ -932,6 +934,14 @@ public sealed class QueueTests : StorageFixture
         driver.Fail(driver.Reserve(new[] { "mail" }, now));
         Assert.True(driver.Forget(Assert.Single(driver.Failed()).Id));
         Assert.Equal(0, driver.Clear(null));
+    }
+
+    [Fact]
+    public void IdsMadeInTheSameMillisecondSortInTheOrderTheyWereMade()
+    {
+        var ids = Enumerable.Range(0, 2000).Select(_ => QueuedJob.NewId()).ToList();
+        Assert.Equal(ids, ids.OrderBy(id => id, StringComparer.Ordinal).ToList());
+        Assert.Equal(ids.Count, ids.Distinct().Count());
     }
 
     [Fact]

@@ -134,6 +134,9 @@ namespace KScript.Syntax
         /// <summary>A function parameter with no type and no default: <c>fn cached(key)</c> rather than <c>fn cached(key: string)</c>.</summary>
         public const string MissingParameterType = "KS6007";
 
+        /// <summary>A script in a project that declares more than one type, model, enum or error type: each goes in its own file.</summary>
+        public const string OneTypePerFile = "KS6008";
+
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>
             "https://github.com/kylepantall/kscript/blob/master/docs/errors.md#" + (code ?? string.Empty).ToLowerInvariant();

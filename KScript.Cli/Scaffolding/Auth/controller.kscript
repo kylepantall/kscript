@@ -8,14 +8,7 @@ to: {{ paths.controllers }}/accounts.kscript
 // Sign-in guide).
 import KScript.Http
 import KScript.Auth
-
-/// What the sign-up form sends. The email and password types check it: the
-/// password rules are in kscript.json.
-type SignUp {
-  name: string
-  email: email
-  password: password
-}
+import "{{ sign_up_import }}"
 
 /// GET /login
 fn show_login() => @view('auth/login', data: {})

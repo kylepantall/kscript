@@ -52,7 +52,7 @@ namespace KScript.Data
     /// <summary>
     /// Two parts joined by an operator: <c>=</c>, <c>&lt;&gt;</c>, <c>&lt;</c>, <c>&lt;=</c>, <c>&gt;</c>, <c>&gt;=</c>,
     /// <c>AND</c>, <c>OR</c>, <c>+</c>, <c>-</c>, <c>*</c>, <c>/</c>, <c>%</c>, <c>||</c>, <c>IN</c>, <c>NOT IN</c>,
-    /// <c>LIKE</c> and <c>REGEXP</c>.
+    /// and <c>LIKE</c>.
     /// </summary>
     internal sealed class SqlBinary : SqlExpr
     {
@@ -92,6 +92,27 @@ namespace KScript.Data
 
         public string Name { get; }
         public IReadOnlyList<SqlExpr> Args { get; }
+    }
+
+    /// <summary>A text column matched against a regex: <c>$u.name->matches(/^[a-z]+$/i)</c>.</summary>
+    internal sealed class SqlMatch : SqlExpr
+    {
+        public SqlMatch(SqlExpr target, KScript.Runtime.RegexValue regex)
+        {
+            Target = target;
+            Regex = regex;
+        }
+
+        public SqlExpr Target { get; }
+        public KScript.Runtime.RegexValue Regex { get; }
+    }
+
+    /// <summary>SQL written as it is, from KScript.Data itself (never from a script): <c>1</c> in <c>ORDER BY 1</c>.</summary>
+    internal sealed class SqlRaw : SqlExpr
+    {
+        public SqlRaw(string text) => Text = text;
+
+        public string Text { get; }
     }
 
     /// <summary><c>CASE WHEN c THEN a ELSE b END</c>.</summary>
@@ -178,19 +199,23 @@ namespace KScript.Data
                     break;
                 case SqlBinary b:
                     if (nested) sb.Append('(');
-                    Expr(b.Left, nested: true);
-                    if (b.Op == "LIKE")
-                    {
-                        sb.Append(" LIKE ");
-                        Expr(b.Right, nested: true);
-                        sb.Append(" ESCAPE '\\'");
-                    }
+                    if (b.Op == "LIKE") Dialect.Like(this, b.Left, b.Right);
+                    else if (b.Op == "||") Dialect.Concat(this, b.Left, b.Right);
                     else
                     {
+                        Expr(b.Left, nested: true);
                         sb.Append(' ').Append(b.Op).Append(' ');
                         Expr(b.Right, nested: true);
                     }
                     if (nested) sb.Append(')');
+                    break;
+                case SqlMatch m:
+                    if (nested) sb.Append('(');
+                    Dialect.Matches(this, m.Target, m.Regex);
+                    if (nested) sb.Append(')');
+                    break;
+                case SqlRaw raw:
+                    sb.Append(raw.Text);
                     break;
                 case SqlUnary u when u.Op is "IS NULL" or "IS NOT NULL":
                     if (nested) sb.Append('(');
@@ -205,7 +230,7 @@ namespace KScript.Data
                     if (nested) sb.Append(')');
                     break;
                 case SqlCall call:
-                    sb.Append(call.Name).Append('(');
+                    sb.Append(Dialect.Function(call.Name)).Append('(');
                     if (call.Args.Count == 0) sb.Append('*');
                     for (int i = 0; i < call.Args.Count; i++)
                     {

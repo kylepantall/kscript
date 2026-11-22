@@ -40,7 +40,7 @@
   "make": ["{{#if auth}}auth{{/if}}"],
   // Printed after the project is made. Lines that come out empty are left out.
   "notes": [
-    "{{#if db in postgres, mysql}}this version of KScript.Data connects to SQLite only. config/config.yaml{{#if docker}} and compose.yaml{{/if}} are set up for {{ db }}, and the tests use SQLite in memory, so the project is ready when {{ db }} support lands. Until then, set DATABASE_URL=sqlite:data/app.sqlite to run it.{{/if}}"
+    "{{#if db in postgres, mysql}}the app keeps its data in {{ db }}, at the url in config/config.yaml (DATABASE_URL overrides it){{#if docker}}, and docker compose up starts the database too{{/if}}. kscript test uses SQLite in memory, so tests need no database server.{{/if}}"
   ],
   // Printed after the project is made, under "Next:". Lines that come out empty are left out.
   "next": [

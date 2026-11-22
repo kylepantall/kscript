@@ -1,10 +1,7 @@
-// The shape of GitHub's repository data. Other scripts import these types.
-enum Visibility { public, private, internal }
-
-type Owner {
-  login: string
-  id: int
-}
+// The shape of GitHub's repository data. Other scripts import it; each type it
+// uses has its own file.
+import "owner.kscript"
+import "visibility.kscript"
 
 /// A GitHub repository.
 type Repo {
