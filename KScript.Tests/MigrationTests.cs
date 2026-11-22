@@ -57,7 +57,8 @@ public sealed class MigrationTests : DataFixture
         return System.Text.RegularExpressions.Regex.Replace(System.Text.RegularExpressions.Regex.Replace(text, @"\(\n\s+", "("), @",?\n\s*\)", ")").Replace(",\n    ", ", ");
     }
 
-    private const string User = """
+    // Raw strings have the file's line ends (\r\n in a Windows checkout); the tests edit them by \n.
+    private static readonly string User = """
         import KScript.Data
 
         enum Role { member, admin }
@@ -71,9 +72,9 @@ public sealed class MigrationTests : DataFixture
           active: bool = true
           posts: Post[]
         }
-        """;
+        """.ReplaceLineEndings("\n");
 
-    private const string Post = """
+    private static readonly string Post = """
         import KScript.Data
 
         model Post {
@@ -82,21 +83,25 @@ public sealed class MigrationTests : DataFixture
           author: User
           tags: Tag[]
         }
-        """;
+        """.ReplaceLineEndings("\n");
 
-    private const string Tag = """
+    private static readonly string Tag = """
         import KScript.Data
 
         model Tag {
           name: string
           posts: Post[]
         }
-        """;
+        """.ReplaceLineEndings("\n");
 
-    private void Models(string user = User, string post = Post, string tag = Tag)
+    /// <summary>Stands for the Tag model in <see cref="Models"/>; null there means no Tag model.</summary>
+    private const string DefaultTag = "\0tag";
+
+    private void Models(string user = null, string post = null, string tag = DefaultTag)
     {
-        FileOf("models/user.kscript", user);
-        FileOf("models/post.kscript", post);
+        if (tag == DefaultTag) tag = Tag;
+        FileOf("models/user.kscript", user ?? User);
+        FileOf("models/post.kscript", post ?? Post);
         if (tag != null) FileOf("models/tag.kscript", tag);
         else File.Delete(Path.Combine(Project, "models", "tag.kscript"));
     }
