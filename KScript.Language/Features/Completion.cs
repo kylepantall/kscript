@@ -524,6 +524,12 @@ namespace KScript.Language.Features
                 case AttributeKind.ExpressionList:
                 case AttributeKind.Statements:
                 case AttributeKind.Template:
+                    if (cursor.Region == null && a.Name == "value" && string.IsNullOrWhiteSpace(before)
+                        && DeclaredTypeValueCompletions(cursor.TagElement, replace) is { Count: > 0 } typed)
+                    {
+                        // <let type="duration" value="‸">: the values a native type offers.
+                        return typed.Concat(ExpressionStartCompletions(analysis, cursor.Offset, replace, template: false)).ToList();
+                    }
                     return cursor.Region != null ? null : ExpressionStartCompletions(analysis, cursor.Offset, replace, a.Kind == AttributeKind.Template);
 
                 default:
@@ -808,6 +814,7 @@ namespace KScript.Language.Features
             List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false);
             start.InsertRange(0, ParameterNameCompletions(analysis, region, wordStart, replace));
             start.InsertRange(0, NamedValueCompletions(analysis, region, wordStart, replace));
+            start.InsertRange(0, DeclaredTypeValueCompletions(region, wordStart, replace));
             start.InsertRange(0, ListItemCompletions(analysis, region, wordStart, replace));
             return start;
         }

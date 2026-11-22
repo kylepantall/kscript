@@ -122,6 +122,12 @@ namespace KScript.Language.Analysis
                     CheckArithmetic(arithmetic, region);
                     return;
 
+                case BinaryNode { Operator: "<" or "<=" or ">" or ">=" } comparison:
+                    AnalyzeExpr(comparison.Left, region, scope, ExprContext.Value);
+                    AnalyzeExpr(comparison.Right, region, scope, ExprContext.Value);
+                    CheckNativeOrdering(comparison, region);
+                    return;
+
                 default:
                     foreach (ExprNode child in node.Children)
                     {
