@@ -3,6 +3,7 @@
 ## Unreleased
 
 - One way to write each thing, and the editor says so. A spelling that was renamed or removed is underlined with what to write now: `to:` is `into:` for the variable a result goes into, argument names use `_` (`max_tokens`, `on_click`), text arguments take quotes (`title: "Results"`), booleans are `true` and `false`, a function is named `@name`, a type is named bare and called to make a value (`Repo($data)`), counting is `->count()`, and the error types are `Query` and `Connection`. Most have a quick fix, and **KScript: Check Project** with `kscript check --fix` rewrites a whole folder. The docs have the full list under **What changed**.
+- A name of your own that breaks the naming rules is underlined (KS6013): functions, variables, fields and arguments are `snake_case`, and types, models, enums and error types are `PascalCase`. The built-in names are held to the same rules by the engine itself, so suggestions never offer a name spelled another way.
 - Error messages in a `.kscript` file are worded for `.kscript`: they say statement and argument and show `name: value`, not XML tags and attributes.
 - Highlighting matches the language: `is`, `++`, `--` and `%=` are no longer coloured as operators, and the comparison words (`lt`, `ge`, `eq`) are coloured only in XML, where they are written.
 - Scripts are `.kscript` files, or `.ks.xml` for the XML form. `.ks` and plain `.xml` files are no longer treated as scripts.

@@ -157,6 +157,12 @@ Keys are `snake_case`. An old key is an error that names the new one.
 | `format.rules.braceStyle`, `wrapStrings`, `wrapChains`, `wrapBodies`, `wrapComments` | `format.rules.brace_style`, `wrap_strings`, `wrap_chains`, `wrap_bodies`, `wrap_comments` |
 | `make.format` | `make.syntax` |
 
+## Names
+
+Your own names follow the same rules as the built-in ones, and a name that breaks them is a warning (KS6013): functions, variables, fields and arguments are `snake_case`, and types, models, enums and error types are `PascalCase`. Rename `fn sendEmail()` to `fn send_email()` and `type repo` to `type Repo`.
+
+The built-in names can no longer drift from these rules. The engine checks each statement, argument, command, method and field as a package registers it, and refuses one that breaks a rule, so a new package can't bring back a hyphenated argument or a second name for `->count()`. [Working on KScript](contributing.md) lists the rules.
+
 ## Files
 
 | Before | Now |
