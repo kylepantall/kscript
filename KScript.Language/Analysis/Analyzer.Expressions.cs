@@ -42,7 +42,7 @@ namespace KScript.Language.Analysis
                 case VariableNode v:
                 {
                     TextSpan span = VariableNameSpan(v, region);
-                    ReferenceVariable(v.Name, span, scope, isWrite: false, mustBeMutable: false, offset: span.Start);
+                    CheckTypeIsBare(ReferenceVariable(v.Name, span, scope, isWrite: false, mustBeMutable: false, offset: span.Start), span);
                     return;
                 }
 
@@ -60,6 +60,11 @@ namespace KScript.Language.Analysis
                     AnalyzeExpr(m.Target, region, scope, ExprContext.Value);
                     TypeShape receiver = Infer(m.Target, region);
                     AnalyzeArguments(m.Arguments, region, scope, LambdaParameterShapes(m.Name, receiver));
+                    if (CheckRetiredConstructor(m, receiver, region))
+                    {
+                        FlushBare(m.Arguments, region, scope);
+                        return;
+                    }
                     CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false, m.Arguments, region);
                     if (m.Name == "sql" && receiver.Type == KType.Database)
                     {
@@ -151,7 +156,7 @@ namespace KScript.Language.Analysis
             argumentTexts.UnionWith(args.Select(a => a.Value).OfType<LiteralNode>());
             foreach (ArgumentNode arg in args)
             {
-                if (BareWord(arg) is (_, false, IdentifierNode typeNode) && (ReferenceBareType(typeNode, region, scope) || ReferenceBareErrorType(typeNode, region, scope)))
+                if (BareWord(arg) is (_, false, IdentifierNode typeNode) && (ReferenceDeclaredType(typeNode, region, scope) || ReferenceBareErrorType(typeNode, region, scope)))
                 {
                     continue;
                 }
@@ -172,7 +177,7 @@ namespace KScript.Language.Analysis
                     foreach (ExprNode item in list.Items)
                     {
                         if (item is IdentifierNode id && id.Name != "_" && scope.Lookup(id.Name, region.Source.ToSource(id.Span.Start)) is not { Kind: SymbolKind.Import }
-                            && !ReferenceBareType(id, region, scope))
+                            && !ReferenceDeclaredType(id, region, scope))
                         {
                             bare.Add(id);
                             continue;
@@ -196,7 +201,7 @@ namespace KScript.Language.Analysis
 
         private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context)
         {
-            if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceBareType(id, region, scope) || ReferenceBareErrorType(id, region, scope))
+            if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceDeclaredType(id, region, scope) || ReferenceBareErrorType(id, region, scope))
             {
                 return;
             }
@@ -218,6 +223,13 @@ namespace KScript.Language.Analysis
             else
             {
                 fixes.Add(new QuickFix($"Quote as '{id.Name}'", new TextChange(span, "'" + id.Name + "'")));
+                if (char.IsUpper(id.Name[0]))
+                {
+                    // A capitalised word reads as a type, model, enum, error or job: one that isn't declared or imported here.
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedVariable,
+                        $"No type named {id.Name} is declared or imported here. Text needs quotes ('{id.Name}').", fixes);
+                    return;
+                }
                 hint = $" Variables start with $ ($" + id.Name + "), and text needs quotes ('" + id.Name + "').";
             }
             Report(span, DiagnosticSeverity.Error, DiagnosticCodes.BareIdentifier, $"'{id.Name}' isn't a value." + hint, fixes);
@@ -387,11 +399,15 @@ namespace KScript.Language.Analysis
                             }
                             return;
                         }
+                        if (AnalyzeTypeCall(call, id, region, scope, piped: true))
+                        {
+                            return;
+                        }
                         CheckMethod(id.Name, span, left ?? TypeShape.Unknown, call.Arguments.Count, pipe: true, call.Arguments, region);
                         return;
                     }
 
-                    if (AnalyzeErrorCall(call, id, region, scope) || AnalyzeJobCall(call, id, region, scope))
+                    if (AnalyzeErrorCall(call, id, region, scope) || AnalyzeJobCall(call, id, region, scope) || AnalyzeTypeCall(call, id, region, scope, piped: false))
                     {
                         return;
                     }
@@ -401,8 +417,9 @@ namespace KScript.Language.Analysis
                         Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Call functions with @: @{id.Name}(...).",
                             new[] { new QuickFix($"Change to @{id.Name}", new TextChange(new TextSpan(span.Start, 0), "@")) });
                     }
-                    else if (catalog.GetCommand(id.Name) != null)
+                    else if (!char.IsUpper(id.Name[0]) && catalog.GetCommand(id.Name) != null)
                     {
+                        // A capitalised name is a type being called (User($data)), never a command spelt without @.
                         Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Commands start with @: @{id.Name}(...).",
                             new[] { new QuickFix($"Change to @{id.Name}", new TextChange(new TextSpan(span.Start, 0), "@")) });
                     }

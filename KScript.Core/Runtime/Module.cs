@@ -86,6 +86,16 @@ namespace KScript.Runtime
         /// <summary>True when the root is a package element (&lt;KScript.Window&gt;) rather than &lt;kscript&gt;.</summary>
         public bool IsPackageRoot { get; internal set; }
 
+        /// <summary>
+        /// The thing a file describes, when it describes one: the root of an XML file (<c>&lt;KScript.Routes&gt;</c>), or
+        /// the one PascalCase statement at the top level of a script (<c>Routes { }</c> after its imports). Null for a
+        /// plain script.
+        /// </summary>
+        public MarkupElement MainElement { get; internal set; }
+
+        /// <summary>The name of <see cref="MainElement"/> without a package prefix (<c>Routes</c>, <c>Window</c>), or null.</summary>
+        public string MainElementName => MainElement == null ? null : Metadata.ElementInfo.BareName(MainElement.Name);
+
         /// <summary>The packages this script can use, KScript.Core first.</summary>
         public IReadOnlyList<KScriptPackage> Packages => packages;
 

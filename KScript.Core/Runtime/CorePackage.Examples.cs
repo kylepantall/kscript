@@ -158,12 +158,11 @@ namespace KScript.Runtime
                 ("string->replace_pattern", "'2026-11-19'->replace_pattern('([0-9]+)-([0-9]+)-([0-9]+)', '$3/$2/$1')"),
 
                 // Types
-                ("type->from", "<type name=\"User\" fields=\"login: string, id: int\" />\n<let name=\"user\" value=\"$User->from({ login: 'joan', id: '7' })\" />\n<echo>{ $user.login } is user { $user.id + 1 - 1 }</echo>"),
-                ("type->check", "<type name=\"User\" fields=\"login: string, id: int\" />\n<echo>{ $User->check({ login: 'joan', id: 'seven' })->map(fn($p) => $p.message) }</echo>"),
-                ("type->schema", "<type name=\"User\" fields=\"login: string, id?: int\" />\n<echo>{ $User->schema() }</echo>"),
-                ("type->fields", "<type name=\"User\" fields=\"login: string, id: int\" />\n<echo>{ $User->fields()->map(fn($f) => $f.name) }</echo>"),
-                ("type->name", "<type name=\"User\" fields=\"login: string\" />\n<echo>{ $User->name() }</echo>"),
-                ("type->is", "<type name=\"User\" fields=\"login: string\" />\n<type name=\"Admin\" with=\"User\" fields=\"level: int\" />\n<let name=\"joan\" value=\"$Admin->from({ login: 'joan', level: 2 })\" />\n<echo>{ $User->is($joan) } { $User->is($Admin) } { $Admin->is($User) }</echo>"),
+                ("type->check", "<type name=\"User\" fields=\"login: string, id: int\" />\n<echo>{ User->check({ login: 'joan', id: 'seven' })->map(fn($p) => $p.message) }</echo>"),
+                ("type->schema", "<type name=\"User\" fields=\"login: string, id?: int\" />\n<echo>{ User->schema() }</echo>"),
+                ("type->fields", "<type name=\"User\" fields=\"login: string, id: int\" />\n<echo>{ User->fields()->map(fn($f) => $f.name) }</echo>"),
+                ("type->name", "<type name=\"User\" fields=\"login: string\" />\n<echo>{ User->name() }</echo>"),
+                ("type->is", "<type name=\"User\" fields=\"login: string\" />\n<type name=\"Admin\" with=\"User\" fields=\"level: int\" />\n<let name=\"joan\" value=\"Admin({ login: 'joan', level: 2 })\" />\n<echo>{ User->is($joan) } { User->is(Admin) } { Admin->is(User) }</echo>"),
 
                 // Text with a meaning of its own
                 ("email->local", "Joan.Smith@Example.com->local()"),
@@ -187,8 +186,7 @@ namespace KScript.Runtime
                 // Errors
                 ("error->is", "<try>\n  <throw value=\"FileNotFound('No settings.json')\" />\n  <catch as=\"err\"><echo>{ $err->is(IO) }</echo></catch>\n</try>"),
                 ("error->chain", "<error name=\"PersonNotFound\" extends=\"NotFound\" />\n<try>\n  <throw value=\"PersonNotFound()\" />\n  <catch as=\"err\"><echo>{ $err->chain() }</echo></catch>\n</try>"),
-                ("error_type->new", "<error name=\"OutOfStock\" fields=\"item: string\" message=\"{$item} is out of stock\" />\n<let name=\"e\" value=\"$OutOfStock->new(item: 'tea')\" />\n<echo>{ $e.message }</echo>"),
-                ("error_type->fields", "<error name=\"OutOfStock\" fields=\"item: string, left?: int\" />\n<echo>{ $OutOfStock->fields()->map(fn($f) => $f.name) }</echo>"),
+                ("error_type->fields", "<error name=\"OutOfStock\" fields=\"item: string, left?: int\" />\n<echo>{ OutOfStock->fields()->map(fn($f) => $f.name) }</echo>"),
 
                 // Config and logging
                 ("config->get", "$config->get('server.port', 8080)"),

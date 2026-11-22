@@ -75,9 +75,9 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("enum", "Declares a set of named values. `$Size.small` is 'small', and a parameter typed with it (`params=\"size: Size\"`) only takes those values, which calls can write bare: `@pack(large)`.",
+            p.Element(new ElementInfo("enum", "Declares a set of named values. `Size.small` is 'small', and a parameter typed with it (`params=\"size: Size\"`) only takes those values, which calls can write bare: `@pack(large)`.",
                 ContentKind.Empty,
-                new A("name", K.DeclareVariable, "The enum's name, used as a parameter type and as $Name.", true),
+                new A("name", K.DeclareVariable, "The enum's name, used as a parameter type and as Name (Size.small).", true),
                 new A("values", K.Text, "The values, comma separated: small, medium, large.", true),
                 new A("description", K.Text, "What the enum is for, shown on hover."))
             {
@@ -95,9 +95,9 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("type", "Declares the shape of some data, such as an API response. `->json(as: Repo)`, `$Repo->from($data)`, `<let type=\"Repo\">` and `repo: Repo` parameters check data against it and turn it into a record: a map whose fields the editor knows. Every problem is reported at once, with its JSON path.",
+            p.Element(new ElementInfo("type", "Declares the shape of some data, such as an API response. `->json(as: Repo)`, `Repo($data)`, `<let type=\"Repo\">` and `repo: Repo` parameters check data against it and turn it into a record: a map whose fields the editor knows. Every problem is reported at once, with its JSON path.",
                 ContentKind.Statements,
-                new A("name", K.DeclareVariable, "The type's name, used as `type=\"Repo\"`, `as: Repo` and $Repo.", true),
+                new A("name", K.DeclareVariable, "The type's name, used as `type=\"Repo\"`, `as: Repo` and Repo.", true),
                 new A("fields", K.Fields, "A short type's fields on one line, like fn params: `login: string, id: int, avatar_url?: string`. Bigger types list their fields one per line instead (<field> elements)."),
                 new A("sample", K.Path, "A JSON file holding an example of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
                 new A("extra", K.Enum, "Keys in the data that the type doesn't list: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
@@ -110,7 +110,7 @@ namespace KScript.Runtime
                 new A("not", K.Text, "Values that aren't allowed, such as reserved names: `['@admin', '@root']`."),
                 new A("description", K.Text, "What the type is, shown on hover."))
             {
-                Example = "<type name=\"User\">\n  <field name=\"login\" type=\"string\" />\n  <field name=\"id\" type=\"int\" />\n</type>\n<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int\" from=\"stargazers_count\" />\n  <field name=\"owner\" type=\"User\" />\n</type>\n<let name=\"repo\" value=\"$Repo->from({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })\" />\n<echo>$repo.name has $repo.stars stars</echo>",
+                Example = "<type name=\"User\">\n  <field name=\"login\" type=\"string\" />\n  <field name=\"id\" type=\"int\" />\n</type>\n<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int\" from=\"stargazers_count\" />\n  <field name=\"owner\" type=\"User\" />\n</type>\n<let name=\"repo\" value=\"Repo({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })\" />\n<echo>$repo.name has $repo.stars stars</echo>",
             }, run =>
             {
                 IKObject type = Shapes.Declare(run);
@@ -157,14 +157,14 @@ namespace KScript.Runtime
                 new A("message", K.Text, "What to say when it isn't, such as `must end after it starts`."))
             {
                 MustBeInside = new[] { "type", "model" },
-                Example = "<type name=\"Even\" with=\"int\">\n  <validate test=\"$value % 2 == 0\" message=\"must be even\" />\n</type>\n<echo>{ $Even->from(4) }</echo>",
+                Example = "<type name=\"Even\" with=\"int\">\n  <validate test=\"$value % 2 == 0\" message=\"must be even\" />\n</type>\n<echo>{ Even(4) }</echo>",
             }, run => throw run.Error("<validate> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("normalize", "Cleans up a value before a <type>'s rules check it, such as trimming or lower-casing. The value is `$value`; the result is converted to the type again.", ContentKind.Empty,
                 new A("value", K.Expression, "The cleaned-up value: `$value->trim()->lower()`.", true))
             {
                 MustBeInside = new[] { "type" },
-                Example = "<type name=\"Slug\" with=\"string\" pattern=\"^[a-z0-9-]+$\">\n  <normalize value=\"$value->trim()->lower()\" />\n</type>\n<echo>{ $Slug->from(' Hello-World ') }</echo>",
+                Example = "<type name=\"Slug\" with=\"string\" pattern=\"^[a-z0-9-]+$\">\n  <normalize value=\"$value->trim()->lower()\" />\n</type>\n<echo>{ Slug(' Hello-World ') }</echo>",
             }, run => throw run.Error("<normalize> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("set", "Changes an existing variable. Fails if the variable was never declared (a typo guard) or is const. Without `name`, the text is assignment statements.",
@@ -682,6 +682,11 @@ namespace KScript.Runtime
             var named = new Dictionary<string, object>();
             if (!string.IsNullOrWhiteSpace(message)) named["message"] = message;
             if (cause != null) named["cause"] = cause;
+            if (named.Count == 0 && !type.IsBuiltIn && type.Fields.Fields.Any(f => !f.Optional))
+            {
+                // throw PersonNotFound names the type alone, as a value does: say how to give its fields.
+                throw run.Error($"{type.Name} has fields, so throw it with them: {type.Name}({string.Join(", ", type.Fields.Fields.Where(f => !f.Optional).Select(f => f.Name + ": ..."))}).", "type", "Argument");
+            }
             try
             {
                 throw type.Create(run.Interpreter, Array.Empty<object>(), named);

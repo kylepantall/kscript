@@ -517,6 +517,8 @@ namespace KScript.Language.Agents
             - Operators: `== !=` (loose) `=== !==` (strict) `lt le gt ge eq ne` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
             - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enums are `enum Size { small, large }`, and their values are bare: `@known_folder(downloads)`.
             - Lists of names are arrays: `use: [log, cors]`, never `"log, cors"`.
+            - Types, models, enums, errors and jobs are named bare (`as: Task`, `User->create(name: 'Joan')`), and calling the name makes a value: `Task($data)`, `Task(title: 'x')`. An optional field is `due?: date`. Options go in brackets: `model User(timestamps, unique: [email]) { }`.
+            - A package is named only in its import: `import KScript.UI`, then `Window { }`, never `KScript.Window { }`. Nothing is imported for you (`job` and `dispatch` need `import KScript.Queue`).
 
             """;
 
@@ -527,6 +529,7 @@ namespace KScript.Language.Agents
             - Inventing methods from other languages (`.length`, `.push()` on a string, `len()`): methods use `->` and are listed per package.
             - `else` after a branch that returns, breaks or continues: return early instead (KS6001).
             - Declaring a type in the file that uses it, or several in one file: each type, model, enum and error type gets its own file (`types/`, `models/`, `errors/`, request bodies in `requests/`), named after it in kebab-case, and the files that use it import it (KS6008).
+            - `$Task` for a type, `due: date?` for an optional field, a model's options as lines of its block (KS6014), and `Task->from($data)` (gone: write `Task($data)`).
 
             """;
 

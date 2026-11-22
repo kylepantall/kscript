@@ -355,7 +355,7 @@ namespace KScript.Runtime
             p.Method(s, "json", "as?: type", "Parses the text as JSON. With as: a <type>, the data is checked and turned into records.", KType.Any, (t, c) => Shapes.MapJson(c, Values.ParseJson(S(t)), 0));
             foreach (var m in RecordType.Methods)
                 p.Method(KType.Type, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((IKObject)t).TryCallMethod(c, m.Name, out object r)
-                    ? r : throw c.Error($"{((IKObject)t).ToText()} is made from another type, so it has no ->{m.Name}(). It has ->from(), ->check() and ->name().", "Name"));
+                    ? r : throw c.Error($"{((IKObject)t).ToText()} is made from another type, so it has no ->{m.Name}(). It has ->check() and ->name().", "Name"));
             p.Method(s, "to_number", "default?", "The text as a number, or default when it isn't one.", KType.Number, (t, c) =>
                 Values.TryNumber(S(t), out double d) ? d : c.Has(0) ? c.Arg(0) : throw c.Error($"'{S(t)}' is not a number. Pass a default: ->to_number(0).", "Type"));
             p.Method(s, "to_int", "default?", "The text as a whole number, or default when it isn't one.", KType.Number, (t, c) =>

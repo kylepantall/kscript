@@ -122,7 +122,7 @@ namespace KScript.Metadata
 
         /// <summary>
         /// True when names the signature doesn't list, and words without quotes, mean something to the call itself, as
-        /// columns and values do in <c>$User->where(role: admin)</c>: they reach it as they are instead of being an error.
+        /// columns and values do in <c>User->where(role: admin)</c>: they reach it as they are instead of being an error.
         /// </summary>
         public bool KeepsBareWords { get; set; }
 

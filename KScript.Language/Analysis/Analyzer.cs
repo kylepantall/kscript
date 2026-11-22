@@ -411,6 +411,7 @@ namespace KScript.Language.Analysis
                     {
                         importedEnums[(full, name)] = EnumValuesOf(e);
                     }
+                    importedTypes.Add((full, name));
                     Symbol symbol = ImportedConstant(name, owner.NameSpan, owner, full, where,
                         (new ExternalLocation(full, other.GetPosition(span.Start), other.GetPosition(span.End)), e.Documentation ?? $"A native type of this project, from {where}"));
                     root.Declare(symbol, 0);
@@ -490,6 +491,10 @@ namespace KScript.Language.Analysis
                 if (let.Name == "error")
                 {
                     importedErrors.Add(nameAttr.ValueText.Trim());
+                }
+                if (let.Name != "let" && let.Name != "const")
+                {
+                    importedTypes.Add((path, nameAttr.ValueText.Trim().TrimStart('$')));
                 }
                 if (let.Name == "enum")
                 {

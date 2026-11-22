@@ -199,8 +199,8 @@ namespace KScript.Runtime
 
                 case IdentifierNode id:
                     if (ctx.Module != null && ctx.Module.Aliases.TryGetValue(id.Name, out ImportNamespace ns)) return ns;
-                    // A <type> can be named without $: as: Repo.
-                    if (scope.TryGet(id.Name, out object declaredType) && (declaredType is RecordType || declaredType is ErrorType)) return declaredType;
+                    // A declared type (type, model, enum, error, job) is named bare: as: Repo, User->find(1), Size.small.
+                    if (scope.TryGet(id.Name, out object declaredType) && declaredType is IDeclaredType) return declaredType;
                     // So is an error type: catch NotFound, $err->is(NotFound).
                     if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType) return errorType;
                     throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
@@ -379,7 +379,7 @@ namespace KScript.Runtime
                 negated = true;
             }
             if (node is IdentifierNode id && id.Name != "_" && !(ctx.Module != null && ctx.Module.Aliases.ContainsKey(id.Name))
-                && !(!negated && scope.TryGet(id.Name, out object value) && (value is RecordType || value is ErrorType))
+                && !(!negated && scope.TryGet(id.Name, out object value) && value is IDeclaredType)
                 && !(!negated && ErrorTypes.FindExact(id.Name, null) != null))
             {
                 return new BareWord(id.Name, negated, afterNamed);
@@ -792,6 +792,11 @@ namespace KScript.Runtime
                             throw Fail(call, ctx, ex.Message, ex.Type);
                         }
                     }
+                    // Repo($data), Repo(name: 'x'), Email('a@b.co'), Size('small'): calling a type makes a value of it.
+                    if (stored is RecordType or RefinedType or EnumType)
+                    {
+                        return Construct(stored, args, named, scope, ctx);
+                    }
                     if (piped && Extensions.TryFind(pipedValue, id.Name, ctx.Module, out ExtensionMethod extension))
                     {
                         return Extensions.Call(this, extension, pipedValue, args.Skip(1).ToList(), named, scope, ctx.Module);
@@ -822,6 +827,25 @@ namespace KScript.Runtime
         }
 
         private static readonly object NotPiped = new object();
+
+        /// <summary>Calling a declared type: a record of a type or model, a checked value of a refined type or an enum.</summary>
+        private object Construct(object type, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx)
+        {
+            named ??= new Dictionary<string, object>();
+            switch (type)
+            {
+                case RecordType record:
+                    return record.Construct(this, args, named);
+                case RefinedType refined:
+                    if (args.Count != 1 || named.Count > 0) throw new KScriptException($"{refined.Name}() takes one value to check: {refined.Name}($value).", "Argument");
+                    return Shapes.Convert(this, args[0], TypeRef.Of(refined), "The value", refined.Closure, refined.Module);
+                case EnumType e:
+                    if (args.Count != 1 || named.Count > 0) throw new KScriptException($"{e.Name}() takes one value to check: {e.Name}($value).", "Argument");
+                    return e.Check(args[0], "The value");
+                default:
+                    throw new KScriptException($"{Values.Describe(type)} can't be called.", "Type");
+            }
+        }
 
         private object EvaluatePipe(PipeNode pipe, Scope scope, EvalContext ctx)
         {

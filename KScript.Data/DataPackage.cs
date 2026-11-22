@@ -36,7 +36,7 @@ namespace KScript.Data
         {
             var attributes = new List<A>
             {
-                new A("name", K.DeclareVariable, "The model's name, such as User: $User->where(...) queries it, and its records have its fields.", true),
+                new A("name", K.DeclareVariable, "The model's name, such as User: User->where(...) queries it, and its records have its fields.", true),
                 new A("fields", K.Fields, "A short model's fields on one line: `name: string, email: email`. Bigger models list one <field> per line."),
                 new A("table", K.Text, "The table its records are kept in. Default: the plural of the name in snake case (User is users, BlogPost blog_posts)."),
                 new A("connection", K.Text, "The database connection, from database.connections in your config. Default: the default connection (main)."),
@@ -50,7 +50,7 @@ namespace KScript.Data
                 new A("extra", K.Enum, "Keys ->create() is given that the model doesn't have: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
                 new A("description", K.Text, "What the model is, shown on hover."),
             };
-            p.Element(new ElementInfo("model", "Declares a model: a <type> whose records are kept in a database table. `$User->where(role: admin)->get()` reads them, `$User->create({...})` adds one, and `$user->save()` writes changes. Its fields are checked by their types and rules on every save.",
+            p.Element(new ElementInfo("model", "Declares a model: a <type> whose records are kept in a database table. `User->where(role: admin)->get()` reads them, `User->create({...})` adds one, and `$user->save()` writes changes. Its fields are checked by their types and rules on every save.",
                 ContentKind.Statements, attributes.ToArray())
             {
                 Example = "<model name=\"User\" timestamps=\"yes\" unique=\"email\">\n  <field name=\"name\" type=\"string(max: 120)\" />\n  <field name=\"email\" type=\"email\" />\n</model>",
@@ -66,7 +66,7 @@ namespace KScript.Data
 
         #region Queries
 
-        /// <summary>The query a method works on: the query itself, or (for $User->...) one on the model with no conditions yet.</summary>
+        /// <summary>The query a method works on: the query itself, or (for User->...) one on the model with no conditions yet.</summary>
         private static Query QueryOf(object target, CallContext call)
         {
             if (target is Query q) return q;
@@ -185,7 +185,7 @@ namespace KScript.Data
             new("avg", "column", "The average of a column, or null when no rows match.", KType.Number, (q, c) => q.Aggregate(c, "AVG", Word(c.Arg(0), "->avg()")), Bare: true),
             new("min", "column", "The smallest value of a column, or null when no rows match.", KType.Any, (q, c) => q.Aggregate(c, "MIN", Word(c.Arg(0), "->min()")), Bare: true),
             new("max", "column", "The largest value of a column, or null when no rows match.", KType.Any, (q, c) => q.Aggregate(c, "MAX", Word(c.Arg(0), "->max()")), Bare: true),
-            new("pluck", "column", "One column of every row that matches, as a list: `$User->pluck(email)`.", KType.List, (q, c) => q.Pluck(c, Word(c.Arg(0), "->pluck()")), Bare: true),
+            new("pluck", "column", "One column of every row that matches, as a list: `User->pluck(email)`.", KType.List, (q, c) => q.Pluck(c, Word(c.Arg(0), "->pluck()")), Bare: true),
             new("value", "column", "One column of the first row, or null.", KType.Any, (q, c) => q.Value(c, Word(c.Arg(0), "->value()")), Bare: true),
             new("paginate", "per_page?: number, page?: number", "One page of rows: { items, page, per_page, total, last_page, from, to, has_more }. per_page is 15 by default; page (1 by default) can be text such as $query.page.", KType.Map,
                 (q, c) =>
@@ -218,7 +218,7 @@ namespace KScript.Data
 
         private static readonly QueryMethod[] ModelMethods =
         {
-            new("create", "values...", "Checks the values against the model, saves a new record and returns it: `$User->create({ name: 'Joan', email: 'joan@example.com' })` or `$User->create(name: 'Joan', ...)`. Guarded fields are left out.", KType.Record,
+            new("create", "values...", "Checks the values against the model, saves a new record and returns it: `User->create({ name: 'Joan', email: 'joan@example.com' })` or `User->create(name: 'Joan', ...)`. Guarded fields are left out.", KType.Record,
                 (q, c) => Records.Create(c, q.Model, ValuesOf(c, "create", allowEmpty: true)), Bare: true),
             new("all", "", "Every record (leaving out soft-deleted ones).", KType.List, (q, c) => q.Get(c)),
             new("first_or_create", "match: map, values?: map", "The first record that matches, or a new one made from both maps.", KType.Record,
@@ -416,7 +416,7 @@ namespace KScript.Data
                 new A("retries", K.Expression, "Tries the block again this many times when the database is busy or a deadlock stops it."),
                 new A("connection", K.Text, "The database connection, from database.connections in your config. Default: the default connection."))
             {
-                Example = "<transaction>\n  <do>$Order->create({ total: 10 })</do>\n</transaction>",
+                Example = "<transaction>\n  <do>Order->create({ total: 10 })</do>\n</transaction>",
             }, run =>
             {
                 string connection = run.Raw("connection")?.Trim();

@@ -69,7 +69,7 @@ namespace KScript.Syntax.Markup
             elements ??= Elements;
             // What each argument means depends on the element, so read them by the one rule before printing.
             if (elements != null) CodeArguments.Normalise(document, elements);
-            var writer = new XmlWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? NameListFrom(elements) };
+            var writer = new XmlWriter { ImportPath = importPath ?? (s => s), NameList = nameList ?? NameListFrom(elements), Elements = elements };
             writer.WriteDocument(document);
             return writer.Result;
         }
@@ -347,14 +347,73 @@ namespace KScript.Syntax.Markup
                             WriteComment(c, 0);
                             break;
                         case MarkupElement e when e.Name == "kscript":
+                            if (WritePackageImports(document, null))
+                            {
+                                sb.Append('\n');
+                            }
                             WriteBody(e.Children, 0);
                             break;
                         case MarkupElement e:
+                            if (WritePackageImports(document, e))
+                            {
+                                sb.Append('\n');
+                            }
                             WriteElement(e, 0, chained: false);
                             break;
                     }
                 }
                 Result.Text = sb.ToString().TrimEnd('\n') + "\n";
+            }
+
+            /// <summary>The imports of a package root (&lt;KScript.Routes&gt;), which are written above it rather than inside.</summary>
+            private readonly HashSet<MarkupNode> hoisted = new HashSet<MarkupNode>();
+
+            /// <summary>The packages of the elements best known as XML roots, for when nothing describes the elements.</summary>
+            internal static readonly Dictionary<string, string> RootPackages = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Window"] = "KScript.UI",
+                ["Routes"] = "KScript.Http",
+                ["Document"] = "KScript.Document",
+            };
+
+            /// <summary>
+            /// An XML file names a package in a tag (&lt;KScript.Window&gt;); a .kscript file names it only in an import.
+            /// Writes <c>import KScript.UI</c> for each package a KScript.-prefixed element brings in and the file doesn't
+            /// import, then the root's own imports, which go at the top of a .kscript file. True if anything was written.
+            /// </summary>
+            private bool WritePackageImports(MarkupDocument document, MarkupElement root)
+            {
+                var imported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (MarkupElement import in document.DescendantElements().Where(x => x.Name == "import"))
+                {
+                    if (import.GetAttributeValue("package")?.Trim() is { Length: > 0 } package)
+                    {
+                        imported.Add(ElementInfo.BareName(package));
+                    }
+                }
+                bool wrote = false;
+                foreach (MarkupElement e in document.DescendantElements().Where(x => x.Name.StartsWith("KScript.", StringComparison.Ordinal)))
+                {
+                    string bare = ElementInfo.BareName(e.Name);
+                    string package = Elements?.Invoke(bare)?.Package ?? (RootPackages.TryGetValue(bare, out string known) ? known : null);
+                    if (package == null)
+                    {
+                        Result.Warnings.Add($"<{e.Name}> on line {LineOf(e)} was written as {bare}: add the import of its package at the top.");
+                        continue;
+                    }
+                    if (imported.Add(ElementInfo.BareName(package)))
+                    {
+                        Line(0, "import " + package);
+                        wrote = true;
+                    }
+                }
+                foreach (MarkupElement import in root?.ChildElements.Where(x => x.Name == "import") ?? Enumerable.Empty<MarkupElement>())
+                {
+                    hoisted.Add(import);
+                    WriteElement(import, 0, chained: false);
+                    wrote = true;
+                }
+                return wrote;
             }
 
             private static string Pad(int indent) => new string(' ', indent * 2);
@@ -395,6 +454,8 @@ namespace KScript.Syntax.Markup
                             FlushBlank(ref blankRuns);
                             WriteComment(c, indent);
                             previous = null;
+                            break;
+                        case MarkupElement e when hoisted.Contains(e):
                             break;
                         case MarkupElement e:
                             bool chained = previous != null && sb.Length > 0 && sb[sb.Length - 1] == '\n' && sb.ToString().TrimEnd('\n').EndsWith("}", StringComparison.Ordinal)
@@ -661,15 +722,9 @@ namespace KScript.Syntax.Markup
                             }
                             // fields="login: string, id: int" becomes one line per field, the way .kscript writes types.
                             List<string> fieldLines = FieldsAsLines(Attr("fields"));
-                            // A model's settings are lines too: table: people, unique: [email].
-                            bool model = e.Name == "model";
-                            if (model)
-                            {
-                                rules.InsertRange(0, ModelSettingLines(e));
-                            }
+                            // The options of every declaration go in its brackets: model User(timestamps, unique: [email]).
                             string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "with") && !RuleAttributes.Contains(a.Name)
-                                && !(model && CodeParser.ModelSettings.Contains(a.Name))
-                                && !(a.Name == "fields" && fieldLines != null)).Select(a => FormatAttribute(e, a)));
+                                && !(a.Name == "fields" && fieldLines != null)).Select(a => ModelOption(e, a) ?? FormatAttribute(e, a)));
                             sb.Append(pad).Append(e.Name).Append(' ').Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
                             if (Attr("with") is string with)
                             {
@@ -856,19 +911,20 @@ namespace KScript.Syntax.Markup
 
             private static readonly string[] RuleAttributes = { "min", "max", "pattern", "one_of", "not", "parse" };
 
-            /// <summary>A model's settings as .kscript lines: <c>table: people</c>, <c>unique: [email, [team, slug]]</c>.</summary>
-            private static IEnumerable<string> ModelSettingLines(MarkupElement e)
+            /// <summary>
+            /// A model's lists of fields as they go in its brackets, names as they are:
+            /// <c>unique: [email, [team, slug]]</c>, <c>hidden: [password]</c>. Null for anything else.
+            /// </summary>
+            private static string ModelOption(MarkupElement e, MarkupAttribute a)
             {
-                foreach (string name in CodeParser.ModelSettings)
+                string value = a.Value?.Value?.Trim();
+                if (e.Name != "model" || string.IsNullOrEmpty(value))
                 {
-                    string value = e.GetAttributeValue(name)?.Trim();
-                    if (value == null)
-                    {
-                        continue;
-                    }
-                    bool list = name is "unique" or "index" or "hidden" or "guarded";
-                    yield return name + ": " + (list && !value.StartsWith('[') ? "[" + string.Join(", ", value.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)) + "]" : value);
+                    return null;
                 }
+                return a.Name is "unique" or "index" or "hidden" or "guarded"
+                    ? a.Name + ": " + (value.StartsWith('[') ? value : "[" + string.Join(", ", value.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)) + "]")
+                    : null;
             }
 
             /// <summary>
@@ -1117,7 +1173,8 @@ namespace KScript.Syntax.Markup
                 {
                     Result.Warnings.Add($"<{e.Name}> on line {LineOf(e)} has a shape the short form can't hold, so it was written as {e.Name}(...).");
                 }
-                sb.Append(pad).Append(e.Name);
+                // A package is named only in an import: <KScript.Window> is Window (see WritePackageImports).
+                sb.Append(pad).Append(ElementInfo.BareName(e.Name));
                 if (e.Attributes.Count > 0)
                 {
                     sb.Append('(').Append(string.Join(", ", e.Attributes.Select(a => FormatAttribute(e, a)))).Append(')');
@@ -1312,11 +1369,77 @@ namespace KScript.Syntax.Markup
 
             private SourceText source;
 
+            /// <summary>Describes an element by name, or null when nothing is known about elements.</summary>
+            public Func<string, ElementInfo> Elements { get; init; }
+
             public void WriteDocument(MarkupDocument document)
             {
                 source = document.Source;
-                WriteNodes(document.Children, 0);
+                if (!WritePackageRoot(document))
+                {
+                    WriteNodes(document.Children, 0);
+                }
                 Result.Text = sb.ToString().TrimEnd('\n') + "\n";
+            }
+
+            /// <summary>
+            /// A .kscript file that is one thing (<c>import KScript.Http</c>, its other imports, then <c>Routes { }</c>) is
+            /// the XML file whose root names the package: &lt;KScript.Routes&gt;, with the other imports inside it. False
+            /// when the file isn't that shape, and is written as a &lt;kscript&gt; script.
+            /// </summary>
+            private bool WritePackageRoot(MarkupDocument document)
+            {
+                List<MarkupElement> roots = document.RootElements.ToList();
+                if (roots.Count != 1 || roots[0].Name != "kscript" || roots[0].Attributes.Count > 0 || roots[0].Children.Any(n => n is MarkupText t && !t.IsWhitespace))
+                {
+                    return false;
+                }
+                MarkupElement script = roots[0];
+                List<MarkupElement> others = script.ChildElements.Where(e => e.Name != "import").ToList();
+                if (others.Count != 1 || !char.IsUpper(others[0].Name[0]))
+                {
+                    return false;
+                }
+                MarkupElement main = others[0];
+                string package = Elements?.Invoke(main.Name)?.Package ?? (CodeWriter.RootPackages.TryGetValue(main.Name, out string known) ? known : null);
+                List<MarkupElement> imports = script.ChildElements.Where(e => e.Name == "import").ToList();
+                MarkupElement packageImport = package == null ? null : imports.FirstOrDefault(i =>
+                    string.Equals(ElementInfo.BareName(i.GetAttributeValue("package")?.Trim()), ElementInfo.BareName(package), StringComparison.OrdinalIgnoreCase) && i.GetAttribute("as") == null);
+                if (packageImport == null || script.Children.SkipWhile(n => n != main).Skip(1).Any(n => n is MarkupElement))
+                {
+                    return false;
+                }
+                imports.Remove(packageImport);
+
+                var top = new List<MarkupNode>(document.Children.TakeWhile(n => n != script));
+                top.AddRange(script.Children.TakeWhile(n => n != main).Where(n => n is MarkupComment));
+                top.Add(main);
+                top.AddRange(script.Children.SkipWhile(n => n != main).Skip(1).Where(n => n is MarkupComment));
+                top.AddRange(document.Children.SkipWhile(n => n != script).Skip(1));
+
+                string name = main.Name;
+                List<MarkupNode> children = main.Children.ToList();
+                try
+                {
+                    main.Name = "KScript." + name;
+                    if (imports.Count > 0)
+                    {
+                        var moved = new List<MarkupNode>(imports);
+                        if (children.Any(n => n is MarkupElement || n is MarkupComment))
+                        {
+                            moved.Add(new MarkupText { Content = DecodedText.Plain("\n\n", 0) });
+                        }
+                        main.Children.InsertRange(0, moved);
+                    }
+                    WriteNodes(top, 0);
+                }
+                finally
+                {
+                    main.Name = name;
+                    main.Children.Clear();
+                    main.Children.AddRange(children);
+                }
+                return true;
             }
 
             private static string Pad(int indent) => new string(' ', indent * 2);

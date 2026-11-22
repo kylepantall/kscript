@@ -762,7 +762,7 @@ namespace KScript.Syntax
 
         /// <summary>
         /// A ``` block tagged with a type parses its text: <c>```&lt;json&gt;</c> is <c>'...'-&gt;json()</c> and
-        /// <c>```&lt;Repo&gt;</c> is <c>'...'-&gt;json(as: $Repo)</c>. Any other block is the string itself.
+        /// <c>```&lt;Repo&gt;</c> is <c>'...'-&gt;json(as: Repo)</c>. Any other block is the string itself.
         /// </summary>
         private static ExprNode TypedBlock(Token t, LiteralNode literal)
         {

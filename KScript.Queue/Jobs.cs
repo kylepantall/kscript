@@ -53,7 +53,7 @@ namespace KScript.Queueing
     /// A job type: <c>job SendWelcome(queue: mail, tries: 5) { user_id: int; fn handle() { } }</c>. Calling it with
     /// its fields (<c>SendWelcome(user_id: 7)</c>) makes a job, which <c>dispatch</c> queues.
     /// </summary>
-    public sealed class JobType : IKObject, ICallable
+    public sealed class JobType : IKObject, ICallable, IDeclaredType
     {
         internal JobType(string name, string description, RecordType fields, JobOptions options, MarkupElement handle, MarkupElement failed, Scope closure, Module module)
         {

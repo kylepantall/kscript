@@ -72,7 +72,7 @@ namespace KScript.Http
             }
             if (!app.HasRoutes)
             {
-                error.WriteLine($"There are no route files in {app.SiteRoot}, so there is no API to describe. Add api.kscript (or routes.kscript) starting with KScript.Routes {{ }}.");
+                error.WriteLine($"There are no route files in {app.SiteRoot}, so there is no API to describe. Add api.kscript (or routes.kscript) with import KScript.Http and a Routes {{ }} block.");
                 return 1;
             }
             try
@@ -113,7 +113,7 @@ namespace KScript.Http
             }
             if (!app.HasRoutes)
             {
-                new KScript.Output.CliOutput(error).Error($"There are no route files in [{app.SiteRoot}]. Add routes.ks.xml (or routes.kscript, api.ks.xml) starting with <KScript.Routes>.");
+                new KScript.Output.CliOutput(error).Error($"There are no route files in [{app.SiteRoot}]. Add routes.kscript (or api.kscript) with import KScript.Http and a Routes {{ }} block, or routes.ks.xml starting with <KScript.Routes>.");
                 return 1;
             }
             try

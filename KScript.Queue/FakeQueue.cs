@@ -4,7 +4,7 @@ namespace KScript.Queueing
 {
     /// <summary>
     /// @fake_queue(): from then on in the run, dispatched jobs are kept here instead of queued or run, so a test can
-    /// check what was dispatched (<c>$queue->pushed($SendWelcome)</c>) and then run them (<c>$queue->run_all()</c>).
+    /// check what was dispatched (<c>$queue->pushed(SendWelcome)</c>) and then run them (<c>$queue->run_all()</c>).
     /// </summary>
     public sealed class FakeQueue : IKObject
     {
@@ -89,7 +89,7 @@ namespace KScript.Queueing
                 null => pushed,
                 JobType type => pushed.Where(p => p.Job.Type == type || p.Job.Type.Name == type.Name),
                 string text => pushed.Where(p => p.Job.Type.Name == text),
-                _ => throw new KScriptException($"pushed() takes a job type, such as pushed($SendWelcome), not {Values.Describe(filter)}.", "Argument"),
+                _ => throw new KScriptException($"pushed() takes a job type, such as pushed(SendWelcome), not {Values.Describe(filter)}.", "Argument"),
             };
         }
     }

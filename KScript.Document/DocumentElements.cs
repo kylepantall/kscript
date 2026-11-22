@@ -29,7 +29,7 @@ namespace KScript.Documents
         private static Builder current;
 
         private static Builder Current(ElementRun run) =>
-            current ?? throw run.Error($"{run.Element.Name} only works inside a KScript.Document block.", null, "Syntax");
+            current ?? throw run.Error($"{run.Element.Name} only works inside a Document block.", null, "Syntax");
 
         private static void Into(ElementRun run, List<Block> target, Action body)
         {
@@ -74,7 +74,7 @@ namespace KScript.Documents
 
         internal static bool? Document(ElementRun run)
         {
-            if (current != null) throw run.Error("A KScript.Document can't be inside another one.", null, "Syntax");
+            if (current != null) throw run.Error("A Document can't be inside another one.", null, "Syntax");
             var doc = new Document { BaseDirectory = run.Module.Directory ?? run.Host.WorkingDirectory };
             Located(run, () => doc.Style = Templates.Get(run.Template("template", "plain")), "template");
             foreach (string option in DocumentStyle.Options)
@@ -99,7 +99,7 @@ namespace KScript.Documents
             string into = run.Has("into") ? run.VariableName("into") : null;
             string to = run.Template("to");
             if (into == null && string.IsNullOrWhiteSpace(to))
-                throw run.Error("KScript.Document needs to: (where to save it, such as to: \"paper.pdf\") or into: (a variable to keep it in).", null, "Syntax");
+                throw run.Error("Document needs to: (where to save it, such as to: \"paper.pdf\") or into: (a variable to keep it in).", null, "Syntax");
 
             var builder = new Builder { Doc = doc };
             builder.Targets.Push(doc.Blocks);
