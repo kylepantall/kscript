@@ -126,9 +126,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void ADocumentedLambdaKeepsItsSignatureAndItsDocs()
         {
-            DocumentAnalysis a = Analyze(Script("<!--- Doubles a number. -->\n<let name=\"twice\" value=\"fn($x) => $x * 2\" />"));
+            DocumentAnalysis a = Analyze(Script("<!--- Doubles a number. -->\n<let name=\"twice\" value=\"fn(x) => $x * 2\" />"));
             Symbol twice = a.Symbols.Single(s => s.Name == "twice");
-            Assert.Equal("fn($x)\n\nDoubles a number.", twice.Description);
+            Assert.Equal("fn(x)\n\nDoubles a number.", twice.Description);
         }
 
         [Fact]

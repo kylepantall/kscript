@@ -33,7 +33,7 @@ for i in 0..3 {
 
 ## KS1004
 
-**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(seconds: 2)`.
+**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(duration: 2s)`.
 
 ## KS1005
 
@@ -108,7 +108,7 @@ rows = @sql("select * from users where id = {$id}")   // right: {$id} is a param
 
 ## KS3002
 
-**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element.
+**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element. A statement that was renamed says its new name in both formats (`before-each is now before_each.`), and `kscript check --fix` renames it.
 
 ## KS3003
 
@@ -116,7 +116,7 @@ rows = @sql("select * from users where id = {$id}")   // right: {$id} is a param
 
 ## KS3004
 
-**An argument KScript 2 removed.** The message names what replaced it.
+**An argument KScript 2 removed, or one that was renamed.** The message names what replaced it: `'to' is now into.`, `'must-exist' is now must_exist`, `'src' is now path.` A renamed argument has a quick fix, and `kscript check --fix` applies it. See [Names of statements and arguments](language.md#names-of-statements-and-arguments).
 
 ## KS3005
 
@@ -231,7 +231,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 ## KS5008
 
-**A named argument is given twice, or a word is used as a flag on a parameter that isn't yes/no.** Give each argument once, and give other parameters a value: `name: value`.
+**A named argument is given twice, or a word is used as a flag on a parameter that isn't true/false.** Give each argument once, and give other parameters a value: `name: value`.
 
 ## KS5009
 
@@ -301,7 +301,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6010
 
-**A name declared with `$`.** `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`.
+**A name declared with `$`.** `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
 
 ## KS6011
 
@@ -309,7 +309,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6012
 
-**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`). Logic stays as words: `and`, `or`, `not`.
+**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`; XML keeps the words). Logic stays as words: `and`, `or`, `not`. A function is named as `@name` in an argument, as it is in an expression: `spawn(fn: @job)`, `llm(tools: [@lookup])`, `Get(to: @people.show)`, not a bare `job`. `kscript check --fix` rewrites each one.
 
 ## KS6013
 
@@ -324,3 +324,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 - A model's options go in its brackets, `model User(timestamps, unique: [email]) { }`, not as lines of its block. The block holds fields, `validate` and `fn`.
 
 Calling the name makes a value of every kind of type: `Repo($data)`, `Repo(name: 'x')`, `Age(7)`, `Size('small')`, `NotFound(id: 42)`, `SendWelcome(user_id: 7)`. `->from()` and `->new()` are gone, and using one is an error (KS5003) whose fix writes the call.
+
+## KS6018
+
+**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so the fix adds `s`.

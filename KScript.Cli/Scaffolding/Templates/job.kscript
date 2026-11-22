@@ -15,7 +15,7 @@ hint: Queue it: import "{{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}", then di
 import KScript.Queue
 
 /// {{ title }}.
-job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {{ tries }}, {{/if}}{{#if backoff}}backoff: "{{ backoff }}", {{/if}}timeout: "{{#if timeout}}{{ timeout }}{{else}}60s{{/if}}") {
+job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {{ tries }}, {{/if}}{{#if backoff}}backoff: "{{ backoff }}", {{/if}}timeout: {{#if timeout}}{{ timeout }}{{else}}60s{{/if}}) {
 {{#if fields}}
 {{#each fields}}
   {{ item | trim }}

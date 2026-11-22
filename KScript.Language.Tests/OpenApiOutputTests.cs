@@ -80,7 +80,7 @@ namespace KScript.Language.Tests
         public void ARouteErrorIsReportedNotThrown()
         {
             Write("kscript.json", "{ \"http\": { \"openapi\": { \"file\": \"openapi.yml\" } } }");
-            Write("api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/hi\", to: nowhere.fn)\n}\n");
+            Write("api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/hi\", to: @nowhere.fn)\n}\n");
             OutputResult result = Assert.Single(ProjectOutputs.Build(dir, only: new[] { output }));
             Assert.NotNull(result.Error);
         }

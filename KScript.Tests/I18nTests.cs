@@ -68,7 +68,7 @@ public sealed class I18nTests : IDisposable
     [Fact]
     public void Plural_rules_for_many_languages()
     {
-        Assert.Equal("1 файл, 3 файла, 5 файлов, 21 файл, 1.5 файла", Out("<locale set=\"ru\" /><echo>{ [1, 3, 5, 21, 1.5]->map(fn($n) => @t('files', { count: $n }))->join(', ') }</echo>").TrimEnd().Replace("1,5", "1.5"));
+        Assert.Equal("1 файл, 3 файла, 5 файлов, 21 файл, 1.5 файла", Out("<locale set=\"ru\" /><echo>{ [1, 3, 5, 21, 1.5]->map(fn(n) => @t('files', { count: $n }))->join(', ') }</echo>").TrimEnd().Replace("1,5", "1.5"));
         string Plural(string locale, double n) => Translator.Plural(locale, n);
         Assert.Equal("one", Plural("en", 1));
         Assert.Equal("other", Plural("en", 1.5));

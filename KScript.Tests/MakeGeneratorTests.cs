@@ -74,7 +74,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.True(code == 0, err);
         Assert.Contains("Created routes/web.kscript", output);
         Assert.Contains("Created controllers/users.kscript", output);
-        Assert.Contains("Get(path: \"/users\", to: users.index)", output);
+        Assert.Contains("Get(path: \"/users\", to: @users.index)", output);
         Assert.Contains("open /users", output);
 
         Assert.Equal(0, Make(app, "route", "users/{id}", "--where", "id: int").Code);
@@ -90,9 +90,9 @@ public sealed class MakeGeneratorTests : IDisposable
             "import \"../controllers/users.kscript\" as users\n" +
             "\n" +
             "Routes {\n" +
-            "  Get(path: \"/users\", to: users.index)\n" +
-            "  Get(path: \"/users/{id}\", to: users.show, where: \"id: int\")\n" +
-            "  Post(path: \"/users\", to: users.store)\n" +
+            "  Get(path: \"/users\", to: @users.index)\n" +
+            "  Get(path: \"/users/{id}\", to: @users.show, where: \"id: int\")\n" +
+            "  Post(path: \"/users\", to: @users.store)\n" +
             "}\n", Read(app, "routes/web.kscript"));
 
         string controller = Read(app, "controllers/users.kscript");
@@ -129,7 +129,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Contains("Added to routes/api.kscript", output);
         string api = Read(app, "routes/api.kscript");
         Assert.Contains("import KScript.Http\nimport \"../controllers/hello.kscript\" as hello\nimport \"../controllers/people.kscript\" as people\n\nRoutes {\n", api);
-        Assert.Contains("  Get(path: \"/hello\", to: hello.show)\n  Resource(path: \"/people\", to: people)\n}", api);
+        Assert.Contains("  Get(path: \"/hello\", to: @hello.show)\n  Resource(path: \"/people\", to: people)\n}", api);
         foreach (string action in new[] { "index", "show", "store", "update", "destroy" })
             Assert.Contains($"fn {action}(", Read(app, "controllers/people.kscript"));
 
@@ -140,19 +140,19 @@ public sealed class MakeGeneratorTests : IDisposable
 
         (code, _, err) = Make(app, "route", "reports/export", "--to", "reports.export", "--name", "reports.export");
         Assert.True(code == 0, err);
-        Assert.Contains("Get(path: \"/reports/export\", to: reports.export, name: \"reports.export\")", Read(app, "routes/web.kscript"));
+        Assert.Contains("Get(path: \"/reports/export\", to: @reports.export, name: \"reports.export\")", Read(app, "routes/web.kscript"));
         Assert.Contains("fn export() {", Read(app, "controllers/reports.kscript"));
 
         // A page-style [slug] works too, and the controller's function takes the parameter by its name.
         Assert.Equal(0, Make(app, "route", "posts/[slug]").Code);
-        Assert.Contains("Get(path: \"/posts/{slug}\", to: posts.show)", Read(app, "routes/web.kscript"));
+        Assert.Contains("Get(path: \"/posts/{slug}\", to: @posts.show)", Read(app, "routes/web.kscript"));
         Assert.Contains("fn show(slug: string) {\n  // TODO: Find the one asked for, and answer 404 when there is none:\n  // @abort(404)\n  return { slug: $slug }", Read(app, "controllers/posts.kscript"));
 
         // An admin/users controller doesn't take the users name from another import.
         Assert.Equal(0, Make(app, "route", "users").Code);
         Assert.Equal(0, Make(app, "route", "admin/users", "--method", "delete", "--controller", "admin/users").Code);
         Assert.Contains("import \"../controllers/admin/users.kscript\" as admin_users", Read(app, "routes/web.kscript"));
-        Assert.Contains("Delete(path: \"/admin/users\", to: admin_users.destroy)", Read(app, "routes/web.kscript"));
+        Assert.Contains("Delete(path: \"/admin/users\", to: @admin_users.destroy)", Read(app, "routes/web.kscript"));
 
         AssertNoErrors(app);
         Assert.Equal(201, Request(app, "POST", "/api/people", "{\"name\": \"Ann\"}").Status);
@@ -175,7 +175,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Equal(
             "<!-- Web routes, served by kscript serve (see the Routes and APIs guide). kscript routes lists them. -->\n" +
             "<KScript.Routes>\n" +
-            "  <import src=\"../controllers/users.ks.xml\" as=\"users\" />\n" +
+            "  <import path=\"../controllers/users.ks.xml\" as=\"users\" />\n" +
             "\n" +
             "  <Get path=\"/users\" to=\"users.index\" />\n" +
             "  <Get path=\"/users/{id}\" to=\"users.show\" />\n" +
@@ -197,7 +197,7 @@ public sealed class MakeGeneratorTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ \"http\": { \"routes\": [ { \"file\": \"routes/web.kscript\" }, { \"file\": \"routes/v1.kscript\", \"prefix\": \"/api/v1\", \"api\": true } ] } }"),
-            ("routes/web.kscript", "import KScript.Http\nimport \"../controllers/home.kscript\" as home\n\nRoutes {\n  Get(path: \"/\", to: home.index)\n}\n"),
+            ("routes/web.kscript", "import KScript.Http\nimport \"../controllers/home.kscript\" as home\n\nRoutes {\n  Get(path: \"/\", to: @home.index)\n}\n"),
             ("controllers/home.kscript", "kscript {\n  fn index() => 'home'\n}\n"));
 
         var (code, output, err) = Make(site.Root, "route", "/", "--action", "about", "--method", "get", "--dry-run");
@@ -211,7 +211,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Equal("kscript {\n  fn index() => 'home'\n}\n", Read(site.Root, "controllers/home.kscript"));
 
         Assert.Equal(0, Make(site.Root, "route", "about", "--controller", "home", "--action", "about").Code);
-        Assert.Equal("import KScript.Http\nimport \"../controllers/home.kscript\" as home\n\nRoutes {\n  Get(path: \"/\", to: home.index)\n  Get(path: \"/about\", to: home.about)\n}\n", Read(site.Root, "routes/web.kscript"));
+        Assert.Equal("import KScript.Http\nimport \"../controllers/home.kscript\" as home\n\nRoutes {\n  Get(path: \"/\", to: @home.index)\n  Get(path: \"/about\", to: @home.about)\n}\n", Read(site.Root, "routes/web.kscript"));
         // A controller written as a kscript { } block gets the function inside the block.
         Assert.Equal("kscript {\n  fn index() => 'home'\n\n  /// About.\n  fn about() {\n    // TODO: Answer the route.\n    return { action: 'about' }\n  }\n}\n", Read(site.Root, "controllers/home.kscript"));
 
@@ -219,7 +219,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.True(code == 0, err);
         Assert.Contains("Created routes/v1.kscript", output);
         Assert.Contains("open /api/status", output);
-        Assert.Contains("import KScript.Http\nimport \"../controllers/status.kscript\" as status\n\nRoutes {\n  Get(path: \"/status\", to: status.index)", Read(site.Root, "routes/v1.kscript"));
+        Assert.Contains("import KScript.Http\nimport \"../controllers/status.kscript\" as status\n\nRoutes {\n  Get(path: \"/status\", to: @status.index)", Read(site.Root, "routes/v1.kscript"));
     }
 
     [Fact]
@@ -247,11 +247,11 @@ public sealed class MakeGeneratorTests : IDisposable
         string app = Project();
         Assert.Equal(0, Make(app, "templates", "route", "controller").Code);
         string template = Path.Combine(app, "_templates", "route.kscript");
-        File.WriteAllText(template, File.ReadAllText(template).Replace("to: {{ alias }}.{{ action }}", "to: {{ alias }}.{{ action }}, middleware: log"));
+        File.WriteAllText(template, File.ReadAllText(template).Replace("to: @{{ alias }}.{{ action }}", "to: @{{ alias }}.{{ action }}, middleware: log"));
 
         var (code, output, err) = Make(app, "route", "users");
         Assert.True(code == 0, err);
-        Assert.Contains("Get(path: \"/users\", to: users.index, middleware: log)", Read(app, "routes/web.kscript"));
+        Assert.Contains("Get(path: \"/users\", to: @users.index, middleware: log)", Read(app, "routes/web.kscript"));
     }
 
     [Fact]
@@ -333,11 +333,11 @@ public sealed class MakeGeneratorTests : IDisposable
             import "lib/pricing.kscript"
             import "requests/new-person.kscript"
             import "lib/alerts.kscript"
-            log-provider(fn: alerts, level: error)
+            log_provider(fn: @alerts, level: error)
             ann = @people.save({ name: 'Ann' })
             @people.save({ name: 'Bob' })
             @people.save($ann->set('name', 'Annie'))
-            echo "{ @people.all()->map(fn($p) => $p.name)->join(',') } { @people.find(2).name }"
+            echo "{ @people.all()->map(fn(p) => $p.name)->join(',') } { @people.find(2).name }"
             @people.remove(1)
             echo "{ @people.all()->count() }"
             first = @cache.remember('x', fn() => 42)
@@ -373,7 +373,7 @@ public sealed class MakeGeneratorTests : IDisposable
             new[] { "native", "Tier", "--one-of", "gold,silver" },
             new[] { "native", "Level", "--base", "int", "--one-of", "1,2,3" },
             new[] { "native", "Note" },
-            new[] { "native", "CompanySite", "--base", "url", "--validate", "$value->host()->ends_with('example.com'), 'Use a company site'" },
+            new[] { "native", "CompanySite", "--base", "url", "--validate", "$value.host->ends_with('example.com'), 'Use a company site'" },
         })
         {
             var (code, _, err) = Make(app, args);
@@ -401,7 +401,7 @@ public sealed class MakeGeneratorTests : IDisposable
             who: Username = @Joan
             tier: Tier = gold
             fn off(p: Percent, l: Level) => $p * $l
-            echo "$sku $who $tier { @off(15, 2) } { $site->path() }"
+            echo "$sku $who $tier { @off(15, 2) } { $site.path }"
             try {
               bad: Sku = zzz-0001
             } catch err {

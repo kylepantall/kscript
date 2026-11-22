@@ -20,7 +20,17 @@ namespace KScript.Language.Analysis
             DiagnosticCodes.BoolWords,
             DiagnosticCodes.OneSpelling,
             DiagnosticCodes.TypeForm,
+            DiagnosticCodes.DurationUnit,
         };
+
+        /// <summary>
+        /// How the fix for a renamed element or argument starts (<c>to:</c> is now <c>into:</c>). The old name is an
+        /// error, not a style, but its fix is a plain rename and always safe, so it is applied too.
+        /// </summary>
+        internal const string RenameTitle = "Rename to ";
+
+        private static bool IsRename(Diagnostic d) =>
+            d.Code is DiagnosticCodes.RetiredElement or DiagnosticCodes.RetiredAttribute && d.Fixes[0].Title.StartsWith(RenameTitle, StringComparison.Ordinal);
 
         private static readonly bool Migrating = Environment.GetEnvironmentVariable("KSCRIPT_MIGRATE") == "1";
 
@@ -37,7 +47,7 @@ namespace KScript.Language.Analysis
                 var changes = new List<TextChange>();
                 foreach (Diagnostic d in diagnostics.OrderBy(d => d.Span.Start))
                 {
-                    if (d.Fixes == null || d.Fixes.Count == 0 || !(Rules.Contains(d.Code) || also?.Invoke(d) == true || (Migrating && d.Code == DiagnosticCodes.InvalidAttributeValue && d.Fixes[0].Title == "Write it in braces")))
+                    if (d.Fixes == null || d.Fixes.Count == 0 || !(Rules.Contains(d.Code) || IsRename(d) || also?.Invoke(d) == true || (Migrating && d.Code == DiagnosticCodes.InvalidAttributeValue && d.Fixes[0].Title == "Write it in braces")))
                     {
                         continue;
                     }

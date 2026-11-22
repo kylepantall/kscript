@@ -29,7 +29,7 @@ namespace KScript.Language.Tests
         private static readonly LanguageService Service = new LanguageService(files: Files);
 
         private static DocumentAnalysis Analyze(string body, string file = "routes.ks.xml") =>
-            TestHelpers.WithoutUnused(Analyzer.Analyze("<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n" + body + "\n</KScript.Routes>", Path.Combine(Site, file), Files));
+            TestHelpers.WithoutUnused(Analyzer.Analyze("<KScript.Routes>\n  <import path=\"controllers/people.ks.xml\" as=\"people\" />\n" + body + "\n</KScript.Routes>", Path.Combine(Site, file), Files));
 
         [Theory]
         [InlineData("<Get path=\"/people/{id}\" to=\"people.show\" where=\"id: int\" name=\"people.show\" />")]
@@ -70,7 +70,7 @@ namespace KScript.Language.Tests
         public void ListsCanBeArrays()
         {
             DocumentAnalysis a = Analyzer.Analyze(
-                "import KScript.Http\nimport \"controllers/people.ks.xml\" as people\n\nRoutes {\n  fn stamp(request: map, next: fn) => $next($request)\n  Middleware(use: [stamp, cors, throttle:30, admin])\n  Resource(path: \"/people\", to: people, only: [index, show])\n  Route(methods: [get, post], path: \"/both\", to: people.index)\n  Group(middleware: [auth]) {\n    Get(path: \"/\", to: people.show)\n  }\n}\n",
+                "import KScript.Http\nimport \"controllers/people.ks.xml\" as people\n\nRoutes {\n  fn stamp(request: map, next: fn) => $next($request)\n  Middleware(use: [stamp, cors, throttle:30, admin])\n  Resource(path: \"/people\", to: people, only: [index, show])\n  Route(methods: [get, post], path: \"/both\", to: @people.index)\n  Group(middleware: [auth]) {\n    Get(path: \"/\", to: @people.show)\n  }\n}\n",
                 Path.Combine(Site, "routes.kscript"), Files);
             TestHelpers.AssertClean(a);
         }
@@ -103,7 +103,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void NamesInAnArrayComplete()
         {
-            string text = "import KScript.Http\nimport \"controllers/people.ks.xml\" as people\n\nRoutes {\n  Get(path: \"/\", to: people.index, middleware: [cors, ‸])\n}\n";
+            string text = "import KScript.Http\nimport \"controllers/people.ks.xml\" as people\n\nRoutes {\n  Get(path: \"/\", to: @people.index, middleware: [cors, ‸])\n}\n";
             int offset = text.IndexOf('‸');
             text = text.Remove(offset, 1);
             DocumentAnalysis analysis = Service.Analyze(text, Path.Combine(Site, "routes.kscript"));
@@ -123,7 +123,7 @@ namespace KScript.Language.Tests
         public void TheCodeFormatWorksToo()
         {
             DocumentAnalysis a = Analyzer.Analyze(
-                "import KScript.Http\nimport \"controllers/people.ks.xml\" as people\n\nRoutes(middleware: admin) {\n  Get(path: \"/people/{id}\", to: people.show)\n  Group(prefix: \"/v2\", middleware: [cors, throttle:5]) {\n    Get(path: \"/\", to: people.index)\n  }\n}\n",
+                "import KScript.Http\nimport \"controllers/people.ks.xml\" as people\n\nRoutes(middleware: admin) {\n  Get(path: \"/people/{id}\", to: @people.show)\n  Group(prefix: \"/v2\", middleware: [cors, throttle:5]) {\n    Get(path: \"/\", to: @people.index)\n  }\n}\n",
                 Path.Combine(Site, "api.kscript"), Files);
             TestHelpers.AssertClean(a);
         }
@@ -138,7 +138,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void ControllerNamesAndMiddlewareComplete()
         {
-            string text = "<KScript.Routes>\n  <import src=\"controllers/people.ks.xml\" as=\"people\" />\n  <Get path=\"/\" to=\"‸\" middleware=\"\" />\n</KScript.Routes>";
+            string text = "<KScript.Routes>\n  <import path=\"controllers/people.ks.xml\" as=\"people\" />\n  <Get path=\"/\" to=\"‸\" middleware=\"\" />\n</KScript.Routes>";
             int offset = text.IndexOf('‸');
             text = text.Remove(offset, 1);
             DocumentAnalysis analysis = Service.Analyze(text, Path.Combine(Site, "routes.ks.xml"));

@@ -36,14 +36,14 @@ public class DesktopSampleTests : IDisposable
                 s.Click("Play");
                 UINode timer = s.FindAll("Timer")[0];
                 Assert.True(timer.Flag("when"));
-                for (int i = 0; i < 3; i++) s.Fire(s.FindAll("Timer")[0], "on-tick");
+                for (int i = 0; i < 3; i++) s.Fire(s.FindAll("Timer")[0], "on_tick");
                 Assert.Equal("3", Stat("GENERATION"));
                 s.Click("Pause");
                 Assert.False(s.FindAll("Timer")[0].Flag("when"));
 
                 s.Click("Clear");
                 Assert.Equal("0 (0%)", Stat("ALIVE"));
-                s.Fire(s.FindAll("Box")[1 + 5], "on-click");
+                s.Fire(s.FindAll("Box")[1 + 5], "on_click");
                 Assert.Equal("1 (0.1%)", Stat("ALIVE"));
 
                 s.SetBound(s.FindAll("Select")[1], "glider");

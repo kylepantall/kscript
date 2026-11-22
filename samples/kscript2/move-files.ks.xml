@@ -2,17 +2,17 @@
   <import package="KScript.Terminal" />
   <import package="KScript.IO" />
 
-  <input to="old_dir">Move files from: </input>
-  <input to="new_dir">Move files to: </input>
-  <input to="file_types">File types (comma separated): </input>
+  <input into="old_dir">Move files from: </input>
+  <input into="new_dir">Move files to: </input>
+  <input into="file_types">File types (comma separated): </input>
 
   <let
     name="types"
-    value="$file_types->split(',')->map(fn($t) => $t->trim())" />
+    value="$file_types->split(',')->map(fn(t) => $t->trim())" />
   <for
     each="file"
-    in="@files($old_dir) |> filter(fn($f) => $types->contains($f->extension()))">
-    <let name="target" value="@join_path(base: $new_dir, $file->name())" />
+    in="@files($old_dir) |> filter(fn(f) => $types->contains($f.extension))">
+    <let name="target" value="@join_path(base: $new_dir, $file.name)" />
     <move from="$file" to="$target" />
     <echo>Moved {$file} to {$target}</echo>
   </for>

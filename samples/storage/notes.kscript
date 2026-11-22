@@ -17,7 +17,7 @@ notes = $data->read_json('notes.json', default: [])
 command = $args->first() ?? 'list'
 
 match $command {
-  case 'add' {
+  'add' => {
     text = $args->skip(1)->join(' ')
     $data->write_json(
       'notes.json',
@@ -25,16 +25,16 @@ match $command {
     )
     echo "Added: { $text }"
   }
-  case 'clear' {
+  'clear' => {
     $data->delete('notes.json')
     echo "All notes removed."
   }
-  default {
+  _ => {
     // The file cache keeps the count between runs, so this says how often the
     // notes were read.
     views = @cache(file)->increment('views')
     echo "{ $config->get('greeting', 'Your notes') } ({ $views } views, in \
-      { $data->path() })"
+      { $data.path })"
     for note in $notes {
       echo "- { $note.text }"
     }

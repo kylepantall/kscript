@@ -77,7 +77,7 @@ public class AITests
     public void The_llm_element_fills_in_its_prompt_and_stores_the_answer()
     {
         var model = new FakeModel().Says("Sorry to hear that, Ann.");
-        string output = Run(model, "<let name=\"name\" value=\"'Ann'\" /><llm to=\"reply\" system=\"You are support for {$name}'s shop.\">\n  {$name} wrote: my order is late\n</llm><echo>{$reply}</echo>");
+        string output = Run(model, "<let name=\"name\" value=\"'Ann'\" /><llm into=\"reply\" system=\"You are support for {$name}'s shop.\">\n  {$name} wrote: my order is late\n</llm><echo>{$reply}</echo>");
         Assert.Equal("Sorry to hear that, Ann.\n", output);
         Assert.Equal("You are support for Ann's shop.", model.Requests[0].System);
         Assert.Equal("Ann wrote: my order is late", model.Sent[0][0].Text);
@@ -87,7 +87,7 @@ public class AITests
     public void A_schema_gives_back_a_map()
     {
         var model = new FakeModel().Says("{\"category\": \"bug\", \"urgency\": 4, \"tags\": [\"login\"]}");
-        string output = Run(model, "<llm to=\"t\" schema=\"{ category: 'bug|feature', urgency: 'int 1-5', tags: ['string'], summary: 'a one-line summary' }\">Triage: login fails</llm><echo>{$t.category} {$t.urgency + 1} {$t.tags[0]}</echo>");
+        string output = Run(model, "<llm into=\"t\" schema=\"{ category: 'bug|feature', urgency: 'int 1-5', tags: ['string'], summary: 'a one-line summary' }\">Triage: login fails</llm><echo>{$t.category} {$t.urgency + 1} {$t.tags[0]}</echo>");
         Assert.Equal("bug 5 login\n", output);
 
         Dictionary<string, JsonElement> schema = model.Requests[0].Schema;
@@ -109,7 +109,7 @@ public class AITests
             .Then(r => new AiReply { StopReason = "end_turn", Blocks = { AiBlock.FromText("Order 42 has shipped.") } });
         string output = Run(model,
             "<fn name=\"order_status\" params=\"id: int\" description=\"The status of an order.\" value=\"$id == 42 ? 'shipped' : 'unknown'\" />" +
-            "<llm to=\"answer\" tools=\"order_status\">Where is order 42?</llm><echo>{$answer}</echo>");
+            "<llm into=\"answer\" tools=\"order_status\">Where is order 42?</llm><echo>{$answer}</echo>");
         Assert.Equal("Order 42 has shipped.\n", output);
 
         AiTool tool = model.Requests[0].Tools.Single();
@@ -140,7 +140,7 @@ public class AITests
         string output = Run(model,
             "<let name=\"chat\" value=\"@chat('You are friendly.')\" />" +
             "<echo>{ $chat->ask('Hi, I am Kyle') }</echo><echo>{ $chat->ask('What is my name?') }</echo>" +
-            "<echo>{ $chat->history()->count() } { $chat->history()[3].text }</echo>");
+            "<echo>{ $chat.history->count() } { $chat.history[3].text }</echo>");
         Assert.Equal("Hello Kyle!\nYour name is Kyle.\n4 Your name is Kyle.\n", output);
         Assert.Equal("You are friendly.", model.Requests[1].System);
         Assert.Equal(new[] { "Hi, I am Kyle", "Hello Kyle!", "What is my name?" }, model.Sent[1].Select(m => m.Text));
@@ -164,7 +164,7 @@ public class AITests
         var model = new FakeModel().Then(_ => new AiReply { StopReason = "refusal" }).Says("ok");
         string output = Run(model,
             "<let name=\"chat\" value=\"@chat()\" /><try><echo>{ $chat->ask('bad') }</echo><catch><echo>declined</echo></catch></try>" +
-            "<echo>{ $chat->ask('good') } { $chat->history()->count() }</echo>");
+            "<echo>{ $chat->ask('good') } { $chat.history->count() }</echo>");
         Assert.Equal("declined\nok 2\n", output);
     }
 
@@ -172,7 +172,7 @@ public class AITests
     public void Tools_must_be_fn_functions()
     {
         var model = new FakeModel();
-        var ex = Assert.Throws<KScriptException>(() => Run(model, "<echo>{ @llm('x', { tools: [fn($x) => $x] }) }</echo>"));
+        var ex = Assert.Throws<KScriptException>(() => Run(model, "<echo>{ @llm('x', { tools: [fn(x) => $x] }) }</echo>"));
         Assert.Contains("tools are <fn> functions", ex.Message);
     }
 
@@ -189,8 +189,8 @@ public class AITests
         var model = new FakeModel().Says("one").Says("two");
         string output = Run(model,
             "<let name=\"chat\" value=\"@chat('Be kind.', { model: 'claude-test' })\" />" +
-            "<echo>{ $chat.model } { $chat.system } { $chat.nothing ?? 'none' } { $chat->model() } {$chat}</echo>" +
-            "<echo>{ $chat->ask('a') } {$chat} { $chat->reset()->history()->count() } { $chat->ask('b') }</echo>");
+            "<echo>{ $chat.model } { $chat.system } { $chat.nothing ?? 'none' } { $chat.model } {$chat}</echo>" +
+            "<echo>{ $chat->ask('a') } {$chat} { $chat->reset().history->count() } { $chat->ask('b') }</echo>");
         Assert.Equal("claude-test Be kind. none claude-test chat (0 messages)\none chat (1 messages) 0 two\n", output);
         Assert.Single(model.Sent[1]);
     }
@@ -241,7 +241,7 @@ public class AITests
         Run(model,
             "<let name=\"r\" value=\"@llm('x', { schema: { s: 'text', n: 'float', i: 'integer', b: 'boolean', d: 'date', c: 'a | b | a', r: 'number 1.5 to 3', k: 'int 1-5', note: 'a one-line note', list: ['string'], nested: { x: 'int' } } })\" />" +
             "<fn name=\"all\" params=\"s: string, i: int, f: float, n: number, b: bool, l: list, m: map, d: date, a, o = 1\" value=\"1\" />" +
-            "<llm to=\"x\" tools=\"all\">hi</llm>");
+            "<llm into=\"x\" tools=\"all\">hi</llm>");
         string schema = JsonSerializer.Serialize(model.Requests[0].Schema);
         Assert.Contains("\"s\":{\"type\":\"string\"}", schema);
         Assert.Contains("\"n\":{\"type\":\"number\"}", schema);
@@ -273,7 +273,7 @@ public class AITests
         Assert.Contains("can't use a number (5) as a field", Error("<echo>{ @llm('x', { schema: { a: 5 } }) }</echo>"));
         Assert.Contains("needs a map of fields", Error("<let name=\"c\" value=\"@chat()\" /><echo>{ $c->ask('x', [1]) }</echo>"));
         Assert.Contains("nope", Error("<let name=\"c\" value=\"@chat()\" /><echo>{ $c->nope() }</echo>"));
-        Assert.Contains("there is no function called missing", Error("<llm to=\"x\" tools=\"missing\">hi</llm>"));
+        Assert.Contains("there is no function called missing", Error("<llm into=\"x\" tools=\"missing\">hi</llm>"));
     }
 
     [Fact]

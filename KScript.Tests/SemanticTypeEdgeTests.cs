@@ -6,8 +6,8 @@ namespace KScript.Tests;
 public class SemanticTypeEdgeTests
 {
     [Theory]
-    [InlineData("type Age with [int] { min: 0 }\necho \"{ Age.name } { Age.base } { Age.description ?? 'none' } { Age->name() }\"", "Age int none Age")]
-    [InlineData("type Age with [int] { min: 0 }\necho Age->fields()", "has no ->fields(). It has ->check() and ->name().")]
+    [InlineData("type Age with [int] { min: 0 }\necho \"{ Age.name } { Age.base } { Age.description ?? 'none' } { Age.name }\"", "Age int none Age")]
+    [InlineData("type Age with [int] { min: 0 }\necho Age.fields", "has no .fields. It has ->check() and .name.")]
     [InlineData("type Age with [int] { min: 0 }\necho Age.nope ?? 'x'", "x")]
     [InlineData("type T with [string] { one_of: 'a, b' }\nt: T = 'c'", "must be one of 'a, b'")]
     [InlineData("type T with [string] { pattern: '[' }\nt: T = 'c'", "pattern [ isn't a regular expression")]
@@ -70,7 +70,7 @@ public class SemanticTypeEdgeTests
     [InlineData("e = joan@example.com\nh: handle = @j\necho \"{ [$e, $e]->unique()->count() } { [$h, $h]->unique()->count() }\"", "1 1")]
     [InlineData("echo joan@example.c", "joan@example.c isn't an email: 'c' isn't a top-level domain.")]
     [InlineData("fn f(size: string(min: 1) = big-box) => $size\necho @f()", "big-box")]
-    [InlineData("fn f(id: uuid(v: 4)) => $id->version()\necho @f(3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f)", "4")]
+    [InlineData("fn f(id: uuid(v: 4)) => $id.version\necho @f(3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f)", "4")]
     [InlineData("fn f(n: int = big-box) => $n\necho @f()", "Unknown name 'big'")]
     [InlineData("fn f(h: handle = @a--b) => $h\necho @f()", "@a--b")]
     [InlineData("h: handle = @a--b\necho $h", "@a--b")]

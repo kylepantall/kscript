@@ -20,7 +20,7 @@ fn place(sku: string, customer: email, quantity: int) {
     if $product.stock < $quantity {
       throw Conflict(message: 'Only ' + $product.stock + ' ' + $product.name + ' left')
     }
-    $product.stock = $product.stock - $quantity
+    product.stock = $product.stock - $quantity
     $product->save()
     return Order->create(
       product_id: $product.id,
@@ -42,7 +42,7 @@ Order->where(customer: 'ben@example.com')->update(status: paid)
 
 echo 'Kitchen things under 20:'
 cheap = 20
-for p in Product->where(fn($p) =>
+for p in Product->where(fn(p) =>
   $p.price < $cheap and $p.sku->starts_with('MUG'))->order_by(name)->get() {
     echo "- { $p.name }: { $p.price } ({ $p.stock } left)"
   }

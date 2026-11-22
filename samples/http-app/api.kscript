@@ -7,7 +7,7 @@ Routes(middleware: api) {
   // Every API response gets the security headers.
   Middleware(use: [secure_headers])
 
-  Get(path: "/health", to: people.health)
+  Get(path: "/health", to: @people.health)
   Resource(path: "/people", to: people, only: [index, show])
 
   Group(middleware: [auth, json_only]) {

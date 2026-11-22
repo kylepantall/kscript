@@ -1,7 +1,7 @@
 <kscript>
   <!-- Typed JSON: the data is checked against Repo, and $repo. completes its fields. -->
   <import package="KScript.IO" />
-  <import src="types/repo.ks.xml" />
+  <import path="types/repo.ks.xml" />
 
   <let name="repos" value="@read_json('data/repos.json', as: Repo)" />
   <for each="repo" in="$repos">

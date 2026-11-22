@@ -208,9 +208,6 @@ namespace KScript.Runtime
             {
                 case "new":
                     throw new KScriptException($"->new() is gone: call the error type to make an error, {Name}(...).", "Retired");
-                case "fields":
-                    result = FieldList();
-                    return true;
                 default:
                     result = null;
                     return false;
@@ -227,12 +224,20 @@ namespace KScript.Runtime
 
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("fields", "", "The error's fields (its own and the ones it inherits): name, type, optional and description.", "list"),
+        };
+
+        internal static readonly (string Name, string Type, string Description)[] ValueFields =
+        {
+            ("name", "string", "The error type's name."),
+            ("extends", "string", "The error type it extends, or null."),
+            ("status", "number", "The HTTP status errors of this type carry, such as 404, or null."),
+            ("description", "string", "What the error type is for, or null."),
+            ("fields", "list", "The error's fields (its own and the ones it inherits): name, type, optional and description."),
         };
     }
 
     /// <summary>
-    /// A caught error: what <c>catch NotFound as e</c> and <c>&lt;expect-error as&gt;</c> declare. It is a map
+    /// A caught error: what <c>catch NotFound as e</c> and <c>&lt;expect_error as&gt;</c> declare. It is a map
     /// (<c>$e.type</c>, <c>$e.message</c>, <c>$e.status</c>, <c>$e.cause</c>, its fields), so it prints and converts to
     /// JSON like one, and it remembers the error so <c>throw $e</c> rethrows it unchanged.
     /// </summary>

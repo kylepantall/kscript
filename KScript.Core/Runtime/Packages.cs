@@ -110,6 +110,7 @@ namespace KScript.Runtime
         private readonly Dictionary<string, ElementDefinition> elements = new Dictionary<string, ElementDefinition>(StringComparer.Ordinal);
         private readonly Dictionary<string, CommandDefinition> commands = new Dictionary<string, CommandDefinition>(StringComparer.Ordinal);
         private readonly List<MethodDefinition> methods = new List<MethodDefinition>();
+        private readonly List<ValueFieldDefinition> fields = new List<ValueFieldDefinition>();
         private readonly Dictionary<string, VariableDefinition> variables = new Dictionary<string, VariableDefinition>(StringComparer.Ordinal);
         private readonly Dictionary<string, EchoFormatter> echoFormats = new Dictionary<string, EchoFormatter>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> requires = new List<string>();
@@ -129,10 +130,13 @@ namespace KScript.Runtime
         public IReadOnlyDictionary<string, ElementDefinition> Elements { get { EnsureRegistered(); return elements; } }
         public IReadOnlyDictionary<string, CommandDefinition> Commands { get { EnsureRegistered(); return commands; } }
         public IReadOnlyList<MethodDefinition> Methods { get { EnsureRegistered(); return methods; } }
+
+        /// <summary>Fields the package adds to types of value: <c>$response.status</c>.</summary>
+        public IReadOnlyList<ValueFieldDefinition> Fields { get { EnsureRegistered(); return fields; } }
         public IReadOnlyDictionary<string, VariableDefinition> Variables { get { EnsureRegistered(); return variables; } }
         public IReadOnlyDictionary<string, EchoFormatter> EchoFormats { get { EnsureRegistered(); return echoFormats; } }
 
-        /// <summary>Kinds of log provider this package adds, by type name: logging.providers[].type and &lt;log-provider type&gt;.</summary>
+        /// <summary>Kinds of log provider this package adds, by type name: logging.providers[].type and &lt;log_provider type&gt;.</summary>
         public IReadOnlyDictionary<string, LogProviderType> LogProviders { get { EnsureRegistered(); return logProviders; } }
 
         /// <summary>Packages that are imported along with this one.</summary>
@@ -203,6 +207,20 @@ namespace KScript.Runtime
             }
 
             /// <summary>
+            /// Adds a field, read as <c>value.name</c> on values of <paramref name="receiver"/>. A field is a plain fact
+            /// about the value (<c>$response.status</c>, <c>$file.name</c>); anything that takes arguments or does work
+            /// is a <see cref="Method"/>. Without a <paramref name="handler"/> the value's own
+            /// <see cref="IKObject.TryGetMember"/> reads it.
+            /// </summary>
+            public ValueFieldDefinition Field(string receiver, string name, string type, string description, FieldHandler handler = null)
+            {
+                var info = new ValueFieldInfo(receiver, name, type, description) { Package = package.Name };
+                var def = new ValueFieldDefinition(info, handler ?? ((t, _) => t is IKObject o && o.TryGetMember(name, out object v) ? v : null), package);
+                package.fields.Add(def);
+                return def;
+            }
+
+            /// <summary>
             /// Adds usage examples to commands and methods registered above: <c>("@now", "...")</c> for a command and
             /// <c>("string->upper", "'hi'->upper()")</c> for a method. An example is an expression (the docs show it
             /// echoed) or statements starting with <c>&lt;</c>. Hover and <c>kscript docs</c> show them, and the docs
@@ -212,6 +230,15 @@ namespace KScript.Runtime
             {
                 foreach (var (key, example) in examples)
                 {
+                    // "url.host" names a field.
+                    int dot = key.IndexOf('.');
+                    if (dot > 0 && !key.StartsWith("@", StringComparison.Ordinal) && !key.Contains("->"))
+                    {
+                        ValueFieldDefinition field = package.fields.FirstOrDefault(f => f.Receiver == key.Substring(0, dot) && f.Name == key.Substring(dot + 1))
+                            ?? throw new InvalidOperationException($"{package.Name} has no field {key} to give an example to.");
+                        field.Info.Example = example;
+                        continue;
+                    }
                     Find(key, "an example").Example = example;
                 }
             }
@@ -314,7 +341,7 @@ namespace KScript.Runtime
 
             /// <summary>
             /// Adds a kind of log provider, such as http. Scripts that import the package can name it in
-            /// logging.providers (type: http) or &lt;log-provider type="http"&gt;; <paramref name="create"/> gets the options.
+            /// logging.providers (type: http) or &lt;log_provider type="http"&gt;; <paramref name="create"/> gets the options.
             /// </summary>
             public void LogProvider(string type, string description, Func<LogProviderContext, ILogProvider> create) =>
                 package.logProviders[type] = new LogProviderType(type, description, create, package.Name);
@@ -486,5 +513,9 @@ namespace KScript.Runtime
 
         public IEnumerable<KScriptPackage> FindMethod(string name, IEnumerable<KScriptPackage> except = null) =>
             LoadAll().Where(p => p.Methods.Any(m => m.Name == name) && (except == null || !except.Contains(p)));
+
+        /// <summary>The field called <paramref name="name"/> on values of <paramref name="receiver"/>, from any installed package, or null.</summary>
+        public ValueFieldDefinition FindField(string receiver, string name) =>
+            LoadAll().SelectMany(p => p.Fields).FirstOrDefault(f => f.Receiver == receiver && f.Name == name);
     }
 }

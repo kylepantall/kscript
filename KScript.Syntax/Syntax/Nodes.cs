@@ -48,6 +48,9 @@ namespace KScript.Syntax
 
         /// <summary><c>https://example.com/docs</c>, written without quotes.</summary>
         Url,
+
+        /// <summary>A length of time written without quotes: <c>30s</c>, <c>500ms</c>, <c>1h30m</c>.</summary>
+        Duration,
     }
 
     public sealed class LiteralNode : ExprNode
@@ -197,7 +200,7 @@ namespace KScript.Syntax
         public string Name { get; internal set; }
     }
 
-    /// <summary><c>fn($a, $b) =&gt; body</c>.</summary>
+    /// <summary><c>fn(a, b) =&gt; body</c>.</summary>
     public sealed class LambdaNode : ExprNode
     {
         public List<ParameterNode> Parameters { get; } = new List<ParameterNode>();
@@ -234,16 +237,20 @@ namespace KScript.Syntax
         public override IEnumerable<ExprNode> Children => new[] { Start, End, Step };
     }
 
+    /// <summary>One arm of a match: <c>1, 2 =&gt; result</c>, <c>_ when $n &gt; 9 =&gt; result</c> or <c>_ =&gt; result</c>.</summary>
     public sealed class MatchArmNode : ExprNode
     {
-        /// <summary>The pattern, or null for the <c>_</c> default arm.</summary>
-        public ExprNode Pattern { get; internal set; }
+        /// <summary>The values the arm matches (<c>1, 2 =&gt;</c>); empty for <c>_</c>, which matches anything.</summary>
+        public List<ExprNode> Patterns { get; } = new List<ExprNode>();
+
+        /// <summary>The test after <c>when</c>, which must also hold; null if the arm has none.</summary>
+        public ExprNode Guard { get; internal set; }
 
         public ExprNode Result { get; internal set; }
-        public override IEnumerable<ExprNode> Children => new[] { Pattern, Result };
+        public override IEnumerable<ExprNode> Children => Patterns.Append(Guard).Append(Result);
     }
 
-    /// <summary><c>match subject { pattern =&gt; result, _ =&gt; fallback }</c>.</summary>
+    /// <summary><c>match subject { pattern =&gt; result, a, b =&gt; result, _ =&gt; fallback }</c>.</summary>
     public sealed class MatchNode : ExprNode
     {
         public ExprNode Subject { get; internal set; }

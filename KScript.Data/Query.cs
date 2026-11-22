@@ -315,7 +315,7 @@ namespace KScript.Data
         /// <summary>Brings back soft-deleted rows.</summary>
         public double Restore(CallContext call)
         {
-            if (Model?.SoftDeletes != true) throw new KScriptException($"->restore() is for models with soft_deletes: yes, and {Model?.Name ?? Table} doesn't have it.", "Argument");
+            if (Model?.SoftDeletes != true) throw new KScriptException($"->restore() is for models with soft_deletes: true, and {Model?.Name ?? Table} doesn't have it.", "Argument");
             return (this with { Trashed = "only" }).Update(call, new[] { new KeyValuePair<string, object>(ModelInfo.DeletedAt, null) });
         }
 

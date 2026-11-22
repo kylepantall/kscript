@@ -114,6 +114,7 @@ namespace KScript.Runtime
                 foreach (var c in package.Commands) module.Commands[c.Key] = c.Value;
             }
             foreach (MethodDefinition m in package.Methods) module.Methods[m.Receiver + ":" + m.Name] = m;
+            foreach (ValueFieldDefinition f in package.Fields) module.Fields[f.Receiver + ":" + f.Name] = f;
             foreach (var v in package.Variables) module.Variables[v.Key] = v.Value;
             foreach (var f in package.EchoFormats) module.EchoFormats[f.Key] = f.Value;
         }
@@ -154,7 +155,7 @@ namespace KScript.Runtime
                     Add(GetPackage(packageName, module, import), alias);
                     continue;
                 }
-                string src = import.GetAttributeValue("src");
+                string src = import.GetAttributeValue("path");
                 if (src == null) continue; // reported by the attribute check
                 Module imported = LoadImport(src, module, import);
                 module.ScriptImports[import] = imported;
@@ -198,7 +199,7 @@ namespace KScript.Runtime
         }
 
         /// <summary>
-        /// Loads and runs a script (once) and gives a module its exports, as <c>&lt;import src="..." /&gt;</c> does:
+        /// Loads and runs a script (once) and gives a module its exports, as <c>&lt;import path="..." /&gt;</c> does:
         /// all of them, the comma separated <paramref name="names"/>, or under <paramref name="alias"/>.
         /// </summary>
         public void ImportScript(Module module, string path, Scope scope, string alias = null, string names = null)
@@ -243,7 +244,7 @@ namespace KScript.Runtime
         private Module LoadImport(string src, Module from, MarkupElement import)
         {
             string full = System.IO.Path.GetFullPath(System.IO.Path.Combine(from.Directory, src));
-            int at = import.GetAttribute("src").Value?.SourceSpan.Start ?? import.Span.Start;
+            int at = import.GetAttribute("path").Value?.SourceSpan.Start ?? import.Span.Start;
             if (loading.Contains(full))
                 throw Located(new KScriptException($"{src} imports this script back (directly or through other scripts). Imports can't go round in a circle.", "Import"), from, at);
             if (modulesByPath.TryGetValue(full, out Module cached)) return cached;
@@ -274,8 +275,10 @@ namespace KScript.Runtime
                 return def;
             }
 
+            if (Retired.RenamedElement(name) is RetiredInfo renamed)
+                throw Located(new KScriptException(renamed.Message(module.ElementHint(name)), "Retired"), module, e.NameSpan.Start);
             if (Retired.Elements.TryGetValue(name, out RetiredInfo retired))
-                throw Located(new KScriptException($"<{name}> was removed in KScript 2. {retired.Replacement}", "Retired"), module, e.NameSpan.Start);
+                throw Located(new KScriptException(retired.Message($"<{name}>"), "Retired"), module, e.NameSpan.Start);
 
             KScriptPackage owner = Packages.FindElement(name, module.Packages).FirstOrDefault();
             if (owner != null)
@@ -292,7 +295,7 @@ namespace KScript.Runtime
                 foreach (MarkupAttribute a in e.Attributes)
                 {
                     if (Retired.Attributes.TryGetValue(a.Name, out RetiredInfo r))
-                        throw Located(new KScriptException($"{a.Name}=\"...\" was removed in KScript 2. {r.Replacement}", "Retired"), module, a.NameSpan.Start);
+                        throw Located(new KScriptException(r.Message($"{a.Name}=\"...\""), "Retired"), module, a.NameSpan.Start);
                     throw Located(new KScriptException($"<kscript> has no attributes, but this one has {a.Name}=\"...\".", "Syntax"), module, a.NameSpan.Start);
                 }
                 CheckStatements(module, e);
@@ -395,9 +398,11 @@ namespace KScript.Runtime
                 AttributeInfo spec = info.GetAttribute(a.Name);
                 if (spec == null)
                 {
+                    if (Retired.RenamedAttribute(info, a.Name) is RetiredInfo renamed)
+                        throw Located(new KScriptException(renamed.Message($"{module.ElementHint(info.Name)}: '{a.Name}'"), "Retired"), module, a.NameSpan.Start);
                     if (info.AllowsExtraAttributes || a.Name.StartsWith("on-", StringComparison.Ordinal) && info.Content == ContentKind.Markup) continue;
                     if (Retired.Attributes.TryGetValue(a.Name, out RetiredInfo r))
-                        throw Located(new KScriptException($"{a.Name}=\"...\" was removed in KScript 2. {r.Replacement}", "Retired"), module, a.NameSpan.Start);
+                        throw Located(new KScriptException(r.Message($"{a.Name}=\"...\""), "Retired"), module, a.NameSpan.Start);
                     string close = Values.Closest(a.Name, info.Attributes.Select(x => x.Name));
                     string list = info.Attributes.Count == 0 ? $"<{info.Name}> has no attributes." : $"Its attributes are: {string.Join(", ", info.Attributes.Select(x => x.Name))}.";
                     throw Located(new KScriptException($"<{info.Name}> has no attribute '{a.Name}'." + (close != null ? $" Did you mean {close}?" : string.Empty) + " " + list, "Syntax"), module, a.NameSpan.Start);
@@ -423,7 +428,7 @@ namespace KScript.Runtime
                         break;
                     case AttributeKind.Bool:
                         if (Values.ParseBool(a.Value.Value) == null && !a.Value.Value.Contains('{'))
-                            throw Located(new KScriptException($"{a.Name}=\"{a.Value.Value}\" should be yes or no.", "Syntax"), module, a.Value.SourceSpan.Start);
+                            throw Located(new KScriptException($"{a.Name}=\"{a.Value.Value}\" should be true or false.", "Syntax"), module, a.Value.SourceSpan.Start);
                         break;
                 }
             }

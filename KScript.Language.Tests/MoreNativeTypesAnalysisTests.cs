@@ -26,7 +26,7 @@ namespace KScript.Language.Tests
         [InlineData("i: iban = 'GB00WEST12345698765432'", "isn't an iban")]
         [InlineData("ip: ip(version: 6) = 10.0.0.1", "IPv6")]
         [InlineData("type Market with [country] { one_of: [GB, IE] }\nm: Market = FR", "doesn't fit Market")]
-        [InlineData("fn host(u: url) => $u->host()\necho @host('nope')", "isn't a url")]
+        [InlineData("fn host(u: url) => $u.host\necho @host('nope')", "isn't a url")]
         public void LiteralsThatDontFitTheirTypeAreReported(string code, string message)
         {
             Diagnostic d = AssertSingle(Code(code), DiagnosticCodes.InvalidTypedValue);
@@ -34,18 +34,18 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("u: url = https://example.com/docs?page=2 // the docs\necho $u->host()")]
-        [InlineData("u = https://example.com/docs\necho $u->path()\necho $u->contains('docs')")]
-        [InlineData("echo https://example.com/a->host()")]
-        [InlineData("d: domain = example.com\necho $d->tld()")]
+        [InlineData("u: url = https://example.com/docs?page=2 // the docs\necho $u.host")]
+        [InlineData("u = https://example.com/docs\necho $u.path\necho $u->contains('docs')")]
+        [InlineData("echo https://example.com/a.host")]
+        [InlineData("d: domain = example.com\necho $d.tld")]
         [InlineData("z: timezone = Europe/London\necho $z->offset()")]
         [InlineData("p: port = 8080\necho $p + 1")]
         [InlineData("c: color = red\necho $c->contrast(white)")]
         [InlineData("ip: ip = 10.0.0.1\necho $ip->in('10.0.0.0/8')")]
-        [InlineData("c: country = gb\necho $c->currency()->symbol()")]
+        [InlineData("c: country = gb\necho $c.currency.symbol")]
         [InlineData("enum Color { red, green }\nc: Color = green\necho $c")]
         [InlineData("type Duration { minutes: int }\nd = Duration({ minutes: 1 })\necho $d.minutes")]
-        [InlineData("type Site with [url] { validate: $value->host()->ends_with('example.com'), 'Use a company site' }\ns: Site = https://www.example.com\necho $s->host()")]
+        [InlineData("type Site with [url] { validate: $value.host->ends_with('example.com'), 'Use a company site' }\ns: Site = https://www.example.com\necho $s.host")]
         public void ValuesThatFitAreClean(string code) => AssertClean(WithoutUnused(Code(code)));
 
         [Theory]
@@ -62,11 +62,18 @@ namespace KScript.Language.Tests
         {
             (string text, int offset) = WithCaret("u: url = https://example.com\necho $u->‸");
             List<string> labels = Service.GetCompletions(Service.Analyze(text, "/tmp/natives.kscript"), offset).Select(i => i.Label).ToList();
-            Assert.Contains("host", labels);
+            Assert.DoesNotContain("host", labels);
             Assert.Contains("with_query", labels);
             Assert.Contains("contains", labels);
             Assert.DoesNotContain("to_date", labels);
             Assert.DoesNotContain("version", labels);
+
+            // A url's facts are fields, offered after a dot.
+            (text, offset) = WithCaret("u: url = https://example.com\necho $u.‸");
+            List<string> fields = Service.GetCompletions(Service.Analyze(text, "/tmp/natives.kscript"), offset).Select(i => i.Label).ToList();
+            Assert.Contains("host", fields);
+            Assert.Contains("query", fields);
+            Assert.DoesNotContain("with_query", fields);
         }
 
         [Fact]

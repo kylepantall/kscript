@@ -374,8 +374,8 @@ public sealed class ProjectTemplateApiTests : IDisposable
         using var site = new TempSite(
             ("kscript.json", "{ \"name\": \"local\" }"),
             ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/echo\") {\n    return { query: $request.query, auth: $request.headers.authorization ?? '', cookie: $request.cookies.sid ?? '' }\n  }\n  Post(path: \"/echo\") {\n    return @response({ body: $request.body, type: $request.headers['content-type'] }, status: 201)\n  }\n  Get(path: \"/loop\") {\n    return @api('/api/loop')->json()\n  }\n  Get(path: \"/again\") {\n    return @api('/api/echo')->json()\n  }\n}\n"),
-            ("scripts/ask.kscript", "import KScript.Net\nr = @api('/api/echo?a=1&b=two+words&flag')\necho $r->status()\necho $r->json().query\necho @api('/api/echo', options: { method: 'post', body: 'plain' })->json()\necho @api('/api/echo', options: { method: 'POST', body: { x: 1 }, headers: { 'Content-Type': 'application/merge+json' } })->json().type\necho @api('/nothing')->status()\necho @api('/api/missing')->status()\n"),
-            ("scripts/loop.kscript", "import KScript.Net\necho @api('/api/loop')->status()\n"));
+            ("scripts/ask.kscript", "import KScript.Net\nr = @api('/api/echo?a=1&b=two+words&flag')\necho $r.status\necho $r->json().query\necho @api('/api/echo', options: { method: 'post', body: 'plain' })->json()\necho @api('/api/echo', options: { method: 'POST', body: { x: 1 }, headers: { 'Content-Type': 'application/merge+json' } })->json().type\necho @api('/nothing').status\necho @api('/api/missing').status\n"),
+            ("scripts/loop.kscript", "import KScript.Net\necho @api('/api/loop').status\n"));
         var (output, error) = RunScript(Path.Combine(site.Root, "scripts", "ask.kscript"));
         Assert.Null(error);
         Assert.Contains("200", output);
@@ -429,12 +429,12 @@ public sealed class ProjectTemplateApiTests : IDisposable
     [Fact]
     public void ApiWithAPathNeedsAProjectWithRoutes()
     {
-        using var lone = new TempSite(("ask.kscript", "import KScript.Net\necho @api('/api/x')->status()\n"));
+        using var lone = new TempSite(("ask.kscript", "import KScript.Net\necho @api('/api/x').status\n"));
         var (_, error) = RunScript(Path.Combine(lone.Root, "ask.kscript"));
         Assert.NotNull(error);
         Assert.Contains("isn't in a project with routes", error.Message);
 
-        using var bare = new TempSite(("kscript.json", "{ }"), ("ask.kscript", "import KScript.Net\necho @api('/api/x')->status()\n"));
+        using var bare = new TempSite(("kscript.json", "{ }"), ("ask.kscript", "import KScript.Net\necho @api('/api/x').status\n"));
         Assert.Contains("isn't in a project with routes", RunScript(Path.Combine(bare.Root, "ask.kscript")).Error.Message);
         // Asking twice reuses the app it made for the project.
         Assert.Contains("isn't in a project with routes", RunScript(Path.Combine(bare.Root, "ask.kscript")).Error.Message);
@@ -500,7 +500,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     {
         using var site = new TempSite(
             ("kscript.json", "{ }"),
-            ("routes/api.kscript", "import KScript.Http\nimport KScript.Auth\n\nRoutes {\n  Get(path: \"/c\") {\n    $session->put('k', 'v')\n    return { ok: true }\n  }\n}\n"));
+            ("routes/api.kscript", "import KScript.Http\nimport KScript.Auth\n\nRoutes {\n  Get(path: \"/c\") {\n    $session->set('k', 'v')\n    return { ok: true }\n  }\n}\n"));
         LocalResponse r = LocalRequests.Send(new KScriptHost(TextWriter.Null, TextWriter.Null), site.Root,
             new Dictionary<string, object> { ["method"] = "GET", ["path"] = "/api/c", ["headers"] = new Dictionary<string, object>() });
         Assert.Equal(200, r.Status);
@@ -560,7 +560,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         // Without config.root, the files are read from the project folder; a broken kscript.json is left to report itself.
         using var plain = new TempSite(("kscript.json", "{ }"), ("config.yaml", "app:\n  name: Plain\n"), ("sub/page.html", "<p>{ $config.app.name }</p>\n"));
         Assert.Contains("<p>Plain</p>", plain.Render("sub/page.html").Body);
-        using var broken = new TempSite(("kscript.json", "{ nope"), ("page.html", "<p>{ @config('x', 'none') }</p>\n"));
+        using var broken = new TempSite(("kscript.json", "{ nope"), ("page.html", "<p>{ $config->get('x', 'none') }</p>\n"));
         Assert.Contains("<p>none</p>", broken.Render("page.html").Body);
     }
 }

@@ -43,7 +43,7 @@ public sealed class ReleaseFeatureCoverageTests
             ("kscript.json", "{ \"paths\": { \"routes\": \"app/routes\" } }"));
         var (code, output, err) = Make(site.Root, "route", "users/{id}", "--method", "put");
         Assert.True(code == 0, err);
-        Assert.Contains("Put(path: \"/users/{id}\", to: users.update)", output);
+        Assert.Contains("Put(path: \"/users/{id}\", to: @users.update)", output);
         Assert.Contains("kscript serve only finds app/routes/web.kscript once kscript.json lists it", output);
         Assert.True(File.Exists(Path.Combine(site.Root, "app", "routes", "web.kscript")));
     }
@@ -58,7 +58,7 @@ public sealed class ReleaseFeatureCoverageTests
         Assert.True(code == 0, err);
         string routes = File.ReadAllText(Path.Combine(site.Root, "routes", "web.kscript")).Replace("\r\n", "\n");
         Assert.Contains("import \"../controllers/admin/users.kscript\" as admin_users3", routes);
-        Assert.Contains("Get(path: \"/admin/users\", to: admin_users3.index)", routes);
+        Assert.Contains("Get(path: \"/admin/users\", to: @admin_users3.index)", routes);
     }
 
     private const string Sizes = "<enum name=\"Size\" values=\"small, medium, large\" />"

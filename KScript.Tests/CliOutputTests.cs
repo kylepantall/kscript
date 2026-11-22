@@ -355,7 +355,7 @@ public class TerminalOutputTests
         Assert.Contains("   ERROR  Broken [x].", error.ToString());
         Assert.Contains("type=\"loud\" isn't one of", Assert.Throws<KScriptException>(() => Run("<alert type=\"loud\">x</alert>")).Message);
         Assert.Contains("items needs a list", Assert.Throws<KScriptException>(() => Run("<bullets items=\"3\" />")).Message);
-        Assert.Contains("rows needs a list", Assert.Throws<KScriptException>(() => Run("<table rows=\"3\" />")).Message);
+        Assert.Contains("rows should be a list of rows", Assert.Throws<KScriptException>(() => Run("<table rows=\"3\" />")).Message);
     }
 
     [Fact]
@@ -366,13 +366,13 @@ public class TerminalOutputTests
         Assert.Contains("│ Joan │  82 │", maps);
         Assert.Contains("│ Sam  │   9 │", maps);
 
-        string chosen = Run("<table rows=\"[{ name: 'Joan', age: 82 }]\" columns=\"'age'\" headers=\"['Age']\" align=\"['left']\" />");
+        string chosen = Run("<table rows=\"[{ name: 'Joan', age: 82 }]\" columns=\"{ Age: 'age' }\" align=\"['left']\" />");
         Assert.Contains("│ Age │", chosen);
         Assert.Contains("│ 82  │", chosen);
 
+        // A list of lists: the first row holds the headings, as in a document's Table.
         string lists = Run("<table rows=\"[['a', 1], ['b'], 'c']\" />");
-        Assert.Contains("│ 1 │ 2 │", lists);
-        Assert.Contains("│ a │ 1 │", lists);
+        Assert.Contains("│ a │ 1 │\n  ├", lists);
         Assert.Contains("│ b │   │", lists);
         Assert.Contains("│ c │   │", lists);
         Assert.Contains("│ x │", Run("<table rows=\"[{ x: null }]\" />"));

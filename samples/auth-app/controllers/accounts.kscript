@@ -13,7 +13,7 @@ fn sign_in(form: map) {
   user = null
   try {
     user = @attempt($form.email ?? '', $form.password ?? '', remember: $form.remember == 'yes')
-  } catch err when $err.type eq 'TooManyRequests' {
+  } catch err when $err.type == 'TooManyRequests' {
     return @view('auth/login', data: { error: $err.message, email: $form.email })->with_status(429)
   }
   if $user == null {
@@ -31,7 +31,7 @@ fn sign_up(form: map) {
   try {
     data = SignUp($form)
     user = @register($data.email, $data.password, name: $data.name->trim())
-  } catch err when $err.type eq 'Shape' or $err.type eq 'Validation' {
+  } catch err when $err.type == 'Shape' or $err.type == 'Validation' {
     return @view('auth/register', data: { problems: $err.problems ?? [], name: $form.name, email: $form.email })->with_status(422)
   }
   @login($user)
@@ -68,7 +68,7 @@ fn reset(form: map) {
   user = null
   try {
     user = @reset_password($form.token ?? '', $form.password ?? '')
-  } catch err when $err.type eq 'Validation' {
+  } catch err when $err.type == 'Validation' {
     return @view('auth/reset-password', data: { token: $form.token, error: $err.message })->with_status(422)
   }
   if $user == null {

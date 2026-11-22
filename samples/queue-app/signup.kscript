@@ -15,5 +15,5 @@ echo "Queued {$queued.job} {$queued.id} on {$queued.queue}"
   ->dispatch()
 echo "Queued order 42: charge, ship, then receipt"
 
-later = SendReceipt(order_id: 43)->dispatch(delay: '10m')
+later = SendReceipt(order_id: 43)->dispatch(delay: 10m)
 echo "Order 43's receipt waits until {$later.available_at->format('HH:mm')}"

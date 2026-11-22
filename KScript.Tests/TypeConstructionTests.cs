@@ -37,7 +37,7 @@ public sealed class TypeConstructionTests : DataFixture
     [InlineData("r = { name: 'p' } |> Repo()\necho $r.name", "p\n")]
     [InlineData("echo Age('7') + 1", "8\n")]
     [InlineData("echo Size('small')", "small\n")]
-    [InlineData("t = Repo\necho $t->name()\necho @json('{\"name\": \"v\"}', as: $t).name", "Repo\nv\n")]
+    [InlineData("t = Repo\necho $t.name\necho @json('{\"name\": \"v\"}', as: $t).name", "Repo\nv\n")]
     [InlineData("echo @json('{\"name\": \"x\"}', as: Repo).name", "x\n")]
     [InlineData("try {\n  throw Missing(what: 'key')\n} catch Missing as e {\n  echo $e.what\n}", "key\n")]
     public void CallingATypeMakesAValue(string code, string printed)

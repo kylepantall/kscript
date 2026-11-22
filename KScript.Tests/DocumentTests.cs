@@ -227,7 +227,7 @@ Line two""
       }
     }
   }
-  Section(title: Results, new-page: yes) {
+  Section(title: Results, new_page: yes) {
     Math(id: eq-one) ""E = mc^2""
     Math(numbered: no) ""\int_0^1 x \, dx = \tfrac{1}{2}""
     Code(language: python) ""def f(x):
@@ -235,19 +235,19 @@ Line two""
     Quote(by: ""Someone"") ""A quotation.
 
 Two paragraphs.""
-    Table(caption: ""Data from maps."", id: tab-data, data: $rows, columns: { Name: 'name', Score: 'score', City: 'team.city', Missing: 'nope' })
-    Table(data: [[1, 2], [3, 4]], header: no, rules: grid, widths: [2, 1], size: 0.9)
-    Table(data: $rows, columns: ['name', 'score'], rules: none, align: ""l | c"")
-    Table(data: [['a', 'b'], ['c', 'd']])
-    Table(data: [5, 6])
-    Table(caption: ""Hand made."", align: ""lcr"") {
+    Table(caption: ""Data from maps."", id: tab-data, rows: $rows, columns: { Name: 'name', Score: 'score', City: 'team.city', Missing: 'nope' })
+    Table(rows: [[1, 2], [3, 4]], header: false, rules: grid, widths: [2, 1], size: 0.9)
+    Table(rows: $rows, columns: ['name', 'score'], rules: none, align: ['left', 'center'])
+    Table(rows: [['a', 'b'], ['c', 'd']])
+    Table(rows: [5, 6])
+    Table(caption: ""Hand made."", align: ['left', 'center', 'right']) {
       Tr(header: yes) ""A | B | C""
       Tr ""1 \| one | 2 | 3""
       Tr ""wide cell that keeps going and going and going and going and going and going | x | y""
     }
-    Figure(src: ""fig.png"", caption: ""A figure."", id: fig-one, width: '50%')
-    Figure(src: ""photo.jpg"", width: 0.3)
-    Markdown(src: ""ch/intro.md"")
+    Figure(path: ""fig.png"", caption: ""A figure."", id: fig-one, width: '50%')
+    Figure(path: ""photo.jpg"", width: 0.3)
+    Markdown(path: ""ch/intro.md"")
     Markdown ""
       ### Inline markdown
 
@@ -258,7 +258,7 @@ Two paragraphs.""
     PageBreak
     Paragraph ""After the break.""
   }
-  Bibliography(src: ""refs.bib"", title: ""Sources"") {
+  Bibliography(path: ""refs.bib"", title: ""Sources"") {
     Source(id: extra, type: book, author: ""Jane Doe"", title: ""Uncited"", year: 2000)
   }
 }
@@ -339,7 +339,7 @@ Document(template: letter, to: ""letter.pdf, letter.docx"") {
   }
 }
 Document(template: invoice, to: ""invoice.pdf, invoice.docx, invoice.html"") {
-  Invoice(number: 7, title: ""Bill"", from: ""Us"", to: ""Them"", due: ""Soon"", tax: 10, tax-name: ""Sales tax"", paid: 50, notes: ""Thanks"", currency: USD, items: [{ description: 'A', qty: 2, unit_price: 10 }, { item: 'B', amount: 5 }, { name: 'C', rate: 1.5, quantity: 3 }, { description: 'Free' }])
+  Invoice(number: 7, title: ""Bill"", from: ""Us"", to: ""Them"", due: ""Soon"", tax: 10, tax_name: ""Sales tax"", paid: 50, notes: ""Thanks"", currency: USD, items: [{ description: 'A', qty: 2, unit_price: 10 }, { item: 'B', amount: 5 }, { name: 'C', rate: 1.5, quantity: 3 }, { description: 'Free' }])
   Invoice(items: [{ description: 'Yen', price: 1000 }], currency: JPY)
   Invoice(items: [{ description: 'Other', price: -3 }], currency: XYZ)
   Invoice(items: [{ description: 'Odd', price: 3 }], currency: ""Ð"")
@@ -364,7 +364,7 @@ Document(template: invoice, to: ""invoice.pdf, invoice.docx, invoice.html"") {
     public void Style_options_change_the_page()
     {
         Run(@"
-Document(paper: letter, landscape: yes, margin: ""1in 2cm 30mm 40pt"", font: sans, heading-font: mono, size: 12, line-height: 1.5, align: left, accent: navy, numbered: no, title-page: yes, chapters: yes, citations: numeric, header: ""Left"", footer: """", rules: grid, language: ""en-GB"", title: ""Styled"", to: ""styled.pdf, styled.docx, styled.html, styled.tex"") {
+Document(paper: letter, landscape: yes, margin: ""1in 2cm 30mm 40pt"", font: sans, heading_font: mono, size: 12, line_height: 1.5, align: left, accent: navy, numbered: no, title_page: yes, chapters: yes, citations: numeric, header: ""Left"", footer: """", rules: grid, language: ""en-GB"", title: ""Styled"", to: ""styled.pdf, styled.docx, styled.html, styled.tex"") {
   Abstract ""On the title page.""
   Section(title: A) {
     Paragraph ""Text.""
@@ -433,16 +433,16 @@ Document(title: ""Values"", to: [""{ $name }.docx""]) {
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph(id: x) \"a\"\n  Paragraph(id: x) \"b\"\n}", "Two parts of the document have id: x")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Math \"\\frac{1}\"\n}", "In the maths")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"\\( \\nosuch \\)\"\n}", "nosuch")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Figure(src: \"missing.png\")\n}", "missing.png")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Figure(src: \"text.png\")\n}", "PNG or JPEG")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Figure(src: \"x.png\", width: 2)\n}", "width")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Markdown(src: \"none.md\")\n}", "no Markdown file")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Bibliography(src: \"none.bib\")\n}", "no BibTeX file")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Figure(path: \"missing.png\")\n}", "missing.png")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Figure(path: \"text.png\")\n}", "PNG or JPEG")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Figure(path: \"x.png\", width: 2)\n}", "width")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Markdown(path: \"none.md\")\n}", "no Markdown file")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Bibliography(path: \"none.bib\")\n}", "no BibTeX file")]
     [InlineData("s = 'stars'\nimport KScript.Document\n\nDocument(to: \"a.pdf\") {\n  List(style: \"{ $s }\") {\n  }\n}", "should be bullet")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  List {\n    List {\n    }\n  }\n}", "after the Item")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Table(align: \"lx\")\n}", "isn't a column alignment")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Table(data: 5)\n}", "list of rows")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Table(data: [], columns: 5)\n}", "columns:")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Table(align: ['left', 'x'])\n}", "isn't a column alignment")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Table(rows: 5)\n}", "list of rows")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Table(rows: [], columns: 5)\n}", "columns should be a list of keys")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Table(rules: double)\n}", "rules")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  VSpace(height: tall)\n}", "tall")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Invoice(items: 5)\n}", "items:")]
@@ -487,7 +487,7 @@ Document(title: ""Values"", to: [""{ $name }.docx""]) {
             sb.Append("  }\n");
         }
         sb.Append("  Code \"").Append(string.Join("\n", Enumerable.Range(0, 120).Select(i => "line " + i + " " + new string('x', i % 140)))).Append("\"\n");
-        sb.Append("  Table(caption: \"Tall.\", data: [").Append(string.Join(", ", Enumerable.Range(0, 90).Select(i => $"{{ n: {i}, word: 'word {i}' }}"))).Append("])\n");
+        sb.Append("  Table(caption: \"Tall.\", rows: [").Append(string.Join(", ", Enumerable.Range(0, 90).Select(i => $"{{ n: {i}, word: 'word {i}' }}"))).Append("])\n");
         sb.Append("  Paragraph \"").Append("https://example.org/" + new string('a', 400)).Append("\"\n");
         sb.Append("}\necho $doc->pages()\n");
         int pages = int.Parse(Run(sb.ToString()).Trim(), CultureInfo.InvariantCulture);

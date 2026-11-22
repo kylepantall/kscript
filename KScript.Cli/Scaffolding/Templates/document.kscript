@@ -30,7 +30,7 @@ Document(
 
     Paragraph "Equation [#eq-main] is the mean. Section [#intro] has the background."
 
-    Table(caption: "Results.", align: "lr") {
+    Table(caption: "Results.", align: ['left', 'right']) {
       Tr(header: yes) "Measure | Value"
       Tr "Mean | 4.2"
       Tr "Count | 12"

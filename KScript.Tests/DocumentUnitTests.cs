@@ -212,10 +212,10 @@ public sealed class DocumentStyleTests
         var style = new DocumentStyle();
         foreach (var (name, value) in new[]
         {
-            ("font", "times"), ("font", "helvetica"), ("font", "courier"), ("heading-font", "serif"), ("align", "justified"), ("align", "centre"),
+            ("font", "times"), ("font", "helvetica"), ("font", "courier"), ("heading_font", "serif"), ("align", "justified"), ("align", "centre"),
             ("rules", "lines"), ("rules", "grid"), ("rules", "none"), ("citations", "author-year"), ("citations", "numeric"), ("numbered", "yes"),
             ("accent", "#abc"), ("accent", "#AABBCC"), ("accent", "maroon"), ("paper", "us-letter"), ("paper", "a4"), ("paper", "210mm x 297mm"), ("margin", "1in"),
-            ("line-height", "1.2"), ("size", "9.5pt"), ("landscape", "no"), ("header", "a | b | c"), ("language", "fr"),
+            ("line_height", "1.2"), ("size", "9.5pt"), ("landscape", "no"), ("header", "a | b | c"), ("language", "fr"),
         })
         {
             style.Set(name, value);
@@ -231,7 +231,7 @@ public sealed class DocumentStyleTests
         foreach (var (name, value, message) in new[]
         {
             ("font", "comic", "isn't a font"), ("align", "up", "align"), ("rules", "double", "rules"), ("citations", "harvard", "citation style"),
-            ("numbered", "maybe", "yes or no"), ("line-height", "-1", "positive number"), ("paper", "10cm x tall", "paper size"), ("paper", "1 x 2 x 3", "paper size"),
+            ("numbered", "maybe", "true or false"), ("line_height", "-1", "positive number"), ("paper", "10cm x tall", "paper size"), ("paper", "1 x 2 x 3", "paper size"),
             ("margin", "-1cm", "isn't a length"), ("accent", "blurple", "colour"), ("nosuch", "x", "nosuch"),
         })
         {

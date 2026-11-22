@@ -8,7 +8,7 @@ import KScript.Net
 fn list_notes() {
   answer = @api('/api/notes')
 {{#if auth}}
-  if $answer->status() == 401 {
+  if $answer.status == 401 {
     return null
   }
 {{/if}}
@@ -19,7 +19,7 @@ fn list_notes() {
 /// blank title), or null when it was added.
 fn add_note(title: string) {
   answer = @api('/api/notes', options: { method: 'POST', body: { title: $title->trim() } })
-  if $answer->status() == 422 {
+  if $answer.status == 422 {
     return 'Give the note a title.'
   }
   $answer->check()
@@ -39,6 +39,6 @@ fn delete_note(id: int) {
 
 /// How many notes are not done yet, as text: '1 note left'.
 fn notes_left(notes: list) {
-  n = $notes->count(fn($n) => not $n.done)
+  n = $notes->count(fn(n) => not $n.done)
   return $n + ($n == 1 ? ' note left' : ' notes left')
 }

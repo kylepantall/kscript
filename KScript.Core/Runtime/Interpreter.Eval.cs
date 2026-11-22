@@ -68,7 +68,7 @@ namespace KScript.Runtime
             return parsed.Nodes.Select(n => Evaluate(n, scope, ctx)).ToList();
         }
 
-        /// <summary>Runs <c>x = 3; $total += $price</c> statements. With <paramref name="declare"/>, plain names are declared (as &lt;let&gt; does).</summary>
+        /// <summary>Runs <c>x = 3; total += $price</c> statements. With <paramref name="declare"/>, plain names are declared (as &lt;let&gt; does).</summary>
         /// <summary>
         /// Runs assignment statements and calls. <paramref name="declare"/> declares every assigned name in this scope
         /// (&lt;let&gt;); <paramref name="declareNew"/> declares only names not yet in scope and changes the rest
@@ -187,7 +187,7 @@ namespace KScript.Runtime
                         LiteralKind.Number => double.Parse(lit.Value, NumberStyles.Float, CultureInfo.InvariantCulture),
                         LiteralKind.String => lit.Template == null ? lit.Value : FillIn(lit.Template, scope, ctx),
                         LiteralKind.Bool => lit.Value == "true",
-                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url => TypedLiteral(lit, ctx),
+                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Duration => TypedLiteral(lit, ctx),
                         _ => null,
                     };
 
@@ -288,7 +288,11 @@ namespace KScript.Runtime
                     object subject = Evaluate(match.Subject, scope, ctx);
                     foreach (MatchArmNode arm in match.Arms)
                     {
-                        if (arm.Pattern == null || Matches(subject, arm.Pattern, scope, ctx)) return Evaluate(arm.Result, scope, ctx);
+                        if ((arm.Patterns.Count == 0 || arm.Patterns.Any(p => Matches(subject, p, scope, ctx)))
+                            && (arm.Guard == null || Values.Truthy(Evaluate(arm.Guard, scope, ctx))))
+                        {
+                            return Evaluate(arm.Result, scope, ctx);
+                        }
                     }
                     return null;
                 }
@@ -556,6 +560,10 @@ namespace KScript.Runtime
                     if (obj.TryGetMember(name, out object field)) return field;
                     break;
             }
+            // A field a package gives the type: $response.status, $date.year.
+            if (TryFindField(target, name, ctx.Module, out ValueFieldDefinition definition)) return definition.Handler(target, this);
+            if (TryFindMethod(target, name, ctx.Module, out MethodDefinition asMethod) && asMethod.Receiver != "any")
+                throw Fail(node, ctx, $"{name} is a method of {Values.Describe(target)}, not a field. Call it with ->{name}().", "Name");
             throw Fail(node, ctx, $"{Values.Describe(target)} has no field '{name}'." + (target is string || target is double ? $" To call a method, write ->{name}()." : string.Empty), "Name");
         }
 
@@ -581,6 +589,9 @@ namespace KScript.Runtime
                 }
                 case IKObject obj when obj.TryGetMember(Values.ToStr(key), out object field):
                     return field;
+                // A field a package gives the type, by name: $file['size'].
+                case IKObject when key is string name && TryFindField(target, name, ctx.Module, out ValueFieldDefinition definition):
+                    return definition.Handler(target, this);
             }
             throw Fail(node, ctx, $"Can't index into {Values.Describe(target)}.", "Type");
         }
@@ -710,7 +721,7 @@ namespace KScript.Runtime
                 if (module == null || !module.Aliases.TryGetValue(alias, out ImportNamespace ns))
                 {
                     string close = module == null ? null : Values.Closest(alias, module.Aliases.Keys);
-                    throw Fail(node, ctx, $"@{name}: nothing is imported as '{alias}'." + (close != null ? $" Did you mean {close}?" : $" Import it with <import package=\"...\" as=\"{alias}\" /> or <import src=\"...\" as=\"{alias}\" />."), "Name");
+                    throw Fail(node, ctx, $"@{name}: nothing is imported as '{alias}'." + (close != null ? $" Did you mean {close}?" : $" Import it with <import package=\"...\" as=\"{alias}\" /> or <import path=\"...\" as=\"{alias}\" />."), "Name");
                 }
                 if (ns.TryGet(member, out object found))
                 {
@@ -868,7 +879,7 @@ namespace KScript.Runtime
                 case CallNode call:
                     return EvaluateCall(call, left, scope, ctx);
                 case MethodCallNode:
-                    throw Fail(pipe.Right, ctx, "After |> write the method name without ->: $list |> filter(fn($x) => ...).", "Syntax");
+                    throw Fail(pipe.Right, ctx, "After |> write the method name without ->: $list |> filter(fn(x) => ...).", "Syntax");
             }
             object right = Evaluate(pipe.Right, scope, ctx);
             return CallResolved(right, SourceOf(pipe.Right, ctx), new List<object> { left }, null, scope, ctx, pipe.Right);
@@ -877,6 +888,18 @@ namespace KScript.Runtime
         #endregion
 
         #region Methods
+
+        /// <summary>The field a package adds to values like <paramref name="target"/>: <c>$response.status</c>.</summary>
+        private bool TryFindField(object target, string name, Module module, out ValueFieldDefinition field)
+        {
+            field = null;
+            if (target == null || target is Dictionary<string, object>) return false;
+            string type = Values.TypeOf(target);
+            if (module != null && module.Fields.TryGetValue(type + ":" + name, out field)) return true;
+            // A value can reach a script that doesn't import the package it came from.
+            field = Packages.FindField(type, name);
+            return field != null;
+        }
 
         private bool TryFindMethod(object target, string name, Module module, out MethodDefinition method)
         {
@@ -905,7 +928,7 @@ namespace KScript.Runtime
         /// <summary>A regex, email or UUID written without quotes. One that isn't valid fails at the literal.</summary>
         private object TypedLiteral(LiteralNode lit, EvalContext ctx)
         {
-            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, LiteralKind.Url => "url", _ => SemanticTypes.Uuid };
+            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, LiteralKind.Url => "url", LiteralKind.Duration => Duration.TypeName, _ => SemanticTypes.Uuid };
             if (SemanticTypes.TryConvert(type, lit.Value, out object value, out string reason)) return value;
             throw Fail(lit, ctx, $"{lit.Value} isn't {KScript.Metadata.NativeTypes.Get(type).WithArticle}: {reason}.", "Syntax");
         }
@@ -941,6 +964,11 @@ namespace KScript.Runtime
             {
                 return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             }
+
+            if (target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
+                throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
+            if (TryFindField(target, name, ctx.Module, out _))
+                throw Fail(node, ctx, $"{name} is a field of {Values.Describe(target)}, not a method. Read it with a dot and no brackets: .{name}", "Name");
 
             if (target == null)
                 throw Fail(node, ctx, $"Can't call ->{name}() on null. Use ?? to give a default, such as ($value ?? '')->{name}().", "Null");

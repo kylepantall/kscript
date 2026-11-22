@@ -46,18 +46,18 @@ namespace KScript.Language.Tests
         [InlineData("echo(format: json) $data", "kscript { echo(format: json, value: $data) }")]
         [InlineData("echo \"a\" + $b", "kscript { echo(value: \"a\" + $b) }")]
         [InlineData("import KScript.Math as math", "kscript { import(package: KScript.Math, as: math) }")]
-        [InlineData("import \"lib/x.kscript\" as x", "kscript { import(src: lib/x.kscript, as: x) }")]
-        [InlineData("import a, b from \"lib/x.kscript\"", "kscript { import(names: a, b, src: lib/x.kscript) }")]
-        [InlineData("for key, value at i in $map { echo $key }", "kscript { for(each: key, value, index: i, in: $map) { echo(value: $key) } }")]
+        [InlineData("import \"lib/x.kscript\" as x", "kscript { import(path: lib/x.kscript, as: x) }")]
+        [InlineData("import a, b from \"lib/x.kscript\"", "kscript { import(names: a, b, path: lib/x.kscript) }")]
+        [InlineData("for key, value at i in $map { echo $key }", "kscript { for(each: key, value, at: i, in: $map) { echo(value: $key) } }")]
         [InlineData("while true { break }", "kscript { while(test: true) { break } }")]
         [InlineData("fn double(x: int, y = 2) => $x * $y", "kscript { fn(name: double, params: x: int, y = 2, value: $x * $y) }")]
         [InlineData("fn hi() { return }", "kscript { fn(name: hi) { return } }")]
         [InlineData("throw Validation \"Bad {$x}\"", "kscript { throw(type: Validation) \"Bad {$x}\" }")]
         [InlineData("exit 2", "kscript { exit(code: 2) }")]
-        [InlineData("input(to: name) \"Name: \"", "kscript { input(to: name) \"Name:\" }")]
+        [InlineData("input(into: name) \"Name: \"", "kscript { input(into: name) \"Name:\" }")]
         [InlineData("move(from: $a, to: \"x, y\")", "kscript { move(from: $a, to: x, y) }")]
         [InlineData("Row(gap: 8, wrap) { Text \"Hi\" }", "kscript { Row(gap: 8, wrap: yes) { Text \"Hi\" } }")]
-        [InlineData("Button(on-click: \"n = $n + 1\") \"Add\"", "kscript { Button(on-click: n = $n + 1) \"Add\" }")]
+        [InlineData("Button(on_click: \"n = $n + 1\") \"Add\"", "kscript { Button(on_click: n = $n + 1) \"Add\" }")]
         [InlineData("type User { login: string; id: int }", "kscript { type(name: User) { field(name: login, type: string); field(name: id, type: int) } }")]
         [InlineData("type User(fields: \"login: string\", extra: error)", "kscript { type(name: User, fields: login: string, extra: error) }")]
         [InlineData("type Repo {\n  stars: int from stargazers_count\n  owner from \"owner.login\"\n  tags?: string[] = []\n  label => $name + '!'\n}",
@@ -82,7 +82,7 @@ namespace KScript.Language.Tests
         public void IfChainsBecomeSiblings()
         {
             Assert.Equal("kscript { if(test: $a) { echo \"a\" }; elif(test: $b) { echo \"b\" }; elif(test: $c) { echo \"c\" }; else { echo \"d\" } }",
-                Shape(Root("if $a {\n  echo \"a\"\n} elif $b {\n  echo \"b\"\n}\nelse if $c { echo \"c\" } else {\n  echo \"d\"\n}")));
+                Shape(Root("if $a {\n  echo \"a\"\n} elif $b {\n  echo \"b\"\n}\nelif $c { echo \"c\" } else {\n  echo \"d\"\n}")));
         }
 
         [Fact]
@@ -96,17 +96,17 @@ namespace KScript.Language.Tests
         public void MatchCases()
         {
             Assert.Equal("kscript { match(value: $c) { case(is: 1, 2) { echo \"low\" }; case(when: $c > 9) { echo \"high\" }; default { echo \"?\" } } }",
-                Shape(Root("match $c {\n  case 1, 2 { echo \"low\" }\n  when $c > 9 { echo \"high\" }\n  default { echo \"?\" }\n}")));
+                Shape(Root("match $c {\n  1, 2 => echo \"low\"\n  _ when $c > 9 => { echo \"high\" }\n  _ => echo \"?\"\n}")));
         }
 
         [Fact]
         public void ExpressionsContinueOverLines()
         {
-            MarkupElement root = Root("names = $people\n  |> filter(fn($p) => $p.age >= 18)\n  |> map(fn($p) => $p.name)\nm = {\n  a: 1,\n  b: 2\n}\nt = $a and\n  $b");
+            MarkupElement root = Root("names = $people\n  |> filter(fn(p) => $p.age >= 18)\n  |> map(fn(p) => $p.name)\nm = {\n  a: 1,\n  b: 2\n}\nt = $a and\n  $b");
             List<MarkupElement> lets = root.ChildElements.ToList();
             Assert.All(lets, l => Assert.Equal("do", l.Name));
             Assert.Equal(3, lets.Count);
-            Assert.EndsWith("|> map(fn($p) => $p.name)", lets[0].SingleText.Value);
+            Assert.EndsWith("|> map(fn(p) => $p.name)", lets[0].SingleText.Value);
             Assert.Equal("m = {\n  a: 1,\n  b: 2\n}", lets[1].SingleText.Value);
             Assert.Equal("t = $a and\n  $b", lets[2].SingleText.Value);
         }
@@ -236,7 +236,7 @@ namespace KScript.Language.Tests
                 // let, set and do are all "x = value" in .kscript, so they compare as one kind of statement.
                 .Select(e => e.Name is "let" or "set" or "do" && !IsYes(e.GetAttributeValue("const")) && e.GetAttribute("type") == null
                     ? "assign"
-                    : e.Name + "(" + string.Join(",", e.Attributes.Select(a => a.Name).Where(n => n != "description" && n != "src").OrderBy(n => n)) + ")")
+                    : e.Name + "(" + string.Join(",", e.Attributes.Select(a => a.Name).Where(n => n != "description" && n != "path").OrderBy(n => n)) + ")")
                 .ToList();
 
         private static bool IsYes(string v) => v == "yes";

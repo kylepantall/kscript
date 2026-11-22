@@ -10,14 +10,14 @@
   -->
   <import package="KScript.Terminal" />
   <import package="KScript.IO" />
-  <import src="lib/life.ks.xml" />
+  <import path="lib/life.ks.xml" />
 
   <!-- Two characters per cell keeps the board roughly square in most terminal fonts. -->
   <let
     name="board_w"
     value="@min(40, ((@terminal_width() - 4) / 2)->floor())" />
   <let name="board_h" value="20" />
-  <let name="frame_ms" value="70" />
+  <let name="frame_time" value="70ms" />
 
   <fn name="draw" params="world: map, title = ''">
     <if @is_terminal()>
@@ -25,7 +25,7 @@
     </if>
     <let name="s" value="@summary($world)" />
     <echo>{ @bold('Life Lab') } { @dim('·') } { $world.pattern } { $title ne '' ? @dim('· ' + $title) : '' }</echo>
-    <echo>{ $world.grid->map(fn($row) => '  ' + $row->chars()->map(fn($c) => $c eq $alive_cell ? @color('██', colour: 'green') : @dim('· '))->join(''))->join(@char_of(10)) }</echo>
+    <echo>{ $world.grid->map(fn(row) => '  ' + $row->chars()->map(fn(c) => $c eq $alive_cell ? @color('██', colour: 'green') : @dim('· '))->join(''))->join(@char_of(10)) }</echo>
     <echo>  Generation { @bold($s.generation) }   Alive { $s.population } ({ $s.density }%)   Born { $s.births }   Died { $s.deaths }</echo>
     <echo>  { @color($s.status, colour: $s.status eq 'Extinct' ? 'red' : $s.status eq 'Evolving' ? 'cyan' : 'yellow') }   { @dim($s.size + ', edges ' + $s.edges) }</echo>
   </fn>
@@ -37,7 +37,7 @@
       <set name="w" value="@advance($w, generations: 1)" />
       <if @is_terminal()>
         <call fn="draw" args="$w, 'playing ' + ($i + 1) + '/' + $generations" />
-        <wait ms="$frame_ms" />
+        <wait duration="$frame_time" />
       </if>
       <if @population($w.grid) eq 0>
         <break />
@@ -56,7 +56,7 @@
         message="'{$name_or_path}' isn't a pattern name or a file. Patterns: { $patterns->keys()->join(', ') }." />
     </if>
     <let name="rows" value="@parse_cells(@read_text($name_or_path))" />
-    <return value="@new_world(@place(@blank(width: @max($board_w, @width($rows) + 2), height: @max($board_h, @height($rows) + 2)), rows: $rows), wrap: $wrap, pattern: @file($name_or_path)->name())" />
+    <return value="@new_world(@place(@blank(width: @max($board_w, @width($rows) + 2), height: @max($board_h, @height($rows) + 2)), rows: $rows), wrap: $wrap, pattern: @file($name_or_path).name)" />
   </fn>
 
   <!-- kscript life.ks.xml <pattern> [generations]: play and stop. -->
@@ -89,7 +89,7 @@
   <while true>
     <call fn="draw" args="$world" />
     <echo />
-    <menu to="action" options="$actions">What next?</menu>
+    <menu into="action" options="$actions">What next?</menu>
     <match $action>
       <case is="'step'">
         <set name="world" value="@advance($world, generations: 1)" />
@@ -101,26 +101,26 @@
         <set name="world" value="@play($world, generations: 100)" />
       </case>
       <case is="'pattern'">
-        <menu to="name" options="$patterns->keys()">Which pattern?</menu>
+        <menu into="name" options="$patterns->keys()">Which pattern?</menu>
         <echo>{ @dim($patterns[$name].about) }</echo>
         <set
           name="world"
           value="@pattern_world($name, width: $board_w, height: $board_h, wrap: $world.wrap)" />
       </case>
       <case is="'random'">
-        <input to="density" type="number" default="30">How full, in percent? [30] </input>
+        <input into="density" type="number" default="30">How full, in percent? [30] </input>
         <set
           name="world"
           value="@new_world(@random_grid(width: $board_w, height: $board_h, density: $density->clamp(min: 1, max: 100)), wrap: $world.wrap, pattern: 'random ' + $density + '%')" />
       </case>
       <case is="'edit'">
-        <input to="where">Cell to flip, as column row (from 1, e.g. 5 3): </input>
+        <input into="where">Cell to flip, as column row (from 1, e.g. 5 3): </input>
         <let
           name="xy"
-          value="$where->trim()->split(' ')->reject(fn($p) => $p eq '')->map(fn($p) => $p->to_int(default: 0) - 1)" />
+          value="$where->trim()->split(' ')->reject(fn(p) => $p eq '')->map(fn(p) => $p->to_int(default: 0) - 1)" />
         <if not ($xy->count() eq 2 and $xy[0] ge 0 and $xy[1] ge 0 and $xy[0] lt @width($world.grid) and $xy[1] lt @height($world.grid))>
           <echo>{ @color('That cell is off the board.', colour: 'red') }</echo>
-          <wait seconds="1" />
+          <wait duration="1s" />
           <continue />
         </if>
         <set
@@ -128,14 +128,14 @@
           value="@edit_world($world, grid: @toggle($world.grid, x: $xy[0], y: $xy[1]))" />
       </case>
       <case is="'file'">
-        <input to="path">Pattern file: </input>
+        <input into="path">Pattern file: </input>
         <try>
           <set
             name="world"
             value="@load_pattern($path->trim(), wrap: $world.wrap)" />
           <catch as="err">
             <echo>{ @color($err.message, colour: 'red') }</echo>
-            <wait seconds="1.5" />
+            <wait duration="1.5s" />
           </catch>
         </try>
       </case>

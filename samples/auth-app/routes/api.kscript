@@ -7,6 +7,6 @@ import "../controllers/accounts.kscript" as accounts
 Routes {
   // API tokens (kscript make auth --api): POST an email and password for a
   // token, then send it as Authorization: Bearer.
-  Post(path: "/tokens", to: accounts.issue_token)
-  Get(path: "/me", to: accounts.me, middleware: auth)
+  Post(path: "/tokens", to: @accounts.issue_token)
+  Get(path: "/me", to: @accounts.me, middleware: auth)
 }

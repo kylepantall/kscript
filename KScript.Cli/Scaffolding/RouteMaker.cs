@@ -222,7 +222,7 @@ namespace KScript.Scaffolding
         }
 
         private static readonly Regex CodeImport = new Regex(@"^\s*import\s+""(?<src>[^""]+)""(\s+as\s+(?<as>\w+))?", RegexOptions.Multiline);
-        private static readonly Regex XmlImport = new Regex(@"<import\s+[^>]*?src=""(?<src>[^""]+)""[^>]*?>", RegexOptions.Multiline);
+        private static readonly Regex XmlImport = new Regex(@"<import\s+[^>]*?path=""(?<src>[^""]+)""[^>]*?>", RegexOptions.Multiline);
 
         /// <summary>The name a route file already imports this script as, or null.</summary>
         private static string ImportedAs(string text, string src)

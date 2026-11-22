@@ -112,7 +112,7 @@ namespace KScript.Runtime
 
     /// <summary>
     /// An email address. Spaces at either end are trimmed and the domain is lower-cased; the part before the @ keeps
-    /// its case. <c>->local()</c> and <c>->domain()</c> give its parts.
+    /// its case. <c>.local</c> and <c>.domain</c> give its parts.
     /// </summary>
     public sealed class EmailAddress : ISemanticText
     {
@@ -206,7 +206,7 @@ namespace KScript.Runtime
 
     /// <summary>
     /// A handle such as <c>@kyle_p</c>: an @ and then 1 to 30 letters, digits, _, . or -. It is lower-cased, so
-    /// <c>'@Kyle'</c> and <c>'@kyle'</c> are the same handle. <c>->name()</c> is the name without the @.
+    /// <c>'@Kyle'</c> and <c>'@kyle'</c> are the same handle. <c>.name</c> is the name without the @.
     /// </summary>
     public sealed class HandleName : ISemanticText
     {
@@ -532,7 +532,7 @@ namespace KScript.Runtime
     }
 
     /// <summary>
-    /// A UUID such as <c>3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f</c>, in lower case with dashes. <c>->version()</c> is
+    /// A UUID such as <c>3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f</c>, in lower case with dashes. <c>.version</c> is
     /// its version (4 for random ones, 8 for custom ones). <c>@uuid()</c> makes new ones.
     /// </summary>
     public sealed class UuidValue : ISemanticText

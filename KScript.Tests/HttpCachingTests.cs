@@ -35,7 +35,7 @@ public class HttpCachingTests
     private const string Routes = """
         <KScript.Routes>
           <import package="KScript.IO" />
-          <import src="c.ks.xml" as="c" />
+          <import path="c.ks.xml" as="c" />
           <Get path="/tagged" etag="yes" cache="60"><return value="'same'" /></Get>
           <Get path="/weak" middleware="etag:weak"><return value="'w'" /></Get>
           <Get path="/strong" middleware="etag:strong, cache_control:private;max_age=10"><return value="'s'" /></Get>
@@ -199,7 +199,7 @@ public class HttpCachingTests
         Assert.Contains("cache_control needs directives", Send(new HttpApp(noDirectives.Root), "GET", "/x").Body);
 
         using var badTtl = Site("<KScript.Routes><Get path=\"/x\" middleware=\"cache_response:later\"><return value=\"1\" /></Get></KScript.Routes>");
-        Assert.Contains("t a time limit", Send(new HttpApp(badTtl.Root), "GET", "/x").Body);
+        Assert.Contains("should be a length of time", Send(new HttpApp(badTtl.Root), "GET", "/x").Body);
     }
 
     [Fact]

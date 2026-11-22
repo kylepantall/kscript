@@ -103,11 +103,11 @@ namespace KScript.Runtime
                 if (builtIn && !isOverride)
                 {
                     throw Located(run, e, $"{Article(receiver)} already has ->{name}(). To replace it, write "
-                        + (code ? $"override fn {name}(...)" : $"<fn name=\"{name}\" override=\"yes\">") + "; to add a new method, give it another name.");
+                        + (code ? $"override fn {name}(...)" : $"<fn name=\"{name}\" override=\"true\">") + "; to add a new method, give it another name.");
                 }
                 if (isOverride && !builtIn)
                 {
-                    throw Located(run, e, $"{Article(receiver)} has no built-in ->{name}() to override. " + (code ? "Drop override" : "Drop override=\"yes\"") + " to add it as a new method.");
+                    throw Located(run, e, $"{Article(receiver)} has no built-in ->{name}() to override. " + (code ? "Drop override" : "Drop override=\"true\"") + " to add it as a new method.");
                 }
 
                 string key = receiver + ":" + name;

@@ -110,7 +110,7 @@ public class ErrorTypeTests
     {
         string output = Run(Declarations + """
             echo "{ PersonNotFound.name } { PersonNotFound.extends } { PersonNotFound.status } { PersonNotFound.description }"
-            echo "{ OutOfStock->fields()->map(fn($f) => $f.name + ':' + $f.type) } { OutOfStock.fields->count() } { Plain.extends } { Plain.status ?? 'none' }"
+            echo "{ OutOfStock.fields->map(fn(f) => $f.name + ':' + $f.type) } { OutOfStock.fields->count() } { Plain.extends } { Plain.status ?? 'none' }"
             echo "{ NotFound.status } { NotFound.extends } { Shape.extends } { @type(Plain) }"
             """);
         Assert.Equal("PersonNotFound NotFound 404 Nothing has that id.\nitem:string, left:int 2 Error none\n404 Error Type error_type\n", output);
@@ -330,7 +330,7 @@ public class ErrorTypeTests
                   throw PersonNotFound(id: $id)
                 }
                 test(name: "subtypes count") {
-                  expect-error(type: NotFound, as: e) {
+                  expect_error(type: NotFound, as: e) {
                     @find(1)
                   }
                   expect(value: $e.id, equals: 1)
@@ -346,8 +346,8 @@ public class ErrorTypeTests
                 test(name: "throws nothing") {
                   expect(value: 1 + 1, throws: IO)
                 }
-                test(name: "expect-error the wrong type") {
-                  expect-error(type: IO) {
+                test(name: "expect_error the wrong type") {
+                  expect_error(type: IO) {
                     @find(4)
                   }
                 }
@@ -410,11 +410,11 @@ public class ErrorStatusTests
         import "controllers/people.kscript" as people
 
         Routes {
-          Get(path: "/people/{id}", to: people.show, where: "id: int")
-          Get(path: "/pay", to: people.pay)
-          Get(path: "/forbid", to: people.forbid)
-          Get(path: "/caught", to: people.caught)
-          Get(path: "/crash", to: people.crash)
+          Get(path: "/people/{id}", to: @people.show, where: "id: int")
+          Get(path: "/pay", to: @people.pay)
+          Get(path: "/forbid", to: @people.forbid)
+          Get(path: "/caught", to: @people.caught)
+          Get(path: "/crash", to: @people.crash)
         }
         """;
 

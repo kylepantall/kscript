@@ -104,7 +104,7 @@ namespace KScript.Documents
                             foreach (string key in c.Keys)
                             {
                                 if (!doc.Sources.TryGetValue(key, out Source s))
-                                    throw new KScriptException($"[@{key}] cites a source the document doesn't have. Add it to the bibliography: Bibliography(src: \"refs.bib\") or Source(id: {key}, ...).", "Reference");
+                                    throw new KScriptException($"[@{key}] cites a source the document doesn't have. Add it to the bibliography: Bibliography(path: \"refs.bib\") or Source(id: {key}, ...).", "Reference");
                                 if (!order.Contains(s)) order.Add(s);
                             }
                             break;

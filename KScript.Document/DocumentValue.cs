@@ -36,6 +36,12 @@ namespace KScript.Documents
             return false;
         }
 
+        internal static readonly (string Name, string Type, string Description)[] Fields =
+        {
+            ("title", KType.String, "The document's title ('' without one)."),
+            ("sections", KType.Number, "How many sections it has."),
+        };
+
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
             ("save", "path", "Saves the document. The extension picks the format: .pdf, .docx, .tex, .md or .html.", KType.Null),

@@ -358,29 +358,29 @@ public sealed class DataQueryTests : DataFixture
     {
         string[] lines = Lines(Users + """
             min = 18
-            echo User->where(fn($u) => $u.age >= $min)->pluck(name)
-            echo User->where(fn($u) => $u.age < $min or $u.age == null)->pluck(name)
-            echo User->where(fn($u) => $u.age != null and not ($u.age > 20))->pluck(name)
-            echo User->where(fn($u) => $u.name->contains('d'))->pluck(name)
-            echo User->where(fn($u) => $u.name->starts_with('B'))->pluck(name)
-            echo User->where(fn($u) => $u.email->ends_with('.org'))->pluck(name)
-            echo User->where(fn($u) => $u.name->lower() == 'cy')->pluck(name)
-            echo User->where(fn($u) => $u.name->upper()->length() == 3)->pluck(name)
-            echo User->where(fn($u) => $u.name->trim() == 'Ada')->count()
-            echo User->where(fn($u) => $u.name->matches(/^[AB]/))->pluck(name)
-            echo User->where(fn($u) => $u.role == member and $u.active)->pluck(name)
-            echo User->where(fn($u) => not $u.active)->pluck(name)
-            echo User->where(fn($u) => $u.name in ['Ada', 'Cy'])->pluck(name)
-            echo User->where(fn($u) => ($u.age ?? 0) == 0)->pluck(name)
-            echo User->where(fn($u) => $u.age + 1 == 37 or $u.age * 2 == 34)->pluck(name)
-            echo User->where(fn($u) => $u.age - 6 == 30 and $u.age / 2 == 18 and $u.age % 5 == 1)->pluck(name)
-            echo User->where(fn($u) => -$u.age == -17 and +$u.age == 17)->pluck(name)
-            echo User->where(fn($u) => ($u.age > 18 ? 'adult' : 'child') == 'child')->pluck(name)
-            echo User->where(fn($u) => $u.name + '!' == 'Ada!')->pluck(name)
-            echo User->where(fn($u) => 'Ada' == $u.name)->pluck(name)
-            echo User->where(fn($u) => null == $u.age)->pluck(name)
-            echo User->where(fn($u) => null != $u.age)->count()
-            echo User->where(fn($u) => $u.email == 'ADA@example.com')->count()
+            echo User->where(fn(u) => $u.age >= $min)->pluck(name)
+            echo User->where(fn(u) => $u.age < $min or $u.age == null)->pluck(name)
+            echo User->where(fn(u) => $u.age != null and not ($u.age > 20))->pluck(name)
+            echo User->where(fn(u) => $u.name->contains('d'))->pluck(name)
+            echo User->where(fn(u) => $u.name->starts_with('B'))->pluck(name)
+            echo User->where(fn(u) => $u.email->ends_with('.org'))->pluck(name)
+            echo User->where(fn(u) => $u.name->lower() == 'cy')->pluck(name)
+            echo User->where(fn(u) => $u.name->upper()->length() == 3)->pluck(name)
+            echo User->where(fn(u) => $u.name->trim() == 'Ada')->count()
+            echo User->where(fn(u) => $u.name->matches(/^[AB]/))->pluck(name)
+            echo User->where(fn(u) => $u.role == member and $u.active)->pluck(name)
+            echo User->where(fn(u) => not $u.active)->pluck(name)
+            echo User->where(fn(u) => $u.name in ['Ada', 'Cy'])->pluck(name)
+            echo User->where(fn(u) => ($u.age ?? 0) == 0)->pluck(name)
+            echo User->where(fn(u) => $u.age + 1 == 37 or $u.age * 2 == 34)->pluck(name)
+            echo User->where(fn(u) => $u.age - 6 == 30 and $u.age / 2 == 18 and $u.age % 5 == 1)->pluck(name)
+            echo User->where(fn(u) => -$u.age == -17 and +$u.age == 17)->pluck(name)
+            echo User->where(fn(u) => ($u.age > 18 ? 'adult' : 'child') == 'child')->pluck(name)
+            echo User->where(fn(u) => $u.name + '!' == 'Ada!')->pluck(name)
+            echo User->where(fn(u) => 'Ada' == $u.name)->pluck(name)
+            echo User->where(fn(u) => null == $u.age)->pluck(name)
+            echo User->where(fn(u) => null != $u.age)->count()
+            echo User->where(fn(u) => $u.email == 'ADA@example.com')->count()
             """);
         Assert.Equal(new[]
         {
@@ -495,7 +495,7 @@ public sealed class DataQueryTests : DataFixture
     public void UpdatingManyRows()
     {
         string[] lines = Lines(Users + """
-            echo User->where(fn($u) => $u.age != null)->update(active: false)
+            echo User->where(fn(u) => $u.age != null)->update(active: false)
             echo User->where(active: false)->count()
             echo User->where(name: 'Ada')->increment(age)
             echo User->where(name: 'Ada')->increment(age, by: 3)
@@ -513,7 +513,7 @@ public sealed class DataQueryTests : DataFixture
         string[] lines = Lines(Users + """
             p = User->order_by(name)->paginate(2)
             echo [$p.page, $p.per_page, $p.total, $p.last_page, $p.from, $p.to, $p.has_more]
-            echo $p.items->map(fn($u) => $u.name)
+            echo $p.items->map(fn(u) => $u.name)
             p2 = User->order_by(name)->paginate(2, '2')
             echo [$p2.page, $p2.from, $p2.to, $p2.has_more, $p2.items->count()]
             p3 = User->paginate(per_page: 2, page: 'abc')
@@ -532,7 +532,7 @@ public sealed class DataQueryTests : DataFixture
     {
         string[] lines = Lines(Users + """
             fn show(rows, n) {
-              echo "{ $n }: { $rows->map(fn($u) => $u.name)->join(' ') }"
+              echo "{ $n }: { $rows->map(fn(u) => $u.name)->join(' ') }"
             }
             fn first(rows, n) {
               echo "{ $n }: { $rows[0].name }"
@@ -542,28 +542,28 @@ public sealed class DataQueryTests : DataFixture
             User->order_by(name)->chunk(1, @first)
             """);
         Assert.Equal(new[] { "0: Ada Ben", "1: Cy", "0: Ada" }, lines);
-        Assert.Contains("size", Fails(Users + "User->chunk(0, fn($r) => true)").Message);
+        Assert.Contains("size", Fails(Users + "User->chunk(0, fn(r) => true)").Message);
     }
 
     [Fact]
     public void WhenAddsConditionsOnlyWhenTheTestIsTrue()
     {
         string[] lines = Lines(Users + """
-            fn search(term) => User->when($term != null, fn($q) => $q->where(fn($u) => $u.name->contains($term)))->count()
+            fn search(term) => User->when($term != null, fn(q) => $q->where(fn(u) => $u.name->contains($term)))->count()
             echo @search(null)
             echo @search('y')
-            echo User->when(false, fn($q) => $q->where(name: 'Ada'), fn($q) => $q->where(name: 'Ben'))->pluck(name)
-            echo User->when(false, fn($q) => $q, null)->count()
+            echo User->when(false, fn(q) => $q->where(name: 'Ada'), fn(q) => $q->where(name: 'Ben'))->pluck(name)
+            echo User->when(false, fn(q) => $q, null)->count()
             """);
         Assert.Equal(new[] { "3", "1", "Ben", "3" }, lines);
-        Assert.Contains("must return the query", Fails(Users + "User->when(true, fn($q) => 1)").Message);
+        Assert.Contains("must return the query", Fails(Users + "User->when(true, fn(q) => 1)").Message);
     }
 
     [Fact]
     public void DescribingAQuery()
     {
         string[] lines = Lines(Users + """
-            q = User->where(fn($u) => $u.age > 18 and $u.name->contains('50%_'))->order_by(name: desc)->limit(5)->offset(10)
+            q = User->where(fn(u) => $u.age > 18 and $u.name->contains('50%_'))->order_by(name: desc)->limit(5)->offset(10)
             d = $q->sql()
             echo $d.sql
             echo $d.params
@@ -578,22 +578,22 @@ public sealed class DataQueryTests : DataFixture
     public void ConditionsThatCantBeSqlSayWhy()
     {
         Assert.Contains("lambda", Fails(Users + "fn adult(u) => $u.age > 18\nUser->where(@adult)->get()").Message);
-        Assert.Contains("one parameter", Fails(Users + "User->where(fn($a, $b) => true)->get()").Message);
-        Assert.Contains("only the row's own columns", Fails(Users + "User->where(fn($u) => $u.name.length > 1)->get()").Message);
-        Assert.Contains("not the whole row", Fails(Users + "User->where(fn($u) => $u == null)->get()").Message);
-        Assert.Contains("can't run in the database", Fails(Users + "User->where(fn($u) => [$u.name][0] == 'x')->get()").Message);
-        Assert.Contains("worked out from other fields", Fails(Users + "User->where(fn($u) => $u.label == 'x')->get()").Message);
-        Assert.Contains("no column 'nope'", Fails(Users + "User->where(fn($u) => $u.nope == 1)->get()").Message);
-        Assert.Contains("right of 'in'", Fails(Users + "User->where(fn($u) => 'a' in $u.tags)->get()").Message);
-        Assert.Contains("must be a list", Fails(Users + "User->where(fn($u) => $u.name in 'abc')->get()").Message);
-        Assert.Contains("passwords are stored as hashes", Fails(Users + "User->where(fn($u) => $u.password == 'x')->get()").Message);
-        Assert.Contains("only be used on a column", Fails(Users + "User->where(fn($u) => 'x'->contains($u.name))->get()").Message);
-        Assert.Contains("takes 1 argument", Fails(Users + "User->where(fn($u) => $u.name->contains())->get()").Message);
-        Assert.Contains("takes 0 arguments", Fails(Users + "User->where(fn($u) => $u.name->lower('x') == 'a')->get()").Message);
-        Assert.Contains("no SQL form", Fails(Users + "User->where(fn($u) => $u.name->reverse() == 'a')->get()").Message);
-        Assert.Contains("can't run in the database", Fails(Users + "User->where(fn($u) => $u.age |> @abs() == 1)->get()").Message);
-        Assert.Contains("no SQL form here", Fails(Users + "User->where(fn($u) => $u.age ** 2 == 4)->get()").Message);
-        Assert.Contains("isn't a Role", Fails(Users + "User->where(fn($u) => $u.role == boss)->get()").Message);
+        Assert.Contains("one parameter", Fails(Users + "User->where(fn(a, b) => true)->get()").Message);
+        Assert.Contains("only the row's own columns", Fails(Users + "User->where(fn(u) => $u.name.length > 1)->get()").Message);
+        Assert.Contains("not the whole row", Fails(Users + "User->where(fn(u) => $u == null)->get()").Message);
+        Assert.Contains("can't run in the database", Fails(Users + "User->where(fn(u) => [$u.name][0] == 'x')->get()").Message);
+        Assert.Contains("worked out from other fields", Fails(Users + "User->where(fn(u) => $u.label == 'x')->get()").Message);
+        Assert.Contains("no column 'nope'", Fails(Users + "User->where(fn(u) => $u.nope == 1)->get()").Message);
+        Assert.Contains("right of 'in'", Fails(Users + "User->where(fn(u) => 'a' in $u.tags)->get()").Message);
+        Assert.Contains("must be a list", Fails(Users + "User->where(fn(u) => $u.name in 'abc')->get()").Message);
+        Assert.Contains("passwords are stored as hashes", Fails(Users + "User->where(fn(u) => $u.password == 'x')->get()").Message);
+        Assert.Contains("only be used on a column", Fails(Users + "User->where(fn(u) => 'x'->contains($u.name))->get()").Message);
+        Assert.Contains("takes 1 argument", Fails(Users + "User->where(fn(u) => $u.name->contains())->get()").Message);
+        Assert.Contains("takes 0 arguments", Fails(Users + "User->where(fn(u) => $u.name->lower('x') == 'a')->get()").Message);
+        Assert.Contains("no SQL form", Fails(Users + "User->where(fn(u) => $u.name->reverse() == 'a')->get()").Message);
+        Assert.Contains("can't run in the database", Fails(Users + "User->where(fn(u) => $u.age |> @abs() == 1)->get()").Message);
+        Assert.Contains("no SQL form here", Fails(Users + "User->where(fn(u) => $u.age ** 2 == 4)->get()").Message);
+        Assert.Contains("isn't a Role", Fails(Users + "User->where(fn(u) => $u.role == boss)->get()").Message);
         Assert.Contains("isn't a Role", Fails(Users + "User->where(role: boss)->get()").Message);
         Assert.Contains("password hashes", Fails(Users + "User->where(password: 'x')->get()").Message);
     }
@@ -626,7 +626,7 @@ public sealed class DataQueryTests : DataFixture
             $db->sql('create table visits (id {{AutoId}}, page text, n integer, at real)')
             echo $db->table(visits)->insert([{ page: '/', n: 1, at: 1.5 }, { page: '/about', n: 2 }])
             echo @db(visits)->where(page: '/')->first()
-            echo @db('visits')->where(fn($v) => $v.n > 1)->pluck(page)
+            echo @db('visits')->where(fn(v) => $v.n > 1)->pluck(page)
             echo @db(visits)->order_by(n: desc)->value(page)
             echo @db(visits)->latest(n)->value(page)
             echo @db(visits)->where(page: '/')->update(n: 5)
@@ -672,7 +672,7 @@ public sealed class DataSqlTests : DataFixture
             name = 'Ada'
             echo @sql("select age from users where name = {$name}")[0].age
             ids = [1, 3]
-            echo @sql("select name from users where id in {$ids} order by id")->map(fn($r) => $r.name)
+            echo @sql("select name from users where id in {$ids} order by id")->map(fn(r) => $r.name)
             none = []
             echo @sql("select count(*) as n from users where id in {$none}")[0].n
             echo @sql("select '{{literal}}' as t")[0].t
@@ -811,7 +811,7 @@ public sealed class DataTransactionTests : DataFixture
         string[] lines = Lines(Accounts + """
             transaction {
               Account->where(id: 1)->decrement(balance, by: 10)
-              echo $db->in_transaction()
+              echo $db.is_in_transaction
             }
             try {
               transaction {
@@ -821,7 +821,7 @@ public sealed class DataTransactionTests : DataFixture
             } catch Conflict {
               echo 'undone'
             }
-            echo $db->in_transaction()
+            echo $db.is_in_transaction
             echo Account->find(1).balance
             """);
         Assert.Equal(new[] { "true", "undone", "false", "90" }, lines);
@@ -1051,7 +1051,7 @@ public sealed class DataCoverageTests : DataFixture
             echo @type($again.address)
             echo $again.born->format('yyyy')
             echo Profile->where(handle: '@ada', token: '0b7e2d4c-7c4b-4a63-9b8a-3f5f1b2c9d10')->count()
-            echo Profile->where(fn($p) => $p.age > 30)->count()
+            echo Profile->where(fn(p) => $p.age > 30)->count()
             echo Profile->max(born)->format('yyyy')
             """);
         Assert.Equal(new[] { "@ada, 36, London, 1, 0.5", "Address", "1815", "1", "1", "1815" }, lines);

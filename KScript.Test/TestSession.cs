@@ -32,7 +32,7 @@ namespace KScript.Testing
         }
     }
 
-    /// <summary>A &lt;before-each&gt; or &lt;after-each&gt; block.</summary>
+    /// <summary>A &lt;before_each&gt; or &lt;after_each&gt; block.</summary>
     internal sealed class TestHook
     {
         public MarkupElement Element;

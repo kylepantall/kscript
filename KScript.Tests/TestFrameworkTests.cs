@@ -59,11 +59,11 @@ public class TestFrameworkTests
     {
         TestFileResult file = RunTests("""
             <let name="log" value="[]" />
-            <before-each><set name="log" value="$log->push('outer before')" /></before-each>
-            <after-each><set name="log" value="$log->push('outer after')" /></after-each>
+            <before_each><set name="log" value="$log->push('outer before')" /></before_each>
+            <after_each><set name="log" value="$log->push('outer after')" /></after_each>
             <describe name="cart">
-              <before-each><set name="log" value="$log->push('inner before')" /></before-each>
-              <after-each><set name="log" value="$log->push('inner after')" /></after-each>
+              <before_each><set name="log" value="$log->push('inner before')" /></before_each>
+              <after_each><set name="log" value="$log->push('inner after')" /></after_each>
               <describe name="when empty">
                 <test name="has nothing"><set name="log" value="$log->push('test')" /></test>
               </describe>
@@ -80,7 +80,7 @@ public class TestFrameworkTests
     public void VariablesDeclaredInATestStayInThatTest()
     {
         TestFileResult file = RunTests("""
-            <before-each><let name="fresh" value="[]" /></before-each>
+            <before_each><let name="fresh" value="[]" /></before_each>
             <test name="one"><let name="mine" value="1" /><expect value="$fresh" count="0" /></test>
             <test name="two"><expect value="$mine ?? 'gone'" equals="'gone'" /></test>
             """);
@@ -88,14 +88,16 @@ public class TestFrameworkTests
     }
 
     [Fact]
-    public void EachRunsATestPerItemWithItsOwnName()
+    public void ATestInAForLoopRunsPerItemWithItsOwnName()
     {
         TestFileResult file = RunTests("""
             <fn name="double" params="n" value="$n * 2" />
-            <test name="doubles {$case.n} (#{$i})" each="case" index="i" in="[{ n: 1, want: 2 }, { n: 2, want: 4 }, { n: 3, want: 7 }]">
-              <expect value="@double($case.n)" equals="$case.want" />
-            </test>
-            <test name="{$entry.key}" each="entry" in="{ a: 1 }"><expect value="$entry.value" equals="1" /></test>
+            <for each="case" at="i" in="[{ n: 1, want: 2 }, { n: 2, want: 4 }, { n: 3, want: 7 }]">
+              <test name="doubles {$case.n} (#{$i})">
+                <expect value="@double($case.n)" equals="$case.want" />
+              </test>
+            </for>
+            <for each="entry" in="{ a: 1 }"><test name="{$entry.key}"><expect value="$entry.value" equals="1" /></test></for>
             """);
         Assert.Equal(new[] { "doubles 1 (#0)", "doubles 2 (#1)", "doubles 3 (#2)", "a" }, file.Tests.Select(t => t.Name));
         Assert.Equal(new[] { TestOutcome.Passed, TestOutcome.Passed, TestOutcome.Failed, TestOutcome.Passed }, file.Tests.Select(t => t.Outcome));
@@ -147,12 +149,12 @@ public class TestFrameworkTests
         Passes("""
             <expect value="'3'" equals="3" />
             <expect value="[1, { a: 2 }]" equals="[1, { a: 2 }]" />
-            <expect value="1" not-equals="2" />
+            <expect value="1" not_equals="2" />
             <expect value="3" same="3" />
             <expect value="['a', 'b']" contains="'b'" />
             <expect value="'hello world'" contains="'lo w'" />
             <expect value="{ name: 'Joan' }" contains="'name'" />
-            <expect value="['a']" not-contains="'z'" />
+            <expect value="['a']" not_contains="'z'" />
             <expect value="'abc-123'" matches="'^[a-z]+-\d+$'" />
             <expect value="[1, 2]" type="list" />
             <expect value="null" type="null" />
@@ -182,17 +184,17 @@ public class TestFrameworkTests
     public void ExpectError()
     {
         Passes("""
-            <expect-error type="Validation" contains="positive" as="err">
+            <expect_error type="Validation" contains="positive" as="err">
               <throw type="Validation" message="Age must be positive" />
-            </expect-error>
+            </expect_error>
             <expect value="$err.message" equals="'Age must be positive'" />
-            <expect-error><echo>{ 1 / 'x' }</echo></expect-error>
+            <expect_error><echo>{ 1 / 'x' }</echo></expect_error>
             """);
-        Assert.Equal("Expected an error, but the body ran without one.", Failure("<expect-error><echo>fine</echo></expect-error>"));
-        Assert.Equal("Expected a Validation error, but got Type: oops", Failure("<expect-error type=\"Validation\"><throw type=\"Type\" message=\"oops\" /></expect-error>"));
-        Assert.Equal("Expected the error message to contain 'x', but it was: oops", Failure("<expect-error contains=\"x\"><throw message=\"oops\" /></expect-error>"));
+        Assert.Equal("Expected an error, but the body ran without one.", Failure("<expect_error><echo>fine</echo></expect_error>"));
+        Assert.Equal("Expected a Validation error, but got Type: oops", Failure("<expect_error type=\"Validation\"><throw type=\"Type\" message=\"oops\" /></expect_error>"));
+        Assert.Equal("Expected the error message to contain 'x', but it was: oops", Failure("<expect_error contains=\"x\"><throw message=\"oops\" /></expect_error>"));
         // A failed check inside the body is still a failure, not the expected error.
-        Assert.Equal("Expected 1 to equal 2, but it was 1.", Failure("<expect-error><expect value=\"1\" equals=\"2\" /></expect-error>"));
+        Assert.Equal("Expected 1 to equal 2, but it was 1.", Failure("<expect_error><expect value=\"1\" equals=\"2\" /></expect_error>"));
     }
 
     [Fact]
@@ -201,13 +203,13 @@ public class TestFrameworkTests
         TestFileResult file = RunTests("""
             <import package="KScript.Terminal" />
             <fn name="ask">
-              <input to="name">Name? </input>
+              <input into="name">Name? </input>
               <echo>Hi {$name}</echo>
             </fn>
             <test name="captures">
-              <capture to="out" input="['Joan']"><call fn="ask" /></capture>
+              <capture into="out" input="['Joan']"><call fn="ask" /></capture>
               <expect value="$out" contains="'Hi Joan'" />
-              <capture to="two"><echo>a</echo><echo>b</echo></capture>
+              <capture into="two"><echo>a</echo><echo>b</echo></capture>
               <expect value="$two->lines()" equals="['a', 'b']" />
             </test>
             """);
@@ -243,7 +245,7 @@ public class TestFrameworkTests
     public void SlowTestsTimeOut()
     {
         TestFileResult file = RunTests("""
-            <test name="forever" timeout="0.2"><while test="true"><do>@assert(true)</do></while></test>
+            <test name="forever" timeout="0.2s"><while test="true"><do>@assert(true)</do></while></test>
             <test name="next one still runs"><assert test="true" /></test>
             """);
         Assert.Equal(TestOutcome.Failed, file.Tests[0].Outcome);
@@ -280,7 +282,7 @@ public class TestFrameworkTests
         // <expect> and <assert> stop any script with an Assertion error, so a script can check itself.
         var e = ScriptRunner.Fails("<expect value=\"1\" equals=\"2\" />", "KScript.Test");
         Assert.Equal("Assertion", e.Type);
-        Assert.Equal("ok\n", ScriptRunner.RunBody("<capture to=\"out\"><echo>ok</echo></capture><echo>$out</echo>", "", "KScript.Test"));
+        Assert.Equal("ok\n", ScriptRunner.RunBody("<capture into=\"out\"><echo>ok</echo></capture><echo>$out</echo>", "", "KScript.Test"));
     }
 
     [Fact]
@@ -300,10 +302,10 @@ public class TestFrameworkTests
               <expect value="$r.error.message" contains="'bad'" />
             </test>
             <test name="bad option">
-              <expect-error type="Argument" contains="no option 'arg'"><do>@run_script('greet.ks.xml', options: { arg: [] })</do></expect-error>
+              <expect_error type="Argument" contains="no option 'arg'"><do>@run_script('greet.ks.xml', options: { arg: [] })</do></expect_error>
             </test>
             """, null,
-            ("greet.ks.xml", "<kscript><import package=\"KScript.Terminal\" /><echo>Hello {$args[0]}</echo><input to=\"a\">Sure? </input><echo newline=\"no\">{$a}</echo><exit code=\"4\" /></kscript>"),
+            ("greet.ks.xml", "<kscript><import package=\"KScript.Terminal\" /><echo>Hello {$args[0]}</echo><input into=\"a\">Sure? </input><echo newline=\"no\">{$a}</echo><exit code=\"4\" /></kscript>"),
             ("broken.ks.xml", "<kscript><throw message=\"bad\" /></kscript>"));
         Assert.All(file.Tests, t => Assert.True(t.Outcome == TestOutcome.Passed, t.FullName + ": " + t.Message));
     }

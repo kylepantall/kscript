@@ -63,7 +63,7 @@ namespace KScript.Language.Tests
         [InlineData("r = { name: 'k' } |> Repo()\necho $r.name")]
         [InlineData("a = Age(7)\necho $a")]
         [InlineData("s = Size('small')\necho $s")]
-        [InlineData("t = Repo\necho $t->name()")]
+        [InlineData("t = Repo\necho $t.name")]
         [InlineData("echo Repo->check({ name: 'k' }).ok")]
         [InlineData("fn show(repo: Repo?) {\n  echo $repo?.name\n}\n@show(null)")]
         [InlineData("try {\n  throw Missing(what: 'x')\n} catch Missing as e {\n  echo $e.what\n}")]

@@ -176,7 +176,7 @@ public sealed class StorageTests : StorageFixture
             <do>$config->write_json('settings.json', { theme: 'dark' }); $config->write('notes/today.txt', 'milk')</do>
             <do>$config->append('log.txt', 'a'); $config->append('log.txt', 'b')</do>
             <echo>{ $config->read_json('settings.json').theme } { $config->read('notes/today.txt') } { $config->read('log.txt') }</echo>
-            <echo>{ $config.kind } { $config.app } { $config.path == $config->path() } { $config->to_string() == $config->path() }</echo>
+            <echo>{ $config.kind } { $config.app } { $config.path == $config.path } { $config->to_string() == $config.path }</echo>
             """);
         Assert.Equal("none light\ndark milk ab\nconfig notes true true\n", output);
         Assert.Equal("{\n  \"theme\": \"dark\"\n}", File.ReadAllText(Path.Combine(AppFolder("notes", "config"), "settings.json")).Replace("\r\n", "\n"));
@@ -193,7 +193,7 @@ public sealed class StorageTests : StorageFixture
             <echo>{ $data->exists() } { $data->exists('notes') } { $data->exists('nope.txt') }</echo>
             <echo>{ $data->list() } | { $data->list('*.txt', recursive) } | { $data->list(pattern: null) }</echo>
             <echo>{ $data->list(/^notes\/.*\.txt$/, recursive) } | { $data->list(/\.json$/) }</echo>
-            <echo>{ $data->folder('notes')->list() } { $data->folder('notes')->path()->ends_with('notes') } { $data->path('notes/c.txt')->ends_with('c.txt') }</echo>
+            <echo>{ $data->folder('notes')->list() } { $data->folder('notes').path->ends_with('notes') } { $data->path_of('notes/c.txt')->ends_with('c.txt') }</echo>
             <echo>{ $data->delete('a.json') } { $data->delete('a.json') } { $data->delete('notes/deep') }</echo>
             <echo>{ $data->clear() } { $data->list(recursive) }</echo>
             """);

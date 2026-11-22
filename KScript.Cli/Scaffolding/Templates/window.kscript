@@ -20,7 +20,7 @@ Window(title: "{{ title }}", width: {{ width ?? 480 }}, height: {{ height ?? 360
   Text(size: 24, weight: bold) "{{ title }}"
   Text "Clicked {$count} times"
   Row(gap: 8) {
-    Button(variant: primary, on-click: count += 1) "Click"
-    Button(on-click: count = 0, disabled: $count eq 0) "Reset"
+    Button(variant: primary, on_click: count += 1) "Click"
+    Button(on_click: count = 0, disabled: $count == 0) "Reset"
   }
 }
