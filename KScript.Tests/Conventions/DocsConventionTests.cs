@@ -164,6 +164,40 @@ public sealed class DocsConventionTests
         Assert.True(notWrong.Count == 0, string.Join("\n", notWrong));
     }
 
+    [Fact]
+    public void Every_example_in_the_reference_checks_clean()
+    {
+        // The reference is generated from each package's examples; the guides' examples are read from their files above.
+        var problems = new List<string>();
+        int seen = 0;
+        foreach ((string page, string format, string code, _) in DocsTests.Examples())
+        {
+            if (page.StartsWith("/guide", StringComparison.Ordinal)) continue;
+            seen++;
+            problems.AddRange(ProblemsIn(new Fence(format == "kscript" ? "kscript" : "xml", Array.Empty<string>(), code, 1), page + " (" + format + ")")
+                .Select(p => p + "\n    " + code.TrimEnd().Replace("\n", "\n    ")));
+        }
+        Assert.True(seen > 300, "Fewer reference examples than expected were found.");
+        Assert.True(problems.Count == 0, "Examples in the reference check clean under kscript:recommended:\n" + string.Join("\n", problems.Distinct()));
+    }
+
+    [Fact]
+    public void The_what_changed_page_lists_every_rename()
+    {
+        // docs/upgrading.md is written by hand from the tables the errors are made from: a new row needs a line there.
+        string page = File.ReadAllText(Path.Combine(Root, "docs", "upgrading.md"));
+        var missing = new List<string>();
+        void Needs(string old, string what) { if (!page.Contains(old, StringComparison.Ordinal)) missing.Add($"{what}: {old}"); }
+
+        foreach (var flag in KScript.CliFlags.RetiredFlags.Keys) Needs(flag.Flag, "kscript " + flag.Command);
+        foreach (string setting in KScript.Projects.ProjectConfig.RetiredSettings.Keys) Needs(setting.Split('.').Last(), "kscript.json");
+        foreach (string type in KScript.Runtime.ErrorTypes.Renamed.Keys) Needs(type, "error type");
+        foreach (string element in KScript.Runtime.Retired.RenamedElements.Keys) Needs("`" + element + "`", "statement");
+        foreach (var row in KScript.Runtime.Retired.RenamedAttributes) Needs("`" + row.Element + "`", "argument " + row.Old + " of");
+        foreach (var method in KScript.Runtime.RetiredMembers.Methods) Needs("->" + method.Value.Name + "(", "method of " + method.Key.Split(':')[0]);
+        Assert.True(missing.Count == 0, "docs/upgrading.md doesn't mention:\n" + string.Join("\n", missing));
+    }
+
     /// <summary>The sample projects: each folder under samples/, and the sample site.</summary>
     public static IEnumerable<object[]> Samples()
     {

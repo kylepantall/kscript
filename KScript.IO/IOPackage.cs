@@ -136,7 +136,7 @@ namespace KScript.IO
             p.Command("file", "path", "A file value for a path, with fields like .name, .extension and .size, and methods like ->read_text().", KType.File, c => new FileValue(PathOf(c.Need(0), c)),
                 "<let name=\"report\" value=\"@file('out/report.pdf')\" />");
             p.Command("read_text", "path", "The text of a file. Relative paths are from the script's folder.", KType.String, c => File.ReadAllText(PathOf(c.Need(0), c)),
-                "<do>@write_text('config.json', '{ \"port\": 8080 }')</do>\n<let name=\"config\" value=\"@read_text('config.json')->json()\" />\n<echo>$config.port</echo>");
+                "<do>@write_text('config.json', '{ \"port\": 8080 }')</do>\n<let name=\"settings\" value=\"@read_text('config.json')->json()\" />\n<echo>$settings.port</echo>");
             p.Command("read_lines", "path", "The lines of a file.", KType.List, c => File.ReadAllLines(PathOf(c.Need(0), c)).Cast<object>().ToList());
             p.Command("read_json", "path, as?: type", "A JSON file read into maps and lists. With as: a <type>, the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))), 1));
             p.Command("read_yaml", "path", "A YAML file read into maps and lists.", KType.Any, c =>

@@ -222,7 +222,7 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Stylesheets](docs/stylesheets.md): `.ks.css`, `.ks.scss` and `.ks.sass`, and `kscript css`
 - [Routes, controllers and middleware](docs/http.md): KScript.Http route files, JSON APIs, views and middleware
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
-- [Desktop apps](docs/desktop.md): `KScript.Window` and its elements
+- [Desktop apps](docs/desktop.md): `Window { }` and its elements, from `KScript.UI`
 - [Programs](docs/compile.md): `kscript compile`, targets, icons and what a program holds
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
@@ -230,6 +230,7 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Standards](docs/standards.md): shareable lint and format standards, `kscript:recommended` and `kscript check --print-config`
 - [Error codes](docs/errors.md): what each `KS` code means and how to fix it
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
+- [What changed](docs/upgrading.md): every spelling that was renamed or removed, with what to write now
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI
 - [Roadmap](docs/roadmap.md): what's planned next, such as compiling KScript to TypeScript
 
