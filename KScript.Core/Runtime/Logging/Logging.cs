@@ -506,7 +506,7 @@ namespace KScript.Runtime
                 if (c.Module?.Globals == null || !c.Module.Globals.TryGet(clean, out fn))
                     throw new KScriptException($"{c.Where}: there is no function called {clean}. Declare it with <fn name=\"{clean}\" params=\"entry\" ...>.", "Config");
             }
-            function = fn as ICallable ?? throw new KScriptException($"{c.Where}: fn should be a function, such as fn($entry) => ..., but got {Values.Describe(fn)}.", "Config");
+            function = fn as ICallable ?? throw new KScriptException($"{c.Where}: fn should be a function, such as fn(entry) => ..., but got {Values.Describe(fn)}.", "Config");
         }
 
         public void Write(LogEntry entry) =>

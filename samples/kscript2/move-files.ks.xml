@@ -8,10 +8,10 @@
 
   <let
     name="types"
-    value="$file_types->split(',')->map(fn($t) => $t->trim())" />
+    value="$file_types->split(',')->map(fn(t) => $t->trim())" />
   <for
     each="file"
-    in="@files($old_dir) |> filter(fn($f) => $types->contains($f.extension))">
+    in="@files($old_dir) |> filter(fn(f) => $types->contains($f.extension))">
     <let name="target" value="@join_path(base: $new_dir, $file.name)" />
     <do>@move($file, $target)</do>
     <echo>Moved {$file} to {$target}</echo>

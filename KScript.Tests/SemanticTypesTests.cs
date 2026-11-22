@@ -27,8 +27,8 @@ public class SemanticTypesTests
     [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f.version", "4")]
     // regex
     [InlineData("r = /(?<y>\\d{4})-(\\d\\d)/\necho \"{ $r->test('on 2026-11') } { $r->match('on 2026-11').groups.y } { $r->match('on 2026-11').captures } { $r->match('none') ?? 'null' }\"", "true 2026 2026, 11 null")]
-    [InlineData("echo \"{ /\\d+/->match_all('3 cats, 12 dogs')->map(fn($m) => $m.index) } { /\\s*,\\s*/->split('a , b,c') }\"", "0, 8 a, b, c")]
-    [InlineData("echo \"{ /(\\d+)/->replace('a1b22', '<$1>') } { /\\d+/->replace('a1b22', fn($m) => $m.text + '!') }\"", "a<1>b<22> a1!b22!")]
+    [InlineData("echo \"{ /\\d+/->match_all('3 cats, 12 dogs')->map(fn(m) => $m.index) } { /\\s*,\\s*/->split('a , b,c') }\"", "0, 8 a, b, c")]
+    [InlineData("echo \"{ /(\\d+)/->replace('a1b22', '<$1>') } { /\\d+/->replace('a1b22', fn(m) => $m.text + '!') }\"", "a<1>b<22> a1!b22!")]
     [InlineData("r = /^[a-z]+$/im\necho \"$r { $r.pattern } { $r.flags } { $r->type() } { $r->test('ABC') }\"", "/^[a-z]+$/im ^[a-z]+$ im regex true")]
     [InlineData("r: regex = '^a+$'\necho \"$r { $r->test('aa') }\"", "/^a+$/ true")]
     [InlineData("r: regex = '/x/s'\necho $r.flags", "s")]

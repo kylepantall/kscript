@@ -37,8 +37,8 @@ import KScript.Terminal
 
 folder = $args[0] ?? @known_folder(downloads)
 big = @files($folder, pattern: '*', recursive)
-  |> filter(fn($f) => $f.size gt 1000000)
-  |> sort_by(fn($f) => -$f.size)
+  |> filter(fn(f) => $f.size > 1000000)
+  |> sort_by(fn(f) => -$f.size)
 
 for f in $big {
   echo "{ @bold($f.name) }  { ($f.size / 1000000)->round(digits: 1) } MB"
@@ -46,7 +46,7 @@ for f in $big {
   echo "Nothing over 1 MB in {$folder}."
 }
 
-if $big->count() gt 0 {
+if $big->count() > 0 {
   confirm(into: ok) "Move them to an archive folder?"
   if $ok {
     for f in $big {
@@ -56,7 +56,7 @@ if $big->count() gt 0 {
 }
 ```
 
-You get real values (strings, numbers, lists, maps, dates, files), methods on all of them with `->`, pipes with `|>`, lambdas with `fn($x) => …`, `try`/`catch`, and functions you call like commands. Calling an API takes one line too:
+You get real values (strings, numbers, lists, maps, dates, files), methods on all of them with `->`, pipes with `|>`, lambdas with `fn(x) => …`, `try`/`catch`, and functions you call like commands. Calling an API takes one line too:
 
 ```kscript
 import KScript.Net

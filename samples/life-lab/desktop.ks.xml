@@ -23,7 +23,7 @@
   <let name="wrap" value="true" />
   <let
     name="pattern_choices"
-    value="$patterns->keys()->map(fn($k) => { label: $k->replace(old: '_', new: ' ')->capitalize(), value: $k })" />
+    value="$patterns->keys()->map(fn(k) => { label: $k->replace(old: '_', new: ' ')->capitalize(), value: $k })" />
 
   <fn name="tick">
     <set name="world" value="@advance($world, generations: 1)" />

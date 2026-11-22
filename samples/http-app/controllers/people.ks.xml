@@ -10,7 +10,7 @@
   <fn name="all" value="@read_json($file)" />
 
   <fn name="find" params="id: int">
-    <return value="@all()->find(fn($p) => $p.id == $id)" />
+    <return value="@all()->find(fn(p) => $p.id == $id)" />
   </fn>
 
   <!-- Pages -->
@@ -19,7 +19,7 @@
     <let name="min" value="($query.min_age ?? '0')->to_number(default: 0)" />
     <let
       name="people"
-      value="@all() |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)" />
+      value="@all() |> filter(fn(p) => $p.age ge $min) |> sort_by(fn(p) => $p.name)" />
     <return value="@view('people/index', people: $people, min: $min)" />
   </fn>
 
@@ -41,7 +41,7 @@
     @returns Person[]
   -->
   <fn name="index" params="query: PeopleQuery">
-    <return value="@all() |> filter(fn($p) => $query.role == null or $p.role == $query.role)" />
+    <return value="@all() |> filter(fn(p) => $query.role == null or $p.role == $query.role)" />
   </fn>
 
   <!---
@@ -69,7 +69,7 @@
     <let name="people" value="@all()" />
     <let
       name="person"
-      value="{ id: $people->map(fn($p) => $p.id)->max() + 1, name: $json.name, age: $json.age ?? 0, role: $json.role ?? 'Member' }" />
+      value="{ id: $people->map(fn(p) => $p.id)->max() + 1, name: $json.name, age: $json.age ?? 0, role: $json.role ?? 'Member' }" />
     <do>@write_json($file, $people->push($person))</do>
     <return value="@response($person, status: 201, headers: { Location: @route('people.show', id: $person.id) })" />
   </fn>
@@ -83,14 +83,14 @@
     <let
       name="changed"
       value="$person->merge($json ?? {})->merge({ id: $person.id })" />
-    <do>@write_json($file, @all()->map(fn($p) => $p.id == $person.id ? $changed : $p))</do>
+    <do>@write_json($file, @all()->map(fn(p) => $p.id == $person.id ? $changed : $p))</do>
     <return value="$changed" />
   </fn>
 
   <!--- Removes a person. -->
   <fn name="destroy" params="id: int">
     <let name="person" value="@find($id) ?? @abort(404)" />
-    <do>@write_json($file, @all()->reject(fn($p) => $p.id == $person.id))</do>
+    <do>@write_json($file, @all()->reject(fn(p) => $p.id == $person.id))</do>
     <return value="@response(null, status: 204)" />
   </fn>
 </kscript>

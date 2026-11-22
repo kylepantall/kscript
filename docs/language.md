@@ -13,7 +13,7 @@ total = $price * $qty
 const limit = 10
 n: int = $args[0] // convert, or stop with a clear error
 
-echo "Hello, {$name}! You have { $count } new { $count eq 1 ? 'message' : 'messages' }."
+echo "Hello, {$name}! You have { $count } new { $count == 1 ? 'message' : 'messages' }."
 echo "$person.name is $person.age" // bare $name works in text too
 echo "$people" // a map or list of maps prints as indented JSON
 ```
@@ -34,14 +34,14 @@ In a value, braces are only filled in when they start with `$` or `@`, so routes
 
 ## Expressions
 
-`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `lt le gt ge` (or `> >=`), `eq ne`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn($x) => …`. In `.kscript` files `<` and `>` work as written. In XML, use the word forms inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. Write `and`/`or` rather than `&&`/`||` everywhere.
+`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Comparisons are symbols and logic is words: write `and`, `or` and `not`, never `&&`, `||` or `!`. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
 
 ## Control flow
 
 ```kscript
-if $n lt 10 {
+if $n < 10 {
   // …
-} elif $n lt 100 {
+} elif $n < 100 {
   // …
 } else {
   // …
@@ -56,7 +56,7 @@ for i at n in 0..10 step 2 {
 for key, value in $map {
   // …
 }
-while $queue->count() gt 0 {
+while $queue->count() > 0 {
   // …
   break
   // …
@@ -65,20 +65,18 @@ while $queue->count() gt 0 {
 }
 
 match $choice {
-  case 1 {
+  1 => echo "One"
+  2, 3 => {
     // …
   }
-  case 2, 3 {
-    // …
-  }
-  when $it gt 9 {
-    // …
-  }
-  default {
+  _ when $it > 9 => echo "Out of range"
+  _ => {
     // …
   }
 }
 ```
+
+Each arm of a `match` is `pattern => result`. The pattern is one value or several (`2, 3 =>`), or `_` for anything, and a `when` test can follow it (`_ when $it > 9 =>`). The result is one statement on the same line, or a `{ }` block of them. A match used as a value writes its arms the same way, with a value as each result: `label = match $choice { 1 => 'one', 2, 3 => 'a few', _ => 'many' }`. Arms are separated by a new line or a comma, and the first arm that fits is taken. In XML the arms are `<case is="2, 3">`, `<case when="…">` and `<default>`.
 
 In XML, `<if>`, `<elif>`, `<while>` and `<match>` take their expression straight in the start tag: `<if $user.is_logged_in>` is short for `<if test="$user.is_logged_in">`, and `<match $choice>` for `<match value="$choice">`. Both forms work in scripts and pages; use the long one when the tag has other attributes. Inside the tag, `<`, `>` and quotes need no escaping, so `<if $n > 3>` and `<if $name == "Joan">` work. A `>` ends the tag unless it has a space on both sides with more of the condition after it, so write `$n > 3`, not `$n>3`. `kscript convert` and the editor's `<if>` snippet use the short form.
 
@@ -92,10 +90,10 @@ first.
 
 ```kscript try
 fn grade(score: number) {
-  if $score ge 90 {
+  if $score >= 90 {
     return 'A'
   }
-  if $score ge 75 {
+  if $score >= 75 {
     return 'B'
   }
   return 'C'
@@ -122,7 +120,7 @@ reported).
 | --- | --- |
 | KS6002 | A function nothing calls. Calls from the other files of the project count: a library function another script imports and calls, a controller a route file names (`to="people.show"`, or `<Resource to="people">` for its index, store, show, update and destroy), and middleware named in `kscript.json`. A function that only calls itself is still unused. |
 | KS6003 | A variable, constant or loop variable whose value is never read, including one that is only ever set. A script's top-level constants are exported like its functions, so they count as used when an importing file uses them. In pages, only a function's own variables are checked, because a layout or component may read the rest. |
-| KS6004 | A function parameter the body never reads. For a lambda, only the parameters after the last one it reads, since the caller decides what it is passed: write `fn($_y) => ...` to keep the position. |
+| KS6004 | A function parameter the body never reads. For a lambda, only the parameters after the last one it reads, since the caller decides what it is passed: write `fn(_y) => ...` to keep the position. |
 | KS6005 | An import nothing uses: an `as` alias, a name in `names="..."`, a whole script, or a package none of whose elements, commands, methods or variables appear. |
 | KS6006 | Not unused code, but a style hint: a list of names written as one string in a `.kscript` file (`Middleware(use: "log, cors")`). Write it as an array, `use: [log, cors]`; the quick fix does it for you. XML attributes are text, so `use="log, cors"` is fine there. |
 | KS6008 | Not unused code either: a script in a project that declares a second type, model, enum or error type. Each goes in its own file, named after it, and is imported where it is used; the warning says where to move it (`types/order-status.kscript`). The type the file is named after stays. Scripts outside a project aren't checked. |
@@ -154,7 +152,7 @@ echo "{ @greet('World') } { 4 |> @square() }"
 spawn(fn: @background_job)
 ```
 
-Functions can be called before they are declared, recurse, and be passed around: `@square` is the function itself. Lambdas are values too: `by_age = fn($a, $b) => $a.age - $b.age`.
+Functions can be called before they are declared, recurse, and be passed around: `@square` is the function itself. Lambdas are values too, and declare their parameters the same bare way: `by_age = fn(a, b) => $a.age - $b.age`.
 
 ### Named arguments
 
@@ -289,8 +287,8 @@ Values are strings, numbers, bools, lists, maps, dates, functions and null, plus
 
 ```kscript
 echo "{ $name->trim()->upper() }"
-echo "{ $people->filter(fn($p) => $p.age ge 18)->map(fn($p) => $p.name)->join(', ') }"
-echo "{ $people |> sort_by(fn($p) => $p.name) |> first() }"
+echo "{ $people->filter(fn(p) => $p.age >= 18)->map(fn(p) => $p.name)->join(', ') }"
+echo "{ $people |> sort_by(fn(p) => $p.name) |> first() }"
 echo "{ @now()->add_days(7)->format(pattern: 'd MMMM yyyy') }"
 ```
 
@@ -374,7 +372,7 @@ try {
 throw Validation "Age must be positive, got {$age}"
 ```
 
-`catch` takes the error types it handles, joined by `|`, and `as` names the error: `catch FileNotFound | Permission as e`. A catch with only a lower-case name (`catch err`) handles every error. `when` adds a test: `catch Network as e when $e.status eq 503`. Catches are tried in order and the first that fits runs. Error type names start with a capital letter, which is how `catch` tells them from the variable's name.
+`catch` takes the error types it handles, joined by `|`, and `as` names the error: `catch FileNotFound | Permission as e`. A catch with only a lower-case name (`catch err`) handles every error. `when` adds a test: `catch Network as e when $e.status == 503`. Catches are tried in order and the first that fits runs. Error type names start with a capital letter, which is how `catch` tells them from the variable's name.
 
 Unknown elements, attributes and syntax errors are reported before a script starts, so a typo near the end doesn't leave a job half done.
 

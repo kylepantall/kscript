@@ -301,7 +301,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6010
 
-**A name declared with `$`.** `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`.
+**A name declared with `$`.** `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
 
 ## KS6011
 
@@ -309,7 +309,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6012
 
-**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`). Logic stays as words: `and`, `or`, `not`. A function is named as `@name` in an argument, as it is in an expression: `spawn(fn: @job)`, `llm(tools: [@lookup])`, `Get(to: @people.show)`, not a bare `job`.
+**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`; XML keeps the words). Logic stays as words: `and`, `or`, `not`. A function is named as `@name` in an argument, as it is in an expression: `spawn(fn: @job)`, `llm(tools: [@lookup])`, `Get(to: @people.show)`, not a bare `job`. `kscript check --fix` rewrites each one.
 
 ## KS6013
 

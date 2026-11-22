@@ -6,7 +6,7 @@ layout: _layout.html
 
 # Our team ({ $people->count() } people)
 
-<for each="p" in="$people->sort_by(fn($p) => $p.name)">
+<for each="p" in="$people->sort_by(fn(p) => $p.name)">
 - **{$p.name}**, {$p.role}
 </for>
 

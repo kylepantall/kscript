@@ -139,7 +139,12 @@
     "keywords": {
       "patterns": [
         {
-          "match": "(?<![\\w$@.-])(if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue)(?![\\w-])",
+          "match": "(?<![\\w$@.-])(if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue)(?![\\w-])",
+          "name": "keyword.control.flow.kscript"
+        },
+        {
+          "comment": "The arm of a match that takes anything: _ => ... or _ when $n > 9 => ...",
+          "match": "(?<![\\w$@.-])_(?=\\s*(?:=>|when(?![\\w-])))",
           "name": "keyword.control.flow.kscript"
         },
         {
@@ -159,7 +164,7 @@
     "element": {
       "patterns": [
         {
-          "begin": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)\\s*(\\()",
+          "begin": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)\\s*(\\()",
           "beginCaptures": {
             "1": {
               "name": "entity.name.tag.kscript"
@@ -192,7 +197,7 @@
           ]
         },
         {
-          "match": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|case|when|default|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)(?=\\s*(?:\\\"|\\{|$))",
+          "match": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)(?=\\s*(?:\\\"|\\{|$))",
           "captures": {
             "1": {
               "name": "entity.name.tag.kscript"
@@ -370,7 +375,8 @@
     "operators": {
       "patterns": [
         {
-          "match": "(?<![\\w$@.-])(and|or|not|is|in|gt|lt|ge|le|eq|ne)(?![\\w-])",
+          "comment": "Logic is written in words. Comparisons are symbols in a .kscript file (lt, gt, eq and the rest are the XML spellings).",
+          "match": "(?<![\\w$@.-])(and|or|not|is|in)(?![\\w-])",
           "name": "keyword.operator.word.kscript"
         },
         {

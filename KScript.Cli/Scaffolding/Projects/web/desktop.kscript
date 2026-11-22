@@ -33,6 +33,6 @@ KScript.Window(title: "{{ title }}", width: 480, height: 560, theme: system) {
 
   Row(gap: 8) {
     Text "{ @tasks_left($tasks) }"
-    Button(on_click: { tasks = @clear_done($tasks) }, disabled: not $tasks->any(fn($t) => $t.done)) "Clear done"
+    Button(on_click: { tasks = @clear_done($tasks) }, disabled: not $tasks->any(fn(t) => $t.done)) "Clear done"
   }
 }

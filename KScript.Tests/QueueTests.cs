@@ -257,9 +257,9 @@ public sealed class QueueTests : StorageFixture
 
               fn handle() {
                 match $kind {
-                  case 'flaky' { throw Flaky "try again" }
-                  case 'missing' { throw NotFound "gone" }
-                  default { throw Validation "bad" }
+                  'flaky' => throw Flaky "try again"
+                  'missing' => throw NotFound "gone"
+                  _ => throw Validation "bad"
                 }
               }
             }

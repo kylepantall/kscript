@@ -110,7 +110,7 @@ public class ErrorTypeTests
     {
         string output = Run(Declarations + """
             echo "{ $PersonNotFound.name } { $PersonNotFound.extends } { $PersonNotFound.status } { $PersonNotFound.description }"
-            echo "{ $OutOfStock.fields->map(fn($f) => $f.name + ':' + $f.type) } { $OutOfStock.fields->count() } { $Plain.extends } { $Plain.status ?? 'none' }"
+            echo "{ $OutOfStock.fields->map(fn(f) => $f.name + ':' + $f.type) } { $OutOfStock.fields->count() } { $Plain.extends } { $Plain.status ?? 'none' }"
             echo "{ NotFound.status } { NotFound.extends } { Shape.extends } { $Plain->type() }"
             """);
         Assert.Equal("PersonNotFound NotFound 404 Nothing has that id.\nitem:string, left:int 2 Error none\n404 Error Type error_type\n", output);

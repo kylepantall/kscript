@@ -33,7 +33,7 @@ namespace KScript.Language.Tests
             new object[] { Code, "for x in [1] {\n  ‸\n}", "break" },
             new object[] { Code, "while true {\n  b‸\n}", "continue" },
             new object[] { Code, "try {\n} catch err {\n  ‸\n}", "err" },
-            new object[] { Code, "x = 1\nmatch $x {\n  ‸\n}", "case" },
+            new object[] { Code, "x = 1\nmatch $x {\n  ‸\n}", "value =>" },
             new object[] { Code, "if true {\n} e‸", "else" },
             new object[] { Code, "x = 1; e‸", "echo" },
 
@@ -49,7 +49,7 @@ namespace KScript.Language.Tests
             new object[] { Code, "x = { a: ‸ }", "@now" },
             new object[] { Code, "y = @round(‸)", "digits:" },
             new object[] { Code, "y = @round(1, d‸)", "digits:" },
-            new object[] { Code, "x = fn($a) => ‸", "@now" },
+            new object[] { Code, "x = fn(a) => ‸", "@now" },
             new object[] { Code, "x = match 1 { 1 => ‸ }", "@now" },
             new object[] { Code, "x = [1]\ny = $x |> ‸", "map" },
             new object[] { Code, "x = 'a'\ny = $x->‸", "upper" },
@@ -132,7 +132,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Only_cases_go_in_a_match()
         {
-            Assert.Equal(new[] { "case", "default", "when" }, Complete("x = 1\nmatch $x {\n  ‸\n}", Code).Select(i => i.Label).OrderBy(l => l, StringComparer.Ordinal));
+            Assert.Equal(new[] { "_ =>", "_ when", "value =>" }, Complete("x = 1\nmatch $x {\n  ‸\n}", Code).Select(i => i.Label).OrderBy(l => l, StringComparer.Ordinal));
             List<string> xml = Complete("<kscript>\n<match value=\"1\">\n<‸\n</match>\n</kscript>", Xml).Select(i => i.Label).ToList();
             Assert.Contains("default", xml);
             Assert.DoesNotContain("echo", xml);

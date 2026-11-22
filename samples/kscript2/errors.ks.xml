@@ -10,7 +10,7 @@
     value="[{ id: 1, item: 'tea', qty: 5 }, { id: 2, item: 'coffee', qty: 1 }]" />
 
   <fn name="place" params="id: int">
-    <let name="order" value="$orders->find(fn($o) => $o.id == $id)" />
+    <let name="order" value="$orders->find(fn(o) => $o.id == $id)" />
     <if $order == null>
       <throw value="OrderNotFound(id: $id)" />
     </if>

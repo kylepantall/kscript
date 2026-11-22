@@ -22,8 +22,8 @@ model User {
 $db->create_table($User)
 
 joan = $User->create(name: 'Joan', email: 'joan@example.com', age: 34, password: 'correct horse battery')
-adults = $User->where(fn($u) => $u.age >= 18 and $u.email->ends_with('@example.com'))->order_by(name)->get()
-echo $adults->map(fn($u) => $u.name)
+adults = $User->where(fn(u) => $u.age >= 18 and $u.email->ends_with('@example.com'))->order_by(name)->get()
+echo $adults->map(fn(u) => $u.name)
 echo $joan.id
 ```
 
@@ -65,7 +65,7 @@ Settings go first, one per line:
 | `unique: [email, [team_id, slug]]` | Fields no two records may share. A list in the list is a set of fields that is unique together. A save that clashes fails with `UniqueViolation`. |
 | `index: [team_id]` | Fields to index, so queries on them stay fast. |
 | `hidden: [password]` | Fields left out of JSON, so they never reach a route's response. |
-| `guarded: [role]` | Fields `->create($form)` and `->update($form)` leave alone, so a form can't set them. Set them on the record: `$user.role = 'admin'`. |
+| `guarded: [role]` | Fields `->create($form)` and `->update($form)` leave alone, so a form can't set them. Set them on the record: `user.role = 'admin'`. |
 | `connection: reports` | The [connection](#connections) the table is in. |
 
 How each type is stored:
@@ -96,7 +96,7 @@ model Note {
 $db->create_table($Note)
 
 note = $Note->create(text: 'Buy milk')
-$note.pinned = true
+note.pinned = true
 $note->save()
 
 $note->update(text: 'Buy oat milk')
@@ -114,7 +114,7 @@ echo $Note->count()
 | `$record->fresh()` | The record as the database has it now. |
 | `$record->is_dirty(field?)`, `->dirty()` | Whether it has changes that aren't saved, and which fields. |
 
-Values are checked as they are set: `$note.pinned = 'maybe'` fails with a Type error before anything reaches the database.
+Values are checked as they are set: `note.pinned = 'maybe'` fails with a Type error before anything reaches the database.
 
 ## Queries
 
@@ -141,8 +141,8 @@ big = 50
 paid = $Order->where(status: 'paid')
 echo $paid->count()
 echo $paid->sum(total)
-echo $Order->where(fn($o) => $o.total > $big)->order_by(total: desc)->pluck(customer)
-echo $Order->where(fn($o) => $o.customer->starts_with('A'))->latest()->first().total
+echo $Order->where(fn(o) => $o.total > $big)->order_by(total: desc)->pluck(customer)
+echo $Order->where(fn(o) => $o.customer->starts_with('A'))->latest()->first().total
 ```
 
 ### Conditions
@@ -156,7 +156,7 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 | Method | What it does |
 | --- | --- |
 | `->where(...)`, `->or_where(...)`, `->where_not(...)` | Keep the rows that match, or that match these instead, or that don't. |
-| `->when(test, fn($q) => ...)` | Changes the query only when the test is true, for optional filters. |
+| `->when(test, fn(q) => ...)` | Changes the query only when the test is true, for optional filters. |
 | `->order_by(name)`, `->order_by(total: desc)` | Sorts. `->latest()` and `->oldest()` sort by `created_at`. |
 | `->limit(n)`, `->offset(n)` | Reads at most `n` rows, after skipping `n`. |
 | `->select(id, name)`, `->distinct()` | Reads only these columns, and leaves out rows that repeat. |
@@ -174,7 +174,7 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 | `->sum(col)`, `->average(col)`, `->min(col)`, `->max(col)` | Totals over the rows that match. |
 | `->pluck(col)`, `->value(col)` | One column of every row, or of the first. |
 | `->paginate(per_page, page)` | One page: `{ items, page, per_page, total, last_page, from, to, has_more }`. `page` may be text, such as `$query.page`. |
-| `->chunk(size, fn($rows, $n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
+| `->chunk(size, fn(rows, n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
 | `->sql()` | The SQL and parameters the query would run, without running it. |
 
 ### Changing many rows

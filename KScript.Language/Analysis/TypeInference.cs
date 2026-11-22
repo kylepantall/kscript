@@ -169,7 +169,7 @@ namespace KScript.Language.Analysis
                 case MethodCallNode m:
                 {
                     TypeShape receiver = Infer(m.Target, region);
-                    // ->map(fn($p) => $p.name) is a list of whatever the lambda returns.
+                    // ->map(fn(p) => $p.name) is a list of whatever the lambda returns.
                     if (receiver.Type == KType.List && m.Name == "map" && m.Arguments.Count == 1 && m.Arguments[0].Value is LambdaNode lambda)
                     {
                         TypeShape item = Infer(lambda.Body, region);

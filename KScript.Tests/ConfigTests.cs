@@ -182,7 +182,7 @@ public sealed class ConfigTests : IDisposable
         FileOf("config.yaml", "");
         FileOf("config.json", "{ \"a\": { \"b\": 1 } }");
         Assert.Equal("{\n  \"a\": {\n    \"b\": 1\n  }\n}\n", Run("<echo>{$config}</echo>"));
-        Assert.Equal("config.json config.yaml\n", Run("<echo>{ $config->sources()->map(fn($s) => $s.name)->join(' ') }</echo>"));
+        Assert.Equal("config.json config.yaml\n", Run("<echo>{ $config->sources()->map(fn(s) => $s.name)->join(' ') }</echo>"));
     }
 
     [Fact]

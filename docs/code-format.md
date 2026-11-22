@@ -57,11 +57,11 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `@greet('Hi')` | `<do>@greet('Hi')</do>` |
 | `echo "Hello, $name"` | `<echo>Hello, $name</echo>` |
 | `echo $list[1]`, `echo(format: json) $data` | `<echo value="$list[1]" />` |
-| `if a { } elif b { } else { }` (also `else if`) | `<if test>`, `<elif test>`, `<else>` |
+| `if a { } elif b { } else { }` | `<if test>`, `<elif test>`, `<else>` |
 | `for item in $list { }`, `for key, value in $map { }` | `<for each in>` |
 | `for item at i in $list { }` | `<for each="item" at="i" in="$list">` |
 | `while test { }`, `break`, `continue` | `<while test>`, `<break/>`, `<continue/>` |
-| `match $x { case 1, 2 { } when $x > 9 { } default { } }` | `<match value>`, `<case is>`, `<case when>`, `<default>` |
+| `match $x { 1, 2 => { }, _ when $x > 9 => { }, _ => { } }` | `<match value>`, `<case is>`, `<case when>`, `<default>` |
 | `fn greet(who: string, hi = 'Hello') { }` | `<fn name="greet" params="who: string, hi = 'Hello'">` |
 | `fn double(x: int) => $x * 2` | `<fn name="double" params="x: int" value="$x * 2" />` |
 | `return $x`, `exit 1` | `<return value="$x" />`, `<exit code="1" />` |
@@ -146,8 +146,12 @@ repo = ```<Repo>
 - A statement ends at a new line, `;` or the `}` that closes its block. It carries on when a bracket is open, the
   line ends with an operator (`|>`, `->`, `+`, `,`, `and`, ...), or the next line starts with `|>`, `->`, `?`, `:`,
   `.`, `and` or `or`.
-- In the head of `if`, `elif`, `for`, `while`, `match`, `case` and `when`, the first `{` outside brackets opens the
+- In the head of `if`, `elif`, `for`, `while` and `match`, the first `{` outside brackets opens the
   block. Wrap a map literal in parentheses there.
+- A `match` holds arms, `pattern => result`: `1, 2 => echo "low"`, `_ when $x > 9 => { }` for a test and `_ => { }`
+  for anything else. The result is one statement on the arm's line or a `{ }` block, and arms are separated by a new
+  line or a comma. A match used as a value (`label = match $x { 1 => 'one', _ => 'other' }`) writes its arms the
+  same way.
 - `"double quotes"` are text, exactly like XML element text or an attribute value: `{ }` and `$name` interpolate where
   the element interpolates, and in an expression too (`greeting = "Hello $name"`), where a `{ }` is filled in when it
   starts with `$` or `@`. `\"` and `\\` are the only escapes (plus a `\` at the end of a line, which joins it to
@@ -158,7 +162,11 @@ repo = ```<Repo>
 - A list of names is an array: `Middleware(use: [secure_headers, json_only])`, `Resource(..., only: [index, show])`.
   The XML form writes the same list as text, `use="secure_headers, json_only"`, and `kscript convert` turns one into
   the other. The old string form (`use: "a, b"`) still works in `.kscript`, with a KS6006 hint to use the array.
-- Expressions are kept as written, so raw `<` and `>` work (`lt` and `gt` still do).
+- Comparisons are symbols (`<`, `<=`, `>`, `>=`, `==`, `!=`) and logic is words (`and`, `or`, `not`). The comparison
+  words `lt`, `le`, `gt`, `ge`, `eq` and `ne` are the XML spellings: `kscript convert` writes the symbols, and a
+  word left in a `.kscript` file is reported (KS6012) with a fix.
+- A name is declared bare and read with `$`: `total = 0`, `total += 1`, `for item in $list`, `fn double(n)`,
+  `fn(n) => $n * 2`. Writing `$total = 0` or `fn($n)` is reported (KS6010) with a fix.
 - The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. A file whose only
   statement is `kscript { }` or a `KScript.*` element (such as `KScript.Window(...) { }`) uses that element as the
   root. `import` goes at that top level, not inside another block.

@@ -8,7 +8,7 @@ stock = { tea: 2, coffee: 10 }
 orders = [{ id: 1, item: 'tea', qty: 5 }, { id: 2, item: 'coffee', qty: 1 }]
 
 fn place(id: int) {
-  order = $orders->find(fn($o) => $o.id == $id)
+  order = $orders->find(fn(o) => $o.id == $id)
   if $order == null {
     throw OrderNotFound(id: $id)
   }

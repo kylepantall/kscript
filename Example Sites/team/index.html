@@ -1,5 +1,5 @@
 <let name="people" value="@read_json('data/people.json')" />
-<let name="oldest" value="$people->max_by(fn($p) => $p.age)" />
+<let name="oldest" value="$people->max_by(fn(p) => $p.age)" />
 
 <layout path="_layout.html" title="Home">
   <h1>Welcome</h1>

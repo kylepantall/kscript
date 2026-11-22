@@ -19,6 +19,6 @@ KScript.Window(title: "{{ title }}", width: {{ width ?? 480 }}, height: {{ heigh
   Text "Clicked {$count} times"
   Row(gap: 8) {
     Button(variant: primary, on_click: count += 1) "Click"
-    Button(on_click: count = 0, disabled: $count eq 0) "Reset"
+    Button(on_click: count = 0, disabled: $count == 0) "Reset"
   }
 }

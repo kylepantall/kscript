@@ -97,7 +97,7 @@ public sealed class IOTests : IDisposable
     public void Known_folders_have_paths()
     {
         string output = Run(
-            "<echo>{ ['home', 'desktop', 'documents', 'downloads', 'music', 'pictures', 'videos', 'temp']->map(fn($n) => @known_folder($n)->count() > 0)->join(' ') }</echo>" +
+            "<echo>{ ['home', 'desktop', 'documents', 'downloads', 'music', 'pictures', 'videos', 'temp']->map(fn(n) => @known_folder($n)->count() > 0)->join(' ') }</echo>" +
             "<echo>{ @known_folder(' Home ') == @home() } { @known_folder('appdata') != null } { @temp_folder() == @known_folder('temp') }</echo>");
         Assert.Equal("true true true true true true true true\ntrue true true\n", output);
         Assert.Contains("'attic' isn't a valid name", Fails("<echo>{ @known_folder('attic') }</echo>").Message);

@@ -169,9 +169,9 @@ public class CoreTests
     [Fact]
     public void LambdasAndListMethods()
     {
-        Assert.Equal("2,4,6\n", RunBody("<echo>{ [1, 2, 3]->map(fn($x) => $x * 2)->join(',') }</echo>"));
-        Assert.Equal("Joan\n", RunBody("<let name=\"people\" value=\"[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]\" /><echo>{ $people->max_by(fn($p) => $p.age).name }</echo>"));
-        Assert.Equal("3\n", RunBody("<echo>{ [1, 2, 3, 4, 5] |> filter(fn($x) => $x gt 2) |> count() }</echo>"));
+        Assert.Equal("2,4,6\n", RunBody("<echo>{ [1, 2, 3]->map(fn(x) => $x * 2)->join(',') }</echo>"));
+        Assert.Equal("Joan\n", RunBody("<let name=\"people\" value=\"[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]\" /><echo>{ $people->max_by(fn(p) => $p.age).name }</echo>"));
+        Assert.Equal("3\n", RunBody("<echo>{ [1, 2, 3, 4, 5] |> filter(fn(x) => $x gt 2) |> count() }</echo>"));
     }
 
     [Fact]

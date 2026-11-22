@@ -736,13 +736,10 @@ namespace KScript.Pages
                 if (c.Name == "default") hit = true;
                 else if (c.Name == "case")
                 {
-                    if (c.Attr("is") is string isExpr)
-                    {
-                        var options = state.Ctx.Runtime.EvaluateList(isExpr, matchScope, state.Module);
-                        hit = options.Any(o => Values.LooseEquals(o, value));
-                    }
-                    else if (c.Attr("when") is string when) hit = Values.Truthy(Eval(when, matchScope, state));
-                    else throw new PageException("<case> needs an is or when attribute.");
+                    string isExpr = c.Attr("is"), when = c.Attr("when");
+                    if (isExpr == null && when == null) throw new PageException("<case> needs an is or when attribute.");
+                    hit = (isExpr == null || state.Ctx.Runtime.EvaluateList(isExpr, matchScope, state.Module).Any(o => Values.LooseEquals(o, value)))
+                        && (when == null || Values.Truthy(Eval(when, matchScope, state)));
                 }
                 else throw new PageException($"Only <case> and <default> can go inside <match>, not <{c.Name}>.");
 

@@ -204,10 +204,10 @@ public class UIDesktopTests
               <let name="on" value="[false, false, false, false]" />
               <let name="name" value="''" />
               <Column gap="6">
-                <Text weight="bold">{ $on->filter(fn($x) => $x)->count() } on</Text>
+                <Text weight="bold">{ $on->filter(fn(x) => $x)->count() } on</Text>
                 <Grid columns="2" gap="2">
                   <for each="v" at="i" in="$on">
-                    <Box width="20" height="20" background="{ $v ? '#22c55e' : '#1e293b' }" on_click="on = $on->map(fn($x, $j) => $j eq $i ? not $x : $x)" />
+                    <Box width="20" height="20" background="{ $v ? '#22c55e' : '#1e293b' }" on_click="on = $on->map(fn(x, j) => $j eq $i ? not $x : $x)" />
                   </for>
                 </Grid>
                 <TextBox bind="name" placeholder="Name" />

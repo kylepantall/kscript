@@ -12,9 +12,9 @@ total = 0
 total = $total + $price * $qty
 total += 1
 x = 3
-$x += 1
-$x = 3
-$total += $price * $qty
+x += 1
+x = 3
+total += $price * $qty
 echo "$x $total"
 const config = { debug: false, retries: 3 }
 echo "Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for \
@@ -27,10 +27,10 @@ person = { name: 'Joan', age: 82 }
 echo "$person.name is { $person['age'] }"
 people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
 names = $people
-  |> filter(fn($p) => $p.age >= 18)
-  |> map(fn($p) => $p.name)
+  |> filter(fn(p) => $p.age >= 18)
+  |> map(fn(p) => $p.name)
   |> join(', ')
-by_age = fn($a, $b) => $a.age - $b.age
+by_age = fn(a, b) => $a.age - $b.age
 sorted = $people->sort($by_age)
 echo "Youngest: {$sorted[0].name}"
 echo $names |> lower() |> @greet('Hi')
@@ -49,7 +49,7 @@ for key, value in $config {
   echo "$key = $value"
 }
 while $n < 3 {
-  $n += 1
+  n += 1
 }
 
 // Branches
@@ -63,18 +63,12 @@ if $score >= 90 {
 }
 choice = 2
 match $choice {
-  case 1 {
-    @greet('settings')
-  }
-  case 2, 3 {
+  1 => @greet('settings')
+  2, 3 => {
     echo "Coming soon"
   }
-  when $choice > 9 {
-    echo "Out of range"
-  }
-  default {
-    echo "Unknown option"
-  }
+  _ when $choice > 9 => echo "Out of range"
+  _ => echo "Unknown option"
 }
 label = match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }
 echo $label

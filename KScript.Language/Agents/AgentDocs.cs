@@ -481,7 +481,7 @@ namespace KScript.Language.Agents
               if $tasks->is_empty() {
                 return [] // return early rather than else
               }
-              return $tasks->filter(fn($t) => not $t.done)->take($limit)
+              return $tasks->filter(fn(t) => not $t.done)->take($limit)
             }
 
             tasks = @exists('tasks.json') ? @read_json('tasks.json', as: 'Task[]') : []
@@ -491,16 +491,12 @@ namespace KScript.Language.Agents
               echo "{ $count }. { @label($task, mark: '*') }" // read with $, call with @
             }
             match $count {
-              case 0 {
-                echo 'Nothing to do'
-              }
-              default {
-                echo "$count open"
-              }
+              0 => echo 'Nothing to do'
+              _ => echo "$count open"
             }
             try {
-              @write_json('done.json', $tasks->filter(fn($t) => $t.done))
-            } catch err when $err.type eq 'IO' {
+              @write_json('done.json', $tasks->filter(fn(t) => $t.done))
+            } catch err when $err.type == 'IO' {
               throw Validation "Could not save: { $err.message }"
             }
             """;
@@ -513,8 +509,8 @@ namespace KScript.Language.Agents
 
         internal const string Rules = """
             - `$name` reads a variable; `name = value` sets it. `@name(...)` calls a fn or command; `$x->name(...)` calls a method; `$x.name` reads a field (a plain fact: `$response.status`, `$file.size`); `$x |> name()` pipes.
-            - Text: `"Hi { $name }"` or `"Hi $name"`; `{{ }}` for literal braces. Lambdas: `fn($x) => $x * 2`.
-            - Operators: `== !=` (loose) `=== !==` (strict) `lt le gt ge eq ne` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
+            - Text: `"Hi { $name }"` or `"Hi $name"`; `{{ }}` for literal braces. Lambdas: `fn(x) => $x * 2`.
+            - Operators: `== !=` (loose) `=== !==` (strict) `< <= > >=` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
             - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enums are `enum Size { small, large }`, and their values are bare: `@known_folder(downloads)`.
             - Lists of names are arrays: `use: [log, cors]`, never `"log, cors"`.
             - Lengths of time are durations, a number and a unit with no quotes: `timeout: 30s`, `ttl: 10m`, `wait(duration: 500ms)`. A plain number is seconds.

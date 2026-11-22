@@ -12,7 +12,7 @@ namespace KScript.Http
     /// routes/web.php and routes/api.php. A file whose root is &lt;KScript.Routes&gt; maps HTTP methods and paths to
     /// controller functions, views or redirects. Controllers are ordinary &lt;fn&gt;s; what they return becomes the
     /// response (a map or list is JSON, text is HTML, <c>@view()</c> renders a page). Middleware is a
-    /// <c>fn($request, $next)</c> or a built-in (log, cors, auth, throttle), applied to the whole file, a
+    /// <c>fn(request, next)</c> or a built-in (log, cors, auth, throttle), applied to the whole file, a
     /// &lt;Group&gt; or one route.
     /// </summary>
     public sealed class HttpPackage : KScriptPackage

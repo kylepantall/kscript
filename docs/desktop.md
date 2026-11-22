@@ -9,7 +9,7 @@ KScript.Window(title: Counter, width: 320, height: 200) {
   Text(size: 32) "{$count}"
   Row {
     Button(variant: primary, on_click: count += 1) "Add one"
-    Button(on_click: count = 0, disabled: $count eq 0) "Reset"
+    Button(on_click: count = 0, disabled: $count == 0) "Reset"
   }
 }
 ```

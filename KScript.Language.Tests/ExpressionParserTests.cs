@@ -62,15 +62,15 @@ namespace KScript.Language.Tests
         [InlineData("{ 'quoted key': 1 }", "{quoted key:1}")]
         [InlineData("[{ a: [1] }]", "[{a:[1]}]")]
         // Lambdas and pipes
-        [InlineData("fn($x) => $x * 2", "(fn [x] (* $x 2))")]
-        [InlineData("fn($a, $b) => $a.age - $b.age", "(fn [a b] (- (. $a age) (. $b age)))")]
+        [InlineData("fn(x) => $x * 2", "(fn [x] (* $x 2))")]
+        [InlineData("fn(a, b) => $a.age - $b.age", "(fn [a b] (- (. $a age) (. $b age)))")]
         [InlineData("fn() => 1", "(fn [] 1)")]
-        [InlineData("$people->filter(fn($p) => $p.age ge 18)", "(-> $people filter (fn [p] (>= (. $p age) 18)))")]
+        [InlineData("$people->filter(fn(p) => $p.age ge 18)", "(-> $people filter (fn [p] (>= (. $p age) 18)))")]
         [InlineData("$x |> upper()", "(|> $x (call upper))")]
         [InlineData("$title |> lower() |> slugify()", "(|> (|> $title (call lower)) (call slugify))")]
         [InlineData("$a + 1 |> round()", "(|> (+ $a 1) (call round))")]
         [InlineData("$x |> f() == 3", "(== (|> $x (call f)) 3)")]
-        [InlineData("$x |> fn($v) => $v + 1", "(|> $x (fn [v] (+ $v 1)))")]
+        [InlineData("$x |> fn(v) => $v + 1", "(|> $x (fn [v] (+ $v 1)))")]
         [InlineData("@read_text($path) |> json()", "(|> @read_text($path) (call json))")]
         // Named arguments
         [InlineData("@chat(system: 'You are a tutor.')", "@chat(system:'You are a tutor.')")]
@@ -164,12 +164,12 @@ namespace KScript.Language.Tests
         [Fact]
         public void SpansPointAtTheSource()
         {
-            const string source = "$people->filter(fn($p) => $p.age ge 18)";
+            const string source = "$people->filter(fn(p) => $p.age ge 18)";
             ParseResult result = ExpressionParser.ParseExpression(source);
             MethodCallNode call = Assert.IsType<MethodCallNode>(result.Root);
             Assert.Equal("filter", source.Substring(call.NameSpan.Start, call.NameSpan.Length));
             Assert.Equal(source.Length, call.Span.End);
-            Assert.Equal("(fn($p) => $p.age ge 18)", source.Substring(call.ArgumentList.Span.Start, call.ArgumentList.Span.Length));
+            Assert.Equal("(fn(p) => $p.age ge 18)", source.Substring(call.ArgumentList.Span.Start, call.ArgumentList.Span.Length));
 
             MemberNode member = result.Root.DescendantsAndSelf().OfType<MemberNode>().Single();
             Assert.Equal("age", source.Substring(member.NameSpan.Start, member.NameSpan.Length));

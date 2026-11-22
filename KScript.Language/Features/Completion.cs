@@ -13,19 +13,22 @@ namespace KScript.Language.Features
             ("and", "Logical and: `$a and $b`."),
             ("or", "Logical or: `$a or $b`."),
             ("not", "Logical not: `not $a`."),
-            ("eq", "Loose equality, the same as `==`: `'3' eq 3` is true."),
-            ("ne", "Loose inequality, the same as `!=`."),
-            ("lt", "Less than: `$a lt $b`. (A raw `<` isn't allowed in XML attributes.)"),
-            ("le", "Less than or equal."),
-            ("gt", "Greater than (`>` also works)."),
-            ("ge", "Greater than or equal (`>=` also works)."),
+            ("eq", "Loose equality, the XML spelling of `==`: `'3' eq 3` is true."),
+            ("ne", "Loose inequality, the XML spelling of `!=`."),
+            ("lt", "Less than, the XML spelling of `<`: `$a lt $b`."),
+            ("le", "Less than or equal, the XML spelling of `<=`."),
+            ("gt", "Greater than, the XML spelling of `>`."),
+            ("ge", "Greater than or equal, the XML spelling of `>=`."),
             ("in", "Membership: `$ext in ['.cs', '.xml']`."),
             ("true", "The boolean true."),
             ("false", "The boolean false."),
             ("null", "No value."),
-            ("fn", "A lambda: `fn($x) => $x * 2`."),
+            ("fn", "A lambda: `fn(x) => $x * 2`."),
             ("match", "Match expression: `match $x { 1 => 'one', _ => 'other' }`."),
         };
+
+        /// <summary>The comparison words, which are the XML spellings: a .kscript file writes the symbols.</summary>
+        private static readonly HashSet<string> ComparisonWords = new HashSet<string> { "eq", "ne", "lt", "le", "gt", "ge" };
 
         /// <summary>
         /// Completions at an offset. <paramref name="trigger"/> is the character the editor asked after, if any: after
@@ -825,12 +828,13 @@ namespace KScript.Language.Features
             }
             items.AddRange(VariableCompletions(analysis, offset, replace, withSigil: true));
             items.AddRange(CommandCompletions(analysis, replace, withSigil: true));
-            items.AddRange(ExpressionKeywords.Select(k => new CompletionItem
+            bool codeFile = analysis.Markup.Syntax == KScript.Syntax.Markup.SourceSyntax.Code;
+            items.AddRange(ExpressionKeywords.Where(k => !(codeFile && ComparisonWords.Contains(k.Word))).Select(k => new CompletionItem
             {
                 Label = k.Word,
                 Kind = CompletionKind.Keyword,
                 Documentation = k.Doc,
-                InsertText = k.Word == "fn" ? "fn(\\$${1:x}) => $0" : null,
+                InsertText = k.Word == "fn" ? "fn(${1:x}) => $0" : null,
                 IsSnippet = k.Word == "fn",
                 ReplaceSpan = replace,
                 SortText = "3" + k.Word,

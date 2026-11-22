@@ -81,7 +81,7 @@ fn sign_in(form: map) {
   user = null
   try {
     user = @attempt($form.email, $form.password)
-  } catch err when $err.type eq 'TooManyRequests' {
+  } catch err when $err.type == 'TooManyRequests' {
     return @view('auth/login', data: { error: $err.message })->with_status(429)
   }
   return @redirect(@intended())

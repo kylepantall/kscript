@@ -82,7 +82,7 @@ namespace KScript.Language.Tests
         public void IfChainsBecomeSiblings()
         {
             Assert.Equal("kscript { if(test: $a) { echo \"a\" }; elif(test: $b) { echo \"b\" }; elif(test: $c) { echo \"c\" }; else { echo \"d\" } }",
-                Shape(Root("if $a {\n  echo \"a\"\n} elif $b {\n  echo \"b\"\n}\nelse if $c { echo \"c\" } else {\n  echo \"d\"\n}")));
+                Shape(Root("if $a {\n  echo \"a\"\n} elif $b {\n  echo \"b\"\n}\nelif $c { echo \"c\" } else {\n  echo \"d\"\n}")));
         }
 
         [Fact]
@@ -96,17 +96,17 @@ namespace KScript.Language.Tests
         public void MatchCases()
         {
             Assert.Equal("kscript { match(value: $c) { case(is: 1, 2) { echo \"low\" }; case(when: $c > 9) { echo \"high\" }; default { echo \"?\" } } }",
-                Shape(Root("match $c {\n  case 1, 2 { echo \"low\" }\n  when $c > 9 { echo \"high\" }\n  default { echo \"?\" }\n}")));
+                Shape(Root("match $c {\n  1, 2 => echo \"low\"\n  _ when $c > 9 => { echo \"high\" }\n  _ => echo \"?\"\n}")));
         }
 
         [Fact]
         public void ExpressionsContinueOverLines()
         {
-            MarkupElement root = Root("names = $people\n  |> filter(fn($p) => $p.age >= 18)\n  |> map(fn($p) => $p.name)\nm = {\n  a: 1,\n  b: 2\n}\nt = $a and\n  $b");
+            MarkupElement root = Root("names = $people\n  |> filter(fn(p) => $p.age >= 18)\n  |> map(fn(p) => $p.name)\nm = {\n  a: 1,\n  b: 2\n}\nt = $a and\n  $b");
             List<MarkupElement> lets = root.ChildElements.ToList();
             Assert.All(lets, l => Assert.Equal("do", l.Name));
             Assert.Equal(3, lets.Count);
-            Assert.EndsWith("|> map(fn($p) => $p.name)", lets[0].SingleText.Value);
+            Assert.EndsWith("|> map(fn(p) => $p.name)", lets[0].SingleText.Value);
             Assert.Equal("m = {\n  a: 1,\n  b: 2\n}", lets[1].SingleText.Value);
             Assert.Equal("t = $a and\n  $b", lets[2].SingleText.Value);
         }

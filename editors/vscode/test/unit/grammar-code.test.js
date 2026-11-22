@@ -41,6 +41,25 @@ function tokenize(grammar, source) {
 
 const scopeOf = (tokens, text, nth = 0) => (tokens.filter((t) => t.text === text)[nth] || { scopes: '' }).scopes;
 
+test('match arms: values, _ and when', async () => {
+  const tokens = tokenize(await load(), [
+    'match $n {',
+    '  1, 2 => echo "low"',
+    '  _ when $n > 9 and $ok => { echo "high" }',
+    '  _ => echo "other"',
+    '}',
+    'if $n lt 3 { }',
+  ].join('\n'));
+  assert.match(scopeOf(tokens, 'match'), /keyword\.control\.flow\.kscript/);
+  assert.match(scopeOf(tokens, '_'), /keyword\.control\.flow\.kscript/);
+  assert.match(scopeOf(tokens, '_', 1), /keyword\.control\.flow\.kscript/);
+  assert.match(scopeOf(tokens, 'when'), /keyword\.control\.flow\.kscript/);
+  assert.match(scopeOf(tokens, '=>'), /storage\.type\.function\.arrow\.kscript/);
+  assert.match(scopeOf(tokens, 'and'), /keyword\.operator\.word\.kscript/);
+  // Comparisons are symbols in a .kscript file: the XML words aren't operators here.
+  assert.doesNotMatch(tokens.filter((t) => t.text.includes('lt')).map((t) => t.scopes).join(' '), /keyword\.operator\.word/);
+});
+
 test('keywords, functions and calls', async () => {
   const tokens = tokenize(await load(), [
     'import KScript.IO',

@@ -292,7 +292,7 @@ namespace KScript.Language.Tests
         {
             string text = Script("<fn name=\"f\" params=\"a, b, c\"><return value=\"$b\" /></fn>\n<fn name=\"g\" params=\"only\"><return value=\"1\" /></fn>\n"
                 + "<fn name=\"dead\" params=\"z\" value=\"1\" />\n<fn name=\"skip\" params=\"_q\" value=\"1\" />\n"
-                + "<let name=\"h\" value=\"fn($x, $y) => $x\" />\n<let name=\"k\" value=\"fn($x, $y) => $y\" />\n<let name=\"m\" value=\"fn($_x) => 1\" />\n"
+                + "<let name=\"h\" value=\"fn(x, y) => $x\" />\n<let name=\"k\" value=\"fn(x, y) => $y\" />\n<let name=\"m\" value=\"fn(_x) => 1\" />\n"
                 + "<echo>{ @f(1, 2, 3) } { @g(1) } { @skip(1) } { $h(1, 2) } { $k(1, 2) } { $m(1) }</echo>");
             DocumentAnalysis a = Check(text);
             Assert.Equal(new[] { "KS6004:a", "KS6004:c", "KS6004:only", "KS6002:dead", "KS6004:y" }, Unused(a));
@@ -304,7 +304,7 @@ namespace KScript.Language.Tests
             Assert.Contains("<fn name=\"g\">", Fix(a, Find(a, DiagnosticCodes.UnusedParameter, "only"), "Remove"));
             Diagnostic lambda = Find(a, DiagnosticCodes.UnusedParameter, "y");
             Assert.Equal("The lambda parameter $y is never used.", lambda.Message);
-            Assert.Contains("fn($x, $_y) => $x", Fix(a, lambda, "Rename"));
+            Assert.Contains("fn(x, _y) => $x", Fix(a, lambda, "Rename"));
         }
 
         [Fact]

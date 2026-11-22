@@ -267,7 +267,7 @@ public class ErrorReportTests
         {
             using var site = new TempSite(("routes.ks.xml", """
                 <KScript.Routes>
-                  <let name="hello" value="fn($request) => 'Hello ' + $request.path" />
+                  <let name="hello" value="fn(request) => 'Hello ' + $request.path" />
                   <Get path="/hi" to="hello" />
                 </KScript.Routes>
                 """));

@@ -25,7 +25,7 @@
     </if>
     <let name="s" value="@summary($world)" />
     <echo>{ @bold('Life Lab') } { @dim('·') } { $world.pattern } { $title ne '' ? @dim('· ' + $title) : '' }</echo>
-    <echo>{ $world.grid->map(fn($row) => '  ' + $row->chars()->map(fn($c) => $c eq $alive_cell ? @color('██', color: 'green') : @dim('· '))->join(''))->join(@char_of(10)) }</echo>
+    <echo>{ $world.grid->map(fn(row) => '  ' + $row->chars()->map(fn(c) => $c eq $alive_cell ? @color('██', color: 'green') : @dim('· '))->join(''))->join(@char_of(10)) }</echo>
     <echo>  Generation { @bold($s.generation) }   Alive { $s.population } ({ $s.density }%)   Born { $s.births }   Died { $s.deaths }</echo>
     <echo>  { @color($s.status, color: $s.status eq 'Extinct' ? 'red' : $s.status eq 'Evolving' ? 'cyan' : 'yellow') }   { @dim($s.size + ', edges ' + $s.edges) }</echo>
   </fn>
@@ -117,7 +117,7 @@
         <input into="where">Cell to flip, as column row (from 1, e.g. 5 3): </input>
         <let
           name="xy"
-          value="$where->trim()->split(' ')->reject(fn($p) => $p eq '')->map(fn($p) => $p->to_int(default: 0) - 1)" />
+          value="$where->trim()->split(' ')->reject(fn(p) => $p eq '')->map(fn(p) => $p->to_int(default: 0) - 1)" />
         <if not ($xy->count() eq 2 and $xy[0] ge 0 and $xy[1] ge 0 and $xy[0] lt @width($world.grid) and $xy[1] lt @height($world.grid))>
           <echo>{ @color('That cell is off the board.', color: 'red') }</echo>
           <wait duration="1s" />
