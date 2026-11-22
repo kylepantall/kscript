@@ -68,7 +68,7 @@ public class CoreTests
     [Fact]
     public void DoRunsStatements()
     {
-        Assert.Equal("7\n", RunBody("<let name=\"x\" value=\"0\" /><do>$x = 3; $x += 4</do><echo>$x</echo>"));
+        Assert.Equal("7\n", RunBody("<let name=\"x\" value=\"0\" /><do>x = 3; x += 4</do><echo>$x</echo>"));
     }
 
     [Fact]
@@ -249,6 +249,6 @@ public class CoreTests
     [Fact]
     public void StepLimitStopsRunawayLoops()
     {
-        Assert.Throws<KScriptException>(() => Run("<kscript><while test=\"true\"><do>$x = 1</do></while></kscript>", options: new InterpreterOptions { MaxSteps = 1000 }));
+        Assert.Throws<KScriptException>(() => Run("<kscript><while test=\"true\"><do>x = 1</do></while></kscript>", options: new InterpreterOptions { MaxSteps = 1000 }));
     }
 }

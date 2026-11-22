@@ -73,6 +73,8 @@ public class SyntaxConventionTests
             // A template isn't a script until it is filled in: read it with its {{#if}} lines dropped and a word in
             // each {{ placeholder }}, which keeps the code around them readable.
             text = Regex.Replace(text, @"\{\{\s*[#/][^}]*\}\}", string.Empty);
+            // {{ pascal }} is where a type's name goes, so its word is a type's name.
+            text = Regex.Replace(text, @"\{\{\s*pascal\s*\}\}", "X");
             text = Regex.Replace(text, @"\{\{[^}]*\}\}", "x");
         }
         Assert.Empty(Problems(text, ScriptRunner.RepoFile(file)).Select(p => $"{file}{p}"));
@@ -172,7 +174,8 @@ public class SyntaxConventionTests
         SourceText source = new SourceText(code);
         foreach (Diagnostic d in Analyzer.Analyze(code, path).Diagnostics.OrderBy(d => d.Span.Start))
         {
-            if (Guarded.Contains(d.Code) || (d.Code == DiagnosticCodes.RetiredElement && d.Message.Contains("arm", StringComparison.Ordinal)))
+            // KS6013 too: what the samples, templates and docs declare is named as the language names its own.
+            if (Guarded.Contains(d.Code) || d.Code == DiagnosticCodes.NamingStyle || (d.Code == DiagnosticCodes.RetiredElement && d.Message.Contains("arm", StringComparison.Ordinal)))
             {
                 yield return $"({firstLine + source.GetPosition(d.Span.Start).Line + 1}): {d.Code} {d.Message}";
             }

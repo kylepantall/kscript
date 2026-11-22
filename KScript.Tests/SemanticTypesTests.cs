@@ -137,7 +137,7 @@ public class SemanticTypesTests
         Assert.Contains("updated must not be before created",
             CodeFails(types + "a = Admin({ name: 'J', email: 'j@example.com', created: '2026-02-01', updated: '2026-01-01' })").Message);
         Assert.Contains("updated must not be before created",
-            CodeFails(types + "a = Admin({ name: 'J', email: 'j@example.com', created: '2026-01-01', updated: '2026-02-01' })\n$a.updated = '2025-01-01'->to_date()").Message);
+            CodeFails(types + "a = Admin({ name: 'J', email: 'j@example.com', created: '2026-01-01', updated: '2026-02-01' })\na.updated = '2025-01-01'->to_date()").Message);
         Assert.Equal("Hi J", Code(types + "u = User({ name: 'J', email: 'j@example.com' })\necho $u->hello()"));
         Assert.Contains("A User has no method ->nope()", CodeFails(types + "u = User({ name: 'J', email: 'j@example.com' })\necho $u->nope()").Message);
     }

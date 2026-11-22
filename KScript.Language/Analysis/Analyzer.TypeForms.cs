@@ -38,7 +38,9 @@ namespace KScript.Language.Analysis
                 return;
             }
             // t = Repo: $t is a variable that holds a type, and a variable is read with $.
-            if (symbol.DeclaringElement != null && symbol.DeclaringElement.Name is not ("type" or "model" or "enum" or "error" or "job"))
+            // An imported type is declared, here, by its import.
+            bool imported = symbol.SourcePath != null && importedTypes.Contains((symbol.SourcePath, symbol.Name));
+            if (!imported && symbol.DeclaringElement != null && symbol.DeclaringElement.Name is not ("type" or "model" or "enum" or "error" or "job"))
             {
                 return;
             }

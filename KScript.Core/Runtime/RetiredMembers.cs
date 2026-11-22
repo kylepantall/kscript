@@ -54,7 +54,12 @@ namespace KScript.Runtime
         public static RetiredInfo Method(string receiver, string name) =>
             receiver != null && name != null && Methods.TryGetValue(receiver + ":" + name, out RetiredInfo info) ? info : null;
 
-        private static IReadOnlyDictionary<string, RetiredInfo> Table(params (string Receiver, string Name, string Replacement, string Rename)[] rows) =>
-            rows.ToDictionary(r => r.Receiver + ":" + r.Name, r => new RetiredInfo(r.Name, r.Replacement, r.Rename), StringComparer.Ordinal);
+        // A plain loop: every package load reads this table (Conventions), and LINQ over tuples is slow to start.
+        private static IReadOnlyDictionary<string, RetiredInfo> Table(params (string Receiver, string Name, string Replacement, string Rename)[] rows)
+        {
+            var table = new Dictionary<string, RetiredInfo>(rows.Length, StringComparer.Ordinal);
+            foreach (var r in rows) table.Add(r.Receiver + ":" + r.Name, new RetiredInfo(r.Name, r.Replacement, r.Rename));
+            return table;
+        }
     }
 }

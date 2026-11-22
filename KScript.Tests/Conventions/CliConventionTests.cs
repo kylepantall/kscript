@@ -181,7 +181,8 @@ public sealed class CliConventionTests : IDisposable
         }
     }
 
-    private static bool IsSnake(string key) => Regex.IsMatch(key, @"^\$?[a-z][a-z0-9]*(_[a-z0-9]+)*$");
+    // The rule is the engine's: the lists of settings the code declares go through Conventions.Settings, which refuses a name that breaks it.
+    private static bool IsSnake(string key) => KScript.Runtime.Conventions.IsSettingName(key);
 
     [Theory]
     [InlineData("kscript.schema.json")]

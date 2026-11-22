@@ -72,7 +72,7 @@ namespace KScript.Language.Tests
         [InlineData("<do></do>", DiagnosticCodes.StatementSyntax, "<do> is empty.")]
         [InlineData("<for each=\"a, b, c\" in=\"[1]\"><echo>{$a}</echo></for>", DiagnosticCodes.InvalidAttributeValue, "each takes one name, or two")]
         [InlineData("<fn name=\"f\" value=\"1\"><echo>x</echo></fn>", DiagnosticCodes.InvalidAttribute, "<fn> has both a value and a body.")]
-        [InlineData("<let name=\"x\" value=\"0\" /><echo>{ $x = 1 }</echo>", DiagnosticCodes.AssignmentNotAllowed, "Assignment isn't allowed here.")]
+        [InlineData("<let name=\"x\" value=\"0\" /><echo>{ x = 1 }</echo>", DiagnosticCodes.AssignmentNotAllowed, "Assignment isn't allowed here.")]
         [InlineData("<echo>{ char_of(65) }</echo>", DiagnosticCodes.UnknownCommand, "Commands start with @: @char_of(...).")]
         [InlineData("<echo>{ nothing('a') }</echo>", DiagnosticCodes.UnknownCommand, "Unknown function 'nothing'.")]
         [InlineData("<echo>{ 1 |> 2 }</echo>", DiagnosticCodes.ExpressionSyntax, "A pipe needs a method, function, command or lambda on its right")]

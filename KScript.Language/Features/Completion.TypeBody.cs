@@ -183,7 +183,7 @@ namespace KScript.Language.Features
             SortText = "2fn",
         };
 
-        /// <summary>After <c>timestamps: </c>, yes and no; after <c>hidden: [</c> and the other field lists, the model's fields.</summary>
+        /// <summary>After <c>timestamps: </c>, true and false; after <c>hidden: [</c> and the other field lists, the model's fields.</summary>
         private List<CompletionItem> ModelSettingValueCompletions(MarkupElement model, string setting, string valueBefore, int offset)
         {
             int wordLength = 0;
@@ -196,7 +196,7 @@ namespace KScript.Language.Features
             if (a?.Kind == AttributeKind.Bool)
             {
                 return wordLength == valueBefore.Length
-                    ? new[] { "yes", "no" }.Select(v => new CompletionItem { Label = v, Kind = CompletionKind.Value, Detail = setting, ReplaceSpan = replace, SortText = v == "yes" ? "0" : "1" }).ToList()
+                    ? new[] { "true", "false" }.Select(v => new CompletionItem { Label = v, Kind = CompletionKind.Value, Detail = setting, ReplaceSpan = replace, SortText = v == "true" ? "0" : "1" }).ToList()
                     : new List<CompletionItem>();
             }
             if (!FieldListSettings.Contains(setting))
@@ -238,12 +238,12 @@ namespace KScript.Language.Features
             Add("id", "int", "The key the database numbers, added when the model doesn't declare it.");
             if (IsYesText(model.GetAttributeValue("timestamps")))
             {
-                Add("created_at", "date", "When the record was first saved (timestamps: yes).");
-                Add("updated_at", "date", "When the record was last saved (timestamps: yes).");
+                Add("created_at", "date", "When the record was first saved (the timestamps option).");
+                Add("updated_at", "date", "When the record was last saved (the timestamps option).");
             }
             if (IsYesText(model.GetAttributeValue("soft_deletes")))
             {
-                Add("deleted_at", "date?", "When the record was deleted (soft_deletes: yes).");
+                Add("deleted_at", "date?", "When the record was deleted (the soft_deletes option).");
             }
             return fields;
         }

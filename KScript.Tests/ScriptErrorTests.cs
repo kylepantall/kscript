@@ -14,10 +14,10 @@ internal sealed class OddPackage : KScriptPackage
 
     protected override void Register(PackageBuilder p)
     {
-        p.Element(new ElementInfo("page-only", "Only in pages, with no handler.", ContentKind.Empty) { Context = ElementContext.Page }, null);
+        p.Element(new ElementInfo("page_only", "Only in pages, with no handler.", ContentKind.Empty) { Context = ElementContext.Page }, null);
         p.Element(new ElementInfo("described", "Described, but nothing runs it.", ContentKind.Empty), null);
         p.Element(new ElementInfo("panel", "Holds output markup.", ContentKind.Markup) { AllowsExtraAttributes = false }, run => { run.Host.Write("panel"); return null; });
-        p.Element(new ElementInfo("disk-full", "Fails the way file code does.", ContentKind.Empty), run => throw new IOException("The disk is full."));
+        p.Element(new ElementInfo("disk_full", "Fails the way file code does.", ContentKind.Empty), run => throw new IOException("The disk is full."));
         p.Element(new ElementInfo("loose", "Takes any attribute.", ContentKind.Empty) { AllowsExtraAttributes = true }, run => null);
     }
 }
@@ -110,11 +110,11 @@ public sealed class ScriptErrorTests : IDisposable
             return output.ToString();
         }
 
-        Assert.Contains("<page-only> only works in web pages", Assert.Throws<KScriptException>(() => Run("<page-only />")).Message);
+        Assert.Contains("<page_only> only works in web pages", Assert.Throws<KScriptException>(() => Run("<page_only />")).Message);
         Assert.Contains("<described> only works in web pages", Assert.Throws<KScriptException>(() => Run("<described />")).Message);
         Assert.Equal("panel", Run("<panel on-click=\"x\"><div>text</div><let name=\"a\" value=\"1\" /></panel><loose anything=\"1\" />"));
         Assert.Contains("Expected an expression", Assert.Throws<KScriptException>(() => Run("<panel><let name=\"a\" value=\"1 +\" /></panel>")).Message);
-        var disk = Assert.Throws<KScriptException>(() => Run("<disk-full />"));
+        var disk = Assert.Throws<KScriptException>(() => Run("<disk_full />"));
         Assert.Equal("IO", disk.Type);
         Assert.Equal(1, disk.Line);
         Assert.Contains("KScript.Ghost isn't installed in this copy of kscript", Assert.Throws<KScriptException>(() => Run("<import package=\"Ghost\" />")).Message);

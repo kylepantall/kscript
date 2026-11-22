@@ -10,8 +10,6 @@ namespace KScript.Language.Analysis
     // kscript check --fix rewrites them.
     public sealed partial class Analyzer
     {
-        private static readonly bool MigrateQuotedCode = Environment.GetEnvironmentVariable("KSCRIPT_MIGRATE") == "1";
-
         private bool IsCodeFile => result.Markup.Syntax == SourceSyntax.Code;
 
         /// <summary>
@@ -21,7 +19,12 @@ namespace KScript.Language.Analysis
         /// </summary>
         private void CheckArgumentForm(MarkupElement e, MarkupAttribute attr, AttributeInfo a)
         {
-            if (!IsCodeFile || !attr.IsArgument || attr.Value == null)
+            if (!IsCodeFile)
+            {
+                CheckXmlDuration(attr, a);
+                return;
+            }
+            if (!attr.IsArgument || attr.Value == null)
             {
                 return;
             }
@@ -29,16 +32,6 @@ namespace KScript.Language.Analysis
             {
                 Report(attr.Span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, attr.FormError,
                     new[] { new QuickFix("Write it in braces", new TextChange(ValueSpan(attr), "{ " + attr.ValueText.Trim() + " }")) });
-                return;
-            }
-
-            if (MigrateQuotedCode && attr.Quote == '"' && CodeArguments.IsValue(a.Kind))
-            {
-                // MIGRATION ONLY: files written before quotes always made a string wrapped code in them.
-                string code = Quotes.Decode(attr.ValueText, 1, attr.ValueText.Length - 1, '"').Trim();
-                bool safe = !code.Contains('\n') && SplitNames(DecodedText.Plain(code, 0)).Count() <= 1;
-                string now = a.Kind == AttributeKind.ExpressionList ? "[" + code + "]" : safe ? code : "(" + code + ")";
-                Report(ValueSpan(attr), DiagnosticSeverity.Warning, DiagnosticCodes.OneSpelling, "migrate", new[] { new QuickFix("migrate", new TextChange(ValueSpan(attr), now)) });
                 return;
             }
 
@@ -142,10 +135,24 @@ namespace KScript.Language.Analysis
                 : null;
         }
 
-        private void ReportDurationUnit(TextSpan span, string name, string duration) =>
+        private void ReportDurationUnit(TextSpan span, string name, string duration, bool attribute = false) =>
             Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.DurationUnit,
-                $"Write the length of time with its unit and no quotes: {name}: {duration}. A plain number is seconds.",
+                $"Write the length of time with its unit and no quotes: {(attribute ? name + " as " + duration : name + ": " + duration)}. A plain number is seconds.",
                 new[] { new QuickFix($"Write {duration}", new TextChange(span, duration)) });
+
+        /// <summary>KS6018 in XML: <c>timeout="30"</c> and <c>ttl="'10m'"</c> are written <c>timeout="30s"</c> and <c>ttl="10m"</c>.</summary>
+        private void CheckXmlDuration(MarkupAttribute attr, AttributeInfo a)
+        {
+            if (a.Type != DurationType || attr.Value == null || result.Markup.Syntax == SourceSyntax.Code)
+            {
+                return;
+            }
+            string text = attr.ValueText.Trim();
+            if (text.Length > 0 && DurationAsWritten(Unquoted(text) ?? text) is string duration && duration != text)
+            {
+                ReportDurationUnit(TrimmedSpan(attr.Value), attr.Name, duration, attribute: true);
+            }
+        }
 
         /// <summary>A number, a list, a map, true, false or null: a value as it stands, never mistaken for a name.</summary>
         private static bool IsPlainValue(string text) =>

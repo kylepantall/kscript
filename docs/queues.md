@@ -208,7 +208,7 @@ import "jobs/send-welcome.kscript"
 queue = @fake_queue()
 SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
 
-echo "{$queue->count()} welcome email queued for user {$queue->pushed(SendWelcome)[0].user_id}"
+echo "{$queue->count_of(SendWelcome)} welcome email queued for user {$queue->pushed(SendWelcome)[0].user_id}"
 $queue->run_all()
 ```
 

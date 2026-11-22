@@ -193,7 +193,7 @@ public class PageRendererTests
     public void Let_set_and_assignment_statements()
     {
         Assert.Equal("4", Render("<let>x = 3</let><set>x += 1</set>{$x}"));
-        Assert.Equal("15", Render("<let name=\"total\" value=\"0\" /><for each=\"n\" in=\"[1, 2, 3, 4, 5]\"><do>$total += $n</do></for>{$total}"));
+        Assert.Equal("15", Render("<let name=\"total\" value=\"0\" /><for each=\"n\" in=\"[1, 2, 3, 4, 5]\"><do>total += $n</do></for>{$total}"));
         Assert.Equal("6", Render("<let name=\"n\" value=\"5\" /><set name=\"n\" op=\"+=\" value=\"1\" />{$n}"));
         Assert.Equal("[1, 2]", Render("<let name=\"xs\">[1, 2]</let>[{$xs}]"));
         var ex = Assert.Throws<PageException>(() => Render("<set name=\"nope\" value=\"1\" />"));

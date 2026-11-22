@@ -152,7 +152,7 @@ public sealed class DataModelTests : DataFixture
             echo $u.role
             $u->update({ role: 'admin', name: 'Dee' })
             echo [$u.role, $u.name]
-            $u.role = 'admin'
+            u.role = 'admin'
             $u->save()
             echo User->find($u.id).role
             echo User->where(role: admin)->update(role: member)
@@ -166,7 +166,7 @@ public sealed class DataModelTests : DataFixture
     {
         Assert.Contains("email", Fails(Users + "User->create(name: 'X', email: 'not an email')").Message);
         Assert.Contains("40", Fails(Users + "User->create(name: '" + new string('x', 50) + "', email: 'x@example.com')").Message);
-        Assert.Contains("age", Fails(Users + "u = User->find(1)\n$u.age = 'old'").Message);
+        Assert.Contains("age", Fails(Users + "u = User->find(1)\nu.age = 'old'").Message);
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public sealed class DataModelTests : DataFixture
             echo $again->to_json()->contains('password')
             raw = @sql('select password from users where id = 4')[0].password
             echo $raw->starts_with('$argon2id$')
-            $again.password = 'another good password'
+            again.password = 'another good password'
             $again->save()
             echo User->find(4).password->verify('another good password')
             """);
@@ -204,7 +204,7 @@ public sealed class DataModelTests : DataFixture
             $db->create_table(Note)
             n = Note->create(text: 'a')
             echo [$n.created_at->format('yyyy-MM-dd'), $n.updated_at->format('yyyy-MM-dd')]
-            $n.text = 'b'
+            n.text = 'b'
             $n->save()
             again = Note->find(1)
             echo [$again.created_at->format('yyyy-MM-dd'), $again.updated_at->format('yyyy-MM-dd')]
@@ -222,7 +222,7 @@ public sealed class DataModelTests : DataFixture
             u = User->find(1)
             echo $u->is_dirty()
             echo $u->is_saved()
-            $u.age = 37
+            u.age = 37
             echo $u->is_dirty()
             echo $u->is_dirty(age)
             echo $u->is_dirty(name)
@@ -301,7 +301,7 @@ public sealed class DataModelTests : DataFixture
             Country->create(code: 'nz', name: 'New Zealand')
             c = Country->find('nz')
             echo $c.name
-            $c.name = 'Aotearoa'
+            c.name = 'Aotearoa'
             $c->save()
             echo Country->find_or_fail('nz').name
             echo Country->find('xx') ?? 'none'
@@ -1118,7 +1118,7 @@ public sealed class DataCoverageTests : DataFixture
             echo @db(pings)->count()
             echo User->where({}, name: 'Ada')->count()
             s = User->select(id, name)->first()
-            $s.age = 99
+            s.age = 99
             echo $s->dirty()
             $s->save()
             echo User->find(1).age

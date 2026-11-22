@@ -107,7 +107,7 @@ namespace KScript.Language.Analysis
                 return;
             }
             // KS6018: timeout: 30 and ttl: '10m' are written 30s and 10m.
-            if (IsCodeFile && slot.Type == DurationType && a.Value is LiteralNode { Kind: LiteralKind.Number or LiteralKind.String, Template: null } time
+            if (slot.Type == DurationType && a.Value is LiteralNode { Kind: LiteralKind.Number or LiteralKind.String, Template: null } time
                 && DurationAsWritten(time.Value) is string duration)
             {
                 ReportDurationUnit(region.Source.ToSource(time.Span), slot.Name, duration);
@@ -302,7 +302,10 @@ namespace KScript.Language.Analysis
                             new[] { new QuickFix($"Change to {close}", new TextChange(span, close)) });
                         continue;
                     }
-                    positional++; // Left pending: reported as an unknown name after the call.
+                    // Left pending: reported as an unknown name after the call. It is still the value given for this
+                    // parameter, so the call isn't also told that it needs one.
+                    filled[positional] = a;
+                    positional++;
                     continue;
                 }
 

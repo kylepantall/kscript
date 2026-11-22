@@ -32,7 +32,7 @@ internal sealed class ProbePackage : KScriptPackage
     protected override void Register(PackageBuilder p)
     {
         p.Command("probe", "", "A value with its own methods.", "probe", c => new ProbeValue());
-        p.Command("on_starting_thread", "fail", "Runs on the thread that started the script and says whether that is another thread.", "bool", c =>
+        p.Command("on_starting_thread", "fail", "Runs on the thread that started the script and says whether that is another thread.", "any", c =>
         {
             bool fail = Values.Truthy(c.Arg(0));
             int here = Environment.CurrentManagedThreadId;
@@ -45,9 +45,9 @@ internal sealed class ProbePackage : KScriptPackage
             return there != here;
         });
         p.Command("lambda_params", "fn", "The parameter names of a lambda.", "list", c => ((Lambda)c.Arg(0)).Parameters.Cast<object>().ToList());
-        p.Element(new KScript.Metadata.ElementInfo("needs-x", "Reads an attribute it didn't declare as required.", KScript.Metadata.ContentKind.Empty,
+        p.Element(new KScript.Metadata.ElementInfo("needs_x", "Reads an attribute it didn't declare as required.", KScript.Metadata.ContentKind.Empty,
             new KScript.Metadata.AttributeInfo("x", KScript.Metadata.AttributeKind.Template, "Something.")), run => { run.RequiredTemplate("x"); return null; });
-        p.Element(new KScript.Metadata.ElementInfo("needs-y", "Reads an attribute it doesn't have.", KScript.Metadata.ContentKind.Empty), run => { run.RequiredRaw("y"); return null; });
+        p.Element(new KScript.Metadata.ElementInfo("needs_y", "Reads an attribute it doesn't have.", KScript.Metadata.ContentKind.Empty), run => { run.RequiredRaw("y"); return null; });
     }
 
     private sealed class ProbeValue : IKObject
@@ -324,8 +324,8 @@ public sealed class BuiltInTests : IDisposable
         }
 
         Assert.Equal("hi you a, b\n", Run("<echo>{ @probe() |> hello('you') } { @lambda_params(fn(a, b) => 1) }</echo>"));
-        Assert.Contains("<needs-x> needs a x attribute: Something.", Assert.Throws<KScriptException>(() => Run("<needs-x />")).Message);
-        Assert.Contains("<needs-y> needs a y attribute.", Assert.Throws<KScriptException>(() => Run("<needs-y />")).Message);
+        Assert.Contains("<needs_x> needs a x attribute: Something.", Assert.Throws<KScriptException>(() => Run("<needs_x />")).Message);
+        Assert.Contains("<needs_y> needs a y attribute.", Assert.Throws<KScriptException>(() => Run("<needs_y />")).Message);
         Assert.Equal("hi you\n", Run("<echo>{ @probe()->hello(x: 1, 'you') }</echo>"));
         Assert.Equal("true\n", Run("<echo>{ @on_starting_thread(false) }</echo>"));
         Assert.Contains("refused on the starting thread", Assert.Throws<KScriptException>(() => Run("<echo>{ @on_starting_thread(true) }</echo>")).Message);
@@ -344,7 +344,7 @@ public sealed class BuiltInTests : IDisposable
         public override string Description => "Dates written as JSON, for tests.";
 
         protected override void Register(PackageBuilder p) =>
-            p.Method(KType.Date, "json", "", "The date as a JSON string.", KType.String, (target, call) => "\"" + ((DateTime)target).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\"");
+            p.Method(KType.Date, "json", "indent?", "The date as a JSON string.", KType.String, (target, call) => "\"" + ((DateTime)target).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\"");
     }
 
     [Fact]

@@ -630,7 +630,7 @@ namespace KScript.Runtime
                 {
                     object container = Evaluate(AssignedThrough(member.Target), scope, ctx);
                     if (container is not Dictionary<string, object> map)
-                        throw Fail(member, ctx, $"Only map fields can be set, but {SourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
+                        throw Fail(member, ctx, $"Only map fields can be set, but {ReadSourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
                     if (node.Operator != "=") value = Combine(map.TryGetValue(member.Name, out object cur) ? cur : null, node.Operator, value, node, ctx);
                     SetKey(map, member.Name, value, member, ctx);
                     return;
@@ -659,10 +659,18 @@ namespace KScript.Runtime
                             return;
                         }
                     }
-                    throw Fail(index, ctx, $"Only list items and map keys can be set, but {SourceOf(index.Target, ctx)} is {Values.Describe(container)}.", "Type");
+                    throw Fail(index, ctx, $"Only list items and map keys can be set, but {ReadSourceOf(index.Target, ctx)} is {Values.Describe(container)}.", "Type");
                 }
             }
             throw Fail(target, ctx, "Only a variable, a map field or a list item can be assigned to.", "Syntax");
+        }
+
+        /// <summary>How an assignment's target is read, for a message: <c>s.a = 1</c> sets a field of <c>$s</c>.</summary>
+        private string ReadSourceOf(ExprNode node, EvalContext ctx)
+        {
+            ExprNode root = node;
+            while (root is MemberNode or IndexNode) root = root is MemberNode m ? m.Target : ((IndexNode)root).Target;
+            return (root is IdentifierNode ? "$" : string.Empty) + SourceOf(node, ctx);
         }
 
         /// <summary>
@@ -980,6 +988,9 @@ namespace KScript.Runtime
 
             // A package's methods for its own objects come first, so their arguments are bound by name (and flags) like commands'.
             bool defined = TryFindMethod(target, name, ctx.Module, out MethodDefinition method);
+            // A renamed method says so before its arguments are looked at: User->avg(age) is told about ->average(), not about age.
+            if (!defined && target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
+                throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
             if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             if (target is IKObject obj && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), name, out object result))
             {
@@ -990,8 +1001,6 @@ namespace KScript.Runtime
                 return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             }
 
-            if (target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
-                throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
             if (TryFindField(target, name, ctx.Module, out _))
                 throw Fail(node, ctx, $"{name} is a field of {Values.Describe(target)}, not a method. Read it with a dot and no brackets: .{name}", "Name");
 

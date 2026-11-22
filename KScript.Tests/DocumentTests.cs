@@ -204,9 +204,9 @@ Document(template: paper, title: ""Kitchen Sink"", subtitle: ""All of it"", auth
     Paragraph(align: center) ""Centred.""
     Paragraph(align: right) ""Right.""
     Paragraph(align: left) ""Left.""
-    Paragraph(lines: yes) ""Line one
+    Paragraph(lines: true) ""Line one
 Line two""
-    Section(title: Methods, id: methods, numbered: no) {
+    Section(title: Methods, id: methods, numbered: false) {
       List(style: number, start: 3) {
         Item ""Three""
         List(style: letter) {
@@ -227,9 +227,9 @@ Line two""
       }
     }
   }
-  Section(title: Results, new_page: yes) {
+  Section(title: Results, new_page: true) {
     Math(id: eq-one) ""E = mc^2""
-    Math(numbered: no) ""\int_0^1 x \, dx = \tfrac{1}{2}""
+    Math(numbered: false) ""\int_0^1 x \, dx = \tfrac{1}{2}""
     Code(language: python) ""def f(x):
     return x * 2  # { not interpolated }""
     Quote(by: ""Someone"") ""A quotation.
@@ -241,7 +241,7 @@ Two paragraphs.""
     Table(rows: [['a', 'b'], ['c', 'd']])
     Table(rows: [5, 6])
     Table(caption: ""Hand made."", align: ['left', 'center', 'right']) {
-      Tr(header: yes) ""A | B | C""
+      Tr(header: true) ""A | B | C""
       Tr ""1 \| one | 2 | 3""
       Tr ""wide cell that keeps going and going and going and going and going and going | x | y""
     }
@@ -364,7 +364,7 @@ Document(template: invoice, to: ""invoice.pdf, invoice.docx, invoice.html"") {
     public void Style_options_change_the_page()
     {
         Run(@"
-Document(paper: letter, landscape: yes, margin: ""1in 2cm 30mm 40pt"", font: sans, heading_font: mono, size: 12, line_height: 1.5, align: left, accent: navy, numbered: no, title_page: yes, chapters: yes, citations: numeric, header: ""Left"", footer: """", rules: grid, language: ""en-GB"", title: ""Styled"", to: ""styled.pdf, styled.docx, styled.html, styled.tex"") {
+Document(paper: letter, landscape: true, margin: ""1in 2cm 30mm 40pt"", font: sans, heading_font: mono, size: 12, line_height: 1.5, align: left, accent: navy, numbered: false, title_page: true, chapters: true, citations: numeric, header: ""Left"", footer: """", rules: grid, language: ""en-GB"", title: ""Styled"", to: ""styled.pdf, styled.docx, styled.html, styled.tex"") {
   Abstract ""On the title page.""
   Section(title: A) {
     Paragraph ""Text.""

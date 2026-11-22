@@ -1,16 +1,18 @@
-using System.Text.RegularExpressions;
-
 using KScript.Language.Catalog;
 using KScript.Metadata;
 using KScript.Runtime;
 
 namespace KScript.Tests.Conventions;
 
+using Conventions = KScript.Runtime.Conventions;
+
 /// <summary>
 /// How the standard packages behave, checked over everything every package registers, so one package can't drift
 /// from the rest: names that answer true or false, fields and methods, the verbs for keyed things, lengths of
 /// time, and the arguments a table takes. The rules are written out in docs/contributing.md ("How the standard
-/// packages behave"). Each allow-list is short and says why each name is on it.
+/// packages behave"). The rules and their allow-lists (each short, each saying why a name is on it) are in
+/// <see cref="Conventions"/>, which the engine applies as each package registers; these tests apply them to the whole
+/// catalog, one rule at a time.
 /// </summary>
 public class StdlibBehaviourConventionTests
 {
@@ -23,6 +25,20 @@ public class StdlibBehaviourConventionTests
 
     private static string Show(CallableInfo c) => c.Kind == CallableKind.Method ? $"{c.ReceiverType}->{c.Name}()" : $"@{c.Name}()";
 
+    private static readonly IReadOnlyList<KScriptPackage> Packages = PackageRegistry.Default.LoadAll().ToList();
+
+    /// <summary>What every rule that spans registrations says about the packages that ship, and what the tables in Conventions say.</summary>
+    private static readonly IReadOnlyList<string> Together = Conventions.Together(Packages);
+
+    private static readonly IReadOnlyList<string> Tables = Conventions.Tables(Packages);
+
+    /// <summary>What a rule of <see cref="Conventions"/> says about each command and method: nothing, when all is well.</summary>
+    private static IEnumerable<string> Broken(Func<string, CallableInfo, string> rule) =>
+        Callables.Select(c => rule(c.Package, c)).Where(problem => problem != null);
+
+    private static IEnumerable<string> Broken(Func<string, ValueFieldInfo, string> rule) =>
+        Catalog.Fields.Select(f => rule(f.Package, f)).Where(problem => problem != null);
+
     private static void None(IEnumerable<string> broken, string rule)
     {
         List<string> list = broken.Distinct().OrderBy(b => b, StringComparer.Ordinal).ToList();
@@ -31,209 +47,101 @@ public class StdlibBehaviourConventionTests
 
     #region True or false: is_x and has_x
 
-    /// <summary>Verbs that ask a question about their argument, so they read as one: <c>$list->contains(3)</c>.</summary>
-    private static readonly HashSet<string> VerbQuestions = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "contains", "starts_with", "ends_with", "matches", // text and lists: does it contain, start with, end with, match this?
-        "exists",                                          // @exists(path), $storage->exists(name), $query->exists(): is it there?
-        "between",                                         // $n->between(1, 10)
-        "any", "all",                                      // $list->any(fn), $list->all(fn)
-        "in",                                              // $ip->in(block)
-        "is",                                              // $error->is(NotFound), $mime->is('text/*'), Type->is(value)
-        "test",                                            // $regex->test(text)
-        "satisfies",                                       // $version->satisfies('^1.2')
-        "verify",                                          // $password->verify(hash): is this the password?
-        "needs_rehash",                                    // $password->needs_rehash(hash)
-        "can", "cannot",                                   // @can('edit', $post)
-        "not",                                             // $flag->not(): the operator as a method, for pipes
-    };
-
-    /// <summary>Actions that do something and say whether they did: the name is the action, not a question.</summary>
-    private static readonly HashSet<string> ActionsThatReport = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "set", "remove", "delete", "force_delete", "add", "save", "restore", "retry", "drop_table", "create_table", "revoke_token", "send", "copy", "move",
-        "confirm", "assert", "to_bool", "attempt", "login", "logout", "release", "acquire",
-    };
+    [Fact]
+    public void A_command_or_method_that_answers_true_or_false_is_named_is_x_or_has_x() =>
+        None(Broken(Conventions.AnswersTrueOrFalse),
+            "These return true or false, so their names start with is_ or has_ (or add a verb question to Conventions.VerbQuestions, with a reason):");
 
     [Fact]
-    public void A_command_or_method_that_answers_true_or_false_is_named_is_x_or_has_x()
-    {
-        None(Callables.Where(c => c.ReturnType == KType.Bool && !IsQuestionName(c.Name)
-                && !(VerbQuestions.Contains(c.Name) && (c.MaxArgs > 0 || c.Name is "exists" or "needs_rehash" or "not"))
-                && !ActionsThatReport.Contains(c.Name)).Select(Show),
-            "These return true or false, so their names start with is_ or has_ (or add a verb question to the list, with a reason):");
-    }
-
-    [Fact]
-    public void A_field_that_is_true_or_false_is_named_is_x_or_has_x()
-    {
+    public void A_field_that_is_true_or_false_is_named_is_x_or_has_x() =>
         // exists: the same word @exists(path) and $storage->exists(name) use.
-        None(Catalog.Fields.Where(f => f.Type == KType.Bool && !IsQuestionName(f.Name) && f.Name != "exists").Select(f => $"{f.Receiver}.{f.Name}"),
-            "These fields are true or false, so their names start with is_ or has_:");
-    }
+        None(Broken(Conventions.FieldTrueOrFalse), "These fields are true or false, so their names start with is_ or has_:");
 
     [Fact]
-    public void Nothing_named_is_x_or_has_x_returns_anything_but_true_or_false()
-    {
-        None(Callables.Where(c => IsQuestionName(c.Name) && c.ReturnType != KType.Bool).Select(Show)
-                .Concat(Catalog.Fields.Where(f => IsQuestionName(f.Name) && f.Type != KType.Bool).Select(f => $"{f.Receiver}.{f.Name}")),
+    public void Nothing_named_is_x_or_has_x_returns_anything_but_true_or_false() =>
+        None(Broken(Conventions.QuestionGivesTrueOrFalse).Concat(Broken(Conventions.QuestionFieldIsTrueOrFalse)),
             "A name that starts with is_ or has_ answers true or false:");
-    }
 
-    private static bool IsQuestionName(string name) =>
-        name == "has" || name.StartsWith("is_", StringComparison.Ordinal) || name.StartsWith("has_", StringComparison.Ordinal);
+    [Fact]
+    public void The_lists_of_names_that_answer_without_is_stay_short()
+    {
+        Assert.True(Conventions.VerbQuestions.Count <= 20, "VerbQuestions is meant to stay short.");
+        Assert.True(Conventions.ActionsThatReport.Count <= 25, "ActionsThatReport is meant to stay short.");
+    }
 
     #endregion
 
     #region Descriptions say true and false
 
-    // The word yes, unless it is quoted text a script reads ('yes'->to_bool()).
-    private static readonly Regex Yes = new Regex(@"(?<!['""\w])yes(?!['""\w])", RegexOptions.IgnoreCase);
-
-    /// <summary>Descriptions that are about a person answering yes or no, not about a boolean in a script.</summary>
-    private static readonly HashSet<string> AboutAPersonsAnswer = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "<confirm>", // asks a yes/no question at the terminal
-    };
-
     [Fact]
     public void Descriptions_say_true_and_false_never_yes_and_no()
     {
-        IEnumerable<(string Where, string Text)> all =
-            Callables.Select(c => (Show(c), c.Description))
-            .Concat(Callables.SelectMany(c => c.Signatures.SelectMany(s => s.Parameters).Select(p => ($"{Show(c)} {p.Name}", p.Description))))
-            .Concat(Catalog.Fields.Select(f => ($"{f.Receiver}.{f.Name}", f.Description)))
-            .Concat(Elements.Select(e => ($"<{e.Name}>", e.Description)))
-            .Concat(Elements.SelectMany(e => e.Attributes.Select(a => ($"<{e.Name} {a.Name}>", a.Description))));
-        None(all.Where(d => d.Text != null && !AboutAPersonsAnswer.Contains(d.Where) && (Yes.IsMatch(d.Text) || Regex.IsMatch(d.Text, @"(^|[.:(] )no (if|when|for)\b")))
-                .Select(d => $"{d.Where}: {d.Text}"),
-            "Booleans are true and false. Write \"True when ...\", not \"yes if ...\":");
+        // <confirm> asks a person a yes/no question at the terminal; it is the one description about a person's answer.
+        Assert.Equal(new[] { "confirm" }, Conventions.AboutAPersonsAnswer);
+        IEnumerable<string> all =
+            Callables.Select(c => Conventions.TrueAndFalse(c.Package, Show(c), c.Description))
+            .Concat(Callables.SelectMany(c => c.Signatures.SelectMany(s => s.Parameters).Select(p => Conventions.TrueAndFalse(c.Package, $"{Show(c)} {p.Name}", p.Description))))
+            .Concat(Catalog.Fields.Select(f => Conventions.TrueAndFalse(f.Package, $"{f.Receiver}.{f.Name}", f.Description)))
+            .Concat(Elements.Select(e => Conventions.TrueAndFalse(e.Package, $"<{e.Name}>", e.Description, Conventions.AboutAPersonsAnswer.Contains(e.Name))))
+            .Concat(Elements.SelectMany(e => e.Attributes.Select(a => Conventions.TrueAndFalse(e.Package, $"<{e.Name} {a.Name}>", a.Description))));
+        None(all.Where(problem => problem != null), "Booleans are true and false. Write \"True when ...\", not \"yes if ...\":");
     }
 
+    [Theory]
+    [InlineData("yes if the file is there", true)]
+    [InlineData("Says Yes or No.", true)]
+    [InlineData("True when it is there. no if it isn't", true)]
+    [InlineData("The mode: no when it is off", true)]
+    [InlineData("Reads 'yes' and \"yes\" as true: 'yes'->to_bool().", false)]
+    [InlineData("Yesterday's eyes: there is no file for it.", false)]
+    [InlineData("True when the file is there.", false)]
+    public void The_check_for_yes_and_no_finds_them(string description, bool found) =>
+        Assert.Equal(found, Conventions.TrueAndFalse("KScript.X", "x", description) != null);
+
     [Fact]
-    public void A_description_of_something_true_or_false_starts_with_True()
-    {
-        None(Callables.Where(c => c.ReturnType == KType.Bool && IsQuestionName(c.Name) && c.Description != null && !c.Description.StartsWith("True ", StringComparison.Ordinal)).Select(c => $"{Show(c)}: {c.Description}")
-                .Concat(Catalog.Fields.Where(f => f.Type == KType.Bool && f.Description != null && !f.Description.StartsWith("True ", StringComparison.Ordinal)).Select(f => $"{f.Receiver}.{f.Name}: {f.Description}")),
+    public void A_description_of_something_true_or_false_starts_with_True() =>
+        None(Broken(Conventions.StartsWithTrue).Concat(Broken(Conventions.FieldStartsWithTrue)),
             "Describe an is_x or has_x as \"True when ...\" (or \"True for ...\"):");
-    }
 
     #endregion
 
     #region Fields and methods
 
-    /// <summary>
-    /// Methods with no arguments, on types of value that have fields, that are right to stay methods: each one does
-    /// work every time it is called, changes something, or gives a new value made from this one. Anything else with
-    /// no arguments is a plain fact, and plain facts are fields.
-    /// </summary>
-    private static readonly Dictionary<string, string> ZeroArgumentMethods = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        // The value in another form, worked out each time (like to_text and to_json).
-        ["base64->decode"] = "decodes the text",
-        ["card->reveal"] = "gives the whole number, which is hidden everywhere else",
-        ["color->css"] = "the colour written for CSS",
-        ["color->hex"] = "the colour written as #rrggbb",
-        ["color->rgb"] = "the colour as a list of three numbers",
-        ["date->date"] = "a new date without the time",
-        ["date->iso"] = "the date written as ISO 8601",
-        ["date->timestamp"] = "the date converted to seconds since 1970",
-        ["domain->ascii"] = "the name converted to punycode",
-        ["duration->iso"] = "the length of time written as ISO 8601",
-        ["iban->formatted"] = "the number written in groups of four",
-        ["phone->tel"] = "the number written as a tel: link",
-        ["document->html"] = "writes the document as HTML",
-        ["document->latex"] = "writes the document as LaTeX",
-        ["document->markdown"] = "writes the document as Markdown",
-        ["type->schema"] = "builds the type's JSON Schema",
-        ["error->chain"] = "walks the causes into a list",
-        // Work that reads a file, a database, a queue or the network.
-        ["file->read_text"] = "reads the file",
-        ["file->read_lines"] = "reads the file",
-        ["http_response->json"] = "parses the body",
-        ["response->check"] = "throws unless the status is 2xx",
-        ["document->pages"] = "lays the document out to count its pages",
-        ["document->words"] = "counts the words in the text",
-        ["database->tables"] = "asks the database",
-        ["queue->size"] = "asks the queue's driver",
-        ["queue->waiting"] = "asks the queue's driver",
-        ["queue->failed"] = "asks the queue's driver",
-        ["cache->keys"] = "reads the store, leaving out what has run out",
-        ["session->all"] = "copies every value into a map",
-        ["logger->entries"] = "copies what a memory provider holds",
-        // Actions.
-        ["cache->clear"] = "removes every key",
-        ["queue->clear"] = "removes every waiting job",
-        ["storage->clear"] = "deletes every file",
-        ["chat->reset"] = "forgets the conversation",
-        ["session->regenerate"] = "gives the session a new id",
-        ["logger->flush"] = "writes out what is held back",
-    };
-
-    /// <summary>Types whose fields are the user's own (a record's columns, a setting's keys), so their own facts stay methods.</summary>
-    private static readonly HashSet<string> FieldsAreTheUsersOwn = new HashSet<string>(StringComparer.Ordinal)
-    {
-        KType.Record, KType.Map, KType.Any,
-    };
-
     [Fact]
-    public void A_plain_fact_about_a_value_is_a_field_not_a_method_with_no_arguments()
-    {
-        None(Catalog.Methods.Where(m => !m.Planned && m.MaxArgs == 0 && Catalog.FieldsOf(m.ReceiverType).Count > 0 && !FieldsAreTheUsersOwn.Contains(m.ReceiverType)
-                && !ConvertsOrAsks(m.Name) && !ZeroArgumentMethods.ContainsKey($"{m.ReceiverType}->{m.Name}")).Select(Show),
-            "These take no arguments on a type that has fields. Make each a field (p.Field), or add it to ZeroArgumentMethods with the work it does:");
-    }
+    public void A_plain_fact_about_a_value_is_a_field_not_a_method_with_no_arguments() =>
+        // The methods with no arguments that are right to stay methods are Conventions.ZeroArgumentMethods, each with the work it does.
+        None(Together.Where(problem => problem.Contains("it takes no arguments on a type that has fields")),
+            "These take no arguments on a type that has fields. Make each a field (p.Field), or add it to Conventions.ZeroArgumentMethods with the work it does:");
 
     [Fact]
     public void No_method_has_the_name_of_a_field_of_the_same_type()
     {
+        None(Together.Where(problem => problem.Contains("A name is a field or a method of a type, never both")), "A name is a field or a method of a type, never both:");
         None(Catalog.Methods.Where(m => !m.Planned && Catalog.GetField(m.ReceiverType, m.Name) != null).Select(Show),
             "A name is a field or a method of a type, never both:");
     }
 
     [Fact]
-    public void The_allow_list_of_methods_with_no_arguments_has_no_stale_entries()
-    {
-        HashSet<string> real = Catalog.Methods.Where(m => !m.Planned && m.MaxArgs == 0).Select(Show).Select(s => s.Substring(0, s.Length - 2)).ToHashSet(StringComparer.Ordinal);
-        None(ZeroArgumentMethods.Keys.Where(k => !real.Contains(k)), "These are no longer methods with no arguments; take them off the list:");
-    }
-
-    // to_x gives the value in another form, is_x and has_x ask a question: both are methods everywhere.
-    private static bool ConvertsOrAsks(string name) =>
-        name.StartsWith("to_", StringComparison.Ordinal) || name.StartsWith("as_", StringComparison.Ordinal) || IsQuestionName(name);
+    public void The_allow_list_of_methods_with_no_arguments_has_no_stale_entries() =>
+        None(Tables.Where(problem => problem.StartsWith("Conventions.ZeroArgumentMethods", StringComparison.Ordinal)), "These are no longer methods with no arguments; take them off the list:");
 
     #endregion
 
     #region get, set, has, remove, delete, clear, flush
 
     [Fact]
-    public void Keyed_things_use_get_set_has_and_remove()
-    {
-        None(Callables.Where(c => c.Name is "put" or "forget" or "unset" or "erase" or "purge" or "wipe" or "empty" or "reset_all").Select(Show),
-            "Things kept by key use get, set, has and remove, and clear empties them. These use another verb:");
-    }
+    public void Keyed_things_use_get_set_has_and_remove() =>
+        None(Broken(Conventions.KeyedVerb), "Things kept by key use get, set, has and remove, and clear empties them. These use another verb:");
 
     [Fact]
-    public void Flush_only_writes_out_what_is_held_back()
-    {
+    public void Flush_only_writes_out_what_is_held_back() =>
         // The logger holds entries back and flush writes them. Nothing else may use the word.
-        None(Callables.Where(c => c.Name == "flush" && Show(c) != "logger->flush()").Select(Show),
-            "flush means \"write out what is being held back\". To remove everything, the word is clear:");
-    }
+        None(Broken(Conventions.Flush), "flush means \"write out what is being held back\". To remove everything, the word is clear:");
 
     [Fact]
-    public void A_type_with_get_and_set_removes_with_remove()
-    {
+    public void A_type_with_get_and_set_removes_with_remove() =>
         // Storage reads and writes files, so it has read, write and delete, not get and set.
-        foreach (string type in Catalog.MethodReceivers)
-        {
-            HashSet<string> names = Catalog.Methods.Where(m => !m.Planned && m.ReceiverType == type).Select(m => m.Name).ToHashSet(StringComparer.Ordinal);
-            if (!names.Contains("get") || !names.Contains("set")) continue;
-            Assert.False(names.Contains("delete"), $"{type} has get and set, so it removes a key with remove, not delete.");
-            Assert.True(names.Contains("has"), $"{type} has get and set, so it needs has.");
-            Assert.True(names.Contains("remove"), $"{type} has get and set, so it needs remove.");
-        }
-    }
+        None(Together.Where(problem => problem.Contains("has get and set")), "A type with get and set has has and remove, and no delete:");
 
     [Fact]
     public void Old_verbs_say_what_to_write_instead()
@@ -251,33 +159,35 @@ public class StdlibBehaviourConventionTests
 
     #region Lengths of time are durations
 
-    private static readonly Regex TimeName = new Regex("^(timeout|ttl|every|delay|wait|backoff|retry_after|retry_until|unique_for|lockout|duration|expires|.+_(for|after|until|timeout|ttl))$");
-
-    /// <summary>Arguments with a name that sounds like a length of time but that hold something else.</summary>
-    private static readonly Dictionary<string, string> NotALengthOfTime = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-    };
-
-    private static readonly HashSet<string> UnitNames = new HashSet<string>(StringComparer.Ordinal) { "ms", "milliseconds", "seconds", "secs", "minutes", "hours" };
-
     [Fact]
     public void Every_length_of_time_is_declared_as_a_duration()
     {
-        IEnumerable<string> attributes = Elements.SelectMany(e => e.Attributes.Where(a => TimeName.IsMatch(a.Name) && a.Type != Duration.TypeName).Select(a => $"<{e.Name} {a.Name}>"));
-        IEnumerable<string> parameters = Callables.SelectMany(c => c.Signatures.SelectMany(s => s.Parameters)
-            .Where(p => TimeName.IsMatch(p.Name) && p.Type != Duration.TypeName).Select(p => $"{Show(c)} {p.Name}"));
-        None(attributes.Concat(parameters).Where(n => !NotALengthOfTime.ContainsKey(n)),
-            "A length of time is a duration (30s, 5m, 1h30m). Declare these with the duration type, or add them to NotALengthOfTime with what they hold:");
+        IEnumerable<string> attributes = Elements.SelectMany(e => e.Attributes.Select(a => Conventions.LengthOfTimeArgument(e.Package, e, a)));
+        IEnumerable<string> parameters = Callables.SelectMany(c => c.Signatures.SelectMany(s => s.Parameters).Select(p => Conventions.LengthOfTimeParameter(c.Package, c, p)));
+        None(attributes.Concat(parameters).Where(problem => problem != null),
+            "A length of time is a duration (30s, 5m, 1h30m). Declare these with the duration type, or add them to Conventions.NotALengthOfTime with what they hold:");
     }
+
+    [Theory]
+    [InlineData("timeout", true)]
+    [InlineData("ttl", true)]
+    [InlineData("retry_after", true)]
+    [InlineData("unique_for", true)]
+    [InlineData("lock_until", true)]
+    [InlineData("read_timeout", true)]
+    [InlineData("cache_ttl", true)]
+    [InlineData("_for", false)]
+    [InlineData("format", false)]
+    [InlineData("before", false)]
+    public void A_name_that_is_a_length_of_time_is_recognised(string name, bool time) => Assert.Equal(time, Conventions.IsTimeName(name));
 
     [Fact]
     public void No_argument_is_named_for_a_unit_of_time()
     {
-        IEnumerable<string> attributes = Elements.SelectMany(e => e.Attributes.Where(a => UnitNames.Contains(a.Name)).Select(a => $"<{e.Name} {a.Name}>"));
+        IEnumerable<string> attributes = Elements.SelectMany(e => e.Attributes.Select(a => Conventions.UnitArgument(e.Package, e, a)));
         // $date->add_hours(hours) counts hours: the unit is the method's own name, not a second way to give a length of time.
-        IEnumerable<string> parameters = Callables.Where(c => !c.Name.StartsWith("add_", StringComparison.Ordinal))
-            .SelectMany(c => c.Signatures.SelectMany(s => s.Parameters).Where(p => UnitNames.Contains(p.Name)).Select(p => $"{Show(c)} {p.Name}"));
-        None(attributes.Concat(parameters), "The unit is part of the value (wait(duration: 500ms)), not of the argument's name:");
+        IEnumerable<string> parameters = Callables.SelectMany(c => c.Signatures.SelectMany(s => s.Parameters).Select(p => Conventions.UnitParameter(c.Package, c, p)));
+        None(attributes.Concat(parameters).Where(problem => problem != null), "The unit is part of the value (wait(duration: 500ms)), not of the argument's name:");
     }
 
     [Theory]

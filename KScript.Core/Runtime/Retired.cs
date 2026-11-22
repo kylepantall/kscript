@@ -213,7 +213,12 @@ namespace KScript.Runtime
             return null;
         }
 
-        private static IReadOnlyDictionary<string, RetiredInfo> Table(params (string Name, string Replacement, string Rename)[] rows) =>
-            rows.ToDictionary(r => r.Name, r => new RetiredInfo(r.Name, r.Replacement, r.Rename), StringComparer.Ordinal);
+        // A plain loop: every package load reads these tables (Conventions), and LINQ over tuples is slow to start.
+        private static IReadOnlyDictionary<string, RetiredInfo> Table(params (string Name, string Replacement, string Rename)[] rows)
+        {
+            var table = new Dictionary<string, RetiredInfo>(rows.Length, StringComparer.Ordinal);
+            foreach (var r in rows) table.Add(r.Name, new RetiredInfo(r.Name, r.Replacement, r.Rename));
+            return table;
+        }
     }
 }

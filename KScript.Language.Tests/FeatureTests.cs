@@ -72,7 +72,7 @@ namespace KScript.Language.Tests
         public void CompletesAttributeValues()
         {
             Assert.Equal(new[] { "json", "markdown", "text" }, Labels(Script("<echo format=\"‸\">x</echo>")).OrderBy(x => x));
-            Assert.Contains("yes", Labels(Script("<let name=\"x\" value=\"1\" const=\"‸\" />")));
+            Assert.Contains("true", Labels(Script("<let name=\"x\" value=\"1\" const=\"‸\" />")));
             Assert.Contains("greet", Labels(Script("<fn name=\"greet\" /><call fn=\"‸\" />")));
         }
 

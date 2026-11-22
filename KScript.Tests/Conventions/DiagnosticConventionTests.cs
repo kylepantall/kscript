@@ -9,6 +9,8 @@ using KScript.Syntax.Markup;
 
 namespace KScript.Tests.Conventions;
 
+using Conventions = KScript.Runtime.Conventions;
+
 /// <summary>
 /// What KScript says when something is wrong follows three rules, each checked against the source so it can't drift:
 /// every diagnostic code is reported somewhere and documented, in order; every error type the runtime raises is a
@@ -56,7 +58,7 @@ public sealed class DiagnosticConventionTests
     /// Codes declared and documented ahead of the rule that reports them, which is being written separately.
     /// Take a code out of this list when its rule lands; the list should end up empty.
     /// </summary>
-    private static readonly string[] ReportedElsewhere = { DiagnosticCodes.NamingStyle };
+    private static readonly string[] ReportedElsewhere = { };
 
     [Fact]
     public void Every_diagnostic_code_is_reported_somewhere()
@@ -183,6 +185,10 @@ public sealed class DiagnosticConventionTests
     public void No_built_in_error_type_ends_in_Error_and_the_old_names_say_what_they_are_now()
     {
         Assert.DoesNotContain(ErrorTypes.BuiltIn.Values, t => t.Name != ErrorTypes.Root && t.Name.EndsWith("Error", StringComparison.Ordinal));
+        // The engine's own rule, which ErrorTypes applies as each built-in type is added.
+        Assert.All(ErrorTypes.BuiltIn.Values, t => Assert.Null(Conventions.ErrorTypeName(t.Name)));
+        Assert.Contains("ends in Error (Query)", Conventions.ErrorTypeName("QueryError"));
+        Assert.Contains("PascalCase (NotFound)", Conventions.ErrorTypeName("not_found"));
         Assert.Equal(new[] { "ConnectionError", "QueryError" }, ErrorTypes.Renamed.Keys.OrderBy(k => k, StringComparer.Ordinal));
         Assert.All(ErrorTypes.Renamed, r => Assert.True(ErrorTypes.BuiltIn.ContainsKey(r.Value) && !ErrorTypes.BuiltIn.ContainsKey(r.Key)));
 

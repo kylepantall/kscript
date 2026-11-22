@@ -54,6 +54,7 @@ namespace KScript.Language.Analysis
             Analyzer analyzer = RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog));
             analyzer.ReportDeferred();
             analyzer.CheckSpellings();
+            analyzer.CheckNamingStyle();
             analyzer.CheckUnused(projectWide);
             analyzer.SpeakCode();
             return analyzer.result;

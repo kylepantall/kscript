@@ -486,7 +486,8 @@ namespace KScript.Language.Features
                     return ErrorTypeCompletions(analysis, cursor.Offset, replace);
 
                 case AttributeKind.Bool:
-                    return new[] { "yes", "no" }.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
+                    // A boolean is true or false (KS6011); the flag on its own is offered with the argument names.
+                    return new[] { "true", "false" }.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
                 case AttributeKind.FunctionReference:
                 case AttributeKind.FunctionReferences:

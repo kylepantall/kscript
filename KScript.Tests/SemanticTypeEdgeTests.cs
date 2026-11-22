@@ -34,7 +34,7 @@ public class SemanticTypeEdgeTests
     [InlineData("type S {\n  parse: { a: $value }\n  a: string\n}\necho S('x').a", "x")]
     [InlineData("type A { n: int(min: 1) }\ntype B { n: int(max: 5) }\ntype C with [A, B] {}\necho \"{ C->check({ n: 9 })[0].message } { C->check({ n: 0 })->count() } { C->check({ n: 3 })->count() }\"", "must be at most 5. 1 0")]
     [InlineData("type A { n: int(min: 1)? }\ntype B { n: int(max: 5)? }\ntype C with [A, B] {}\necho \"{ C->check({})->count() } { C->check({ n: 9 })->count() }\"", "0 1")]
-    [InlineData("type B { a: int; b?: int; validate: ($b ?? 0) < 5, 'b is too big' }\nx = B({ a: 1 })\ntry {\n  $x.b = 9\n} catch err {\n  echo $err.message\n}\necho $x->keys()", "b is too big")]
+    [InlineData("type B { a: int; b?: int; validate: ($b ?? 0) < 5, 'b is too big' }\nx = B({ a: 1 })\ntry {\n  x.b = 9\n} catch err {\n  echo $err.message\n}\necho $x->keys()", "b is too big")]
     [InlineData("type Age with [int] { max: 3 }\ntype T { a: Age[] }\necho T->schema().properties->to_json()", "{\"a\":{\"type\":\"array\",\"items\":{\"type\":\"integer\",\"maximum\":3}}}")]
     [InlineData("type Tags with [string[]] { max: 2 }\ntype T { a: Tags }\necho T->schema().properties->to_json()", "\"maxItems\":2")]
     [InlineData("type F with [bool] { }\ntype T { a: F }\necho T->schema().properties->to_json()", "{\"a\":{\"type\":\"boolean\"}}")]
