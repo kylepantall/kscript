@@ -113,7 +113,8 @@ public sealed class DataRelationTests : DataFixture
         // avg was renamed, and says so.
         Assert.Equal("average", RetiredMembers.Method("query", "avg").Rename);
         Assert.Equal("average", RetiredMembers.Method("model", "avg").Rename);
-        Assert.Contains("->average(column)", Fails(Blog + "$ada->posts()->avg('views')").Message);
+        Assert.Contains("->average(column)", Fails(Blog + "$ada->posts()->avg(views)").Message);
+        Assert.Contains("->average(column)", Fails(Blog + "Post->avg(views)").Message);
         Assert.Contains("no SQL form", Fails(Blog + "User->where(fn(u) => $u.posts->avg(fn(p) => $p.views) > 25)->get()").Message);
         // A relation in a condition has the methods a list has: no second names.
         Assert.Contains("no SQL form", Fails(Blog + "User->where(fn(u) => $u.posts->none())->get()").Message);

@@ -980,6 +980,9 @@ namespace KScript.Runtime
 
             // A package's methods for its own objects come first, so their arguments are bound by name (and flags) like commands'.
             bool defined = TryFindMethod(target, name, ctx.Module, out MethodDefinition method);
+            // A renamed method says so before its arguments are looked at: User->avg(age) is told about ->average(), not about age.
+            if (!defined && target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
+                throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
             if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             if (target is IKObject obj && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), name, out object result))
             {
@@ -990,8 +993,6 @@ namespace KScript.Runtime
                 return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             }
 
-            if (target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
-                throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
             if (TryFindField(target, name, ctx.Module, out _))
                 throw Fail(node, ctx, $"{name} is a field of {Values.Describe(target)}, not a method. Read it with a dot and no brackets: .{name}", "Name");
 
