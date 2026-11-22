@@ -82,7 +82,7 @@ The api and fullstack templates take the same options:
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database the notes are kept in, set up in `config/config.yaml`. `none` keeps them in a JSON file instead (`notes.file` in the config). KScript.Data connects to SQLite only for now, so with `postgres` or `mysql` the settings (and compose file) are ready, the tests still pass on SQLite in memory, and `DATABASE_URL=sqlite:data/app.sqlite` runs the app until that support lands. |
+| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database the notes are kept in, set up in `config/config.yaml`. `none` keeps them in a JSON file instead (`notes.file` in the config). With `postgres` or `mysql` the app connects to that server (`DATABASE_URL` overrides the url, and `--docker` adds it to the compose file), while `kscript test` still uses SQLite in memory. |
 | `--auth`, `--no-auth` | on (api), off (fullstack) | Sign-in. In the api template: `POST /api/register`, `/api/tokens`, `GET /api/me`, and notes that belong to who is signed in. In the fullstack template it also runs [`kscript make auth`](auth.md) for the sign-in pages; the pages call the API as whoever is viewing them. |
 | `--cache`, `--no-cache` | on | Caches the notes list and answers repeat requests with `304 Not Modified` (the `etag` middleware). |
 | `--docker` | off | Adds a `Dockerfile`, `.dockerignore` and `compose.yaml`, with a Postgres or MySQL service for those databases, and `make up` / `make down`. |

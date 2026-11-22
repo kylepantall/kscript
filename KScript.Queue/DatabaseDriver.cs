@@ -124,13 +124,17 @@ namespace KScript.Queueing
         private void EnsureTables()
         {
             if (Ready.ContainsKey(db)) return;
-            foreach (string sql in new[]
-            {
-                $"CREATE TABLE IF NOT EXISTS {Q(JobsTable)} ({Q("id")} TEXT PRIMARY KEY, {Q("queue")} TEXT NOT NULL, {Q("available_at")} INTEGER NOT NULL, {Q("reserved_until")} INTEGER, {Q("payload")} TEXT NOT NULL)",
-                $"CREATE INDEX IF NOT EXISTS {Q("ix_" + JobsTable + "_next")} ON {Q(JobsTable)} ({Q("queue")}, {Q("available_at")})",
-                $"CREATE TABLE IF NOT EXISTS {Q(FailedTable)} ({Q("id")} TEXT PRIMARY KEY, {Q("queue")} TEXT NOT NULL, {Q("failed_at")} INTEGER NOT NULL, {Q("payload")} TEXT NOT NULL)",
-                $"CREATE TABLE IF NOT EXISTS {Q(LocksTable)} ({Q("key")} TEXT PRIMARY KEY, {Q("until")} INTEGER NOT NULL)",
-            })
+            Dialect d = db.Dialect;
+            string key = d.KeyText, text = d.LongText, number = d.BigInteger;
+            foreach (string sql in d.CreateTable(JobsTable,
+                    new[] { $"{Q("id")} {key} PRIMARY KEY", $"{Q("queue")} {key} NOT NULL", $"{Q("available_at")} {number} NOT NULL", $"{Q("reserved_until")} {number}", $"{Q("payload")} {text} NOT NULL" },
+                    new[] { new TableIndex("ix_" + JobsTable + "_next", new[] { "queue", "available_at" }, false) }, ifMissing: true)
+                .Concat(d.CreateTable(FailedTable,
+                    new[] { $"{Q("id")} {key} PRIMARY KEY", $"{Q("queue")} {key} NOT NULL", $"{Q("failed_at")} {number} NOT NULL", $"{Q("payload")} {text} NOT NULL" },
+                    Array.Empty<TableIndex>(), ifMissing: true))
+                .Concat(d.CreateTable(LocksTable,
+                    new[] { $"{Q("key")} {key} PRIMARY KEY", $"{Q("until")} {number} NOT NULL" },
+                    Array.Empty<TableIndex>(), ifMissing: true)))
             {
                 db.Execute(null, new SqlStatement(sql, Array.Empty<object>()));
             }
@@ -156,8 +160,8 @@ namespace KScript.Queueing
             Rows(sql, parameters).Select(r => Parse(r["payload"])).Where(j => j != null).ToList();
 
         private string PushSql =>
-            $"INSERT INTO {Q(JobsTable)} ({Q("id")}, {Q("queue")}, {Q("available_at")}, {Q("reserved_until")}, {Q("payload")}) VALUES (@p1, @p2, @p3, NULL, @p4)"
-            + $" ON CONFLICT ({Q("id")}) DO UPDATE SET {Q("queue")} = excluded.{Q("queue")}, {Q("available_at")} = excluded.{Q("available_at")}, {Q("reserved_until")} = NULL, {Q("payload")} = excluded.{Q("payload")}";
+            db.Dialect.Upsert($"INSERT INTO {Q(JobsTable)} ({Q("id")}, {Q("queue")}, {Q("available_at")}, {Q("reserved_until")}, {Q("payload")}) VALUES (@p1, @p2, @p3, NULL, @p4)",
+                "id", new[] { "queue", "available_at", "reserved_until", "payload" });
 
         /// <summary>Saves a job as waiting: a new row, or the row it already has (a released or retried job).</summary>
         public void Push(QueuedJob job) => Execute(PushSql, job.Id, job.Queue, Ms(job.AvailableAt), job.ToJson());
@@ -182,8 +186,7 @@ namespace KScript.Queueing
                         if (next == null)
                         {
                             // Not a job: move it to the failed jobs so it doesn't block the queue.
-                            tx.Execute($"INSERT INTO {Q(FailedTable)} ({Q("id")}, {Q("queue")}, {Q("failed_at")}, {Q("payload")}) SELECT {Q("id")}, {Q("queue")}, @p2, {Q("payload")} FROM {Q(JobsTable)} WHERE {Q("id")} = @p1"
-                                + $" ON CONFLICT ({Q("id")}) DO NOTHING", id, at);
+                            tx.Execute(db.Dialect.InsertOrIgnore($"INSERT INTO {Q(FailedTable)} ({Q("id")}, {Q("queue")}, {Q("failed_at")}, {Q("payload")}) SELECT {Q("id")}, {Q("queue")}, @p2, {Q("payload")} FROM {Q(JobsTable)} WHERE {Q("id")} = @p1", "id"), id, at);
                             tx.Execute($"DELETE FROM {Q(JobsTable)} WHERE {Q("id")} = @p1", id);
                             continue;
                         }
@@ -214,8 +217,8 @@ namespace KScript.Queueing
             copy.ReservedUntil = null;
             Transaction(tx =>
             {
-                tx.Execute($"INSERT INTO {Q(FailedTable)} ({Q("id")}, {Q("queue")}, {Q("failed_at")}, {Q("payload")}) VALUES (@p1, @p2, @p3, @p4)"
-                    + $" ON CONFLICT ({Q("id")}) DO UPDATE SET {Q("queue")} = excluded.{Q("queue")}, {Q("failed_at")} = excluded.{Q("failed_at")}, {Q("payload")} = excluded.{Q("payload")}",
+                tx.Execute(db.Dialect.Upsert($"INSERT INTO {Q(FailedTable)} ({Q("id")}, {Q("queue")}, {Q("failed_at")}, {Q("payload")}) VALUES (@p1, @p2, @p3, @p4)",
+                    "id", new[] { "queue", "failed_at", "payload" }),
                     copy.Id, copy.Queue, Ms(copy.FailedAt ?? QueueRuntime.Clock()), copy.ToJson());
                 return tx.Execute($"DELETE FROM {Q(JobsTable)} WHERE {Q("id")} = @p1", job.Id);
             });
@@ -254,11 +257,21 @@ namespace KScript.Queueing
 
         public bool Forget(string id) => Execute($"DELETE FROM {Q(FailedTable)} WHERE {Q("id")} = @p1", id) > 0;
 
-        public bool Lock(string key, DateTime until, DateTime now) =>
+        public bool Lock(string key, DateTime until, DateTime now)
+        {
             // A new key, or one whose lock has run out, is taken; a key held until later changes nothing.
-            Execute($"INSERT INTO {Q(LocksTable)} ({Q("key")}, {Q("until")}) VALUES (@p1, @p2)"
-                + $" ON CONFLICT ({Q("key")}) DO UPDATE SET {Q("until")} = excluded.{Q("until")} WHERE {Q(LocksTable)}.{Q("until")} <= @p3",
-                key, Ms(until), Ms(now)) > 0;
+            if (db.Dialect.ConditionalUpsert)
+            {
+                return Execute(db.Dialect.Upsert($"INSERT INTO {Q(LocksTable)} ({Q("key")}, {Q("until")}) VALUES (@p1, @p2)", "key", new[] { "until" })
+                    + $" WHERE {Q(LocksTable)}.{Q("until")} <= @p3", key, Ms(until), Ms(now)) > 0;
+            }
+            // MySQL's upsert can't have a WHERE: a lock that has run out is deleted, then the key is taken if it is free.
+            return Transaction(tx =>
+            {
+                tx.Execute($"DELETE FROM {Q(LocksTable)} WHERE {Q("key")} = @p1 AND {Q("until")} <= @p2", key, Ms(now));
+                return tx.Execute(db.Dialect.InsertOrIgnore($"INSERT INTO {Q(LocksTable)} ({Q("key")}, {Q("until")}) VALUES (@p1, @p2)", "key"), key, Ms(until)) > 0;
+            });
+        }
 
         public void Unlock(string key) => Execute($"DELETE FROM {Q(LocksTable)} WHERE {Q("key")} = @p1", key);
 

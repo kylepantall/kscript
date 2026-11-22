@@ -155,7 +155,7 @@ namespace KScript.Data
                 for (int i = 0; i < Order.Count; i++)
                 {
                     if (i > 0) w.Append(", ");
-                    w.Expr(Order[i].Expr).Append(Order[i].Descending ? " DESC" : " ASC");
+                    w.Expr(Order[i].Expr).Append(d.Direction(Order[i].Descending));
                 }
             }
             if (withOrder) w.Append(d.Limit(Limit, Offset));
@@ -254,7 +254,7 @@ namespace KScript.Data
         public void Chunk(CallContext call, int size, ICallable fn)
         {
             if (size < 1) throw new KScriptException("->chunk() needs a size of 1 or more.", "Argument");
-            Query ordered = Order.Count > 0 ? this : OrderBy(Model != null ? new SqlColumn(Model.Key, Model.KeyColumn) : new SqlColumn("rowid"), false);
+            Query ordered = Order.Count > 0 ? this : OrderBy(Model != null ? new SqlColumn(Model.Key, Model.KeyColumn) : Database.Dialect.RowOrder, false);
             for (int page = 0; ; page++)
             {
                 List<object> batch = ordered.Taking(size).Skipping((Offset ?? 0) + page * size).Get(call);
@@ -342,7 +342,7 @@ namespace KScript.Data
             var w = new SqlWriter(d).Append("INSERT INTO ").Name(table);
             if (values.Count == 0)
             {
-                w.Append(" DEFAULT VALUES");
+                w.Append(d.DefaultValues);
             }
             else
             {

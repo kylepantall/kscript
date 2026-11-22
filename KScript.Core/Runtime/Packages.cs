@@ -343,7 +343,7 @@ namespace KScript.Runtime
             ("KScript.Style", "KScript.Style.StylePackage, KScript.Style", "Stylesheets written in KScript (.ks.css, .ks.scss, .ks.sass), with colour, size and responsive helpers."),
             ("KScript.Storage", "KScript.Storage.StoragePackage, KScript.Storage", "App folders for config, data, cache, state and logs, in the right place on each platform."),
             ("KScript.Document", "KScript.Documents.DocumentPackage, KScript.Document", "Scientific and professional documents (papers, reports, letters, invoices) with LaTeX maths, citations and tables, saved as PDF, Word, LaTeX, Markdown or HTML."),
-            ("KScript.Data", "KScript.Data.DataPackage, KScript.Data", "Databases: models, a query builder, transactions and raw SQL, on SQLite."),
+            ("KScript.Data", "KScript.Data.DataPackage, KScript.Data", "Databases: models, a query builder, transactions and raw SQL, on SQLite, Postgres, MySQL and MariaDB."),
             ("KScript.Cache", "KScript.Caching.CachePackage, KScript.Cache", "A cache of values by key, with time limits: in memory, or in files in the app's cache folder."),
             ("KScript.Queue", "KScript.Queueing.QueuePackage, KScript.Queue", "Queued jobs: job declarations, dispatch, retries with backoff, failed jobs, and the worker that runs them."),
             ("KScript.Http", "KScript.Http.HttpPackage, KScript.Http", "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve."),

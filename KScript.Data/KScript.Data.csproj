@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Version>2.0.0</Version>
     <Product>KScript</Product>
-    <Description>KScript.Data: models, a query builder, transactions and raw SQL for KScript, on SQLite.</Description>
+    <Description>KScript.Data: models, a query builder, transactions and raw SQL for KScript, on SQLite, Postgres, MySQL and MariaDB.</Description>
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
@@ -26,6 +26,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
+    <PackageReference Include="MySqlConnector" Version="3.0.0" />
+    <PackageReference Include="Npgsql" Version="8.0.8" />
   </ItemGroup>
 
 </Project>
