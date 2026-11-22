@@ -59,7 +59,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `echo $list[1]`, `echo(format: json) $data` | `<echo value="$list[1]" />` |
 | `if a { } elif b { } else { }` (also `else if`) | `<if test>`, `<elif test>`, `<else>` |
 | `for item in $list { }`, `for key, value in $map { }` | `<for each in>` |
-| `for item at i in $list { }` | `<for each="item" index="i" in="$list">` |
+| `for item at i in $list { }` | `<for each="item" at="i" in="$list">` |
 | `while test { }`, `break`, `continue` | `<while test>`, `<break/>`, `<continue/>` |
 | `match $x { case 1, 2 { } when $x > 9 { } default { } }` | `<match value>`, `<case is>`, `<case when>`, `<default>` |
 | `fn greet(who: string, hi = 'Hello') { }` | `<fn name="greet" params="who: string, hi = 'Hello'">` |
@@ -68,8 +68,8 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `try { } catch err when test { } catch { } finally { }` | `<try>` with `<catch as when>` and `<finally>` inside |
 | `throw Validation "Bad {$x}"` | `<throw type="Validation">Bad {$x}</throw>` |
 | `import KScript.Math as math` | `<import package="KScript.Math" as="math" />` |
-| `import "lib/s.kscript" as s` | `<import src="lib/s.kscript" as="s" />` |
-| `import slugify from "lib/s.kscript"` | `<import src="lib/s.kscript" names="slugify" />` |
+| `import "lib/s.kscript" as s` | `<import path="lib/s.kscript" as="s" />` |
+| `import slugify from "lib/s.kscript"` | `<import path="lib/s.kscript" names="slugify" />` |
 | `enum Size { small, medium, large }` | `<enum name="Size" values="small, medium, large" />` |
 | `type Repo(extra: error) { … }` | `<type name="Repo" extra="error">` with `<field>`s inside |
 | `stars: int from stargazers_count` (in a type) | `<field name="stars" type="int" from="stargazers_count" />` |
@@ -86,9 +86,9 @@ A field line in a `type` block is `name[?][: type] [from path] [= default | => v
 Any other name is an element: `name(attribute: value, ...) "text" { children }`, each part optional.
 
 ```
-input(to: old_dir) "Move files from: "
+input(into: old_dir) "Move files from: "
 Row(gap: 8, wrap) {
-  Button(variant: primary, on-click: "playing = not $playing") "{ $playing ? 'Pause' : 'Play' }"
+  Button(variant: primary, on_click: "playing = not $playing") "{ $playing ? 'Pause' : 'Play' }"
 }
 ```
 
@@ -217,7 +217,7 @@ of the same name.
 Converting keeps a project working in the new format:
 
 - An import of a script that is converted in the same run, or already has a converted version, points at the new
-  file (`<import src="lib/tasks.ks.xml" />` becomes `import "lib/tasks.kscript"`). An import of a script that stays
+  file (`<import path="lib/tasks.ks.xml" />` becomes `import "lib/tasks.kscript"`). An import of a script that stays
   in the old format is kept, with a note; the two formats can import each other.
 - File names in comments and strings that name a converted script are renamed too (`@run_script('hello.ks.xml')`),
   and one-line XML examples in comments are written the .kscript way.

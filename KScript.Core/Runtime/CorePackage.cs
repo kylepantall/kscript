@@ -99,7 +99,7 @@ namespace KScript.Runtime
                 ContentKind.Statements,
                 new A("name", K.DeclareVariable, "The type's name, used as `type=\"Repo\"`, `as: Repo` and $Repo.", true),
                 new A("fields", K.Fields, "A short type's fields on one line, like fn params: `login: string, id: int, avatar_url?: string`. Bigger types list their fields one per line instead (<field> elements)."),
-                new A("sample", K.Path, "A JSON file holding an example of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
+                new A("path", K.Path, "A JSON file holding a sample of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
                 new A("extra", K.Enum, "Keys in the data that the type doesn't list: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
                 new A("with", K.TypeNames, "Other types this one is made from. Types with fields are joined: `with=\"User, Auditable\"` has all their fields and rules, and fits wherever they do. One built-in type, such as `with=\"int\"` or `with=\"handle\"`, makes a type with rules instead of fields: min, max, pattern, one_of, not, <validate> and <normalize>.", false, Values.DeclarableTypes.ToArray()),
                 new A("min", K.Text, "The smallest value allowed: a number for numbers, a date for dates, the length for text (a handle's name without its @), the count for lists. Needs with=\"...\" naming one built-in type."),
@@ -230,7 +230,7 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("for", "Loops over a list, a map or a range such as 0..10 (end exclusive) or 0..100 step 5. `$loop` holds index, first, last and count.", ContentKind.Statements,
                 new A("each", K.DeclareVariables, "The loop variable, or `key, value` for a map.", true),
                 new A("in", K.Expression, "What to loop over: a list, a map, a range, a number (0 up to it) or text (its characters).", true),
-                new A("index", K.DeclareVariable, "A variable for the position, from 0."))
+                new A("at", K.DeclareVariable, "A variable for the position, from 0."))
             {
                 IsLoop = true,
                 Example = "<let name=\"people\" value=\"[{ name: 'Joan' }, { name: 'Sam' }]\" />\n<for each=\"p\" in=\"$people\">\n  <echo>{$p.name}</echo>\n</for>\n<for each=\"i\" in=\"0..10\"><echo>$i</echo></for>\n<let name=\"settings\" value=\"{ host: 'localhost', port: 8080 }\" />\n<for each=\"key, value\" in=\"$settings\"><echo>$key = $value</echo></for>",
@@ -311,7 +311,7 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("call", "Calls a function for its effect, optionally keeping the result.", ContentKind.Empty,
                 new A("fn", K.FunctionReference, "The function (or command) to call.", true),
                 new A("args", K.ExpressionList, "Arguments, comma separated."),
-                new A("to", K.DeclareVariable, "A variable for the result."))
+                new A("into", K.DeclareVariable, "A variable for the result."))
             {
                 Example = "<fn name=\"greet\" params=\"who\"><echo>Hello, $who!</echo></fn>\n<call fn=\"greet\" args=\"'World'\" />",
             }, Call);
@@ -355,17 +355,17 @@ namespace KScript.Runtime
                 Example = "<let name=\"age\" value=\"-1\" />\n<try>\n  <throw type=\"Validation\" message=\"Age must be positive, got {$age}\" />\n  <catch as=\"err\"><echo>{ $err.type }: { $err.message }</echo></catch>\n</try>",
             }, Throw);
 
-            p.Element(new ElementInfo("import", "Imports a package (`package=\"KScript.Terminal\"`), or the top-level <fn> functions and <let const> values of another script (`src`). Goes at the top of the script.", ContentKind.Empty,
+            p.Element(new ElementInfo("import", "Imports a package (`package=\"KScript.Terminal\"`), or the top-level <fn> functions and <let const> values of another script (`path`). Goes at the top of the script.", ContentKind.Empty,
                 new A("package", K.Text, "A package such as KScript.Terminal, KScript.Math, KScript.IO or KScript.Net."),
-                new A("src", K.Path, "A script to import, relative to this file."),
+                new A("path", K.Path, "A script to import, relative to this file."),
                 new A("as", K.DeclareVariable, "Use the import under a prefix: `@math.sqrt(2)`, `str.slugify()`."),
                 new A("names", K.FunctionReferences, "Import only these names from a script, callable directly: `@slugify()`."))
             {
-                Example = "<import package=\"KScript.Terminal\" />\n<import package=\"KScript.Math\" as=\"math\" />\n<import src=\"lib/strings.ks.xml\" as=\"str\" />",
+                Example = "<import package=\"KScript.Terminal\" />\n<import package=\"KScript.Math\" as=\"math\" />\n<import path=\"lib/strings.ks.xml\" as=\"str\" />",
             }, run =>
             {
-                if (!run.Has("package") && !run.Has("src")) throw run.Error("<import> needs package=\"...\" (such as KScript.Terminal) or src=\"...\" (a script file).", null, "Syntax");
-                if (run.Has("src")) run.Interpreter.ImportScript(run.Element, run.Scope, run.Module);
+                if (!run.Has("package") && !run.Has("path")) throw run.Error("<import> needs package=\"...\" (such as KScript.Terminal) or path=\"...\" (a script file).", null, "Syntax");
+                if (run.Has("path")) run.Interpreter.ImportScript(run.Element, run.Scope, run.Module);
                 return null;
             });
 
@@ -387,11 +387,11 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("marray", "Builds a list or map from nested <item> elements, for data that reads better as markup than as a literal.", ContentKind.Statements,
+            p.Element(new ElementInfo("collection", "Builds a list or map from nested <item> elements, for data that reads better as markup than as a literal.", ContentKind.Statements,
                 new A("name", K.DeclareVariable, "The variable to declare.", true),
                 new A("const", K.Bool, "yes makes a later <set> an error."))
             {
-                Example = "<marray name=\"person\">\n  <item key=\"name\">Joan</item>\n  <item key=\"age\">82</item>\n</marray>",
+                Example = "<collection name=\"person\">\n  <item key=\"name\">Joan</item>\n  <item key=\"age\">82</item>\n</collection>",
             }, run =>
             {
                 object value = Items(run, run.Element);
@@ -399,12 +399,12 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("item", "An entry of <marray>. With `key` it is a map entry, without it a list item. Its text is the value (numbers become numbers); nested items make a list or map.", ContentKind.Template,
+            p.Element(new ElementInfo("item", "An entry of <collection>. With `key` it is a map entry, without it a list item. Its text is the value (numbers become numbers); nested items make a list or map.", ContentKind.Template,
                 new A("key", K.Text, "The key in the enclosing map."),
                 new A("value", K.Expression, "The value as an expression, instead of text."))
             {
-                MustBeInside = new[] { "marray", "item" },
-            }, run => throw run.Error("<item> must be inside <marray>.", null, "Syntax"), ownsContent: true);
+                MustBeInside = new[] { "collection", "item" },
+            }, run => throw run.Error("<item> must be inside <collection>.", null, "Syntax"), ownsContent: true);
         }
 
         private static bool? Assign(ElementRun run, bool declare)
@@ -494,7 +494,7 @@ namespace KScript.Runtime
         {
             string[] names = run.RequiredRaw("each").Split(',').Select(n => n.Trim().TrimStart('$')).Where(n => n.Length > 0).ToArray();
             if (names.Length == 0 || names.Length > 2) throw run.Error("each=\"...\" names the loop variable (each=\"item\"), or a key and value for a map (each=\"key, value\").", "each", "Syntax");
-            string indexName = run.VariableName("index", required: false);
+            string indexName = run.VariableName("at", required: false);
             object source = run.Eval("in");
 
             List<(object Item, object Key)> items = source switch
@@ -607,7 +607,7 @@ namespace KScript.Runtime
             ICallable fn = FindFunction(run, run.RequiredRaw("fn"));
             List<object> args = run.Has("args") ? run.EvalList("args") : new List<object>();
             object result = run.Interpreter.Call(fn, args, null, run.Scope, run.Module);
-            if (run.Has("to")) run.Scope.Declare(run.VariableName("to"), result);
+            if (run.Has("into")) run.Scope.Declare(run.VariableName("into"), result);
             return null;
         }
 

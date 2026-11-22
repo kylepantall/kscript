@@ -6,8 +6,10 @@ describe(name: "greeting") {
     expect(value: @greeting('Joan'), equals: 'Hello, Joan!')
   }
 
-  test(name: "tidies '{$name}'", each: name, in: ['  joan ', 'JOAN', 'joan']) {
-    expect(value: @greeting($name), equals: 'Hello, Joan!')
+  for name in ['  joan ', 'JOAN', 'joan'] {
+    test(name: "tidies '{$name}'") {
+      expect(value: @greeting($name), equals: 'Hello, Joan!')
+    }
   }
 }
 

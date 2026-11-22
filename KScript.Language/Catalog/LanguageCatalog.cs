@@ -83,6 +83,9 @@ namespace KScript.Language.Catalog
 
         public RetiredInfo GetRetiredAttribute(string name) => name != null && retiredAttributes.TryGetValue(name, out RetiredInfo r) ? r : null;
 
+        /// <summary>An attribute the element no longer has: one that was renamed on it (to: is now into:), else a retired v1 attribute.</summary>
+        public RetiredInfo GetRetiredAttribute(ElementInfo element, string name) => Retired.RenamedAttribute(element, name) ?? GetRetiredAttribute(name);
+
         public CallableInfo GetCommand(string name) => name != null && commands.TryGetValue(name, out CallableInfo c) ? c : null;
 
         public RetiredInfo GetRetiredCommand(string name) => name != null && retiredCommands.TryGetValue(name, out RetiredInfo r) ? r : null;
@@ -172,6 +175,10 @@ namespace KScript.Language.Catalog
         private void AddRetired()
         {
             foreach (var kv in Retired.Elements)
+            {
+                if (!elements.ContainsKey(kv.Key)) retiredElements[kv.Key] = kv.Value;
+            }
+            foreach (var kv in Retired.RenamedElements)
             {
                 if (!elements.ContainsKey(kv.Key)) retiredElements[kv.Key] = kv.Value;
             }

@@ -36,13 +36,13 @@ namespace KScript.Web
                 Example = "<live id=\"search\"><state name=\"query\" value=\"''\" /><input bind=\"query\"></live>",
             });
             Page(p, new ElementInfo("include", "Renders another page file here. Other attributes become its variables.", ContentKind.Empty,
-                new A("src", K.Path, "The file to include, relative to this page.", required: true))
+                new A("path", K.Path, "The file to include, relative to this page.", required: true))
             {
                 Context = ElementContext.Page,
                 AllowsExtraAttributes = true,
             });
             Page(p, new ElementInfo("layout", "Wraps the page in a layout file. Extra attributes become variables in the layout (`$title`).", ContentKind.Markup,
-                new A("src", K.Path, "The layout file, such as _layout.html.", true))
+                new A("path", K.Path, "The layout file, such as _layout.html.", true))
             {
                 AllowsExtraAttributes = true,
                 Context = ElementContext.Page,

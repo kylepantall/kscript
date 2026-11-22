@@ -1,5 +1,5 @@
 --- make
-description: A page layout; pages use it with <layout src="…" title="…">
+description: A page layout; pages use it with <layout path="…" title="…">
 category: Pages and styles
 usage: <name> [--css a.css,b.css] [--lang en]
 --css: Stylesheets to link, comma separated
@@ -7,7 +7,7 @@ usage: <name> [--css a.css,b.css] [--lang en]
 example: kscript make layout blog --css /site.css
 example: kscript make layout docs --lang fr
 to: {{ paths.layouts }}/{{ kebab }}.html
-hint: Use it in a page: <layout src="{{ paths.layouts }}/{{ kebab }}.html" title="…"> … </layout>
+hint: Use it in a page: <layout path="{{ paths.layouts }}/{{ kebab }}.html" title="…"> … </layout>
 ---
 <!doctype html>
 <html lang="{{ lang ?? en }}">

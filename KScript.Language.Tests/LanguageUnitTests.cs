@@ -62,10 +62,10 @@ namespace KScript.Language.Tests
         {
             var unreadable = new AnalyzerCoverageTests.Files();
             unreadable.Unreadable.Add(Path.Combine(AnalyzerCoverageTests.Folder, "kscript.json"));
-            Assert.Contains(AnalyzerCoverageTests.Check("<input to=\"x\" />", files: unreadable).Diagnostics, d => d.Code == DiagnosticCodes.MissingImport);
+            Assert.Contains(AnalyzerCoverageTests.Check("<input into=\"x\" />", files: unreadable).Diagnostics, d => d.Code == DiagnosticCodes.MissingImport);
 
             var broken = new AnalyzerCoverageTests.Files(("kscript.json", "{ nope"));
-            Assert.Contains(AnalyzerCoverageTests.Check("<input to=\"x\" />", files: broken).Diagnostics, d => d.Code == DiagnosticCodes.MissingImport);
+            Assert.Contains(AnalyzerCoverageTests.Check("<input into=\"x\" />", files: broken).Diagnostics, d => d.Code == DiagnosticCodes.MissingImport);
         }
 
         [Fact]
@@ -115,7 +115,7 @@ namespace KScript.Language.Tests
             [Fact]
         public void Imported_constants_keep_their_types()
         {
-            DocumentAnalysis a = AnalyzerCoverageTests.Check("<import src=\"limits.ks.xml\" /><let name=\"v\" value=\"$limit\" /><echo>{$v}</echo>");
+            DocumentAnalysis a = AnalyzerCoverageTests.Check("<import path=\"limits.ks.xml\" /><let name=\"v\" value=\"$limit\" /><echo>{$v}</echo>");
             Assert.Equal("number", a.Symbols.First(s => s.Name == "limit").Shape.Display());
         }
     }

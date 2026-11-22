@@ -15,7 +15,8 @@ namespace KScript.Language.Tests
         [InlineData("<afor from=\"a\" to=\"b\"></afor>", DiagnosticCodes.RetiredElement, "afor", "<for each")]
         [InlineData("<Echo>hi</Echo>", DiagnosticCodes.UnknownElement, "Echo", "Did you mean <echo>?")]
         [InlineData("<echo colour=\"red\">hi</echo>", DiagnosticCodes.UnknownAttribute, "colour", null)]
-        [InlineData("<for each=\"i\" in=\"0..3\" indx=\"n\"><echo>$i</echo></for>", DiagnosticCodes.UnknownAttribute, "indx", "Did you mean 'index'?")]
+        [InlineData("<wait secnds=\"1\" />", DiagnosticCodes.UnknownAttribute, "secnds", "Did you mean 'seconds'?")]
+        [InlineData("<for each=\"i\" in=\"0..3\" index=\"n\"><echo>$i</echo></for>", DiagnosticCodes.RetiredAttribute, "index", "'index' is now at.")]
         [InlineData("<if condition=\"yes\"></if>", DiagnosticCodes.RetiredAttribute, "condition", "Use test=")]
         [InlineData("<for in=\"0..3\"></for>", DiagnosticCodes.MissingAttribute, "for", "'each'")]
         [InlineData("<echo format=\"html\">x</echo>", DiagnosticCodes.InvalidAttributeValue, "html", "text, json, markdown")]
@@ -96,7 +97,7 @@ namespace KScript.Language.Tests
         [InlineData("<let>x = 3; y = $x * 2</let><echo>$y</echo>")]
         [InlineData("<let name=\"x\" value=\"1\" /><set>x += 1</set><do>$x = $x * 2; x ??= 0</do>")]
         [InlineData("<let name=\"p\" value=\"{ a: [1, 2] }\" /><do>$p.a[0] = 3</do>")]
-        [InlineData("<for each=\"i\" index=\"n\" in=\"0..10 step 2\"><echo>$n: $i</echo><if test=\"$i gt 4\"><break /></if></for>")]
+        [InlineData("<for each=\"i\" at=\"n\" in=\"0..10 step 2\"><echo>$n: $i</echo><if test=\"$i gt 4\"><break /></if></for>")]
         [InlineData("<let name=\"m\" value=\"{ a: 1 }\" /><for each=\"k, v\" in=\"$m\"><echo>$k=$v</echo></for>")]
         [InlineData("<while test=\"true\"><continue /></while>")]
         [InlineData("<if test=\"true\"></if><elif test=\"false\"></elif><elif test=\"false\"></elif><else></else>")]
@@ -110,14 +111,14 @@ namespace KScript.Language.Tests
         [InlineData("<let name=\"names\" value=\"[1, 2] |> map(fn($n) => $n + 1) |> join(', ')\" />")]
         [InlineData("<let name=\"s\" value=\"[3, 1]->sort(fn($a, $b) => $a - $b)->first()\" />")]
         [InlineData("<try><throw type=\"Validation\" message=\"bad {1}\" /><catch as=\"err\" when=\"$err.type eq 'Validation'\"><echo>{$err.message} {$err.line}</echo></catch><finally></finally></try>")]
-        [InlineData("<import package=\"KScript.Terminal\" /><input to=\"name\">Name: </input><echo>Hi $name</echo>")]
+        [InlineData("<import package=\"KScript.Terminal\" /><input into=\"name\">Name: </input><echo>Hi $name</echo>")]
         [InlineData("<echo>email kyle@example.com, it's $args fine</echo>")]
         [InlineData("<echo>Use {{ and }}.</echo>")]
         [InlineData("<let name=\"u\" value=\"null\" /><echo>{ $u?.name ?? 'guest' }</echo>")]
         [InlineData("<let name=\"x\" value=\"match 2 { 1 => 'a', _ => 'b' }\" />")]
         [InlineData("<import package=\"KScript.AI\" /><let name=\"c\" value=\"@chat(system: 'Be kind.')\" /><echo>{ $c->ask('hi') }</echo>")]
         [InlineData("<let name=\"n\" type=\"int\" value=\"'3'\" /><echo>{ $n->round() }</echo>")]
-        [InlineData("<marray name=\"cfg\"><item key=\"a\">1</item></marray><echo>$cfg.a</echo>")]
+        [InlineData("<collection name=\"cfg\"><item key=\"a\">1</item></collection><echo>$cfg.a</echo>")]
         [InlineData("<if test=\"$args->count() gt 0 and 1 &lt; 2\"></if>")]
         [InlineData("<if test=\"'3' == 3 and '3' !== 3\"></if>")]
         [InlineData("<echo><![CDATA[ raw < text ]]></echo>")]
@@ -183,7 +184,8 @@ namespace KScript.Language.Tests
                 "<if condition=\"true\"></if>",
                 "<echo format=\"markdwn\">x</echo>",
                 "<def id=\"x\">1</def>",
-                "<for each=\"i\" in=\"0..2\" indx=\"n\"></for>",
+                "<for each=\"i\" in=\"0..2\" index=\"n\"></for>",
+                "<wait secnds=\"1\" />",
                 "<let name=\"x\" value=\"1\" /><echo>{ x }</echo>",
                 "<fn name=\"f\" params=\"x\" value=\"$x\" /><echo>{ f(1) }</echo>",
                 "<echo>@join_pth('a')</echo>",
@@ -244,7 +246,7 @@ namespace KScript.Language.Tests
         public void PagesMixHtmlAndKScript()
         {
             string page = "<!doctype html>\n<let name=\"min\" value=\"$request.query.min ?? 0\" />\n" +
-                          "<layout src=\"_layout.html\" title=\"People\">\n<h1 class=\"{ $min gt 0 ? 'x' : '' }\">Over {$min}</h1>\n" +
+                          "<layout path=\"_layout.html\" title=\"People\">\n<h1 class=\"{ $min gt 0 ? 'x' : '' }\">Over {$min}</h1>\n" +
                           "<input type=\"checkbox\" checked=\"{$min gt 0}\"><br>\n<people-card person=\"{ { name: 'Joan' } }\" />\n" +
                           "<script>if (a < b) {}</script>\n</layout>";
             DocumentAnalysis a = Analyze(page, Path.Combine(Site, "people.html"), SiteFiles());
@@ -317,7 +319,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void PagesReportUnknownComponentsAndMissingFiles()
         {
-            string page = "<layout src=\"_missing.html\"><people-crd person=\"1\" /><p>{ $nope }</p></layout>";
+            string page = "<layout path=\"_missing.html\"><people-crd person=\"1\" /><p>{ $nope }</p></layout>";
             DocumentAnalysis a = Analyze(page, Path.Combine(Site, "x.html"), SiteFiles());
             Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.InvalidAttributeValue && d.Message.Contains("_missing.html"));
             Diagnostic component = a.Diagnostics.Single(d => d.Code == DiagnosticCodes.UnknownElement);
@@ -381,7 +383,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void ImportsBringInFunctions()
         {
-            string script = Script("<import src=\"lib/strings.ks.xml\" as=\"str\" /><import src=\"lib/strings.ks.xml\" names=\"slugify\" />" +
+            string script = Script("<import path=\"lib/strings.ks.xml\" as=\"str\" /><import path=\"lib/strings.ks.xml\" names=\"slugify\" />" +
                                    "<echo>{ 'A B' |> str.slugify() } @slugify('x') { str.titlecase('x') }</echo>");
             DocumentAnalysis a = Analyze(script, Path.Combine(Site, "main.ks.xml"), SiteFiles());
             Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedFunction);
@@ -394,7 +396,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void ImportsBringInConstants()
         {
-            string script = Script("<import src=\"lib/strings.ks.xml\" /><import src=\"lib/strings.ks.xml\" names=\"dash\" as=\"s\" /><echo>{$dash} {$scratch}</echo>");
+            string script = Script("<import path=\"lib/strings.ks.xml\" /><import path=\"lib/strings.ks.xml\" names=\"dash\" as=\"s\" /><echo>{$dash} {$scratch}</echo>");
             DocumentAnalysis a = Analyze(script, Path.Combine(Site, "main.ks.xml"), SiteFiles());
             Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedVariable);
             Assert.Equal("scratch", a.Source[d.Span]);
@@ -406,7 +408,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void PagesImportScriptsAndHandlersSeeTheEvent()
         {
-            string page = "<import src=\"lib/strings.ks.xml\" />\n<live id=\"x\"><state name=\"v\" value=\"''\" />\n" +
+            string page = "<import path=\"lib/strings.ks.xml\" />\n<live id=\"x\"><state name=\"v\" value=\"''\" />\n" +
                           "<input on-input=\"v = @slugify($event.value) + $dash\"><p>{$v}</p></live>\n<p>{ $event ?? '' }</p>";
             DocumentAnalysis a = Analyze(page, Path.Combine(Site, "p.html"), SiteFiles());
             Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedVariable);
@@ -416,7 +418,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void ImportingAMissingNameIsAnError()
         {
-            string script = Script("<import src=\"lib/strings.ks.xml\" names=\"slugfy\" />");
+            string script = Script("<import path=\"lib/strings.ks.xml\" names=\"slugfy\" />");
             DocumentAnalysis a = Analyze(script, Path.Combine(Site, "main.ks.xml"), SiteFiles());
             Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedFunction);
             Assert.Equal("slugify", d.Fixes.Single().Changes.Single().NewText);

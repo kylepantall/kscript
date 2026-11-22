@@ -35,7 +35,7 @@ public sealed class EvaluationTests : IDisposable
     [InlineData("<echo>{ @now() + 1 > @now() }</echo>", "true\n")]
     [InlineData("<echo>{ [1, 2][5] ?? 'n' } { [1, 2][-1] } { 'abc'[1] } { 'abc'[-1] } { 'abc'[9] ?? 'n' } { { a: 1 }['a'] }</echo>", "n 2 b c n 1\n")]
     [InlineData("<echo>{ $list.count } { $list.length } { 'abc'.length }</echo>", "3 3 3\n")]
-    [InlineData("<import package=\"KScript.Math\" as=\"m\" /><import src=\"lib.ks.xml\" as=\"lib\" /><echo>{ m.pi > 3 } { m.sqrt(16) } { lib.pi2 } { lib.helper() } { @lib.pi2 } { @m.sqrt(9) } { m.e > 2 }</echo>", "true 4 6.28 1 6.28 3 true\n")]
+    [InlineData("<import package=\"KScript.Math\" as=\"m\" /><import path=\"lib.ks.xml\" as=\"lib\" /><echo>{ m.pi > 3 } { m.sqrt(16) } { lib.pi2 } { lib.helper() } { @lib.pi2 } { @m.sqrt(9) } { m.e > 2 }</echo>", "true 4 6.28 1 6.28 3 true\n")]
     [InlineData("<let name=\"m\" value=\"{ a: 1 }\" /><do>$m['a'] += 2; $m['b'] ??= 5; $m.c ??= 1; $m.c += 1</do><echo>{ $m->to_json() }</echo>", "{\"a\":3,\"b\":5,\"c\":2}\n")]
     [InlineData("<let name=\"x\" value=\"10\" /><do>$x -= 1; $x *= 2; $x /= 3; $x ??= 4</do><echo>$x</echo>", "6\n")]
     [InlineData("<let name=\"l\" value=\"[1]\" /><do>$l += 2; $l[2] = 5; $l[-1] += 1; $l[0] *= 7</do><echo>{ $l }</echo>", "7, 2, 6\n")]

@@ -252,9 +252,9 @@ public class TypedJsonTests
             File.WriteAllText(Path.Combine(dir, "scalar.json"), "3");
             string script = Path.Combine(dir, "t.ks.xml");
             File.WriteAllText(script, "<kscript>"
-                + "<type name=\"Repo\" sample=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /><field name=\"name\" type=\"string\" description=\"Mine.\" /></type>"
+                + "<type name=\"Repo\" path=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /><field name=\"name\" type=\"string\" description=\"Mine.\" /></type>"
                 + "<echo>{ $Repo->fields()[0].description }</echo>"
-                + "<type name=\"Item\" sample=\"list.json\" />"
+                + "<type name=\"Item\" path=\"list.json\" />"
                 + "<echo>{ $Repo->fields()->map(fn($f) => $f.name + ':' + $f.type + ($f.optional ? '?' : ''))->join(' ') }</echo>"
                 + "<echo>{ $Item->fields()->map(fn($f) => $f.name + ($f.optional ? '?' : ''))->join(' ') }</echo>"
                 + "<let name=\"r\" value=\"$Repo->from({ name: 'k', stargazers_count: 5, stars: 9, private: true, owner: { login: 'k' }, topics: [], mixed: [], empty: [], nums: [], flags: [], 'avatar-url': 'y', '2x': 1, items: [{ id: 3 }], deep: { a: { b: { c: { d: { e: { f: { g: { h: { i: 1 } } } } } } } } }, lists: [] })\" />"
@@ -266,9 +266,9 @@ public class TypedJsonTests
 
             foreach ((string attrs, string message) in new[]
             {
-                ("sample=\"missing.json\"", "The sample file 'missing.json' doesn't exist."),
-                ("sample=\"bad.json\"", "The sample file 'bad.json' isn't JSON"),
-                ("sample=\"scalar.json\"", "must hold a JSON object, or a list of objects"),
+                ("path=\"missing.json\"", "The sample file 'missing.json' doesn't exist."),
+                ("path=\"bad.json\"", "The sample file 'bad.json' isn't JSON"),
+                ("path=\"scalar.json\"", "must hold a JSON object, or a list of objects"),
             })
             {
                 File.WriteAllText(script, $"<kscript><type name=\"T\" {attrs} /></kscript>");
@@ -370,7 +370,7 @@ public class TypedJsonTests
         {
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><type name=\"User\" fields=\"login: string\" /></kscript>");
             string script = Path.Combine(dir, "t.ks.xml");
-            File.WriteAllText(script, "<kscript><import src=\"lib.ks.xml\" names=\"Usr\" /></kscript>");
+            File.WriteAllText(script, "<kscript><import path=\"lib.ks.xml\" names=\"Usr\" /></kscript>");
             Assert.Contains("Did you mean User? Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s, <model>s and <job>s.", Assert.Throws<KScriptException>(() => RunScriptFile(script)).Message);
         }
         finally
@@ -387,7 +387,7 @@ public class TypedJsonTests
         {
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><type name=\"User\" fields=\"login: string\" /></kscript>");
             string script = Path.Combine(dir, "t.ks.xml");
-            File.WriteAllText(script, "<kscript><import src=\"lib.ks.xml\" /><echo>{ @json('{\"login\": \"k\"}', as: User)->type() }</echo></kscript>");
+            File.WriteAllText(script, "<kscript><import path=\"lib.ks.xml\" /><echo>{ @json('{\"login\": \"k\"}', as: User)->type() }</echo></kscript>");
             Assert.Equal("User\n", RunScriptFile(script));
         }
         finally
@@ -424,7 +424,7 @@ public class TypedJsonTests
         {
             File.WriteAllText(Path.Combine(dir, "s.json"), "{ \"owner\": { \"login\": \"k\" } }");
             string script = Path.Combine(dir, "t.ks.xml");
-            File.WriteAllText(script, "<kscript><type name=\"S\" sample=\"s.json\" /><echo value=\"$S->schema().properties.owner.title\" /></kscript>");
+            File.WriteAllText(script, "<kscript><type name=\"S\" path=\"s.json\" /><echo value=\"$S->schema().properties.owner.title\" /></kscript>");
             Assert.Equal("S.owner\n", RunScriptFile(script));
         }
         finally

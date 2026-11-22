@@ -51,7 +51,7 @@ namespace KScript.Queueing
                 new A("at", K.Expression, "When it may run: a date."),
                 new A("queue", K.Text, "The queue, instead of the job's own."),
                 new A("connection", K.Text, "The connection, instead of the job's own."),
-                new A("to", K.DeclareVariable, "A variable that gets what was queued: { id, job, queue, connection, available_at }."))
+                new A("into", K.DeclareVariable, "A variable that gets what was queued: { id, job, queue, connection, available_at }."))
             {
                 Example = "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<do>@fake_queue()</do>\n<dispatch value=\"Hello(who: 'Joan')\" delay=\"'5m'\" />",
             }, run =>
@@ -69,7 +69,7 @@ namespace KScript.Queueing
                     _ => throw run.Error($"dispatch needs a job, such as dispatch SendWelcome(user_id: 7), not {Values.Describe(value)}.", "value", "Type"),
                 };
                 object queued = Dispatcher.Dispatch(run.Interpreter, run.Module, jobs, options);
-                if (run.Has("to")) run.Scope.Declare(run.VariableName("to"), queued);
+                if (run.Has("into")) run.Scope.Declare(run.VariableName("into"), queued);
                 return null;
             });
 

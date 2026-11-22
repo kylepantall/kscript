@@ -43,7 +43,7 @@
   <for each="i" in="0..100 step 5">
     <echo>$i</echo>
   </for>
-  <for each="item" index="k" in="$colours">
+  <for each="item" at="k" in="$colours">
     <echo>$k: $item</echo>
   </for>
   <for each="key, value" in="$config">

@@ -521,7 +521,7 @@ namespace KScript.Language.Features
             }
         }
 
-        /// <summary>The error types for a catch, throw, extends or expect-error: declared ones first, then the built-ins.</summary>
+        /// <summary>The error types for a catch, throw, extends or expect_error: declared ones first, then the built-ins.</summary>
         private static List<CompletionItem> ErrorTypeCompletions(DocumentAnalysis analysis, int offset, TextSpan replace)
         {
             List<CompletionItem> items = analysis.Symbols.Where(s => s.Shape.Type == KType.ErrorType).GroupBy(s => s.Name).Select(g => new CompletionItem

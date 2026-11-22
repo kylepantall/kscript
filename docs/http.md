@@ -32,8 +32,8 @@ KScript.Routes {
   Middleware(use: secure_headers)
 
   Get(path: /, view: home, name: home)
-  Get(path: /people, to: people.list, name: people.list)
-  Get(path: /people/{id}, to: people.page, name: people.page, where: id: int)
+  Get(path: /people, to: @people.list, name: people.list)
+  Get(path: /people/{id}, to: @people.page, name: people.page, where: id: int)
   Get(path: /team, redirect: /people, status: 301)
 
   Get(path: /ping) {
@@ -243,8 +243,8 @@ Browsers and proxies can keep an answer and ask again only when it may have chan
 KScript.Routes {
   import "controllers/people.kscript" as people
 
-  Get(path: /people, to: people.index, etag: yes, cache: 60)
-  Get(path: /people/{id}, to: people.show, etag: yes, cache: "private, max-age=0, must-revalidate")
+  Get(path: /people, to: @people.index, etag: yes, cache: 60)
+  Get(path: /people/{id}, to: @people.show, etag: yes, cache: "private, max-age=0, must-revalidate")
 }
 ```
 

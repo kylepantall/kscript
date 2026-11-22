@@ -85,11 +85,11 @@ test('double quotes are text that interpolates; single quotes are expression str
 });
 
 test('elements and their attributes', async () => {
-  const tokens = tokenize(await load(), 'Row(gap: 8, wrap) {\n  Button(variant: primary, on-click: "go()") "Play"\n  div {\n  }\n}');
+  const tokens = tokenize(await load(), 'Row(gap: 8, wrap) {\n  Button(variant: primary, on_click: "go()") "Play"\n  div {\n  }\n}');
   assert.match(scopeOf(tokens, 'Row'), /entity\.name\.tag\.kscript/);
   assert.match(scopeOf(tokens, 'gap'), /entity\.other\.attribute-name\.kscript/);
   assert.match(scopeOf(tokens, 'Button'), /entity\.name\.tag\.kscript/);
-  assert.match(scopeOf(tokens, 'on-click'), /entity\.other\.attribute-name\.kscript/);
+  assert.match(scopeOf(tokens, 'on_click'), /entity\.other\.attribute-name\.kscript/);
   assert.match(scopeOf(tokens, 'div'), /entity\.name\.tag\.kscript/);
   assert.match(scopeOf(tokens, 'Play'), /string\.quoted\.double\.kscript/);
 });

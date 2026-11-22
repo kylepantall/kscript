@@ -41,7 +41,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("<kscript>\n  <import src=\"‸\" />\n</kscript>", "main.ks.xml")]
+        [InlineData("<kscript>\n  <import path=\"‸\" />\n</kscript>", "main.ks.xml")]
         [InlineData("import \"‸\"", "tour.kscript")]
         [InlineData("import double from \"‸\"", "tour.kscript")]
         public void EmptyPathListsEveryScriptInTheProject(string text, string file)
@@ -57,7 +57,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("<kscript><import src=\"lib/‸\" /></kscript>", "main.ks.xml")]
+        [InlineData("<kscript><import path=\"lib/‸\" /></kscript>", "main.ks.xml")]
         [InlineData("import \"lib/‸\" as m", "tour.kscript")]
         public void FolderPathListsThatFolder(string text, string file)
         {

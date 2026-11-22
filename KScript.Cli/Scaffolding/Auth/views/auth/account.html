@@ -2,7 +2,7 @@
 to: {{ paths.views }}/auth/account.html
 ---
 <import package="KScript.Auth" />
-<layout src="{{ layout }}" title="Your account">
+<layout path="{{ layout }}" title="Your account">
   <h1>Your account</h1>
   <if test="$session->has('status')"><p class="status">{ $session->get('status') }</p></if>
   <p>Signed in as <strong>{ $data.user.name ?? $data.user.email }</strong> ({ $data.user.email }).</p>
