@@ -6,8 +6,12 @@
   <picker to="new_dir">Move files to: </picker>
   <input to="file_types">File types (comma separated, such as txt, pdf): </input>
 
-  <let name="types" value="$file_types->split(',')->map(fn($t) => $t->trim()->trim_start('.'))" />
-  <for each="file" in="@files($old_dir) |> filter(fn($f) => $types->contains($f->extension()))">
+  <let
+    name="types"
+    value="$file_types->split(',')->map(fn($t) => $t->trim()->trim_start('.'))" />
+  <for
+    each="file"
+    in="@files($old_dir) |> filter(fn($f) => $types->contains($f->extension()))">
     <let name="target" value="@join_path(base: $new_dir, $file->name())" />
     <move from="$file" to="$target" />
     <echo>Moved {$file->name()} to {$target}</echo>

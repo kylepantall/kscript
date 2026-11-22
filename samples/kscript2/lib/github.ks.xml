@@ -9,7 +9,11 @@
 
   <type name="Repo" description="A GitHub repository.">
     <field name="name" type="string" />
-    <field name="stars" type="int" from="stargazers_count" description="How many people starred it." />
+    <field
+      name="stars"
+      type="int"
+      from="stargazers_count"
+      description="How many people starred it." />
     <field name="owner" type="Owner" />
     <field name="topics" type="string[]" default="[]" />
     <field name="license" type="string?" from="license.name" />

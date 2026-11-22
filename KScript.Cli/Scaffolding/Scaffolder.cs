@@ -163,7 +163,7 @@ namespace KScript.Scaffolding
             string content = StubTemplate.Render(body, values);
             // A template whose sections end with a blank line leaves one at the end; files end with one newline.
             if (content.EndsWith("\n\n", StringComparison.Ordinal)) content = content.TrimEnd('\n') + "\n";
-            (to, content) = ScriptFormat.Apply(template.FileName, to, content, values["format"]);
+            (to, content) = ScriptFormat.Apply(template.FileName, to, content, values["format"], global::KScript.Language.Formatting.FormatOptions.From(KScript.Projects.ProjectConfig.FindAndLoad(root)));
 
             string full = Path.GetFullPath(Path.Combine(root, to));
             string rootWithSlash = root.EndsWith(Path.DirectorySeparatorChar) ? root : root + Path.DirectorySeparatorChar;

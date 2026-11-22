@@ -148,6 +148,7 @@ namespace KScript.Scaffolding
                         string added = Scaffolder.Make(new MakeRequest { Type = "controller", Name = controller, Root = root, Options = controllerOptions, To = controllerFile, Rendering = true }).Content;
                         string updated = AppendFunctions(source, added, xml);
                         if (Regex.IsMatch(added, @"@(response|view|redirect|abort)\(") && !Regex.IsMatch(source, @"^\s*(import\s+KScript\.Http\b|<import\s+package=""KScript\.Http"")", RegexOptions.Multiline)) updated = AddHttpImport(updated, xml);
+                        updated = ScriptFormat.Tidy(full, updated, global::KScript.Language.Formatting.FormatOptions.From(project));
                         if (!request.DryRun) File.WriteAllText(full, updated);
                         result.Files.Add(("Added " + string.Join(", ", missing.Select(f => f + "()")) + " to", controllerFile));
                     }
@@ -163,6 +164,8 @@ namespace KScript.Scaffolding
                 }
             }
 
+            // The new route is laid out as kscript fmt would, so the routes file stays formatted.
+            text = ScriptFormat.Tidy(routesFull, text, global::KScript.Language.Formatting.FormatOptions.From(project));
             if (!request.DryRun)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(routesFull)!);
@@ -211,10 +214,11 @@ namespace KScript.Scaffolding
 
         internal static string NewRoutesFile(bool api, bool xml)
         {
-            string comment = api
-                ? "API routes, served by kscript serve under /api with JSON errors (see the Routes and APIs guide). kscript routes lists them."
-                : "Web routes, served by kscript serve (see the Routes and APIs guide). kscript routes lists them.";
-            return xml ? $"<!-- {comment} -->\n<KScript.Routes>\n</KScript.Routes>\n" : $"// {comment}\nKScript.Routes {{\n}}\n";
+            string first = api
+                ? "API routes, served by kscript serve under /api with JSON errors (see the Routes"
+                : "Web routes, served by kscript serve (see the Routes and APIs guide). kscript";
+            string second = api ? "and APIs guide). kscript routes lists them." : "routes lists them.";
+            return xml ? $"<!-- {first} {second} -->\n<KScript.Routes>\n</KScript.Routes>\n" : $"// {first}\n// {second}\nKScript.Routes {{\n}}\n";
         }
 
         private static readonly Regex CodeImport = new Regex(@"^\s*import\s+""(?<src>[^""]+)""(\s+as\s+(?<as>\w+))?", RegexOptions.Multiline);

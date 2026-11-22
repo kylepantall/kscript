@@ -4,7 +4,9 @@
   <test name="oldest.ks.xml finds Joan">
     <let name="result" value="@run_script('../oldest.ks.xml')" />
     <expect value="$result.code" equals="0" />
-    <expect value="$result.output->lines()" equals="['Joan is the oldest at 82 years old.', 'Joan again.']" />
+    <expect
+      value="$result.output->lines()"
+      equals="['Joan is the oldest at 82 years old.', 'Joan again.']" />
   </test>
 
   <test name="imports.ks.xml prints the slug twice">

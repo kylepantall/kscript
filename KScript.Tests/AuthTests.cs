@@ -330,7 +330,7 @@ public sealed class AuthMakeTests : AuthSiteFixture
         string routes = Read("routes/web.ks.xml");
         Assert.Contains("<import package=\"KScript.Auth\" />", routes);
         Assert.Contains("<Group middleware=\"guest\">", routes);
-        Assert.Contains("<fn name=\"sign_up\" params=\"form\"", Read("controllers/accounts.ks.xml"));
+        Assert.Matches(@"<fn\s+name=""sign_up""\s+params=""form""", Read("controllers/accounts.ks.xml"));
         Assert.DoesNotContain("accounts", Read("routes/api.kscript"));
 
         var b = new Browser(App());

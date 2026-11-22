@@ -24,11 +24,15 @@
     </test>
 
     <test name="cells placed off the edge are dropped">
-      <expect value="@place(@blank(width: 3, height: 2), rows: ['OOOO'], left: 1, top: 1)" equals="['...', '.OO']" />
+      <expect
+        value="@place(@blank(width: 3, height: 2), rows: ['OOOO'], left: 1, top: 1)"
+        equals="['...', '.OO']" />
     </test>
 
     <test name="grids print as text">
-      <expect value="@to_text(['O.', '.O'], alive: '#', dead: '-')" equals="'#-' + @char_of(10) + '-#'" />
+      <expect
+        value="@to_text(['O.', '.O'], alive: '#', dead: '-')"
+        equals="'#-' + @char_of(10) + '-#'" />
     </test>
 
     <test name="the .cells format is read, comments and all">
@@ -59,10 +63,15 @@
       <expect value="@neighbours($g, x: 0, y: 0, wrap: true)" equals="1" />
     </test>
 
-    <test name="next_state: {$c.alive ? 'live' : 'dead'} cell with {$c.n} neighbours" each="c" in="[
+    <test
+      name="next_state: {$c.alive ? 'live' : 'dead'} cell with {$c.n} neighbours"
+      each="c"
+      in="[
         { alive: true, n: 1, next: false }, { alive: true, n: 2, next: true }, { alive: true, n: 3, next: true },
         { alive: true, n: 4, next: false }, { alive: false, n: 3, next: true }, { alive: false, n: 2, next: false }]">
-      <expect value="@next_state(alive: $c.alive, neighbours: $c.n)" equals="$c.next" />
+      <expect
+        value="@next_state(alive: $c.alive, neighbours: $c.n)"
+        equals="$c.next" />
     </test>
 
     <test name="a blinker flips between a row and a column">
@@ -83,14 +92,20 @@
 
     <test name="with walls, life at the edge dies instead of wrapping">
       <let name="g" value="['O..', 'O..', 'O..']" />
-      <expect value="@population(@next_generation($g, wrap: true))" equals="9" />
-      <expect value="@next_generation($g, wrap: false)" equals="['...', 'OO.', '...']" />
+      <expect
+        value="@population(@next_generation($g, wrap: true))"
+        equals="9" />
+      <expect
+        value="@next_generation($g, wrap: false)"
+        equals="['...', 'OO.', '...']" />
     </test>
   </describe>
 
   <describe name="worlds">
     <test name="flip takes the column,row a board button sends">
-      <let name="w" value="@flip(@new_world(@blank(width: 3, height: 3)), where: '2,0')" />
+      <let
+        name="w"
+        value="@flip(@new_world(@blank(width: 3, height: 3)), where: '2,0')" />
       <expect value="$w.grid" equals="['..O', '...', '...']" />
       <expect value="@flip($w, where: 'nonsense')" equals="$w" />
       <expect value="@flip($w, where: '9,9')" equals="$w" />
@@ -107,19 +122,29 @@
       <expect
         value="@status(@advance(@pattern_world('pulsar', width: 17, height: 17), generations: 4))"
         equals="'Oscillating, period 3'" />
-      <expect value="@status(@advance(@new_world(['...', '.O.', '...']), generations: 1))" equals="'Extinct'" />
-      <expect value="@status(@pattern_world('glider', width: 10, height: 10))" equals="'Evolving'" />
+      <expect
+        value="@status(@advance(@new_world(['...', '.O.', '...']), generations: 1))"
+        equals="'Extinct'" />
+      <expect
+        value="@status(@pattern_world('glider', width: 10, height: 10))"
+        equals="'Evolving'" />
     </test>
 
     <test name="advance counts births and deaths and stops when nothing is alive">
-      <let name="w" value="@advance(@pattern_world('blinker', width: 5, height: 5), generations: 2)" />
+      <let
+        name="w"
+        value="@advance(@pattern_world('blinker', width: 5, height: 5), generations: 2)" />
       <expect value="[$w.births, $w.deaths]" equals="[4, 4]" />
-      <let name="dead" value="@advance(@new_world(['...', '.O.', '...']), generations: 10)" />
+      <let
+        name="dead"
+        value="@advance(@new_world(['...', '.O.', '...']), generations: 10)" />
       <expect value="$dead.generation" equals="1" />
     </test>
 
     <test name="summary has what both front ends show">
-      <let name="s" value="@summary(@pattern_world('glider', width: 10, height: 10))" />
+      <let
+        name="s"
+        value="@summary(@pattern_world('glider', width: 10, height: 10))" />
       <expect value="$s.population" equals="5" />
       <expect value="$s.density" equals="5" />
       <expect value="$s.size" equals="'10 × 10'" />
@@ -129,16 +154,22 @@
 
   <describe name="front ends">
     <test name="the terminal version plays a pattern and exits">
-      <let name="run" value="@run_script('../life.ks.xml', options: { args: ['blinker', '3'] })" />
+      <let
+        name="run"
+        value="@run_script('../life.ks.xml', options: { args: ['blinker', '3'] })" />
       <expect value="$run.code" equals="0" />
       <expect value="$run.output" contains="'Generation 3'" />
       <expect value="$run.output" contains="'Oscillating, period 2'" />
     </test>
 
     <test name="the terminal version reports unknown patterns">
-      <let name="run" value="@run_script('../life.ks.xml', options: { args: ['no-such-pattern'] })" />
+      <let
+        name="run"
+        value="@run_script('../life.ks.xml', options: { args: ['no-such-pattern'] })" />
       <expect value="$run.code" equals="3" />
-      <expect value="$run.error.message" contains="'a pattern name or a file'" />
+      <expect
+        value="$run.error.message"
+        contains="'a pattern name or a file'" />
     </test>
 
     <test name="the menu works with typed answers">

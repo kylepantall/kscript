@@ -1,4 +1,5 @@
-// Tests for the notes API (controllers/notes{{ ext }}). @api('/api/...') sends a request to this app's own routes,
+// Tests for the notes API (controllers/notes{{ ext }}). @api('/api/...') sends
+// a request to this app's own routes,
 // without a server. kscript test uses config/config.test.yaml, so these notes never reach the real {{#if db is none}}notes file{{else}}database{{/if}}.
 import KScript.Net
 {{#if auth}}
@@ -19,7 +20,8 @@ fn notes_api(path, method: string = 'GET', body = null{{#if auth}}, as = {}{{/if
 
 describe(name: "notes") {
 {{#if auth}}
-  // Each test signs up someone new (in before-each), so no test sees another's notes.
+  // Each test signs up someone new (in before-each), so no test sees another's
+  // notes.
   me = {}
 
 {{/if}}

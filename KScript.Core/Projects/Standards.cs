@@ -77,7 +77,7 @@ namespace KScript.Projects
                     "rules": { "KS6*": "warning" }
                   },
                   "format": {
-                    "printWidth": 120,
+                    "printWidth": 80,
                     "maxBlankLines": 1,
                     "endOfLine": "auto",
                     "rules": {
@@ -90,7 +90,10 @@ namespace KScript.Projects
                       "finalNewline": true,
                       "spacing": true,
                       "braceStyle": true,
-                      "wrapStrings": true
+                      "wrapStrings": true,
+                      "wrapChains": true,
+                      "wrapBodies": true,
+                      "wrapComments": true
                     }
                   }
                 }

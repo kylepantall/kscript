@@ -271,7 +271,7 @@ namespace KScript.LanguageServer
             rows.Add(("format.enabled", f.Enabled ? "true" : "false", From("format.enabled")));
             string indent = f.UseTabs == true ? "tab" : f.IndentSize is int size ? size.ToString() : "the editor's tab settings (kscript fmt: 2)";
             rows.Add(("format.indent", indent, config.Sources.ContainsKey("format.indent") ? From("format.indent") : From("format.tabWidth")));
-            rows.Add(("format.printWidth", (f.PrintWidth ?? 120).ToString(), From("format.printWidth")));
+            rows.Add(("format.printWidth", (f.PrintWidth ?? 80).ToString(), From("format.printWidth")));
             rows.Add(("format.maxBlankLines", (f.MaxBlankLines ?? 1).ToString(), From("format.maxBlankLines")));
             rows.Add(("format.endOfLine", f.EndOfLine, From("format.endOfLine")));
             rows.Add(("format.preserve", f.Preserve.Count == 0 ? "(none)" : string.Join(", ", f.Preserve), From("format.preserve")));

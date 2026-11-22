@@ -28,7 +28,10 @@
       <let
         name="found"
         value="$people |> filter(fn($p) => $p.name->lower()->contains($q) or $p.role->lower()->contains($q))" />
-      <input bind="query" placeholder="Search by name or role…" autocomplete="off">
+      <input
+        bind="query"
+        placeholder="Search by name or role…"
+        autocomplete="off">
       <p class="note">{$found->count()} of {$people->count()} people</p>
       <ul>
         <for each="p" in="$found">
@@ -57,12 +60,17 @@
         <for each="t" in="$todos">
           <li class="{ $t.done ? 'done' : '' }">
             <label><input type="checkbox" checked="{$t.done}" on-change="todos = $todos->map(fn($x) => $x.id == $t.id ? $x->set(key: 'done', value: not $x.done) : $x)"> {$t.text}</label>
-            <button class="remove" title="Remove" on-click="todos = $todos->reject(fn($x) => $x.id == $t.id)">✕</button>
+            <button
+              class="remove"
+              title="Remove"
+              on-click="todos = $todos->reject(fn($x) => $x.id == $t.id)">✕</button>
           </li>
         </for>
       </ul>
       <p class="note">{$todos->count(fn($t) => not $t.done)} left</p>
-      <button on-click="todos = $todos->reject(fn($t) => $t.done)" disabled="{ not $todos->any(fn($t) => $t.done) }">Clear done</button>
+      <button
+        on-click="todos = $todos->reject(fn($t) => $t.done)"
+        disabled="{ not $todos->any(fn($t) => $t.done) }">Clear done</button>
     </live>
   </section>
 

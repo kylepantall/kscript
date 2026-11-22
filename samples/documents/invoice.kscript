@@ -1,9 +1,14 @@
 import KScript.Document
 
-// An invoice: line items are a list of maps; subtotal, tax and total are worked out for you.
+// An invoice: line items are a list of maps; subtotal, tax and total are worked
+// out for you.
 
 items = [
-  { description: 'Workshop: *Cellular automata for beginners* (half day)', quantity: 2, price: 450 },
+  {
+    description: 'Workshop: *Cellular automata for beginners* (half day)',
+    quantity: 2,
+    price: 450
+  },
   { description: 'Pattern library design', quantity: 12.5, price: 85 },
   { description: 'Travel', price: 64.2 },
 ]

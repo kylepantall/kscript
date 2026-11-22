@@ -4,7 +4,8 @@ adds-to: web
 import KScript.Auth
 import "{{ controller_import }}" as accounts
 
-// Signing in and out (kscript make auth). auth sends guests to /login; guest sends people who are signed in home.
+// Signing in and out (kscript make auth). auth sends guests to /login; guest
+// sends people who are signed in home.
 Group(middleware: guest) {
   Get(path: "/login", to: accounts.show_login, name: "login")
   Post(path: "/login", to: accounts.sign_in)

@@ -13,7 +13,9 @@
     </test>
 
     <test name="reports every problem">
-      <expect value="$Repo->check({ stargazers_count: 'lots' })->count()" equals="5" />
+      <expect
+        value="$Repo->check({ stargazers_count: 'lots' })->count()"
+        equals="5" />
     </test>
   </describe>
 </kscript>

@@ -9,7 +9,8 @@ base: project
 to: {{ paths.tests }}/{{ dir }}{{ kebab }}.test{{ ext }}
 hint: Run it: kscript test {{ paths.tests }}/{{ dir }}{{ kebab }}.test{{ ext }}
 ---
-// Bring in what you're testing, e.g. import "../{{ paths.lib }}/{{ kebab }}{{ ext }}"
+// Bring in what you're testing, e.g. import
+// "../{{ paths.lib }}/{{ kebab }}{{ ext }}"
 
 describe(name: "{{ title }}") {
   // TODO: Replace these examples with tests of your own code.

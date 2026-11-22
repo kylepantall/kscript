@@ -174,7 +174,7 @@ kscript make project my-app --template ../starters/api   # any folder
   },
   "format": {
     "indent": 2,           // spaces per level, or "tab"; used by kscript fmt and Format Document
-    "printWidth": 120,     // start tags past this column get one attribute per line
+    "printWidth": 80,      // the longest a line should be; longer lines are wrapped
     "rules": { "statementPerLine": false },  // any rule can be turned off
     "exclude": ["vendor"]  // see docs/formatting.md for every format setting
   },

@@ -1,17 +1,27 @@
-// Web routes, served by kscript serve (see the Routes and APIs guide). kscript routes lists them.
+// Web routes, served by kscript serve (see the Routes and APIs guide). kscript
+// routes lists them.
 KScript.Routes {
   import KScript.Auth
   import "../controllers/accounts.kscript" as accounts
 
-  // Signing in and out (kscript make auth). auth sends guests to /login; guest sends people who are signed in home.
+  // Signing in and out (kscript make auth). auth sends guests to /login; guest
+  // sends people who are signed in home.
   Group(middleware: guest) {
     Get(path: "/login", to: accounts.show_login, name: "login")
     Post(path: "/login", to: accounts.sign_in)
     Get(path: "/register", to: accounts.show_register, name: "register")
     Post(path: "/register", to: accounts.sign_up)
-    Get(path: "/forgot-password", to: accounts.show_forgot, name: "password.forgot")
+    Get(
+      path: "/forgot-password",
+      to: accounts.show_forgot,
+      name: "password.forgot"
+    )
     Post(path: "/forgot-password", to: accounts.send_reset)
-    Get(path: "/reset-password/{token}", to: accounts.show_reset, name: "password.reset")
+    Get(
+      path: "/reset-password/{token}",
+      to: accounts.show_reset,
+      name: "password.reset"
+    )
     Post(path: "/reset-password", to: accounts.reset)
   }
   Group(middleware: auth) {

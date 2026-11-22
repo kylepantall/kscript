@@ -8,7 +8,8 @@ example: kscript make const app --values "name = 'Shop', version = '1.0'"
 to: {{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Import it with import "{{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}", then use the values as $name
 ---
-// {{ title }}: values that can't change. Scripts that import this file see each one as $name.
+// {{ title }}: values that can't change. Scripts that import this file see each
+// one as $name.
 {{#each values}}
 const {{ item }}
 {{else}}

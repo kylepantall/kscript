@@ -8,7 +8,8 @@ example: kscript make request orders/NewOrder --fields "product: string, quantit
 to: {{ paths.requests }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Use it in a controller: import "../{{ paths.requests }}/{{ dir }}{{ kebab }}{{ ext }}", then fn store(json: {{ pascal }}). A body that doesn't fit gets 422.
 ---
-/// The body of a {{ title }} request. Data that doesn't fit is answered with 422 before the controller runs.
+/// The body of a {{ title }} request. Data that doesn't fit is answered with
+/// 422 before the controller runs.
 type {{ pascal }} {
 {{#each fields}}
   {{ item }}

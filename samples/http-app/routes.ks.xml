@@ -7,8 +7,18 @@
 
   <Get path="/" view="home" name="home" />
   <!-- etag: browsers that already have this version get 304 Not Modified; cache: they may keep it for a minute. -->
-  <Get path="/people" to="people.list" name="people.list" etag="yes" cache="60" />
-  <Get path="/people/{id}" to="people.page" name="people.page" where="id: int" etag="yes" />
+  <Get
+    path="/people"
+    to="people.list"
+    name="people.list"
+    etag="yes"
+    cache="60" />
+  <Get
+    path="/people/{id}"
+    to="people.page"
+    name="people.page"
+    where="id: int"
+    etag="yes" />
   <Get path="/team" redirect="/people" status="301" />
 
   <Get path="/ping">

@@ -1,8 +1,8 @@
 --- make
 when: auth
 ---
-// Tests for sign-up and API tokens (controllers/accounts{{ ext }}). @api('/api/...') sends a request to this app's
-// own routes, without a server.
+// Tests for sign-up and API tokens (controllers/accounts{{ ext }}).
+// @api('/api/...') sends a request to this app's own routes, without a server.
 import KScript.Net
 
 describe(name: "accounts") {

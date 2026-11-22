@@ -1,4 +1,5 @@
-// Error types: declare them, throw them with their fields, and catch them by type.
+// Error types: declare them, throw them with their fields, and catch them by
+// type.
 
 /// An order that can't be found.
 error OrderNotFound(message: "No order {$id}") extends NotFound {
@@ -6,7 +7,10 @@ error OrderNotFound(message: "No order {$id}") extends NotFound {
 }
 
 /// Not enough of something in stock.
-error OutOfStock(status: 409, message: "Only {$left} {$item} left, {$wanted} wanted") {
+error OutOfStock(
+  status: 409,
+  message: "Only {$left} {$item} left, {$wanted} wanted"
+) {
   item: string
   left: int
   wanted: int

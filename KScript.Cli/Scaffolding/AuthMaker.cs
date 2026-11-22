@@ -92,7 +92,7 @@ namespace KScript.Scaffolding
                 var imports = lines.TakeWhile(l => Regex.IsMatch(l, xml ? @"^\s*<import\b" : @"^\s*import\b")).ToList();
                 var routes = lines.Skip(imports.Count).SkipWhile(l => l.Trim().Length == 0).ToList();
                 imports = imports.Where(i => !text.Split('\n').Any(l => l.Trim() == i.Trim())).ToList();
-                routeEdits.Add((file, RouteMaker.Insert(text, imports, routes, xml, file), existed));
+                routeEdits.Add((file, ScriptFormat.Tidy(full, RouteMaker.Insert(text, imports, routes, xml, file), global::KScript.Language.Formatting.FormatOptions.From(project)), existed));
             }
 
             // kscript.json: a rule for new passwords, which @register() and @reset_password() check.

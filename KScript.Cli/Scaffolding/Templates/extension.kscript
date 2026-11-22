@@ -9,7 +9,8 @@ example: kscript make extension list --methods second
 to: {{ paths.extensions }}/{{ dir }}{{ name }}{{ ext }}
 hint: Every script in the project now has these methods: {{#each methods}}->{{ item | snake }}(){{#unless last}}, {{/unless}}{{/each}}{{#unless methods}}add fn lines inside the block{{/unless}}. $this is the {{ name }} each one is called on
 ---
-/// Methods for every {{ name }} in the project. $this is the {{ name }} a method is called on.
+/// Methods for every {{ name }} in the project. $this is the {{ name }} a method
+/// is called on.
 extend {{ name }} {
 {{#each methods}}
   /// What {{ item | snake }} does.

@@ -21,7 +21,8 @@ job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {
 
 {{/if}}
   fn handle() {
-    // TODO: Do the work here. An error retries the job after its backoff, until its tries run out.
+    // TODO: Do the work here. An error retries the job after its backoff, until
+    // its tries run out.
     log "{{ title }}"
   }
 

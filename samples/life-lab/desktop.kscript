@@ -1,6 +1,13 @@
-// Life Lab as a desktop app, in the .kscript format: kscript desktop.kscript opens it in a window.
-// The rules come from lib/life.ks.xml, the same script the terminal and browser versions use.
-KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, background: "#0f172a") {
+// Life Lab as a desktop app, in the .kscript format: kscript desktop.kscript
+// opens it in a window. The rules come from lib/life.ks.xml, the same script
+// the terminal and browser versions use.
+KScript.Window(
+  title: "Life Lab",
+  width: 760,
+  height: 720,
+  theme: dark,
+  background: "#0f172a"
+) {
   import "lib/life.ks.xml"
 
   cols = 40
@@ -11,7 +18,9 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
   pattern = 'glider_gun'
   soup = 30
   wrap = true
-  pattern_choices = $patterns->keys()->map(fn($k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
+  pattern_choices = $patterns
+    ->keys()
+    ->map(fn($k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
 
   fn tick() {
     world = @advance($world, 1)
@@ -22,7 +31,8 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
 
   Column(gap: 4) {
     Text(size: 26, weight: bold, color: "#e2e8f0") "Life Lab"
-    Text(color: "#94a3b8") "Conway's Game of Life, written in KScript. Click cells to draw, then press Play."
+    Text(color: "#94a3b8") "Conway's Game of Life, written in KScript. Click \
+      cells to draw, then press Play."
   }
 
   Row(gap: 8, wrap) {
@@ -40,9 +50,19 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
 
   Row(gap: 8, wrap) {
     Button(on-click: "world = @new_world(@random_grid($cols, $rows, $soup), $world.wrap, 'random soup'); playing = false") "Random soup"
-    Slider(bind: soup, min: 5, max: 80, step: 5, width: 140, tooltip: "How full the soup is")
+    Slider(
+      bind: soup,
+      min: 5,
+      max: 80,
+      step: 5,
+      width: 140,
+      tooltip: "How full the soup is"
+    )
     Text(color: "#94a3b8", width: 40) "{$soup}%"
-    CheckBox(bind: wrap, on-change: "world = $world->merge({ wrap: $event.value })") "Wrap edges"
+    CheckBox(
+      bind: wrap,
+      on-change: "world = $world->merge({ wrap: $event.value })"
+    ) "Wrap edges"
     Button(on-click: "world = @new_world(@blank($cols, $rows), $world.wrap); playing = false") "Clear"
   }
 
@@ -76,6 +96,7 @@ KScript.Window(title: "Life Lab", width: 760, height: 720, theme: dark, backgrou
     }
   }
 
-  Text(size: 12, color: "#64748b") "Also runs in a terminal (kscript life.ks.xml) and a browser (kscript serve). Same \
-    rules, one script: lib/life.ks.xml."
+  Text(size: 12, color: "#64748b") "Also runs in a terminal (kscript \
+    life.ks.xml) and a browser (kscript serve). Same rules, one script: \
+    lib/life.ks.xml."
 }

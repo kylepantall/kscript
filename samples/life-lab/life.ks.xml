@@ -13,7 +13,9 @@
   <import src="lib/life.ks.xml" />
 
   <!-- Two characters per cell keeps the board roughly square in most terminal fonts. -->
-  <let name="board_w" value="@min(40, ((@terminal_width() - 4) / 2)->floor())" />
+  <let
+    name="board_w"
+    value="@min(40, ((@terminal_width() - 4) / 2)->floor())" />
   <let name="board_h" value="20" />
   <let name="frame_ms" value="70" />
 
@@ -60,13 +62,17 @@
   <!-- kscript life.ks.xml <pattern> [generations]: play and stop. -->
   <if $args->count() gt 0>
     <let name="world" value="@load_pattern($args[0])" />
-    <let name="world" value="@play($world, generations: ($args[1] ?? '100')->to_int(default: 100))" />
+    <let
+      name="world"
+      value="@play($world, generations: ($args[1] ?? '100')->to_int(default: 100))" />
     <call fn="draw" args="$world, 'done'" />
     <exit />
   </if>
 
   <!-- Interactive -->
-  <let name="world" value="@pattern_world('glider', width: $board_w, height: $board_h)" />
+  <let
+    name="world"
+    value="@pattern_world('glider', width: $board_w, height: $board_h)" />
   <let name="actions">{
     'Step one generation': 'step',
     'Play 25 generations': 'play25',
@@ -97,7 +103,9 @@
       <case is="'pattern'">
         <menu to="name" options="$patterns->keys()">Which pattern?</menu>
         <echo>{ @dim($patterns[$name].about) }</echo>
-        <set name="world" value="@pattern_world($name, width: $board_w, height: $board_h, wrap: $world.wrap)" />
+        <set
+          name="world"
+          value="@pattern_world($name, width: $board_w, height: $board_h, wrap: $world.wrap)" />
       </case>
       <case is="'random'">
         <input to="density" type="number" default="30">How full, in percent? [30] </input>
@@ -115,12 +123,16 @@
           <wait seconds="1" />
           <continue />
         </if>
-        <set name="world" value="@edit_world($world, grid: @toggle($world.grid, x: $xy[0], y: $xy[1]))" />
+        <set
+          name="world"
+          value="@edit_world($world, grid: @toggle($world.grid, x: $xy[0], y: $xy[1]))" />
       </case>
       <case is="'file'">
         <input to="path">Pattern file: </input>
         <try>
-          <set name="world" value="@load_pattern($path->trim(), wrap: $world.wrap)" />
+          <set
+            name="world"
+            value="@load_pattern($path->trim(), wrap: $world.wrap)" />
           <catch as="err">
             <echo>{ @color($err.message, colour: 'red') }</echo>
             <wait seconds="1.5" />

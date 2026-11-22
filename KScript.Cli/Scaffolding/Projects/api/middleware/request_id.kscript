@@ -1,8 +1,10 @@
-// The app's own middleware. A middleware is a function of the request and the next step: it can answer
-// early, or change the response the rest of the app gives. routes/api{{ ext }} uses it for every route.
+// The app's own middleware. A middleware is a function of the request and the
+// next step: it can answer early, or change the response the rest of the app
+// gives. routes/api{{ ext }} uses it for every route.
 import KScript.Http
 
-/// Gives every response an X-Request-Id header (the caller's own, or a new one) so logs and clients can match them up.
+/// Gives every response an X-Request-Id header (the caller's own, or a new one)
+/// so logs and clients can match them up.
 fn request_id(request, next) {
   id = $request.headers['x-request-id'] ?? @uuid()
   return $next($request)->with_header('X-Request-Id', $id)

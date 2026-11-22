@@ -10,7 +10,8 @@ example: kscript make window windows/about --title "About this app"
 to: {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Open it: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }}. Build a program from it: kscript compile {{ dir }}{{ kebab }}{{ ext }}
 ---
-// {{ title }}: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }} opens it, and the script ends when the window closes.
+// {{ title }}: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }} opens
+// it, and the script ends when the window closes.
 KScript.Window(title: "{{ title }}", width: {{ width ?? 480 }}, height: {{ height ?? 360 }}, theme: system) {
   count = 0
 

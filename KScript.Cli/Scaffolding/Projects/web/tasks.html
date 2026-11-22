@@ -7,7 +7,9 @@
     <state name="tasks" value="@starter_tasks()" />
     <state name="draft" value="''" />
 
-    <form class="add-task" on-submit="tasks = @add_task($tasks, title: $draft); draft = ''">
+    <form
+      class="add-task"
+      on-submit="tasks = @add_task($tasks, title: $draft); draft = ''">
       <input bind="draft" placeholder="What needs doing?" autocomplete="off">
       <button>Add</button>
     </form>
@@ -16,12 +18,17 @@
       <for each="t" in="$tasks">
         <li class="{ $t.done ? 'done' : '' }">
           <label><input type="checkbox" checked="{$t.done}" on-change="tasks = @toggle_task($tasks, id: $t.id)"> {$t.title}</label>
-          <button class="remove" title="Remove" on-click="tasks = @remove_task($tasks, id: $t.id)">✕</button>
+          <button
+            class="remove"
+            title="Remove"
+            on-click="tasks = @remove_task($tasks, id: $t.id)">✕</button>
         </li>
       </for>
     </ul>
 
     <p class="note">{ @tasks_left($tasks) }</p>
-    <button on-click="tasks = @clear_done($tasks)" disabled="{ not $tasks->any(fn($t) => $t.done) }">Clear done</button>
+    <button
+      on-click="tasks = @clear_done($tasks)"
+      disabled="{ not $tasks->any(fn($t) => $t.done) }">Clear done</button>
   </live>
 </layout>
