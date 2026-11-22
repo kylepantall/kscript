@@ -22,8 +22,8 @@ test('gives a new unsaved script a path to run from', () => {
 });
 
 test('knows a test file by its name', () => {
-  for (const name of ['a.test.kscript', '/x/cart.test.ks.xml', 'C:\\x\\cart.TEST.xml']) assert.ok(isTestFile(name), name);
-  for (const name of ['a.kscript', 'test.kscript', 'a.test.js', 'latest.ks.xml']) assert.ok(!isTestFile(name), name);
+  for (const name of ['a.test.kscript', '/x/cart.test.ks.xml', 'C:\\x\\cart.TEST.ks.xml']) assert.ok(isTestFile(name), name);
+  for (const name of ['a.kscript', 'test.kscript', 'a.test.js', 'latest.ks.xml', 'cart.test.xml']) assert.ok(!isTestFile(name), name);
 });
 
 const report = `<?xml version="1.0" encoding="utf-8"?>
