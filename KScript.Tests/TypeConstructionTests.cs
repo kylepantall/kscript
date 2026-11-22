@@ -45,6 +45,54 @@ public sealed class TypeConstructionTests : DataFixture
         Assert.Equal(printed, Runs(code));
     }
 
+    [Fact]
+    public void CastEvaluatesOnceThenNormalizesAndValidatesTheResult()
+    {
+        string printed = Runs("""
+            type PasskeySessionKey with [string] {
+              min: 8
+              normalize: $value->trim()
+              pattern: /^passkey_[a-zA-Z]+$/
+            }
+            fn key_for(kind) {
+              echo 'called'
+              return " passkey_{$kind} "
+            }
+            key = @key_for('login') as PasskeySessionKey
+            echo $key
+            """);
+        Assert.Equal("called\npasskey_login\n", printed);
+    }
+
+    [Theory]
+    [InlineData("echo '41' as int + 1", "42\n")]
+    [InlineData("echo 'small' as Size", "small\n")]
+    [InlineData("items = [{name: 'arc'}] as Repo[]\necho $items[0].name", "arc\n")]
+    [InlineData("echo null as Age? == null", "true\n")]
+    [InlineData("echo 'ok' as string(min: 2)", "ok\n")]
+    public void CastUsesTheDeclaredTarget(string code, string printed) =>
+        Assert.Equal(printed, Runs(code));
+
+    [Theory]
+    [InlineData("'200' as Age?", "Shape", "150")]
+    [InlineData("[{stars: 1}] as Repo[]", "Shape", "name")]
+    [InlineData("'x' as string(min: 2)", "Shape", "2")]
+    [InlineData("null as MissingType?", "Type", "Unknown type 'MissingType'")]
+    [InlineData("[] as MissingType[]", "Type", "Unknown type 'MissingType'")]
+    [InlineData("[] as string(typo: 1)[]", "Type", "typo")]
+    public void InvalidCastFailsEvenForNullableOrListTargets(string expression, string errorType, string message)
+    {
+        KScriptException error = TypeFails("value = " + expression);
+        Assert.Equal(errorType, error.Type);
+        Assert.Contains(message, error.Message);
+    }
+
+    [Fact]
+    public void XmlExpressionsSupportTheSameCast()
+    {
+        Assert.Equal("42\n", ScriptRunner.Run("""<kscript><echo value="'41' as int + 1" /></kscript>"""));
+    }
+
     [Theory]
     [InlineData("Repo({ stars: 1 })", "name")]
     [InlineData("Repo(stars: 'many', name: 'k')", "stars")]

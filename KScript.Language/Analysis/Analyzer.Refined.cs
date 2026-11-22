@@ -208,10 +208,9 @@ namespace KScript.Language.Analysis
                 CheckLiteralFits(value.Value.Trim(), type, span, scope, offset);
                 return true;
             }
-            if (parsed.Success && parsed.Root is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.SlashPath or LiteralKind.Duration or LiteralKind.Regex or LiteralKind.Number } literal)
+            if (parsed.Success)
             {
-                object text = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, CultureInfo.InvariantCulture) : literal.Value;
-                CheckLiteralFits(text, type, value.ToSource(literal.Span), scope, offset);
+                CheckTypedLiteral(parsed.Root, type, value, scope, offset);
             }
             return false;
         }
@@ -266,6 +265,15 @@ namespace KScript.Language.Analysis
             return true;
         }
 
+        private void CheckTypedLiteral(ExprNode node, string type, DecodedText sourceText, Scope scope, int offset)
+        {
+            if (node is LiteralNode { Template: null, Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.SlashPath or LiteralKind.Duration or LiteralKind.Regex or LiteralKind.Number } literal)
+            {
+                object value = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, CultureInfo.InvariantCulture) : literal.Value;
+                CheckLiteralFits(value, type, sourceText.ToSource(literal.Span), scope, offset);
+            }
+        }
+
         /// <summary>Reports, at the literal, a value that can't be <paramref name="type"/>: a bad email, an out of range Age, a word not in an enum.</summary>
         private void CheckLiteralFits(object literal, string type, TextSpan span, Scope scope, int offset)
         {
@@ -300,14 +308,24 @@ namespace KScript.Language.Analysis
                     }
                     return TypeArgumentProblem(t, lower, converted);
                 }
-                bool fits = lower is "int" or "float" or "number" ? literal is double : lower == "string" && literal is string;
-                return fits ? TypeArgumentProblem(t, lower, literal) : null;
+                if (lower is "int" or "float" or "number" or "bool")
+                {
+                    try
+                    {
+                        return TypeArgumentProblem(t, lower, Values.ConvertTo(literal, lower, "This value"));
+                    }
+                    catch (KScriptException error)
+                    {
+                        return error.Message;
+                    }
+                }
+                return lower == "string" && literal is string ? TypeArgumentProblem(t, lower, literal) : null;
             }
 
             Symbol symbol = scope?.Lookup(name, offset) ?? result.RootScope.Lookup(name, int.MaxValue);
             if (symbol?.EnumValues is List<string> values && literal is string word)
             {
-                if (values.Any(v => string.Equals(v, word, StringComparison.OrdinalIgnoreCase)))
+                if (values.Any(v => string.Equals(v, word.Trim(), StringComparison.OrdinalIgnoreCase)))
                 {
                     return null;
                 }

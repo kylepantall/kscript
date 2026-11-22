@@ -218,6 +218,42 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void UnsavedNativeTypeReportsAndClearsTrailingComma()
+        {
+            const string uri = "file:///work/natives/passkey-session-key.kscript";
+            Initialize();
+            OpenAs("kscript-code", """
+                type PasskeySessionKey with [string] {
+                  min: 8,
+                  normalize: $value->trim()
+                  pattern: /passkey_[a-zA-Z]+$/
+                }
+                """, uri);
+            var diagnostic = Assert.Single(Diagnostics(uri));
+            Assert.Equal("KS1001", diagnostic["code"].GetValue<string>());
+            Assert.Equal(1, diagnostic["severity"].GetValue<int>());
+            Assert.True(JsonNode.DeepEquals(Range(1, 8, 1, 9), diagnostic["range"]));
+
+            var actions = Request("textDocument/codeAction", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = uri },
+                ["range"] = diagnostic["range"].DeepClone(),
+                ["context"] = new JsonObject { ["diagnostics"] = new JsonArray(diagnostic.DeepClone()) },
+            })["result"].AsArray();
+            var fix = Assert.Single(actions, a => a["title"].GetValue<string>() == "Remove trailing comma");
+            var edit = Assert.Single(fix["edit"]["changes"][uri].AsArray());
+            Assert.Equal("", edit["newText"].GetValue<string>());
+            Assert.True(JsonNode.DeepEquals(diagnostic["range"], edit["range"]));
+            Notify("textDocument/didChange", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = uri, ["version"] = 2 },
+                ["contentChanges"] = new JsonArray(new JsonObject { ["range"] = edit["range"].DeepClone(), ["text"] = "" }),
+            });
+            WaitForDiagnostics(uri, 2);
+            Assert.Empty(Diagnostics(uri));
+        }
+
+        [Fact]
         public void ClosingADocumentClearsItsDiagnostics()
         {
             Initialize();

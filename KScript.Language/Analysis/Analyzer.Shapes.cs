@@ -647,27 +647,32 @@ namespace KScript.Language.Analysis
             CheckTypeText(text, TrimmedSpan(attr.Value), attr.Value.ToSource(0));
         }
 
-        private void CheckTypeText(string text, TextSpan span, int offset)
+        private bool CheckTypeText(string text, TextSpan span, int offset, Scope scope = null)
         {
             // Arguments given where the type is used (uuid(v: 4), string(min: 1)) are checked when the script runs.
-            string name = TypeInference.WithoutTypeArguments(text).TrimEnd('?').TrimEnd();
-            while (name.EndsWith("[]", StringComparison.Ordinal))
-            {
-                name = name.Substring(0, name.Length - 2).TrimEnd();
-            }
+            string name = TypeBase(text);
             if (name.Length == 0 || !Lexer.IsIdentStart(name[0]) || !name.All(Lexer.IsIdentChar))
             {
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{text}' isn't a type. Write a name such as string, int or Repo, with [] for a list and ? to allow null.");
-                return;
+                return false;
             }
-            ReferenceImportedType(text, span);
+            if (scope == null)
+            {
+                ReferenceImportedType(text, span);
+            }
+            else if (scope.Lookup(name, offset) is Symbol symbol && IsTypeSymbol(symbol))
+            {
+                result.References.Add(new SymbolReference(symbol, span, false, false));
+            }
             if (TypeNamed(text, offset) == null)
             {
                 IEnumerable<string> known = BuiltInTypes.Concat(SemanticTypeNames).Concat(TypeNames());
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                     $"Unknown type '{name}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <type name=\"{name}\" fields=\"...\" /> or <enum name=\"{name}\" values=\"...\" />.",
                     SuggestFix(span, name, known, n => n));
+                return false;
             }
+            return true;
         }
 
         /// <summary>The names of the &lt;type&gt;s and &lt;enum&gt;s visible from the root of the document.</summary>

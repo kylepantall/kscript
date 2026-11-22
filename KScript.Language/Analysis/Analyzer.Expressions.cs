@@ -39,6 +39,27 @@ namespace KScript.Language.Analysis
                     CheckTextIsNotATemplate(literal, region, scope);
                     return;
 
+                case CastNode cast:
+                {
+                    AnalyzeExpr(cast.Value, region, scope, ExprContext.Value);
+                    if (cast.TypeName.Length == 0)
+                    {
+                        return;
+                    }
+                    if (cast.TypeName.Contains('(') && KScript.Runtime.TypeRef.Parse(cast.TypeName) == null)
+                    {
+                        Report(region.Source.ToSource(cast.TypeSpan), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                            $"'{cast.TypeName}' isn't a valid cast type. Type options take literal values.");
+                        return;
+                    }
+                    TextSpan nameSpan = region.Source.ToSource(new TextSpan(cast.TypeSpan.Start, TypeBase(cast.TypeName).Length));
+                    if (CheckTypeText(cast.TypeName, nameSpan, nameSpan.Start, scope))
+                    {
+                        CheckTypedLiteral(cast.Value, cast.TypeName, region.Source, scope, nameSpan.Start);
+                    }
+                    return;
+                }
+
                 case VariableNode v:
                 {
                     TextSpan span = VariableNameSpan(v, region);

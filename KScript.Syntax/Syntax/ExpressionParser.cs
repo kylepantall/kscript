@@ -23,7 +23,8 @@ namespace KScript.Syntax
     ///   term       := unary ( ( '*' | '/' | '%' ) unary )*
     ///   unary      := ( '-' | '+' ) unary | power
     ///   power      := postfix ( '**' unary )?
-    ///   postfix    := primary ( '-&gt;' name args | '.' name | '?.' name | '[' expression ']' | args )*
+    ///   postfix    := primary ( '-&gt;' name args | '.' name | '?.' name | '[' expression ']' | args | 'as' type )*
+    ///   type       := name ( '[]' | '(' rules ')' )* '?'?
     ///   primary    := number | string | true | false | null | $name | @name args? | name | '(' expression ')'
     ///               | '[' list ']' | '{' map '}' | 'fn' '(' params ')' '=&gt;' expression | 'match' nullish '{' arms '}'
     ///   params     := ( name ( ',' name )* )?                           declared bare: fn(a, b) =&gt; $a + $b
@@ -45,6 +46,8 @@ namespace KScript.Syntax
         private bool inMatchArms;
         private int index;
         private int lastEnd;
+        private int bracketDepth;
+        private readonly Stack<int> pendingConditionalDepths = new();
 
         private ExpressionParser(string text, int start, bool textMode)
         {
@@ -225,7 +228,9 @@ namespace KScript.Syntax
                 return condition;
             }
             Advance();
+            pendingConditionalDepths.Push(bracketDepth);
             ExprNode whenTrue = ParseExpr();
+            pendingConditionalDepths.Pop();
             Expect(":", "in a ? b : c conditional");
             ExprNode whenFalse = ParseExpr();
             return new ConditionalNode
@@ -297,8 +302,9 @@ namespace KScript.Syntax
             while (Peek().Is("|>"))
             {
                 Advance();
-                ExprNode right = ParsePostfix(ParsePrimary());
+                ExprNode right = ParsePostfix(ParsePrimary(), allowCast: false);
                 left = new PipeNode { Left = left, Right = right, Span = TextSpan.FromBounds(left.Span.Start, right.Span.End) };
+                if (Peek().IsWord("as")) left = ParsePostfix(left);
             }
             return left;
         }
@@ -378,7 +384,7 @@ namespace KScript.Syntax
 
         #region Postfix and primary
 
-        private ExprNode ParsePostfix(ExprNode node)
+        private ExprNode ParsePostfix(ExprNode node, bool allowCast = true)
         {
             while (true)
             {
@@ -387,6 +393,12 @@ namespace KScript.Syntax
                 if (textMode && !adjacent)
                 {
                     return node;
+                }
+
+                if (allowCast && !textMode && t.IsWord("as"))
+                {
+                    node = ParseCast(node);
+                    continue;
                 }
 
                 if (t.Is("->"))
@@ -483,6 +495,80 @@ namespace KScript.Syntax
                 return node;
             }
         }
+
+        private CastNode ParseCast(ExprNode value)
+        {
+            Token op = Advance();
+            Token name = Peek();
+            var cast = new CastNode { Value = value, OperatorSpan = op.Span };
+            if (name.Kind != TokenKind.Identifier)
+            {
+                Error(name.Span, "Expected a type name after 'as', such as string or ProductName.");
+                cast.TypeSpan = new TextSpan(name.Span.Start, 0);
+                cast.TypeName = string.Empty;
+                cast.Span = TextSpan.FromBounds(value.Span.Start, name.Span.Start);
+                return cast;
+            }
+            Advance();
+            // As in a declaration, list and rule suffixes are adjacent to the type. A nonempty
+            // index like int[][0] accesses the converted list. A spaced '?' starts a conditional.
+            while (Peek().Span.Start == lastEnd)
+            {
+                if (Peek().Is("[") && Peek(1).Is("]") && Peek().Span.End == Peek(1).Span.Start)
+                {
+                    Advance();
+                    Advance();
+                }
+                else if (Peek().Is("("))
+                {
+                    ParseMap(")");
+                }
+                else break;
+            }
+            if (NullableCastSuffix()) Advance();
+            cast.TypeSpan = TextSpan.FromBounds(name.Span.Start, lastEnd);
+            cast.TypeName = lexer.Text.Substring(cast.TypeSpan.Start, cast.TypeSpan.Length);
+            cast.Span = TextSpan.FromBounds(value.Span.Start, lastEnd);
+            return cast;
+        }
+
+        // T? allows null. The same '?' in value as bool?yes:no starts a conditional.
+        private bool NullableCastSuffix()
+        {
+            if (!Peek().Is("?") || Peek().Span.Start != lastEnd) return false;
+            Token next = Peek(1);
+            if (next.Kind == TokenKind.EndOfInput) return true;
+            if (next.Kind == TokenKind.Identifier)
+                return next.Text is "as" or "and" or "or" or "in" or "eq" or "ne" or "lt" or "le" or "gt" or "ge" or "step" or "when";
+            if (next.Kind != TokenKind.Punctuation) return false;
+            if (next.Is("(") || next.Is("{") || next.Is("!")) return false;
+            if (!next.Is("[") && !next.Is("+") && !next.Is("-")) return true;
+
+            // Indexing and arithmetic can also start the true branch ([...], +n, -n).
+            // A ':' outside any brackets, before the end of this expression, distinguishes it.
+            int depth = 0;
+            int neededColons = 1 + pendingConditionalDepths.Count(d => d == bracketDepth);
+            for (int offset = 1; ; offset++)
+            {
+                Token token = Peek(offset);
+                if (token.Kind == TokenKind.EndOfInput) return true;
+                if (depth == 0)
+                {
+                    if (token.Is(",") || token.Is(";")) return true;
+                    if (token.Is("?") && !Peek(offset + 1).Is(":")) neededColons++;
+                    if (token.Is(":") && --neededColons == 0) return false;
+                }
+                depth += BracketDelta(token);
+                if (depth < 0) return true;
+            }
+        }
+
+        private static int BracketDelta(Token token) => token.Kind != TokenKind.Punctuation ? 0 : token.Text switch
+        {
+            "(" or "[" or "{" => 1,
+            ")" or "]" or "}" => -1,
+            _ => 0,
+        };
 
         private ExprNode ParsePrimary()
         {
@@ -773,11 +859,11 @@ namespace KScript.Syntax
             return list;
         }
 
-        private ExprNode ParseMap()
+        private ExprNode ParseMap(string closing = "}")
         {
             Token open = Advance();
             MapNode map = new MapNode();
-            while (!Peek().Is("}") && Peek().Kind != TokenKind.EndOfInput)
+            while (!Peek().Is(closing) && Peek().Kind != TokenKind.EndOfInput)
             {
                 Token key = Peek();
                 if (key.Kind != TokenKind.Identifier && key.Kind != TokenKind.String && key.Kind != TokenKind.Number)
@@ -795,7 +881,7 @@ namespace KScript.Syntax
                 }
                 Advance();
             }
-            Token close = Expect("}", "to close the map");
+            Token close = Expect(closing, closing == "}" ? "to close the map" : "to close the type arguments");
             map.Span = TextSpan.FromBounds(open.Span.Start, Math.Max(close.Span.End, lastEnd));
             return map;
         }
@@ -904,6 +990,7 @@ namespace KScript.Syntax
             {
                 index++;
                 lastEnd = t.Span.End;
+                bracketDepth += BracketDelta(t);
             }
             if (t.Error != null)
             {

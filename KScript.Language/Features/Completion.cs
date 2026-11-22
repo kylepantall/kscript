@@ -19,6 +19,7 @@ namespace KScript.Language.Features
             ("le", "Less than or equal, the XML spelling of `<=`."),
             ("gt", "Greater than, the XML spelling of `>`."),
             ("ge", "Greater than or equal, the XML spelling of `>=`."),
+            ("as", "Checked conversion: `$value as Type`."),
             ("in", "Membership: `$ext in ['.cs', '.xml']`."),
             ("true", "The boolean true."),
             ("false", "The boolean false."),
@@ -89,6 +90,19 @@ namespace KScript.Language.Features
                 return expected;
             }
 
+            int wordStart = WordStart(text, offset);
+            int before = wordStart;
+            while (before > 0 && text[before - 1] is ' ' or '\t')
+            {
+                before--;
+            }
+            if (before < wordStart && before >= 2 && text.AsSpan(before - 2, 2).SequenceEqual("as")
+                && analysis.Regions.Any(r => r.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<CastNode>()
+                    .Any(c => r.Source.ToSource(c.OperatorSpan.End) == before)))
+            {
+                return TypeCompletions(analysis, TextSpan.FromBounds(wordStart, offset));
+            }
+
             if (analysis.Kind == DocumentKind.Markdown && analysis.Markup.FrontMatter is FrontMatter fm && offset <= fm.Span.End && offset > 3)
             {
                 return FrontMatterCompletions(analysis, offset);
@@ -148,7 +162,6 @@ namespace KScript.Language.Features
             }
 
             // Plain script text: bare $ and @ references still complete.
-            int wordStart = WordStart(text, offset);
             if (wordStart > 0 && (text[wordStart - 1] == '$' || text[wordStart - 1] == '@') && analysis.Kind == DocumentKind.Script)
             {
                 return text[wordStart - 1] == '$'

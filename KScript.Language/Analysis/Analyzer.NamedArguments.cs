@@ -94,7 +94,11 @@ namespace KScript.Language.Analysis
         /// <summary>An argument that reached its parameter: a waiting <c>@kyle</c> is a handle there, and a literal is checked against the type.</summary>
         private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
-            CheckNumberArgument(a, slot, region);
+            if (slot.Type is "number" or "int" or "float")
+            {
+                CheckNumberArgument(a, slot, region);
+                return;
+            }
             if (pendingRaw.Contains(a))
             {
                 if (slot.RawText == null || slot.RawText == "handle")
@@ -134,10 +138,9 @@ namespace KScript.Language.Analysis
             {
                 CheckLiteralFits(word, slot.Type, region.Source.ToSource(node.Span), null, 0);
             }
-            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.SlashPath or LiteralKind.Duration or LiteralKind.Number } literal)
+            else
             {
-                object value = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, System.Globalization.CultureInfo.InvariantCulture) : literal.Value;
-                CheckLiteralFits(value, slot.Type, region.Source.ToSource(literal.Span), null, 0);
+                CheckTypedLiteral(a.Value, slot.Type, region.Source, null, 0);
             }
         }
 

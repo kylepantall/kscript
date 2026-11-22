@@ -31,6 +31,9 @@ namespace KScript.Language.Analysis
         {
             switch (node)
             {
+                case CastNode cast:
+                    return TypeNamed(cast.TypeName, region.Source.ToSource(cast.TypeSpan.Start)) ?? TypeShape.Unknown;
+
                 case LiteralNode lit:
                     return new TypeShape(lit.Kind switch
                     {
@@ -508,15 +511,16 @@ namespace KScript.Language.Analysis
             {
                 return text;
             }
-            int depth = 0;
-            for (int i = open; i < text.Length; i++)
+            if (KScript.Runtime.TypeRef.Parse(text) is KScript.Runtime.TypeRef type)
             {
-                if (text[i] == '(') depth++;
-                else if (text[i] == ')' && --depth == 0)
+                int listDepth = type.ListDepth;
+                for (var inner = type.ArgBase; inner != null; inner = inner.ArgBase)
                 {
-                    return (text.Substring(0, open) + text.Substring(i + 1)).Trim();
+                    listDepth += inner.ListDepth;
                 }
+                return type.Name + string.Concat(Enumerable.Repeat("[]", listDepth)) + (type.Optional ? "?" : string.Empty);
             }
+            // Retain the name while an incomplete type argument is being edited.
             return text.Substring(0, open).Trim();
         }
 
