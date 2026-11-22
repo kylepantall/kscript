@@ -160,6 +160,12 @@ namespace KScript.Language.Analysis
                     pendingBare.Add(arg);
                     continue;
                 }
+                if ((arg.Value as MemberNode)?.DottedName != null)
+                {
+                    // posts.tags: names for a method that reads them (->with), otherwise checked as an expression.
+                    pendingBare.Add(arg);
+                    continue;
+                }
                 if (IsUnknownReference(arg.Value, scope, region))
                 {
                     pendingHandles.Add(arg);
@@ -540,10 +546,10 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            if (own != null || receiver.Methods.TryGetValue(name, out own))
+            if (own != null || receiver.Methods.TryGetValue(name, out own) || TypeInference.ScopeOf(receiver, name) is Symbol scope && (own = scope) != null)
             {
-                // A method the record's <type> declares with <fn>.
-                result.References.Add(new SymbolReference(own, nameSpan, false, false));
+                // A method the record's <type> declares with <fn>, or a model's scope (which uses the fn it was made from).
+                result.References.Add(new SymbolReference(scopeDeclarations.GetValueOrDefault(own) ?? own, nameSpan, false, false));
                 if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(own, result.RootScope), region, nameSpan))
                 {
                     return;
@@ -559,6 +565,13 @@ namespace KScript.Language.Analysis
 
             string type = (types ??= new TypeInference(catalog, result)).ReceiverType(name, receiver);
             List<CallableInfo> candidates = catalog.GetMethods(name, type).ToList();
+            // A record or query of a model this file can't see (declared in another file): its relations and scopes aren't known here.
+            // A value of no known type may be such a record too, once KScript.Data is imported: $user->posts() in fn(user).
+            if (candidates.Count == 0 && (receiver.Type is KType.Record or KType.Query && receiver.Instance == null && receiver.Name == null
+                || receiver.Type == KType.Any && !receiver.Declared && importedPackages.Contains("KScript.Data")))
+            {
+                return;
+            }
             if (candidates.Count == 0)
             {
                 IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Concat(receiver.Kind != null ? catalog.MethodsFor(receiver.Kind) : Enumerable.Empty<CallableInfo>()).Select(m => m.Name).Concat(receiver.Methods.Keys)

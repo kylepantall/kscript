@@ -9,6 +9,9 @@ namespace KScript.Data
 
         /// <summary>The stored values as last read or saved, by field. Fields a query didn't select are missing.</summary>
         public Dictionary<string, object> Original { get; set; } = new Dictionary<string, object>(StringComparer.Ordinal);
+
+        /// <summary>The records read with this one (by one ->get()), so a relation read on one is loaded for all of them in one query.</summary>
+        public List<Record> Batch { get; set; }
     }
 
     /// <summary>Reading, creating, saving and deleting model records.</summary>
@@ -21,11 +24,14 @@ namespace KScript.Data
         {
             ModelInfo model = query.Model;
             if (model == null) return Rows.Map(row);
+            // Its relations add fields (author_id), so they are worked out before the fields are read.
+            IReadOnlyDictionary<string, Relation> relations = model.Relations;
             var record = new Record(model.Type);
             var state = new RecordState { Exists = true };
             foreach (FieldDefinition f in model.Type.Fields)
             {
-                if (f.Computed) continue;
+                // A relation is left out until it is read (or loaded with ->with()), so JSON only has the ones loaded.
+                if (f.Computed || relations.ContainsKey(f.Name)) continue;
                 Column c = model.Column(f.Name);
                 if (row.TryGetValue(f.Name, out object raw))
                 {
@@ -38,6 +44,10 @@ namespace KScript.Data
                 {
                     record[f.Name] = null;
                 }
+            }
+            foreach (string count in query.Counts.Select(c => c.Name + "_count"))
+            {
+                if (row.TryGetValue(count, out object n)) record[count] = n == null ? 0.0 : System.Convert.ToDouble(n, System.Globalization.CultureInfo.InvariantCulture);
             }
             Compute(call, record);
             record.Tag = state;
@@ -95,17 +105,44 @@ namespace KScript.Data
             model.Guarded.Count == 0 ? values : values.Where(kv => !model.Guarded.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
 
         /// <summary><c>$User->create({...})</c>: checks the values against the model, saves them and returns the record.</summary>
-        public static Record Create(CallContext call, ModelInfo model, Dictionary<string, object> values)
+        public static Record Create(CallContext call, ModelInfo model, Dictionary<string, object> values, bool fillable = true)
         {
-            Dictionary<string, object> fill = Fillable(model, values).ToDictionary(kv => kv.Key, kv => kv.Value is BareWord w ? w.Name : kv.Value, StringComparer.Ordinal);
+            Dictionary<string, object> fill = (fillable ? Fillable(model, values) : values).ToDictionary(kv => kv.Key, kv => kv.Value is BareWord w ? w.Name : kv.Value, StringComparer.Ordinal);
             var record = (Record)Shapes.MapAs(call.Interpreter, fill, model.Type, $"The {model.Name}");
+            Link(model, record);
             Insert(call, model, record);
             return record;
+        }
+
+        /// <summary>
+        /// The relations of a record about to be made: a belongs-to record given (author: $user) sets its column, and
+        /// the relations not given are left out, to be loaded when they are read.
+        /// </summary>
+        internal static void Link(ModelInfo model, Record record)
+        {
+            foreach (Relation r in model.Relations.Values)
+            {
+                object value = record.GetValueOrDefault(r.Name);
+                if (r.Kind == RelationKind.BelongsTo && value is Record target)
+                {
+                    record[r.ForeignKey] = ModelInfo.KeyOfTarget(r, target);
+                    continue;
+                }
+                if (value is Record or List<object> { Count: > 0 })
+                    throw new KScriptException($"{r.Where} {r.Describe()}, so it isn't saved with the {model.Name}. Save the {model.Name}, then add to it with ->{r.Name}()->create(...)"
+                        + (r.Kind == RelationKind.ManyToMany ? $" or ->{r.Name}()->attach(...)." : "."), "Type");
+                record.Remove(r.Name);
+            }
         }
 
         /// <summary>A record made with <c>$User->from()</c>, or a new one, as a row of the table.</summary>
         private static void Insert(CallContext call, ModelInfo model, Record record)
         {
+            foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.BelongsTo && !r.Optional))
+            {
+                if (record.GetValueOrDefault(r.ForeignKey) == null)
+                    throw new KScriptException($"A {model.Name} needs its {r.Name} (a {r.Target.Name}): give {r.Name}: ${ModelInfo.Snake(r.Target.Name)} or {r.ForeignKey}, or make it optional with {r.Name}: {r.Target.Name}?.", "Shape");
+            }
             Database db = Database.For(call, model);
             DateTime now = Rows.Clock();
             if (model.Timestamps)
@@ -179,6 +216,7 @@ namespace KScript.Data
             ModelInfo model = ModelInfo.Of(record);
             if (State(record)?.Exists != true)
             {
+                Link(model, record);
                 Insert(call, model, record);
                 return record;
             }

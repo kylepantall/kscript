@@ -135,11 +135,60 @@ namespace KScript.Data
         /// <summary>The CREATE TABLE and CREATE INDEX statements for a model.</summary>
         public IEnumerable<string> CreateTable(ModelInfo model, bool ifMissing)
         {
-            var indexed = new HashSet<string>(model.Unique.Concat(model.Index).SelectMany(g => g), StringComparer.Ordinal);
-            var columns = model.Columns.Select(c => ColumnDefinition(c, c.IsKey || indexed.Contains(c.Name))).ToList();
+            List<TableIndex> indexes = Indexes(model);
+            var indexed = new HashSet<string>(indexes.SelectMany(i => i.Columns), StringComparer.Ordinal);
+            var columns = model.Columns.Select(c => ColumnDefinition(c, c.IsKey || indexed.Contains(c.Name)))
+                .Concat(model.Columns.Where(c => c.References != null).Select(c => ForeignKey(model.Table, c.Name, c.References.Target.Table, c.References.Target.Key, c.References.OnDelete)))
+                .ToList();
+            return Prepare(model).Concat(CreateTable(model.Table, columns, indexes, ifMissing));
+        }
+
+        /// <summary>
+        /// A model's indexes: its unique and index settings, and one on each belongs-to column that no other index
+        /// starts with, so loading and counting relations stays fast.
+        /// </summary>
+        public static List<TableIndex> Indexes(ModelInfo model)
+        {
             var indexes = model.Unique.Select(u => new TableIndex(IndexName(model.Table, u, true), u, true))
                 .Concat(model.Index.Select(i => new TableIndex(IndexName(model.Table, i, false), i, false))).ToList();
-            return Prepare(model).Concat(CreateTable(model.Table, columns, indexes, ifMissing));
+            foreach (Column c in model.Columns.Where(c => c.References != null))
+            {
+                if (indexes.Any(i => i.Columns[0] == c.Name)) continue;
+                indexes.Add(new TableIndex(IndexName(model.Table, new[] { c.Name }, false), new[] { c.Name }, false));
+            }
+            return indexes;
+        }
+
+        /// <summary>A FOREIGN KEY constraint, as a line of CREATE TABLE: <c>CONSTRAINT fk_posts_author_id FOREIGN KEY (author_id) REFERENCES users (id) ON DELETE CASCADE</c>.</summary>
+        public string ForeignKey(string table, string column, string references, string key, string onDelete) =>
+            $"CONSTRAINT {Quote(ForeignKeyName(table, column))} FOREIGN KEY ({Quote(column)}) REFERENCES {Quote(references)} ({Quote(key)}) ON DELETE {(onDelete ?? "restrict").ToUpperInvariant()}";
+
+        public static string ForeignKeyName(string table, string column)
+        {
+            string name = "fk_" + table + "_" + column;
+            if (name.Length <= 60) return name;
+            string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(name))).Substring(0, 8).ToLowerInvariant();
+            return name.Substring(0, 51) + "_" + hash;
+        }
+
+        /// <summary>
+        /// The pivot table of a many to many relation: a column for each side's key, which together are its key, and
+        /// a foreign key to each table, so deleting a record unlinks it.
+        /// </summary>
+        public IEnumerable<string> CreatePivot(Relation r, bool ifMissing)
+        {
+            Column owner = r.PivotOwnerColumn;
+            Column target = r.PivotTargetColumn;
+            var columns = new List<string>
+            {
+                Quote(owner.Name) + " " + ColumnType(owner, indexed: true) + " NOT NULL",
+                Quote(target.Name) + " " + ColumnType(target, indexed: true) + " NOT NULL",
+                $"PRIMARY KEY ({Quote(owner.Name)}, {Quote(target.Name)})",
+                ForeignKey(r.Pivot, owner.Name, r.Owner.Table, r.Owner.Key, "cascade"),
+                ForeignKey(r.Pivot, target.Name, r.Target.Table, r.Target.Key, "cascade"),
+            };
+            var indexes = new List<TableIndex> { new TableIndex(IndexName(r.Pivot, new[] { target.Name }, false), new[] { target.Name }, false) };
+            return CreateTable(r.Pivot, columns, indexes, ifMissing);
         }
 
         /// <summary>Statements a model's table needs first, such as a collation.</summary>
