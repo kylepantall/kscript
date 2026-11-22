@@ -104,7 +104,7 @@ namespace KScript.Language.Formatting
                 text = Space(text);
             }
             text = Layout(text, options);
-            if (full && (options.WrapAttributes || options.WrapStrings))
+            if (full && (options.WrapAttributes || options.WrapStrings || options.WrapChains || options.WrapBodies || options.WrapComments))
             {
                 for (int i = 0; i < 24; i++)
                 {
@@ -701,6 +701,11 @@ namespace KScript.Language.Formatting
             int lastColumns = 0;
             StringBlock block = null; // the ``` block whose lines are being copied, moved by blockDelta columns
             int blockDelta = 0;
+            // The columns each line was written at, and the receiver indent a chain line (->, |>) on it or after it
+            // steps in from: a line's own indent, or for a chain line, the indent of the line its chain started on.
+            int[] lineColumns = new int[s.LineStarts.Count];
+            int[] chainBases = new int[s.LineStarts.Count];
+            int chainBase = 0;
 
             for (int line = 0; line < s.LineStarts.Count; line++)
             {
@@ -726,13 +731,18 @@ namespace KScript.Language.Formatting
                     bool endsInString = end > start && (s.States[end - 1] == State.Single || s.States[end - 1] == State.Double) && !ClosesString(s, end - 1);
                     if (options.TrimTrailingWhitespace && !endsInString) content = content.TrimEnd();
                     sb.Append(Indent(lastColumns + options.IndentSize, options)).Append(content).Append('\n');
+                    lineColumns[line] = lastColumns + options.IndentSize;
+                    chainBases[line] = chainBase;
                     wroteLine = true;
                     previousOpened = false;
                 }
                 else if (verbatim || startsInString)
                 {
                     FlushBlanks(sb, ref blankRun, options);
-                    sb.Append(block != null && !verbatim && start > block.Start ? Shift(raw, blockDelta, options) : raw).Append('\n');
+                    string copied = block != null && !verbatim && start > block.Start ? Shift(raw, blockDelta, options) : raw;
+                    sb.Append(copied).Append('\n');
+                    lineColumns[line] = Columns(copied, options);
+                    chainBases[line] = chainBase;
                     wroteLine = true;
                     previousOpened = false;
                 }
@@ -757,14 +767,30 @@ namespace KScript.Language.Formatting
                             p++;
                             while (p < end && (text[p] == ' ' || text[p] == '\t')) p++;
                         }
-                        int levels = effective.Select(e => e.Line).Distinct().Count();
                         bool inBlock = effective.Count == 0 || s.IsBlock[effective[effective.Count - 1].Opener];
                         bool closes = p > first;
-                        if (inBlock && !closes && lastCodeLine >= 0 && IsContinuation(s, lastCodeLine, first))
+                        // Inside brackets, one level past the line the innermost bracket was opened on; a line that
+                        // starts by closing brackets lines up with the line that opened the first of them.
+                        int openerLine = closes && s.Match[first] >= 0 ? stack.FindLast(e => e.Opener == s.Match[first]).Line : -1;
+                        bool closesKnown = closes && s.Match[first] >= 0 && stack.Any(e => e.Opener == s.Match[first]);
+                        int indent = closesKnown ? lineColumns[openerLine]
+                            : effective.Count == 0 ? 0
+                            : lineColumns[effective[effective.Count - 1].Line] + options.IndentSize;
+                        bool chain = !closes && lastCodeLine >= 0 && s.States[first] == State.Code && StartsWithChain(text, first);
+                        if (chain)
                         {
-                            levels++;
+                            // A chained call goes one level past the line its receiver started on.
+                            indent = chainBase + options.IndentSize;
                         }
-                        columns = options.Indent ? levels * options.IndentSize : Columns(raw, options);
+                        else if (inBlock && !closes && lastCodeLine >= 0 && IsContinuation(s, lastCodeLine, first))
+                        {
+                            indent += options.IndentSize;
+                        }
+                        columns = options.Indent ? indent : Columns(raw, options);
+                        if (HasCode(s, start, end))
+                        {
+                            chainBase = chain ? chainBase : closesKnown ? chainBases[openerLine] : columns;
+                        }
                         if (IsCommentOpenLine(s, first, end))
                         {
                             commentDelta = columns - Columns(raw, options);
@@ -779,6 +805,8 @@ namespace KScript.Language.Formatting
                     bool endsInString = end > start && (s.States[end - 1] == State.Single || s.States[end - 1] == State.Double) && !(end - 1 >= 0 && ClosesString(s, end - 1));
                     if (options.TrimTrailingWhitespace && !endsInString) content = content.TrimEnd();
                     sb.Append(Indent(columns, options)).Append(content).Append('\n');
+                    lineColumns[line] = columns;
+                    chainBases[line] = chainBase;
                     wroteLine = true;
                     if (!startsInComment) lastColumns = columns;
                     // A ``` block opened on this line moves with it: the closing fence sets the block's indentation.
@@ -939,6 +967,16 @@ namespace KScript.Language.Formatting
             return false;
         }
 
+        private static readonly string[] ChainOperators = { "->", "|>", "?.", "." };
+
+        /// <summary>The line starts with a chained call or pipe: <c>->name()</c>, <c>|> step()</c> or <c>.field</c> (not <c>..</c>).</summary>
+        private static bool StartsWithChain(string text, int p)
+        {
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            if (string.CompareOrdinal(text, p, "..", 0, 2) == 0) return false;
+            return ChainOperators.Any(op => string.CompareOrdinal(text, p, op, 0, op.Length) == 0);
+        }
+
         private static bool StartsWithContinuation(string text, int p)
         {
             while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
@@ -981,22 +1019,35 @@ namespace KScript.Language.Formatting
         #region Wrapping
 
         /// <summary>
-        /// A line past the print width with a bracketed list on it (arguments, attributes, an array or a map, opened
-        /// and closed on that line) gets one item per line. The outermost such list on the line is wrapped first.
+        /// Breaks each line that runs past the print width, one step per pass (the caller re-lays the text out and
+        /// runs it again until nothing changes). The breaks are tried from the loosest join to the tightest, the way
+        /// Prettier and dart format do: after a one-line function's <c>=&gt;</c>, then before each call of a
+        /// <c>-&gt;</c> chain or <c>|&gt;</c> pipe, then one item per line in a bracketed list (arguments, an array or a
+        /// map), then inside a long string. A long <c>//</c> or <c>///</c> comment line is broken between words.
         /// </summary>
         private static string Wrap(string text, FormatOptions options)
         {
             Scan s = Read(text);
             Edits edits = new Edits();
+            bool[] keepComment = CommentsToKeep(s);
             for (int line = 0; line < s.LineStarts.Count; line++)
             {
                 int start = s.LineStarts[line], end = s.LineEnd(line);
+                if (options.WrapChains && start < text.Length && !s.Verbatim[start] && ContinuesABrokenChain(s, start, end) is int arrow)
+                {
+                    edits.Insert(arrow, "\n");
+                    continue;
+                }
                 if (start >= text.Length || s.Verbatim[start] || Columns(text.Substring(start, end - start), options) + (end - start) - LeadingWidth(text, start, end) <= options.PrintWidth)
                 {
                     continue;
                 }
                 bool joined = start > 0 && s.Joined[start - 1];
                 if (start > 0 && s.States[start - 1] != State.Code && s.States[start - 1] != State.LineComment && !joined) continue;
+
+                if (options.WrapComments && !keepComment[line] && WrapComment(s, line, keepComment, options, edits)) continue;
+                if (!joined && options.WrapBodies && WrapBody(s, start, end, edits)) continue;
+                if (!joined && options.WrapChains && WrapChain(s, start, end, options, edits)) continue;
 
                 bool wrapped = false;
                 for (int i = start; i < end && options.WrapAttributes; i++)
@@ -1020,6 +1071,10 @@ namespace KScript.Language.Formatting
                     edits.Replace(before + 1, close - before - 1, "\n");
                     wrapped = true;
                     break;
+                }
+                if (!wrapped && !joined && options.WrapBodies && WrapBody(s, start, end, edits, nested: true))
+                {
+                    wrapped = true;
                 }
                 if (!wrapped && options.WrapStrings)
                 {
@@ -1072,6 +1127,8 @@ namespace KScript.Language.Formatting
                 // Break after a space that is inside the string, followed by more of the string (not its closing quote).
                 if (c != ' ' || braces > 0 || i + 1 >= end || text[i + 1] == ' ' || text[i + 1] == '\\' || s.States[i + 1] != state || ClosesString(s, i + 1) || IsQuote(s, i)) continue;
                 if (i == start + leadingChars || s.States[i - 1] != state || IsQuote(s, i - 1)) continue;
+                // Not just inside maths: \( x \) stays together where it can.
+                if (i >= 2 && text[i - 2] == '\\' && (text[i - 1] == '(' || text[i - 1] == '[')) continue;
                 // Only a break that makes the line fit: if the string starts past the width, wrapping it won't help.
                 if (Column(i + 1) + 1 > options.PrintWidth) break;
                 best = i;
@@ -1080,6 +1137,269 @@ namespace KScript.Language.Formatting
             int indent = (start > 0 && s.Joined[start - 1] ? leadingColumns : leadingColumns + options.IndentSize);
             if (Column(best + 1) <= indent + 1) return; // breaking here wouldn't make the line any shorter
             edits.Replace(best + 1, 0, "\\\n" + Indent(indent, options));
+            // When this line already joins the next one, the words that move down go to the start of that line
+            // instead of a short line of their own; the next pass wraps that line if it is now too long.
+            if (end < text.Length && end > 0 && s.Joined[end] && text[end - 1] == '\\' && !s.Verbatim[end] && !IsInBlock(s, end))
+            {
+                int next = SkipAllSpaces(text, end + 1);
+                edits.Replace(end - 1, next - (end - 1), string.Empty);
+            }
+        }
+
+        /// <summary>
+        /// The code on a line that isn't inside a bracket opened on that line: true at each code character at the
+        /// line's own level. A closer of a bracket opened on an earlier line ends what came before it.
+        /// </summary>
+        private static bool[] TopLevel(Scan s, int start, int end, out int from)
+        {
+            bool[] top = new bool[end - start];
+            from = start;
+            for (int i = start; i < end; i++)
+            {
+                if (s.States[i] == State.LineComment || s.States[i] == State.BlockComment) continue;
+                char c = s.Text[i];
+                if (s.IsCode(i) && (c == '(' || c == '[' || c == '{'))
+                {
+                    top[i - start] = true;
+                    if (s.Match[i] < 0 || s.Match[i] >= end) break; // the rest of the line is inside it
+                    i = s.Match[i];
+                    top[i - start] = true;
+                    continue;
+                }
+                if (s.IsCode(i) && (c == ')' || c == ']' || c == '}'))
+                {
+                    // Closes a bracket from an earlier line: what came before belongs to it.
+                    Array.Clear(top, 0, i - start + 1);
+                    from = i + 1;
+                    continue;
+                }
+                top[i - start] = true;
+            }
+            return top;
+        }
+
+        /// <summary>
+        /// A one-line function (<c>fn name(args) =&gt; body</c>, or a lambda <c>fn($x) =&gt; body</c> outside
+        /// brackets) whose line is too long: the body moves to the next line, one level in.
+        /// </summary>
+        private static bool WrapBody(Scan s, int start, int end, Edits edits, bool nested = false)
+        {
+            string text = s.Text;
+            bool[] top = TopLevel(s, start, end, out _);
+            for (int i = start; i + 1 < end; i++)
+            {
+                // nested: a lambda passed as the only argument, $list->map(fn($x) => ...), once nothing else helped.
+                if ((nested ? !Editable(s, i) || !s.InExpression[i] : !top[i - start]) || text[i] != '=' || text[i + 1] != '>' || !Editable(s, i + 1)) continue;
+                int body = SkipAllSpaces(text, i + 2);
+                if (nested && (body >= end || !Editable(s, body) || text[body] == '{')) continue;
+                if (body >= end || !Editable(s, body) || text[body] == '{' || s.States[body] == State.LineComment) return false;
+                // The arrow must close a function's head: fn name(...) => or fn(...) =>.
+                int close = i - 1;
+                while (close > start && (text[close] == ' ' || text[close] == '\t')) close--;
+                if (text[close] != ')' || s.Match[close] < start)
+                {
+                    if (nested) continue;
+                    return false;
+                }
+                int open = s.Match[close] - 1;
+                while (open > start && (text[open] == ' ' || text[open] == '\t')) open--;
+                int word = open;
+                while (word >= start && (char.IsLetterOrDigit(text[word]) || text[word] == '_')) word--;
+                string name = text.Substring(word + 1, open - word);
+                bool isFn = name == "fn";
+                if (!isFn && name.Length > 0)
+                {
+                    int before = word;
+                    while (before > start && (text[before] == ' ' || text[before] == '\t')) before--;
+                    isFn = before >= start + 1 && text.Substring(before - 1, 2) == "fn" && (before - 2 < start || !char.IsLetterOrDigit(text[before - 2]));
+                }
+                if (!isFn)
+                {
+                    if (nested) continue;
+                    return false;
+                }
+                edits.Replace(i + 2, body - (i + 2), "\n");
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// A <c>|&gt;</c> pipe or a <c>-&gt;</c> call chain on a line that is too long: each step starts its own line, one
+        /// level in from where the chain starts. A pipe is broken before a chain. A single call is moved down only when
+        /// it hangs off another call (<c>@cache()-&gt;remember(...)</c>), not off a plain name.
+        /// </summary>
+        private static bool WrapChain(Scan s, int start, int end, FormatOptions options, Edits edits)
+        {
+            string text = s.Text;
+            bool[] top = TopLevel(s, start, end, out int from);
+            // Never in a block's head (if, for, while, match): the { must stay on the line.
+            for (int i = from; i < end; i++)
+            {
+                if (top[i - start] && text[i] == '{' && s.IsBlock[i]) return false;
+            }
+            int first = SkipAllSpaces(text, from);
+            List<int> pipes = new List<int>();
+            for (int i = first + 1; i + 1 < end; i++)
+            {
+                if (top[i - start] && text[i] == '|' && text[i + 1] == '>' && Editable(s, i + 1)) pipes.Add(i);
+            }
+            if (pipes.Count > 0)
+            {
+                foreach (int p in pipes)
+                {
+                    int before = p - 1;
+                    while (before > start && (text[before] == ' ' || text[before] == '\t')) before--;
+                    edits.Replace(before + 1, p - before - 1, "\n");
+                }
+                return true;
+            }
+
+            // Runs of code with no space between them at the line's level: a chain is one such run.
+            List<int> best = null;
+            int bestStart = -1;
+            int runStart = first;
+            List<int> arrows = new List<int>();
+            for (int i = first; i <= end; i++)
+            {
+                bool split = i == end || (top[i - start] && (char.IsWhiteSpace(text[i]) || text[i] == ',')) || (i > first && !s.IsCode(i) && s.States[i] != State.Single && s.States[i] != State.Double);
+                if (split)
+                {
+                    if (arrows.Count > 0 && (best == null || arrows.Count > best.Count))
+                    {
+                        best = arrows;
+                        bestStart = runStart;
+                    }
+                    arrows = new List<int>();
+                    runStart = i + 1;
+                    continue;
+                }
+                if (top[i - start] && text[i] == '-' && i + 1 < end && text[i + 1] == '>' && Editable(s, i + 1) && i > runStart) arrows.Add(i);
+            }
+            if (best == null) return false;
+            string receiver = text.Substring(bestStart, best[0] - bestStart);
+            bool plainName = receiver.TrimStart('$', '@').All(c => char.IsLetterOrDigit(c) || c == '_' || c == '.');
+            if (plainName)
+            {
+                // One call on a plain name ($user->save(...)) is left for its arguments to wrap, and the first call
+                // stays with a name no wider than an indent ($x->a()->b()), like Prettier's z.object().
+                if (best.Count == 1) return false;
+                if (receiver.Length <= options.IndentSize + 1) best = best.Skip(1).ToList();
+            }
+            if (best.Count == 0) return false;
+            foreach (int a in best) edits.Insert(a, "\n");
+            return true;
+        }
+
+        /// <summary>
+        /// A line such as <c>})-&gt;sum()</c> that closes a call from a chain already broken one call per line: the
+        /// call after it goes on its own line too, so the chain reads the same all the way down.
+        /// </summary>
+        private static int? ContinuesABrokenChain(Scan s, int start, int end)
+        {
+            string text = s.Text;
+            int p = SkipAllSpaces(text, start);
+            int first = p;
+            while (p < end && Editable(s, p) && (text[p] == ')' || text[p] == ']' || text[p] == '}')) p++;
+            if (p == first || p + 1 >= end || text[p] != '-' || text[p + 1] != '>' || !Editable(s, p) || s.Match[first] < 0) return null;
+            int openerLine = s.Text.LastIndexOf('\n', s.Match[first]) + 1;
+            return StartsWithChain(text, openerLine) ? p : null;
+        }
+
+        /// <summary>
+        /// Comment lines the formatter must not break: directives, Markdown tables and headings, and the lines of an
+        /// <c>@example</c> or a ``` fence in a doc comment.
+        /// </summary>
+        private static bool[] CommentsToKeep(Scan s)
+        {
+            bool[] keep = new bool[s.LineStarts.Count];
+            bool inFence = false, inExample = false;
+            for (int line = 0; line < s.LineStarts.Count; line++)
+            {
+                int start = s.LineStarts[line], end = s.LineEnd(line);
+                int first = SkipAllSpaces(s.Text, start);
+                bool doc = first + 2 < end && string.CompareOrdinal(s.Text, first, "///", 0, 3) == 0 && s.States[first] == State.LineComment;
+                if (!doc)
+                {
+                    inFence = inExample = false;
+                    string comment = first < end && s.States[first] == State.LineComment ? s.Text.Substring(first, end - first) : string.Empty;
+                    keep[line] = comment.Contains("kscript-fmt", StringComparison.Ordinal);
+                    continue;
+                }
+                string body = s.Text.Substring(first + 3, end - first - 3).Trim();
+                bool fence = body.StartsWith("```", StringComparison.Ordinal);
+                if (body.StartsWith("@", StringComparison.Ordinal)) inExample = body.StartsWith("@example", StringComparison.Ordinal);
+                keep[line] = inFence || fence || inExample || body.StartsWith("|", StringComparison.Ordinal) || body.StartsWith("#", StringComparison.Ordinal);
+                if (fence) inFence = !inFence;
+            }
+            return keep;
+        }
+
+        /// <summary>
+        /// A line that is only a <c>//</c> or <c>///</c> comment and runs past the print width is broken at the last space
+        /// that fits; the rest goes on a new comment line. In a doc comment, the rest of a tag (<c>@param</c>) or a
+        /// list item is indented under its text, so it reads (and parses) as the same paragraph.
+        /// </summary>
+        private static bool WrapComment(Scan s, int line, bool[] keep, FormatOptions options, Edits edits)
+        {
+            string text = s.Text;
+            int start = s.LineStarts[line], end = s.LineEnd(line);
+            int first = SkipAllSpaces(text, start);
+            if (first + 1 >= end || s.States[first] != State.LineComment || text[first] != '/' || text[first + 1] != '/') return false;
+            int slashes = first;
+            while (slashes < end && text[slashes] == '/') slashes++;
+            if (slashes - first > 3) return false; // a //// rule line
+            int words = SkipAllSpaces(text, slashes);
+            if (words >= end) return false;
+            string body = text.Substring(words, end - words);
+            string hang = string.Empty;
+            if (slashes - first == 3 && body.StartsWith("@", StringComparison.Ordinal)) hang = "  ";
+            else if (System.Text.RegularExpressions.Regex.Match(body, @"^([-*+]|\d+[.)]) ") is { Success: true } item) hang = new string(' ', item.Length);
+            else if (slashes - first == 3 && start > 0)
+            {
+                // A line that already hangs under a tag or list item keeps the same indentation.
+                hang = text.Substring(slashes, words - slashes).Length > 1 ? text.Substring(slashes + 1, words - slashes - 1) : string.Empty;
+            }
+            int leadingColumns = Columns(text.Substring(start, end - start), options);
+            int Column(int i) => leadingColumns + (i - first);
+            int best = -1;
+            for (int i = words + 1; i < end; i++)
+            {
+                if (text[i] != ' ' || text[i - 1] == ' ' || i + 1 >= end || text[i + 1] == ' ') continue;
+                if (Column(i) > options.PrintWidth) break;
+                best = i;
+            }
+            if (best < 0) return false;
+            string prefix = text.Substring(first, slashes - first) + (slashes < words ? " " : string.Empty) + hang;
+            // Breaking must make the line shorter than the text that moves down would start at, and the word that
+            // moves down must fit on its new line (a long link would only move, not fit).
+            if (Column(best + 1) <= leadingColumns + prefix.Length + 1) return false;
+            int wordEnd = text.IndexOf(' ', best + 1);
+            if (wordEnd < 0 || wordEnd > end) wordEnd = end;
+            if (leadingColumns + prefix.Length + (wordEnd - best - 1) > options.PrintWidth) return false;
+            edits.Replace(best, 1, "\n" + Indent(leadingColumns, options) + prefix);
+
+            // The words that move down join the next line when it carries on the same paragraph, so a comment is
+            // reflowed rather than left with a short line in the middle (the next pass wraps that line if needed).
+            if (end < text.Length && line + 1 < keep.Length && !keep[line + 1])
+            {
+                int nextEnd = s.LineEnd(line + 1);
+                int nextFirst = SkipAllSpaces(text, end + 1);
+                int nextSlashes = nextFirst;
+                while (nextSlashes < nextEnd && text[nextSlashes] == '/') nextSlashes++;
+                int nextWords = SkipAllSpaces(text, nextSlashes);
+                string nextBody = nextWords < nextEnd ? text.Substring(nextWords, nextEnd - nextWords) : string.Empty;
+                bool sameParagraph = nextFirst - (end + 1) == first - start
+                    && string.CompareOrdinal(text, end + 1, text, start, first - start) == 0
+                    && nextSlashes - nextFirst == slashes - first
+                    && s.States[nextFirst] == State.LineComment
+                    && text.Substring(nextSlashes, nextWords - nextSlashes) == prefix.Substring(slashes - first)
+                    && nextBody.Length > 0
+                    && !nextBody.StartsWith("@", StringComparison.Ordinal)
+                    && !System.Text.RegularExpressions.Regex.IsMatch(nextBody, @"^([-*+]|\d+[.)]) |^[|#>]|^```");
+                if (sameParagraph) edits.Replace(end, nextWords - end, " ");
+            }
+            return true;
         }
 
         private static bool IsQuote(Scan s, int i) => (s.Text[i] == '"' || s.Text[i] == '\'') && (i == 0 || s.States[i - 1] == State.Code || s.States[i - 1] == State.LineComment || s.States[i - 1] == State.BlockComment);

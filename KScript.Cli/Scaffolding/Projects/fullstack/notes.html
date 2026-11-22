@@ -11,8 +11,13 @@ unless: auth
     <state name="problem" value="''" />
     <let name="notes" value="@list_notes()" />
 
-    <form class="add-note" on-submit="problem = @add_note($draft) ?? ''; draft = $problem == '' ? '' : $draft">
-      <input bind="draft" placeholder="What do you want to remember?" autocomplete="off">
+    <form
+      class="add-note"
+      on-submit="problem = @add_note($draft) ?? ''; draft = $problem == '' ? '' : $draft">
+      <input
+        bind="draft"
+        placeholder="What do you want to remember?"
+        autocomplete="off">
       <button>Add</button>
     </form>
     <if $problem != ''>

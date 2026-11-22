@@ -1,14 +1,16 @@
 --- make
 when: cache
 ---
-// The app's cache (KScript.Cache, see docs/cache.md). The store and time limit come from config/config.yaml:
-// cache.store is memory (shared while kscript serve runs) or file (kept between runs), and cache.ttl how long.
+// The app's cache (KScript.Cache, see docs/cache.md). The store and time limit
+// come from config/config.yaml: cache.store is memory (shared while kscript
+// serve runs) or file (kept between runs), and cache.ttl how long.
 import KScript.Cache
 
 /// The cache store the settings name.
 fn app_cache() => @cache($config.cache.store ?? 'memory', name: 'app')
 
-/// The value kept under the key, or else what compute gives, kept for cache.ttl.
+/// The value kept under the key, or else what compute gives, kept for
+/// cache.ttl.
 fn cached(key: string, compute: fn) => @app_cache()->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
 
 /// Forgets a key, so the next request works the value out again.

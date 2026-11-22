@@ -23,7 +23,9 @@
 
       <div class="lab">
         <live id="lab">
-          <state name="world" value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
+          <state
+            name="world"
+            value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
           <state name="playing" value="false" />
           <state name="speed" value="'150'" />
           <state name="pattern" value="'glider_gun'" />
@@ -60,7 +62,13 @@
             </label>
             <div class="group">
               <button on-click="world = @new_world(@random_grid(width: $cols, height: $rows, density: $soup->to_number(default: 30)), wrap: $world.wrap, pattern: 'random soup'); playing = false">Random soup</button>
-              <input type="range" min="5" max="80" step="5" bind="soup" aria-label="How full the soup is">
+              <input
+                type="range"
+                min="5"
+                max="80"
+                step="5"
+                bind="soup"
+                aria-label="How full the soup is">
               <span class="muted">{$soup}%</span>
             </div>
             <label class="check"><input type="checkbox" checked="{$world.wrap}" on-change="world = $world->merge({ wrap: $event.checked })"> Wrap edges</label>
@@ -73,10 +81,15 @@
           </p>
 
           <!-- One handler for the whole board: the clicked cell's value is "column,row". -->
-          <div class="board" style="--cols: {$cols}" on-click="world = @flip($world, where: $event.value)">
+          <div
+            class="board"
+            style="--cols: {$cols}"
+            on-click="world = @flip($world, where: $event.value)">
             <for each="row" index="y" in="$world.grid">
               <for each="c" index="x" in="$row">
-                <button class="{ $c eq 'O' ? 'cell on' : 'cell' }" value="{$x},{$y}"></button>
+                <button
+                  class="{ $c eq 'O' ? 'cell on' : 'cell' }"
+                  value="{$x},{$y}"></button>
               </for>
             </for>
           </div>

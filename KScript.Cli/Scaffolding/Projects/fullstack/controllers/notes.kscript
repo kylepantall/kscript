@@ -1,8 +1,9 @@
 --- make
 unless: db is none
 ---
-// The notes API: each function answers one of the Resource routes in routes/api{{ ext }}.
-// A record or list it returns is sent as JSON; a note that isn't there is a 404.
+// The notes API: each function answers one of the Resource routes in
+// routes/api{{ ext }}. A record or list it returns is sent as JSON; a note that
+// isn't there is a 404.
 import KScript.Http
 import KScript.Data
 {{#if auth}}

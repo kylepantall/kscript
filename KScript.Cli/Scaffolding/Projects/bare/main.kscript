@@ -1,4 +1,5 @@
-// {{ title }}. Run it with: kscript main{{ ext }}, or kscript main{{ ext }} Ellie
+// {{ title }}. Run it with: kscript main{{ ext }}, or kscript main{{ ext }}
+// Ellie
 
 /// A friendly hello for someone.
 fn greeting(name: string) => 'Hello, ' + $name->trim()->title() + '!'

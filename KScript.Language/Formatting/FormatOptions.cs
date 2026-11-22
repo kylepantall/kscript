@@ -13,7 +13,7 @@ namespace KScript.Language.Formatting
 
     /// <summary>
     /// How <see cref="Formatter"/> lays a document out. The defaults match the samples in this repository:
-    /// two-space indents, start tags wrapped past 120 columns, at most one blank line in a row.
+    /// two-space indents, lines wrapped past 80 columns, at most one blank line in a row.
     /// </summary>
     public sealed class FormatOptions
     {
@@ -23,8 +23,11 @@ namespace KScript.Language.Formatting
         /// <summary>Indent with tabs instead of spaces.</summary>
         public bool UseTabs { get; set; }
 
-        /// <summary>A start tag with several attributes that would run past this column puts one attribute per line.</summary>
-        public int PrintWidth { get; set; } = 120;
+        /// <summary>
+        /// The longest a line should be. Longer lines are broken: a start tag puts one attribute per line, and in
+        /// .kscript files a long call, chain, one-line function, string or comment is wrapped.
+        /// </summary>
+        public int PrintWidth { get; set; } = 80;
 
         public EndOfLine EndOfLine { get; set; } = EndOfLine.Auto;
 
@@ -66,6 +69,15 @@ namespace KScript.Language.Formatting
         /// <summary>.kscript files: break a string past the print width with a \ at the end of the line. Off: long strings stay on one line.</summary>
         public bool WrapStrings { get; set; } = true;
 
+        /// <summary>.kscript files: a long <c>-&gt;</c> chain or <c>|&gt;</c> pipe puts each call on its own line. Off: chains stay on one line.</summary>
+        public bool WrapChains { get; set; } = true;
+
+        /// <summary>.kscript files: a long one-line function's body moves to the line after its <c>=&gt;</c>. Off: it stays on the line.</summary>
+        public bool WrapBodies { get; set; } = true;
+
+        /// <summary>.kscript files: a long <c>//</c> or <c>///</c> comment line is broken between words. Off: comments stay as written.</summary>
+        public bool WrapComments { get; set; } = true;
+
         public static FormatOptions Default => new FormatOptions();
 
         /// <summary>
@@ -105,6 +117,9 @@ namespace KScript.Language.Formatting
                     case "spacing": options.Spacing = rule.Value; break;
                     case "braceStyle": options.BraceStyle = rule.Value; break;
                     case "wrapStrings": options.WrapStrings = rule.Value; break;
+                    case "wrapChains": options.WrapChains = rule.Value; break;
+                    case "wrapBodies": options.WrapBodies = rule.Value; break;
+                    case "wrapComments": options.WrapComments = rule.Value; break;
                 }
             }
             return options;

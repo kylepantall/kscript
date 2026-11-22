@@ -17,7 +17,9 @@
 
   <fn name="list" params="query: map">
     <let name="min" value="($query.min_age ?? '0')->to_number(default: 0)" />
-    <let name="people" value="@all() |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)" />
+    <let
+      name="people"
+      value="@all() |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)" />
     <return value="@view('people/index', people: $people, min: $min)" />
   </fn>
 
@@ -48,7 +50,9 @@
     @returns Person
   -->
   <fn name="show" params="id: int">
-    <let name="person" value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
+    <let
+      name="person"
+      value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
     <!-- A client that already has this version gets 304 Not Modified, and nothing below runs. -->
     <do>@etag($person)</do>
     <return value="$person" />
@@ -76,7 +80,9 @@
   -->
   <fn name="update" params="id: int, json: map?">
     <let name="person" value="@find($id) ?? @abort(404)" />
-    <let name="changed" value="$person->merge($json ?? {})->merge({ id: $person.id })" />
+    <let
+      name="changed"
+      value="$person->merge($json ?? {})->merge({ id: $person.id })" />
     <do>@write_json($file, @all()->map(fn($p) => $p.id == $person.id ? $changed : $p))</do>
     <return value="$changed" />
   </fn>

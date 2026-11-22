@@ -1,5 +1,9 @@
 <kscript>
-  <error name="OrderNotFound" message="No order {$id}" description="An order that can't be found." extends="NotFound">
+  <error
+    name="OrderNotFound"
+    message="No order {$id}"
+    description="An order that can't be found."
+    extends="NotFound">
     <field name="id" type="int" />
   </error>
 </kscript>

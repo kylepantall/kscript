@@ -20,7 +20,7 @@ The formatter only touches whitespace that can't change what a file does.
 - Each statement goes on its own line: a one-line block such as `for i in 1..3 { echo $i }` is opened up, and statements joined with `;` are split.
 - `else`, `elif`, `catch` and `finally` go on the line of the `}` before them: `} else {`.
 - Spacing inside a line: one space after commas and colons (`add(1, 2)`, `{ a: 1 }`), around `=` and `=>`, before a block's `{` and before a `//` comment at the end of a line.
-- A call, array or map that runs past `printWidth` puts one item per line.
+- A line that runs past `printWidth` (80 columns unless you [set it](#settings)) is wrapped, as described in [Long lines](#long-lines).
 - Trailing spaces are removed, runs of blank lines shrink to `maxBlankLines` (and go entirely at the start and end of a block), and the file ends with exactly one newline.
 
 ```kscript
@@ -48,7 +48,67 @@ if $x->count() > 2 {
 }
 ```
 
-Text in quotes, comments (`//`, `///` and `/* */`), enum values and match cases written on one line (`label = match $n { 1 => 'one', _ => 'many' }`) are kept as they are. After formatting, `kscript fmt` reads the file again and checks that it is the same program, statement for statement; if it isn't, the file is left alone with an error (please report it).
+#### Long lines
+
+A line longer than `printWidth` is broken where the code joins most loosely, one step at a time, until it fits, the way
+Prettier and dart format do. Each step is tried in this order:
+
+1. **A one-line function's body** moves to the next line, after the `=>`.
+2. **A chain** of `->` calls, or a pipe of `|>` steps, puts each call on its own line, one level in from where the
+   chain starts. One call on a plain name (`$user->save(...)`) is left for its arguments to wrap, and a name no wider
+   than an indent keeps its first call (`$s->trim()`).
+3. **A call, array or map** puts one item per line.
+4. **A lambda** that is a call's only argument breaks after its `=>`.
+5. **A string** is broken between words, with a `\` at the end of the line so the break isn't part of it (the
+   [`wrapStrings`](#turning-rules-off) rule).
+
+A `//` or `///` comment that runs past `printWidth` is broken between words, and the words that move down join the next
+comment line when it carries on the same paragraph. In a doc comment, the rest of a tag (`@param`) or a list item hangs
+under its text. `@example` code, ``` fences, tables, headings and words too long to fit (like links) are left alone.
+
+```kscript
+import KScript.IO
+import KScript.Cache
+
+/// The value kept under the key, or else what compute gives, kept for cache.ttl, which says how long.
+fn cached(key, compute) => @cache('memory', name: 'app')->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
+
+fn adults(people) => $people->filter(fn($p) => $p.age >= 18)->sort_by(fn($p) => $p.name)->map(fn($p) => $p.name)->take(20)
+
+people = @read_json('people.json')
+names = $people |> filter(fn($p) => $p.age > 18) |> map(fn($p) => $p.name->upper()) |> sort()
+```
+
+becomes
+
+```kscript
+import KScript.IO
+import KScript.Cache
+
+/// The value kept under the key, or else what compute gives, kept for
+/// cache.ttl, which says how long.
+fn cached(key, compute) =>
+  @cache('memory', name: 'app')
+    ->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
+
+fn adults(people) =>
+  $people
+    ->filter(fn($p) => $p.age >= 18)
+    ->sort_by(fn($p) => $p.name)
+    ->map(fn($p) => $p.name)
+    ->take(20)
+
+people = @read_json('people.json')
+names = $people
+  |> filter(fn($p) => $p.age > 18)
+  |> map(fn($p) => $p.name->upper())
+  |> sort()
+```
+
+Lines are only broken, never joined, so a short line you split on purpose stays split. Set `printWidth` in
+`kscript.json` (or your [standard](standards.md)) to choose the width, and turn any step off with the rules below.
+
+Text in quotes, `/* */` comments, enum values and match cases written on one line (`label = match $n { 1 => 'one', _ => 'many' }`) are kept as they are, apart from the long-line wrapping above. After formatting, `kscript fmt` reads the file again and checks that it is the same program, statement for statement; if it isn't, the file is left alone with an error (please report it).
 
 ### XML scripts and pages
 
@@ -94,7 +154,7 @@ Put style settings under `"format"` in `kscript.json`. Every setting is optional
   "format": {
     "indent": 2,              // spaces per level, or "tab"
     "tabWidth": 2,            // with "indent": "tab", the columns a tab counts as
-    "printWidth": 120,        // wrap a start tag's attributes past this column
+    "printWidth": 80,         // the longest a line should be; longer lines are wrapped
     "maxBlankLines": 1,       // blank lines kept in a row
     "endOfLine": "auto",      // auto (keep each file's), lf or crlf
     "preserve": ["pre-like"], // elements whose content is kept exactly
@@ -125,9 +185,12 @@ Each thing the formatter does is a rule you can turn off under `format.rules` (`
 | `finalNewline` | Ends the file with exactly one newline. | The file ends as it did. |
 | `spacing` | `.kscript` files: one space after commas and colons, around `=` and `=>`, and before a block's `{`. | Spacing inside lines is kept. |
 | `braceStyle` | `.kscript` files: `} else {`, `} catch {` on one line. | `else` and `catch` stay on the line they're on. |
+| `wrapChains` | `.kscript` files: puts each call of a `->` chain or `\|>` pipe that runs past `printWidth` on its own line. | Chains stay on one line. |
+| `wrapBodies` | `.kscript` files: moves a long one-line function's body (and a long lambda's, when it is a call's only argument) to the line after its `=>`. | Bodies stay on the `=>` line. |
+| `wrapComments` | `.kscript` files: breaks a `//` or `///` comment line that runs past `printWidth` between words. | Comments stay as written. |
 | `wrapStrings` | `.kscript` files: breaks a string that runs past `printWidth` at a space, ending the line with `\` so the break isn't part of the string. | Long strings stay on one line. |
 
-In `.kscript` files, `tidyTags` does nothing, `wrapAttributes` wraps long calls, arrays and maps, and `statementPerLine` opens up one-line blocks and splits `;`.
+In `.kscript` files, `tidyTags` does nothing, `wrapAttributes` puts one item per line in long calls, arrays and maps, and `statementPerLine` opens up one-line blocks and splits `;`.
 
 ```jsonc
 {

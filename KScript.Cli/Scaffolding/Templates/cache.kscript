@@ -9,15 +9,18 @@ example: kscript make cache reports --file data/report-cache.json
 to: {{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Import it with import "{{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}" as {{ snake }}, then: repos = @{{ snake }}.remember('repos', fn() => @api($url)->json())
 ---
-// {{ title }}: values kept in a JSON file for {{ minutes ?? 10 }} minutes, so slow work runs once.
+// {{ title }}: values kept in a JSON file for {{ minutes ?? 10 }} minutes, so
+// slow work runs once.
 import KScript.IO
 
-// File paths are relative to this script, so {{ up }} leads back to the project folder.
+// File paths are relative to this script, so {{ up }} leads back to the project
+// folder.
 const file = '{{ up }}{{ file }}{{#unless file}}{{ paths.data }}/{{ dir }}{{ kebab }}.json{{/unless}}'
 
 fn saved() => @exists($file) ? @read_json($file) : {}
 
-/// The cached value for key, or what make() returns, which is kept for next time.
+/// The cached value for key, or what make() returns, which is kept for next
+/// time.
 fn remember(key: string, make: fn, minutes = {{ minutes ?? 10 }}) {
   entries = @saved()
   entry = $entries[$key]

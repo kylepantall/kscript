@@ -1,5 +1,6 @@
-// The JSON API, served by kscript serve under /api (see docs/http.md). kscript routes lists the routes, and
-// /_api shows their docs. Each route is answered by a controller function; a map or list it returns is JSON.
+// The JSON API, served by kscript serve under /api (see docs/http.md). kscript
+// routes lists the routes, and /_api shows their docs. Each route is answered
+// by a controller function; a map or list it returns is JSON.
 KScript.Routes(middleware: [cors, request_id]) {
 {{#if auth}}
   import KScript.Auth
@@ -16,7 +17,8 @@ KScript.Routes(middleware: [cors, request_id]) {
   }
 {{#if auth}}
 
-  // Sign up, then trade an email and password for a token. Send it as Authorization: Bearer <token>.
+  // Sign up, then trade an email and password for a token. Send it as
+  // Authorization: Bearer <token>.
   Group(middleware: "throttle:10") {
     Post(path: "/register", to: accounts.sign_up)
     Post(path: "/tokens", to: accounts.issue_token)

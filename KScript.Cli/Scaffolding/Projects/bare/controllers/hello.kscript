@@ -1,7 +1,8 @@
 --- make
 when: api
 ---
-// A controller: each function answers a route in routes/api{{ ext }}. A map or list it returns is sent as JSON.
+// A controller: each function answers a route in routes/api{{ ext }}. A map or
+// list it returns is sent as JSON.
 
 /// GET /api/hello, or /api/hello?name=Ellie
 fn show(query: map) => { message: 'Hello, ' + ($query.name ?? 'world') + '!' }

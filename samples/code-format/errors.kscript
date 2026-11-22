@@ -1,4 +1,5 @@
-// Error types: declare each in its own file (errors/), throw them with their fields, and catch them by type.
+// Error types: declare each in its own file (errors/), throw them with their
+// fields, and catch them by type.
 
 import "errors/order-not-found.kscript"
 import "errors/out-of-stock.kscript"

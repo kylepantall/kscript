@@ -2,8 +2,9 @@
 when: db is none
 to: controllers/notes.kscript
 ---
-// The notes API: each function answers one of the Resource routes in routes/api{{ ext }}. A map or list it
-// returns is sent as JSON. With no database, the notes are kept in the JSON file config.yaml names (notes.file).
+// The notes API: each function answers one of the Resource routes in
+// routes/api{{ ext }}. A map or list it returns is sent as JSON. With no
+// database, the notes are kept in the JSON file config.yaml names (notes.file).
 import KScript.IO
 import KScript.Http
 {{#if auth}}

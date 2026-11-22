@@ -25,20 +25,51 @@ namespace KScript.Language.Formatting
             return SameNodes(a.Children, b.Children, a, ref difference);
         }
 
-        private static List<MarkupNode> Significant(List<MarkupNode> nodes) =>
-            nodes.Where(n => !(n is MarkupText t && t.IsWhitespace && !t.IsCData)).ToList();
+        /// <summary>
+        /// The nodes that matter, each with the text of a run of // comments it starts: a // comment the formatter broke
+        /// over two lines is still the same comment, so a run of // lines is compared as one text, word for word.
+        /// </summary>
+        private static List<(MarkupNode Node, string Comment)> Significant(List<MarkupNode> nodes)
+        {
+            var result = new List<(MarkupNode Node, string Comment)>();
+            foreach (MarkupNode n in nodes)
+            {
+                if (n is MarkupText t && t.IsWhitespace && !t.IsCData) continue;
+                bool line = n is MarkupComment c && !c.IsBlock && c.Plain;
+                if (line && result.Count > 0 && result[result.Count - 1].Comment != null)
+                {
+                    var last = result[result.Count - 1];
+                    result[result.Count - 1] = (last.Node, last.Comment + " " + ((MarkupComment)n).Text);
+                    continue;
+                }
+                result.Add((n, line ? ((MarkupComment)n).Text : null));
+            }
+            return result;
+        }
+
+        private static string Words(string s) => string.Join(" ", (s ?? string.Empty).Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
 
         private static bool SameNodes(List<MarkupNode> left, List<MarkupNode> right, MarkupDocument source, ref string difference)
         {
-            List<MarkupNode> a = Significant(left), b = Significant(right);
+            var a = Significant(left);
+            var b = Significant(right);
             for (int i = 0; i < Math.Max(a.Count, b.Count); i++)
             {
                 if (i >= a.Count || i >= b.Count)
                 {
-                    difference = "a statement was added or removed near " + Where(source, (i < a.Count ? a[i] : a.LastOrDefault())?.Span.Start ?? 0);
+                    difference = "a statement was added or removed near " + Where(source, (i < a.Count ? a[i] : a.LastOrDefault()).Node?.Span.Start ?? 0);
                     return false;
                 }
-                if (!SameNode(a[i], b[i], source, ref difference)) return false;
+                if (a[i].Comment != null && b[i].Comment != null)
+                {
+                    if (Words(a[i].Comment) != Words(b[i].Comment))
+                    {
+                        difference = "a comment changed at " + Where(source, a[i].Node.Span.Start);
+                        return false;
+                    }
+                    continue;
+                }
+                if (!SameNode(a[i].Node, b[i].Node, source, ref difference)) return false;
             }
             return true;
         }

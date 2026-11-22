@@ -11,7 +11,8 @@ hint: Import it with import "{{ paths.storage }}/{{ dir }}{{ kebab }}{{ ext }}" 
 // {{ title }}, kept as a JSON list in {{ file }}{{#unless file}}{{ paths.data }}/{{ dir }}{{ kebab }}.json{{/unless}}. Each record gets a numeric id when it is first saved.
 import KScript.IO
 
-// File paths are relative to this script, so {{ up }} leads back to the project folder.
+// File paths are relative to this script, so {{ up }} leads back to the project
+// folder.
 const file = '{{ up }}{{ file }}{{#unless file}}{{ paths.data }}/{{ dir }}{{ kebab }}.json{{/unless}}'
 
 /// Every record, or an empty list before anything is saved.
@@ -20,7 +21,8 @@ fn all() => @exists($file) ? @read_json($file) : []
 /// The record with this id, or null.
 fn find(id: int) => @all()->find(fn($r) => $r.id == $id)
 
-/// Adds a record, or replaces the one with the same id. Returns the saved record.
+/// Adds a record, or replaces the one with the same id. Returns the saved
+/// record.
 fn save(record: map) {
   records = @all()
   if $record.id != null {

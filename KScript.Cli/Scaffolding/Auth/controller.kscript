@@ -2,8 +2,10 @@
 to: {{ paths.controllers }}/accounts.kscript
 ---
 // Signing up, in and out, password resets{{#if api}}, API tokens{{/if}} and the account page, made by kscript make auth.
-// The routes are in {{ routes_file }}, and the pages in {{ paths.views }}/auth/. KScript.Auth keeps the users,
-// sessions and tokens, and checks the CSRF token every form sends with {! @csrf_field() } (see the Sign-in guide).
+// The routes are in {{ routes_file }}, and the pages in
+// {{ paths.views }}/auth/. KScript.Auth keeps the users, sessions and tokens,
+// and checks the CSRF token every form sends with {! @csrf_field() } (see the
+// Sign-in guide).
 import KScript.Http
 import KScript.Auth
 import "{{ sign_up_import }}"
@@ -11,7 +13,8 @@ import "{{ sign_up_import }}"
 /// GET /login
 fn show_login() => @view('auth/login', data: {})
 
-/// POST /login: a wrong email or password shows the form again. After a few wrong tries, @attempt makes them wait.
+/// POST /login: a wrong email or password shows the form again. After a few
+/// wrong tries, @attempt makes them wait.
 fn sign_in(form: map) {
   user = null
   try {
@@ -50,13 +53,15 @@ fn sign_out() {
 /// GET /forgot-password
 fn show_forgot() => @view('auth/forgot-password', data: {})
 
-/// POST /forgot-password: the answer is the same whether or not the email has an account.
+/// POST /forgot-password: the answer is the same whether or not the email has
+/// an account.
 fn send_reset(form: map, request: map) {
   token = @reset_token($form.email ?? '')
   if $token != null {
     site = ($request.scheme ?? 'http') + '://' + ($request.headers.host ?? 'localhost')
     link = $site + @route('password.reset', token: $token)
-    // Email $link to $form.email with your mail provider. Until then, it is written to the server's log.
+    // Email $link to $form.email with your mail provider. Until then, it is
+    // written to the server's log.
     log "Password reset link for {$form.email}: {$link}"
   }
   $session->flash('status', 'If that email has an account, a link to reset its password is on its way.')
@@ -66,7 +71,8 @@ fn send_reset(form: map, request: map) {
 /// GET /reset-password/:token
 fn show_reset(token: string) => @view('auth/reset-password', data: { token: $token })
 
-/// POST /reset-password: sets the new password, ends the account's other sessions and signs it in here.
+/// POST /reset-password: sets the new password, ends the account's other
+/// sessions and signs it in here.
 fn reset(form: map) {
   user = null
   try {
@@ -100,7 +106,8 @@ fn delete_token(id: string) {
 }
 {{#if api}}
 
-/// POST {{ api_prefix }}/tokens with a JSON email and password: answers with a new API token.
+/// POST {{ api_prefix }}/tokens with a JSON email and password: answers with a
+/// new API token.
 fn issue_token(json: map) {
   user = @attempt($json.email ?? '', $json.password ?? '', session: false)
   if $user == null {

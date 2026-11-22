@@ -1,4 +1,5 @@
-// The shape of GitHub's repository data. Other scripts import it; each type it uses has its own file.
+// The shape of GitHub's repository data. Other scripts import it; each type it
+// uses has its own file.
 import "owner.kscript"
 import "visibility.kscript"
 
