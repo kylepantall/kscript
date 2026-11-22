@@ -240,8 +240,13 @@ namespace KScript.Language.Tests
             Assert.Equal(DiagnosticSeverity.Error, d.Severity);
             Assert.Equal(12, d.Span.Start);
             Assert.Contains(Analyze("n = 5\ng = \"{ $n->upper() }\"\necho $g\n").Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
-            // Braces that don't start with a value, and doubled braces, are text.
-            Assert.Empty(Analyze("route = \"/users/{id} {{x}} \\d{3} a@b.com $5\"\necho $route\n").Diagnostics);
+            // A brace always holds an expression, whatever it opens with: a type, a number, a bracket.
+            Assert.Empty(Analyze("type P {\n  n: int\n}\ng = \"{ P(n: 1).n } { 1 + 2 } { (3) } { [1, 2]->count() }\"\necho $g\n").Diagnostics);
+            Diagnostic id = Assert.Single(Analyze("route = \"/users/{id}\"\necho $route\n").Diagnostics);
+            Assert.Contains("'id' isn't a value", id.Message);
+            Assert.Contains(Analyze("css = \"a { color: red }\"\necho $css\n").Diagnostics, x => x.Message.Contains("write {{ and }} for braces, or use 'single quotes'"));
+            // Doubled braces and single quotes are text.
+            Assert.Empty(Analyze("route = \"{{x}} a@b.com $5\"\necho $route\npath = '/users/{id} \\d{3}'\necho $path\n").Diagnostics);
         }
 
         [Fact]

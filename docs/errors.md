@@ -271,7 +271,11 @@ A built-in type that was renamed is an error, with a fix that writes the new nam
 
 ## Style
 
-Style rules keep code easy to read. They are warnings, and a [standard](standards.md) can turn each one off.
+The KS6xxx codes come in two kinds.
+
+**Old spellings are errors.** KS6006, KS6009, KS6010, KS6011, KS6012 and KS6014 each mark a spelling that was replaced by one that is kept. In a `.kscript` file the script doesn't run: the engine stops with the same message `kscript check` gives, and no standard or `lint.rules` setting turns it down. `kscript check --fix` rewrites every one of them. XML scripts keep the forms that are XML's own (`lt` and `ge`, a comma list in an attribute, `fields="x: int, y: int"`), and get a warning where a rule applies to both forms (KS6010).
+
+**Style rules are warnings.** KS6001 to KS6005, KS6007, KS6008, KS6013 and KS6018 are about how a file reads, not whether it runs. They are warnings, and a [standard](standards.md) can turn each one off or make it an error.
 
 ## KS6001
 
@@ -295,7 +299,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6006
 
-**A list of names written as one string.** In a `.kscript` file write an array: `use: [log, cors]`.
+**A list written as one string.** An error in a `.kscript` file. Write an array: `use: [log, cors]` for names, `to: ['paper.pdf', 'paper.md']` for text, `fields: [x: int, y: int]` for fields. `kscript check --fix` rewrites it.
 
 ## KS6007
 
@@ -307,27 +311,27 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6009
 
-**Text written as a bare word.** In a `.kscript` argument list, quotes make text and everything else is code, so text goes in quotes: `Section(title: "Results")`, `Document(to: 'paper.pdf')`. A bare word is a name: a variable to fill (`to: answer`), a function, a type or one of a fixed set of words (`align: right`). `kscript check --fix` adds the quotes.
+**Text written as a bare word.** An error in a `.kscript` file. In an argument list, quotes make text and everything else is code, so text goes in quotes: `Section(title: "Results")`, `Document(to: 'paper.pdf')`. A bare word is a name: a variable to fill (`to: answer`), a function, a type or one of a fixed set of words (`align: right`). `kscript check --fix` adds the quotes.
 
 ## KS6010
 
-**A name declared with `$`.** `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
+**A name declared with `$`.** An error in a `.kscript` file, and a warning in XML. `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
 
 ## KS6011
 
-**yes/no where true/false is meant.** Booleans are `true` and `false` everywhere in `.kscript`: `Section(numbered: false)`. A flag on its own (`Section(numbered)`) means true.
+**yes/no where true/false is meant.** An error in a `.kscript` file. Booleans are `true` and `false` everywhere in `.kscript`: `Section(numbered: false)`. A flag on its own (`Section(numbered)`) means true. `kscript check --fix` rewrites it.
 
 ## KS6012
 
-**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`; XML keeps the words). Logic stays as words: `and`, `or`, `not`. A function is named as `@name` in an argument, as it is in an expression: `spawn(fn: @job)`, `llm(tools: [@lookup])`, `Get(to: @people.show)`, not a bare `job`. `kscript check --fix` rewrites each one.
+**A second spelling.** An error in a `.kscript` file. Each of these has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`; XML keeps the words). Logic stays as words: `and`, `or`, `not`. A function is named as `@name` in an argument, as it is in an expression: `spawn(fn: @job)`, `llm(tools: [@lookup])`, `Get(to: @people.show)`, not a bare `job`. `kscript check --fix` rewrites each one.
 
 ## KS6013
 
-**A name that breaks the naming rules.** Functions, variables, fields and arguments are `snake_case`; types, models, enums and error types are `PascalCase`. The editor renames a variable everywhere the file uses it with the quick fix; a function, a parameter, a field or a type has no quick fix, because other files and callers may name it, so use the editor's rename. `kscript check --fix` leaves names alone.
+**A name that breaks the naming rules.** A warning: the script runs. Functions, variables, fields and arguments are `snake_case`; types, models, enums and error types are `PascalCase`. The editor renames a variable everywhere the file uses it with the quick fix; a function, a parameter, a field or a type has no quick fix, because other files and callers may name it, so use the editor's rename. `kscript check --fix` leaves names alone.
 
 ## KS6014
 
-**A type written the long way.** Each of these has one form, and `kscript check --fix` rewrites the other:
+**A type written the long way.** An error in a `.kscript` file. Each of these has one form, and `kscript check --fix` rewrites the other:
 
 - A type, model, enum, error or job is named bare, without `$`: `$text->json(as: Repo)`, `User->create(name: 'Joan')`. `$` reads a variable.
 - An optional field is marked on its name, `age?: int`, not on its type (`age: int?`). `T?` stays for a parameter that may be null: `fn show(repo: Repo?)`.
@@ -337,4 +341,4 @@ Calling the name makes a value of every kind of type: `Repo($data)`, `Repo(name:
 
 ## KS6018
 
-**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so the fix adds `s`.
+**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so this is a warning and the fix adds `s`. `wait(500ms)` takes its one argument without the name.

@@ -12,13 +12,27 @@ namespace KScript.Tests.Conventions;
 /// <summary>
 /// One spelling for each piece of syntax: names are declared bare (<c>x = 3</c>, <c>fn(n) =&gt; $n</c>), a match has one
 /// arm syntax (<c>pattern =&gt; result</c>), a .kscript file compares with symbols and joins with words, and
-/// <c>elif</c>, <c>key: value</c> and <c>catch A | B</c> have no second form. The second spellings still parse, so
-/// each is reported (KS6010, KS6012) with a fix, and every sample, template and docs example is checked to be free of
-/// them, so they can't come back.
+/// <c>elif</c>, <c>key: value</c> and <c>catch A | B</c> have no second form. In a .kscript file a second spelling is an
+/// error (KS6010, KS6012) that carries its fix, and the file doesn't run; every sample, template and docs example is
+/// checked to be free of them, so they can't come back.
 /// </summary>
 public class SyntaxConventionTests
 {
-    private static readonly string[] Guarded = { DiagnosticCodes.BareDeclaration, DiagnosticCodes.OneSpelling };
+    /// <summary>Every old spelling (the codes a .kscript file doesn't run with), so no sample, template or example holds one.</summary>
+    private static readonly string[] Guarded =
+    {
+        DiagnosticCodes.BareDeclaration, DiagnosticCodes.OneSpelling, DiagnosticCodes.PreferArrayList,
+        DiagnosticCodes.QuoteText, DiagnosticCodes.BoolWords, DiagnosticCodes.TypeForm,
+    };
+
+    [Fact]
+    public void TheGuardCoversEveryOldSpelling()
+    {
+        foreach (string code in typeof(DiagnosticCodes).GetFields().Select(f => f.GetValue(null)).OfType<string>().Where(OldSpellings.IsOldSpelling))
+        {
+            Assert.Contains(code, Guarded);
+        }
+    }
 
     private static List<Diagnostic> Lint(string code, string path = "test.kscript") =>
         Analyzer.Analyze(code, path).Diagnostics.Where(d => Guarded.Contains(d.Code)).OrderBy(d => d.Span.Start).ToList();
@@ -68,8 +82,12 @@ public class SyntaxConventionTests
     public void SamplesAndTemplatesUseOneSpelling(string file)
     {
         string text = File.ReadAllText(ScriptRunner.RepoFile(file));
+        string skip = null;
         if (text.Contains("{{", StringComparison.Ordinal) && file.Contains("Scaffolding", StringComparison.Ordinal))
         {
+            // The word that stands in for a placeholder isn't quoted where the value it stands for is a number or a
+            // duration; TemplateConventionTests checks every template filled in.
+            skip = DiagnosticCodes.QuoteText;
             // A template isn't a script until it is filled in: read it with its {{#if}} lines dropped and a word in
             // each {{ placeholder }}, which keeps the code around them readable.
             text = Regex.Replace(text, @"\{\{\s*[#/][^}]*\}\}", string.Empty);
@@ -77,7 +95,7 @@ public class SyntaxConventionTests
             text = Regex.Replace(text, @"\{\{\s*pascal\s*\}\}", "X");
             text = Regex.Replace(text, @"\{\{[^}]*\}\}", "x");
         }
-        Assert.Empty(Problems(text, ScriptRunner.RepoFile(file)).Select(p => $"{file}{p}"));
+        Assert.Empty(Problems(text, ScriptRunner.RepoFile(file), skip: skip).Select(p => $"{file}{p}"));
     }
 
     [Theory]
@@ -168,13 +186,17 @@ public class SyntaxConventionTests
         Assert.Empty(problems.Distinct());
     }
 
-    /// <summary>KS6010 and KS6012, and the arms of a match written the old way (case, when, default blocks).</summary>
-    private static IEnumerable<string> Problems(string code, string path, int firstLine = 0)
+    /// <summary>Every old spelling, and the arms of a match written the old way (case, when, default blocks).</summary>
+    private static IEnumerable<string> Problems(string code, string path, int firstLine = 0, string skip = null)
     {
         SourceText source = new SourceText(code);
         foreach (Diagnostic d in Analyzer.Analyze(code, path).Diagnostics.OrderBy(d => d.Span.Start))
         {
             // KS6013 too: what the samples, templates and docs declare is named as the language names its own.
+            if (d.Code == skip)
+            {
+                continue;
+            }
             if (Guarded.Contains(d.Code) || d.Code == DiagnosticCodes.NamingStyle || (d.Code == DiagnosticCodes.RetiredElement && d.Message.Contains("arm", StringComparison.Ordinal)))
             {
                 yield return $"({firstLine + source.GetPosition(d.Span.Start).Line + 1}): {d.Code} {d.Message}";
@@ -208,7 +230,7 @@ public class SyntaxConventionTests
     {
         Diagnostic d = Assert.Single(Lint(code));
         Assert.Equal(DiagnosticCodes.BareDeclaration, d.Code);
-        Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, d.Severity);
         Assert.Equal(expected, Fix(code));
         Assert.Empty(Lint(expected));
     }
@@ -238,9 +260,11 @@ public class SyntaxConventionTests
     }
 
     [Fact]
-    public void BothLambdaFormsRunTheSame()
+    public void OnlyTheBareLambdaFormRuns()
     {
-        Assert.Equal("2, 4\n2, 4\n", Run("echo [1, 2]->map(fn(n) => $n * 2)\necho [1, 2]->map(fn($n) => $n * 2)\n"));
+        Assert.Equal("2, 4\n", Run("echo [1, 2]->map(fn(n) => $n * 2)\n"));
+        KScriptException refused = Assert.Throws<KScriptException>(() => Run("echo [1, 2]->map(fn($n) => $n * 2)\n"));
+        Assert.Contains("Declare the parameter as n", refused.Message);
     }
 
     [Fact]
@@ -313,7 +337,7 @@ public class SyntaxConventionTests
         Assert.All(found, d =>
         {
             Assert.Equal(DiagnosticCodes.OneSpelling, d.Code);
-            Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+            Assert.Equal(DiagnosticSeverity.Error, d.Severity);
             Assert.NotEmpty(d.Fixes);
         });
         Assert.Equal(expected, Fix(code));
@@ -321,9 +345,11 @@ public class SyntaxConventionTests
     }
 
     [Fact]
-    public void TheSecondSpellingsStillRun()
+    public void TheSecondSpellingsDontRun()
     {
-        Assert.Equal("b\n", Run("n = 1\nif $n > 1 { echo \"a\" } else if $n > 0 { echo \"b\" }\n"));
+        KScriptException refused = Assert.Throws<KScriptException>(() => Run("n = 1\nif $n > 1 { echo \"a\" } else if $n > 0 { echo \"b\" }\n"));
+        Assert.Contains("Write elif", refused.Message);
+        Assert.Equal("b\n", Run("n = 1\nif $n > 1 { echo \"a\" } elif $n > 0 { echo \"b\" }\n"));
     }
 
     [Fact]

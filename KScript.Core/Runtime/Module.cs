@@ -131,6 +131,9 @@ namespace KScript.Runtime
 
         internal readonly Dictionary<object, ParseResult> ParseCache = new Dictionary<object, ParseResult>(ReferenceEqualityComparer.Instance);
         internal readonly Dictionary<object, Template> TemplateCache = new Dictionary<object, Template>(ReferenceEqualityComparer.Instance);
+
+        /// <summary>The old spelling found in a piece of code of a .kscript file (see <see cref="KScript.Syntax.Markup.OldSpellings"/>), by the text it is in.</summary>
+        internal readonly Dictionary<object, KScript.Syntax.Markup.OldSpelling> OldSpellingCache = new Dictionary<object, KScript.Syntax.Markup.OldSpelling>(ReferenceEqualityComparer.Instance);
         internal readonly Dictionary<MarkupElement, DecodedText> ContentCache = new Dictionary<MarkupElement, DecodedText>(ReferenceEqualityComparer.Instance);
 
         internal bool HasRun;

@@ -87,7 +87,7 @@ public class CodeFormatTests
             total = 0
             for i in 0..5 {
               if $i == 3 { continue }
-              $total += $i
+              total += $i
             }
             echo $total
             for x in [] { echo "never" } else { echo "empty" }
@@ -384,14 +384,28 @@ public class CodeFormatTests
     public void DoubleQuotesFillInValuesAndSingleQuotesDoNot()
     {
         Assert.Equal(
-            "Hello Joan, you have 4 and 2! Sam a+b {x} /users/{id} \\d{3} $5 a@b.com\nHello $name {$n}\nHi dear Joan!\nJOAN.\n",
+            "Hello Joan, you have 4 and 2! Sam a+b {x} $5 a@b.com\nHello $name {$n} /users/{id} \\d{3}\nHi dear Joan!\nJOAN.\n",
             Run("name = 'Joan'\nn = 2\np = { name: 'Sam', tags: ['a', 'b'] }\n"
-                + "g = \"Hello $name, you have { $n * 2 } and {$n}! $p.name { $p.tags->join('+') } {{x}} /users/{id} \\d{3} $5 a@b.com\"\n"
+                + "g = \"Hello $name, you have { $n * 2 } and {$n}! $p.name { $p.tags->join('+') } {{x}} $5 a@b.com\"\n"
                 + "echo $g\n"
-                + "s = 'Hello $name {$n}'\necho $s\n"
+                + "s = 'Hello $name {$n} /users/{id} \\d{3}'\necho $s\n"
                 + "fn greet(who) {\n  return \"Hi $who!\"\n}\n"
                 + "echo @greet(\"dear $name\")\n"
                 + "echo \"{ $name->upper() }. \"->trim()\n").Replace("\r\n", "\n"));
+    }
+
+    [Fact]
+    public void ABraceInDoubleQuotesAlwaysHoldsAnExpression()
+    {
+        // Whatever it opens with: a type, a number, a bracket, a list, text.
+        Assert.Equal("ada2@x 3 4 2 q\n",
+            Run("type P {\n  n: int\n}\nmail = \"ada{ P(n: 2).n }@x { 1 + 2 } { (4) } { [1, 2]->count() } { 'q' }\"\necho $mail\n").Replace("\r\n", "\n"));
+        // So a brace that isn't one is written {{ }}, or the text goes in single quotes.
+        KScriptException unknown = Assert.Throws<KScriptException>(() => Run("route = \"/users/{id}\"\necho $route\n"));
+        Assert.Contains("id", unknown.Message);
+        KScriptException open = Assert.Throws<KScriptException>(() => Run("css = \"a { color: red }\"\necho $css\n"));
+        Assert.Contains("write {{ and }} for braces, or use 'single quotes'", open.Message);
+        Assert.Equal("/users/{id} a { color: red }\n", Run("route = \"/users/{{id}}\"\ncss = 'a { color: red }'\necho \"$route $css\"\n").Replace("\r\n", "\n"));
     }
 
     [Fact]

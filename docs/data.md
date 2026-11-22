@@ -47,7 +47,7 @@ post = Post->create(title: 'Hello', body: 'The first post.')
 echo $post->excerpt()
 ```
 
-A model's options go in the brackets after its name, like the options of every other declaration: `model Post(table: "posts", timestamps, unique: [slug])`. The block holds only fields, `validate` rules and `fn`. An option written as a line of the block still runs, but `kscript check` reports it (KS6014) and `kscript check --fix` moves it into the brackets.
+A model's options go in the brackets after its name, like the options of every other declaration: `model Post(table: "posts", timestamps, unique: [slug])`. The block holds only fields, `validate` rules and `fn`. An option written as a line of the block is an error (KS6014), and `kscript check --fix` moves it into the brackets.
 
 | Option | What it does |
 | --- | --- |

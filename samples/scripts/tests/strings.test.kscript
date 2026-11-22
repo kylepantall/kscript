@@ -17,3 +17,10 @@ describe(name: "slugify") {
     }
   }
 }
+
+// @titlecase is deprecated: the method it names is what new code calls.
+describe(name: "upper") {
+  test(name: "upper-cases") {
+    expect(value: 'abc'->upper(), equals: 'ABC')
+  }
+}

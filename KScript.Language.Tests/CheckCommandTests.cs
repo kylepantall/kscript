@@ -39,7 +39,7 @@ namespace KScript.Language.Tests
         public void FolderChecksIncludeKscriptFiles()
         {
             Write("a.kscript", "echo \"hi\"");
-            Write(Path.Combine("tests", "a.test.kscript"), "kscript {\n  describe(name: a) {\n  }\n}\n");
+            Write(Path.Combine("tests", "a.test.kscript"), "kscript {\n  describe(name: \"a\") {\n  }\n}\n");
             Write(Path.Combine("tests", "bad.kscript"), "echo $nope");
             (int code, string output) = Run(false, dir);
             Assert.Equal(1, code);

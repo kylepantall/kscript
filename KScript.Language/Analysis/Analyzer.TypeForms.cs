@@ -46,7 +46,7 @@ namespace KScript.Language.Analysis
             }
             TextSpan written = TextSpan.FromBounds(nameSpan.Start - 1, nameSpan.End);
             Report(written, DiagnosticSeverity.Warning, DiagnosticCodes.TypeForm,
-                $"Write {symbol.Name}, without $: a type is named bare. $ reads a variable.",
+                OldSpellings.TypeIsBare(symbol.Name),
                 new[] { new QuickFix($"Write {symbol.Name}", new TextChange(new TextSpan(written.Start, 1), string.Empty)) });
         }
 
@@ -127,7 +127,7 @@ namespace KScript.Language.Analysis
                 changes.Add(new TextChange(new TextSpan(nameSpan.End, 0), "?"));
             }
             Report(typeSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeForm,
-                IsCodeFile ? $"Mark an optional field on its name: {bare}?: {plain}." : $"Mark an optional field on its name: name=\"{bare}?\" type=\"{plain}\".",
+                OldSpellings.OptionalIsOnName(name, type, IsCodeFile),
                 new[] { new QuickFix($"Write {bare}?: {plain}", changes.ToArray()) });
         }
 
@@ -142,26 +142,19 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            List<MarkupAttribute> lines = e.Attributes
-                .Where(a => CodeParser.ModelSettings.Contains(a.Name) && a.NameSpan.Length > 0 && a.NameSpan.Start >= e.ContentSpan.Start && a.Span.End <= e.ContentSpan.End)
-                .OrderBy(a => a.NameSpan.Start).ToList();
+            string text = source.Text;
+            (List<MarkupAttribute> lines, List<string> options) = OldSpellings.ModelOptionLines(e, text, name => AttributeOf(e, name));
             if (lines.Count == 0)
             {
                 return;
             }
 
-            string text = source.Text;
             var changes = new List<TextChange>();
-            var options = new List<string>();
             // True while every line so far, from the '{' on, was an option: the blank line after them goes too.
             bool leading = true;
             int previousEnd = e.ContentSpan.Start;
             foreach (MarkupAttribute line in lines)
             {
-                string value = text.Substring(line.Span.Start, line.Span.Length).Trim();
-                bool? flag = AttributeOf(e, line.Name)?.Kind == AttributeKind.Bool ? KScript.Runtime.Values.ParseBool(value) : null;
-                options.Add(flag == true ? line.Name : flag == false ? line.Name + ": false" : line.Name + ": " + value);
-
                 // The whole line goes when the option is all it holds; otherwise only the option and its ';'.
                 int start = line.NameSpan.Start;
                 int end = line.Span.End;
@@ -227,11 +220,10 @@ namespace KScript.Language.Analysis
                 changes.Add(new TextChange(new TextSpan(open, 0), "(" + joined + ")"));
             }
 
-            string example = $"model {nameAttr.ValueText.Trim()}({joined})";
             foreach (MarkupAttribute line in lines)
             {
                 Report(TextSpan.FromBounds(line.NameSpan.Start, line.Span.End), DiagnosticSeverity.Warning, DiagnosticCodes.TypeForm,
-                    $"Write a model's options in its brackets: {example}. The block holds its fields, rules and fn.",
+                    OldSpellings.ModelOptionsInBrackets(nameAttr.ValueText.Trim(), options),
                     new[] { new QuickFix("Move the options into the brackets", changes.ToArray()) });
             }
         }

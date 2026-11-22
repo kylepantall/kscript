@@ -347,7 +347,7 @@ public sealed class MakeGeneratorTests : IDisposable
             echo "{ @cache.remember('x', fn() => 7) }"
             echo "{ Repo({ name: 'k', stargazers_count: 3 }).stars } { Size.large } $max_items { @total(5) }"
             echo "{ NewPerson({ name: 'Sam', age: 9 }).age }"
-            locale(set: fr)
+            locale(set: "fr")
             echo "{ @t('items', { count: 2 }) }"
             log(level: error) "boom"
             """);

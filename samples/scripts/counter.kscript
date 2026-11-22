@@ -1,0 +1,17 @@
+// A desktop app: kscript counter.kscript opens the window, and
+// kscript compile counter.kscript builds it as a program.
+import KScript.UI
+
+Window(title: "Counter", width: 320, height: 220) {
+  count = 0
+
+  fn reset() {
+    count = 0
+  }
+
+  Text(size: 32) "{$count}"
+  Row(gap: 8) {
+    Button(variant: primary, on_click: count += 1) "Add one"
+    Button(on_click: @reset()) "Reset"
+  }
+}
