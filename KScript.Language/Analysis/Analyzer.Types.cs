@@ -69,7 +69,8 @@ namespace KScript.Language.Analysis
         /// <summary>Gives hoisted functions the return types found by the last pass, and imported names their types.</summary>
         private void ApplyKnownTypes(Scope root)
         {
-            foreach ((Symbol symbol, int _) in root.Symbols)
+            IEnumerable<Symbol> members = root.Symbols.Select(r => r.Symbol).Where(s => s.Kind == SymbolKind.Import).SelectMany(s => s.Members.Values);
+            foreach (Symbol symbol in root.Symbols.Select(r => r.Symbol).Concat(members).ToList())
             {
                 if (symbol.SourcePath == null)
                 {

@@ -288,6 +288,19 @@ namespace KScript.Language.Analysis
                     {
                         alias.Shape.Fields.TryAdd(name, new FieldInfo(name, new TypeShape(KType.Fn), null, exported[name].Description));
                         result.ExternalMembers.TryAdd((alias, name), exported[name].Location);
+                        Symbol fn = new Symbol
+                        {
+                            Name = name,
+                            Kind = SymbolKind.Function,
+                            DeclarationSpan = span,
+                            DeclaringElement = e,
+                            SourcePath = full,
+                            Alias = alias,
+                            Description = exported[name].Description ?? $"Imported from {src}",
+                        };
+                        fn.Parameters.AddRange(exported[name].Params);
+                        result.ExternalDeclarations[fn] = exported[name].Location;
+                        alias.Members.TryAdd(name, fn);
                     }
                 }
                 if (constants != null)
@@ -296,6 +309,12 @@ namespace KScript.Language.Analysis
                     {
                         alias.Shape.Fields.TryAdd(name, new FieldInfo(name, TypeShape.Unknown, null, constants[name].Description));
                         result.ExternalMembers.TryAdd((alias, name), constants[name].Location);
+                        if (!alias.Members.ContainsKey(name))
+                        {
+                            Symbol constant = MemberConstant(name, span, e, full, src, constants[name]);
+                            constant.Alias = alias;
+                            alias.Members[name] = constant;
+                        }
                     }
                 }
                 result.Symbols.Add(alias);
@@ -482,6 +501,14 @@ namespace KScript.Language.Analysis
 
         private Symbol ImportedConstant(string name, TextSpan at, MarkupElement import, string full, string src, (ExternalLocation Location, string Description) constant)
         {
+            Symbol symbol = MemberConstant(name, at, import, full, src, constant);
+            result.Symbols.Add(symbol);
+            return symbol;
+        }
+
+        /// <summary>A constant, enum or type another script declares, with where it is declared (not yet one of this file's symbols).</summary>
+        private Symbol MemberConstant(string name, TextSpan at, MarkupElement import, string full, string src, (ExternalLocation Location, string Description) constant)
+        {
             Symbol symbol = new Symbol
             {
                 Name = name,
@@ -502,7 +529,6 @@ namespace KScript.Language.Analysis
                 }
             }
             result.ExternalDeclarations[symbol] = constant.Location;
-            result.Symbols.Add(symbol);
             return symbol;
         }
 

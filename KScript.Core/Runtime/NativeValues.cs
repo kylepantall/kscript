@@ -73,6 +73,58 @@ namespace KScript.Runtime
 
         /// <summary>Also takes numbers (port takes 8080 as well as '8080').</summary>
         public bool TakesNumbers { get; init; }
+
+        /// <summary>
+        /// The values the editor suggests where the type is expected: every value when there is a list (time zones,
+        /// countries, currencies), the common ones (durations such as 30s and 1h), or ones worked out from where it is
+        /// written (a path type can list the project's routes). Null when the type has nothing to suggest.
+        /// </summary>
+        public Func<NativeValueContext, IEnumerable<NativeValueSuggestion>> Suggest { get; init; }
+
+        /// <summary>A fixed list of suggestions, whatever the context.</summary>
+        public static Func<NativeValueContext, IEnumerable<NativeValueSuggestion>> Fixed(Func<IEnumerable<string>> values) =>
+            _ => values().Select(v => new NativeValueSuggestion(v));
+    }
+
+    /// <summary>Where a native type's value is being written, for <see cref="NativeParser.Suggest"/>.</summary>
+    public sealed class NativeValueContext
+    {
+        /// <summary>The full path of the file being edited, or null for an unsaved one.</summary>
+        public string DocumentPath { get; init; }
+
+        /// <summary>The folder holding the nearest kscript.json, or the file's own folder when there is none.</summary>
+        public string ProjectRoot { get; init; }
+
+        /// <summary>What has been typed of the value so far (without quotes): "/au".</summary>
+        public string Typed { get; init; } = string.Empty;
+
+        /// <summary>The options written with the type, by name: path(exists: route) gives exists = "route".</summary>
+        public IReadOnlyDictionary<string, string> Options { get; init; } = new Dictionary<string, string>();
+
+        /// <summary>The project's routes, worked out only when asked for: method, path and the handler, as written.</summary>
+        public Func<IReadOnlyList<(string Method, string Path, string Handler)>> Routes { get; init; } = () => Array.Empty<(string, string, string)>();
+
+        /// <summary>Reads files and folders (the editor's own copy of open files first), so suggestions can list what exists.</summary>
+        public Func<string, IEnumerable<string>> ListFolder { get; init; } = _ => Array.Empty<string>();
+    }
+
+    /// <summary>One value the editor suggests for a native type, with an optional short detail and Markdown docs.</summary>
+    public sealed class NativeValueSuggestion
+    {
+        public NativeValueSuggestion(string value, string detail = null, string documentation = null)
+        {
+            Value = value;
+            Detail = detail;
+            Documentation = documentation;
+        }
+
+        /// <summary>The value as it is written, without quotes: Europe/London, /login.</summary>
+        public string Value { get; }
+
+        /// <summary>A few words shown beside it: "GET → accounts.show_login".</summary>
+        public string Detail { get; }
+
+        public string Documentation { get; }
     }
 
     /// <summary>The parsers of the native types, by name: the language's own here, and those packages add.</summary>
@@ -117,22 +169,48 @@ namespace KScript.Runtime
                 Add("port", new NativeParser(Port) { TakesNumbers = true });
                 Add("slug", new NativeParser(Slug));
                 Add("semver", new NativeParser(Semver));
-                Add("mime", new NativeParser(Mime));
+                Add("mime", new NativeParser(Mime) { Suggest = NativeParser.Fixed(() => CommonMimeTypes) });
                 Add("hex", new NativeParser(Hex, HexOptions));
                 Add("base64", new NativeParser(Base64));
                 Add("jwt", new NativeParser(Jwt));
                 Add("json", new NativeParser(Json));
                 Add("phone", new NativeParser(Phone, PhoneOptions));
-                Add("country", new NativeParser(Country));
-                Add("currency", new NativeParser(Currency));
-                Add("locale", new NativeParser(Locale));
-                Add("timezone", new NativeParser(TimeZone));
-                Add("duration", new NativeParser(Duration) { TakesNumbers = true });
-                Add("cron", new NativeParser(Cron));
-                Add("color", new NativeParser(Color));
+                Add("country", new NativeParser(Country) { Suggest = NativeParser.Fixed(CountryCodes.TwoLetterCodes) });
+                Add("currency", new NativeParser(Currency) { Suggest = NativeParser.Fixed(CountryCodes.CurrencyCodes) });
+                Add("locale", new NativeParser(Locale) { Suggest = NativeParser.Fixed(LocaleNames) });
+                Add("timezone", new NativeParser(TimeZone) { Suggest = NativeParser.Fixed(TimeZoneNames) });
+                Add("duration", new NativeParser(Duration) { TakesNumbers = true, Suggest = NativeParser.Fixed(() => CommonDurations) });
+                Add("cron", new NativeParser(Cron) { Suggest = NativeParser.Fixed(() => CronMacros.Keys) });
+                Add("color", new NativeParser(Color) { Suggest = NativeParser.Fixed(() => ColorNames.Keys) });
                 Add("iban", new NativeParser(Iban));
                 Add("card", new NativeParser(Card));
             }
+
+            private static readonly string[] CommonDurations = { "30s", "1m", "5m", "15m", "30m", "1h", "1h30m", "12h", "1d", "7d", "1w", "30d" };
+
+            private static readonly string[] CommonMimeTypes =
+            {
+                "application/json", "application/pdf", "application/xml", "application/zip", "application/octet-stream", "application/x-www-form-urlencoded",
+                "multipart/form-data", "text/plain", "text/html", "text/css", "text/csv", "text/markdown", "text/javascript",
+                "image/png", "image/jpeg", "image/gif", "image/svg+xml", "image/webp", "audio/mpeg", "video/mp4",
+            };
+
+            /// <summary>Every IANA time zone the system knows, and UTC (Windows lists its own names, so they are given as IANA).</summary>
+            private static IEnumerable<string> TimeZoneNames()
+            {
+                var names = new SortedSet<string>(StringComparer.Ordinal) { "UTC" };
+                foreach (TimeZoneInfo z in TimeZoneInfo.GetSystemTimeZones())
+                {
+                    string id = z.HasIanaId ? z.Id : TimeZoneInfo.TryConvertWindowsIdToIanaId(z.Id, out string iana) ? iana : null;
+                    if (id != null && id.Contains('/') && !id.StartsWith("Etc/", StringComparison.Ordinal)) names.Add(id);
+                }
+                return names;
+            }
+
+            /// <summary>Language tags of the cultures the system knows: en, en-GB, pt-BR.</summary>
+            private static IEnumerable<string> LocaleNames() =>
+                CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
+                    .Select(c => c.Name).Where(n => n.Length >= 2 && n.Split('-').Length <= 2).Distinct().OrderBy(n => n, StringComparer.Ordinal);
 
             private static List<string> Texts(object value) =>
                 value is List<object> list ? list.Select(v => Values.ToStr(v).Trim()).ToList() : new List<string> { Values.ToStr(value).Trim() };

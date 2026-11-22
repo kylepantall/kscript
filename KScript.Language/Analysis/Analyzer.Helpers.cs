@@ -251,7 +251,7 @@ namespace KScript.Language.Analysis
         private Symbol ReferenceFunction(string name, TextSpan span, Scope scope)
         {
             int dot = name.IndexOf('.');
-            if (dot > 0 && dot < name.Length - 1)
+            if (dot > 0)
             {
                 ReferenceImportedFunction(name, dot, span, scope);
                 return null;
@@ -298,7 +298,12 @@ namespace KScript.Language.Analysis
                 return;
             }
             result.References.Add(new SymbolReference(import, aliasSpan, false, false));
-            NoteMemberUse(import, member);
+            if (member.Length == 0)
+            {
+                Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"Name a function of the import '{aliasName}' after the dot.");
+                return;
+            }
+            ReferenceMember(import, member, memberSpan);
             if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member))
             {
                 Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{aliasName}' has no '{member}'.",

@@ -190,6 +190,12 @@ namespace KScript.Language.Features
             return false;
         }
 
-        private static bool IsLiteral(ExprNode node) => node is LiteralNode || node is UnaryNode { Operand: LiteralNode };
+        /// <summary>
+        /// A number, text or yes/no written as it is. Literals of a native type (30s, https://..., joan@example.com, a
+        /// UUID, a /regex/) aren't: their type isn't plain from the text, so they keep their hint.
+        /// </summary>
+        private static bool IsLiteral(ExprNode node) =>
+            node is LiteralNode { Kind: LiteralKind.Number or LiteralKind.String or LiteralKind.Bool or LiteralKind.Null }
+            || node is UnaryNode { Operand: LiteralNode { Kind: LiteralKind.Number } };
     }
 }

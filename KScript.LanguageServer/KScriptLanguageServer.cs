@@ -515,9 +515,9 @@ namespace KScript.LanguageServer
             }
             bool includeDeclaration = p["context"]?["includeDeclaration"]?.GetValue<bool>() ?? true;
             JsonArray locations = new JsonArray();
-            foreach (SymbolReference r in service.GetReferences(a, Offset(a.Source, p["position"]), includeDeclaration))
+            foreach (SourceLocation location in service.GetProjectReferences(a, Offset(a.Source, p["position"]), includeDeclaration))
             {
-                locations.Add((JsonNode)new JsonObject { ["uri"] = doc.Uri, ["range"] = Range(a.Source, r.Span) });
+                locations.Add((JsonNode)Location(doc, a, location));
             }
             return locations;
         }

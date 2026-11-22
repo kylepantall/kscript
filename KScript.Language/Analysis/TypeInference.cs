@@ -251,7 +251,8 @@ namespace KScript.Language.Analysis
                             // 'ab' * 3 repeats the text.
                             return new TypeShape(KType.String);
                         default:
-                            return new TypeShape(KType.Number);
+                            // dd-MM-yyyy is unquoted text, not a sum: a bare word in the arithmetic leaves the type unknown.
+                            return IsBareWord(binary.Left, region) || IsBareWord(binary.Right, region) ? TypeShape.Unknown : new TypeShape(KType.Number);
                     }
 
                 case MatchNode match:
@@ -266,6 +267,23 @@ namespace KScript.Language.Analysis
 
                 default:
                     return TypeShape.Unknown;
+            }
+        }
+
+        /// <summary>A word that isn't a variable, function or type here, or arithmetic that already has one.</summary>
+        private bool IsBareWord(ExprNode node, ExpressionRegion region)
+        {
+            switch (node)
+            {
+                case IdentifierNode id:
+                {
+                    int offset = region.Source.ToSource(id.Span.Start);
+                    return result.RootScope?.Innermost(offset).Lookup(id.Name, offset) == null;
+                }
+                case BinaryNode { Operator: "+" or "-" or "*" or "/" or "%" or "**" } b:
+                    return IsBareWord(b.Left, region) || IsBareWord(b.Right, region);
+                default:
+                    return false;
             }
         }
 

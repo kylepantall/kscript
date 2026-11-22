@@ -34,11 +34,25 @@ namespace KScript.Language.Features
                     {
                         Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
                         Documentation = c.Description,
-                        Parameters = s.Parameters.Select(p => (p.Label, p.Deprecated != null ? DeprecationLine(p.Deprecated, p.Name) + p.Description : p.Description)).ToList(),
-                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : null, p.IsFlag)).ToList(),
+                        Parameters = s.Parameters.Select(p => (p.Label, WithAccepts(p.Deprecated != null ? DeprecationLine(p.Deprecated, p.Name) + p.Description : p.Description, p.Values.Count > 0 ? null : p.Type))).ToList(),
+                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : NativeValues(analysis, p.Type), p.IsFlag)).ToList(),
                         DeprecatedParameters = s.Parameters.Where(p => p.Deprecated != null).Select(p => p.Name).ToList(),
                     });
                 }
+            }
+
+            // A parameter typed with a native type or enum says what it takes: timezone gives its description and some zones.
+            string WithAccepts(string doc, string type)
+            {
+                string name = type != null ? SplitType(type).Name : null;
+                if (name == null || (EnumValuesOf(analysis, name) == null && KScript.Metadata.NativeTypes.Get(name) == null))
+                {
+                    return doc;
+                }
+                string accepts = EnumValuesOf(analysis, name) is IReadOnlyList<string> members
+                    ? $"One of {string.Join(", ", members.Take(12))}{(members.Count > 12 ? ", ..." : string.Empty)}."
+                    : KScript.Metadata.NativeTypes.Get(name).Description;
+                return string.IsNullOrEmpty(doc) ? accepts : doc + "\n\n" + accepts;
             }
 
             void AddFunction(Symbol fn)
@@ -48,14 +62,31 @@ namespace KScript.Language.Features
                 {
                     Label = fn.TypedSignature,
                     Documentation = doc != null ? doc.ToMarkdown(includeParams: false) : fn.Description,
-                    Parameters = fn.Parameters.Select(p => (p.Label, doc?.ParamText(p.Name))).ToList(),
+                    Parameters = fn.Parameters.Select(p => (p.Label, WithAccepts(doc?.ParamText(p.Name), p.Type))).ToList(),
                     Details = fn.Parameters.Select(p => (p.Name,
-                        p.Type != null ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type && x.EnumValues != null)?.EnumValues : null,
+                        p.Type != null ? EnumValuesOf(analysis, SplitType(p.Type).Name) ?? NativeValues(analysis, p.Type) : null,
                         p.Type == KType.Bool)).ToList(),
                     ItemValues = fn.Parameters.Select(p => p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal)
-                        ? (IReadOnlyList<string>)analysis.Symbols.FirstOrDefault(x => x.Name == p.Type.Substring(0, p.Type.Length - 2).Trim() && x.EnumValues != null)?.EnumValues
+                        ? EnumValuesOf(analysis, p.Type.Substring(0, p.Type.Length - 2).Trim())
                         : null).ToList(),
                 });
+            }
+
+            // @accounts.sign_in(...) or math.sqrt(...): the imported script's function, or the package's command.
+            void AddAliasMember(string aliasName, string memberName)
+            {
+                if (!(analysis.RootScope?.Lookup(aliasName, int.MaxValue) is Symbol { Kind: SymbolKind.Import } import))
+                {
+                    return;
+                }
+                if (import.Members.TryGetValue(memberName, out Symbol fn) && fn.Kind == SymbolKind.Function)
+                {
+                    AddFunction(fn);
+                }
+                else if (import.Package != null && Catalog.GetCommand(memberName) is CallableInfo command && command.Package == import.Package)
+                {
+                    AddCallable(command);
+                }
             }
 
             PipeNode PipeInto(ExprNode right) => region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<PipeNode>().FirstOrDefault(p => p.Right == right);
@@ -74,8 +105,17 @@ namespace KScript.Language.Features
                     {
                         AddCallable(command);
                     }
+                    else if (c.Name.IndexOf('.') is int dot && dot > 0)
+                    {
+                        AddAliasMember(c.Name.Substring(0, dot), c.Name.Substring(dot + 1));
+                    }
                     break;
                 }
+
+                case CallNode call when call.Callee is MemberNode member && member.Target is IdentifierNode alias:
+                    piped = PipeInto(call) != null ? 1 : 0;
+                    AddAliasMember(alias.Name, member.Name);
+                    break;
 
                 case MethodCallNode m:
                 {
@@ -109,6 +149,24 @@ namespace KScript.Language.Features
                 }
             }
             return signatures;
+        }
+
+        /// <summary>
+        /// A value as an argument is written: a word (an enum value, en, GBP) or a duration (30s) as it is, anything
+        /// else (Europe/London, image/png, @daily) in quotes, since an argument reads unquoted text as code.
+        /// </summary>
+        internal static string ArgumentText(string value) =>
+            value.Length > 0 && (Lexer.IsIdentStart(value[0]) || char.IsDigit(value[0])) && value.All(c => Lexer.IsIdentChar(c) || c == '.') ? null : "'" + value + "'";
+
+        /// <summary>The values a native type such as timezone suggests for an argument (quoted when they aren't one word), or null.</summary>
+        private IReadOnlyList<string> NativeValues(DocumentAnalysis analysis, string type)
+        {
+            if (type == null || KScript.Metadata.NativeTypes.Get(SplitType(type).Name) == null)
+            {
+                return null;
+            }
+            List<string> values = AcceptedValues(analysis, type).Select(v => v.Value).ToList();
+            return values.Count > 0 ? values : null;
         }
 
         /// <summary>The name in a parameter label: <c>name?</c>, <c>rest...</c>, <c>count: int = 1</c>.</summary>
@@ -169,6 +227,8 @@ namespace KScript.Language.Features
                             Kind = CompletionKind.Value,
                             Detail = name,
                             Documentation = $"A value of `{name}` in `{signature.Label}`.",
+                            InsertText = ArgumentText(value),
+                            FilterText = value,
                             ReplaceSpan = replace,
                             SortText = "000" + value,
                         });
@@ -320,6 +380,13 @@ namespace KScript.Language.Features
         private List<CompletionItem> NamedValueCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)
         {
             string text = region.Source.Value;
+            // A value that isn't one word yet (Europe/Lo‸, en-G‸) is replaced whole.
+            int rawStart = RawValueStart(text, wordStart);
+            if (rawStart < wordStart && text[rawStart] != '$' && text[rawStart] != '@' && text[rawStart] != '\'' && text[rawStart] != '"')
+            {
+                replace = TextSpan.FromBounds(region.Source.ToSource(rawStart), replace.End);
+                wordStart = rawStart;
+            }
             int p = wordStart;
             while (p > 0 && char.IsWhiteSpace(text[p - 1]))
             {
@@ -349,6 +416,8 @@ namespace KScript.Language.Features
                         Kind = CompletionKind.Value,
                         Detail = d.Name,
                         Documentation = $"A value of `{d.Name}` in `{signature.Label}`.",
+                        InsertText = ArgumentText(value),
+                        FilterText = value,
                         ReplaceSpan = replace,
                         SortText = "000" + value,
                     })))
@@ -380,7 +449,7 @@ namespace KScript.Language.Features
                             var owner = signature.Details.FirstOrDefault(d => d.Values != null && d.Values.Contains(word, StringComparer.OrdinalIgnoreCase));
                             if (owner.Name != null)
                             {
-                                return new HoverResult($"**{word}**: a value of `{owner.Name}` ({string.Join(", ", owner.Values)}) in `{signature.Label}`.", region.Source.ToSource(node.Span));
+                                return new HoverResult($"**{word}**: a value of `{owner.Name}` ({string.Join(", ", owner.Values.Take(12))}{(owner.Values.Count > 12 ? ", ..." : string.Empty)}) in `{signature.Label}`.", region.Source.ToSource(node.Span));
                             }
                         }
                     }

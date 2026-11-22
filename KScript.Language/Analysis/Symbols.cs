@@ -229,17 +229,30 @@ namespace KScript.Language.Analysis
         /// <summary>For imports: the file they come from (absolute, when the document has a path).</summary>
         public string SourcePath { get; internal set; }
 
+        /// <summary>
+        /// For an import with an alias: what is reached through it (<c>@accounts.show_login</c>, <c>lib.limit</c>), by
+        /// name: the functions and constants of the script it imports, declared in that file. A package alias has none
+        /// (its commands are in the catalog; see <see cref="Package"/>).
+        /// </summary>
+        public IDictionary<string, Symbol> Members { get; } = new Dictionary<string, Symbol>(StringComparer.Ordinal);
+
+        /// <summary>For a member of an import alias: the alias it is reached through.</summary>
+        public Symbol Alias { get; internal set; }
+
+        /// <summary>For an import alias of a package (<c>import KScript.Math as math</c>): the package.</summary>
+        public string Package { get; internal set; }
+
         public bool IsConst => Kind == SymbolKind.Constant;
 
         /// <summary>True if the user can rename it (not a built-in or front matter key).</summary>
-        public bool CanRename => Kind != SymbolKind.BuiltIn;
+        public bool CanRename => Kind != SymbolKind.BuiltIn && Alias == null;
 
         /// <summary>For a method an extend block adds: the type it extends, such as date.</summary>
         public string ExtensionOf { get; internal set; }
 
         public string Signature => Kind == SymbolKind.Function
-            ? $"{(ExtensionOf != null ? ExtensionOf + "->" : "@")}{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
-            : "$" + Name;
+            ? $"{(ExtensionOf != null ? ExtensionOf + "->" : Alias != null ? "@" + Alias.Name + "." : "@")}{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
+            : Alias != null ? Alias.Name + "." + Name : "$" + Name;
 
         /// <summary>The signature with the return type when it is known: <c>@double(x: int): number</c>.</summary>
         public string TypedSignature => Kind == SymbolKind.Function && ReturnShape.Type != KType.Any ? Signature + ": " + ReturnShape.Display() : Signature;

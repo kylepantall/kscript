@@ -84,7 +84,12 @@ namespace KScript.Language.Analysis
                     if (member.Target is IdentifierNode alias && scope.Lookup(alias.Name, region.Source.ToSource(alias.Span.Start)) is Symbol s && s.Kind == SymbolKind.Import)
                     {
                         result.References.Add(new SymbolReference(s, region.Source.ToSource(alias.Span), false, false));
-                        NoteMemberUse(s, member.Name);
+                        TextSpan memberSpan = region.Source.ToSource(member.NameSpan);
+                        if (ReferenceMember(s, member.Name, memberSpan) == null && s.Shape.Fields.Count > 0 && member.Name.Length > 0 && !s.Shape.Fields.ContainsKey(member.Name))
+                        {
+                            Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{alias.Name}' has no '{member.Name}'.",
+                                SuggestFix(memberSpan, member.Name, s.Shape.Fields.Keys, n => n));
+                        }
                     }
                     else
                     {
@@ -115,6 +120,10 @@ namespace KScript.Language.Analysis
                     CheckLiteralFits("@" + handle.Name, "handle", region.Source.ToSource(handle.Span), null, 0);
                     return;
                 }
+
+                case BinaryNode { Operator: "+" or "-" or "*" or "/" or "%" or "**" } unquoted when UnquotedWords(unquoted, region, scope) is List<IdentifierNode> words:
+                    ReportUnquotedText(unquoted, words, region);
+                    return;
 
                 case BinaryNode { Operator: "+" or "-" or "*" or "/" or "%" or "**" } arithmetic:
                     AnalyzeExpr(arithmetic.Left, region, scope, ExprContext.Value);
@@ -208,6 +217,58 @@ namespace KScript.Language.Analysis
                 }
                 AnalyzeExpr(arg.Value, region, scope, ExprContext.Argument);
             }
+        }
+
+        /// <summary>
+        /// The bare words of arithmetic that is really unquoted text, such as <c>dd-MM-yyyy</c> or <c>a/b</c>: every
+        /// part is a word or a number, and none of the words is a variable, function or type here. Null otherwise.
+        /// </summary>
+        private List<IdentifierNode> UnquotedWords(BinaryNode node, ExpressionRegion region, Scope scope)
+        {
+            List<IdentifierNode> words = new List<IdentifierNode>();
+            bool Collect(ExprNode n)
+            {
+                switch (n)
+                {
+                    case BinaryNode { Operator: "+" or "-" or "*" or "/" or "%" or "**" } b:
+                        return Collect(b.Left) && Collect(b.Right);
+                    case LiteralNode { Kind: LiteralKind.Number }:
+                        return true;
+                    case IdentifierNode id when id.Name != "_" && scope.Lookup(id.Name, region.Source.ToSource(id.Span.Start)) == null:
+                        words.Add(id);
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return Collect(node) && words.Count > 0 ? words : null;
+        }
+
+        /// <summary>One problem for the whole of <c>dd-MM-yyyy</c>, with a fix that quotes it, instead of one per word.</summary>
+        private void ReportUnquotedText(BinaryNode node, List<IdentifierNode> words, ExpressionRegion region)
+        {
+            TextSpan span = region.Source.ToSource(node.Span);
+            string written = result.Source.Text.Substring(span.Start, span.Length);
+            List<string> names = words.Select(w => w.Name).Distinct(StringComparer.Ordinal).ToList();
+            string list = names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+            List<QuickFix> fixes = new List<QuickFix> { new QuickFix($"Quote as '{written}'", new TextChange(span, "'" + written + "'")) };
+            string message = $"{written} isn't a value: {list} {(names.Count == 1 ? "isn't a variable" : "aren't variables")}, so it can't be worked out. Text needs quotes ('{written}').";
+
+            // _day = dd-MM-yyyy reads as a date pattern: offer the type for one when the language has it.
+            bool datePattern = written.All(c => "dMyHhmsfaEtz-/.: ".IndexOf(c) >= 0);
+            if (datePattern && KScript.Metadata.NativeTypes.Get("date_format") != null)
+            {
+                string text = result.Source.Text;
+                int lineStart = text.LastIndexOf('\n', Math.Max(0, span.Start - 1)) + 1;
+                System.Text.RegularExpressions.Match assign = System.Text.RegularExpressions.Regex.Match(text.Substring(lineStart, span.Start - lineStart), @"^[ \t]*\$?([A-Za-z_]\w*)[ \t]*=[ \t]*$");
+                if (IsCode && assign.Success)
+                {
+                    int nameEnd = lineStart + assign.Groups[1].Index + assign.Groups[1].Length;
+                    fixes.Add(new QuickFix("Make it a date_format", new TextChange(new TextSpan(nameEnd, 0), ": date_format"), new TextChange(span, written)));
+                }
+                message += " For a date pattern, give the variable the date_format type.";
+            }
+            Report(span, DiagnosticSeverity.Error, DiagnosticCodes.BareIdentifier, message, fixes);
         }
 
         private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context)
@@ -310,7 +371,7 @@ namespace KScript.Language.Analysis
             int dot = c.Name.IndexOf('.');
             if (dot > 0)
             {
-                AnalyzeAliasCommand(c, dot, nameSpan, scope);
+                AnalyzeAliasCommand(c, dot, nameSpan, scope, region);
                 return;
             }
 
@@ -365,7 +426,7 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary><c>@math.sqrt(2)</c> or <c>@str.slugify($t)</c>: a command of a package or a function of a script imported with as="...".</summary>
-        private void AnalyzeAliasCommand(CommandCallNode c, int dot, TextSpan nameSpan, Scope scope)
+        private void AnalyzeAliasCommand(CommandCallNode c, int dot, TextSpan nameSpan, Scope scope, ExpressionRegion region)
         {
             string aliasName = c.Name.Substring(0, dot), member = c.Name.Substring(dot + 1);
             TextSpan aliasSpan = new TextSpan(nameSpan.Start, dot);
@@ -382,7 +443,21 @@ namespace KScript.Language.Analysis
                 return;
             }
             result.References.Add(new SymbolReference(import, aliasSpan, false, false));
-            NoteMemberUse(import, member);
+            if (ReferenceMember(import, member, memberSpan) is Symbol fn && fn.Kind == SymbolKind.Function)
+            {
+                ReportIfDeprecated(fn, memberSpan);
+                int count = c.ArgumentList == null ? -1 : c.Arguments.Count;
+                if (count >= 0)
+                {
+                    NoteCallArguments(fn, c.Arguments, null, region);
+                    TextSpan full = TextSpan.FromBounds(nameSpan.Start - 1, nameSpan.End);
+                    if (!CheckNamedArguments($"@{import.Name}.{fn.Name}()", c.Arguments, 0, SlotsOf(fn, scope), region, full))
+                    {
+                        CheckFunctionArgumentCount(fn, count, full);
+                    }
+                }
+                return;
+            }
             if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member))
             {
                 Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{aliasName}' has no '{member}'.",
@@ -457,7 +532,17 @@ namespace KScript.Language.Analysis
                     if (import?.Kind == SymbolKind.Import)
                     {
                         result.References.Add(new SymbolReference(import, aliasSpan, false, false));
-                        NoteMemberUse(import, member.Name);
+                        if (ReferenceMember(import, member.Name, region.Source.ToSource(member.NameSpan)) is Symbol fn && fn.Kind == SymbolKind.Function)
+                        {
+                            ReportIfDeprecated(fn, region.Source.ToSource(member.NameSpan));
+                            // $title |> str.slugify(): the piped value is the first argument.
+                            int pipedIn = piped ? 1 : 0;
+                            if (!CheckNamedArguments($"{alias.Name}.{fn.Name}()", call.Arguments, pipedIn, SlotsOf(fn, scope), region, region.Source.ToSource(call.Span)))
+                            {
+                                CheckFunctionArgumentCount(fn, call.Arguments.Count + pipedIn, region.Source.ToSource(call.Span));
+                            }
+                            return;
+                        }
                         if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member.Name))
                         {
                             TextSpan memberSpan = region.Source.ToSource(member.NameSpan);

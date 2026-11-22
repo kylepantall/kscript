@@ -72,6 +72,18 @@ namespace KScript.Language.Features
             {
                 return new List<CompletionItem>();
             }
+            if (AliasMemberCompletions(analysis, offset) is List<CompletionItem> members)
+            {
+                return members;
+            }
+            if (SigilCompletions(analysis, offset) is List<CompletionItem> sigil)
+            {
+                return sigil;
+            }
+            if (ExpectedValueCompletions(analysis, offset) is List<CompletionItem> expected)
+            {
+                return expected;
+            }
 
             if (analysis.Kind == DocumentKind.Markdown && analysis.Markup.FrontMatter is FrontMatter fm && offset <= fm.Span.End && offset > 3)
             {
@@ -782,6 +794,11 @@ namespace KScript.Language.Features
             {
                 return VariableCompletions(analysis, offset, replace, withSigil: false);
             }
+            if (before == '@' && wordStart >= 2 && Lexer.IsIdentChar(text[wordStart - 2]))
+            {
+                // joan@exa‸: an email address being written, not a command.
+                return new List<CompletionItem>();
+            }
             if (before == '@')
             {
                 return CommandCompletions(analysis, replace, withSigil: false);
@@ -1026,6 +1043,239 @@ namespace KScript.Language.Features
                         Documentation = f.Description,
                         ReplaceSpan = replace,
                     });
+                }
+            }
+            return items;
+        }
+
+        /// <summary>
+        /// Straight after <c>@</c> only commands and functions, and after <c>$</c> only variables, wherever the parser
+        /// is (a value it can't read yet, such as <c>tz: timezone = @</c>, included). When the type the value must have
+        /// is known, the commands that give it come first. Null when the word isn't after a sigil.
+        /// </summary>
+        private List<CompletionItem> SigilCompletions(DocumentAnalysis analysis, int offset)
+        {
+            string text = analysis.Source.Text;
+            int wordStart = WordStart(text, offset);
+            if (analysis.Kind != DocumentKind.Script || wordStart == 0 || (wordStart < offset && !Lexer.IsIdentStart(text[wordStart])))
+            {
+                return null;
+            }
+            char sigil = text[wordStart - 1];
+            // joan@example.com and a$b are text, not a command or a variable.
+            if ((sigil != '@' && sigil != '$') || (wordStart >= 2 && (Lexer.IsIdentChar(text[wordStart - 2]) || text[wordStart - 2] == '@' || text[wordStart - 2] == '$')))
+            {
+                return null;
+            }
+            TextSpan replace = TextSpan.FromBounds(wordStart, offset);
+            if (sigil == '$')
+            {
+                return VariableCompletions(analysis, offset, replace, withSigil: false);
+            }
+            if (ExpectedTypeAt(analysis, wordStart - 1) is string expected && SplitType(expected).Name == "handle")
+            {
+                return null;
+            }
+            List<CompletionItem> commands = CommandCompletions(analysis, replace, withSigil: false);
+            if (ExpectedTypeAt(analysis, wordStart - 1) is string type)
+            {
+                string want = SplitType(type).Name;
+                HashSet<string> giving = new HashSet<string>(Catalog.Commands.Where(c => c.ReturnType == want).Select(c => c.Name), StringComparer.Ordinal);
+                giving.UnionWith(analysis.Symbols.Where(f => f.Kind == SymbolKind.Function && (f.ReturnShape.Type == want || f.ReturnShape.Name == want)).Select(f => f.Name));
+                commands = commands.Select(i => giving.Contains(i.FilterText ?? i.Label) ? WithSort(i, "0" + i.SortText) : i).ToList();
+            }
+            return commands;
+        }
+
+        private static CompletionItem WithSort(CompletionItem i, string sort) => new CompletionItem
+        {
+            Label = i.Label, Kind = i.Kind, Detail = i.Detail, Documentation = i.Documentation, IsSnippet = i.IsSnippet, InsertText = i.InsertText,
+            ReplaceSpan = i.ReplaceSpan, SortText = sort, FilterText = i.FilterText, Deprecated = i.Deprecated, SuggestAgain = i.SuggestAgain,
+            AdditionalEdits = i.AdditionalEdits,
+        };
+
+        private static readonly System.Text.RegularExpressions.Regex TypedLetBefore = new System.Text.RegularExpressions.Regex(
+            @"^[ \t]*(?:const[ \t]+)?\$?([A-Za-z_]\w*)[ \t]*:[ \t]*([^=]+?)[ \t]*=[ \t]*$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private static readonly System.Text.RegularExpressions.Regex AssignBefore = new System.Text.RegularExpressions.Regex(
+            @"^[ \t]*\$?([A-Za-z_]\w*)[ \t]*=[ \t]*$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>
+        /// The type the value starting at <paramref name="valueStart"/> must have, when the line says: <c>tz: timezone = ‸</c>,
+        /// or <c>tz = ‸</c> for a variable declared with a type. Null when it isn't known.
+        /// </summary>
+        internal string ExpectedTypeAt(DocumentAnalysis analysis, int valueStart)
+        {
+            if (analysis.Markup.Syntax != SourceSyntax.Code)
+            {
+                return null;
+            }
+            string text = analysis.Source.Text;
+            int lineStart = text.LastIndexOf('\n', Math.Max(0, valueStart - 1)) + 1;
+            if (valueStart < lineStart)
+            {
+                return null;
+            }
+            string before = text.Substring(lineStart, valueStart - lineStart);
+            if (TypedLetBefore.Match(before) is { Success: true } typed)
+            {
+                return typed.Groups[2].Value.Trim();
+            }
+            if (AssignBefore.Match(before) is { Success: true } assign
+                && analysis.ScopeAt(valueStart).Lookup(assign.Groups[1].Value, valueStart) is Symbol { Kind: SymbolKind.Variable or SymbolKind.Parameter } v
+                && v.Shape.Type != KType.Any && (v.Shape.Name != null || EnumValuesOf(analysis, v.Shape.Type) != null || KScript.Metadata.NativeTypes.Get(v.Shape.Type) != null))
+            {
+                return v.Shape.Name ?? v.Shape.Type;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// The value of a typed variable (<c>tz: timezone = Eu‸</c>): the values the type accepts first (time zones, an
+        /// enum's values, durations), then the variables and commands that could give one. Null when no type is known.
+        /// </summary>
+        private List<CompletionItem> ExpectedValueCompletions(DocumentAnalysis analysis, int offset)
+        {
+            string text = analysis.Source.Text;
+            int start = RawValueStart(text, offset);
+            if (start < offset && (text[start] == '$' || text[start] == '@' || text[start] == '\'' || text[start] == '"'))
+            {
+                return null;
+            }
+            if (!(ExpectedTypeAt(analysis, start) is string type))
+            {
+                return null;
+            }
+            List<CompletionItem> items = ValueItems(analysis, type, text.Substring(start, offset - start), TextSpan.FromBounds(start, RawValueEnd(text, offset)), "the type of this value");
+            if (items.Count == 0)
+            {
+                return null;
+            }
+            TextSpan word = TextSpan.FromBounds(WordStart(text, offset), offset);
+            items.AddRange(ExpressionStartCompletions(analysis, offset, word, template: false).Where(i => i.Kind != CompletionKind.Keyword || i.Label == "null"));
+            return items;
+        }
+
+        /// <summary>Completion items for the values <paramref name="type"/> accepts, sorted before everything else.</summary>
+        internal List<CompletionItem> ValueItems(DocumentAnalysis analysis, string type, string typed, TextSpan replace, string where) =>
+            AcceptedValues(analysis, type, typed).Select((v, i) => new CompletionItem
+            {
+                Label = v.Value,
+                Kind = CompletionKind.Value,
+                Detail = v.Detail ?? SplitType(type).Name,
+                Documentation = v.Documentation ?? $"A value {SplitType(type).Name} accepts ({where}).",
+                ReplaceSpan = replace,
+                FilterText = v.Value,
+                SortText = "000" + i.ToString("D4"),
+            }).ToList();
+
+        /// <summary>Where an unquoted value under the cursor starts: Europe/Lo‸ starts at E, en-G‸ at e.</summary>
+        internal static int RawValueStart(string text, int offset)
+        {
+            int i = offset;
+            while (i > 0 && !char.IsWhiteSpace(text[i - 1]) && "(),=[]{}:".IndexOf(text[i - 1]) < 0)
+            {
+                i--;
+            }
+            return i;
+        }
+
+        private static int RawValueEnd(string text, int offset)
+        {
+            int i = offset;
+            while (i < text.Length && !char.IsWhiteSpace(text[i]) && "(),=[]{}".IndexOf(text[i]) < 0)
+            {
+                i++;
+            }
+            return i;
+        }
+
+        /// <summary>
+        /// After <c>@accounts.</c> or <c>accounts.</c>, where accounts is an import alias: what the imported script
+        /// exports (its functions with their signatures and docs, then its constants and types), or the commands of
+        /// an imported package. Null anywhere else. It reads the text, so it works while the line doesn't parse yet.
+        /// </summary>
+        private List<CompletionItem> AliasMemberCompletions(DocumentAnalysis analysis, int offset)
+        {
+            string text = analysis.Source.Text;
+            int wordStart = WordStart(text, offset);
+            if (wordStart < 2 || text[wordStart - 1] != '.')
+            {
+                return null;
+            }
+            int aliasEnd = wordStart - 1, aliasStart = aliasEnd;
+            while (aliasStart > 0 && Lexer.IsIdentChar(text[aliasStart - 1]))
+            {
+                aliasStart--;
+            }
+            if (aliasStart == aliasEnd || !Lexer.IsIdentStart(text[aliasStart]))
+            {
+                return null;
+            }
+            char before = aliasStart > 0 ? text[aliasStart - 1] : '\0';
+            if (before == '$' || before == '.' || before == '>' || Lexer.IsIdentChar(before))
+            {
+                return null;
+            }
+            string aliasName = text.Substring(aliasStart, aliasEnd - aliasStart);
+            if (!(analysis.ScopeAt(offset).Lookup(aliasName, offset) is Symbol import) || import.Kind != SymbolKind.Import)
+            {
+                return null;
+            }
+
+            int wordEnd = offset;
+            while (wordEnd < text.Length && Lexer.IsIdentChar(text[wordEnd]))
+            {
+                wordEnd++;
+            }
+            TextSpan replace = TextSpan.FromBounds(wordStart, wordEnd);
+            // A function named without a call: a route's to: @accounts.show_login, or a name already followed by (.
+            int p = before == '@' ? aliasStart - 1 : aliasStart;
+            while (p > 0 && char.IsWhiteSpace(text[p - 1]))
+            {
+                p--;
+            }
+            bool reference = (wordEnd < text.Length && text[wordEnd] == '(')
+                || (p >= 3 && text.Substring(p - 3, 3) == "to:") || (p >= 4 && text.Substring(p - 4, 4) == "to=\"");
+
+            List<CompletionItem> items = new List<CompletionItem>();
+            foreach (Symbol m in import.Members.Values)
+            {
+                bool fn = m.Kind == SymbolKind.Function;
+                items.Add(new CompletionItem
+                {
+                    Label = m.Name,
+                    Kind = fn ? CompletionKind.Function : CompletionKind.Constant,
+                    Detail = fn ? m.TypedSignature : m.Shape.Type != KType.Any ? m.Shape.Display() : null,
+                    Documentation = SymbolMarkdown(analysis, m),
+                    InsertText = fn && !reference ? m.Name + (m.Parameters.Count == 0 ? "()" : "($1)") : null,
+                    IsSnippet = fn && !reference,
+                    ReplaceSpan = replace,
+                    FilterText = m.Name,
+                    SortText = (fn ? "0" : "1") + m.Name,
+                });
+            }
+            if (import.Package != null)
+            {
+                foreach (CallableInfo c in Catalog.Commands.Where(c => c.Package == import.Package && !c.Planned))
+                {
+                    items.Add(new CompletionItem
+                    {
+                        Label = c.Name,
+                        Kind = CompletionKind.Command,
+                        Detail = c.Labels.FirstOrDefault(),
+                        Documentation = CallableMarkdown(c),
+                        Deprecated = c.Deprecated != null,
+                        InsertText = reference ? null : c.Name + (c.MaxArgs == 0 ? "()" : "($1)"),
+                        IsSnippet = !reference,
+                        ReplaceSpan = replace,
+                        FilterText = c.Name,
+                        SortText = (c.Deprecated != null ? "9" : "0") + c.Name,
+                    });
+                }
+                foreach (FieldInfo f in import.Shape.Fields.Values.Where(f => f.Shape.Type != KType.Fn))
+                {
+                    items.Add(new CompletionItem { Label = f.Name, Kind = CompletionKind.Variable, Detail = f.Shape.Display(), Documentation = f.Description, ReplaceSpan = replace, SortText = "1" + f.Name });
                 }
             }
             return items;

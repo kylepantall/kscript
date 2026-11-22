@@ -101,6 +101,7 @@ namespace KScript.Language.Analysis
                 DeclarationSpan = aliasSpan,
                 DeclaringElement = e,
                 Description = $"The {package} package: {catalog.Packages[package]}",
+                Package = package,
                 Shape = new TypeShape(KType.Map),
             };
             foreach (CallableInfo command in catalog.Commands.Where(c => c.Package == package))

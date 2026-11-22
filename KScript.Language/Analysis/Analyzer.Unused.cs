@@ -39,6 +39,21 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>
+        /// <c>@accounts.show_login</c>: notes the use, and references the member where its name is written, so hover,
+        /// go to definition and find references work on it. Returns the member, or null when the alias has no such name.
+        /// </summary>
+        private Symbol ReferenceMember(Symbol import, string member, TextSpan memberSpan)
+        {
+            NoteMemberUse(import, member);
+            if (!string.IsNullOrEmpty(member) && import.Members.TryGetValue(member, out Symbol symbol))
+            {
+                result.References.Add(new SymbolReference(symbol, memberSpan, false, false));
+                return symbol;
+            }
+            return null;
+        }
+
+        /// <summary>
         /// &lt;Resource path="/people" to="people" /&gt; (KScript.Http) routes to the index, store, show, update and
         /// destroy functions of the script imported as people (or only="..." of them, or all but except="...").
         /// </summary>
