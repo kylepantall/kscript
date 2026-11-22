@@ -404,7 +404,7 @@ namespace KScript.Runtime
                     return true;
                 default:
                     result = null;
-                    return false;
+                    return Tag is IRecordKind kind && kind.TryCallTypeMethod(call, this, name, out result);
             }
         }
 
@@ -431,6 +431,29 @@ namespace KScript.Runtime
             ("description", "string", "What the type is for, or null."),
             ("fields", "list", "The type's fields: name, type, optional, from, computed and description."),
         };
+    }
+
+    /// <summary>
+    /// What a package does with the records of a kind of type it declares, beyond what a plain record does: KScript.Data
+    /// loads a model's relations when they are first read, gives records a method for each relation, and gives the
+    /// model its scopes. Kept as the type's <see cref="RecordType.Tag"/>.
+    /// </summary>
+    internal interface IRecordKind
+    {
+        /// <summary>A member the record doesn't hold, such as a relation that hasn't been loaded yet. False to read the field as usual.</summary>
+        bool TryGetMember(Interpreter interpreter, Record record, string name, out object value);
+
+        /// <summary>True when the kind adds a method by this name to its records, such as <c>->posts()</c>.</summary>
+        bool HasMethod(Record record, string name);
+
+        /// <summary>A method of the record that the kind adds, such as <c>$user->posts()</c>.</summary>
+        bool TryCallMethod(CallContext call, Record record, string name, out object result);
+
+        /// <summary>A method of the type that the kind adds, such as a scope: <c>User->admins()</c>.</summary>
+        bool TryCallTypeMethod(CallContext call, RecordType type, string name, out object result);
+
+        /// <summary>Called after a field of a record is set, with its converted value.</summary>
+        void FieldSet(Record record, string name, object value);
     }
 
     /// <summary>
@@ -468,6 +491,7 @@ namespace KScript.Runtime
             // Every field is set when a record is made, so there is always an old value to put back.
             TryGetValue(name, out object old);
             this[name] = converted;
+            (Type.Tag as IRecordKind)?.FieldSet(this, name, converted);
             if (Type.Validators.Count == 0) return;
             List<string> failures = Shapes.Failures(interpreter, this);
             if (failures.Count == 0) return;

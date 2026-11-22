@@ -163,6 +163,149 @@ namespace KScript.Language.Tests
             Assert.Contains(twice.Diagnostics, d => d.Message == "This model already sets timestamps.");
         }
 
+        private const string Blog = """
+            import KScript.Data
+
+            model User {
+              name: string
+              posts: Post[](by: author)
+              profile?: Profile
+            }
+
+            model Profile {
+              user: User
+              bio: string
+            }
+
+            model Post {
+              title: string
+              published: bool = false
+              author: User(on_delete: cascade)
+              tags: Tag[]
+
+              fn drafts(query) => $query->where(published: false)
+              fn popular(query, over: int = 10) => $query
+            }
+
+            model Tag {
+              name: string
+            }
+
+            """;
+
+        [Fact]
+        public void RelationsAreFieldsMethodsAndColumns()
+        {
+            DocumentAnalysis a = Code(Blog + """
+                u = User->find(1)
+                echo $u.posts->map(fn(p) => $p.title)
+                echo $u.profile.bio
+                echo $u.posts_count
+                p = Post->first()
+                echo [$p.author.name, $p.author_id]
+                q = $u->posts()->where(published: true)
+                echo $q->first().title
+                echo $u->posts()->create(title: 'x').author.name
+                echo $p->tags()->attach([1, 2])
+                echo Post->drafts()->popular(5)->with(author, tags, author.posts)->with_count(tags)->get()
+                echo Post->where(fn(x) => $x.author.name == 'Ada')->drafts()->first().title
+                echo $p->load(author).title
+                """);
+            TestHelpers.AssertClean(a);
+
+            DocumentAnalysis wrong = Code(Blog + """
+                u = User->find(1)
+                echo $u.profile_id
+                echo $u->postz()
+                echo Post->popular(1, 2, 3)
+                echo Post->draftz()
+                echo @len(author.posts)
+                """);
+            Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("User has no field 'profile_id'"));
+            Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("->postz()"));
+            Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("->popular() takes 0 to 1 argument"));
+            Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("Unknown method ->draftz()"));
+            Assert.Contains(wrong.Diagnostics, d => d.Code == "KS2004" && d.Message.Contains("'author' isn't a value"));
+        }
+
+        [Fact]
+        public void ModelsInTheModelsFolderAreKnownWithoutImports()
+        {
+            const string user = """
+                import KScript.Data
+
+                model User {
+                  name: string
+                  posts: Post[]
+                  badges: Badge[]
+                  self?: User
+                }
+
+                u = User->first()
+                echo $u.posts[0].author.name
+                echo $u->posts()->count()
+                echo $u.posts[0]->publish()
+                """;
+            var files = new AnalyzerCoverageTests.Files(
+                ("kscript.json", "{ \"name\": \"blog\" }"),
+                ("models/user.kscript", user),
+                ("models/post.kscript", "import KScript.Data\n\n/// A blog post.\nmodel Post {\n  title: string\n  author: User\n}\n"),
+                ("models/badge.kscript", "import KScript.Data\n\nenum Colour { red }\n"));
+            string path = Path.Combine(Folder, "models", "user.kscript");
+            DocumentAnalysis a = TestHelpers.WithoutUnused(Analyzer.Analyze(user, path, files));
+            Assert.DoesNotContain(a.Diagnostics, d => d.Message.Contains("Post", StringComparison.Ordinal));
+            Assert.Contains(a.Symbols, s => s.Name == "Post" && s.Description.Contains("A blog post", StringComparison.Ordinal));
+            Assert.DoesNotContain(a.Symbols, s => s.Name == "Badge");
+
+            // A field with no type in an XML model is skipped when looking for the models it names.
+            DocumentAnalysis odd = TestHelpers.WithoutUnused(Analyzer.Analyze("<kscript><import package=\"KScript.Data\" /><model name=\"Odd\" fields=\"name: string, oops\" /></kscript>", Path.Combine(Folder, "odd.ks.xml"), EmptyFileSystem.Instance));
+            Assert.DoesNotContain(odd.Symbols, s => s.Name == "oops" && s.Kind == SymbolKind.Constant);
+        }
+
+        [Fact]
+        public void ValuesOfNoKnownTypeMayBeRecordsWithRelations()
+        {
+            DocumentAnalysis a = Code("""
+                import KScript.Data
+
+                fn titles(user) => $user->posts()->where(published: true)->count()
+                fn loaded(query) => $query->with(author, tags)->get()
+                """);
+            TestHelpers.AssertClean(a);
+
+            // Without KScript.Data there are no relations, so a misspelt method is still found.
+            DocumentAnalysis plain = Code("""
+                fn size(text) => $text->lenght()
+                """);
+            Assert.Contains(plain.Diagnostics, d => d.Code == DiagnosticCodes.UnknownMethod);
+        }
+
+        [Fact]
+        public void ScopesNeedNoTypeAndAreCalledThroughTheModel()
+        {
+            const string post = """
+                import KScript.Data
+
+                model Post {
+                  title: string
+                  views: int = 0
+
+                  fn popular(query, at_least: int = 10) => $query->where(fn(p) => $p.views >= $at_least)
+                  fn unused(query) => $query
+                }
+
+                echo Post->popular()->count()
+                """;
+            DocumentAnalysis a = Analyzer.Analyze(post, Path.Combine(Folder, "app.kscript"), EmptyFileSystem.Instance);
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.MissingParameterType);
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.UnusedFunction && d.Message.Contains("popular", StringComparison.Ordinal));
+            Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.UnusedFunction && d.Message.Contains("unused", StringComparison.Ordinal));
+
+            // Outside a model, query is a parameter like any other.
+            DocumentAnalysis plain = Analyzer.Analyze("fn f(query) => $query\necho f(1)\n", Path.Combine(Folder, "app.kscript"), EmptyFileSystem.Instance);
+            Assert.Contains(plain.Diagnostics, d => d.Code == DiagnosticCodes.MissingParameterType);
+        }
+
         [Fact]
         public void TheErrorTypesAreKnown()
         {

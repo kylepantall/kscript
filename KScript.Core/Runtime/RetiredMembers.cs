@@ -42,6 +42,7 @@ namespace KScript.Runtime
             ("json", "parse", "Use ->json().", "json"),
             ("number", "pow", "Use the ** operator: $n ** 2.", null),
             ("color", "contrast", "Use ->contrast_ratio(other).", "contrast_ratio"),
+            // One word for the mean everywhere: $list->average(), @average() and a query's ->average(column).
             ("query", "avg", "Use ->average(column).", "average"),
             ("model", "avg", "Use ->average(column).", "average"));
 

@@ -165,6 +165,12 @@ namespace KScript.Language.Analysis
                     pendingBare.Add(arg);
                     continue;
                 }
+                if ((arg.Value as MemberNode)?.DottedName != null)
+                {
+                    // posts.tags: names for a method that reads them (->with), otherwise checked as an expression.
+                    pendingBare.Add(arg);
+                    continue;
+                }
                 if (IsUnknownReference(arg.Value, scope, region))
                 {
                     pendingHandles.Add(arg);
@@ -561,10 +567,10 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            if (own != null || receiver.Methods.TryGetValue(name, out own))
+            if (own != null || receiver.Methods.TryGetValue(name, out own) || TypeInference.ScopeOf(receiver, name) is Symbol scope && (own = scope) != null)
             {
-                // A method the record's <type> declares with <fn>.
-                result.References.Add(new SymbolReference(own, nameSpan, false, false));
+                // A method the record's <type> declares with <fn>, or a model's scope (which uses the fn it was made from).
+                result.References.Add(new SymbolReference(scopeDeclarations.GetValueOrDefault(own) ?? own, nameSpan, false, false));
                 if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(own, result.RootScope), region, nameSpan))
                 {
                     return;
@@ -581,6 +587,13 @@ namespace KScript.Language.Analysis
             string type = (types ??= new TypeInference(catalog, result)).ReceiverType(name, receiver);
             List<CallableInfo> candidates = catalog.GetMethods(name, type).ToList();
             if (!pipe && (candidates.Count == 0 || (receiver.Type != KType.Any && !candidates.Any(m => m.ReceiverType == receiver.Type || m.ReceiverType == KType.Any))) && FieldOrRetired(name, nameSpan, receiver))
+            {
+                return;
+            }
+            // A record or query of a model this file can't see (declared in another file): its relations and scopes aren't known here.
+            // A value of no known type may be such a record too, once KScript.Data is imported: $user->posts() in fn(user).
+            if (candidates.Count == 0 && (receiver.Type is KType.Record or KType.Query && receiver.Instance == null && receiver.Name == null
+                || receiver.Type == KType.Any && !receiver.Declared && importedPackages.Contains("KScript.Data")))
             {
                 return;
             }
@@ -653,7 +666,7 @@ namespace KScript.Language.Analysis
         {
             bool unknown = receiver.Type == KType.Any;
             // A renamed method of this very type comes first: storage's ->path(name) is ->path_of(name), though .path is a field.
-            RetiredInfo retired = catalog.GetRetiredMethod(receiver.Type, name);
+            RetiredInfo retired = catalog.GetRetiredMethod(receiver.Type, name) ?? catalog.GetRetiredMethod(receiver.Kind, name);
             ValueFieldInfo field = retired != null ? null
                 : catalog.GetField(receiver.Type, name) ?? catalog.GetField(receiver.Kind, name) ?? (unknown ? catalog.Fields.FirstOrDefault(f => f.Name == name) : null);
             if (field != null)

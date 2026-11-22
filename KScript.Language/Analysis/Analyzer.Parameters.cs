@@ -93,6 +93,11 @@ namespace KScript.Language.Analysis
                 {
                     continue;
                 }
+                // A model's scope, fn drafts(query): its first parameter is always the model's query, so it needs no type.
+                if (i == 0 && p.Name == "query" && fn.Parent != null && IsModelElement(fn.Parent))
+                {
+                    continue;
+                }
                 string written = declared[i].TypeFromCalls ? WrittenType(declared[i].Shape) : null;
                 QuickFix[] fix = written != null ? new[] { new QuickFix($"Write {p.Name}: {written}", new TextChange(new TextSpan(p.Span.End, 0), ": " + written)) } : null;
                 string message = written != null

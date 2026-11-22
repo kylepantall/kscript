@@ -376,6 +376,8 @@ namespace KScript.Runtime
             {
                 return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed);
             }
+            // posts.tags names a path of names, for a parameter that reads them: ->with(posts.tags).
+            if ((node as MemberNode)?.DottedName is string path) return new BareWord(path, false, afterNamed);
             bool negated = false;
             if (node is UnaryNode { Operator: "not", Operand: IdentifierNode inner })
             {
@@ -533,6 +535,7 @@ namespace KScript.Runtime
                 case Record record:
                     try
                     {
+                        if (record.Type.Tag is IRecordKind kind && kind.TryGetMember(this, record, name, out object loaded)) return loaded;
                         return record.Get(name);
                     }
                     catch (KScriptException ex)
@@ -625,7 +628,7 @@ namespace KScript.Runtime
             {
                 case MemberNode member:
                 {
-                    object container = Evaluate(member.Target, scope, ctx);
+                    object container = Evaluate(AssignedThrough(member.Target), scope, ctx);
                     if (container is not Dictionary<string, object> map)
                         throw Fail(member, ctx, $"Only map fields can be set, but {SourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
                     if (node.Operator != "=") value = Combine(map.TryGetValue(member.Name, out object cur) ? cur : null, node.Operator, value, node, ctx);
@@ -634,7 +637,7 @@ namespace KScript.Runtime
                 }
                 case IndexNode index:
                 {
-                    object container = Evaluate(index.Target, scope, ctx);
+                    object container = Evaluate(AssignedThrough(index.Target), scope, ctx);
                     object key = Evaluate(index.Index, scope, ctx);
                     switch (container)
                     {
@@ -661,6 +664,20 @@ namespace KScript.Runtime
             }
             throw Fail(target, ctx, "Only a variable, a map field or a list item can be assigned to.", "Syntax");
         }
+
+        /// <summary>
+        /// What a field or item is set on, as an expression to read: the name an assignment starts with is written
+        /// bare (<c>user.name = 'Ada'</c>, <c>totals[0] += 1</c>), and it is the variable.
+        /// </summary>
+        private static ExprNode AssignedThrough(ExprNode node) => node switch
+        {
+            IdentifierNode id => new VariableNode { Name = id.Name, Span = id.Span },
+            MemberNode m when AssignedThrough(m.Target) is ExprNode inner && !ReferenceEquals(inner, m.Target) =>
+                new MemberNode { Target = inner, Name = m.Name, NameSpan = m.NameSpan, NullSafe = m.NullSafe, Span = m.Span },
+            IndexNode i when AssignedThrough(i.Target) is ExprNode inner && !ReferenceEquals(inner, i.Target) =>
+                new IndexNode { Target = inner, Index = i.Index, Span = i.Span },
+            _ => node,
+        };
 
         /// <summary>Sets a map key. A record checks the key is one of its fields and converts the value.</summary>
         private void SetKey(Dictionary<string, object> map, string key, object value, ExprNode node, EvalContext ctx)
@@ -952,6 +969,13 @@ namespace KScript.Runtime
                 DeclareFunction(methodElement, methodScope, record.Type.Module);
                 methodScope.TryGet(name, out object fn);
                 return Call((ICallable)fn, args, named, scope, ctx.Module);
+            }
+
+            // Methods the record's kind adds, such as a model record's relations: $user->posts().
+            if (target is Record kindRecord && kindRecord.Type.Tag is IRecordKind kind && kind.HasMethod(kindRecord, name)
+                && kind.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), kindRecord, name, out object added))
+            {
+                return added;
             }
 
             // A package's methods for its own objects come first, so their arguments are bound by name (and flags) like commands'.

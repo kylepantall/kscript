@@ -45,6 +45,17 @@ namespace KScript.Data
 
         public bool SkipLocked { get; private init; }
 
+        /// <summary>The relations ->with() loads after the rows are read: names or paths (posts.tags), each with an optional function that changes its query.</summary>
+        public IReadOnlyList<(string Path, ICallable Constrain)> Withs { get; private init; } = Array.Empty<(string, ICallable)>();
+
+        /// <summary>The relations ->with_count() counts, as a <c>name_count</c> field on each record.</summary>
+        public IReadOnlyList<(string Name, ICallable Constrain)> Counts { get; private init; } = Array.Empty<(string, ICallable)>();
+
+        /// <summary>For <c>$user->posts()</c>: the relation and the record, so ->create() and ->attach() know what to link to.</summary>
+        public Relation Relation { get; private init; }
+
+        public Record Parent { get; private init; }
+
         public string TypeName => KType.Query;
 
         public string ToText() => "query on " + Table + ": " + SelectStatement().Text;
@@ -62,10 +73,13 @@ namespace KScript.Data
             return value != null || name == "model";
         }
 
+        /// <summary>A scope of the model: <c>User->where(...)->admins()</c>.</summary>
         public bool TryCallMethod(CallContext call, string name, out object result)
         {
             result = null;
-            return false;
+            if (Model == null || !Model.IsScope(name)) return false;
+            result = Model.ApplyScope(call, this, name, call.Args, call.Named);
+            return true;
         }
 
         #region Building
@@ -88,6 +102,23 @@ namespace KScript.Data
 
         public Query Locking(string mode, bool skip) => this with { LockMode = mode ?? LockMode ?? "update", SkipLocked = skip || SkipLocked };
 
+        public Query Of(Relation relation, Record parent) => this with { Relation = relation, Parent = parent };
+
+        public Query Loading(string path, ICallable constrain)
+        {
+            ModelInfo at = Model ?? throw new KScriptException($"->with() loads a model's relations, and this query is on the table {Table}, which has no model.", "Argument");
+            foreach (string part in path.Split('.')) at = at.NeedRelation(part.Trim(), " for ->with()").Target;
+            return this with { Withs = Withs.Where(w => w.Path != path).Append((path, constrain)).ToList() };
+        }
+
+        public Query Counting(string name, ICallable constrain)
+        {
+            Relation r = (Model ?? throw new KScriptException($"->with_count() counts a model's relations, and this query is on the table {Table}, which has no model.", "Argument"))
+                .NeedRelation(name, " for ->with_count()");
+            if (!r.ToMany) throw new KScriptException($"->with_count() counts a list of records, and {r.Where} is one {r.Target.Name}.", "Argument");
+            return this with { Counts = Counts.Where(c => c.Name != name).Append((name, constrain)).ToList() };
+        }
+
         /// <summary>A column of this query's table, checked against the model when there is one.</summary>
         public SqlColumn ColumnNamed(string name, string where)
         {
@@ -98,6 +129,11 @@ namespace KScript.Data
             }
             if (Model.Type.Field(name) is FieldDefinition f && f.Computed)
                 throw new KScriptException($"{Model.Name}.{name} is worked out from other fields, so the database doesn't have it{where}.", "Argument");
+            if (Model.Relation(name) is Relation r)
+            {
+                if (r.Kind == RelationKind.BelongsTo) return new SqlColumn(r.ForeignKey, Model.Column(r.ForeignKey));
+                throw new KScriptException($"{r.Where} {r.Describe()}, so it isn't a column{where}. Use a lambda: fn(x) => $x.{name}->any().", "Argument");
+            }
             return new SqlColumn(name, Model.Need(name, where));
         }
 
@@ -108,11 +144,18 @@ namespace KScript.Data
             foreach (KeyValuePair<string, object> pair in pairs)
             {
                 SqlColumn column = ColumnNamed(pair.Key, $" for ->{method}()");
-                SqlExpr one = pair.Value switch
+                object value = pair.Value;
+                // author: $user means author_id is the user's key.
+                if (Model?.Relation(pair.Key) is Relation r)
+                {
+                    object KeyOf(object v) => v is Record t ? ModelInfo.KeyOfTarget(r, t) : v;
+                    value = value is List<object> many ? many.Select(KeyOf).ToList() : KeyOf(value);
+                }
+                SqlExpr one = value switch
                 {
                     null => new SqlUnary("IS NULL", column),
                     List<object> list => new SqlBinary("IN", column, new SqlList(list.Select(v => (SqlExpr)new SqlValue(v, column.Column)).ToList())),
-                    _ => new SqlBinary("=", column, new SqlValue(pair.Value, column.Column)),
+                    _ => new SqlBinary("=", column, new SqlValue(value, column.Column)),
                 };
                 all = all == null ? one : new SqlBinary("AND", all, one);
             }
@@ -146,8 +189,20 @@ namespace KScript.Data
         public SqlStatement SelectStatement(string select = null, bool withOrder = true)
         {
             Dialect d = Database.Dialect;
-            var w = new SqlWriter(d).Append("SELECT ").Append(Distinct && select == null ? "DISTINCT " : string.Empty).Append(select ?? SelectList(d))
-                .Append(" FROM ").Name(Table);
+            var w = new SqlWriter(d).Append("SELECT ").Append(Distinct && select == null ? "DISTINCT " : string.Empty).Append(select ?? SelectList(d));
+            if (select == null)
+            {
+                // ->with_count(posts): (SELECT COUNT(*) FROM posts AS c1 WHERE c1.author_id = users.id) AS posts_count
+                var call = Counts.Count > 0 ? CountCall : null;
+                for (int i = 0; i < Counts.Count; i++)
+                {
+                    Relation r = Model.Relation(Counts[i].Name);
+                    Query constrain = Counts[i].Constrain == null ? null
+                        : call.Call(Counts[i].Constrain, r.Base(call)) as Query ?? throw new KScriptException($"The function given to ->with_count({r.Name}: ...) must return the query.", "Type");
+                    w.Append(", ").Expr(r.Subquery(call, Table, "c" + (i + 1).ToString(CultureInfo.InvariantCulture), "COUNT(*)", constrain: constrain)).Append(" AS ").Name(r.Name + "_count");
+                }
+            }
+            w.Append(" FROM ").Name(Table);
             WriteWhere(w);
             if (withOrder && Order.Count > 0)
             {
@@ -170,7 +225,7 @@ namespace KScript.Data
             if (Limit != null || Offset != null || Distinct)
             {
                 // Aggregates only name columns, so all the parameters are the inner query's.
-                SqlStatement inner = SelectStatement();
+                SqlStatement inner = (this with { Counts = Array.Empty<(string, ICallable)>() }).SelectStatement();
                 string head = new SqlWriter(d).Expr(aggregate).Build().Text;
                 return new SqlStatement("SELECT " + head + " AS v FROM (" + inner.Text + ") AS q", inner.Parameters);
             }
@@ -183,14 +238,26 @@ namespace KScript.Data
 
         #region Reading
 
-        public List<object> Get(CallContext call) =>
-            Database.Rows(call.Interpreter, SelectStatement(), Table).Select(r => Records.Load(this, r, call)).ToList();
+        /// <summary>The call a query's relation counts and scopes run with, set when the query runs.</summary>
+        private CallContext CountCall { get; init; }
 
-        public object First(CallContext call)
+        /// <summary>The statement, with what it needs to run a scope in ->with_count().</summary>
+        private SqlStatement Statement(CallContext call) => (Counts.Count > 0 ? this with { CountCall = call } : this).SelectStatement();
+
+        public List<object> Get(CallContext call)
         {
-            List<Dictionary<string, object>> rows = Database.Rows(call.Interpreter, (Limit == null ? Taking(1) : this).SelectStatement(), Table);
-            return rows.Count == 0 ? null : Records.Load(this, rows[0], call);
+            List<object> records = Database.Rows(call.Interpreter, Statement(call), Table).Select(r => Records.Load(this, r, call)).ToList();
+            if (Model == null || records.Count == 0) return records;
+            List<Record> batch = records.Cast<Record>().ToList();
+            if (batch.Count > 1)
+            {
+                foreach (Record r in batch) Records.State(r).Batch = batch;
+            }
+            if (Withs.Count > 0) Data.Relation.LoadPaths(call, Model, batch, Withs);
+            return records;
         }
+
+        public object First(CallContext call) => (Limit == null ? Taking(1) : this).Get(call).FirstOrDefault();
 
         public object FirstOrFail(CallContext call, object id = null) =>
             First(call) ?? throw Records.NotFound(Model, Table, id);

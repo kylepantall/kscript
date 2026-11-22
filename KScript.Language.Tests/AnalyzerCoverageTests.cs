@@ -28,7 +28,7 @@ namespace KScript.Language.Tests
                     [Path.Combine(Folder, "blank.json")] = " ",
                     [Path.Combine(Folder, "broken.json")] = "{ nope",
                 };
-                foreach (var (name, text) in extra) files[Path.Combine(Folder, name)] = text;
+                foreach (var (name, text) in extra) files[Path.GetFullPath(Path.Combine(Folder, name))] = text;
             }
 
             /// <summary>Files that exist but can't be read.</summary>
