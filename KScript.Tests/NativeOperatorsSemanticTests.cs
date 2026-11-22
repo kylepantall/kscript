@@ -110,7 +110,7 @@ public class NativeOperatorsSemanticTests
         Assert.Equal("text", NativeTypes.Get("uuid").Ordering);
         Assert.Equal("none", NativeTypes.Get("regex").Ordering);
         Assert.Equal("handle", NativeTypes.Get("handle").RawKind);
-        Assert.Equal(new[] { "email", "password", "handle", "uuid", "regex", "duration" }, NativeTypes.Names.Take(6));
+        Assert.Equal(new[] { "email", "password", "handle", "uuid", "regex", "url" }, NativeTypes.Names.Take(6));
     }
 
     [Fact]
