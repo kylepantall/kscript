@@ -74,6 +74,12 @@ namespace KScript.Runtime
         /// <summary>Its fields ($url.host) and methods ($version->bump('minor')).</summary>
         protected abstract void DeclareMembers(NativeMembers m);
 
+        /// <summary>
+        /// What a list of only this type can do besides every list's methods: named filters for ->only() and
+        /// ->without() (semver: releases, prereleases) and methods of its own. Declare none with an empty body.
+        /// </summary>
+        protected abstract void DeclareListMembers(NativeListMembers l);
+
         /// <summary>The string methods its values keep, such as contains and starts_with. Others need ->to_string() first.</summary>
         public abstract IReadOnlyList<string> StringMethods { get; }
 
@@ -108,7 +114,23 @@ namespace KScript.Runtime
             }
         }
 
-        internal void Members(NativeMembers m) => DeclareMembers(m);
+        /// <summary>Registers its fields and methods, and its list filters and list methods, on a package.</summary>
+        internal void Members(KScriptPackage.PackageBuilder p)
+        {
+            DeclareMembers(new NativeMembers(p, Name));
+            var list = new NativeListMembers(p, this);
+            DeclareListMembers(list);
+            ListFilters = list.Filters.Select(f => (f.Name, f.Summary)).ToList();
+            filterList = list;
+        }
+
+        private NativeListMembers filterList;
+
+        /// <summary>The list filter with this name, or null.</summary>
+        internal Func<object, bool> ListFilter(string name) => filterList?.Find(name);
+
+        /// <summary>Its list filters, by name, once its members are registered.</summary>
+        public IReadOnlyList<(string Name, string Summary)> ListFilters { get; private set; } = Array.Empty<(string, string)>();
 
         /// <summary>What the parser, analyzer and docs know about it (KScript.Syntax can't see this class).</summary>
         public NativeTypeInfo Info => info ??= new NativeTypeInfo(Name, Description, Example, StringMethods)
@@ -189,7 +211,7 @@ namespace KScript.Runtime
         /// <summary>Its own order, given two values of the type, or null.</summary>
         public Func<object, object, int> Compare { get; }
 
-        /// <summary>No order: &lt; and friends are an error that says so. Sorting needs a key, such as ->sort(fn($x) => $x->to_string()).</summary>
+        /// <summary>No order: &lt; and friends are an error that says so. Sorting needs a key, such as ->sort_by(fn(x) => $x->to_string()).</summary>
         public static readonly Ordering None = new Ordering("none", null);
 
         /// <summary>Alphabetical by the tidied text (country codes, slugs).</summary>

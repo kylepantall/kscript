@@ -25,11 +25,52 @@ namespace KScript.Runtime
         /// </summary>
         public object EvaluateTyped(DecodedText text, Scope scope, Module module, string type)
         {
-            string kind = Shapes.RawTextKind(TypeRef.Parse(type), scope, module);
+            TypeRef typeRef = TypeRef.Parse(type);
+            string kind = Shapes.RawTextKind(typeRef, scope, module);
+            // semver[] = [1.0.0, 1.0.1-rc]: in a list of a type read from text, each item may be written raw too.
+            if (kind == null && typeRef is { ListDepth: 1 } && RawListItems(text.Value) is List<string> items
+                && Shapes.RawTextKind(TypeRef.Parse(type.Trim()[..^2]), scope, module) is string itemKind)
+                return items.Select(item => RawOrEvaluated(item, itemKind, text, scope, module)).ToList();
             if (kind == null) return EvaluateText(text, scope, module);
             ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
             if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(text.Value, kind)) return text.Value.Trim();
             return EvaluateText(text, scope, module);
+        }
+
+        private object RawOrEvaluated(string item, string kind, DecodedText whole, Scope scope, Module module)
+        {
+            ParseResult parsed = ExpressionParser.ParseExpression(item);
+            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(item, kind)) return item.Trim();
+            return Evaluate(parsed.Root, scope, new EvalContext(module, whole));
+        }
+
+        /// <summary>
+        /// The items of a list literal <c>[a, b]</c>, split at its top-level commas (not inside quotes or brackets), or
+        /// null when the text isn't one list literal.
+        /// </summary>
+        internal static List<string> RawListItems(string text)
+        {
+            string t = text.Trim();
+            if (t.Length < 2 || t[0] != '[' || t[^1] != ']') return null;
+            var items = new List<string>();
+            int depth = 0, start = 1;
+            char quote = '\0';
+            for (int i = 1; i < t.Length - 1; i++)
+            {
+                char c = t[i];
+                if (quote != '\0') { if (c == '\\') i++; else if (c == quote) quote = '\0'; continue; }
+                switch (c)
+                {
+                    case '\'': case '"': quote = c; break;
+                    case '[': case '(': case '{': depth++; break;
+                    case ']': case ')': case '}': if (--depth < 0) return null; break;
+                    case ',' when depth == 0: items.Add(t[start..i]); start = i + 1; break;
+                }
+            }
+            if (depth != 0 || quote != '\0') return null;
+            string last = t[start..^1];
+            if (last.Trim().Length > 0 || items.Count > 0) items.Add(last);
+            return items.Any(x => x.Trim().Length == 0) ? null : items;
         }
 
         private static readonly System.Text.RegularExpressions.Regex RawHandle = new System.Text.RegularExpressions.Regex(@"^@[\w.\-]+$");
@@ -966,6 +1007,9 @@ namespace KScript.Runtime
             if (target is ErrorValue && module.Methods.TryGetValue("error:" + name, out method)) return true;
             // A package's records (a model's) have its methods as well as maps'.
             if (target is Record record && record.Type.RecordKind != null && module.Methods.TryGetValue(record.Type.RecordKind + ":" + name, out method)) return true;
+            // A list of one native type has that type's list methods too: $versions->without(prereleases).
+            if (target is List<object> { Count: > 0 } items && items[0] is IKObject first && NativeTypeRegistry.Get(first.TypeName) != null
+                && items.All(x => x is IKObject k && k.TypeName == first.TypeName) && module.Methods.TryGetValue(first.TypeName + "[]:" + name, out method)) return true;
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
             // An email, handle, uuid or regex is text too, so the string methods that make sense for it work on it.
@@ -1023,6 +1067,8 @@ namespace KScript.Runtime
             if (!defined && target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
                 throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
             if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);
+            // A NativeText has no methods of its own, so an any-method (->is_a(semver)) binds its bare words as declared.
+            if (defined && target is NativeText) return InvokeMethodDefinition(method, target, args, named, scope, ctx);
             if (target is IKObject obj && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), name, out object result))
             {
                 return result;

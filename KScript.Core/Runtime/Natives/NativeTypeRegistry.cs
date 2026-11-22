@@ -77,7 +77,8 @@ namespace KScript.Runtime
         {
             if (TypeOf(value) == type) return value;
             NativeType native = Get(type);
-            return native != null && value is string or ISemanticText or double ? native.Coerce(value) : null;
+            // Only plain text and numbers are parsed: a value of another native type (hex '10') is never read as this one.
+            return native != null && value is string or double ? native.Coerce(value) : null;
         }
 
         private static bool Involves(object a, object b) => Of(a) != null || Of(b) != null;

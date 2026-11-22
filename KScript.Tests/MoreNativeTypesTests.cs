@@ -265,6 +265,9 @@ public class MoreNativeTypesTests
         {
         }
 
+        protected override void DeclareListMembers(NativeListMembers l) =>
+            l.Filter("acme", "Codes in the ACM family.", v => ((NativeText)v).Text.StartsWith("ACM", StringComparison.Ordinal));
+
         protected override void DeclareMembers(NativeMembers m) =>
             m.Method("family", "", "The three letters.", KType.String, (t, c) => ((NativeText)t).Part("family"),
                 "<let name=\"s\" type=\"sku\" value=\"'abc-1234'\" />\n<echo>{ $s->family() }</echo>");

@@ -76,6 +76,10 @@ namespace KScript.Runtime
                 Let + "<echo>{ $x->plus(45m) }</echo>");
         }
 
+        protected override void DeclareListMembers(NativeListMembers l)
+        {
+        }
+
         public override (object Value, string Reason) Parse(string s)
         {
             string t = s.Trim();

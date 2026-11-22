@@ -26,7 +26,8 @@ namespace KScript.Runtime
             const string S = KType.String, N = KType.Number, B = KType.Bool, M = KType.Map, L = KType.List;
 
             // The types on the NativeType contract declare their own fields and methods.
-            foreach (NativeType type in NativeTypeRegistry.BuiltIn) type.Members(new NativeMembers(p, type.Name));
+            foreach (NativeType type in NativeTypeRegistry.BuiltIn) type.Members(p);
+            ListFilters.Register(p);
 
             // url
             p.Field("url", "scheme", S, "The scheme, in lower case: https.", (t, _) => Part(t, "scheme"));

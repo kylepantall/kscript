@@ -222,7 +222,7 @@ namespace KScript.Runtime
                 Conventions.Enforce(Conventions.Name(package.Name, "type", type.Name));
                 type.Package ??= package.Name;
                 NativeTypeRegistry.Register(type);
-                type.Members(new NativeMembers(this, type.Name));
+                type.Members(this);
             }
 
             /// <summary>Adds a method, called as <c>value->name(args)</c> on values of <paramref name="receiver"/>.</summary>
