@@ -83,12 +83,8 @@ namespace KScript.Runtime
 
         static NativeParsers() => BuiltIn.Register();
 
-        /// <summary>Adds a native type: what the editor knows about it, and how its values are made.</summary>
-        public static void Register(NativeTypeInfo info, NativeParser parser)
-        {
-            NativeTypes.Register(info);
-            lock (Gate) Parsers[info.Name] = parser;
-        }
+        /// <summary>Adds a native type: what the editor knows about it, how its values are made and what they do.</summary>
+        public static void Register(NativeType type) => NativeTypeRegistry.Register(type);
 
         internal static void Add(string name, NativeParser parser)
         {
@@ -97,7 +93,14 @@ namespace KScript.Runtime
 
         public static NativeParser Get(string name)
         {
-            lock (Gate) return name != null && Parsers.TryGetValue(name, out NativeParser p) ? p : null;
+            lock (Gate)
+            {
+                if (name == null) return null;
+                if (Parsers.TryGetValue(name, out NativeParser p)) return p;
+                if (NativeTypeRegistry.Get(name) is not NativeType type) return null;
+                // A type on the NativeType contract: its parser, as the older callers ask for it.
+                return Parsers[name] = new NativeParser(type.Parse, type.OptionProblems) { TakesNumbers = type.TakesNumbers };
+            }
         }
 
         private static (object, string) Ok(object value) => (value, null);
@@ -127,7 +130,6 @@ namespace KScript.Runtime
                 Add("currency", new NativeParser(Currency));
                 Add("locale", new NativeParser(Locale));
                 Add("timezone", new NativeParser(TimeZone));
-                Add("duration", new NativeParser(Duration) { TakesNumbers = true });
                 Add("cron", new NativeParser(Cron));
                 Add("color", new NativeParser(Color));
                 Add("iban", new NativeParser(Iban));
@@ -697,69 +699,6 @@ namespace KScript.Runtime
 
             // ---- time ---------------------------------------------------------------------------------------------
 
-            private static readonly (char Unit, double Seconds)[] DurationUnits = { ('w', 604800), ('d', 86400), ('h', 3600), ('m', 60), ('s', 1) };
-
-            /// <summary>Seconds as a duration's short form: 5400 is 1h30m.</summary>
-            internal static string DurationText(double seconds)
-            {
-                if (seconds == 0) return "0s";
-                var sb = new StringBuilder(seconds < 0 ? "-" : string.Empty);
-                double left = Math.Abs(seconds);
-                foreach ((char unit, double size) in DurationUnits)
-                {
-                    if (unit == 's')
-                    {
-                        if (left > 0) sb.Append(Math.Round(left, 3).ToString(CultureInfo.InvariantCulture)).Append('s');
-                        break;
-                    }
-                    double n = Math.Floor(left / size);
-                    if (n > 0) { sb.Append(n.ToString(CultureInfo.InvariantCulture)).Append(unit); left -= n * size; }
-                }
-                return sb.ToString();
-            }
-
-            internal static NativeText DurationOf(double seconds) =>
-                new NativeText("duration", DurationText(seconds), new Dictionary<string, object> { ["seconds"] = seconds });
-
-            private static (object, string) Duration(string s)
-            {
-                string t = s.Trim();
-                if (t.Length == 0) return No("it is empty");
-                if (double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out double plain)) return Ok(DurationOf(plain));
-                bool negative = t.StartsWith('-');
-                if (negative) t = t.Substring(1);
-                double total = 0;
-                if (t.StartsWith('P') || t.StartsWith('p'))
-                {
-                    try
-                    {
-                        total = System.Xml.XmlConvert.ToTimeSpan(t.ToUpperInvariant()).TotalSeconds;
-                    }
-                    catch (FormatException)
-                    {
-                        return No("it isn't an ISO 8601 duration such as PT1H30M");
-                    }
-                    return Ok(DurationOf(negative ? -total : total));
-                }
-                var units = new Dictionary<string, double> { ["w"] = 604800, ["d"] = 86400, ["h"] = 3600, ["m"] = 60, ["min"] = 60, ["s"] = 1, ["ms"] = 0.001 };
-                int i = 0;
-                string compact = t.Replace(" ", string.Empty).ToLowerInvariant();
-                if (compact.Length == 0) return No("it is empty");
-                while (i < compact.Length)
-                {
-                    int start = i;
-                    while (i < compact.Length && (char.IsAsciiDigit(compact[i]) || compact[i] == '.')) i++;
-                    if (i == start || !double.TryParse(compact.AsSpan(start, i - start), NumberStyles.Float, CultureInfo.InvariantCulture, out double n))
-                        return No("write it as numbers with units, such as 1h30m, 90s or 2d (units w, d, h, m, s, ms)");
-                    int unitStart = i;
-                    while (i < compact.Length && char.IsAsciiLetter(compact[i])) i++;
-                    string unit = compact.Substring(unitStart, i - unitStart);
-                    if (!units.TryGetValue(unit, out double size)) return No(unit.Length == 0 ? $"{n} needs a unit (w, d, h, m, s or ms)" : $"'{unit}' isn't a unit (use w, d, h, m, s or ms)");
-                    total += n * size;
-                }
-                return Ok(DurationOf(negative ? -total : total));
-            }
-
             private static readonly Dictionary<string, string> CronMacros = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["@yearly"] = "0 0 1 1 *", ["@annually"] = "0 0 1 1 *", ["@monthly"] = "0 0 1 * *", ["@weekly"] = "0 0 * * 0",
@@ -962,7 +901,7 @@ namespace KScript.Runtime
         internal static int CompareSemver(NativeText a, NativeText b) => BuiltIn.CompareSemver(a, b);
         internal static bool Satisfies(NativeText v, string range, out string problem) => BuiltIn.Satisfies(v, range, out problem);
         internal static byte[] Base64Bytes(string s) => BuiltIn.Base64Bytes(s);
-        internal static NativeText DurationOf(double seconds) => BuiltIn.DurationOf(seconds);
+        internal static NativeText DurationOf(double seconds) => DurationType.Of(seconds);
         internal static DateTime CronNext(NativeText cron, DateTime after) => BuiltIn.CronNext(cron, after);
         internal static NativeText ColorOf(double r, double g, double b, double a) => BuiltIn.ColorOf(r, g, b, a);
     }

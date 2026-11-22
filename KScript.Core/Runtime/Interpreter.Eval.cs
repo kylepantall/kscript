@@ -270,6 +270,7 @@ namespace KScript.Runtime
                     switch (unary.Operator)
                     {
                         case "not": return !Values.Truthy(operand);
+                        case "-" when NativeTypeRegistry.TryNegate(operand, out object negated): return negated;
                         case "-": return -Values.ToNumber(operand, $"'-'{Where(unary, ctx)}");
                         default: return Values.ToNumber(operand, $"'+'{Where(unary, ctx)}");
                     }
@@ -414,9 +415,20 @@ namespace KScript.Runtime
 
         private object EvaluateRange(RangeNode range, Scope scope, EvalContext ctx)
         {
-            double start = Values.ToNumber(Evaluate(range.Start, scope, ctx), "The start of a range");
-            double end = Values.ToNumber(Evaluate(range.End, scope, ctx), "The end of a range");
-            double step = range.Step != null ? Values.ToNumber(Evaluate(range.Step, scope, ctx), "The step of a range") : (end >= start ? 1 : -1);
+            object from = Evaluate(range.Start, scope, ctx), to = Evaluate(range.End, scope, ctx);
+            object by = range.Step != null ? Evaluate(range.Step, scope, ctx) : null;
+            // A range of a native type's values, or of dates by a duration, is declared by the type.
+            try
+            {
+                if (NativeTypeRegistry.TryRange(from, to, by, out List<object> values)) return values;
+            }
+            catch (KScriptException ex) when (ex.Line == 0)
+            {
+                throw Fail(range, ctx, ex.Words, ex.Type);
+            }
+            double start = Values.ToNumber(from, "The start of a range");
+            double end = Values.ToNumber(to, "The end of a range");
+            double step = by != null ? Values.ToNumber(by, "The step of a range") : (end >= start ? 1 : -1);
             if (step == 0) throw Fail(range, ctx, "A range can't have a step of 0.", "Argument");
             var list = new List<object>();
             for (double x = start; step > 0 ? x < end : x > end; x += step)
@@ -474,6 +486,19 @@ namespace KScript.Runtime
         private object Binary(string op, object a, object b, ExprNode node, EvalContext ctx)
         {
             string where = Where(node, ctx);
+            // An operator a native type declares (duration + duration, date - duration, ip in cidr) runs as it says.
+            if (NativeOperators.BinaryOperators.Contains(op))
+            {
+                try
+                {
+                    if (NativeTypeRegistry.TryBinary(op, a, b, out object native)) return native;
+                }
+                catch (KScriptException ex) when (ex.Line == 0)
+                {
+                    throw Fail(node, ctx, ex.Words, ex.Type);
+                }
+                if (NativeTypeRegistry.BinaryProblem(op, a, b) is string problem) throw Fail(node, ctx, problem, "Type");
+            }
             switch (op)
             {
                 case "==": return Values.LooseEquals(a, b);

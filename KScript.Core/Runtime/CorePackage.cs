@@ -489,6 +489,18 @@ namespace KScript.Runtime
             return null;
         }
 
+        private static IEnumerable<object> NativeItems(ElementRun run, object source)
+        {
+            try
+            {
+                return NativeTypeRegistry.TryItems(source, out IEnumerable<object> items) ? items : null;
+            }
+            catch (KScriptException ex) when (ex.Line == 0)
+            {
+                throw run.Error(ex.Message, "in", ex.Type);
+            }
+        }
+
         private static bool? For(ElementRun run)
         {
             string[] names = run.RequiredRaw("each").Split(',').Select(n => n.Trim().TrimStart('$')).Where(n => n.Length > 0).ToArray();
@@ -499,6 +511,8 @@ namespace KScript.Runtime
             List<(object Item, object Key)> items = source switch
             {
                 null => new List<(object, object)>(),
+                // A native type says whether a loop can walk it: a cidr block gives its addresses.
+                IKObject when NativeItems(run, source) is IEnumerable<object> walked => walked.Select(x => (x, (object)null)).ToList(),
                 List<object> list => list.Select(x => (x, (object)null)).ToList(),
                 Dictionary<string, object> map => map.Select(kv => (names.Length > 1 ? kv.Value : new Dictionary<string, object> { ["key"] = kv.Key, ["value"] = kv.Value }, (object)kv.Key)).ToList(),
                 double n => Enumerable.Range(0, Math.Max(0, (int)n)).Select(x => ((object)(double)x, (object)null)).ToList(),

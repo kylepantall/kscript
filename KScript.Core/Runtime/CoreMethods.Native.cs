@@ -25,6 +25,9 @@ namespace KScript.Runtime
         {
             const string S = KType.String, N = KType.Number, B = KType.Bool, M = KType.Map, L = KType.List;
 
+            // The types on the NativeType contract declare their own fields and methods.
+            foreach (NativeType type in NativeTypeRegistry.BuiltIn) type.Members(new NativeMembers(p, type.Name));
+
             // url
             p.Field("url", "scheme", S, "The scheme, in lower case: https.", (t, _) => Part(t, "scheme"));
             p.Field("url", "host", S, "The host name, in lower case: example.com.", (t, _) => Part(t, "host"));
@@ -185,17 +188,7 @@ namespace KScript.Runtime
                 TimeZoneInfo.ConvertTime(c.Arg(0) is DateTime d ? d : throw new KScriptException("convert needs a date.", "Type"), Z(t)));
             p.Method("timezone", "is_dst", "at?: date", "True when summer time is in effect, now or at a date.", B, (t, c) => Z(t).IsDaylightSavingTime(c.Arg(0) is DateTime d ? d : DateTime.UtcNow));
 
-            // duration, cron, color
-            static double Sec(object t) => (double)Part(t, "seconds");
-            p.Field("duration", "seconds", N, "The length in seconds: 5400 for 1h30m.", (t, _) => Sec(t));
-            p.Field("duration", "minutes", N, "The length in minutes: 90 for 1h30m.", (t, _) => Sec(t) / 60);
-            p.Field("duration", "hours", N, "The length in hours: 1.5 for 1h30m.", (t, _) => Sec(t) / 3600);
-            p.Field("duration", "ms", N, "The length in milliseconds.", (t, _) => Sec(t) * 1000);
-            p.Method("duration", "iso", "", "The length in ISO 8601: PT1H30M.", S, (t, c) => System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(Sec(t))));
-            p.Method("duration", "after", "time?: date", "The time this long after a date, or after now.", KType.Date, (t, c) => (c.Arg(0) is DateTime d ? d : DateTime.Now).AddSeconds(Sec(t)));
-            p.Method("duration", "before", "time?: date", "The time this long before a date, or before now.", KType.Date, (t, c) => (c.Arg(0) is DateTime d ? d : DateTime.Now).AddSeconds(-Sec(t)));
-            p.Method("duration", "plus", "other: duration", "The two lengths added: 1h + 30m is 1h30m.", "duration", (t, c) =>
-                NativeParsers.DurationOf(Sec(t) + Sec(c.Arg(0) is NativeText o && o.TypeName == "duration" ? o : Native("duration", c.Str(0)))));
+            // cron, color
             p.Method("cron", "next", "after?: date", "The next time the schedule runs, after a date or after now.", KType.Date, (t, c) =>
                 NativeParsers.CronNext(T(t), c.Arg(0) is DateTime d ? d : DateTime.Now));
             p.Method("cron", "next_times", "count: int, after?: date", "The next few times it runs.", L, (t, c) =>
@@ -306,14 +299,6 @@ namespace KScript.Runtime
                 ("timezone->now", "<let name=\"x\" type=\"timezone\" value=\"'Europe/London'\" />\n<echo>{ $x->now()->type() }</echo>"),
                 ("timezone->convert", "<let name=\"x\" type=\"timezone\" value=\"'Europe/London'\" />\n<echo>{ $x->convert('2026-07-01T12:00:00Z'->to_date()) }</echo>"),
                 ("timezone->is_dst", "<let name=\"x\" type=\"timezone\" value=\"'Europe/London'\" />\n<echo>{ $x->is_dst('2026-01-15'->to_date()) }</echo>"),
-                ("duration.seconds", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x.seconds }</echo>"),
-                ("duration.minutes", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x.minutes }</echo>"),
-                ("duration.hours", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x.hours }</echo>"),
-                ("duration.ms", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x.ms }</echo>"),
-                ("duration->iso", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->iso() }</echo>"),
-                ("duration->after", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->after('2026-11-21T09:00:00'->to_date()) }</echo>"),
-                ("duration->before", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->before('2026-11-21T09:00:00'->to_date()) }</echo>"),
-                ("duration->plus", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->plus(45m) }</echo>"),
                 ("cron->next", "<let name=\"x\" type=\"cron\" value=\"'0 9 * * mon-fri'\" />\n<echo>{ $x->next('2026-11-21T10:00:00'->to_date()) }</echo>"),
                 ("cron->next_times", "<let name=\"x\" type=\"cron\" value=\"'0 9 * * mon-fri'\" />\n<echo>{ $x->next_times(3, '2026-11-21T10:00:00'->to_date()) }</echo>"),
                 ("color->rgb", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->rgb() }</echo>"),
