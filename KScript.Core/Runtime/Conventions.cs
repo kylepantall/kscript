@@ -202,8 +202,6 @@ namespace KScript.Runtime
             ["llm"] = "prompt text against a prompt that is a value",
             // Not two forms of one action: the statement changes the current locale, and @locale() reads it.
             ["locale"] = "the statement sets what the command reads",
-            // Not one action either: the statement writes a log entry, and KScript.Math's @log(x) is the logarithm.
-            ["log"] = "a log entry against a logarithm",
             // KScript.Web's page element renders the Markdown written inside it (a block of text); KScript.Markdown's
             // @markdown(text) reads Markdown that is already a value.
             ["markdown"] = "a block of Markdown in a page against Markdown that is a value",

@@ -142,7 +142,9 @@ namespace KScript.Runtime
             ("transaction", "Use the transaction statement around the work, or $db->transaction(fn) when you need its result (KScript.Data).", null),
             // Renamed so the standard packages follow one set of conventions (docs/contributing.md).
             ("config", "Read a setting as $config.database.port, or $config->get('database.port', 5432) for a path held in a variable or a default.", null),
-            ("signed_in", "Use @is_signed_in() (KScript.Auth).", "is_signed_in"));
+            ("signed_in", "Use @is_signed_in() (KScript.Auth).", "is_signed_in"),
+            // log is the statement that writes a log entry, so the logarithm has its own name.
+            ("log", "The logarithm was renamed to @logarithm(number, base?) (KScript.Math): @logarithm(8, 2).", "logarithm"));
 
         /// <summary>
         /// Elements whose name changed so that every statement name is one word, snake_case or PascalCase, with no
