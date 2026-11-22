@@ -41,6 +41,7 @@ namespace KScript.Language.Analysis
                         LiteralKind.Email => KType.Email,
                         LiteralKind.Uuid => KType.Uuid,
                         LiteralKind.Url => "url",
+                        LiteralKind.SlashPath => "slash_path",
                         LiteralKind.Duration => "duration",
                         _ => KType.Null,
                     });
@@ -172,6 +173,11 @@ namespace KScript.Language.Analysis
                         // @db('users') is a query on the table; @db() and @db(connection: reports) are the database.
                         return new TypeShape(c.Arguments.Any(a => a.Name == null || a.Name == "table") ? KType.Query : KType.Database);
                     }
+                    if (command.ReturnShape != null && ShapeText.Parse(command.ReturnShape) is TypeShape described)
+                    {
+                        // The package says what fields the result has: @user() is { id, email, ... }.
+                        return described;
+                    }
                     TypeShape shape = new TypeShape(command.ReturnType);
                     if (command.Name == "files")
                     {
@@ -237,6 +243,11 @@ namespace KScript.Language.Analysis
                         {
                             TypeShape l = Infer(binary.Left, region);
                             TypeShape r = Infer(binary.Right, region);
+                            if (l.Type == "slash_path")
+                            {
+                                // /docs + 'start' adds names.
+                                return l;
+                            }
                             if (l.Type == KType.String || r.Type == KType.String)
                             {
                                 return new TypeShape(KType.String);

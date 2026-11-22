@@ -417,7 +417,7 @@ namespace KScript.Language.Agents
             w.Append("1. After each change run `kscript check --output json`. Each problem has `file`, `line`, `column`, `code`, `message` and `fixes` (exact text edits). Repeat until it reports 0 errors.\n");
             w.Append(project.Tests > 0 ? $"2. `kscript test` runs the {project.Tests} test file{(project.Tests == 1 ? string.Empty : "s")}. Add a test for each change.\n" : "2. `kscript test` runs `*.test.kscript` files. Add a test for each change.\n");
             w.Append("3. `kscript fmt` formats files. `kscript agents` refreshes these docs (the editor does it on save).\n");
-            w.Append("4. Unsure about a command or method? Read `.kscript/agents/packages/<package>.md`, or call `lookup` / `search_docs` on the `kscript mcp` server (the full reference). Never invent names: `kscript check` rejects unknown ones.\n");
+            w.Append("4. Unsure about a command or method? Read its package's file in `.kscript/agents/packages/` (such as `KScript.Core.md`), or call `lookup` / `search_docs` on the `kscript mcp` server (the full reference). Never invent names: `kscript check` rejects unknown ones.\n");
 
             w.Append("\n## This project\n\n");
             if (project.Main != null)
@@ -428,7 +428,7 @@ namespace KScript.Language.Agents
             int fns = project.Symbols.Count(s => s.Kind == "fn");
             int others = project.Symbols.Count - fns;
             w.Append($"Its own {Count(fns, "function")} and {Count(others, "type, enum and const", "types, enums and consts")} are listed in `.kscript/agents/index.md` with their signatures.\n");
-            w.Append("- Packages (each has `.kscript/agents/packages/<name>.md`):\n");
+            w.Append("- Packages (each has its own file in `.kscript/agents/packages/`):\n");
             foreach (string package in project.Packages)
             {
                 string description = catalog.Packages.TryGetValue(package, out string d) ? Summarize(d, 90) : null;

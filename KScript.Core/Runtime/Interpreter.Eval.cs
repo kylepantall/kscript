@@ -34,8 +34,13 @@ namespace KScript.Runtime
 
         private static readonly System.Text.RegularExpressions.Regex RawHandle = new System.Text.RegularExpressions.Regex(@"^@[\w.\-]+$");
 
-        /// <summary>Text that is plainly a handle (<c>@a--b</c>, which would otherwise read as @a - -b), for a handle type.</summary>
-        internal static bool LooksRaw(string text, string kind) => kind == "handle" && RawHandle.IsMatch(text.Trim());
+        /// <summary>
+        /// Text that is plainly a raw value: a handle (<c>@a--b</c>, which would otherwise read as @a - -b) for a handle type,
+        /// or anything starting with / for a slash_path (<c>/My Apps/Notes</c>, <c>/blog/</c>, which would read as a regex)
+        /// that fills nothing in (<c>/people/$id</c> is worked out).
+        /// </summary>
+        internal static bool LooksRaw(string text, string kind) =>
+            kind == "handle" && RawHandle.IsMatch(text.Trim()) || kind == "slash" && text.TrimStart().StartsWith('/') && !Lexer.SlashPathFillsIn(text);
 
         /// <summary>True if <paramref name="node"/> is only bare words, numbers and the operators between them (<c>my-post</c>, <c>H4cmW12in</c>, <c>Europe/London</c>).</summary>
         internal static bool IsRawWord(ExprNode node, string kind, Scope scope, Module module)
@@ -46,10 +51,16 @@ namespace KScript.Runtime
                     return !(module != null && module.Aliases.ContainsKey(id.Name));
                 case CommandCallNode { ArgumentList: null }:
                     return kind == "handle";
-                case MemberNode { NullSafe: false } member when kind == "word":
+                case LiteralNode { Kind: LiteralKind.SlashPath or LiteralKind.Regex, Template: null } when kind == "slash":
+                    // /docs/start, and /blog/ (which reads as a regex)
+                    return true;
+                case MemberNode { NullSafe: false } member when kind is "word" or "slash":
                     // example.com, api.example.co.uk
                     return IsRawPart(member.Target, kind, scope, module);
-                case BinaryNode bin when bin.Operator == "-" || bin.Operator == "." || bin.Operator == "+" || bin.Operator == "/":
+                case BinaryNode { Operator: "." } dots when kind != "handle":
+                    // 1.4.2 and 10.0.0.1: numbers joined by dots are never arithmetic.
+                    return IsRawPart(dots.Left, kind, scope, module) && IsRawPart(dots.Right, kind, scope, module);
+                case BinaryNode bin when bin.Operator == "-" || bin.Operator == "+" || bin.Operator == "/":
                     return IsRawWord(bin.Left, kind, scope, module) && IsRawPart(bin.Right, kind, scope, module)
                         || IsRawPart(bin.Left, kind, scope, module) && IsRawWord(bin.Right, kind, scope, module);
                 default:
@@ -187,7 +198,7 @@ namespace KScript.Runtime
                         LiteralKind.Number => double.Parse(lit.Value, NumberStyles.Float, CultureInfo.InvariantCulture),
                         LiteralKind.String => lit.Template == null ? lit.Value : FillIn(lit.Template, scope, ctx),
                         LiteralKind.Bool => lit.Value == "true",
-                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Duration => TypedLiteral(lit, ctx),
+                        LiteralKind.Regex or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.SlashPath or LiteralKind.Duration => TypedLiteral(lit, scope, ctx),
                         _ => null,
                     };
 
@@ -449,6 +460,12 @@ namespace KScript.Runtime
                     }
                     return left ?? Evaluate(bin.Right, scope, ctx);
                 }
+                case ".":
+                {
+                    string written = ctx.Origin != null && bin.Span.Start >= 0 && bin.Span.End <= ctx.Origin.Value.Length
+                        ? ctx.Origin.Value.Substring(bin.Span.Start, bin.Span.Length) : "It";
+                    throw Fail(bin, ctx, $"{written} isn't a number. Without quotes it works only where the type reads text, such as an ip or a semver; anywhere else, put it in quotes: '{written}'.", "Syntax");
+                }
             }
 
             if (bin.Operator is "==" or "!=" or "===" or "!==")
@@ -501,6 +518,12 @@ namespace KScript.Runtime
                         var merged = new Dictionary<string, object>(ma);
                         foreach (var kv in mb) merged[kv.Key] = kv.Value;
                         return merged;
+                    }
+                    // /docs + 'guides/start' adds names, the same as ->join().
+                    if (a is NativeText { TypeName: "slash_path" } path && b != null && !(b is List<object> || b is Dictionary<string, object>))
+                    {
+                        if (SemanticTypes.TryConvert("slash_path", path.Text + "/" + Values.ToStr(b), out object joined, out string why)) return joined;
+                        throw Fail(node, ctx, $"{path.Text} + {Values.Describe(b)} isn't a slash_path: {why}.", "Value");
                     }
                     if (a is string || b is string) return Values.ToStr(a) + Values.ToStr(b);
                     if (a is DateTime date && b is double days) return date.AddDays(days);
@@ -957,12 +980,13 @@ namespace KScript.Runtime
             return method.Handler(target, call);
         }
 
-        /// <summary>A regex, email or UUID written without quotes. One that isn't valid fails at the literal.</summary>
-        private object TypedLiteral(LiteralNode lit, EvalContext ctx)
+        /// <summary>A regex, email, UUID, URL, slash path or duration written without quotes. One that isn't valid fails at the literal.</summary>
+        private object TypedLiteral(LiteralNode lit, Scope scope, EvalContext ctx)
         {
-            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, LiteralKind.Url => "url", LiteralKind.Duration => Duration.TypeName, _ => SemanticTypes.Uuid };
-            if (SemanticTypes.TryConvert(type, lit.Value, out object value, out string reason)) return value;
-            throw Fail(lit, ctx, $"{lit.Value} isn't {KScript.Metadata.NativeTypes.Get(type).WithArticle}: {reason}.", "Syntax");
+            string type = lit.Kind switch { LiteralKind.Regex => SemanticTypes.Regex, LiteralKind.Email => SemanticTypes.Email, LiteralKind.Url => "url", LiteralKind.SlashPath => "slash_path", LiteralKind.Duration => Duration.TypeName, _ => SemanticTypes.Uuid };
+            string text = lit.Template != null ? FillIn(lit.Template, scope, ctx) : lit.Value;
+            if (SemanticTypes.TryConvert(type, text, out object value, out string reason)) return value;
+            throw Fail(lit, ctx, $"{text} isn't {KScript.Metadata.NativeTypes.Get(type).WithArticle}: {reason}.", "Syntax");
         }
 
         /// <summary>Calls <c>value->name(args)</c>.</summary>

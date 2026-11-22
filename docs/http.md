@@ -32,12 +32,12 @@ import "middleware/security.kscript"
 Routes {
   Middleware(use: secure_headers)
 
-  Get(path: "/", view: "home", name: "home")
-  Get(path: "/people", to: @people.list, name: "people.list")
-  Get(path: "/people/{id}", to: @people.page, name: "people.page", where: "id: int")
-  Get(path: "/team", redirect: "/people", status: 301)
+  Get(path: /, view: "home", name: "home")
+  Get(path: /people, to: @people.list, name: "people.list")
+  Get(path: /people/{id}, to: @people.page, name: "people.page", where: "id: int")
+  Get(path: /team, redirect: "/people", status: 301)
 
-  Get(path: "/ping") {
+  Get(path: /ping) {
     return 'pong'
   }
 }
@@ -55,7 +55,7 @@ A route has a `path` and one way to answer:
 
 | Attribute | Use |
 | --- | --- |
-| `path` | `/people/{id}`. `{name?}` is optional and `{name*}` takes the rest of the path (`/files/{path*}`). |
+| `path` | `/people/{id}`. `{name?}` is optional and `{name*}` takes the rest of the path (`/files/{path*}`). A path is a [slash path](types.md#slash-paths), so it needs no quotes: `path: /people/{id}` and `path: "/people/{id}"` are the same. Either way `{id}` is a route parameter, never filled in from a variable. |
 | `to` | The controller: a function of an imported script (`@people.show`) or an `fn` in the route file (`@show`). In XML: `to="people.show"`. |
 | `view` | Render this view with the path parameters as its variables. |
 | `redirect`, `status` | Redirect, with 302 by default. |
@@ -97,7 +97,7 @@ fn store(json: NewPerson) {
 A path parameter typed as a [KScript.Data](data.md) model is the record with that key, so the controller gets the post itself. A key with no record, or one that isn't a key, gets `404`, and OpenAPI shows the key's type:
 
 ```kscript
-// routes: Get(path: "/posts/{post}", to: @posts.show)
+// routes: Get(path: /posts/{post}, to: @posts.show)
 fn show(post: Post) => $post
 ```
 
@@ -148,7 +148,7 @@ What a controller returns becomes the response:
 | Text | HTML. |
 | `@view('people/show', person: $p)` | The view rendered with its layout. |
 | `@response(body, status: 201, type: 'text/csv', headers: { … })` | Your own status, type and headers. A map or list body is JSON. |
-| `@redirect('/people')`, `@redirect(to: '/new', status: 301)` | A redirect. |
+| `@redirect(/people)`, `@redirect(to: '/new', status: 301)` | A redirect. |
 | nothing (`null`) | `204 No Content`. |
 
 `@abort(404)` or `@abort(403, message: 'Admins only')` stops the request with that status, from anywhere: a controller, a function it calls, or middleware. `try` doesn't catch it. An error in a controller answers `500` with the file and line, and the server log shows it too.
@@ -181,7 +181,7 @@ Controllers can read and write files with KScript.IO, but only inside the site f
 
 `@view('people/show', person: $p)` renders `views/people/show.html` (or `.md`). If that file doesn't exist, it renders `people/show.html` in the site folder. Leaving off the extension is fine. The named values become the view's variables, and `$request` is there too. Views are normal pages, so layouts, components, `<include>` and `<live>` all work in them.
 
-The `views` folder is never served as pages, because a view needs its controller's data. The editor knows that views get their variables from a controller, so it doesn't flag them as undefined.
+The `views` folder is never served as pages, because a view needs its controller's data. The editor knows that views get their variables from a controller, so it doesn't flag them as undefined. It also reads every `@view('people/show', ...)` in the project's scripts, so in `views/people/show.html` typing `$` offers `$person`, `$person.` offers the fields the controller gave it, and a loop over a list it was given knows the fields of each item. Hovering `$person` says which controller passes it, and **Go to Definition** opens that call. A view that names a package with `<import package="KScript.Auth" />` gets its variables too, so `$session->` lists the session's methods.
 
 ## Middleware
 
@@ -253,8 +253,8 @@ import KScript.Http
 import "controllers/people.kscript" as people
 
 Routes {
-  Get(path: "/people", to: @people.index, etag: true, cache: 60)
-  Get(path: "/people/{id}", to: @people.show, etag: true, cache: "private, max-age=0, must-revalidate")
+  Get(path: /people, to: @people.index, etag: true, cache: 60)
+  Get(path: /people/{id}, to: @people.show, etag: true, cache: "private, max-age=0, must-revalidate")
 }
 ```
 
@@ -300,9 +300,9 @@ Put `etag` in `http.middleware` (or in a group) to tag every route at once:
 Functions the controller doesn't have get no route. `only: [index, show]` and `except: [destroy]` pick actions. `name` changes the name prefix, and `param` changes `{id}`. Put the write actions in an auth group:
 
 ```
-Resource(path: "/people", to: people, only: [index, show])
+Resource(path: /people, to: people, only: [index, show])
 Group(middleware: auth) {
-  Resource(path: "/people", to: people, only: [store, update, destroy])
+  Resource(path: /people, to: people, only: [store, update, destroy])
 }
 ```
 
@@ -328,8 +328,8 @@ Group(middleware: auth) {
 ```kscript
 import KScript.Net
 
-notes = @api('/api/notes')->check()->json()
-added = @api('/api/notes', options: { method: 'POST', body: { title: 'Ship it' } })
+notes = @api(/api/notes)->check()->json()
+added = @api(/api/notes, options: { method: 'POST', body: { title: 'Ship it' } })
 echo $added.status   // 201
 ```
 

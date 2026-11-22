@@ -148,6 +148,12 @@ namespace KScript.Language.Tests
                 Assert.Contains(routes, r => r.Method == "POST" && r.Path == "/admin/users");
                 Assert.Contains(routes, r => r.Method == "GET" && r.Path == "/api/health");
                 Assert.Empty(service.ProjectRoutes(Path.GetTempPath()));
+
+                // slash_path suggests them: typing / where a path is expected lists the project's routes.
+                (string text, int offset) = TestHelpers.WithCaret("p: slash_path = /lo‸\necho $p");
+                CompletionItem login = Assert.Single(service.GetCompletions(service.Analyze(text, Path.Combine(root, "main.kscript")), offset), i => i.Label == "/login");
+                Assert.Equal("GET → @accounts.show_login", login.Detail);
+                Assert.Equal("/lo", text.Substring(login.ReplaceSpan.Start, login.ReplaceSpan.Length));
             }
             finally
             {

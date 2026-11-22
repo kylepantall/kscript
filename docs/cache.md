@@ -56,8 +56,8 @@ import KScript.Http
 import "controllers/people.kscript" as people
 
 Routes {
-  Get(path: "/people", to: @people.index, etag: true, cache: 60)
-  Get(path: "/stats", to: @people.stats, middleware: "cache_response:5m")
+  Get(path: /people, to: @people.index, etag: true, cache: 60)
+  Get(path: /stats, to: @people.stats, middleware: "cache_response:5m")
 }
 ```
 

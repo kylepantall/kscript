@@ -70,11 +70,11 @@ kscript test       # 12 tests, against a database in memory
 | `middleware/request-id.kscript` | The app's own middleware: every response gets an `X-Request-Id` header. |
 | `lib/cache.kscript` | The app's [cache](cache.md), whose store and time limit come from `config/config.yaml`. |
 | `config/config.yaml`, `config/config.test.yaml` | Settings: the database (`${DATABASE_URL:-sqlite:data/app.sqlite}`) and cache. `kscript test` lays `config.test.yaml` over them (see `test.env` below), so tests get an empty database in memory. |
-| `tests/` | Tests that call the API the way a client would, with `@api('/api/notes')` (see [Calling your own API](http.md#calling-your-own-api)). |
+| `tests/` | Tests that call the API the way a client would, with `@api(/api/notes)` (see [Calling your own API](http.md#calling-your-own-api)). |
 
 ### A web app with its API: --template fullstack
 
-`kscript make project notes --template fullstack` makes a website whose pages get their data from the app's own JSON API. `notes.html` is a [live](web.md#reactive-pages-with-live-no-javascript) page that lists, adds, ticks and deletes notes through `lib/notes-client.kscript`, which calls `@api('/api/notes')`. Pages and other clients (a phone app, a script) share one set of rules: `routes/api.kscript`, `controllers/notes.kscript` and `models/note.kscript`, as in the api template. The tests check the API and the client.
+`kscript make project notes --template fullstack` makes a website whose pages get their data from the app's own JSON API. `notes.html` is a [live](web.md#reactive-pages-with-live-no-javascript) page that lists, adds, ticks and deletes notes through `lib/notes-client.kscript`, which calls `@api(/api/notes)`. Pages and other clients (a phone app, a script) share one set of rules: `routes/api.kscript`, `controllers/notes.kscript` and `models/note.kscript`, as in the api template. The tests check the API and the client.
 
 ### Database, sign-in, cache and Docker
 
@@ -219,12 +219,12 @@ kscript make project my-app --template ../starters/api   # any folder
 `kscript make <type> <name>` creates a file where the project keeps that kind of file, makes any folder it needs, and writes scripts in the project's format. [kscript make commands](/cli/make) lists every type with its options and examples, and so does `kscript make --list`; `kscript make <type> --help` shows one.
 
 ```sh
-kscript make route users                              # adds Get(path: "/users", to: @users.index) to routes/web.kscript,
+kscript make route users                              # adds Get(path: /users, to: @users.index) to routes/web.kscript,
                                                       # and makes controllers/users.kscript with index()
 kscript make route "users/{id}" --where "id: int"     # Get(…, to: @users.show), and adds show(id) to the controller
 kscript make route users --method post --api          # Post(…, to: @users.store) in routes/api.kscript, served under /api
-kscript make route people --resource --api            # Resource(path: "/people", to: people), with all five functions
-kscript make route about --view about                 # Get(path: "/about", view: "about"), and views/about.html
+kscript make route people --resource --api            # Resource(path: /people, to: people), with all five functions
+kscript make route about --view about                 # Get(path: /about, view: "about"), and views/about.html
 kscript make controller people --resource             # controllers/people.kscript: index, show, store, update, destroy
 kscript make request NewPerson --fields "name: string, age?: int"   # requests/new-person.kscript, a typed body
 kscript make middleware secure-headers                # middleware/secure-headers.kscript

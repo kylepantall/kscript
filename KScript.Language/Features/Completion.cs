@@ -72,6 +72,10 @@ namespace KScript.Language.Features
             {
                 return new List<CompletionItem>();
             }
+            if (DateFormatCompletions(analysis, offset) is List<CompletionItem> dateFormat)
+            {
+                return dateFormat;
+            }
             if (AliasMemberCompletions(analysis, offset) is List<CompletionItem> members)
             {
                 return members;

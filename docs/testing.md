@@ -216,15 +216,15 @@ Tests that use [KScript.Data](data.md#testing-with-a-database) get a database of
 
 ### Testing an API
 
-`@api('/api/notes')` sends a request to the project's own routes without starting a server (see [Calling your own API](http.md#calling-your-own-api)), so a test checks what a client would get:
+`@api(/api/notes)` sends a request to the project's own routes without starting a server (see [Calling your own API](http.md#calling-your-own-api)), so a test checks what a client would get:
 
 ```kscript
 import KScript.Net
 
 test(name: "a note is saved") {
-  added = @api('/api/notes', options: { method: 'POST', body: { title: 'Ship it' } })
+  added = @api(/api/notes, options: { method: 'POST', body: { title: 'Ship it' } })
   expect(value: $added.status, equals: 201)
-  expect(value: @api('/api/notes/' + $added->json().id)->json().title, equals: 'Ship it')
+  expect(value: @api(/api/notes/$added->json().id)->json().title, equals: 'Ship it')
 }
 ```
 

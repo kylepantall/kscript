@@ -85,6 +85,7 @@ namespace KScript.Language.Analysis
 
             ResolvePackages(root);
             DeclareBuiltIns(root);
+            DeclareViewInputs(root);
             AnalyzeFrontMatter(root);
             HoistFunctions(root);
             HoistProjectNatives(root);
@@ -124,7 +125,7 @@ namespace KScript.Language.Analysis
                 {
                     "request" => Kind != DocumentKind.Script,
                     "event" => false, // declared inside <on>
-                    _ => Kind == DocumentKind.Script && (package == null || importedPackages.Contains(package)),
+                    _ => Kind == DocumentKind.Script ? package == null || importedPackages.Contains(package) : package != null && pageImports.Contains(package),
                 };
                 if (applies)
                 {
@@ -132,6 +133,35 @@ namespace KScript.Language.Analysis
                 }
             }
         }
+
+        /// <summary>
+        /// A view gets its variables from the scripts that render it: <c>@view('auth/account', data: { user: @user() })</c>
+        /// declares $data in views/auth/account.html, typed from the call, so its fields are offered and checked.
+        /// </summary>
+        private void DeclareViewInputs(Scope root)
+        {
+            if (Kind == DocumentKind.Script || result.Path == null)
+            {
+                return;
+            }
+            foreach (KeyValuePair<string, List<ViewInput>> given in ViewInputs.Find(result.Path, files, catalog))
+            {
+                ViewInput first = given.Value[0];
+                string from = string.Join(", ", given.Value.Select(i => i.Function != null ? i.Function + "()" : null).Where(f => f != null).Distinct());
+                Symbol symbol = new Symbol
+                {
+                    Name = given.Key,
+                    Kind = SymbolKind.BuiltIn,
+                    Shape = Unify(given.Value.Select(i => i.Shape)),
+                    Description = $"Given to this view by @view in {RelativeToHere(first.Path)}" + (from.Length > 0 ? $" ({from})." : "."),
+                };
+                result.Symbols.Add(symbol);
+                result.ExternalDeclarations[symbol] = new ExternalLocation(first.Path, first.Start, first.End);
+                root.Declare(symbol, 0);
+            }
+        }
+
+        private string RelativeToHere(string path) => System.IO.Path.GetRelativePath(SiteRoot(), path).Replace('\\', '/');
 
         private static readonly (string Name, string Type, string Description)[] RequestVariables =
         {

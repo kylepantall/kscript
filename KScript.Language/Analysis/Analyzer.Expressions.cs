@@ -179,6 +179,13 @@ namespace KScript.Language.Analysis
                     pendingBare.Add(arg);
                     continue;
                 }
+                if (arg.Value is BinaryNode && KScript.Runtime.Interpreter.IsRawWord(arg.Value, "word", null, null)
+                    && arg.Value.DescendantsAndSelf().OfType<IdentifierNode>().All(i => scope.Lookup(i.Name, region.Source.ToSource(i.Span.Start)) == null))
+                {
+                    // dd-MM-yyyy, light-blue, 1.4.2: words for a parameter whose type reads text, or else names to report.
+                    pendingRaw.Add(arg);
+                    continue;
+                }
                 if ((arg.Value as MemberNode)?.DottedName != null)
                 {
                     // posts.tags: names for a method that reads them (->with), otherwise checked as an expression.

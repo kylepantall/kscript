@@ -168,6 +168,7 @@ namespace KScript.Runtime
                 Add("mac", new NativeParser(Mac));
                 Add("port", new NativeParser(Port) { TakesNumbers = true });
                 Add("slug", new NativeParser(Slug));
+                Add("slash_path", new NativeParser(SlashPath) { Suggest = RoutePaths });
                 Add("semver", new NativeParser(Semver));
                 Add("mime", new NativeParser(Mime) { Suggest = NativeParser.Fixed(() => CommonMimeTypes) });
                 Add("hex", new NativeParser(Hex, HexOptions));
@@ -180,11 +181,18 @@ namespace KScript.Runtime
                 Add("locale", new NativeParser(Locale) { Suggest = NativeParser.Fixed(LocaleNames) });
                 Add("timezone", new NativeParser(TimeZone) { Suggest = NativeParser.Fixed(TimeZoneNames) });
                 Add("duration", new NativeParser(Duration) { TakesNumbers = true, Suggest = NativeParser.Fixed(() => CommonDurations) });
+                Add("date_format", new NativeParser(DateFormat));
                 Add("cron", new NativeParser(Cron) { Suggest = NativeParser.Fixed(() => CronMacros.Keys) });
                 Add("color", new NativeParser(Color) { Suggest = NativeParser.Fixed(() => ColorNames.Keys) });
                 Add("iban", new NativeParser(Iban));
                 Add("card", new NativeParser(Card));
             }
+
+            /// <summary>A slash path suggests the paths of the project's routes, each once, with what answers it.</summary>
+            private static IEnumerable<NativeValueSuggestion> RoutePaths(NativeValueContext context) =>
+                context.Routes().GroupBy(r => r.Path, StringComparer.Ordinal)
+                    .Select(g => new NativeValueSuggestion(g.Key, string.Join(", ", g.Select(r => r.Method).Distinct())
+                        + (g.First().Handler is string handler && handler.Length > 0 ? " → " + handler : string.Empty)));
 
             private static readonly string[] CommonDurations = { "30s", "1m", "5m", "15m", "30m", "1h", "1h30m", "12h", "1d", "7d", "1w", "30d" };
 
@@ -405,6 +413,144 @@ namespace KScript.Runtime
                 if (s.Contains("--")) return No("it can't have two dashes in a row");
                 return Ok(new NativeText("slug", s, new Dictionary<string, object> { ["words"] = s.Split('-').Cast<object>().ToList() }));
             }
+
+            /// <summary>
+            /// Names joined by /: /docs/getting-started or /My Apps/Notes. It always starts with /, so home is /home and '' is /.
+            /// Spaces around each name and runs of spaces inside one are tidied, empty parts (//) and . are dropped,
+            /// .. goes up one (never above /), and a trailing / is dropped. Case is kept.
+            /// </summary>
+            internal static (object, string) SlashPath(string s)
+            {
+                s = s.Trim();
+                if (s.Contains('\\')) return No("names are joined by /, not \\");
+                if (s.Any(char.IsControl)) return No("it has a control character, such as a new line or a tab, in it");
+                var parts = new List<string>();
+                foreach (string raw in s.Split('/'))
+                {
+                    string part = string.Join(' ', raw.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+                    if (part.Length == 0 || part == ".") continue;
+                    if (part == "..")
+                    {
+                        if (parts.Count == 0) return No("its .. goes above /");
+                        parts.RemoveAt(parts.Count - 1);
+                        continue;
+                    }
+                    parts.Add(part);
+                }
+                return Ok(SlashPathValue(parts));
+            }
+
+            internal static NativeText SlashPathValue(List<string> parts) =>
+                new NativeText("slash_path", "/" + string.Join("/", parts), new Dictionary<string, object> { ["segments"] = parts.Cast<object>().ToList() });
+
+            /// <summary>What each letter of a date format means, and the longest run of it that means something.</summary>
+            internal static readonly Dictionary<char, (int Max, string Meaning)> DateLetters = new Dictionary<char, (int, string)>
+            {
+                ['d'] = (4, "the day: d is 7, dd is 07, ddd is Sat, dddd is Saturday"),
+                ['M'] = (4, "the month: M is 3, MM is 03, MMM is Mar, MMMM is March"),
+                ['y'] = (5, "the year: yy is 26, yyyy is 2026"),
+                ['h'] = (2, "the hour on a 12-hour clock: h is 2, hh is 02"),
+                ['H'] = (2, "the hour on a 24-hour clock: H is 14, HH is 14"),
+                ['m'] = (2, "the minute: m is 5, mm is 05"),
+                ['s'] = (2, "the second: s is 9, ss is 09"),
+                ['f'] = (7, "fractions of a second: fff is milliseconds"),
+                ['F'] = (7, "fractions of a second, without trailing zeros"),
+                ['t'] = (2, "AM or PM: t is P, tt is PM"),
+                ['z'] = (3, "the offset from UTC: z is +1, zz is +01, zzz is +01:00"),
+                ['K'] = (1, "the time zone: Z for UTC or an offset such as +01:00"),
+                ['g'] = (2, "the era: A.D."),
+            };
+
+            /// <summary>Letters people reach for from other languages, and what to write instead.</summary>
+            private static readonly Dictionary<char, string> WrongDateLetters = new Dictionary<char, string>
+            {
+                ['Y'] = "years are y (yyyy)",
+                ['D'] = "days are d (dd)",
+                ['S'] = "seconds are s (ss) and fractions are f (fff)",
+                ['a'] = "AM/PM is tt",
+                ['A'] = "AM/PM is tt",
+                ['E'] = "weekday names are ddd or dddd",
+                ['n'] = "minutes are m (mm)",
+                ['i'] = "minutes are m (mm)",
+                ['G'] = "the hour is H (HH) or h (hh)",
+                ['k'] = "the hour is H (HH) or h (hh)",
+                ['u'] = "weekday names are ddd or dddd",
+            };
+
+            /// <summary>The standard one-letter .NET formats a date_format also takes: o is round-trip ISO 8601, and so on.</summary>
+            internal static readonly HashSet<char> StandardDateFormats = new HashSet<char> { 'd', 'D', 'f', 'F', 'g', 'G', 'm', 'M', 'o', 'O', 'r', 'R', 's', 't', 'T', 'u', 'U', 'y', 'Y' };
+
+            /// <summary>
+            /// A .NET date format such as dd-MM-yyyy, d MMMM yyyy or HH:mm, or a standard one-letter format such as o.
+            /// Every letter must mean something (YYYY and DD are the usual slips), runs can't be longer than they mean
+            /// anything for, and text goes in quotes ('at' or "at") or after \. T and Z stand for themselves, for ISO
+            /// 8601 (yyyy-MM-ddTHH:mm:ssZ).
+            /// </summary>
+            internal static (object, string) DateFormat(string s)
+            {
+                if (s.Trim().Length == 0) return No("it is empty: try dd-MM-yyyy");
+                if (s.Length == 1)
+                {
+                    if (!StandardDateFormats.Contains(s[0])) return No($"{s} isn't a date letter or a standard format such as o");
+                    return Ok(new NativeText("date_format", s, new Dictionary<string, object>
+                    {
+                        ["tokens"] = new List<object> { s }, ["has_date"] = s[0] is not ('t' or 'T'), ["has_time"] = s[0] is not ('d' or 'D' or 'm' or 'M' or 'y' or 'Y'), ["standard"] = true,
+                    }));
+                }
+                var tokens = new List<object>();
+                bool date = false, time = false;
+                for (int i = 0; i < s.Length;)
+                {
+                    char c = s[i];
+                    if (c is '\'' or '"')
+                    {
+                        int close = s.IndexOf(c, i + 1);
+                        if (close < 0) return No($"its {c} isn't closed");
+                        tokens.Add(s.Substring(i, close + 1 - i));
+                        i = close + 1;
+                        continue;
+                    }
+                    if (c == '\\')
+                    {
+                        if (i + 1 >= s.Length) return No("it ends with \\");
+                        tokens.Add(s.Substring(i, 2));
+                        i += 2;
+                        continue;
+                    }
+                    if (c == '%' && i + 1 < s.Length && DateLetters.ContainsKey(s[i + 1]))
+                    {
+                        i++;
+                        continue;
+                    }
+                    if (DateLetters.TryGetValue(c, out var letter))
+                    {
+                        int run = 1;
+                        while (i + run < s.Length && s[i + run] == c) run++;
+                        if (run > letter.Max) return No($"{new string(c, run)} is longer than {c} goes; use at most {new string(c, letter.Max)}");
+                        tokens.Add(new string(c, run));
+                        if (c is 'd' or 'M' or 'y' or 'g') date = true;
+                        else if (c is 'h' or 'H' or 'm' or 's' or 'f' or 'F' or 't') time = true;
+                        i += run;
+                        continue;
+                    }
+                    if (char.IsAsciiLetter(c) && c is not ('T' or 'Z'))
+                    {
+                        string hint = WrongDateLetters.TryGetValue(c, out string why) ? why : $"put text in quotes: '{c}'";
+                        return No($"{c} isn't a date letter: {hint}");
+                    }
+                    if (tokens.Count > 0 && tokens[^1] is string last && last.Length > 0 && !DateLetters.ContainsKey(last[0]) && last[0] is not ('\'' or '"' or '\\'))
+                        tokens[^1] = last + c;
+                    else
+                        tokens.Add(c.ToString());
+                    i++;
+                }
+                if (!date && !time && !tokens.Any(t => t is string text && text.Length > 0 && DateLetters.ContainsKey(text[0])))
+                    return No("it has no date or time letters in it: try dd-MM-yyyy");
+                return Ok(new NativeText("date_format", s, new Dictionary<string, object> { ["tokens"] = tokens, ["has_date"] = date, ["has_time"] = time, ["standard"] = false }));
+            }
+
+            /// <summary>The format .NET is given: a one-letter custom format needs % in front, so d is the day rather than the short date.</summary>
+            internal static string DotNetDateFormat(NativeText format) => (bool)format.Part("standard") ? format.Text : format.Text.Length == 1 ? "%" + format.Text : format.Text;
 
             /// <summary>Text made into a slug: 'Hello, World!' becomes hello-world.</summary>
             internal static string Slugify(string s)
@@ -1035,6 +1181,15 @@ namespace KScript.Runtime
 
         // Methods use these.
         internal static string Slugify(string s) => BuiltIn.Slugify(s);
+
+        /// <summary>The format string .NET reads for a date_format.</summary>
+        internal static string DotNetDateFormat(NativeText format) => BuiltIn.DotNetDateFormat(format);
+
+        /// <summary>What each date format letter means, for the editor and the docs.</summary>
+        public static IReadOnlyDictionary<char, (int Max, string Meaning)> DateLetters => BuiltIn.DateLetters;
+
+        /// <summary>A slash_path from its names.</summary>
+        internal static NativeText SlashPath(List<string> parts) => BuiltIn.SlashPathValue(parts);
         internal static bool InBlock(NativeText cidr, IPAddress ip) => BuiltIn.InBlock(cidr, ip);
         internal static NativeText IpValue(IPAddress ip) => BuiltIn.IpValue(ip);
         internal static int CompareSemver(NativeText a, NativeText b) => BuiltIn.CompareSemver(a, b);

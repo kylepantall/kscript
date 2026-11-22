@@ -503,6 +503,9 @@ namespace KScript.Runtime
                 Dictionary<string, object> map => map.Select(kv => (names.Length > 1 ? kv.Value : new Dictionary<string, object> { ["key"] = kv.Key, ["value"] = kv.Value }, (object)kv.Key)).ToList(),
                 double n => Enumerable.Range(0, Math.Max(0, (int)n)).Select(x => ((object)(double)x, (object)null)).ToList(),
                 string s => s.Select(ch => ((object)ch.ToString(), (object)null)).ToList(),
+                // for part in /home/joan/downloads: /home, /joan, /downloads.
+                NativeText { TypeName: "slash_path" } path => ((List<object>)path.Part("segments"))
+                    .Select(name => ((object)NativeParsers.SlashPath(new List<string> { (string)name }), (object)null)).ToList(),
                 _ => throw run.Error($"<for> can't loop over {Values.Describe(source)}.", "in", "Type"),
             };
 
