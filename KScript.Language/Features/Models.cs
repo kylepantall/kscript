@@ -76,6 +76,8 @@ namespace KScript.Language.Features
         /// <summary>The parameters that are deprecated, by name.</summary>
         internal IReadOnlyCollection<string> DeprecatedParameters { get; init; } = Array.Empty<string>();
 
+        internal IReadOnlyCollection<string> ModelParameters { get; init; } = Array.Empty<string>();
+
         /// <summary>Per parameter: the enum values its items take when it is a list of an enum (<c>sizes: Size[]</c>), or null.</summary>
         internal IReadOnlyList<IReadOnlyList<string>> ItemValues { get; init; }
     }

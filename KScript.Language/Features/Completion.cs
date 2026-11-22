@@ -832,23 +832,26 @@ namespace KScript.Language.Features
                 return MethodCompletions(analysis, region, p - 2, replace, pipe: true);
             }
 
-            List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false);
-            start.InsertRange(0, ParameterNameCompletions(analysis, region, wordStart, replace));
-            start.InsertRange(0, NamedValueCompletions(analysis, region, wordStart, replace));
+            List<CompletionItem> parameterNames = ParameterNameCompletions(analysis, region, wordStart, replace, out bool positionalModel);
+            List<CompletionItem> namedValues = NamedValueCompletions(analysis, region, wordStart, replace, out bool namedModel);
+            bool preferModels = positionalModel || namedModel;
+            List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false, preferModels: preferModels);
+            start.InsertRange(0, parameterNames);
+            start.InsertRange(0, namedValues);
             start.InsertRange(0, DeclaredTypeValueCompletions(region, wordStart, replace));
             start.InsertRange(0, WordArgumentCompletions(analysis, region, wordStart, replace));
             start.InsertRange(0, ListItemCompletions(analysis, region, wordStart, replace));
-            return start;
+            return preferModels ? start.OrderBy(i => i.SortText ?? i.Label, StringComparer.Ordinal).ToList() : start;
         }
 
-        private List<CompletionItem> ExpressionStartCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool template)
+        private List<CompletionItem> ExpressionStartCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool template, bool preferModels = false)
         {
             List<CompletionItem> items = new List<CompletionItem>();
             if (template)
             {
                 return items;
             }
-            items.AddRange(VariableCompletions(analysis, offset, replace, withSigil: true));
+            items.AddRange(VariableCompletions(analysis, offset, replace, withSigil: true, preferModels: preferModels));
             items.AddRange(CommandCompletions(analysis, replace, withSigil: true));
             bool codeFile = analysis.Markup.Syntax == KScript.Syntax.Markup.SourceSyntax.Code;
             items.AddRange(ExpressionKeywords.Where(k => !(codeFile && ComparisonWords.Contains(k.Word))).Select(k => new CompletionItem
@@ -864,27 +867,39 @@ namespace KScript.Language.Features
             return items;
         }
 
-        private List<CompletionItem> VariableCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool withSigil)
+        private List<CompletionItem> VariableCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool withSigil, bool preferModels = false)
         {
             Scope scope = analysis.ScopeAt(offset);
             // The script's own variables come first, the one declared nearest above the cursor at the top; the
             // variables KScript provides ($args, $env...) follow by name.
-            List<Symbol> visible = scope.VisibleAt(offset).Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import).ToList();
+            List<Symbol> visible = scope.VisibleAt(offset)
+                .Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import
+                    && (!s.IsTypeDeclaration || (withSigil && scope.Lookup(s.Name, offset) == s))).ToList();
+            if (preferModels)
+            {
+                visible.AddRange(scope.VisibleAt(offset)
+                    .Where(s => s.Kind == SymbolKind.Import && scope.Lookup(s.Name, offset) == s)
+                    .SelectMany(s => s.Members.Values).Where(m => m.IsTypeDeclaration && m.Shape.Kind == KType.Model));
+            }
             Dictionary<Symbol, int> nearest = visible.Where(s => s.Kind != SymbolKind.BuiltIn && s.Kind != SymbolKind.FrontMatter)
                 .OrderByDescending(s => s.DeclarationSpan.Start).Select((s, i) => (s, i)).ToDictionary(p => p.s, p => p.i);
-            return visible
-                .Select(s => new CompletionItem
+            return visible.Select(s =>
+            {
+                bool modelValue = preferModels && s.IsTypeDeclaration && s.Shape.Kind == KType.Model;
+                string name = s.Alias == null ? s.Name : s.Alias.Name + "." + s.Name;
+                return new CompletionItem
                 {
-                    Label = (withSigil ? "$" : string.Empty) + s.Name,
-                    Kind = s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : s.IsConst ? CompletionKind.Constant : CompletionKind.Variable,
+                    Label = withSigil && !s.IsTypeDeclaration ? "$" + name : name,
+                    Kind = modelValue ? CompletionKind.Value : s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : s.IsConst ? CompletionKind.Constant : CompletionKind.Variable,
                     Detail = s.Shape.Display(),
                     Documentation = SymbolMarkdown(analysis, s),
                     ReplaceSpan = replace,
                     // The span replaced is the bare word (the $ isn't typed yet, or sits before it), so filter on the bare name.
-                    FilterText = s.Name,
-                    SortText = nearest.TryGetValue(s, out int rank) ? "0" + rank.ToString("D4") + s.Name : "1" + s.Name,
-                })
-                .ToList();
+                    FilterText = name,
+                    SortText = modelValue ? "!" + name
+                        : nearest.TryGetValue(s, out int rank) ? "0" + rank.ToString("D4") + s.Name : "1" + s.Name,
+                };
+            }).ToList();
         }
 
         private List<CompletionItem> CommandCompletions(DocumentAnalysis analysis, TextSpan replace, bool withSigil)

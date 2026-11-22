@@ -37,6 +37,7 @@ namespace KScript.Language.Features
                         Documentation = c.Description,
                         Parameters = s.Parameters.Select(p => (p.Label, WithAccepts(p.Deprecated != null ? DeprecationLine(p.Deprecated, p.Name) + p.Description : p.Description, p.Values.Count > 0 ? null : p.Type))).ToList(),
                         Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : NativeValues(analysis, p.Type), p.IsFlag)).ToList(),
+                        ModelParameters = s.Parameters.Where(p => p.AcceptsModel).Select(p => p.Name).ToList(),
                         DeprecatedParameters = s.Parameters.Where(p => p.Deprecated != null).Select(p => p.Name).ToList(),
                     });
                 }
@@ -187,8 +188,9 @@ namespace KScript.Language.Features
         /// At the start of an argument (after '(' or ','), offers <c>name:</c> for each parameter of the call that
         /// isn't filled yet.
         /// </summary>
-        private List<CompletionItem> ParameterNameCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)
+        private List<CompletionItem> ParameterNameCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace, out bool acceptsModel)
         {
+            acceptsModel = false;
             string text = region.Source.Value;
             int p = wordStart;
             while (p > 0 && char.IsWhiteSpace(text[p - 1]))
@@ -220,6 +222,7 @@ namespace KScript.Language.Features
             foreach (SignatureInfo signature in signatures.Where(sig => sig.Details != null && !afterNamed && positional < sig.Details.Count))
             {
                 (string name, IReadOnlyList<string> values, _) = signature.Details[positional];
+                acceptsModel |= signature.ModelParameters.Contains(name);
                 foreach (string value in values ?? Array.Empty<string>())
                 {
                     if (seen.Add("=" + value))
@@ -285,7 +288,7 @@ namespace KScript.Language.Features
                         Documentation = (doc != null ? doc + "\n\n" : string.Empty) + $"Named argument of `{signature.Label}`.",
                         InsertText = name + ": ",
                         // An enum or yes/no parameter: show its values as soon as the name is in.
-                        SuggestAgain = signature.Details != null && i < signature.Details.Count && (signature.Details[i].Values?.Count > 0 || signature.Details[i].Flag),
+                        SuggestAgain = signature.ModelParameters.Contains(name) || (signature.Details != null && i < signature.Details.Count && (signature.Details[i].Values?.Count > 0 || signature.Details[i].Flag)),
                         ReplaceSpan = replace,
                         FilterText = name,
                         SortText = (signature.DeprecatedParameters.Contains(name) ? "09" : "00") + i.ToString("D2"),
@@ -380,8 +383,9 @@ namespace KScript.Language.Features
         }
 
         /// <summary>Right after <c>name:</c> in a call, the enum values that parameter takes.</summary>
-        private List<CompletionItem> NamedValueCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)
+        private List<CompletionItem> NamedValueCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace, out bool acceptsModel)
         {
+            acceptsModel = false;
             string text = region.Source.Value;
             // A value that isn't one word yet (Europe/Lo‸, en-G‸) is replaced whole.
             int rawStart = RawValueStart(text, wordStart);
@@ -411,7 +415,9 @@ namespace KScript.Language.Features
                 return new List<CompletionItem>();
             }
             // Each value once, from the first signature that has it.
-            return SignaturesFor(analysis, region, node, out _).Where(sig => sig.Details != null)
+            List<SignatureInfo> signatures = SignaturesFor(analysis, region, node, out _);
+            acceptsModel = signatures.Any(sig => sig.ModelParameters.Contains(name));
+            return signatures.Where(sig => sig.Details != null)
                 .SelectMany(signature => signature.Details.Where(d => d.Name == name)
                     .SelectMany(d => (d.Values ?? Array.Empty<string>()).Select(value => new CompletionItem
                     {

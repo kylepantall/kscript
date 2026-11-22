@@ -15,7 +15,7 @@ namespace KScript.Language.Analysis
     {
         /// <remarks><paramref name="RawText"/>: how a bare word is read for the parameter's type, as text ("word") or a handle ("handle").</remarks>
         internal readonly record struct ParameterSlot(string Name, bool Required, bool Variadic, bool Flag = false, IReadOnlyList<string> Values = null, string TypeName = null,
-            IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null)
+            IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null, bool AcceptsModel = false)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
 
@@ -44,10 +44,11 @@ namespace KScript.Language.Analysis
         /// <summary>Words joined by - . + or / (<c>dd-MM-yyyy</c>, <c>1.4.2</c>) waiting for their call: text for a parameter whose type reads it.</summary>
         private readonly HashSet<ArgumentNode> pendingRaw = new HashSet<ArgumentNode>();
 
-        private static List<List<ParameterSlot>> SlotsOf(IEnumerable<CallableInfo> callables) =>
+        private static List<List<ParameterSlot>> SlotsOf(IEnumerable<CallableInfo> callables, bool knownReceiver = true) =>
             callables.SelectMany(c => c.Signatures)
                 .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null,
-                    RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : p.Type == "word" ? "word" : null, Type: p.Type)).ToList())
+                    RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : p.Type == "word" ? "word" : null,
+                    Type: p.Type, AcceptsModel: knownReceiver && p.AcceptsModel)).ToList())
                 .ToList();
 
         private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
@@ -94,6 +95,11 @@ namespace KScript.Language.Analysis
         /// <summary>An argument that reached its parameter: a waiting <c>@kyle</c> is a handle there, and a literal is checked against the type.</summary>
         private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
+            if (slot.AcceptsModel)
+            {
+                CheckModelArgument(a.Value, region, slot.Type == ParameterInfo.ModelOrString);
+                return;
+            }
             CheckNumberArgument(a, slot, region);
             if (pendingRaw.Contains(a))
             {

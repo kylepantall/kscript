@@ -53,6 +53,18 @@ namespace KScript.Language.Tests
             }
         }
 
+        [Theory]
+        [InlineData("has_table", "->has_table(name: model or string)")]
+        [InlineData("create_table", "->create_table(model: model)")]
+        public void DatabaseTableSignaturesDescribeModelArguments(string name, string label)
+        {
+            CallableInfo method = Assert.Single(Catalog.Methods, m => m.ReceiverType == KType.Database && m.Name == name);
+            Assert.Equal(label, Assert.Single(method.Labels));
+            var parameter = Assert.Single(Assert.Single(method.Signatures).Parameters);
+            Assert.True(parameter.AcceptsModel);
+            Assert.Empty(parameter.Values);
+        }
+
         [Fact]
         public void PackagesDontDefineTheSameElementOrCommand()
         {

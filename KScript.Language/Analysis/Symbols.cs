@@ -244,6 +244,9 @@ namespace KScript.Language.Analysis
 
         public bool IsConst => Kind == SymbolKind.Constant;
 
+        /// <summary>A type, model, enum, error or job declaration, as distinct from a variable holding that type.</summary>
+        internal bool IsTypeDeclaration { get; set; }
+
         /// <summary>True if the user can rename it (not a built-in or front matter key).</summary>
         public bool CanRename => Kind != SymbolKind.BuiltIn && Alias == null;
 

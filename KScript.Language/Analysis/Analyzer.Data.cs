@@ -8,6 +8,39 @@ namespace KScript.Language.Analysis
     /// <summary>KScript.Data in the editor: the columns a query, create or update names are the model's.</summary>
     public sealed partial class Analyzer
     {
+        private void CheckModelArgument(ExprNode value, ExpressionRegion region, bool acceptsTableName)
+        {
+            // A compound expression's inferred shape is a hint for completion. For example, $value ?? 42
+            // may still be a model. Diagnose concrete values and declared variables only.
+            if (value is not (LiteralNode or ListNode or MapNode or LambdaNode or IdentifierNode or VariableNode))
+            {
+                return;
+            }
+            TypeShape shape = Infer(value, region);
+            // Both model declarations and their records carry ModelInfo at run time.
+            if (shape.Kind is KType.Model or KType.Record || shape.Type is KType.Any or KType.Record
+                || (value is VariableNode && !shape.Declared))
+            {
+                return;
+            }
+            if (acceptsTableName && shape.Type == KType.String)
+            {
+                if (value is LiteralNode { Kind: LiteralKind.String, Template: null } text && string.IsNullOrWhiteSpace(text.Value))
+                {
+                    Report(region.Source.ToSource(value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch, "A table name cannot be blank.");
+                }
+                return;
+            }
+            // A map or type returned by an opaque call can still carry a model at run time.
+            if (shape.Name == null && (shape.Type == KType.Type || (shape.Type == KType.Map && value is not MapNode)))
+            {
+                return;
+            }
+            string expected = acceptsTableName ? "a model or a table name" : "a model";
+            Report(region.Source.ToSource(value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                $"This argument needs {expected}, but its type is {shape.Display()}.");
+        }
+
         /// <summary>
         /// Checks the column names a KScript.Data method is given against the model's fields:
         /// <c>User->where(nmae: 'Joan')</c> and <c>->order_by(agee)</c> are warnings that suggest the closest one.

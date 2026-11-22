@@ -66,6 +66,71 @@ namespace KScript.Language.Tests
             Assert.Contains(Complete("fn f(wait: duration) => $wait\necho @f(‸)"), i => i.Label == "30s");
         }
 
+        [Theory]
+        [InlineData("has_table", "", "")]
+        [InlineData("has_table", "name: ", "Por")]
+        [InlineData("create_table", "", "Por")]
+        [InlineData("create_table", "model: ", "")]
+        public void Schema_calls_offer_bare_model_declarations_first(string method, string named, string prefix)
+        {
+            var files = new AnalyzerCoverageTests.Files(("portal-license.kscript", "import KScript.Data\nmodel PortalLicense { title: string }"));
+            var service = new LanguageService(files: files);
+            string path = Path.Combine(AnalyzerCoverageTests.Folder, "schema.kscript");
+            (string text, int at) = TestHelpers.WithCaret("import KScript.Data\nimport \"portal-license.kscript\"\n"
+                + "model ReadingBook { title: string }\n"
+                + $"fn exists(table_name: string) => $db->{method}({named}{prefix}‸)");
+            List<CompletionItem> items = service.GetCompletions(service.Analyze(text, path), at);
+
+            Assert.Equal(new[] { "PortalLicense", "ReadingBook" }, items.Take(2).Select(i => i.Label));
+            Assert.Equal(new[] { "PortalLicense", "ReadingBook" }, items.OrderBy(i => i.SortText, StringComparer.Ordinal).Take(2).Select(i => i.Label));
+            Assert.Contains(items, i => i.Label == "$table_name");
+            Assert.DoesNotContain(items, i => i.Label == "$PortalLicense" || i.Label == "$ReadingBook");
+            CompletionItem model = Assert.Single(items, i => i.Label == "PortalLicense");
+            Assert.Equal(prefix, text.Substring(model.ReplaceSpan.Start, model.ReplaceSpan.Length));
+            string accepted = text.Remove(model.ReplaceSpan.Start, model.ReplaceSpan.Length).Insert(model.ReplaceSpan.Start, model.InsertText ?? model.Label);
+            Assert.EndsWith($"{method}({named}PortalLicense)", accepted, StringComparison.Ordinal);
+            Assert.DoesNotContain(service.Analyze(accepted, path).Diagnostics, d => d.Code == DiagnosticCodes.TypeForm);
+        }
+
+        [Fact]
+        public void A_model_from_an_aliased_import_is_offered_with_its_qualifier()
+        {
+            var files = new AnalyzerCoverageTests.Files(("catalog.kscript", "import KScript.Data\nmodel Book { title: string }"));
+            var service = new LanguageService(files: files);
+            string path = Path.Combine(AnalyzerCoverageTests.Folder, "library.kscript");
+            (string text, int at) = TestHelpers.WithCaret("import KScript.Data\nimport \"catalog.kscript\" as catalog\necho $db->create_table(cat‸)");
+            List<CompletionItem> items = service.GetCompletions(service.Analyze(text, path), at);
+            CompletionItem first = items.OrderBy(i => i.SortText, StringComparer.Ordinal).First();
+            Assert.Equal("catalog.Book", first.InsertText ?? first.Label);
+            Assert.DoesNotContain(items, i => i.Label is "Book" or "$Book");
+        }
+
+        [Fact]
+        public void A_dollar_lists_real_variables_including_ones_that_hold_a_model()
+        {
+            const string code = "import KScript.Data\nmodel Book { title: string }\ntable = Book\nname = 'books'\n";
+            List<CompletionItem> items = Complete(code + "echo $db->has_table($‸)");
+            Assert.Contains(items, i => i.Label == "table");
+            Assert.Contains(items, i => i.Label == "name");
+            Assert.DoesNotContain(items, i => i.Label == "Book");
+
+            List<CompletionItem> values = Complete(code + "echo $db->create_table(‸)");
+            Assert.Contains(values, i => i.Label == "$table");
+            Assert.Contains(values, i => i.Label == "Book");
+        }
+
+        [Fact]
+        public void Xml_schema_calls_also_complete_the_bare_model_name()
+        {
+            (string text, int at) = TestHelpers.WithCaret("<kscript><import package=\"KScript.Data\" />"
+                + "<model name=\"Book\" fields=\"title: string\" /><let name=\"made\" value=\"$db->has_table(Bo‸)\" /></kscript>");
+            DocumentAnalysis analysis = Service.Analyze(text, Path.Combine(Folder, "schema.ks.xml"));
+            List<CompletionItem> items = Service.GetCompletions(analysis, at);
+            CompletionItem first = items.OrderBy(i => i.SortText, StringComparer.Ordinal).First();
+            Assert.Equal("Book", first.InsertText ?? first.Label);
+            Assert.Equal("Bo", text.Substring(first.ReplaceSpan.Start, first.ReplaceSpan.Length));
+        }
+
         [Fact]
         public void After_at_only_commands_and_after_dollar_only_variables()
         {

@@ -528,13 +528,13 @@ namespace KScript.Data
                 (t, c) => RunSql(c, DatabaseOf(t, c), c.Str(0), c.Arg(1, "as"))).Info.KeepsBareWords = true;
             p.Method(KType.Database, "tables", "", "The names of the tables in the database.", KType.List,
                 (t, c) => DatabaseOf(t, c).Tables(c.Interpreter).Cast<object>().ToList());
-            p.Method(KType.Database, "has_table", "name", "True when the database has the table: a name, or a model's table.", KType.Bool,
+            p.Method(KType.Database, "has_table", "name: " + ParameterInfo.ModelOrString, "True when the database has a model's table or a table with the given name: $db->has_table(User) or $db->has_table('users').", KType.Bool,
                 (t, c) =>
                 {
                     string table = ModelInfo.Of(c.Arg(0))?.Table ?? Word(c.Arg(0), "->has_table()");
                     return DatabaseOf(t, c).Tables(c.Interpreter).Contains(table);
                 }).Info.KeepsBareWords = true;
-            p.Method(KType.Database, "create_table", "model", "Makes a model's table and indexes, if the database doesn't have them yet, and the pivot tables of its many to many relations whose other table is there. Make the tables a model links to first. Good for scripts and tests; projects use migrations.", KType.Bool,
+            p.Method(KType.Database, "create_table", "model: model", "Makes a model's table and indexes, if the database doesn't have them yet, and the pivot tables of its many to many relations whose other table is there. Make the tables a model links to first. Good for scripts and tests; projects use migrations.", KType.Bool,
                 (t, c) =>
                 {
                     ModelInfo model = ModelInfo.Of(c.Arg(0)) ?? throw new KScriptException($"->create_table() needs a model, such as User, but got {Values.Describe(c.Arg(0))}.", "Argument");
