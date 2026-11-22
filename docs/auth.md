@@ -44,14 +44,14 @@ import KScript.Http
 import KScript.Auth
 import "../requests/sign-up.kscript"
 
-fn sign_up(form) {
+fn sign_up(form: map) {
   data = $SignUp->from($form)
   user = @register($data.email, $data.password, name: $data.name)
   @login($user)
   return @redirect(@intended())
 }
 
-fn sign_in(form) {
+fn sign_in(form: map) {
   user = @attempt($form.email, $form.password, remember: $form.remember == 'yes')
   if $user == null {
     return @view('auth/login', data: { error: "That email and password don't match an account." })->with_status(422)
@@ -77,7 +77,7 @@ fn sign_out() {
 After `http.auth.attempts` (5) failures for the same email and address within `http.auth.lockout` (a minute), `@attempt` throws a `TooManyRequests` error that says how long to wait. A route answers it with 429 and a `Retry-After` header. Catch it to show the form again:
 
 ```kscript
-fn sign_in(form) {
+fn sign_in(form: map) {
   user = null
   try {
     user = @attempt($form.email, $form.password)
@@ -183,7 +183,7 @@ Users from a database of your own work too: `@login({ id: $row.id, email: $row.e
 import KScript.Http
 import KScript.Auth
 
-fn send_reset(form, request) {
+fn send_reset(form: map, request: map) {
   token = @reset_token($form.email)
   if $token != null {
     link = 'https://' + $request.headers.host + @route('password.reset', token: $token)
@@ -204,7 +204,7 @@ The controller `kscript make auth` writes logs the link. Swap the `log` line for
 import KScript.Http
 import KScript.Auth
 
-fn issue_token(json) {
+fn issue_token(json: map) {
   user = @attempt($json.email, $json.password, session: false)
   if $user == null {
     throw Unauthorized "That email and password don't match an account."

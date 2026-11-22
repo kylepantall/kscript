@@ -9,7 +9,7 @@ name = "world"
 echo "Hello $name!"
 
 // A function takes values and gives one back.
-fn double(n) => $n * 2
+fn double(n: number) => $n * 2
 
 // A list holds several values, and for goes through them one at a time.
 numbers = [1, 2, 3]

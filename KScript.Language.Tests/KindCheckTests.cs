@@ -11,7 +11,7 @@ namespace KScript.Language.Tests
         private static readonly LanguageService Service = new LanguageService();
 
         private static List<Diagnostic> Check(string text, string file = "a.kscript") =>
-            Service.Analyze(text, Path.Combine(Path.GetTempPath(), file)).Diagnostics.Where(d => d.Code != DiagnosticCodes.UnusedVariable).ToList();
+            Service.Analyze(text, Path.Combine(Path.GetTempPath(), file)).Diagnostics.Where(d => d.Code != DiagnosticCodes.UnusedVariable && d.Code != DiagnosticCodes.MissingParameterType).ToList();
 
         private static Diagnostic One(string text, string file = "a.kscript") => Assert.Single(Check(text, file));
 

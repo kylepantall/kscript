@@ -447,7 +447,7 @@ public sealed class McpTests : IDisposable
 
         // A file is checked with its project's lint rules: here, unused variables are info and else is a hint.
         Write("proj/kscript.json", "{ \"lint\": { \"rules\": { \"KS6003\": \"info\", \"KS6001\": \"hint\" } } }");
-        Write("proj/a.kscript", "x = 1\nfn f(a) {\n  if $a {\n    return 1\n  } else {\n    return 2\n  }\n}\necho @f(true)\n");
+        Write("proj/a.kscript", "x = 1\nfn f(a: bool) {\n  if $a {\n    return 1\n  } else {\n    return 2\n  }\n}\necho @f(true)\n");
         var (file, fileError) = Call(server, "check_code", new { path = "proj/a.kscript" });
         Assert.False(fileError);
         Assert.Contains("info KS6003", file);

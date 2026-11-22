@@ -79,7 +79,7 @@ label = match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }
 echo $label
 
 // Functions
-fn greet(who, greeting = 'Hello') {
+fn greet(who: string, greeting = 'Hello') {
   return $greeting + ', ' + $who + '!'
 }
 fn double(x: int) => $x * 2

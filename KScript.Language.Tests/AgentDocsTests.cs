@@ -530,7 +530,8 @@ namespace KScript.Language.Tests
             using var output = new MemoryStream();
             new KScriptLanguageServer(input, output).RunAsync().GetAwaiter().GetResult();
             string text = System.Text.Encoding.UTF8.GetString(output.ToArray());
-            return System.Text.RegularExpressions.Regex.Matches(text, "\"message\":\"([^\"]*)\"").Select(m => m.Groups[1].Value).ToList();
+            // Each line as "<level> <message>": 1 is an error, 3 is info (editors label 1 as "[Error - ...]").
+            return System.Text.RegularExpressions.Regex.Matches(text, "\"type\":(\\d),\"message\":\"([^\"]*)\"").Select(m => m.Groups[1].Value + " " + m.Groups[2].Value).ToList();
         }
 
         private static JsonObject Saved(string path) => new JsonObject
@@ -553,12 +554,12 @@ namespace KScript.Language.Tests
             Write("main.kscript", "fn one() => 1\nfn two() => 2\n");
             List<string> logs = Logs(Saved(main), Saved(Path.Combine(dir, "AGENTS.md")), Saved(null),
                 new JsonObject { ["method"] = "textDocument/didSave", ["params"] = new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = "untitled:1" } } });
-            Assert.Contains(logs, l => l.StartsWith("agents: updated AGENTS.md", StringComparison.Ordinal));
+            Assert.Contains(logs, l => l.StartsWith("3 agents: updated AGENTS.md", StringComparison.Ordinal));
             Assert.Contains("@two()", Read(".kscript/agents/index.md"));
-            Assert.DoesNotContain(Logs(Saved(main)), l => l.StartsWith("agents:", StringComparison.Ordinal));
+            Assert.DoesNotContain(Logs(Saved(main)), l => l.Contains(" agents:", StringComparison.Ordinal));
 
             Write("kscript.json", "{ \"standard\": \"missing-standard\" }");
-            Assert.Contains(Logs(Saved(main)), l => l.StartsWith("agents: ", StringComparison.Ordinal) && l.Contains("standard"));
+            Assert.Contains(Logs(Saved(main)), l => l.StartsWith("1 agents: ", StringComparison.Ordinal) && l.Contains("standard"));
         }
     }
 }

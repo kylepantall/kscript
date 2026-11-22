@@ -198,6 +198,16 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void KscriptReturnHintsFollowTheParameterList()
+        {
+            string text = "fn none() => 1\nfn one(key) => $key == 'a'\nfn spaced (a, b = (1)) {\n  return 'x'\n}\n";
+            DocumentAnalysis a = Service.Analyze(text, "test.kscript");
+            List<string> hints = Service.GetInlayHints(a).Where(h => h.Label.StartsWith(" →", StringComparison.Ordinal))
+                .Select(h => text.Substring(0, h.Offset).Split('\n').Last() + "⟦" + h.Label + "⟧").ToList();
+            Assert.Equal(new[] { "fn none()⟦ → number⟧", "fn one(key)⟦ → bool⟧", "fn spaced (a, b = (1))⟦ → string⟧" }, hints);
+        }
+
+        [Fact]
         public void WideMapsGetShortHints()
         {
             DocumentAnalysis a = Open("<let name=\"m\" value=\"{ alpha: 1, beta: 2, gamma: 3, delta: 4, epsilon: 5, zeta: 6, eta: 7 }\" />");

@@ -1553,13 +1553,17 @@ namespace KScript.Language.Analysis
             if (paramsAttr?.Value != null)
             {
                 List<Symbol> declared = new List<Symbol>();
-                foreach (FunctionParameter p in ParseParameters(paramsAttr.Value, report: true))
+                List<FunctionParameter> parameters = ParseParameters(paramsAttr.Value, report: true);
+                foreach (FunctionParameter p in parameters)
                 {
-                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, ParameterShape(p, e.Span.Start));
+                    TypeShape inferred = InferredParameterShape(p, e.Span.Start);
+                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, inferred ?? ParameterShape(p, e.Span.Start));
+                    symbol.TypeFromCalls = inferred != null;
                     body.Declare(symbol, e.Span.Start);
                     declared.Add(symbol);
                 }
                 functionParameters[e] = declared;
+                CheckParameterTypes(e, parameters, declared);
             }
 
             foreach (MarkupAttribute attr in e.Attributes.Where(a => a.Name != "params" && a.Name != "name"))

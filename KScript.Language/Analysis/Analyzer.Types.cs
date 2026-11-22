@@ -33,7 +33,7 @@ namespace KScript.Language.Analysis
             new Dictionary<string, Dictionary<string, (SymbolKind, TypeShape)>>(StringComparer.Ordinal);
 
         /// <summary>
-        /// Runs the analysis until function return types stop changing. A function can be called above the line that
+        /// Runs the analysis until function return types, and the parameter types calls give, stop changing. A function can be called above the line that
         /// declares it, so the first pass may not know what it returns yet; the next pass does.
         /// </summary>
         private static Analyzer RunToFixedPoint(Func<Analyzer> create)
@@ -43,12 +43,14 @@ namespace KScript.Language.Analysis
             for (int pass = 1; pass < MaxPasses; pass++)
             {
                 Dictionary<int, TypeShape> returns = analyzer.CollectReturnShapes();
-                if (returns.Count == 0 || SameReturns(returns, analyzer.knownReturns))
+                Dictionary<(int, string), TypeShape> parameters = analyzer.CollectParameterShapes();
+                if ((returns.Count == 0 || SameReturns(returns, analyzer.knownReturns)) && SameParameters(parameters, analyzer.knownParameters))
                 {
                     break;
                 }
                 Analyzer next = create();
                 next.knownReturns = returns;
+                next.knownParameters = parameters;
                 next.importCache = analyzer.importCache;
                 next.Run();
                 analyzer = next;

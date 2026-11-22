@@ -91,7 +91,7 @@ Inside a function or a loop, end a branch early instead of writing `else`: `retu
 first.
 
 ```kscript try
-fn grade(score) {
+fn grade(score: number) {
   if $score ge 90 {
     return 'A'
   }
@@ -134,7 +134,7 @@ function that is part of an API used from outside the project can say so with `@
 ```kscript
 /// Kept for scripts that still call it.
 /// @public
-fn titlecase(text) => $text->upper()
+fn titlecase(text: string) => $text->upper()
 ```
 
 Like KS6001, these come from the default [standard](standards.md), `kscript:recommended`, as warnings
@@ -144,7 +144,7 @@ Like KS6001, these come from the default [standard](standards.md), `kscript:reco
 ## Functions
 
 ```kscript
-fn greet(who, greeting = 'Hello') {
+fn greet(who: string, greeting = 'Hello') {
   return $greeting + ', ' + $who + '!'
 }
 fn square(n: number) => $n * $n
@@ -177,7 +177,7 @@ A yes/no parameter can be written as a bare word: `recursive` sets it to yes and
 ```kscript
 all = @files($folder, pattern: '*.txt', recursive)
 echo "{ $data->to_json(not indented) }"
-fn save(path, overwrite: bool = false) {
+fn save(path: string, overwrite: bool = false) {
   // …
 }
 @save('out.txt', overwrite)

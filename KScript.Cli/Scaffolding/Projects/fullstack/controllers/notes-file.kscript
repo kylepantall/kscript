@@ -21,7 +21,7 @@ fn all_notes() => @exists($config.notes.file) ? @read_json($config.notes.file) :
 fn mine() => {{#if auth}}@all_notes()->filter(fn($n) => $n.user_id == @user().id){{else}}@all_notes(){{/if}}
 
 /// Saves every note.
-fn save_notes(notes) {
+fn save_notes(notes: list) {
   @write_json($config.notes.file, $notes)
 {{#if cache}}
   @forget_cached(@list_key())

@@ -477,7 +477,7 @@ namespace KScript.Language.Agents
             /// What the fn does, shown in hover. Tags: @param @returns @example @llm @prefer @avoid @pitfall
             fn label(task: Task, mark: string = '-') => $mark + ' ' + $task.title->upper()
 
-            fn open_tasks(tasks) {
+            fn open_tasks(tasks: Task[]) {
               if $tasks->is_empty() {
                 return [] // return early rather than else
               }

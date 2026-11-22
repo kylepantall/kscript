@@ -131,6 +131,9 @@ namespace KScript.Syntax
         /// <summary>A list of names written as one string in a .kscript file (<c>use: "log, cors"</c>) rather than an array (<c>use: [log, cors]</c>).</summary>
         public const string PreferArrayList = "KS6006";
 
+        /// <summary>A function parameter with no type and no default: <c>fn cached(key)</c> rather than <c>fn cached(key: string)</c>.</summary>
+        public const string MissingParameterType = "KS6007";
+
         /// <summary>A script in a project that declares more than one type, model, enum or error type: each goes in its own file.</summary>
         public const string OneTypePerFile = "KS6008";
 

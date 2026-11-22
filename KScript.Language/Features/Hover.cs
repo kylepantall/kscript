@@ -48,6 +48,10 @@ namespace KScript.Language.Features
             {
                 return DocCommentHover(analysis, offset, docComment);
             }
+            if (TypeBodyHover(analysis, offset) is HoverResult body)
+            {
+                return body;
+            }
             Cursor cursor = Locate(analysis, offset);
 
             if (cursor.InElementName || cursor.InEndTagName)
