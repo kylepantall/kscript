@@ -299,7 +299,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void RenamesFunctionsEverywhere()
         {
-            (DocumentAnalysis a, int offset) = At(Script("<fn name=\"gr‸eet\" params=\"x\" value=\"$x\" /><call fn=\"greet\" args=\"1\" /><echo>@greet(1) { 1 |> greet() }</echo>"));
+            (DocumentAnalysis a, int offset) = At(Script("<fn name=\"gr‸eet\" params=\"x: int\" value=\"$x\" /><call fn=\"greet\" args=\"1\" /><echo>@greet(1) { 1 |> greet() }</echo>"));
             RenameResult rename = Service.Rename(a, offset, "hello");
             Assert.Equal(4, rename.Changes.Count);
             string renamed = AnalyzerTests.Apply(a.Source.Text, rename.Changes);

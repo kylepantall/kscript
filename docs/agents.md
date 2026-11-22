@@ -81,7 +81,7 @@ Tags in a `///` doc comment add what the code can't say. All of them are optiona
 /// @avoid Calling it in a loop: it saves each time. Build the list, then call @save_tasks once.
 /// @pitfall title is trimmed, and an empty title throws Validation.
 /// @example @add_task($tasks, title: 'Buy milk')
-fn add_task(tasks, title) {
+fn add_task(tasks: list, title: string) {
   // …
 }
 

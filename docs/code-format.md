@@ -13,7 +13,7 @@ import KScript.IO
 
 /// Lower-cases text and joins words with dashes.
 /// @param text The text to change.
-fn slugify(text) => $text->lower()->replace(' ', '-')
+fn slugify(text: string) => $text->lower()->replace(' ', '-')
 
 people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
 for p in $people {
@@ -62,7 +62,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `for item at i in $list { }` | `<for each="item" index="i" in="$list">` |
 | `while test { }`, `break`, `continue` | `<while test>`, `<break/>`, `<continue/>` |
 | `match $x { case 1, 2 { } when $x > 9 { } default { } }` | `<match value>`, `<case is>`, `<case when>`, `<default>` |
-| `fn greet(who, hi = 'Hello') { }` | `<fn name="greet" params="who, hi = 'Hello'">` |
+| `fn greet(who: string, hi = 'Hello') { }` | `<fn name="greet" params="who: string, hi = 'Hello'">` |
 | `fn double(x: int) => $x * 2` | `<fn name="double" params="x: int" value="$x * 2" />` |
 | `return $x`, `exit 1` | `<return value="$x" />`, `<exit code="1" />` |
 | `try { } catch err when test { } catch { } finally { }` | `<try>` with `<catch as when>` and `<finally>` inside |
@@ -180,10 +180,10 @@ The text is Markdown, with tags:
 /// @example
 ///   @greet('Kyle')   // Hello, Kyle!
 /// @see @welcome
-fn greet(who, greeting = 'Hello') => $greeting + ', ' + $who + '!'
+fn greet(who: string, greeting = 'Hello') => $greeting + ', ' + $who + '!'
 
 /// @deprecated Use @greet instead.
-fn hello(who) => @greet($who)
+fn hello(who: string) => @greet($who)
 ```
 
 `@arg` and `@argument` are other names for `@param`, and `@return` for `@returns`. In the editor, typing `@` at the

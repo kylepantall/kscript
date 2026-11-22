@@ -31,7 +31,7 @@ fn index() {
 {{/if}}
 {{#if item is show}}
 /// GET /{{ url }}/:{{ params ?? id }}: one of them.
-fn show({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{else}}id{{/each}}) {
+fn show({{#each params}}{{ item }}: {{#if item is id}}int{{else}}string{{/if}}{{#unless last}}, {{/unless}}{{else}}id: int{{/each}}) {
   // TODO: Find the one asked for, and answer 404 when there is none: @abort(404)
   return { {{#each params}}{{ item }}: ${{ item }}{{#unless last}}, {{/unless}}{{else}}id: $id{{/each}} }
 }
@@ -39,7 +39,7 @@ fn show({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{else}}id{{/each
 {{/if}}
 {{#if item is store}}
 /// POST /{{ url }}: adds one from the JSON body.
-fn store(json) {
+fn store(json: map) {
   // TODO: Save $json, then return what was saved.
   return @response($json, status: 201)
 }
@@ -47,7 +47,7 @@ fn store(json) {
 {{/if}}
 {{#if item is update}}
 /// PUT or PATCH /{{ url }}/:{{ params ?? id }}: changes one.
-fn update({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{else}}id{{/each}}, json) {
+fn update({{#each params}}{{ item }}: {{#if item is id}}int{{else}}string{{/if}}{{#unless last}}, {{/unless}}{{else}}id: int{{/each}}, json: map) {
   // TODO: Change the saved one with $json, then return it.
   return { {{#each params}}{{ item }}: ${{ item }}, {{else}}id: $id, {{/each}}changes: $json }
 }
@@ -55,7 +55,7 @@ fn update({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{else}}id{{/ea
 {{/if}}
 {{#if item is destroy}}
 /// DELETE /{{ url }}/:{{ params ?? id }}: removes one. Returning nothing answers 204 No Content.
-fn destroy({{#each params}}{{ item }}{{#unless last}}, {{/unless}}{{else}}id{{/each}}) {
+fn destroy({{#each params}}{{ item }}: {{#if item is id}}int{{else}}string{{/if}}{{#unless last}}, {{/unless}}{{else}}id: int{{/each}}) {
   // TODO: Remove it from where it is kept.
   log "Removed {{#each params}}{${{ item }}}{{#unless last}} {{/unless}}{{else}}{$id}{{/each}}"
   return null

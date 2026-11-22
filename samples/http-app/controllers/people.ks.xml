@@ -15,19 +15,19 @@
 
   <fn name="all" value="@read_json($file)" />
 
-  <fn name="find" params="id">
+  <fn name="find" params="id: int">
     <return value="@all()->find(fn($p) => $p.id == $id)" />
   </fn>
 
   <!-- Pages -->
 
-  <fn name="list" params="query">
+  <fn name="list" params="query: map">
     <let name="min" value="($query.min_age ?? '0')->to_number(default: 0)" />
     <let name="people" value="@all() |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)" />
     <return value="@view('people/index', people: $people, min: $min)" />
   </fn>
 
-  <fn name="page" params="id">
+  <fn name="page" params="id: int">
     <let name="person" value="@find($id)" />
     <if $person == null>
       <do>@abort(404, message: 'Nobody has that id.')</do>
@@ -80,7 +80,7 @@
     Changes some of a person's fields.
     @returns Person
   -->
-  <fn name="update" params="id: int, json">
+  <fn name="update" params="id: int, json: map?">
     <let name="person" value="@find($id) ?? @abort(404)" />
     <let name="changed" value="$person->merge($json ?? {})->merge({ id: $person.id })" />
     <do>@write_json($file, @all()->map(fn($p) => $p.id == $person.id ? $changed : $p))</do>

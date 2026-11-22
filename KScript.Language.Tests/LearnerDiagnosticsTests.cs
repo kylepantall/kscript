@@ -41,13 +41,13 @@ namespace KScript.Language.Tests
         [InlineData("func")]
         public void FunctionKeywordsPointToFn(string word)
         {
-            string text = $"{word} twice(n) {{\n  return $n * 2\n}}\necho @twice(2)\n";
+            string text = $"{word} twice(n: int) {{\n  return $n * 2\n}}\necho @twice(2)\n";
             DocumentAnalysis a = Analyze(text);
             Diagnostic d = Assert.Single(a.Diagnostics);
             Assert.Equal($"Functions start with fn, not {word}: fn greet(who) {{ }}.", d.Message);
             // It is read as the function it was meant to be, so its body and its callers are checked as usual.
             Assert.Contains(a.Symbols, s => s.Kind == SymbolKind.Function && s.Name == "twice");
-            string expected = "fn twice(n) {\n  return $n * 2\n}\necho @twice(2)\n";
+            string expected = "fn twice(n: int) {\n  return $n * 2\n}\necho @twice(2)\n";
             Assert.Equal(expected, Fixed(text, d));
             Assert.Empty(Analyze(expected).Diagnostics);
         }
@@ -222,11 +222,11 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("name = 'Joan'\necho \"Hello $name\"\n")]
         [InlineData("name = 'Joan'\ng = \"Hello $name\"\necho $g\n")]
-        [InlineData("fn greet(who) {\n  return \"Hi $who!\"\n}\necho @greet('a')\n")]
+        [InlineData("fn greet(who: string) {\n  return \"Hi $who!\"\n}\necho @greet('a')\n")]
         [InlineData("price = 'It costs $5'\necho $price\n")]
         [InlineData("label = '$nobody is here'\necho $label\n")]
         [InlineData("name = 'Joan'\ntext = 'Hello ' + $name\necho $text\n")]
-        [InlineData("fn shout(text) {\n  return $text->upper()\n}\nname = 'Joan'\necho @shout('$name') + $name\n")]
+        [InlineData("fn shout(text: string) {\n  return $text->upper()\n}\nname = 'Joan'\necho @shout('$name') + $name\n")]
         public void FilledInTextAndPlainTextAreLeftAlone(string text)
         {
             Assert.Empty(Analyze(text).Diagnostics);
