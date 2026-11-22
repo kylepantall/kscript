@@ -162,7 +162,7 @@ namespace KScript.Language.Analysis
         /// </summary>
         private void CheckMapField(TypeShape target, MemberNode member, ExpressionRegion region)
         {
-            if ((target.Type == KType.String && member.Name != "length") || target.Type == KType.Number || target.Type == KType.Bool)
+            if ((target.Type == KType.String && member.Name != "count") || target.Type == KType.Number || target.Type == KType.Bool)
             {
                 // $name.upper: a method needs -> and ( ).
                 TextSpan at = region.Source.ToSource(TextSpan.FromBounds(member.NameSpan.Start - 1, member.NameSpan.End));

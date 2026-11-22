@@ -20,7 +20,7 @@ namespace KScript.Language.Catalog
 
         private readonly Dictionary<string, ElementInfo> elements = new Dictionary<string, ElementInfo>(StringComparer.OrdinalIgnoreCase);
 
-        // Names as written, so KScript.Http's <Delete> and KScript.IO's <delete> are both known: an exact match wins.
+        // Names as written, so KScript.Http's <Delete> and a script's own <delete> are both known: an exact match wins.
         private readonly Dictionary<string, ElementInfo> exactElements = new Dictionary<string, ElementInfo>(StringComparer.Ordinal);
         private readonly Dictionary<string, RetiredInfo> retiredElements = new Dictionary<string, RetiredInfo>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, RetiredInfo> retiredAttributes = new Dictionary<string, RetiredInfo>(StringComparer.OrdinalIgnoreCase);

@@ -484,7 +484,7 @@ namespace KScript.Language.Analysis
 
                 default:
                     Report(region.Source.ToSource(pipe.Right.Span), DiagnosticSeverity.Error, DiagnosticCodes.ExpressionSyntax,
-                        "A pipe needs a method, function, command or lambda on its right, as in |> upper() or |> @json().");
+                        "A pipe needs a method, function, command or lambda on its right, as in |> upper() or |> json().");
                     return;
             }
         }
@@ -559,6 +559,13 @@ namespace KScript.Language.Analysis
 
             string type = (types ??= new TypeInference(catalog, result)).ReceiverType(name, receiver);
             List<CallableInfo> candidates = catalog.GetMethods(name, type).ToList();
+            if (candidates.Count == 0 && (Runtime.Retired.Method(type, name) ?? Runtime.Retired.Method(receiver.Kind, name)) is RetiredInfo retiredMethod)
+            {
+                // ->where() on a list, ->count(): a second name that was removed. Say which one to write.
+                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod, $"{arrow}{name}() on a {type} was removed. {retiredMethod.Replacement}",
+                    retiredMethod.Rename != null ? new[] { new QuickFix($"Change to {retiredMethod.Rename}", new TextChange(nameSpan, retiredMethod.Rename)) } : null);
+                return;
+            }
             if (candidates.Count == 0)
             {
                 IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Concat(receiver.Kind != null ? catalog.MethodsFor(receiver.Kind) : Enumerable.Empty<CallableInfo>()).Select(m => m.Name).Concat(receiver.Methods.Keys)

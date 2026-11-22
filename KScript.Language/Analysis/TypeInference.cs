@@ -8,7 +8,7 @@ namespace KScript.Language.Analysis
     /// <summary>Works out the shape of an expression's value from the source (literals, declarations, return types).</summary>
     public sealed class TypeInference
     {
-        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "where", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip" };
+        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip" };
         private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "max_by", "min_by", "pop" };
 
         private readonly LanguageCatalog catalog;
@@ -188,7 +188,16 @@ namespace KScript.Language.Analysis
                     switch (pipe.Right)
                     {
                         case CallNode call when call.Callee is IdentifierNode id:
-                            return FunctionNamed(id.Name) is Symbol piped ? piped.ReturnShape : InferMethod(id.Name, left, call.Arguments.Count);
+                            if (FunctionNamed(id.Name) is Symbol piped)
+                            {
+                                return piped.ReturnShape;
+                            }
+                            // $text |> json(as: Repo) gives records, as $text->json(as: Repo) does.
+                            if (id.Name == "json" && MappedShape(catalog.GetMethods("json", left.Type).FirstOrDefault(x => KType.AcceptsMethod(x.ReceiverType, x.Name, left.Type)), call.Arguments, 0, null, region) is TypeShape asPiped)
+                            {
+                                return asPiped;
+                            }
+                            return InferMethod(id.Name, left, call.Arguments.Count);
                         case CommandCallNode command:
                             return Infer(command, region);
                         default:
