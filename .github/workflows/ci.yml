@@ -49,9 +49,9 @@ jobs:
   test:
     name: Build and test (${{ matrix.name }})
     if: github.event.action != 'closed'
-    # The Linux job runs on home-ci (home-ci-linux, via runner-warden). Windows and macOS run on
-    # GitHub-hosted runners, which are free for this public repo and faster than queueing for a
-    # Windows machine at home.
+    # Linux and Windows run on runner-warden (home-ci-linux, home-ci-windows). runner-warden pins
+    # the Windows jobs to the Windows PC, which runs several jobs at once and is faster than a
+    # GitHub-hosted runner. macOS runs on GitHub-hosted runners.
     # Pull requests from forks always fall back to a GitHub-hosted runner so
     # untrusted code never executes on home-ci.
     timeout-minutes: 20
@@ -65,7 +65,8 @@ jobs:
             runner: '"home-ci-linux"'
             hosted: ubuntu-latest
           - name: windows
-            self-hosted: false
+            self-hosted: true
+            runner: '"home-ci-windows"'
             hosted: windows-latest
           - name: macos
             self-hosted: false
@@ -242,7 +243,7 @@ jobs:
       matrix:
         include:
           - { name: linux,   rid: linux-x64, target: linux-x64, self-hosted: true,  runner: '"home-ci-linux"',   hosted: ubuntu-latest,  ext: '' }
-          - { name: windows, rid: win-x64,   target: win-x64,   self-hosted: false, hosted: windows-latest, ext: '.exe' }
+          - { name: windows, rid: win-x64,   target: win-x64,   self-hosted: true,  runner: '"home-ci-windows"', hosted: windows-latest, ext: '.exe' }
           - { name: macos,   rid: osx-arm64, target: mac-arm64, self-hosted: false, hosted: macos-latest,   ext: '' }
     defaults:
       run:
