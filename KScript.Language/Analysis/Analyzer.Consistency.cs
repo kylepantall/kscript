@@ -10,8 +10,6 @@ namespace KScript.Language.Analysis
     // kscript check --fix rewrites them.
     public sealed partial class Analyzer
     {
-        private static readonly bool MigrateQuotedCode = Environment.GetEnvironmentVariable("KSCRIPT_MIGRATE") == "1";
-
         private bool IsCodeFile => result.Markup.Syntax == SourceSyntax.Code;
 
         /// <summary>
@@ -29,16 +27,6 @@ namespace KScript.Language.Analysis
             {
                 Report(attr.Span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, attr.FormError,
                     new[] { new QuickFix("Write it in braces", new TextChange(ValueSpan(attr), "{ " + attr.ValueText.Trim() + " }")) });
-                return;
-            }
-
-            if (MigrateQuotedCode && attr.Quote == '"' && CodeArguments.IsValue(a.Kind))
-            {
-                // MIGRATION ONLY: files written before quotes always made a string wrapped code in them.
-                string code = Quotes.Decode(attr.ValueText, 1, attr.ValueText.Length - 1, '"').Trim();
-                bool safe = !code.Contains('\n') && SplitNames(DecodedText.Plain(code, 0)).Count() <= 1;
-                string now = a.Kind == AttributeKind.ExpressionList ? "[" + code + "]" : safe ? code : "(" + code + ")";
-                Report(ValueSpan(attr), DiagnosticSeverity.Warning, DiagnosticCodes.OneSpelling, "migrate", new[] { new QuickFix("migrate", new TextChange(ValueSpan(attr), now)) });
                 return;
             }
 

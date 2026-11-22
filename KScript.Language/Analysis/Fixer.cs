@@ -32,8 +32,6 @@ namespace KScript.Language.Analysis
         private static bool IsRename(Diagnostic d) =>
             d.Code is DiagnosticCodes.RetiredElement or DiagnosticCodes.RetiredAttribute && d.Fixes[0].Title.StartsWith(RenameTitle, StringComparison.Ordinal);
 
-        private static readonly bool Migrating = Environment.GetEnvironmentVariable("KSCRIPT_MIGRATE") == "1";
-
         /// <summary>The text with every safe fix applied, and how many were. Runs until nothing more changes.</summary>
         public static (string Text, int Fixed) Apply(string text, string path, ProjectConfig config = null, Func<Diagnostic, bool> also = null)
         {
@@ -47,7 +45,7 @@ namespace KScript.Language.Analysis
                 var changes = new List<TextChange>();
                 foreach (Diagnostic d in diagnostics.OrderBy(d => d.Span.Start))
                 {
-                    if (d.Fixes == null || d.Fixes.Count == 0 || !(Rules.Contains(d.Code) || IsRename(d) || also?.Invoke(d) == true || (Migrating && d.Code == DiagnosticCodes.InvalidAttributeValue && d.Fixes[0].Title == "Write it in braces")))
+                    if (d.Fixes == null || d.Fixes.Count == 0 || !(Rules.Contains(d.Code) || IsRename(d) || also?.Invoke(d) == true))
                     {
                         continue;
                     }
