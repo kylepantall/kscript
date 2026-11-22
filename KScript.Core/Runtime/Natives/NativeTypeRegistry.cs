@@ -16,6 +16,11 @@ namespace KScript.Runtime
         /// <summary>The language's own native types. A new one is a class in this folder, added here.</summary>
         public static IReadOnlyList<NativeType> BuiltIn { get; } = new NativeType[]
         {
+            new EmailType(),
+            new PasswordType(),
+            new HandleType(),
+            new UuidType(),
+            new RegexType(),
             new DurationType(),
             new TimezoneType(),
             new CronType(),

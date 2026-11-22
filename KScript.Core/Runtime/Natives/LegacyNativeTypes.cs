@@ -16,20 +16,6 @@ namespace KScript.Runtime
 
         public static void Register()
         {
-            // The first five came first, and keep the string methods they had (PR 86).
-            Add(new NativeTypeInfo("email", "An email address such as joan@example.com. Spaces are trimmed and the domain is lowercased.", "joan@example.com",
-                With("lower", "upper", "split", "replace")) { Article = "an", JsonFormat = "email", Options = new[] { "domains" } });
-            Add(new NativeTypeInfo("password", "A secret. It prints as ********, can't be compared with ==, and is hashed to be stored.", "'correct horse battery staple'",
-                Array.Empty<string>()) { Secret = true, Options = new[] { "upper", "lower", "digit", "symbol", "common", "score", "algorithm" }, JsonFormat = "password" });
-            Add(new NativeTypeInfo("handle", "@ followed by letters, digits, _, . or -: a username such as @joan. Lowercased.", "@joan",
-                new[] { "contains", "starts_with", "ends_with", "count", "upper", "slice", "matches", "truncate", "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json" })
-                { RawKind = "handle" });
-            Add(new NativeTypeInfo("uuid", "A UUID, versions 1 to 8 and the nil and max UUIDs, lowercased to 8-4-4-4-12.", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f",
-                new[] { "contains", "starts_with", "ends_with", "upper", "slice", "split", "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json" })
-                { Options = new[] { "v" }, JsonFormat = "uuid" });
-            Add(new NativeTypeInfo("regex", "A regular expression with flags i, m, s and x, written /.../ in code.", "/^[a-z]+$/i",
-                new[] { "contains", "starts_with", "ends_with", "count", "escape", "markdown_escape", "json" }) { JsonFormat = "regex" });
-
             // People and places.
             Add(new NativeTypeInfo("phone", "A phone number in E.164: + then the country code and number, 8 to 15 digits. Spaces, dots, dashes and brackets are dropped.", "+447700900123",
                 Searchable) { Options = new[] { "countries" } });
@@ -40,13 +26,11 @@ namespace KScript.Runtime
             Add(new NativeTypeInfo("locale", "A language tag (BCP 47) such as en, en-GB or pt-BR, in its usual case.", "en-GB",
                 With("split")));
 
-            // Time and things that run on it.
-
             // Money.
             Add(new NativeTypeInfo("iban", "An international bank account number, checked with its mod-97 digits. Kept in capitals without spaces.", "GB82WEST12345698765432",
                 Searchable) { Article = "an" });
             Add(new NativeTypeInfo("card", "A payment card number, checked with the Luhn digit. It prints masked apart from the last four digits.", "'4242 4242 4242 4242'",
                 Array.Empty<string>()) { Secret = true });
-                }
+        }
     }
 }

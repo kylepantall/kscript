@@ -163,25 +163,6 @@ namespace KScript.Runtime
                 ("type.name", "<type name=\"User\" fields=\"login: string\" />\n<echo>{ User.name }</echo>"),
                 ("type->is", "<type name=\"User\" fields=\"login: string\" />\n<type name=\"Admin\" with=\"User\" fields=\"level: int\" />\n<let name=\"joan\" value=\"Admin({ login: 'joan', level: 2 })\" />\n<echo>{ User->is($joan) } { User->is(Admin) } { Admin->is(User) }</echo>"),
 
-                // Text with a meaning of its own
-                ("email.local", "<let name=\"who\" type=\"email\" value=\"Joan.Smith@Example.com\" />\n<echo>{ $who.local }</echo>"),
-                ("email.domain", "<let name=\"who\" type=\"email\" value=\"Joan.Smith@Example.com\" />\n<echo>{ $who.domain }</echo>"),
-                ("handle.name", "<let name=\"who\" type=\"handle\" value=\"@Joan_S\" />\n<echo>{ $who.name }</echo>"),
-                ("uuid.version", "<let name=\"id\" type=\"uuid\" value=\"3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\" />\n<echo>{ $id.version }</echo>"),
-                ("regex->test", "/^[a-z]+$/i->test('Hello')"),
-                ("regex->match", "/(\\d{4})-(\\d\\d)/->match('Due 2026-11').groups"),
-                ("regex->match_all", "/\\d+/->match_all('3 cats, 12 dogs')->map(fn(m) => $m.text)"),
-                ("regex->replace", "/(\\d{4})-(\\d\\d)/->replace('2026-11', '$2/$1')"),
-                ("regex->split", "/\\s*[,;]\\s*/->split('tea, coffee;milk')"),
-                ("regex.pattern", "/^[a-z]+$/i.pattern"),
-                ("regex.flags", "/^[a-z]+$/i.flags"),
-                ("password->hash", "<let name=\"pw\" type=\"password\" value=\"'correct horse battery staple'\" />\n<echo>{ $pw->hash()->starts_with('$argon2id$') }</echo>"),
-                ("password->verify", "<let name=\"pw\" type=\"password\" value=\"'correct horse battery staple'\" />\n<let name=\"stored\" value=\"$pw->hash()\" />\n<echo>{ $pw->verify($stored) }</echo>"),
-                ("password->needs_rehash", "<let name=\"pw\" type=\"password\" value=\"'correct horse battery staple'\" />\n<echo>{ $pw->needs_rehash($pw->hash(algorithm: 'bcrypt')) }</echo>"),
-                ("password->strength", "<let name=\"pw\" type=\"password\" value=\"'password1'\" />\n<echo>{ $pw->strength(min: 12, symbol: true).problems }</echo>"),
-                ("password->is_strong", "<let name=\"pw\" type=\"password\" value=\"'correct horse battery staple'\" />\n<echo>{ $pw->is_strong(min: 12) }</echo>"),
-                ("password->reveal", "<let name=\"pw\" type=\"password\" value=\"'s3cret!'\" />\n<echo>$pw is { $pw->reveal()->count() } characters</echo>"),
-
                 // Errors
                 ("error->is", "<try>\n  <throw value=\"FileNotFound('No settings.json')\" />\n  <catch as=\"err\"><echo>{ $err->is(IO) }</echo></catch>\n</try>"),
                 ("error->chain", "<error name=\"PersonNotFound\" extends=\"NotFound\" />\n<try>\n  <throw value=\"PersonNotFound()\" />\n  <catch as=\"err\"><echo>{ $err->chain() }</echo></catch>\n</try>"),
