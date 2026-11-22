@@ -17,6 +17,12 @@ namespace KScript.Runtime
         public static IReadOnlyList<NativeType> BuiltIn { get; } = new NativeType[]
         {
             new DurationType(),
+            new UrlType(),
+            new DomainType(),
+            new IpType(),
+            new CidrType(),
+            new MacType(),
+            new PortType(),
         };
 
         static NativeTypeRegistry()

@@ -30,20 +30,6 @@ namespace KScript.Runtime
             Add(new NativeTypeInfo("regex", "A regular expression with flags i, m, s and x, written /.../ in code.", "/^[a-z]+$/i",
                 new[] { "contains", "starts_with", "ends_with", "count", "escape", "markdown_escape", "json" }) { JsonFormat = "regex" });
 
-            // Web and network.
-            Add(new NativeTypeInfo("url", "An absolute http, https, ftp, ws or wss URL. The scheme and host are lowercased.", "https://example.com/docs?page=2",
-                With("split", "replace")) { JsonFormat = "uri", Options = new[] { "schemes", "hosts" } });
-            Add(new NativeTypeInfo("domain", "A domain name such as example.com or api.example.co.uk, lowercased, without a trailing dot.", "example.com",
-                With("split", "upper")) { JsonFormat = "hostname" });
-            Add(new NativeTypeInfo("ip", "An IPv4 or IPv6 address, written the standard way: 192.168.0.1 or 2001:db8::1.", "192.168.0.1",
-                With("split")) { Article = "an", JsonFormat = "ip", Options = new[] { "version" } });
-            Add(new NativeTypeInfo("cidr", "A block of IP addresses: an address, / and a prefix length, such as 10.0.0.0/8.", "10.0.0.0/8",
-                With("split")));
-            Add(new NativeTypeInfo("mac", "A network card's MAC address, written as six lowercase pairs: 00:1a:2b:3c:4d:5e.", "00:1a:2b:3c:4d:5e",
-                With("split", "upper")));
-            Add(new NativeTypeInfo("port", "A network port, a whole number from 1 to 65535.", "8080",
-                Array.Empty<string>()));
-
             // Identifiers and formats.
             Add(new NativeTypeInfo("slug", "Lowercase words joined by -, for URLs: my-first-post.", "my-first-post",
                 With("split", "upper", "replace")));
