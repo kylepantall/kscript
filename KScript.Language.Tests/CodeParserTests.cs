@@ -208,6 +208,7 @@ namespace KScript.Language.Tests
         [InlineData("samples/xml/oldest.ks.xml", "samples/scripts/oldest.kscript")]
         [InlineData("samples/xml/move-files.ks.xml", "samples/scripts/move-files.kscript")]
         [InlineData("samples/xml/lib/strings.ks.xml", "samples/scripts/lib/strings.kscript")]
+        [InlineData("samples/xml/counter.ks.xml", "samples/scripts/counter.kscript")]
         [InlineData("samples/xml/types/repo.ks.xml", "samples/scripts/types/repo.kscript")]
         [InlineData("samples/xml/types/owner.ks.xml", "samples/scripts/types/owner.kscript")]
         [InlineData("samples/xml/types/visibility.ks.xml", "samples/scripts/types/visibility.kscript")]

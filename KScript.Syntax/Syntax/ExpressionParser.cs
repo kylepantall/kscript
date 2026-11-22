@@ -575,7 +575,7 @@ namespace KScript.Syntax
             return new ErrorNode { Span = new TextSpan(t.Span.Start, 0) };
         }
 
-        /// <summary>"Double quotes" fill in <c>$name</c> and <c>{ $expr }</c>; 'single quotes' and ``` blocks are kept as written.</summary>
+        /// <summary>"Double quotes" fill in <c>$name</c> and <c>{ expr }</c>; 'single quotes' and ``` blocks are kept as written.</summary>
         private Template QuotedTemplate(Token t)
         {
             string text = lexer.Text;

@@ -191,16 +191,16 @@ public sealed class MultilineDocumentTests : DocumentFixture
         Run("""
             import KScript.Document
 
-            Document(template: paper, title: "Reaction Rates", to: "rates.tex, rates.md") {
+            Document(template: "paper", title: "Reaction Rates", to: ['rates.tex', 'rates.md']) {
               Abstract "Most chemical reactions speed up as they get warmer. \
                 This paper reviews the rate law, \( \mathrm{A} \rightarrow \text{products} \), \
                 and the Arrhenius equation."
 
-              Section(title: "The Arrhenius equation", id: arrhenius) {
+              Section(title: "The Arrhenius equation", id: "arrhenius") {
                 Paragraph "\( R = 8.314\ \mathrm{J\,mol^{-1}\,K^{-1}} \) is the gas constant, and \
                   Equation [#eq-ratio] follows from it."
 
-                Math(id: eq-ratio) ```latex
+                Math(id: "eq-ratio") ```latex
                   \ln\frac{k_2}{k_1}
                     = \frac{E_\mathrm{a}}{R}
                       \left(\frac{1}{T_1} - \frac{1}{T_2}\right)

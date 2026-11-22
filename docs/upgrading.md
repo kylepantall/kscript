@@ -2,14 +2,16 @@
 
 KScript now has one way to write each thing. This page lists every spelling that was renamed or removed, with what to write instead.
 
-Nothing here fails quietly. An old spelling is an error or a warning that names the new one, in the editor and in `kscript check`, and most come with a fix:
+Nothing here fails quietly, and no old spelling keeps working. In a `.kscript` file an old spelling is an error that names the new one: the script doesn't run, and the editor and `kscript check` say the same thing. Most come with a fix:
 
 ```sh
 kscript check --fix          # rewrite what can be rewritten, in every script of the project
 kscript check                # then read what is left
 ```
 
-`kscript check --fix` rewrites the spellings marked **fix** below, and renames the statements and arguments that only changed their name. The rest are errors whose message says what to write, and the editor offers a quick fix for most of them.
+`kscript check --fix` rewrites the spellings marked **fix** below, and renames the statements and arguments that only changed their name. It works on a file that doesn't run because of them. The rest are errors whose message says what to write, and the editor offers a quick fix for most of them.
+
+What is left as a warning is style, not spelling: an `else` after a `return` (KS6001), unused code (KS6002 to KS6005), a parameter without a type (KS6007), a second type in one file (KS6008), a name that isn't `snake_case` or `PascalCase` (KS6013) and a length of time without its unit (KS6018). XML scripts keep the forms that are XML's own, such as `lt`, comma lists in attributes and `fields="x: int, y: int"`.
 
 ## Text, names and values
 
@@ -18,6 +20,7 @@ kscript check                # then read what is left
 | `Section(title: Results)` | `Section(title: "Results")`: text in an argument goes in quotes, and a bare word is a name | fix (KS6009) |
 | `Button(on_click: "count += 1")` | `Button(on_click: count += 1)`, or `on_click: { count += 1 }`: double quotes always make text | |
 | `'Hello $name'` | `"Hello $name"`: double quotes fill in `$name` and `{ }` everywhere, single quotes keep text as written | |
+| `route = "/users/{id}"`, `"\d{3}"`, `"a { color: red }"` | `'/users/{id}'`, `'\d{3}'`, `'a { color: red }'`, or doubled braces (`"/users/{{id}}"`): a `{ }` in double quotes always holds an expression, whatever it opens with, so `"{ User->count() } users"` and `"{ 1 + 2 }"` fill in | |
 | `$total = 3`, `$total += 1` | `total = 3`, `total += 1`: a name being set has no `$` | fix (KS6010) |
 | `fn($n) => $n * 2` | `fn(n) => $n * 2` | fix (KS6010) |
 | `numbered: no`, `new_page: yes` | `numbered: false`, `new_page: true` (or the flag on its own: `new_page`) | fix (KS6011) |
@@ -87,7 +90,7 @@ Argument names are `snake_case`. A hyphenated name is an error that says the new
 | `import`, `include`, `layout`, `Markdown`, `Figure`, `Bibliography` | `src` | `path` |
 | `type` | `sample` | `path` |
 | `Table` (KScript.Document) | `data`, `headers`, `align: "lrr"` | `rows`, `columns: { Name: 'name' }`, `align: ['left', 'right']`, as in a terminal `table` |
-| `wait` | `ms`, `seconds` | `duration: 500ms` |
+| `wait` | `ms`, `seconds` | `duration: 500ms`, or the value on its own: `wait(500ms)` |
 | `test` | `each`, `in`, `index` | a `for` loop round the test (above) |
 | `@color`, `log_provider` | `colour` | `color` |
 

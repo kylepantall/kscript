@@ -225,7 +225,7 @@ public class ArgumentConventionTests
     public void ABareFunctionNameIsFlaggedAndFixed(string code, string expected)
     {
         Diagnostic d = Assert.Single(OneSpelling(code));
-        Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, d.Severity);
         Assert.Contains("a function is referred to as @name", d.Message);
         Assert.Contains(DiagnosticCodes.OneSpelling, Fixer.Rules);
         string text = Fixer.Apply(code, Path.Combine(Path.GetTempPath(), "conventions", "a.kscript")).Text;

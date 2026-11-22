@@ -82,7 +82,7 @@ namespace KScript.Language.Tests
         public void ADollarOnATypeIsReportedAndFixed(string code, string better)
         {
             Diagnostic d = Assert.Single(TypeForms(Types + code));
-            Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+            Assert.Equal(DiagnosticSeverity.Error, d.Severity);
             Assert.Contains("without $", d.Message);
             Assert.Equal(Types + better, Fixed(Types + code));
             Assert.Empty(TypeForms(Types + better));
@@ -104,7 +104,7 @@ namespace KScript.Language.Tests
         public void AnOptionalFieldIsMarkedOnItsName(string code, string better, string form)
         {
             Diagnostic d = Assert.Single(TypeForms(code));
-            Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+            Assert.Equal(DiagnosticSeverity.Error, d.Severity);
             Assert.Contains("Mark an optional field on its name: " + form, d.Message);
             Assert.Equal(better, Fixed(code));
             Assert.Empty(TypeForms(better));

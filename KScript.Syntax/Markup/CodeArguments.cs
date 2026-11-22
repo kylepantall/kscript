@@ -19,6 +19,14 @@ namespace KScript.Syntax.Markup
     /// </summary>
     public static class CodeArguments
     {
+        /// <summary>
+        /// What a type declared without fields is told, by the checker and by the engine: each form of a script gets
+        /// the spelling it writes.
+        /// </summary>
+        public static Wording TypeNeedsFields(string name) => new Wording(
+            $"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file (path=\"sample.json\").",
+            $"type {name} needs fields: a block of them (type {name} {{ name: string; age?: int }}), fields: [name: string, age?: int], or a sample file (path: \"sample.json\").");
+
         /// <summary>Applies the rule to every argument of every element in a .kscript document.</summary>
         public static void Normalise(MarkupDocument document, Func<string, ElementInfo> lookup)
         {

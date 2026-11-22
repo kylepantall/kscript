@@ -426,7 +426,7 @@ namespace KScript.Language.Analysis
             bool hasFields = seen.Count > 0 || e.GetAttribute("path") != null || e.GetAttribute("with") != null;
             if (!hasFields)
             {
-                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, $"<type> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file.");
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, CodeArguments.TypeNeedsFields(e.GetAttributeValue("name")?.Trim()));
             }
             string sample = e.GetAttributeValue("path")?.Trim();
             if (!string.IsNullOrEmpty(sample) && ResolvePath(sample) is string full && files.FileExists(full) && result.JsonFileShape(sample) == null)

@@ -68,30 +68,6 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>
-        /// KS6006: a list of names written as one string in a .kscript file, <c>use: "log, cors"</c>, where an array
-        /// reads better: <c>use: [log, cors]</c>. XML attributes are always text, so they are left alone there.
-        /// </summary>
-        private void CheckNameListString(MarkupElement e, MarkupAttribute attr, AttributeInfo a)
-        {
-            if (result.Markup.Syntax != SourceSyntax.Code || !a.IsNameList || e.Name == "import" || attr.Quote != '"' || !attr.ValueText.Contains(','))
-            {
-                return;
-            }
-            List<string> names = KScript.Metadata.NameList.Names(attr.ValueText);
-            if (names.Count < 2 || names.Any(n => !n.All(c => char.IsLetterOrDigit(c) || c is '_' or '.' or ':' or '-' or '$' or '@')))
-            {
-                return;
-            }
-            string array = "[" + string.Join(", ", names) + "]";
-            int open = attr.Value.SourceSpan.Start - 1;
-            QuickFix fix = open >= 0 && source.Text[open] == '"' && attr.Span.End > attr.Value.SourceSpan.End
-                ? new QuickFix($"Write {array}", new TextChange(TextSpan.FromBounds(open, attr.Span.End), array))
-                : null;
-            Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Warning, DiagnosticCodes.PreferArrayList,
-                $"Write the list as an array: {attr.Name}: {array}.", fix != null ? new[] { fix } : null);
-        }
-
-        /// <summary>
         /// KS6008: a script in a project that declares more than one type. Each type, model, enum and error type goes
         /// in its own file (types/, models/, errors/), and the files that use it import it. The first declaration is
         /// one the file is named after (or else the first) is left alone; the others are flagged. Scripts outside a project (one-off scripts) are not checked.

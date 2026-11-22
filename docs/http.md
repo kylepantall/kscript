@@ -217,7 +217,7 @@ Routes {
 }
 ```
 
-In XML, attributes are text, so the same list is written `use="secure_headers, json_only"`. In `.kscript` files, a list written as one string (`use: "log, cors"`) still works, but `kscript check` suggests the array with KS6006, and the quick fix rewrites it. The same goes for every list of names: `only`, `except`, `methods`, and `<llm tools>`.
+In XML, attributes are text, so the same list is written `use="secure_headers, json_only"`. In `.kscript` files, a list written as one string (`use: "log, cors"`) is an error (KS6006), and `kscript check --fix` rewrites it as the array. The same goes for every list of names: `only`, `except`, `methods`, and `<llm tools>`.
 
 ### Built-in middleware
 

@@ -117,7 +117,7 @@ Every allow-list is in `Conventions`, is short, and gives the reason for each en
 
 The checks are plain string comparisons, with no reflection and no regular expressions, so they are cheap: in the released (Native AOT) kscript a script starts as fast as before, within a millisecond or two. A build that runs under the JIT (`dotnet run`, the tests) pays about 25 ms once to compile them. The tests in `KScript.Tests/Conventions/` call the same checks: `ConventionEngineTests` proves that every package that ships loads clean and that each rule fires (it registers something wrong in a throwaway package and reads the message), and the other files apply one rule at a time to the whole catalog, including the elements that are only planned. To add a rule, add a check to `Conventions`, call it from `Element`, `Callable`, `Field` or `Together`, list it here, and add a test that breaks it.
 
-Rules about what a script, a sample or a guide writes (quotes, `true`/`false`, one spelling per piece of syntax) are lint rules (KS6xxx) with their own tests, not part of `Conventions`.
+Rules about what a script, a sample or a guide writes (quotes, `true`/`false`, one spelling per piece of syntax) are the old-spelling rules (KS6006, KS6009 to KS6012, KS6014) with their own tests, not part of `Conventions`. In a `.kscript` file each is an error in `kscript check` and at run time, from one list (`OldSpellings` in KScript.Syntax) that both read, so a new one is added there with its message and its fix.
 
 ## How the standard packages behave
 

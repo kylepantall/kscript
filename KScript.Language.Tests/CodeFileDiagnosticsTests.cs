@@ -14,23 +14,23 @@ namespace KScript.Language.Tests
         [Fact]
         public void MissingImportsSuggestTheKscriptWay()
         {
-            const string text = "// tests\nimport KScript.Math\n\ndescribe(name: x) {\n}\n";
+            const string text = "// tests\nimport KScript.Math\n\ndescribe(name: \"x\") {\n}\n";
             Diagnostic d = Analyze(text, "a.kscript").Diagnostics.Single(x => x.Code == DiagnosticCodes.MissingImport);
             Assert.Contains("Add import KScript.Test at the top", d.Message);
             Assert.DoesNotContain("<import", d.Message);
             Assert.Equal("Add import KScript.Test", d.Fixes[0].Title);
             string fixedText = AnalyzerTests.Apply(text, d.Fixes[0].Changes);
-            Assert.Equal("// tests\nimport KScript.Math\nimport KScript.Test\n\ndescribe(name: x) {\n}\n", fixedText);
+            Assert.Equal("// tests\nimport KScript.Math\nimport KScript.Test\n\ndescribe(name: \"x\") {\n}\n", fixedText);
             Assert.DoesNotContain(Analyze(fixedText, "a.kscript").Diagnostics, x => x.Severity == DiagnosticSeverity.Error);
 
-            Diagnostic top = Analyze("describe(name: x) {\n}\n", "b.kscript").Diagnostics.Single(x => x.Code == DiagnosticCodes.MissingImport);
-            Assert.Equal("import KScript.Test\ndescribe(name: x) {\n}\n", AnalyzerTests.Apply("describe(name: x) {\n}\n", top.Fixes[0].Changes));
+            Diagnostic top = Analyze("describe(name: \"x\") {\n}\n", "b.kscript").Diagnostics.Single(x => x.Code == DiagnosticCodes.MissingImport);
+            Assert.Equal("import KScript.Test\ndescribe(name: \"x\") {\n}\n", AnalyzerTests.Apply("describe(name: \"x\") {\n}\n", top.Fixes[0].Changes));
         }
 
         [Fact]
         public void TestFilesGetKScriptTestWithoutAnImport()
         {
-            Assert.DoesNotContain(Analyze("describe(name: x) {\n  test(name: y) {\n    expect(value: 1, equals: 1)\n  }\n}\n", "a.test.kscript").Diagnostics,
+            Assert.DoesNotContain(Analyze("describe(name: \"x\") {\n  test(name: \"y\") {\n    expect(value: 1, equals: 1)\n  }\n}\n", "a.test.kscript").Diagnostics,
                 x => x.Severity == DiagnosticSeverity.Error);
         }
 

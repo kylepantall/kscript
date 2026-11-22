@@ -192,7 +192,13 @@ namespace KScript.Runtime
                     };
 
                 case VariableNode v:
-                    if (scope.TryGet(v.Name, out object value)) return value;
+                    if (scope.TryGet(v.Name, out object value))
+                    {
+                        // $Repo for the declared type Repo: a type is named bare. (t = Repo; $t is a variable, read with $.)
+                        if (value is IDeclaredType declared && declared.Name == v.Name && v.Span.Length > 1 && ctx.Module?.IsCode == true)
+                            throw Fail(node, ctx, KScript.Syntax.Markup.OldSpellings.TypeIsBare(v.Name), "Syntax");
+                        return value;
+                    }
                     // A package's variable ($config, $session) in a page or other document that isn't run as a script.
                     if (ctx.Module != null && ctx.Module.Variables.TryGetValue(v.Name, out VariableDefinition packageVariable)) return packageVariable.Value(this, ctx.Module);
                     throw Fail(node, ctx, UndefinedMessage(v.Name, scope), "Name");
