@@ -1742,11 +1742,14 @@ namespace KScript.Projects
         /// </summary>
         public static bool IsAgentFile(string relative) => relative is "AGENTS.md" or "CLAUDE.md";
 
-        /// <summary>True when the file is under the project folder and matches lint.exclude.</summary>
+        /// <summary>
+        /// True when the file is under the project folder and matches lint.exclude, or is one kscript generates
+        /// (.kscript/, AGENTS.md, CLAUDE.md): the editor and <c>kscript check</c> report nothing for it.
+        /// </summary>
         public bool IsExcluded(string path)
         {
             string rel = Relative(path);
-            return rel != null && Lint.Exclude.Any(g => GlobMatches(g, rel));
+            return rel != null && (IsGenerated(rel) || Lint.Exclude.Any(g => GlobMatches(g, rel)));
         }
 
         /// <summary>True when the file matches lint.include and not lint.exclude.</summary>

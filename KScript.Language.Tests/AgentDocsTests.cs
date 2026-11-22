@@ -260,6 +260,17 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void AgentsMdHasNoTagLikePlaceholders()
+        {
+            // Read as Markdown, a placeholder such as `<package>` is a start tag that is never closed (KS1003).
+            Write("kscript.json", "{ \"name\": \"demo\" }");
+            Write("main.kscript", "fn one() => 1\n");
+            string section = AgentDocs.AgentsSection(AgentDocs.Read(dir));
+            MarkupDocument doc = MarkupParser.Parse(new KScript.Syntax.Text.SourceText(section), DocumentKind.Markdown);
+            Assert.DoesNotContain(doc.Diagnostics, d => d.Code == KScript.Syntax.DiagnosticCodes.UnclosedElement);
+        }
+
+        [Fact]
         public void TheCrashCourseChecksCleanInBothFormats()
         {
             Write("tasks.json", "[{ \"title\": \"a\" }]");
