@@ -181,7 +181,7 @@ Controllers can read and write files with KScript.IO, but only inside the site f
 
 `@view('people/show', person: $p)` renders `views/people/show.html` (or `.md`). If that file doesn't exist, it renders `people/show.html` in the site folder. Leaving off the extension is fine. The named values become the view's variables, and `$request` is there too. Views are normal pages, so layouts, components, `<include>` and `<live>` all work in them.
 
-The `views` folder is never served as pages, because a view needs its controller's data. The editor knows that views get their variables from a controller, so it doesn't flag them as undefined.
+The `views` folder is never served as pages, because a view needs its controller's data. The editor knows that views get their variables from a controller, so it doesn't flag them as undefined. It also reads every `@view('people/show', ...)` in the project's scripts, so in `views/people/show.html` typing `$` offers `$person`, `$person.` offers the fields the controller gave it, and a loop over a list it was given knows the fields of each item. Hovering `$person` says which controller passes it, and **Go to Definition** opens that call. A view that names a package with `<import package="KScript.Auth" />` gets its variables too, so `$session->` lists the session's methods.
 
 ## Middleware
 
