@@ -350,7 +350,7 @@ namespace KScript.Language.Analysis
                 Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
                     $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode
                         ? $"import KScript.Name as {aliasName} or import \"...\" as {aliasName}."
-                        : $"<import package=\"...\" as=\"{aliasName}\" /> or <import src=\"...\" as=\"{aliasName}\" />."),
+                        : $"<import package=\"...\" as=\"{aliasName}\" /> or <import path=\"...\" as=\"{aliasName}\" />."),
                     SuggestFix(aliasSpan, aliasName, aliases, n => n));
                 return;
             }
@@ -559,11 +559,8 @@ namespace KScript.Language.Analysis
 
             string type = (types ??= new TypeInference(catalog, result)).ReceiverType(name, receiver);
             List<CallableInfo> candidates = catalog.GetMethods(name, type).ToList();
-            if (candidates.Count == 0 && (Runtime.Retired.Method(type, name) ?? Runtime.Retired.Method(receiver.Kind, name)) is RetiredInfo retiredMethod)
+            if (!pipe && (candidates.Count == 0 || (receiver.Type != KType.Any && !candidates.Any(m => m.ReceiverType == receiver.Type || m.ReceiverType == KType.Any))) && FieldOrRetired(name, nameSpan, receiver))
             {
-                // ->where() on a list, ->count(): a second name that was removed. Say which one to write.
-                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod, $"{arrow}{name}() on a {type} was removed. {retiredMethod.Replacement}",
-                    retiredMethod.Rename != null ? new[] { new QuickFix($"Change to {retiredMethod.Rename}", new TextChange(nameSpan, retiredMethod.Rename)) } : null);
                 return;
             }
             if (candidates.Count == 0)
@@ -627,6 +624,53 @@ namespace KScript.Language.Analysis
             }
         }
 
+        /// <summary>
+        /// <c>->status()</c> where status is a field (<c>.status</c>), or a method that was renamed (<c>->put()</c> is
+        /// <c>->set()</c>): reports it with a fix and returns true.
+        /// </summary>
+        private bool FieldOrRetired(string name, TextSpan nameSpan, TypeShape receiver)
+        {
+            bool unknown = receiver.Type == KType.Any;
+            // A renamed method of this very type comes first: storage's ->path(name) is ->path_of(name), though .path is a field.
+            RetiredInfo retired = catalog.GetRetiredMethod(receiver.Type, name);
+            ValueFieldInfo field = retired != null ? null
+                : catalog.GetField(receiver.Type, name) ?? catalog.GetField(receiver.Kind, name) ?? (unknown ? catalog.Fields.FirstOrDefault(f => f.Name == name) : null);
+            if (field != null)
+            {
+                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod,
+                    $"{name} is a field of {Article(field.Receiver)}, not a method. Read it with a dot and no brackets: .{name}",
+                    CallToField(nameSpan, name) is TextChange change ? new[] { new QuickFix($"Change to .{name}", change) } : null);
+                return true;
+            }
+            retired ??= unknown ? catalog.GetRetiredMethod(name) : null;
+            if (retired == null)
+            {
+                return false;
+            }
+            QuickFix fix = retired.Rename == null ? null
+                : retired.Rename.StartsWith('.') ? (CallToField(nameSpan, retired.Rename.Substring(1)) is TextChange toField ? new QuickFix($"Change to {retired.Rename}", toField) : null)
+                : new QuickFix($"Change to {retired.Rename}", new TextChange(nameSpan, retired.Rename));
+            Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod, $"->{name}() is no longer part of KScript. {retired.Replacement}", fix != null ? new[] { fix } : null);
+            return true;
+        }
+
+        /// <summary>The edit that turns <c>->name()</c> at <paramref name="nameSpan"/> into <c>.field</c>, or null when it has arguments.</summary>
+        private TextChange CallToField(TextSpan nameSpan, string field)
+        {
+            string text = result.Source.Text;
+            int start = nameSpan.Start;
+            while (start > 0 && char.IsWhiteSpace(text[start - 1])) start--;
+            if (start < 2 || text[start - 2] != '-' || text[start - 1] != '>') return null;
+            start -= 2;
+            int end = nameSpan.End;
+            while (end < text.Length && char.IsWhiteSpace(text[end])) end++;
+            if (end >= text.Length || text[end] != '(') return null;
+            end++;
+            while (end < text.Length && char.IsWhiteSpace(text[end])) end++;
+            if (end >= text.Length || text[end] != ')') return null;
+            return new TextChange(TextSpan.FromBounds(start, end + 1), "." + field);
+        }
+
         private void CheckField(MemberNode member, ExpressionRegion region)
         {
             TypeShape target = Infer(member.Target, region);
@@ -638,6 +682,16 @@ namespace KScript.Language.Analysis
                 Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownMethod,
                     $"{(target.Type == KType.Request ? "$request" : "An error")} has no field '{member.Name}'. It has: {string.Join(", ", target.Fields.Keys)}.",
                     SuggestFix(span, member.Name, target.Fields.Keys, n => n));
+                return;
+            }
+            // $response.json: a method of the value, read as a field.
+            if (member.Name.Length > 0 && !target.Fields.ContainsKey(member.Name) && catalog.FieldsOf(target.Type) is { Count: > 0 } builtIn && !builtIn.ContainsKey(member.Name)
+                && target.Type != KType.Type && catalog.GetMethods(member.Name, target.Type).Any(m => m.ReceiverType == target.Type))
+            {
+                TextSpan at = region.Source.ToSource(TextSpan.FromBounds(member.NameSpan.Start - 1, member.NameSpan.End));
+                Report(at, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownField,
+                    $"{member.Name} is a method of {Article(target.Type)}, not a field. Call it with ->{member.Name}().",
+                    member.NullSafe ? null : new[] { new QuickFix($"Change to ->{member.Name}()", new TextChange(at, "->" + member.Name + "()")) });
             }
         }
 

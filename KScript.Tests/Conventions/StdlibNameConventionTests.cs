@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 
+using KScript.Language.Catalog;
 using KScript.Metadata;
 using KScript.Runtime;
 
@@ -114,6 +115,13 @@ public class StdlibNameConventionTests
         None(Methods.Where(m => m.Name == "count" && Parameters(m).Count > 0).Select(Show),
             "->count() takes no arguments; counting what matches is ->count_of(match):");
         None(Methods.Where(m => m.Name == "length").Select(Show), "The number of items or characters is ->count(), not ->length():");
+        // A list, a text and a map have no fields of their own (a map's are the user's keys), so "how many" is the
+        // method on all of them and on everything else that is counted. See "Fields and methods" in
+        // StdlibBehaviourConventionTests: a name is a field or a method, never both.
+        None(LanguageCatalog.Default.Fields.Where(f => f.Name is "count" or "length").Select(f => $"{f.Receiver}.{f.Name}"),
+            "\"How many\" is the method ->count() on every type, never a field:");
+        Assert.Contains("->count()", ScriptRunner.Fails("<echo>{ [1, 2].count }</echo>").Message);
+        Assert.Contains("->count()", ScriptRunner.Fails("<echo>{ 'abc'.length }</echo>").Message);
     }
 
     [Fact]
@@ -122,13 +130,16 @@ public class StdlibNameConventionTests
         // A KScript 1 command whose name a package uses again (@average in KScript.Math) says so in its replacement.
         None(Commands.Where(c => Retired.Commands.TryGetValue(c.Name, out RetiredInfo r) && !r.Replacement.Contains("@" + c.Name + "(", StringComparison.Ordinal)).Select(Show),
             "These commands are in Retired.Commands, which tells users what to write instead. Don't bring the old name back:");
-        None(Methods.Where(m => Retired.Method(m.ReceiverType, m.Name) != null).Select(Show),
-            "These methods are in Retired.Methods. Don't bring the old name back:");
+        None(Methods.Where(m => RetiredMembers.Method(m.ReceiverType, m.Name) != null).Select(Show),
+            "These methods are in RetiredMembers.Methods. Don't bring the old name back:");
         None(Elements.Where(e => Retired.Elements.ContainsKey(e.Name)).Select(e => $"<{e.Name}> in {e.Package}"),
             "These statements are in Retired.Elements. Don't bring the old name back:");
-        None(Retired.Methods.Values.Where(r => r.Rename != null).Select(r => (Retired: r, Type: r.Name.Substring(0, r.Name.IndexOf("->", StringComparison.Ordinal))))
-                .Where(x => !Methods.Any(m => m.Name == x.Retired.Rename && KType.AcceptsMethod(m.ReceiverType, m.Name, x.Type)))
-                .Select(x => $"{x.Retired.Name} -> {x.Retired.Rename}"),
+        // RetiredMembers is keyed "type:name". A rename that starts with a dot is a field (->ok() became .is_ok).
+        None(RetiredMembers.Methods.Where(r => r.Value.Rename != null).Select(r => (Old: r.Key, r.Value.Rename, Type: r.Key.Substring(0, r.Key.IndexOf(':'))))
+                .Where(x => x.Rename.StartsWith('.')
+                    ? LanguageCatalog.Default.GetField(x.Type, x.Rename.Substring(1)) == null
+                    : !Methods.Any(m => m.Name == x.Rename && KType.AcceptsMethod(m.ReceiverType, m.Name, x.Type)))
+                .Select(x => $"{x.Old} -> {x.Rename}"),
             "A retired method's new name should exist on the same type:");
         None(Retired.Commands.Values.Where(r => r.Rename != null && !Commands.Any(c => c.Name == r.Rename)).Select(r => $"@{r.Name} -> @{r.Rename}"),
             "A retired command's new name should exist:");

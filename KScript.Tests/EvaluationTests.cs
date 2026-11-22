@@ -34,14 +34,14 @@ public sealed class EvaluationTests : IDisposable
     [InlineData("<echo>{ ({ a: 1 } + { b: 2, a: 3 })->to_json() } { [1] + [2] } { 'a' + 1 } { 1 + 'a' }</echo>", "{\"a\":3,\"b\":2} 1, 2 a1 1a\n")]
     [InlineData("<echo>{ @now() + 1 > @now() }</echo>", "true\n")]
     [InlineData("<echo>{ [1, 2][5] ?? 'n' } { [1, 2][-1] } { 'abc'[1] } { 'abc'[-1] } { 'abc'[9] ?? 'n' } { { a: 1 }['a'] }</echo>", "n 2 b c n 1\n")]
-    [InlineData("<echo>{ $list.count } { $list->count() } { 'abc'.count }</echo>", "3 3 3\n")]
-    [InlineData("<import package=\"KScript.Math\" as=\"m\" /><import src=\"lib.ks.xml\" as=\"lib\" /><echo>{ m.pi > 3 } { m.sqrt(16) } { lib.pi2 } { lib.helper() } { @lib.pi2 } { @m.sqrt(9) } { m.e > 2 }</echo>", "true 4 6.28 1 6.28 3 true\n")]
+    [InlineData("<echo>{ $list->count() } { 'abc'->count() } { {a: 1}->count() }</echo>", "3 3 1\n")]
+    [InlineData("<import package=\"KScript.Math\" as=\"m\" /><import path=\"lib.ks.xml\" as=\"lib\" /><echo>{ m.pi > 3 } { m.sqrt(16) } { lib.pi2 } { lib.helper() } { @lib.pi2 } { @m.sqrt(9) } { m.e > 2 }</echo>", "true 4 6.28 1 6.28 3 true\n")]
     [InlineData("<let name=\"m\" value=\"{ a: 1 }\" /><do>$m['a'] += 2; $m['b'] ??= 5; $m.c ??= 1; $m.c += 1</do><echo>{ $m->to_json() }</echo>", "{\"a\":3,\"b\":5,\"c\":2}\n")]
     [InlineData("<let name=\"x\" value=\"10\" /><do>$x -= 1; $x *= 2; $x /= 3; $x ??= 4</do><echo>$x</echo>", "6\n")]
     [InlineData("<let name=\"l\" value=\"[1]\" /><do>$l += 2; $l[2] = 5; $l[-1] += 1; $l[0] *= 7</do><echo>{ $l }</echo>", "7, 2, 6\n")]
     [InlineData("<echo>{ 65 |> char_of() } { 65 |> @char_of() } { 'abc' |> upper() }</echo>", "A A ABC\n")]
     [InlineData("<let name=\"f\" value=\"fn($x) => $x * 2\" /><fn name=\"g\" params=\"x\" value=\"$x * 3\" /><echo>{ 3 |> $f } { 2 |> g() } { g(4) } { char_of(88) }</echo>", "6 6 12 X\n")]
-    [InlineData("<import package=\"KScript.IO\" /><echo>{ @file('a.txt') |> stem() } { @file('a.txt') |> name() }</echo>", "a a.txt\n")]
+    [InlineData("<import package=\"KScript.IO\" /><echo>{ @file('a.txt').stem } { @file('a.txt') |> read_text() }</echo>", "a a\n")]
     [InlineData("<echo>{ '5'->round() } { { a: fn() => 1 }.a() }</echo>", "5 1\n")]
     public void Expressions_give_values(string body, string expected)
     {
@@ -126,7 +126,7 @@ public sealed class EvaluationTests : IDisposable
     public void Package_commands_and_objects_work_as_values()
     {
         Assert.Equal("3 a.txt\n", Run("<import package=\"KScript.Math\" as=\"m\" /><import package=\"KScript.IO\" /><let name=\"f\" value=\"m.sqrt\" /><echo>{ $f(9) } { @file('a.txt')['name'] }</echo>"));
-        Assert.Equal("claude-x\n", Run("<import package=\"KScript.AI\" /><echo>{ @chat('s', model: 'claude-x') |> model() }</echo>"));
+        Assert.Equal("claude-x\n", Run("<import package=\"KScript.AI\" /><echo>{ @chat('s', model: 'claude-x').model }</echo>"));
         Assert.Equal("x", Run("<let name=\"nl\" value=\"false\" /><echo newline=\"{ $nl }\">x</echo>"));
         Assert.Equal("x\n", Run("<echo newline=\"{ 'y' }{ 'es' }\">x</echo>"));
     }

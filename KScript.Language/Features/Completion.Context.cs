@@ -81,7 +81,7 @@ namespace KScript.Language.Features
             if (cursor.InAttributeValue && cursor.TagElement.Name == "import" && cursor.Attribute.Name == "names")
             {
                 string typed = cursor.Attribute.Value.Value.Substring(0, Math.Max(0, cursor.Attribute.Value.FromSource(offset)));
-                return ImportNameCompletions(analysis, cursor.TagElement.GetAttributeValue("src"), TextSpan.FromBounds(WordStart(text, offset), offset), typed.Split(','));
+                return ImportNameCompletions(analysis, cursor.TagElement.GetAttributeValue("path"), TextSpan.FromBounds(WordStart(text, offset), offset), typed.Split(','));
             }
             int lineStart = text.LastIndexOf('\n', Math.Max(0, offset - 1)) + 1;
             int lineEnd = text.IndexOf('\n', offset) is int nl && nl >= 0 ? nl : text.Length;
@@ -312,7 +312,7 @@ namespace KScript.Language.Features
             return items;
         }
 
-        /// <summary>An element as a .kscript statement: <c>describe(name: "$1") { }</c>, <c>wait(ms: $1)</c>; null for a bare word.</summary>
+        /// <summary>An element as a .kscript statement: <c>describe(name: "$1") { }</c>, <c>wait(duration: $1)</c>; null for a bare word.</summary>
         internal static string CodeElementSnippet(ElementInfo e)
         {
             int n = 1;

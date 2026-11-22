@@ -378,7 +378,7 @@ public class MakeProjectTests : IDisposable
             Assert.False(File.Exists(Path.Combine(root, Path.ChangeExtension(f, null).Replace(".ks", "") + ".kscript")));
         }
         Assert.Contains("<KScript.Window title=\"Site\"", File.ReadAllText(Path.Combine(root, "desktop.ks.xml")));
-        Assert.Contains("<import src=\"lib/tasks.ks.xml\" />", File.ReadAllText(Path.Combine(root, "tasks.html")));
+        Assert.Contains("<import path=\"lib/tasks.ks.xml\" />", File.ReadAllText(Path.Combine(root, "tasks.html")));
 
         var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
         Assert.Empty(config.Warnings);

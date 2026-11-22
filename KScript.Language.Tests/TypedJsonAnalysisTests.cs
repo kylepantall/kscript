@@ -218,7 +218,7 @@ namespace KScript.Language.Tests
         [InlineData("<type name=\"T\"><field name=\"a\" from=\"a..b\" /></type>", DiagnosticCodes.InvalidAttributeValue, "'a..b' isn't a path.")]
         [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" from=\"b\" /></type>", DiagnosticCodes.InvalidAttribute, "A field with a value is worked out from the others")]
         [InlineData("<type name=\"T\"><field name=\"a\" value=\"$nope\" /></type>", DiagnosticCodes.UndefinedVariable, "$nope is not defined")]
-        [InlineData("<type name=\"T\" sample=\"bad.json\" />", DiagnosticCodes.InvalidAttributeValue, "'bad.json' isn't a JSON file the editor can read")]
+        [InlineData("<type name=\"T\" path=\"bad.json\" />", DiagnosticCodes.InvalidAttributeValue, "'bad.json' isn't a JSON file the editor can read")]
         [InlineData("<type fields=\"a\" />", DiagnosticCodes.MissingAttribute, "<type> needs")]
         [InlineData("<type name=\"1x\" fields=\"a\" />", DiagnosticCodes.InvalidAttributeValue, "'1x' isn't a valid name.")]
         [InlineData("<type name=\"T\" fields=\": int\" />", DiagnosticCodes.InvalidAttributeValue, "': int' isn't a field.")]
@@ -265,7 +265,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void SampleFilesGiveFields()
         {
-            DocumentAnalysis a = Open("<type name=\"Repo\" sample=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /></type>\n<type name=\"Item\" sample=\"list.json\" />\n<type name=\"Gone\" sample=\"missing.json\" fields=\"a\" />");
+            DocumentAnalysis a = Open("<type name=\"Repo\" path=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /></type>\n<type name=\"Item\" path=\"list.json\" />\n<type name=\"Gone\" path=\"missing.json\" fields=\"a\" />");
             Assert.Equal(new[] { "name", "stargazers_count", "avatar_url", "owner", "stars" }, a.Symbols.First(s => s.Name == "Repo").Shape.Instance.Fields.Keys);
             Assert.Equal(new[] { "id", "tag" }, a.Symbols.First(s => s.Name == "Item").Shape.Instance.Fields.Keys);
             Assert.Single(a.Diagnostics, d => d.Message.Contains("missing.json"));
@@ -282,18 +282,18 @@ namespace KScript.Language.Tests
         [Fact]
         public void OddSamplesAndInlineFields()
         {
-            Assert.Empty(Open("<type name=\"E\" sample=\"empty.json\" />").Symbols.First(s => s.Name == "E").Shape.Instance.Fields);
-            Assert.Equal("_2x", Open("<type name=\"D\" sample=\"digits.json\" />").Symbols.First(s => s.Name == "D").Shape.Instance.Fields.Keys.Single());
+            Assert.Empty(Open("<type name=\"E\" path=\"empty.json\" />").Symbols.First(s => s.Name == "E").Shape.Instance.Fields);
+            Assert.Equal("_2x", Open("<type name=\"D\" path=\"digits.json\" />").Symbols.First(s => s.Name == "D").Shape.Instance.Fields.Keys.Single());
             DocumentAnalysis a = Open("<type name=\"T\" fields=\"a = 'x,y', b: list = [{ c: (1) }], d: string[] = []\" />");
             AssertClean(a);
             Assert.Equal(new[] { "a", "b", "d" }, a.Symbols.First(s => s.Name == "T").Shape.Instance.Fields.Keys);
-            AssertClean(Analyzer.Analyze(Script("<type name=\"T\" sample=\"bad.json\" fields=\"a\" />"), null, EmptyFileSystem.Instance));
+            AssertClean(Analyzer.Analyze(Script("<type name=\"T\" path=\"bad.json\" fields=\"a\" />"), null, EmptyFileSystem.Instance));
         }
 
         [Fact]
         public void ImportedTypesAreKnown()
         {
-            DocumentAnalysis a = Open("<import src=\"lib.ks.xml\" />\n<let name=\"t\" value=\"$Team->from({})\" />\n<let name=\"u\" type=\"Team\" value=\"{}\" />\n<echo>{ $t.size } { $u.name }</echo>");
+            DocumentAnalysis a = Open("<import path=\"lib.ks.xml\" />\n<let name=\"t\" value=\"$Team->from({})\" />\n<let name=\"u\" type=\"Team\" value=\"{}\" />\n<echo>{ $t.size } { $u.name }</echo>");
             AssertClean(a);
             Assert.Equal("Team", Show(a, "t"));
             Assert.Equal("Team", Show(a, "u"));

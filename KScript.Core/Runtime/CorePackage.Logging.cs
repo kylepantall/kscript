@@ -7,10 +7,10 @@ namespace KScript.Runtime
 {
     public sealed partial class CorePackage
     {
-        /// <summary>The attributes of &lt;log-provider&gt; that are passed to the provider as options.</summary>
+        /// <summary>The attributes of &lt;log_provider&gt; that are passed to the provider as options.</summary>
         private static readonly string[] ProviderOptions = { "type", "name", "level", "format", "path", "roll", "stream", "color", "time", "url", "batch" };
 
-        /// <summary>Logging: $log, &lt;log&gt; and &lt;log-provider&gt;.</summary>
+        /// <summary>Logging: $log, &lt;log&gt; and &lt;log_provider&gt;.</summary>
         private static void RegisterLogging(PackageBuilder p)
         {
             p.Variable("log", KType.Logger,
@@ -21,10 +21,12 @@ namespace KScript.Runtime
             {
                 p.Method(KType.Logger, level, "message, fields?", $"Logs a message at {level} level, with an optional map of fields.", KType.Null, LoggerMethod(level));
             }
+            p.Field(KType.Logger, "category", KType.String, "The logger's category, such as db, or null.");
+            p.Field(KType.Logger, "fields", KType.Map, "The fields the logger adds to everything it logs.");
             p.Method(KType.Logger, "log", "level, message, fields?", "Logs a message at a level given by name.", KType.Null, LoggerMethod("log"));
             p.Method(KType.Logger, "with", "fields", "A logger that adds these fields to everything it logs.", KType.Logger, LoggerMethod("with"));
             p.Method(KType.Logger, "named", "category", "A logger for a category, such as db (inside a named logger, db.queries).", KType.Logger, LoggerMethod("named"));
-            p.Method(KType.Logger, "enabled", "level", "True when entries at this level would be written, so costly messages can be skipped.", KType.Bool, LoggerMethod("enabled"));
+            p.Method(KType.Logger, "is_enabled", "level", "True when entries at this level would be written, so costly messages can be skipped.", KType.Bool, LoggerMethod("is_enabled"));
             p.Method(KType.Logger, "entries", "", "What memory providers kept: a list of { time, level, category, message, fields, script, line }.", KType.List, LoggerMethod("entries"));
             p.Method(KType.Logger, "flush", "", "Writes out entries that providers hold back (they are also written when the script ends).", KType.Null, LoggerMethod("flush"));
 
@@ -45,11 +47,11 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("log-provider",
+            p.Element(new ElementInfo("log_provider",
                 "Adds somewhere for log entries to go: the console, a file, memory (for tests), a function, or a type a package adds (KScript.Net adds http). Usually set in config under logging.providers instead.",
                 ContentKind.Empty,
                 new A("type", K.Text, "console, file, memory, or a type from an imported package such as http. Leave it out when using fn."),
-                new A("fn", K.FunctionReference, "A function called with each entry (a map of time, level, category, message, fields, script and line)."),
+                new A("fn", K.FunctionReference, "A function called with each entry (a map of time, level, category, message, fields, script and line): `@alert` (in XML, fn=\"alert\")."),
                 new A("level", K.Enum, "The lowest level this provider writes (default: all that logging lets through).", false, LogLevels.Names),
                 new A("format", K.Enum, "text or json (console and file).", false, "text", "json"),
                 new A("path", K.Template, "The file to append to (file)."),
@@ -61,10 +63,10 @@ namespace KScript.Runtime
                 new A("headers", K.Expression, "A map of request headers (http)."),
                 new A("batch", K.Expression, "How many entries to send at once (http, default 20)."),
                 new A("name", K.Text, "A name for the provider, used in error messages."),
-                new A("replace", K.Bool, "yes removes the providers already set up, including the default console one."))
+                new A("replace", K.Bool, "true removes the providers already set up, including the default console one."))
             {
                 Context = ElementContext.Script,
-                Example = "<log-provider type=\"file\" path=\"logs/app.log\" format=\"json\" level=\"debug\" />\n<fn name=\"alert\" params=\"entry\"><echo>ALERT: {$entry.message}</echo></fn>\n<log-provider fn=\"alert\" level=\"error\" />",
+                Example = "<log_provider type=\"file\" path=\"logs/app.log\" format=\"json\" level=\"debug\" />\n<fn name=\"alert\" params=\"entry\"><echo>ALERT: {$entry.message}</echo></fn>\n<log_provider fn=\"alert\" level=\"error\" />",
             }, run =>
             {
                 LogHub hub = run.Host.Logs;
@@ -86,7 +88,7 @@ namespace KScript.Runtime
                 }
                 try
                 {
-                    hub.Add(options, run.Interpreter, run.Module, "<log-provider>");
+                    hub.Add(options, run.Interpreter, run.Module, "<log_provider>");
                 }
                 catch (KScriptException ex) when (ex.Offset == null)
                 {

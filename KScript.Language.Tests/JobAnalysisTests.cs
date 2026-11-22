@@ -52,8 +52,8 @@ namespace KScript.Language.Tests
         public void ValidJobCodeIsClean()
         {
             AssertClean(Open(Welcome + """
-                dispatch Welcome(user_id: 1, email: 'a@example.com')
-                Welcome(user_id: 2, email: 'b@example.com', name: 'Bo')->dispatch(delay: '5m', queue: 'later')
+                Welcome(user_id: 1, email: 'a@example.com')->dispatch()
+                Welcome(user_id: 2, email: 'b@example.com', name: 'Bo')->dispatch(delay: 5m, queue: 'later')
                 job = Welcome(user_id: 3, email: 'c@example.com')
                 $job->run()
                 echo $job.email
@@ -63,14 +63,14 @@ namespace KScript.Language.Tests
         [Fact]
         public void JobsFromOtherFilesCanBeMade()
         {
-            AssertClean(Open("import \"jobs/remind.kscript\"\ndispatch Remind(user_id: 4)\n"));
-            Assert.Contains("takes its fields by name", Messages("import \"jobs/remind.kscript\"\ndispatch Remind(4)\n"));
+            AssertClean(Open("import \"jobs/remind.kscript\"\nRemind(user_id: 4)->dispatch()\n"));
+            Assert.Contains("takes its fields by name", Messages("import \"jobs/remind.kscript\"\nRemind(4)->dispatch()\n"));
         }
 
         [Theory]
-        [InlineData("dispatch Welcome(user_id: 1)", "Welcome() needs email")]
-        [InlineData("dispatch Welcome(user_id: 1, email: 'a@example.com', mail: 'x')", "Welcome has no field 'mail'")]
-        [InlineData("dispatch Welcome(1, 'a@example.com')", "takes its fields by name")]
+        [InlineData("Welcome(user_id: 1)->dispatch()", "Welcome() needs email")]
+        [InlineData("Welcome(user_id: 1, email: 'a@example.com', mail: 'x')->dispatch()", "Welcome has no field 'mail'")]
+        [InlineData("Welcome(1, 'a@example.com')->dispatch()", "takes its fields by name")]
         public void CallsThatMakeJobsAreChecked(string call, string message) =>
             Assert.Contains(message, Messages(Welcome + call + "\n"));
 
@@ -108,7 +108,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void HoverShowsTheJobsFields()
         {
-            string code = Welcome + "dispatch Wel‸come(user_id: 1, email: 'a@example.com')\n";
+            string code = Welcome + "Wel‸come(user_id: 1, email: 'a@example.com')->dispatch()\n";
             (string text, int offset) = WithCaret(code);
             string hover = Service.GetHover(Service.Analyze(text, DocPath), offset).Markdown;
             Assert.Contains("Says welcome.", hover);

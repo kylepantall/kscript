@@ -118,7 +118,7 @@ public class TestCommandTests
     [Fact]
     public void Hooks_loops_and_signals_inside_tests()
     {
-        TestResult afterFails = Single("<after-each><throw message=\"cleanup broke\" /></after-each><test name=\"t\"><do>1</do></test>");
+        TestResult afterFails = Single("<after_each><throw message=\"cleanup broke\" /></after_each><test name=\"t\"><do>1</do></test>");
         Assert.Equal(TestOutcome.Failed, afterFails.Outcome);
         Assert.Contains("cleanup broke", afterFails.Message);
 
@@ -126,8 +126,8 @@ public class TestCommandTests
         Assert.Equal(TestOutcome.Failed, loose.Outcome);
         Assert.Contains("<break/>", loose.Message);
 
-        using var site = new TempSite(("t.test.ks.xml", "<kscript><test name=\"none {$x}\" each=\"x\" in=\"null\" /></kscript>"), ("u.test.ks.xml", "<kscript><test name=\"t\" each=\"x\" in=\"5\" /></kscript>"));
+        using var site = new TempSite(("t.test.ks.xml", "<kscript><for each=\"x\" in=\"null\"><test name=\"none {$x}\" /></for></kscript>"), ("u.test.ks.xml", "<kscript><test name=\"t\" each=\"x\" in=\"5\" /></kscript>"));
         Assert.Empty(TestRunner.RunFile(Path.Combine(site.Root, "t.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root }).Tests);
-        Assert.Contains("runs over a list or a map", TestRunner.RunFile(Path.Combine(site.Root, "u.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root }).Error);
+        Assert.Contains("was replaced by a for loop round the test", TestRunner.RunFile(Path.Combine(site.Root, "u.test.ks.xml"), new TestRunSettings { BaseDirectory = site.Root }).Error);
     }
 }

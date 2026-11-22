@@ -205,7 +205,7 @@ namespace KScript.Language.Tests
             (DocumentAnalysis a, int offset) = At(Script(IO + "<echo>{ @known_folder(down‸loads) }</echo>"));
             Assert.Contains("a value of `name`", Service.GetHover(a, offset).Markdown);
             (a, offset) = At(Script(IO + "<echo>{ @files('.', not recur‸sive) }</echo>"));
-            Assert.Contains("to no", Service.GetHover(a, offset).Markdown);
+            Assert.Contains("to false", Service.GetHover(a, offset).Markdown);
         }
 
         [Fact]

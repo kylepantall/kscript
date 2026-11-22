@@ -13,38 +13,35 @@ namespace KScript.Testing
     /// <summary>
     /// KScript.Test: tests for scripts, run with <c>kscript test</c>. Test files (<c>name.test.ks.xml</c>) import it
     /// without an &lt;import&gt;. &lt;test&gt; and &lt;describe&gt; declare tests; @assert(), &lt;expect&gt; and
-    /// &lt;expect-error&gt; check results; &lt;capture&gt; and <c>@run_script()</c> collect what a script prints.
+    /// &lt;expect_error&gt; check results; &lt;capture&gt; and <c>@run_script()</c> collect what a script prints.
     /// </summary>
     public sealed class TestPackage : KScriptPackage
     {
         public override string Name => "KScript.Test";
 
-        public override string Description => "Tests run by kscript test: <test>, <describe>, <expect>, <expect-error>, <capture> and @assert().";
+        public override string Description => "Tests run by kscript test: <test>, <describe>, <expect>, <expect_error>, <capture> and @assert().";
 
         /// <summary>The error type of a failed check, as <c>&lt;catch when="$err.type eq 'Assertion'"&gt;</c> sees it.</summary>
         public const string AssertionType = "Assertion";
 
         /// <summary>The attributes of &lt;expect&gt; that say what to check, one per element.</summary>
-        internal static readonly string[] Matchers = { "equals", "not-equals", "same", "contains", "not-contains", "matches", "type", "count", "throws" };
+        internal static readonly string[] Matchers = { "equals", "not_equals", "same", "contains", "not_contains", "matches", "type", "count", "throws" };
 
         protected override void Register(PackageBuilder p)
         {
-            var skip = new A("skip", K.Template, "Skip it: skip=\"yes\", or a reason such as skip=\"needs a network\".");
-            var only = new A("only", K.Bool, "yes runs only the tests marked only in this file, while you work on them.");
+            var skip = new A("skip", K.Template, "Skip it: skip=\"true\", or a reason such as skip=\"needs a network\".");
+            var only = new A("only", K.Bool, "true runs only the tests marked only in this file, while you work on them.");
 
-            p.Element(new ElementInfo("test", "A test. Its body runs on its own when kscript test runs the file, and it passes if nothing in it fails. With `each` and `in`, it runs once per item.", ContentKind.Statements,
-                new A("name", K.Template, "What the test checks, shown in the results. With `each`, `{ }` can use the item.", true),
-                new A("each", K.DeclareVariable, "Run the test once for each item of `in`, with the item in this variable."),
-                new A("in", K.Expression, "The items for `each`: a list, or a map (each item is { key, value })."),
-                new A("index", K.DeclareVariable, "With `each`, a variable for the item's position, from 0."),
+            p.Element(new ElementInfo("test", "A test. Its body runs on its own when kscript test runs the file, and it passes if nothing in it fails. Inside a <for> loop it is one test per item.", ContentKind.Statements,
+                new A("name", K.Template, "What the test checks, shown in the results. In a <for> loop, `{ }` can use the loop's variables.", true),
                 skip, only,
-                new A("timeout", K.Expression, "Fail the test if it runs longer than this many seconds (the default is 10, or test.timeout in kscript.json)."))
+                new A("timeout", K.Expression, "Fail the test if it runs longer than this: 30s, 2m (the default is 10s, or test.timeout in kscript.json). A plain number is seconds.") { Type = Duration.TypeName })
             {
                 Context = ElementContext.Script,
-                Example = "<fn name=\"add\" params=\"a, b\" value=\"$a + $b\" />\n<test name=\"adds two numbers\">\n  <expect value=\"@add(2, 3)\" equals=\"5\" />\n</test>\n<test name=\"doubles {$n}\" each=\"n\" in=\"[1, 2, 3]\">\n  <expect value=\"@add($n, $n)\" equals=\"$n * 2\" />\n</test>",
+                Example = "<fn name=\"add\" params=\"a, b\" value=\"$a + $b\" />\n<test name=\"adds two numbers\">\n  <expect value=\"@add(2, 3)\" equals=\"5\" />\n</test>\n<for each=\"n\" in=\"[1, 2, 3]\">\n  <test name=\"doubles {$n}\">\n    <expect value=\"@add($n, $n)\" equals=\"$n * 2\" />\n  </test>\n</for>",
             }, Test);
 
-            p.Element(new ElementInfo("describe", "A group of tests. Its name goes in front of each test's name, and its <before-each> and <after-each> apply to every test inside.", ContentKind.Statements,
+            p.Element(new ElementInfo("describe", "A group of tests. Its name goes in front of each test's name, and its <before_each> and <after_each> apply to every test inside.", ContentKind.Statements,
                 new A("name", K.Template, "What the group is about.", true),
                 skip, only)
             {
@@ -52,25 +49,25 @@ namespace KScript.Testing
                 Example = "<describe name=\"lists\">\n  <test name=\"push adds to the end\">\n    <expect value=\"[1]->push(2)\" equals=\"[1, 2]\" />\n  </test>\n</describe>",
             }, Describe);
 
-            p.Element(new ElementInfo("before-each", "Runs before every test in its file or <describe>, in the test's own scope. Use it to reset shared variables with <set>.", ContentKind.Statements)
+            p.Element(new ElementInfo("before_each", "Runs before every test in its file or <describe>, in the test's own scope. Use it to reset shared variables with <set>.", ContentKind.Statements)
             {
                 Context = ElementContext.Script,
-                Example = "<let name=\"cart\" value=\"[]\" />\n<before-each>\n  <set name=\"cart\" value=\"[]\" />\n</before-each>",
+                Example = "<let name=\"cart\" value=\"[]\" />\n<before_each>\n  <set name=\"cart\" value=\"[]\" />\n</before_each>",
             }, run => Hook(run, before: true));
 
-            p.Element(new ElementInfo("after-each", "Runs after every test in its file or <describe>, even when the test fails. Use it to tidy up files a test made.", ContentKind.Statements)
+            p.Element(new ElementInfo("after_each", "Runs after every test in its file or <describe>, even when the test fails. Use it to tidy up files a test made.", ContentKind.Statements)
             {
                 Context = ElementContext.Script,
-                Example = "<after-each>\n  <set name=\"cart\" value=\"[]\" />\n</after-each>",
+                Example = "<after_each>\n  <set name=\"cart\" value=\"[]\" />\n</after_each>",
             }, run => Hook(run, before: false));
 
             p.Element(new ElementInfo("expect", "Checks a value and fails the test if the check doesn't hold. Give the value and one check, such as equals=\"5\".", ContentKind.Empty,
                 new A("value", K.Expression, "The value to check.", true),
                 new A("equals", K.Expression, "It equals this (== for text and numbers, item by item for lists and maps)."),
-                new A("not-equals", K.Expression, "It doesn't equal this."),
+                new A("not_equals", K.Expression, "It doesn't equal this."),
                 new A("same", K.Expression, "It is strictly equal (===): same type and value."),
                 new A("contains", K.Expression, "A list has this item, text has this text, or a map has this key."),
-                new A("not-contains", K.Expression, "A list doesn't have this item, text doesn't have this text, or a map doesn't have this key."),
+                new A("not_contains", K.Expression, "A list doesn't have this item, text doesn't have this text, or a map doesn't have this key."),
                 new A("matches", K.Expression, "Text matches this regular expression, such as '^\\d+$'."),
                 new A("type", K.Enum, "Its type is this.", false, "string", "number", "bool", "list", "map", "date", "fn", "error", "null"),
                 new A("count", K.Expression, "A list, map or text has this many items or characters."),
@@ -81,21 +78,21 @@ namespace KScript.Testing
                 Example = "<expect value=\"2 + 3\" equals=\"5\" />\n<expect value=\"$names\" contains=\"'Joan'\" />\n<expect value=\"$id\" matches=\"'^[a-z0-9-]+$'\" />\n<expect value=\"'nope'->json()\" throws=\"Json\" />",
             }, Expect);
 
-            p.Element(new ElementInfo("expect-error", "Fails the test unless its body stops with an error. `type` and `contains` check which error; `as` keeps it for more checks.", ContentKind.Statements,
+            p.Element(new ElementInfo("expect_error", "Fails the test unless its body stops with an error. `type` and `contains` check which error; `as` keeps it for more checks.", ContentKind.Statements,
                 new A("type", K.ErrorType, "The error type it should be (or a type that extends it), such as Validation, FileNotFound or an <error>."),
                 new A("contains", K.Template, "Text the error message should contain."),
                 new A("as", K.DeclareVariable, "A variable for the error (type, message, line, and the fields of <throw>), declared after the element."))
             {
                 Context = ElementContext.Script,
-                Example = "<expect-error type=\"Validation\" contains=\"positive\">\n  <call fn=\"set_age\" args=\"-1\" />\n</expect-error>",
+                Example = "<expect_error type=\"Validation\" contains=\"positive\">\n  <call fn=\"set_age\" args=\"-1\" />\n</expect_error>",
             }, ExpectError);
 
             p.Element(new ElementInfo("capture", "Runs its body and keeps what it prints in a variable instead of showing it. `input` gives it lines to read.", ContentKind.Statements,
-                new A("to", K.DeclareVariable, "The variable that receives the output (line endings are \\n, without the last one).", true),
+                new A("into", K.DeclareVariable, "The variable that receives the output (line endings are \\n, without the last one).", true),
                 new A("input", K.Expression, "What <input> and other prompts read: text, or a list of lines."))
             {
                 Context = ElementContext.Script,
-                Example = "<capture to=\"out\">\n  <call fn=\"greet\" args=\"'Joan'\" />\n</capture>\n<expect value=\"$out\" equals=\"'Hello, Joan!'\" />",
+                Example = "<capture into=\"out\">\n  <call fn=\"greet\" args=\"'Joan'\" />\n</capture>\n<expect value=\"$out\" equals=\"'Hello, Joan!'\" />",
             }, Capture);
 
             p.Command("fail", "message?", "Fails the test now.", KType.Null, c =>
@@ -174,7 +171,7 @@ namespace KScript.Testing
             TestGroup group = session.Current;
             string skip = SkipReason(run) ?? group.Skip;
             bool only = run.Flag("only") || group.Only;
-            double? timeout = run.Has("timeout") ? run.Number("timeout", 0) : null;
+            double? timeout = run.Seconds("timeout");
             int line = run.Module.PositionOf(run.Element.Span.Start).Line;
             List<string> groups = group.Chain().Where(g => g.Name != null).Select(g => g.Name).ToList();
 
@@ -192,33 +189,8 @@ namespace KScript.Testing
                 Group = group,
             });
 
-            if (!run.Has("each"))
-            {
-                if (run.Has("in") || run.Has("index")) throw run.Error("in=\"...\" and index=\"...\" go with each=\"item\".", run.Has("in") ? "in" : "index", "Syntax");
-                Add(run.Scope, run.RequiredTemplate("name"));
-                return null;
-            }
-
-            string each = run.VariableName("each");
-            string indexName = run.VariableName("index", required: false);
-            if (!run.Has("in")) throw run.Error("<test each> needs in=\"...\": the items to run the test with.", "each", "Syntax");
-            object source = run.Eval("in");
-            List<object> items = source switch
-            {
-                null => new List<object>(),
-                List<object> list => list,
-                Dictionary<string, object> map => map.Select(kv => (object)new Dictionary<string, object> { ["key"] = kv.Key, ["value"] = kv.Value }).ToList(),
-                _ => throw run.Error($"<test each> runs over a list or a map, but in=\"...\" is {Values.Describe(source)}.", "in", "Type"),
-            };
-            MarkupAttribute nameAttr = run.Element.GetAttribute("name");
-            for (int i = 0; i < items.Count; i++)
-            {
-                Scope scope = run.Scope.Child();
-                scope.Declare(each, items[i]);
-                if (indexName != null) scope.Declare(indexName, (double)i);
-                string name = nameAttr?.Value == null ? $"#{i + 1}" : run.Interpreter.Interpolate(nameAttr.Value, scope, run.Module, bareReferences: true);
-                Add(scope, name);
-            }
+            // Inside a for loop the element runs once per item, so each run adds a test with the item in its scope.
+            Add(run.Scope, run.RequiredTemplate("name"));
             return null;
         }
 
@@ -283,9 +255,9 @@ namespace KScript.Testing
                     if (!Values.LooseEquals(actual, expected)) throw Failure(run, $"Expected {subject} to equal {Show(expected)}, {got}.{Difference(actual, expected)}", "value");
                     break;
                 }
-                case "not-equals":
+                case "not_equals":
                 {
-                    object expected = run.Eval("not-equals");
+                    object expected = run.Eval("not_equals");
                     if (Values.LooseEquals(actual, expected)) throw Failure(run, $"Expected {subject} not to equal {Show(expected)}.", "value");
                     break;
                 }
@@ -297,12 +269,12 @@ namespace KScript.Testing
                     break;
                 }
                 case "contains":
-                case "not-contains":
+                case "not_contains":
                 {
                     object item = run.Eval(matcher);
                     bool has = Contains(run, actual, item, matcher);
                     if (matcher == "contains" && !has) throw Failure(run, $"Expected {subject} to contain {Show(item)}, {got}.", "value");
-                    if (matcher == "not-contains" && has) throw Failure(run, $"Expected {subject} not to contain {Show(item)}, {got}.", "value");
+                    if (matcher == "not_contains" && has) throw Failure(run, $"Expected {subject} not to contain {Show(item)}, {got}.", "value");
                     break;
                 }
                 case "matches":
@@ -425,7 +397,7 @@ namespace KScript.Testing
 
         private static bool? Capture(ElementRun run)
         {
-            string name = run.VariableName("to");
+            string name = run.VariableName("into");
             TextReader input = run.Has("input") ? InputReader(run.Eval("input")) : null;
             var output = new StringWriter();
             using (run.Host.CaptureOutput(output))

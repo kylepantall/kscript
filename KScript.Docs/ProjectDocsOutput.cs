@@ -100,7 +100,7 @@ namespace KScript.Docs
             foreach (ProjectGuide.ScriptFile file in guide.Files)
             {
                 sb.Append($"## {file.Path}\n\n");
-                sb.Append($"```{language}\n{Shown($"<import src=\"{file.Path}\" />", guide.Format)}\n```\n\n");
+                sb.Append($"```{language}\n{Shown($"<import path=\"{file.Path}\" />", guide.Format)}\n```\n\n");
                 foreach (ProjectGuide.Declaration d in file.Declarations)
                 {
                     sb.Append($"### {(d.Kind == "function" ? d.Signature : d.Name)} ({(d.Kind == "function" ? "fn" : d.Kind)})\n\n");

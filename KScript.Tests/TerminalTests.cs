@@ -64,7 +64,7 @@ public class TerminalTests
     [Fact]
     public void Secret_input_reads_keys_without_showing_them()
     {
-        var (output, _) = Terminal("<input to=\"pw\" secret=\"yes\">Password</input><echo>[$pw]</echo>", keys: "ab\bc\td\n");
+        var (output, _) = Terminal("<input into=\"pw\" secret=\"yes\">Password</input><echo>[$pw]</echo>", keys: "ab\bc\td\n");
         Assert.Equal("Password\n[acd]\n", output);
     }
 
@@ -96,11 +96,11 @@ public class TerminalTests
     [Fact]
     public void Input_converts_and_asks_again()
     {
-        Assert.Equal("N: \nPlease enter a number.\nN: \n2.5\n", Piped("<input to=\"n\" type=\"float\">N:</input><echo>$n</echo>", "x\n2.5\n"));
-        Assert.Contains("Say yes or no", Piped("<input to=\"b\" type=\"bool\" error=\"Say yes or no\">OK?</input><echo>$b</echo>", "maybe\nyes\n"));
-        Assert.Contains("Please enter yes or no.", Piped("<input to=\"b\" type=\"bool\" /><echo>$b</echo>", "maybe\nno\n"));
-        Assert.EndsWith("7\n", Piped("<input to=\"n\" type=\"int\" default=\"7\">N</input><echo>$n</echo>", ""));
-        Assert.EndsWith("plain\n", Piped("<input to=\"s\" /><echo>$s</echo>", "plain\n"));
+        Assert.Equal("N: \nPlease enter a number.\nN: \n2.5\n", Piped("<input into=\"n\" type=\"float\">N:</input><echo>$n</echo>", "x\n2.5\n"));
+        Assert.Contains("Say yes or no", Piped("<input into=\"b\" type=\"bool\" error=\"Say yes or no\">OK?</input><echo>$b</echo>", "maybe\nyes\n"));
+        Assert.Contains("Please enter yes or no.", Piped("<input into=\"b\" type=\"bool\" /><echo>$b</echo>", "maybe\nno\n"));
+        Assert.EndsWith("7\n", Piped("<input into=\"n\" type=\"int\" default=\"7\">N</input><echo>$n</echo>", ""));
+        Assert.EndsWith("plain\n", Piped("<input into=\"s\" /><echo>$s</echo>", "plain\n"));
     }
 
     [Fact]
@@ -111,17 +111,17 @@ public class TerminalTests
         try
         {
             File.WriteAllText(Path.Combine(dir, "a.txt"), "a");
-            string output = Piped($"<picker to=\"f\" type=\"file\">File?</picker><echo>$f</echo>", $"\n{dir}/missing.txt\n\"{dir}/a.txt\"\n");
+            string output = Piped($"<picker into=\"f\" type=\"file\">File?</picker><echo>$f</echo>", $"\n{dir}/missing.txt\n\"{dir}/a.txt\"\n");
             Assert.Contains("There is no file at ''. Try again.", output);
             Assert.Contains("There is no file at '" + dir + "/missing.txt'", output);
             Assert.EndsWith(Path.Combine(dir, "a.txt") + "\n", output);
 
-            Assert.EndsWith(Path.Combine(dir, "new") + "\n", Piped($"<picker to=\"f\" must-exist=\"no\" /><echo>$f</echo>", $"{dir}/new\n"));
-            Assert.Contains("Nope", Piped($"<picker to=\"f\" error=\"Nope\" /><echo>$f</echo>", $"{dir}/zzz\n{dir}\n"));
+            Assert.EndsWith(Path.Combine(dir, "new") + "\n", Piped($"<picker into=\"f\" must_exist=\"no\" /><echo>$f</echo>", $"{dir}/new\n"));
+            Assert.Contains("Nope", Piped($"<picker into=\"f\" error=\"Nope\" /><echo>$f</echo>", $"{dir}/zzz\n{dir}\n"));
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            Assert.EndsWith(Path.GetFullPath(home) + "\n", Piped("<picker to=\"f\" /><echo>$f</echo>", "~\n"));
-            Assert.Contains("reached the end of the input", Fails("<picker to=\"f\" />").Message);
-            Assert.Contains("No valid path after 100 tries", Fails("<picker to=\"f\" />", string.Concat(Enumerable.Repeat($"{dir}/nope\n", 100))).Message);
+            Assert.EndsWith(Path.GetFullPath(home) + "\n", Piped("<picker into=\"f\" /><echo>$f</echo>", "~\n"));
+            Assert.Contains("reached the end of the input", Fails("<picker into=\"f\" />").Message);
+            Assert.Contains("No valid path after 100 tries", Fails("<picker into=\"f\" />", string.Concat(Enumerable.Repeat($"{dir}/nope\n", 100))).Message);
         }
         finally
         {
@@ -132,23 +132,23 @@ public class TerminalTests
     [Fact]
     public void Menus_take_lists_of_maps_and_maps()
     {
-        Assert.EndsWith("b-value\n", Piped("<menu to=\"c\" options=\"[{ label: 'A', v: 1 }, { label: 'B', v: 2 }]\" /><echo>{ $c.v == 2 ? 'b-value' : 'other' }</echo>", "B\n"));
-        Assert.EndsWith("2\n", Piped("<menu to=\"c\" options=\"{ First: 1, Second: 2 }\" /><echo>$c</echo>", "9\nsecond\n"));
-        Assert.Contains("Please choose a number from 1 to 2.", Piped("<menu to=\"c\" options=\"['a', 'b']\" /><echo>$c</echo>", "9\n1\n"));
-        Assert.Contains("needs a list or a map", Fails("<menu to=\"c\" options=\"5\" />").Message);
-        Assert.Contains("has no options", Fails("<menu to=\"c\" options=\"[]\" />").Message);
-        Assert.Contains("reached the end of the input", Fails("<menu to=\"c\" options=\"['a']\" />").Message);
-        Assert.Contains("No valid choice after 100 tries", Fails("<menu to=\"c\" options=\"['a']\" />", string.Concat(Enumerable.Repeat("x\n", 100))).Message);
+        Assert.EndsWith("b-value\n", Piped("<menu into=\"c\" options=\"[{ label: 'A', v: 1 }, { label: 'B', v: 2 }]\" /><echo>{ $c.v == 2 ? 'b-value' : 'other' }</echo>", "B\n"));
+        Assert.EndsWith("2\n", Piped("<menu into=\"c\" options=\"{ First: 1, Second: 2 }\" /><echo>$c</echo>", "9\nsecond\n"));
+        Assert.Contains("Please choose a number from 1 to 2.", Piped("<menu into=\"c\" options=\"['a', 'b']\" /><echo>$c</echo>", "9\n1\n"));
+        Assert.Contains("needs a list or a map", Fails("<menu into=\"c\" options=\"5\" />").Message);
+        Assert.Contains("has no options", Fails("<menu into=\"c\" options=\"[]\" />").Message);
+        Assert.Contains("reached the end of the input", Fails("<menu into=\"c\" options=\"['a']\" />").Message);
+        Assert.Contains("No valid choice after 100 tries", Fails("<menu into=\"c\" options=\"['a']\" />", string.Concat(Enumerable.Repeat("x\n", 100))).Message);
     }
 
     [Fact]
     public void Confirm_takes_defaults_and_asks_again()
     {
-        Assert.Equal("Are you sure? [Y/n] true\n", Piped("<confirm to=\"ok\" default=\"yes\" /><echo>$ok</echo>"));
-        Assert.Contains("[y/N]", Piped("<confirm to=\"ok\" default=\"no\" /><echo>$ok</echo>"));
-        Assert.Contains("Please answer y or n.", Piped("<confirm to=\"ok\" /><echo>$ok</echo>", "hmm\n\nn\n"));
-        Assert.Contains("reached the end of the input", Fails("<confirm to=\"ok\" />").Message);
-        Assert.Contains("No valid answer after 100 tries", Fails("<confirm to=\"ok\" />", string.Concat(Enumerable.Repeat("x\n", 100))).Message);
+        Assert.Equal("Are you sure? [Y/n] true\n", Piped("<confirm into=\"ok\" default=\"yes\" /><echo>$ok</echo>"));
+        Assert.Contains("[y/N]", Piped("<confirm into=\"ok\" default=\"no\" /><echo>$ok</echo>"));
+        Assert.Contains("Please answer y or n.", Piped("<confirm into=\"ok\" /><echo>$ok</echo>", "hmm\n\nn\n"));
+        Assert.Contains("reached the end of the input", Fails("<confirm into=\"ok\" />").Message);
+        Assert.Contains("No valid answer after 100 tries", Fails("<confirm into=\"ok\" />", string.Concat(Enumerable.Repeat("x\n", 100))).Message);
     }
 
     [Fact]

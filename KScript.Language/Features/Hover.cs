@@ -37,8 +37,8 @@ namespace KScript.Language.Features
             ["%"] = "Remainder: `7 % 3` is 1.",
             ["fn"] = "A lambda: `fn($a, $b) => $a + $b`. Lambdas are values; store them, pass them, pipe into them.",
             ["match"] = "Picks a result by value: `match $x { 1 => 'one', 2 => 'two', _ => 'other' }`.",
-            ["true"] = "The boolean true (prints as yes).",
-            ["false"] = "The boolean false (prints as no).",
+            ["true"] = "The boolean true.",
+            ["false"] = "The boolean false.",
             ["null"] = "No value.",
         };
 
@@ -66,7 +66,7 @@ namespace KScript.Language.Features
                 RetiredInfo retired = Catalog.GetRetiredElement(e.Name);
                 if (retired != null)
                 {
-                    return new HoverResult($"**<{e.Name}>** was removed in KScript 2.\n\n{retired.Replacement}", span);
+                    return new HoverResult(retired.Renamed ? retired.Message($"**{e.Name}**") : $"**<{e.Name}>** was removed in KScript 2.\n\n{retired.Replacement}", span);
                 }
                 DocumentLink link = analysis.LinkAt(offset);
                 if (link != null)
@@ -84,10 +84,10 @@ namespace KScript.Language.Features
                 {
                     return new HoverResult($"**{a.Name}** ({KindLabel(a.Kind)}{(a.Required ? ", required" : string.Empty)})\n\n{DeprecationLine(a.Deprecated, a.Name)}{a.Description}{OptionsLine(a)}", cursor.Attribute.NameSpan);
                 }
-                RetiredInfo retired = Catalog.GetRetiredAttribute(cursor.Attribute.Name);
+                RetiredInfo retired = Catalog.GetRetiredAttribute(info, cursor.Attribute.Name);
                 if (retired != null)
                 {
-                    return new HoverResult($"**{cursor.Attribute.Name}** was removed in KScript 2.\n\n{retired.Replacement}", cursor.Attribute.NameSpan);
+                    return new HoverResult(retired.Renamed ? retired.Message($"**{cursor.Attribute.Name}**") : $"**{cursor.Attribute.Name}** was removed in KScript 2.\n\n{retired.Replacement}", cursor.Attribute.NameSpan);
                 }
                 return null;
             }
@@ -154,6 +154,11 @@ namespace KScript.Language.Features
                     {
                         return new HoverResult($"```kscript\n.{field.Name}: {field.Shape.Pretty()}\n```" + (field.Description != null ? "\n\n" + field.Description : string.Empty),
                             region.Source.ToSource(member.NameSpan));
+                    }
+                    if ((Catalog.GetField(target.Kind, member.Name) ?? Catalog.GetField(target.Type, member.Name)) is ValueFieldInfo builtIn)
+                    {
+                        return new HoverResult($"```kscript\n{builtIn.Receiver}.{builtIn.Name}: {builtIn.Type ?? KType.Any}\n```\n\n{builtIn.Description}"
+                            + (builtIn.Example != null ? "\n\n```kscript\n" + builtIn.Example + "\n```" : string.Empty), region.Source.ToSource(member.NameSpan));
                     }
                     break;
                 }

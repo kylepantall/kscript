@@ -6,5 +6,5 @@ when: api
 KScript.Routes {
   import "../controllers/hello{{ ext }}" as hello
 
-  Get(path: "/hello", to: hello.show)
+  Get(path: "/hello", to: @hello.show)
 }

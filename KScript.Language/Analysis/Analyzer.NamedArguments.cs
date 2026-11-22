@@ -103,11 +103,18 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
+            // KS6018: timeout: 30 and ttl: '10m' are written 30s and 10m.
+            if (IsCodeFile && slot.Type == DurationType && a.Value is LiteralNode { Kind: LiteralKind.Number or LiteralKind.String, Template: null } time
+                && DurationAsWritten(time.Value) is string duration)
+            {
+                ReportDurationUnit(region.Source.ToSource(time.Span), slot.Name, duration);
+                return;
+            }
             if (BareWord(a) is (string word, false, IdentifierNode node) && slot.RawText != null)
             {
                 CheckLiteralFits(word, slot.Type, region.Source.ToSource(node.Span), null, 0);
             }
-            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Number } literal)
+            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Duration or LiteralKind.Number } literal)
             {
                 object value = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, System.Globalization.CultureInfo.InvariantCulture) : literal.Value;
                 CheckLiteralFits(value, slot.Type, region.Source.ToSource(literal.Span), null, 0);
@@ -251,7 +258,7 @@ namespace KScript.Language.Analysis
                         if (!target.Flag && (target.IsEnum || target.TypeName != null))
                         {
                             Report(region.Source.ToSource(a.Span), DiagnosticSeverity.Error, DiagnosticCodes.NamedArgument,
-                                $"'{w}' isn't a yes/no parameter of {display}, so it can't be written as a flag. Give it a value: {w}: ...");
+                                $"'{w}' isn't a true/false parameter of {display}, so it can't be written as a flag. Give it a value: {w}: ...");
                         }
                         flagged.Add(w);
                         Fill(flag, a, w);

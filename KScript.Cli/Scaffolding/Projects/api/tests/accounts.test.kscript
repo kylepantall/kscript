@@ -10,26 +10,26 @@ describe(name: "accounts") {
     email = 'test-' + @uuid() + '@example.com'
     body = { name: 'Ada', email: $email, password: 'correct horse battery staple' }
     made = @api('/api/register', options: { method: 'POST', body: $body })
-    expect(value: $made->status(), equals: 201)
+    expect(value: $made.status, equals: 201)
     me = { Authorization: 'Bearer ' + $made->json().token }
     expect(value: @api('/api/me', options: { headers: $me })->json().email, equals: $email)
 
     // The email and password trade for another token.
     again = { email: $email, password: 'correct horse battery staple' }
     token = @api('/api/tokens', options: { method: 'POST', body: $again })
-    expect(value: $token->status(), equals: 201)
+    expect(value: $token.status, equals: 201)
 
-    expect(value: @api('/api/me', options: { method: 'DELETE', headers: $me })->status(), equals: 204)
-    expect(value: @api('/api/me', options: { headers: $me })->status(), equals: 401)
+    expect(value: @api('/api/me', options: { method: 'DELETE', headers: $me }).status, equals: 204)
+    expect(value: @api('/api/me', options: { headers: $me }).status, equals: 401)
   }
 
   test(name: "a wrong password gets no token") {
     wrong = { email: 'nobody@example.com', password: 'not the password' }
-    expect(value: @api('/api/tokens', options: { method: 'POST', body: $wrong })->status(), equals: 401)
+    expect(value: @api('/api/tokens', options: { method: 'POST', body: $wrong }).status, equals: 401)
   }
 
   test(name: "a bad email is turned away with 422") {
     bad = { name: 'Ada', email: 'not an email', password: 'correct horse battery staple' }
-    expect(value: @api('/api/register', options: { method: 'POST', body: $bad })->status(), equals: 422)
+    expect(value: @api('/api/register', options: { method: 'POST', body: $bad }).status, equals: 422)
   }
 }

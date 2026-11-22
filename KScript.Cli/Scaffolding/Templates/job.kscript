@@ -1,5 +1,5 @@
 --- make
-description: A queued job in jobs/: dispatch it with dispatch Name(...), and kscript worker runs it, retrying when it fails
+description: A queued job in jobs/: dispatch it with Name(...)->dispatch(), and kscript worker runs it, retrying when it fails
 category: Scripts and data
 usage: <Name> [--fields "user_id: int, email: email"] [--queue mail] [--tries 5] [--backoff "10s, 1m, 5m"] [--timeout 30s]
 --fields: The fields, comma separated, as name: type, with ? for optional and = for a default (default: none)
@@ -10,10 +10,10 @@ usage: <Name> [--fields "user_id: int, email: email"] [--queue mail] [--tries 5]
 example: kscript make job SendWelcome --fields "user_id: int, email: email" --queue mail --tries 5
 example: kscript make job reports/BuildReport --fields "month: int" --timeout 5m
 to: {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}
-hint: Queue it: import "{{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}", then dispatch {{ pascal }}(...). Run the queue with kscript worker (kscript queue failed lists failures).
+hint: Queue it: import "{{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}", then {{ pascal }}(...)->dispatch(). Run the queue with kscript worker (kscript queue failed lists failures).
 ---
 /// {{ title }}.
-job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {{ tries }}, {{/if}}{{#if backoff}}backoff: "{{ backoff }}", {{/if}}timeout: "{{#if timeout}}{{ timeout }}{{else}}60s{{/if}}") {
+job {{ pascal }}({{#if queue}}queue: "{{ queue }}", {{/if}}{{#if tries}}tries: {{ tries }}, {{/if}}{{#if backoff}}backoff: "{{ backoff }}", {{/if}}timeout: {{#if timeout}}{{ timeout }}{{else}}60s{{/if}}) {
 {{#if fields}}
 {{#each fields}}
   {{ item | trim }}

@@ -41,14 +41,16 @@ namespace KScript.Runtime
             p.Method(KType.Any, "to_string", "", "The value as text.", KType.String, (t, c) => Values.ToStr(t));
             p.Method(KType.Any, "to_json", "indented?: bool", "The value as JSON text.", KType.String, (t, c) => Values.ToJson(t, c.Bool(0)));
             p.Method(KType.Any, "to_yaml", "", "The value as YAML text.", KType.String, (t, c) => Yaml.Write(t));
-            p.Method(KType.Any, "is_null", "", "yes if the value is null.", KType.Bool, (t, c) => t == null);
+            p.Method(KType.Any, "is_null", "", "True when the value is null.", KType.Bool, (t, c) => t == null);
             p.Method(KType.Any, "or", "fallback", "The value if it is truthy, otherwise fallback.", KType.Any, (t, c) => Values.Truthy(t) ? t : c.Arg(0));
             p.Method(KType.Fn, "call", "args...", "Calls the function with these arguments.", KType.Any, (t, c) => c.Interpreter.Call((ICallable)t, c.Args.ToList(), c.Named, c.Scope, c.Module));
             p.Method(KType.Bool, "not", "", "The opposite bool.", KType.Bool, (t, c) => !(bool)t);
 
             // Caught errors and error types.
-            p.Method(KType.Error, "is", "type", "yes if the error is this type or one that extends it: $err->is(NotFound), $err->is(IO).", KType.Bool, (t, c) => ((ErrorValue)t).Is(ErrorName(c, c.Arg(0))));
+            p.Method(KType.Error, "is", "type", "True when the error is this type or one that extends it: $err->is(NotFound), $err->is(IO).", KType.Bool, (t, c) => ((ErrorValue)t).Is(ErrorName(c, c.Arg(0))));
             p.Method(KType.Error, "chain", "", "The error's type and the types it extends, nearest first: ['NotFound', 'Validation', 'Error'].", KType.List, (t, c) => ErrorTypes.Chain(((ErrorValue)t).Exception).Cast<object>().ToList());
+            foreach (var f in ErrorType.ValueFields)
+                p.Field(KType.ErrorType, f.Name, f.Type, f.Description);
             foreach (var m in ErrorType.Methods)
                 p.Method(KType.ErrorType, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((ErrorType)t).TryCallMethod(c, m.Name, out object r) ? r : null);
 
@@ -65,15 +67,15 @@ namespace KScript.Runtime
 
         private static void RegisterSemanticMethods(PackageBuilder p)
         {
-            p.Method(KType.Email, "local", "", "The part before the @, as it was written.", KType.String, (t, c) => ((EmailAddress)t).Local);
-            p.Method(KType.Email, "domain", "", "The part after the @, in lower case.", KType.String, (t, c) => ((EmailAddress)t).Domain);
-            p.Method(KType.Handle, "name", "", "The handle without its @.", KType.String, (t, c) => ((HandleName)t).Name);
-            p.Method(KType.Uuid, "version", "", "The UUID's version: 4 for random ones, 8 for custom ones (0 for the nil UUID).", KType.Number, (t, c) => (double)((UuidValue)t).Version);
+            p.Field(KType.Email, "local", KType.String, "The part before the @, as it was written.", (t, _) => ((EmailAddress)t).Local);
+            p.Field(KType.Email, "domain", KType.String, "The part after the @, in lower case.", (t, _) => ((EmailAddress)t).Domain);
+            p.Field(KType.Handle, "name", KType.String, "The handle without its @.", (t, _) => ((HandleName)t).Name);
+            p.Field(KType.Uuid, "version", KType.Number, "The UUID's version: 4 for random ones, 8 for custom ones (0 for the nil UUID).", (t, _) => (double)((UuidValue)t).Version);
 
             string rx = KType.Regex;
             static System.Text.RegularExpressions.Regex R(object t) => ((RegexValue)t).Regex;
             static object Safe(object t, Func<object> work) => RegexValue.Run((RegexValue)t, _ => work());
-            p.Method(rx, "test", "text: string", "yes if the text matches somewhere (use ^ and $ to match all of it).", KType.Bool, (t, c) => Safe(t, () => R(t).IsMatch(c.Str(0))));
+            p.Method(rx, "test", "text: string", "True when the text matches somewhere (use ^ and $ to match all of it).", KType.Bool, (t, c) => Safe(t, () => R(t).IsMatch(c.Str(0))));
             p.Method(rx, "match", "text: string", "The first match: { text, index, groups, captures }, where groups holds named groups (?<name>...) and captures numbered ones. null if none.", KType.Map,
                 (t, c) => Safe(t, () => R(t).Match(c.Str(0)) is { Success: true } m ? RegexValue.MatchMap(R(t), m) : null));
             p.Method(rx, "match_all", "text: string", "Every match, as { text, index, groups, captures } maps.", KType.List,
@@ -83,19 +85,19 @@ namespace KScript.Runtime
                     ? R(t).Replace(c.Str(0), m => Values.ToStr(c.Call(f, RegexValue.MatchMap(R(t), m))))
                     : R(t).Replace(c.Str(0), c.Str(1))));
             p.Method(rx, "split", "text: string", "The text split at every match.", KType.List, (t, c) => Safe(t, () => R(t).Split(c.Str(0)).Select(x => (object)x).ToList()));
-            p.Method(rx, "pattern", "", "The pattern, without slashes or flags.", KType.String, (t, c) => ((RegexValue)t).Pattern);
-            p.Method(rx, "flags", "", "The flags, such as i.", KType.String, (t, c) => ((RegexValue)t).Flags);
+            p.Field(rx, "pattern", KType.String, "The pattern, without slashes or flags.", (t, _) => ((RegexValue)t).Pattern);
+            p.Field(rx, "flags", KType.String, "The flags, such as i.", (t, _) => ((RegexValue)t).Flags);
 
             string pw = KType.Password;
             p.Method(pw, "hash", "algorithm?: argon2id | bcrypt", "A hash to store instead of the password: argon2id (the default) or bcrypt, with a new random salt each time.", KType.String,
                 (t, c) => ((PasswordValue)t).Hash(c.Arg(0) is null ? ((PasswordValue)t).Algorithm : c.Str(0)));
-            p.Method(pw, "verify", "hash: string", "yes if this is the password the stored hash was made from. Takes the same time whether it matches or not.", KType.Bool,
+            p.Method(pw, "verify", "hash: string", "True when this is the password the stored hash was made from. Takes the same time whether it matches or not.", KType.Bool,
                 (t, c) => ((PasswordValue)t).Verify(c.Str(0)));
-            p.Method(pw, "needs_rehash", "hash: string", "yes if the stored hash was made with weaker settings or another algorithm than ->hash() uses now, so it should be replaced after a successful login.", KType.Bool,
+            p.Method(pw, "needs_rehash", "hash: string", "True when the stored hash was made with weaker settings or another algorithm than ->hash() uses now, so it should be replaced after a successful login.", KType.Bool,
                 (t, c) => PasswordValue.NeedsRehash(c.Str(0), ((PasswordValue)t).Algorithm));
-            p.Method(pw, "strength", StrengthRules, "How hard the password is to guess: { score (0 to 4), label, ok, problems }. Rules: min length (8), max, upper, lower, digit, symbol, common (yes rejects well-known passwords), not (text it mustn't contain) and score (the lowest score that passes, 3).", KType.Map,
+            p.Method(pw, "strength", StrengthRules, "How hard the password is to guess: { score (0 to 4), label, ok, problems }. Rules: min length (8), max, upper, lower, digit, symbol, common (true rejects well-known passwords), not (text it mustn't contain) and score (the lowest score that passes, 3).", KType.Map,
                 (t, c) => ((PasswordValue)t).Strength(c));
-            p.Method(pw, "strong", StrengthRules, "yes if the password passes ->strength() with these rules.", KType.Bool,
+            p.Method(pw, "is_strong", StrengthRules, "True when the password passes ->strength() with these rules.", KType.Bool,
                 (t, c) => (bool)((PasswordValue)t).Strength(c)["ok"]);
             p.Method(pw, "reveal", "", "The password's text. Only use it to pass the password on, such as to another service's login.", KType.String, (t, c) => ((PasswordValue)t).Secret);
         }
@@ -107,7 +109,7 @@ namespace KScript.Runtime
                 c.Has(0) ? throw c.Error("->count() takes no arguments. To count the items that match, use ->count_of(fn).", "Argument") : (double)L(t).Count);
             p.Method(l, "count_of", "match", "How many items match: the items for which a function is true, or the items equal to a value.", KType.Number, (t, c) =>
                 c.Arg(0) is ICallable ? (double)L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).Count() : (double)L(t).Count(x => Values.StrictEquals(x, c.Arg(0))));
-            p.Method(l, "is_empty", "", "yes if the list has no items.", KType.Bool, (t, c) => L(t).Count == 0);
+            p.Method(l, "is_empty", "", "True when the list has no items.", KType.Bool, (t, c) => L(t).Count == 0);
             p.Method(l, "first", "", "The first item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[0] : null);
             p.Method(l, "last", "", "The last item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[^1] : null);
             p.Method(l, "at", "index: number", "The item at an index; negative counts from the end.", KType.Any, (t, c) =>
@@ -127,9 +129,9 @@ namespace KScript.Runtime
                 for (int i = 0; i < list.Count; i++) if (Values.Truthy(Apply(c, c.Fn(0), list[i], i))) return (double)i;
                 return -1d;
             });
-            p.Method(l, "any", "fn?", "yes if fn is true for any item (or, without fn, if the list isn't empty).", KType.Bool, (t, c) =>
+            p.Method(l, "any", "fn?", "True when fn is true for any item (or, without fn, if the list isn't empty).", KType.Bool, (t, c) =>
                 c.Has(0) ? L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).Any() : L(t).Count > 0);
-            p.Method(l, "all", "fn", "yes if fn is true for every item.", KType.Bool, (t, c) => L(t).Select((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).All(b => b));
+            p.Method(l, "all", "fn", "True when fn is true for every item.", KType.Bool, (t, c) => L(t).Select((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).All(b => b));
             p.Method(l, "each", "fn", "Calls fn for each item and returns the list.", l, (t, c) =>
             {
                 var list = L(t);
@@ -179,7 +181,7 @@ namespace KScript.Runtime
             });
             p.Method(l, "reverse", "", "A reversed copy.", l, (t, c) => { var copy = L(t).ToList(); copy.Reverse(); return copy; });
             p.Method(l, "join", "separator?", "The items joined into text (', ' by default).", KType.String, (t, c) => string.Join(c.Str(0, ", "), L(t).Select(Values.ToStr)));
-            p.Method(l, "contains", "item", "yes if the list contains the item.", KType.Bool, (t, c) => L(t).Any(x => Values.LooseEquals(x, c.Arg(0))));
+            p.Method(l, "contains", "item", "True when the list contains the item.", KType.Bool, (t, c) => L(t).Any(x => Values.LooseEquals(x, c.Arg(0))));
             p.Method(l, "index_of", "item", "The index of an item, or -1.", KType.Number, (t, c) => (double)L(t).FindIndex(x => Values.LooseEquals(x, c.Arg(0))));
             p.Method(l, "slice", "start: number, end?: number", "The items from start up to (not including) end; negative positions count from the end.", l, (t, c) =>
             {
@@ -247,7 +249,7 @@ namespace KScript.Runtime
             p.Method(m, "values", "", "The values, as a list.", KType.List, (t, c) => M(t).Values.ToList());
             p.Method(m, "entries", "", "The entries, as a list of { key, value } maps.", KType.List, (t, c) =>
                 M(t).Select(kv => (object)new Dictionary<string, object> { ["key"] = kv.Key, ["value"] = kv.Value }).ToList());
-            p.Method(m, "has", "key", "yes if the key exists.", KType.Bool, (t, c) => M(t).ContainsKey(c.Str(0)));
+            p.Method(m, "has", "key", "True when the key exists.", KType.Bool, (t, c) => M(t).ContainsKey(c.Str(0)));
             p.Method(m, "get", "key, default?", "The value for a key, or the default.", KType.Any, (t, c) => M(t).TryGetValue(c.Str(0), out object v) ? v : c.Arg(1));
             p.Method(m, "set", "key, value", "A new map with the key set.", m, (t, c) => new Dictionary<string, object>(M(t)) { [c.Str(0)] = c.Arg(1) });
             p.Method(m, "remove", "key", "A new map without the key.", m, (t, c) => { var copy = new Dictionary<string, object>(M(t)); copy.Remove(c.Str(0)); return copy; });
@@ -258,7 +260,7 @@ namespace KScript.Runtime
                 return copy;
             });
             p.Method(m, "count", "", "The number of keys.", KType.Number, (t, c) => (double)M(t).Count);
-            p.Method(m, "is_empty", "", "yes if the map has no keys.", KType.Bool, (t, c) => M(t).Count == 0);
+            p.Method(m, "is_empty", "", "True when the map has no keys.", KType.Bool, (t, c) => M(t).Count == 0);
             p.Method(m, "map", "fn", "A new map with fn($value, $key) applied to each value.", m, (t, c) => M(t).ToDictionary(kv => kv.Key, kv => c.Call(c.Fn(0), kv.Value, kv.Key)));
             p.Method(m, "filter", "fn", "The entries for which fn($value, $key) is true.", m, (t, c) => M(t).Where(kv => Values.Truthy(c.Call(c.Fn(0), kv.Value, kv.Key))).ToDictionary(kv => kv.Key, kv => kv.Value));
         }
@@ -273,14 +275,14 @@ namespace KScript.Runtime
             p.Method(n, "min", "other: number", "The smaller of the two.", n, (t, c) => Math.Min(N(t), c.Num(0)));
             p.Method(n, "max", "other: number", "The larger of the two.", n, (t, c) => Math.Max(N(t), c.Num(0)));
             p.Method(n, "clamp", "min: number, max: number", "The number limited to min..max.", n, (t, c) => Math.Clamp(N(t), c.Num(0), c.Num(1)));
-            p.Method(n, "between", "min: number, max: number", "yes if min ≤ the number ≤ max.", KType.Bool, (t, c) => N(t) >= c.Num(0) && N(t) <= c.Num(1));
+            p.Method(n, "between", "min: number, max: number", "True when min ≤ the number ≤ max.", KType.Bool, (t, c) => N(t) >= c.Num(0) && N(t) <= c.Num(1));
             p.Method(n, "to_number", "default?", "The number itself.", n, (t, c) => N(t));
             p.Method(n, "to_int", "", "The whole-number part.", n, (t, c) => Math.Truncate(N(t)));
             p.Method(n, "format", "pattern?", "Formats the number (.NET format, N0 by default: 1,234).", KType.String, (t, c) => N(t).ToString(c.Str(0, "N0"), CultureInfo.InvariantCulture));
             p.Method(n, "increment", "", "The number plus 1.", n, (t, c) => N(t) + 1);
             p.Method(n, "decrement", "", "The number minus 1.", n, (t, c) => N(t) - 1);
-            p.Method(n, "is_even", "", "yes if the number is even.", KType.Bool, (t, c) => N(t) % 2 == 0);
-            p.Method(n, "is_odd", "", "yes if the number is odd.", KType.Bool, (t, c) => Math.Abs(N(t) % 2) == 1);
+            p.Method(n, "is_even", "", "True when the number is even.", KType.Bool, (t, c) => N(t) % 2 == 0);
+            p.Method(n, "is_odd", "", "True when the number is odd.", KType.Bool, (t, c) => Math.Abs(N(t) % 2) == 1);
             p.Method(n, "times", "fn", "Calls fn($i) for $i from 0 up to the number, and returns the results.", KType.List, (t, c) =>
                 Enumerable.Range(0, Math.Max(0, (int)N(t))).Select(i => c.Call(c.Fn(0), (double)i)).ToList());
         }
@@ -289,13 +291,13 @@ namespace KScript.Runtime
         {
             string d = KType.Date;
             p.Method(d, "format", "pattern?", "Formats the date, for example 'd MMMM yyyy' or 'HH:mm'.", KType.String, (t, c) => D(t).ToString(c.Str(0, "yyyy-MM-dd"), CultureInfo.InvariantCulture));
-            p.Method(d, "year", "", "The year.", KType.Number, (t, c) => (double)D(t).Year);
-            p.Method(d, "month", "", "The month, 1 to 12.", KType.Number, (t, c) => (double)D(t).Month);
-            p.Method(d, "day", "", "The day of the month.", KType.Number, (t, c) => (double)D(t).Day);
-            p.Method(d, "hour", "", "The hour, 0 to 23.", KType.Number, (t, c) => (double)D(t).Hour);
-            p.Method(d, "minute", "", "The minute.", KType.Number, (t, c) => (double)D(t).Minute);
-            p.Method(d, "second", "", "The second.", KType.Number, (t, c) => (double)D(t).Second);
-            p.Method(d, "weekday", "", "The day of the week, such as Monday.", KType.String, (t, c) => D(t).DayOfWeek.ToString());
+            p.Field(d, "year", KType.Number, "The year.", (t, _) => (double)D(t).Year);
+            p.Field(d, "month", KType.Number, "The month, 1 to 12.", (t, _) => (double)D(t).Month);
+            p.Field(d, "day", KType.Number, "The day of the month.", (t, _) => (double)D(t).Day);
+            p.Field(d, "hour", KType.Number, "The hour, 0 to 23.", (t, _) => (double)D(t).Hour);
+            p.Field(d, "minute", KType.Number, "The minute.", (t, _) => (double)D(t).Minute);
+            p.Field(d, "second", KType.Number, "The second.", (t, _) => (double)D(t).Second);
+            p.Field(d, "weekday", KType.String, "The day of the week, such as Monday.", (t, _) => D(t).DayOfWeek.ToString());
             p.Method(d, "add_days", "days: number", "The date plus a number of days (negative to go back).", d, (t, c) => D(t).AddDays(c.Num(0)));
             p.Method(d, "add_hours", "hours: number", "The date plus a number of hours.", d, (t, c) => D(t).AddHours(c.Num(0)));
             p.Method(d, "add_minutes", "minutes: number", "The date plus a number of minutes.", d, (t, c) => D(t).AddMinutes(c.Num(0)));
@@ -317,10 +319,10 @@ namespace KScript.Runtime
                 c.Has(0) ? throw c.Error("->count() takes no arguments. To count how often text occurs, use ->count_of(text).", "Argument") : (double)S(t).Length);
             p.Method(s, "count_of", "match", "How many times a piece of text occurs.", KType.Number, (t, c) =>
                 (double)(c.Str(0).Length == 0 ? 0 : (S(t).Length - S(t).Replace(c.Str(0), string.Empty, StringComparison.Ordinal).Length) / c.Str(0).Length));
-            p.Method(s, "is_empty", "", "yes if the text is empty or only spaces.", KType.Bool, (t, c) => S(t).Trim().Length == 0);
-            p.Method(s, "contains", "text", "yes if the text contains this text.", KType.Bool, (t, c) => S(t).Contains(c.Str(0), StringComparison.Ordinal));
-            p.Method(s, "starts_with", "text", "yes if the text starts with this text.", KType.Bool, (t, c) => S(t).StartsWith(c.Str(0), StringComparison.Ordinal));
-            p.Method(s, "ends_with", "text", "yes if the text ends with this text.", KType.Bool, (t, c) => S(t).EndsWith(c.Str(0), StringComparison.Ordinal));
+            p.Method(s, "is_empty", "", "True when the text is empty or only spaces.", KType.Bool, (t, c) => S(t).Trim().Length == 0);
+            p.Method(s, "contains", "text", "True when the text contains this text.", KType.Bool, (t, c) => S(t).Contains(c.Str(0), StringComparison.Ordinal));
+            p.Method(s, "starts_with", "text", "True when the text starts with this text.", KType.Bool, (t, c) => S(t).StartsWith(c.Str(0), StringComparison.Ordinal));
+            p.Method(s, "ends_with", "text", "True when the text ends with this text.", KType.Bool, (t, c) => S(t).EndsWith(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "replace", "old, new", "The text with every old replaced by new. old can be a regex: ->replace(/\\s+/, ' ').", s, (t, c) =>
                 c.Arg(0) is RegexValue rx ? RegexValue.Run(rx, r => r.Replace(S(t), c.Str(1)))
                 : c.Str(0).Length == 0 ? S(t) : S(t).Replace(c.Str(0), c.Str(1), StringComparison.Ordinal));
@@ -354,15 +356,18 @@ namespace KScript.Runtime
             p.Method(s, "url_decode", "", "URL-escaped text decoded.", s, (t, c) => Uri.UnescapeDataString(S(t)));
             p.Method(s, "json", "as?: type", "Parses the text as JSON. With as: a <type> (or 'Repo[]'), the data is checked and turned into records.", KType.Any, (t, c) => Shapes.MapJson(c, Values.ParseJson(S(t)), 0));
             p.Method(s, "yaml", "", "Parses the text as YAML.", KType.Any, (t, c) => Yaml.Parse(S(t)));
+            foreach (var f in RecordType.ValueFields)
+                p.Field(KType.Type, f.Name, f.Type, f.Description, (t, _) => ((IKObject)t).TryGetMember(f.Name, out object v)
+                    ? v : throw new KScriptException($"{((IKObject)t).ToText()} is made from another type, so it has no .{f.Name}. It has ->from(), ->check() and .name.", "Name"));
             foreach (var m in RecordType.Methods)
                 p.Method(KType.Type, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((IKObject)t).TryCallMethod(c, m.Name, out object r)
-                    ? r : throw c.Error($"{((IKObject)t).ToText()} is made from another type, so it has no ->{m.Name}(). It has ->from(), ->check() and ->name().", "Name"));
+                    ? r : throw c.Error($"{((IKObject)t).ToText()} is made from another type, so it has no ->{m.Name}(). It has ->from(), ->check() and .name.", "Name"));
             p.Method(s, "to_number", "default?", "The text as a number, or default when it isn't one.", KType.Number, (t, c) =>
                 Values.TryNumber(S(t), out double d) ? d : c.Has(0) ? c.Arg(0) : throw c.Error($"'{S(t)}' is not a number. Pass a default: ->to_number(0).", "Type"));
             p.Method(s, "to_int", "default?", "The text as a whole number, or default when it isn't one.", KType.Number, (t, c) =>
                 Values.TryNumber(S(t), out double d) ? Math.Truncate(d) : c.Has(0) ? c.Arg(0) : throw c.Error($"'{S(t)}' is not a number. Pass a default: ->to_int(0).", "Type"));
-            p.Method(s, "to_bool", "", "yes/no, true/false, 1/0 as a bool.", KType.Bool, (t, c) =>
-                Values.ParseBool(S(t)) ?? throw c.Error($"'{S(t)}' is not a yes/no value.", "Type"));
+            p.Method(s, "to_bool", "", "Text such as 'true', 'false', 'yes', 'no', '1' or '0' as a bool.", KType.Bool, (t, c) =>
+                Values.ParseBool(S(t)) ?? throw c.Error($"'{S(t)}' is not a true/false value.", "Type"));
             p.Method(s, "to_date", "", "Parses the text as a date.", KType.Date, (t, c) =>
                 DateTime.TryParse(S(t), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime dt) ? dt : throw c.Error($"'{S(t)}' is not a date.", "Format"));
             p.Method(s, "to_base64", "url?: bool", "The text encoded as base64. With url: true, it is URL-safe base64 without padding.", "base64", (t, c) =>
@@ -375,7 +380,7 @@ namespace KScript.Runtime
             p.Method(s, "md5", "", "The MD5 hash of the text, in hex.", s, (t, c) => Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(S(t)))).ToLowerInvariant());
             p.Method(s, "sha256", "", "The SHA-256 hash of the text, in hex.", s, (t, c) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(S(t)))).ToLowerInvariant());
             // pattern is a regex (/^[a-z]+$/i, flags and all) or text holding one; either way a slow match stops after a second.
-            p.Method(s, "matches", "pattern: regex", "yes if the text matches a regular expression: ->matches(/^[a-z]+$/i).", KType.Bool, (t, c) =>
+            p.Method(s, "matches", "pattern: regex", "True when the text matches a regular expression: ->matches(/^[a-z]+$/i).", KType.Bool, (t, c) =>
                 RegexValue.Run(RegexValue.From(c.Arg(0), "->matches()"), r => r.IsMatch(S(t))));
             p.Method(s, "find_all", "pattern: regex", "Every match of a regular expression, as a list.", KType.List, (t, c) =>
                 RegexValue.Run(RegexValue.From(c.Arg(0), "->find_all()"), r => r.Matches(S(t)).Select(m => (object)m.Value).ToList()));

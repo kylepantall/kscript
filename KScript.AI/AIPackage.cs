@@ -6,7 +6,7 @@ using K = KScript.Metadata.AttributeKind;
 
 namespace KScript.AI
 {
-    /// <summary>A conversation that keeps its history: <c>$chat->ask('...')</c>, <c>->history()</c>, <c>->reset()</c>.</summary>
+    /// <summary>A conversation that keeps its history: <c>$chat->ask('...')</c>, <c>.history</c>, <c>->reset()</c>.</summary>
     public sealed class ChatValue : IKObject
     {
         internal ChatValue(string system, string model, List<AiTool> tools, int maxTokens)
@@ -33,6 +33,10 @@ namespace KScript.AI
             {
                 "model" => Model,
                 "system" => System,
+                "history" => Messages
+                    .Where(m => m.Blocks.Any(b => b.Kind == AiBlockKind.Text) && m.Text.Trim().Length > 0)
+                    .Select(m => (object)new Dictionary<string, object> { ["role"] = m.Role, ["text"] = m.Text.Trim() })
+                    .ToList(),
                 _ => null,
             };
             return value != null;
@@ -68,18 +72,9 @@ namespace KScript.AI
                     }
                     return true;
                 }
-                case "history":
-                    result = Messages
-                        .Where(m => m.Blocks.Any(b => b.Kind == AiBlockKind.Text) && m.Text.Trim().Length > 0)
-                        .Select(m => (object)new Dictionary<string, object> { ["role"] = m.Role, ["text"] = m.Text.Trim() })
-                        .ToList();
-                    return true;
                 case "reset":
                     Messages.Clear();
                     result = this;
-                    return true;
-                case "model":
-                    result = Model;
                     return true;
             }
             result = null;
@@ -128,23 +123,24 @@ namespace KScript.AI
                 "<let name=\"chat\" value=\"@chat('You are a helpful assistant.')\" />\n<echo>{ $chat->ask('Hello!') }</echo>");
 
             p.Method(KType.Chat, "ask", "message, schema?", "Sends a message and returns the answer, keeping the history. With a schema the answer is a map.", KType.Any, Chat("ask"));
-            p.Method(KType.Chat, "history", "", "The conversation so far: a list of { role, text }.", KType.List, Chat("history"));
+            p.Field(KType.Chat, "history", KType.List, "The conversation so far: a list of { role, text }.");
+            p.Field(KType.Chat, "model", KType.String, "The model the chat uses.");
+            p.Field(KType.Chat, "system", KType.String, "The system prompt, or null.");
             p.Method(KType.Chat, "reset", "", "Forgets the conversation (keeps the system prompt).", KType.Chat, Chat("reset"));
-            p.Method(KType.Chat, "model", "", "The model the chat uses.", KType.String, Chat("model"));
 
             p.Element(new ElementInfo("llm", "Sends its text as a prompt to a language model (Claude) and stores the answer. @llm(prompt, ...) takes the same options and returns the answer instead, for a prompt that is already a value.", ContentKind.Template,
-                new A("to", K.DeclareVariable, "The variable that receives the answer.", true),
+                new A("into", K.DeclareVariable, "The variable that receives the answer.", true),
                 new A("system", K.Template, "The system prompt."),
                 new A("schema", K.Expression, "Ask for structured output: a map describing the fields, such as `{ category: 'bug|feature', urgency: 'int 1-5' }`. The answer is then a map."),
-                new A("tools", K.FunctionReferences, "<fn> functions the model may call: [lookup, weather]."),
+                new A("tools", K.FunctionReferences, "<fn> functions the model may call: `[@lookup, @weather]` (in XML, tools=\"lookup, weather\")."),
                 new A("model", K.Text, "The model to use (default: claude-opus-5-5, or KSCRIPT_AI_MODEL)."),
-                new A("max-tokens", K.Expression, "The longest answer, in tokens (default 16000)."))
+                new A("max_tokens", K.Expression, "The longest answer, in tokens (default 16000)."))
             {
                 Context = ElementContext.Script,
-                Example = "<llm to=\"reply\" system=\"Answer in Markdown.\">\n  Customer {$customer.name} wrote: {$message}\n</llm>",
+                Example = "<llm into=\"reply\" system=\"Answer in Markdown.\">\n  Customer {$customer.name} wrote: {$message}\n</llm>",
             }, run =>
             {
-                string name = run.VariableName("to");
+                string name = run.VariableName("into");
                 var tools = new List<AiTool>();
                 foreach (string fn in NameList.Names(run.Raw("tools")).Select(t => t.TrimStart('@', '$')).Where(t => t.Length > 0))
                 {
@@ -158,10 +154,10 @@ namespace KScript.AI
                     System = run.Template("system"),
                     Tools = tools,
                     Schema = run.Has("schema") ? Schemas.FromValue(run.Eval("schema"), "<llm schema>") : null,
-                    MaxTokens = run.Has("max-tokens") ? MaxTokens(run.Eval("max-tokens")) : 16000,
+                    MaxTokens = run.Has("max_tokens") ? MaxTokens(run.Eval("max_tokens")) : 16000,
                 };
                 string prompt = run.Text();
-                if (prompt.Trim().Length == 0) throw run.Error("<llm> needs a prompt: write it inside the element, such as <llm to=\"answer\">What is KScript?</llm>.");
+                if (prompt.Trim().Length == 0) throw run.Error("<llm> needs a prompt: write it inside the element, such as <llm into=\"answer\">What is KScript?</llm>.");
                 request.Messages.Add(new AiMessage("user", new[] { AiBlock.FromText(prompt) }));
                 run.Scope.Declare(name, Conversation.Ask(ModelFor(run.Host), request, run.Interpreter, run.Scope, run.Module));
                 return null;

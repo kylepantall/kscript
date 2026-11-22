@@ -60,7 +60,7 @@ namespace KScript.Language.Analysis
                 }
                 else if (ImpliedPackages.ByElement.TryGetValue(e.Name, out string implied) && catalog.FindPackage(implied) is string impliedPackage)
                 {
-                    // job and dispatch are keywords whose package comes with them, as at run time.
+                    // job is a keyword whose package comes with it, as at run time.
                     ImportPackage(impliedPackage);
                 }
                 else if (e.Name == "import" && e.GetAttribute("package") is MarkupAttribute packageAttr && packageAttr.Value != null)

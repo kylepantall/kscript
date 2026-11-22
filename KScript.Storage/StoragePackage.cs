@@ -67,7 +67,7 @@ namespace KScript.Storage
         {
             result = name switch
             {
-                "path" => call.Has(0) && call.Arg(0) != null ? Resolve(call.Str(0)) : Path,
+                "path_of" => Resolve(call.Str(0)),
                 "exists" => call.Has(0) && call.Arg(0) != null ? Exists(Resolve(call.Str(0))) : Directory.Exists(Path),
                 "read" => Read(call, File.ReadAllText),
                 "read_json" => Read(call, path => Values.ParseJson(File.ReadAllText(path))),
@@ -163,9 +163,16 @@ namespace KScript.Storage
             return (double)count;
         }
 
+        internal static readonly (string Name, string Type, string Description)[] Fields =
+        {
+            ("path", KType.String, "The folder's full path."),
+            ("app", KType.String, "The app the folder belongs to."),
+            ("kind", KType.String, "Which of the app's folders it is: config, data, cache, state or logs."),
+        };
+
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("path", "name?", "The folder's full path, or the full path of a file in it.", KType.String),
+            ("path_of", "name", "The full path of a file in the folder. The folder's own path is the field .path.", KType.String),
             ("exists", "name?", "True if the file (or, without a name, the folder) is there.", KType.Bool),
             ("read", "name, default?", "A file's text, or default (null) when it isn't there yet.", KType.String),
             ("read_json", "name, default?", "A JSON file read into maps and lists, or default (null) when it isn't there yet.", KType.Any),
@@ -206,6 +213,8 @@ namespace KScript.Storage
 
         protected override void Register(PackageBuilder p)
         {
+            foreach (var f in StorageFolder.Fields)
+                p.Field(KType.Storage, f.Name, f.Type, f.Description);
             foreach (var m in StorageFolder.Methods)
                 p.Method(KType.Storage, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((StorageFolder)t).Invoke(c, m.Name, out object r) ? r : null);
 
@@ -224,7 +233,7 @@ namespace KScript.Storage
             }, "<echo>{ @app_folders(app: 'Notes').cache }</echo>");
 
             p.Examples(
-                ("storage->path", "<echo>{ @storage(data)->path('notes/today.txt') }</echo>"),
+                ("storage->path_of", "<echo>{ @storage(data)->path_of('notes/today.txt') }</echo>"),
                 ("storage->exists", "<echo>{ @storage(config)->exists('settings.json') }</echo>"),
                 ("storage->read", "<echo>{ @storage(data)->read('notes.txt', default: '') }</echo>"),
                 ("storage->read_json", "<let name=\"settings\" value=\"@storage(config)->read_json('settings.json', default: { theme: 'light' })\" />"),

@@ -395,9 +395,6 @@ namespace KScript.Runtime
                 case "check":
                     result = Shapes.Problems(call.Interpreter, call.Arg(0), TypeRef.Of(this), Closure, Module);
                     return true;
-                case "name":
-                    result = Name;
-                    return true;
                 default:
                     result = null;
                     return false;

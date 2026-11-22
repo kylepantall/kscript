@@ -1,6 +1,6 @@
 <kscript>
   <import package="KScript.IO" />
-  <import src="../types/repo.ks.xml" />
+  <import path="../types/repo.ks.xml" />
 
   <describe name="Repo">
     <test name="maps the saved response">

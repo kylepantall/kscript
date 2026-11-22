@@ -114,7 +114,7 @@ public sealed class BuiltInTests : IDisposable
     {
         Assert.Equal("x\n", Body("<kscript><echo>x</echo></kscript>"));
         Assert.Equal(string.Empty, Run("<KScript.fn name=\"f\" value=\"4\" />"));
-        Assert.Equal("done\n", Body("<wait ms=\"1\" /><wait seconds=\"0.001\" /><wait ms=\"0\" /><echo>done</echo>"));
+        Assert.Equal("done\n", Body("<wait duration=\"1ms\" /><wait duration=\"0.001\" /><wait duration=\"0s\" /><echo>done</echo>"));
         Assert.Contains("needs a name and value", Fails("<set />").Message);
         Assert.Equal("[]012ab0:x1:yk=123\n", Body(
             "<let name=\"out\" value=\"''\" />" +
@@ -142,8 +142,8 @@ public sealed class BuiltInTests : IDisposable
     public void Call_finds_commands_aliases_and_functions()
     {
         Assert.Equal("A 3 6\n", Body(
-            "<import package=\"KScript.Math\" as=\"m\" /><import src=\"lib.ks.xml\" as=\"lib\" />" +
-            "<call fn=\"char_of\" args=\"65\" to=\"a\" /><call fn=\"m.sqrt\" args=\"9\" to=\"b\" /><call fn=\"lib.helper\" args=\"5\" to=\"c\" />" +
+            "<import package=\"KScript.Math\" as=\"m\" /><import path=\"lib.ks.xml\" as=\"lib\" />" +
+            "<call fn=\"char_of\" args=\"65\" into=\"a\" /><call fn=\"m.sqrt\" args=\"9\" into=\"b\" /><call fn=\"lib.helper\" args=\"5\" into=\"c\" />" +
             "<echo>$a $b $c</echo>"));
         Assert.Contains("There is no function called nope. Declare it with <fn name=\"nope\"", Fails("<call fn=\"nope\" />").Message);
         Assert.Contains("Did you mean greet?", Fails("<fn name=\"greet\" value=\"1\" /><call fn=\"gret\" />").Message);
@@ -308,7 +308,7 @@ public sealed class BuiltInTests : IDisposable
     [Fact]
     public void Elements_check_variable_names_at_run_time()
     {
-        Assert.Contains("isn't a variable name", Fails("<for each=\"i\" in=\"[1]\" index=\"2x\"></for>").Message);
+        Assert.Contains("isn't a variable name", Fails("<for each=\"i\" in=\"[1]\" at=\"2x\"></for>").Message);
     }
 
     [Fact]

@@ -8,7 +8,7 @@ namespace KScript.Syntax.Markup
     /// Parses the brace-and-newline KScript format (<c>.kscript</c> files) into the same <see cref="MarkupDocument"/>
     /// that <see cref="MarkupParser"/> builds from XML, so the analyzer, the interpreter and every package run it
     /// unchanged. Keywords such as <c>let</c>, <c>if</c>, <c>for</c> and <c>fn</c> become the elements of the same name;
-    /// any other name, such as <c>input(to: name) "Prompt: "</c>, is an element written as
+    /// any other name, such as <c>input(into: name) "Prompt: "</c>, is an element written as
     /// <c>name(attribute: value, ...) "text" { children }</c>. Expressions are kept as the exact source text, so
     /// positions in errors and in the editor point into the file.
     /// </summary>
@@ -253,7 +253,6 @@ namespace KScript.Syntax.Markup
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
                 case "error" when StartsDeclaration(5): ParseError(parent, start, doc); return;
                 case "job" when StartsDeclaration(3): ParseJob(parent, start, doc); return;
-                case "dispatch" when StartsDispatch(): ParseDispatch(parent, start); return;
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
@@ -310,7 +309,7 @@ namespace KScript.Syntax.Markup
             if (Peek(0) == '"')
             {
                 (DecodedText path, TextSpan span) = ReadString();
-                AddAttribute(e, "src", path, span);
+                AddAttribute(e, "path", path, span);
             }
             else
             {
@@ -330,7 +329,7 @@ namespace KScript.Syntax.Markup
                     if (Peek(0) == '"')
                     {
                         (DecodedText path, TextSpan span) = ReadString();
-                        AddAttribute(e, "src", path, span);
+                        AddAttribute(e, "path", path, span);
                     }
                     else
                     {
@@ -604,7 +603,7 @@ namespace KScript.Syntax.Markup
                 TextSpan index = ReadNameSpan(allowDash: false);
                 if (index.Length > 0)
                 {
-                    AddRawAttribute(e, "index", index);
+                    AddRawAttribute(e, "at", index);
                 }
                 SkipSpaces();
             }
@@ -804,7 +803,7 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary>
-        /// <c>type Repo(sample: "repo.json") { name: string; stars: int from stargazers_count }</c>: a &lt;type&gt;
+        /// <c>type Repo(path: "repo.json") { name: string; stars: int from stargazers_count }</c>: a &lt;type&gt;
         /// whose block holds one field per line.
         /// </summary>
         private void ParseType(MarkupElement parent, int start, string doc, string keyword = "type")
@@ -945,30 +944,6 @@ namespace KScript.Syntax.Markup
                 pos = save;
                 e.StartTagSpan = TextSpan.FromBounds(start, pos);
             }
-            Finish(e, start);
-        }
-
-        /// <summary>True at <c>dispatch SendWelcome(...)</c> or <c>dispatch $job</c>; <c>dispatch(value: ...)</c> stays an element.</summary>
-        private bool StartsDispatch()
-        {
-            int p = pos + 8;
-            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t'))
-            {
-                return false;
-            }
-            while (p < text.Length && (text[p] == ' ' || text[p] == '\t'))
-            {
-                p++;
-            }
-            return p < text.Length && (Lexer.IsIdentStart(text[p]) || text[p] is '$' or '@');
-        }
-
-        /// <summary><c>dispatch SendWelcome(user_id: 1)</c>: a &lt;dispatch value="..."&gt; that queues the job.</summary>
-        private void ParseDispatch(MarkupElement parent, int start)
-        {
-            MarkupElement e = Begin(parent, "dispatch", start);
-            SkipSpaces();
-            AddExpressionAttribute(e, "value", Stop.Line);
             Finish(e, start);
         }
 

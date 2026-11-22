@@ -56,6 +56,28 @@ namespace KScript.Syntax.Markup
                 or AttributeKind.TypeNames or AttributeKind.Parameters or AttributeKind.Fields
             || a?.IsNameList == true;
 
+        /// <summary>
+        /// True for an argument that names functions, written <c>@name</c> in .kscript (and bare in XML). Two lists
+        /// of names are not function references and stay bare: the names an import brings in
+        /// (<c>import(names: [a, b])</c>), and middleware, where built-ins, groups and functions share one list
+        /// (<c>[log, throttle:30, my_check]</c>).
+        /// </summary>
+        public static bool TakesFunctions(string element, AttributeInfo a) =>
+            a != null && (a.Kind == AttributeKind.FunctionReference
+                || (a.Kind == AttributeKind.FunctionReferences && a.Options.Count == 0 && element != "import"));
+
+        /// <summary>The names of a function argument as .kscript writes them (<c>@send</c>, <c>[@a, @b]</c>) or as XML does (<c>send</c>, <c>a, b</c>).</summary>
+        public static string FunctionNames(string value, bool code)
+        {
+            List<string> names = NameList.Names(value).Select(n => n.TrimStart('@')).ToList();
+            if (names.Count == 0 || names.Any(n => !Lexer.IsIdentStart(n[0]) || !n.All(c => Lexer.IsIdentChar(c) || c == '.')))
+            {
+                return value;
+            }
+            if (!code) return string.Join(", ", names);
+            return names.Count == 1 && !NameList.IsArray(value) ? "@" + names[0] : "[" + string.Join(", ", names.Select(n => "@" + n)) + "]";
+        }
+
         private static DecodedText Quoted(MarkupAttribute attr, AttributeKind kind)
         {
             if (IsValue(kind))

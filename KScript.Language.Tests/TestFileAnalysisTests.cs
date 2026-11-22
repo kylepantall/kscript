@@ -10,15 +10,17 @@ namespace KScript.Language.Tests
         private const string Tests = """
             <describe name="cart">
               <let name="cart" value="[]" />
-              <before-each><set name="cart" value="['apple']" /></before-each>
-              <test name="has {$case.n} items" each="case" index="i" in="[{ n: 1 }]">
-                <expect value="$cart" count="$case.n" />
-                <do>@assert($i ge 0)</do>
-              </test>
+              <before_each><set name="cart" value="['apple']" /></before_each>
+              <for each="case" at="i" in="[{ n: 1 }]">
+                <test name="has {$case.n} items">
+                  <expect value="$cart" count="$case.n" />
+                  <do>@assert($i ge 0)</do>
+                </test>
+              </for>
               <test name="errors">
-                <expect-error type="Validation" as="err"><throw type="Validation" message="no" /></expect-error>
+                <expect_error type="Validation" as="err"><throw type="Validation" message="no" /></expect_error>
                 <expect value="$err.message" equals="'no'" />
-                <capture to="out"><echo>hi</echo></capture>
+                <capture into="out"><echo>hi</echo></capture>
                 <expect value="$out" equals="'hi'" />
                 <do>@assert(true); @fail('x')</do>
                 <let name="r" value="@run_script('../hello.ks.xml')" />
@@ -43,11 +45,19 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void TheEachVariableOnlyExistsInsideTheTest()
+        public void TheLoopVariableOnlyExistsInsideTheLoopRoundTheTest()
         {
-            DocumentAnalysis a = Analyze(Script("<test name=\"t\" each=\"x\" in=\"[1]\" />\n<echo>{ $x }</echo>"), "a.test.ks.xml");
+            DocumentAnalysis a = Analyze(Script("<for each=\"x\" in=\"[1]\"><test name=\"t {$x}\" /></for>\n<echo>{ $x }</echo>"), "a.test.ks.xml");
             Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedVariable);
             Assert.Equal("x", a.Source[d.Span]);
+        }
+
+        [Fact]
+        public void EachOnATestSaysToUseAForLoop()
+        {
+            DocumentAnalysis a = Analyze(Script("<test name=\"t\" each=\"x\" in=\"[1]\" />"), "a.test.ks.xml");
+            Assert.All(a.Diagnostics, d => Assert.Equal(DiagnosticCodes.RetiredAttribute, d.Code));
+            Assert.Contains(a.Diagnostics, d => d.Message.Contains("for loop round the test"));
         }
 
         [Fact]
@@ -65,9 +75,9 @@ namespace KScript.Language.Tests
             {
                 [Path.Combine(dir, "lib", "strings.ks.xml")] = "<kscript><fn name=\"slugify\" params=\"text\" value=\"$text\" /><fn name=\"shout\" params=\"t\" value=\"$t\" /></kscript>",
             });
-            DocumentAnalysis a = Analyzer.Analyze(Script("<import src=\"../lib/strings.ks.xml\" />\n<echo>{ @slugify('a') } { @shout('b') }</echo>"), Path.Combine(dir, "tests", "s.test.ks.xml"), files);
+            DocumentAnalysis a = Analyzer.Analyze(Script("<import path=\"../lib/strings.ks.xml\" />\n<echo>{ @slugify('a') } { @shout('b') }</echo>"), Path.Combine(dir, "tests", "s.test.ks.xml"), files);
             AssertClean(a);
-            a = Analyzer.Analyze(Script("<import src=\"../lib/strings.ks.xml\" />\n<echo>{ @nope('a') }</echo>"), Path.Combine(dir, "tests", "s.test.ks.xml"), files);
+            a = Analyzer.Analyze(Script("<import path=\"../lib/strings.ks.xml\" />\n<echo>{ @nope('a') }</echo>"), Path.Combine(dir, "tests", "s.test.ks.xml"), files);
             AssertSingle(a, DiagnosticCodes.UnknownCommand);
         }
 

@@ -67,10 +67,10 @@ A folder value has these methods. Names are paths inside the folder, with `/` be
 | `->delete(name)` | Deletes a file, or a folder and everything in it. True if something was deleted. |
 | `->list(pattern, recursive)` | The names of the files, sorted, such as `['notes/a.txt', 'settings.json']`. `pattern` is a wildcard like `'*.json'`. |
 | `->folder(name)` | A folder inside this one, with the same methods. |
-| `->path(name)` | The full path of a file, or of the folder without a name. Give it to KScript.IO when you need more. |
+| `->path_of(name)` | The full path of a file in the folder. Give it to KScript.IO when you need more. |
 | `->clear()` | Deletes everything in the folder and returns how many files there were. |
 
-The value also has `.app`, `.kind` and `.path`, and it prints as its path.
+The value also has the fields `.app`, `.kind` and `.path` (the folder's own full path), and it prints as its path.
 
 ```kscript
 import KScript.Storage
@@ -103,7 +103,7 @@ echo $config->get('greeting', 'Hello')
 echo $config->reload()->get('greeting')
 ```
 
-The `config` statement does the same for one script: `config(user: yes)`. Environment variables with the config prefix still win over every file.
+The `config` statement does the same for one script: `config(user: true)`. Environment variables with the config prefix still win over every file.
 
 ## Where it works
 

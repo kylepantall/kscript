@@ -358,6 +358,10 @@
           "name": "constant.language.kscript"
         },
         {
+          "match": "(?<![\\w$])(?:\\d+(?:\\.\\d+)?(?:ms|min|w|d|h|m|s))+(?![\\w-])",
+          "name": "constant.numeric.duration.kscript"
+        },
+        {
           "match": "(?<![\\w$])-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b",
           "name": "constant.numeric.kscript"
         }

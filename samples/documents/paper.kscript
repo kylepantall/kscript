@@ -59,7 +59,7 @@ KScript.Document(
 
   Section(title: "Gliders") {
     Figure(
-      src: "glider.png",
+      path: "glider.png",
       caption: "A glider over four generations: after \( p = 4 \) steps it has moved one cell down and to the right.",
       id: "fig-glider",
       width: 0.8
@@ -77,14 +77,14 @@ KScript.Document(
     Table(
       caption: "Some small patterns and their periods.",
       id: "tab-patterns",
-      data: $patterns,
+      rows: $patterns,
       columns: {
         Pattern: 'name',
         Period: 'period',
         Speed: 'speed',
         Cells: 'cells'
       },
-      align: "lrrr"
+      align: ['left', 'right', 'right', 'right']
     )
 
     Section(title: "Population") {
@@ -104,5 +104,5 @@ KScript.Document(
     }
   }
 
-  Bibliography(src: "refs.bib")
+  Bibliography(path: "refs.bib")
 }

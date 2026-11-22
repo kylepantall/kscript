@@ -62,6 +62,13 @@ test('keywords, functions and calls', async () => {
   assert.match(scopeOf(tokens, 'Validation'), /entity\.name\.type\.kscript/);
 });
 
+test('a length of time is one token', async () => {
+  const tokens = tokenize(await load(), "wait(duration: 500ms)\nttl = 1h30m\nn = 30");
+  assert.match(scopeOf(tokens, '500ms'), /constant\.numeric\.duration\.kscript/);
+  assert.match(scopeOf(tokens, '1h30m'), /constant\.numeric\.duration\.kscript/);
+  assert.doesNotMatch(scopeOf(tokens, '30'), /duration/);
+});
+
 test('assignment targets and constants', async () => {
   const tokens = tokenize(await load(), "total = 0\ncount: int = $raw\ntotal += 1\nconst tax = 0.2\nok = $a == true");
   assert.match(scopeOf(tokens, 'total'), /variable\.other\.assignment\.kscript/);
@@ -73,7 +80,7 @@ test('assignment targets and constants', async () => {
   assert.match(scopeOf(tokens, '=='), /keyword\.operator\.kscript/);
 });
 
-test('double quotes are text that interpolates; single quotes are expression strings', async () => {
+test('double quotes fill in $name and { }; single quotes are kept as written', async () => {
   const tokens = tokenize(await load(), "echo \"Hi $name, { @upper('x') } \\\" done\"\nx = $s->replace('a', 'b')");
   assert.match(scopeOf(tokens, 'echo'), /support\.function\.builtin\.kscript/);
   assert.match(scopeOf(tokens, '$name'), /string\.quoted\.double\.kscript variable\.other\.kscript/);
@@ -85,11 +92,11 @@ test('double quotes are text that interpolates; single quotes are expression str
 });
 
 test('elements and their attributes', async () => {
-  const tokens = tokenize(await load(), 'Row(gap: 8, wrap) {\n  Button(variant: primary, on-click: "go()") "Play"\n  div {\n  }\n}');
+  const tokens = tokenize(await load(), 'Row(gap: 8, wrap) {\n  Button(variant: primary, on_click: "go()") "Play"\n  div {\n  }\n}');
   assert.match(scopeOf(tokens, 'Row'), /entity\.name\.tag\.kscript/);
   assert.match(scopeOf(tokens, 'gap'), /entity\.other\.attribute-name\.kscript/);
   assert.match(scopeOf(tokens, 'Button'), /entity\.name\.tag\.kscript/);
-  assert.match(scopeOf(tokens, 'on-click'), /entity\.other\.attribute-name\.kscript/);
+  assert.match(scopeOf(tokens, 'on_click'), /entity\.other\.attribute-name\.kscript/);
   assert.match(scopeOf(tokens, 'div'), /entity\.name\.tag\.kscript/);
   assert.match(scopeOf(tokens, 'Play'), /string\.quoted\.double\.kscript/);
 });
@@ -124,7 +131,7 @@ test('types: with lists, annotations, rules and typed literals', async () => {
     'type Username with [handle, Auditable] {',
     '  max: 16',
     '  pattern: /^@[a-z_]+$/i',
-    '  validate: not $value->name()->starts_with(\'_\'), "No leading _"',
+    '  validate: not $value.name->starts_with(\'_\'), "No leading _"',
     '  level: int',
     '}',
     'id: uuid(v: 4) = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f',

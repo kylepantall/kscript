@@ -33,7 +33,7 @@ for i in 0..3 {
 
 ## KS1004
 
-**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(seconds: 2)`.
+**An argument is written wrongly.** Arguments in brackets are `name: value`, separated by commas: `wait(duration: 2s)`.
 
 ## KS1005
 
@@ -108,7 +108,7 @@ rows = @sql("select * from users where id = {$id}")   // right: {$id} is a param
 
 ## KS3002
 
-**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element.
+**A word that isn't needed, or that KScript 2 removed.** In a `.kscript` file, `x = 3` declares `x` the first time and changes it after that, so `let`, `set` and `var` are dropped. In an XML script, the message names what replaced a KScript 1 element. A statement that was renamed says its new name in both formats (`before-each is now before_each.`), and `kscript check --fix` renames it.
 
 ## KS3003
 
@@ -116,7 +116,7 @@ rows = @sql("select * from users where id = {$id}")   // right: {$id} is a param
 
 ## KS3004
 
-**An argument KScript 2 removed.** The message names what replaced it.
+**An argument KScript 2 removed, or one that was renamed.** The message names what replaced it: `'to' is now into.`, `'must-exist' is now must_exist`, `'src' is now path.` A renamed argument has a quick fix, and `kscript check --fix` applies it. See [Names of statements and arguments](language.md#names-of-statements-and-arguments).
 
 ## KS3005
 
@@ -231,7 +231,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 ## KS5008
 
-**A named argument is given twice, or a word is used as a flag on a parameter that isn't yes/no.** Give each argument once, and give other parameters a value: `name: value`.
+**A named argument is given twice, or a word is used as a flag on a parameter that isn't true/false.** Give each argument once, and give other parameters a value: `name: value`.
 
 ## KS5009
 
@@ -309,7 +309,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6012
 
-**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`). Logic stays as words: `and`, `or`, `not`.
+**A second spelling.** The parser still reads a few second spellings; each has one form to write: `elif` (not `else if`), `key: value` in arguments (not `key = value`), `catch NotFound | Conflict` (not a comma), and symbols for comparisons in `.kscript` (`<`, `>=`, `==`, not `lt`, `ge`, `eq`). Logic stays as words: `and`, `or`, `not`. A function is named as `@name` in an argument, as it is in an expression: `spawn(fn: @job)`, `llm(tools: [@lookup])`, `Get(to: @people.show)`, not a bare `job`.
 
 ## KS6013
 
@@ -317,4 +317,8 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 
 ## KS6014
 
-**A type written the long way.** A type is named bare, without `$`: `@json($text, as: Repo)`, `Repo($data)`. An optional field is marked on its name, `age?: int`, not on its type.
+**A type written the long way.** A type is named bare, without `$`: `$text->json(as: Repo)`, `Repo($data)`. An optional field is marked on its name, `age?: int`, not on its type.
+
+## KS6018
+
+**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so the fix adds `s`.

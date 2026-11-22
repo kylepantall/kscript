@@ -67,9 +67,9 @@ fn sign_out() {
 
 - `@register(email, password, fields...)` checks the email and password with their types and your project's rules. It refuses an email someone already signed up with (case doesn't matter), keeps only an argon2id hash of the password, and keeps the other named values as the user's fields. A problem is a `Validation` error that names the field, which a route answers with 422.
 - `@attempt(email, password, remember?, session?)` returns the user, or `null`. When the email has no account it takes about as long, so the timing doesn't give away who has one. A hash made with older settings is made again. `session: false` only checks, for an API that answers with a token.
-- `@login(user, remember?)` signs a user in. The session gets a new id, so an id seen before the sign-in can't be used. `remember: yes` keeps them signed in for `http.auth.remember` (30 days) after the browser closes.
-- `@logout(everywhere?)` ends the session and removes its cookie. `everywhere: yes` ends the user's sessions on every device.
-- `@user()` is the signed-in user (a map with `id`, `email`, `created_at` and their fields, never the hash), or `null`. `@signed_in()` is true when there is one.
+- `@login(user, remember?)` signs a user in. The session gets a new id, so an id seen before the sign-in can't be used. `remember: true` keeps them signed in for `http.auth.remember` (30 days) after the browser closes.
+- `@logout(everywhere?)` ends the session and removes its cookie. `everywhere: true` ends the user's sessions on every device.
+- `@user()` is the signed-in user (a map with `id`, `email`, `created_at` and their fields, never the hash), or `null`. `@is_signed_in()` is true when there is one.
 - `@intended(default?)` is the page the `auth` middleware sent someone away from, or the default (`http.auth.home`, `/`). It is always a path on this site, so it can't send people elsewhere.
 
 ### Failed sign-ins
@@ -98,12 +98,12 @@ KScript.Routes {
   import "controllers/accounts.kscript" as accounts
 
   Group(middleware: guest) {
-    Get(path: "/login", to: accounts.show_login, name: "login")
-    Post(path: "/login", to: accounts.sign_in)
+    Get(path: "/login", to: @accounts.show_login, name: "login")
+    Post(path: "/login", to: @accounts.sign_in)
   }
   Group(middleware: auth) {
-    Get(path: "/account", to: accounts.account)
-    Post(path: "/logout", to: accounts.sign_out)
+    Get(path: "/account", to: @accounts.account)
+    Post(path: "/logout", to: @accounts.sign_out)
   }
 }
 ```
@@ -140,7 +140,7 @@ Scripts in the page send `@csrf_token()` as an `X-CSRF-Token` header instead. A 
 ```kscript
 import KScript.Auth
 
-$session->put('theme', 'dark')
+$session->set('theme', 'dark')
 theme = $session->get('theme', 'light')
 $session->flash('status', 'Your profile was saved.')
 ```
@@ -149,12 +149,12 @@ $session->flash('status', 'Your profile was saved.')
 | --- | --- |
 | `->get(key, default?)` | The value, or the default. |
 | `->has(key)` | True when the key is there. |
-| `->put(key, value)` | Keeps a value. Values are kept as JSON, and a password is refused. |
+| `->set(key, value)` | Keeps a value. Values are kept as JSON, and a password is refused. |
 | `->flash(key, value)` | Keeps a value for the next request only: a message to show after a redirect. |
-| `->forget(key)` | Removes a key. True if it was there. |
+| `->remove(key)` | Removes a key. True if it was there. |
 | `->all()` | Every value, as a map. |
 | `->regenerate()` | Gives the session a new id with the same values. `@login` does this for you. |
-| `->token()` | The CSRF token, like `@csrf_token()`. |
+| `.token` | The CSRF token, like `@csrf_token()`. |
 
 Keys starting with `_` are kept by KScript.Auth, so they can't be set. The cookie is `HttpOnly` and `SameSite=Lax`. It is `Secure` on https, behind a proxy that sends `X-Forwarded-Proto: https`, or with `SameSite=None`. A session lasts `http.auth.lifetime` (2 hours) after the last request.
 
@@ -209,7 +209,7 @@ fn issue_token(json: map) {
   if $user == null {
     throw Unauthorized "That email and password don't match an account."
   }
-  return @response({ token: @api_token($user, name: 'cli', expires: '30d') }, status: 201)
+  return @response({ token: @api_token($user, name: 'cli', expires: 30d) }, status: 201)
 }
 ```
 

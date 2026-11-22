@@ -33,7 +33,7 @@ namespace KScript.Language.Tests
         public void A_test_file_offers_the_test_statements_before_those()
         {
             List<string> labels = Labels("‸", "cart.test.kscript");
-            Assert.Equal(new[] { "test", "expect", "describe", "expect-error", "echo", "if" }, labels.Take(6));
+            Assert.Equal(new[] { "test", "expect", "describe", "expect_error", "echo", "if" }, labels.Take(6));
         }
 
         [Theory]

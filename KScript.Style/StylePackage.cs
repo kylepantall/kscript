@@ -32,7 +32,7 @@ namespace KScript.Style
 
         protected override void Register(PackageBuilder p)
         {
-            p.Element(new ElementInfo("css-text", "CSS text in a stylesheet, with {$name} and { @fn() } filled in. kscript writes these for you around the KScript elements in a .ks.css file.", ContentKind.Template), run =>
+            p.Element(new ElementInfo("css_text", "CSS text in a stylesheet, with {$name} and { @fn() } filled in. kscript writes these for you around the KScript elements in a .ks.css file.", ContentKind.Template), run =>
             {
                 run.Host.Write(Stylesheets.Interpolate(run.Content, run.Interpreter, run.Scope, run.Module));
                 return null;

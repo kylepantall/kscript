@@ -144,7 +144,7 @@ public class HttpAppTests
 
     private const string Routes = """
         <KScript.Routes>
-          <import src="controllers/people.ks.xml" as="people" />
+          <import path="controllers/people.ks.xml" as="people" />
           <Get path="/people" to="people.index" name="people.index" />
           <Get path="/people/{id}" to="people.page" name="people.show" where="id: int" />
           <Post path="/people" to="people.store" />
@@ -269,7 +269,7 @@ public class HttpAppTests
     {
         using var site = Site(null, ("api.ks.xml", """
             <KScript.Routes>
-              <import src="controllers/people.ks.xml" as="people" />
+              <import path="controllers/people.ks.xml" as="people" />
               <Get path="/people/{id}" to="people.show" />
             </KScript.Routes>
             """));
@@ -289,7 +289,7 @@ public class HttpAppTests
     {
         using var site = Site("""
             <KScript.Routes>
-              <import src="controllers/people.ks.xml" as="people" />
+              <import path="controllers/people.ks.xml" as="people" />
               <Resource path="/people" to="people" />
             </KScript.Routes>
             """);
@@ -305,7 +305,7 @@ public class HttpAppTests
     {
         using var site = Site("""
             <KScript.Routes>
-              <import src="controllers/people.ks.xml" as="people" />
+              <import path="controllers/people.ks.xml" as="people" />
               <Resource path="/a" to="people" only="index, show" name="a" />
               <Resource path="/b" to="people" except="destroy, store, update" name="b" />
             </KScript.Routes>
@@ -336,7 +336,7 @@ public class HttpAppTests
     {
         using var site = Site("""
             <KScript.Routes>
-              <import src="middleware.ks.xml" />
+              <import path="middleware.ks.xml" />
               <Middleware use="stamp" />
               <Get path="/open"><return value="'open'" /></Get>
               <Group prefix="/admin" middleware="admins_only" name="admin.">
@@ -433,7 +433,7 @@ public class HttpAppTests
     {
         using var site = Site(null, ("web/main.ks.xml", """
             <KScript.Routes>
-              <import src="../middleware.ks.xml" />
+              <import path="../middleware.ks.xml" />
               <Get path="/x" middleware="guarded"><return value="'x'" /></Get>
             </KScript.Routes>
             """), ("middleware.ks.xml", Middleware));
@@ -459,9 +459,9 @@ public class HttpAppTests
         using var site = Site(null, ("routes.kscript", """
             KScript.Routes {
               import "controllers/people.ks.xml" as people
-              Get(path: "/people/{id}", to: people.show, where: "id: int")
+              Get(path: "/people/{id}", to: @people.show, where: "id: int")
               Group(prefix: "/v2") {
-                Get(path: "/people", to: people.index)
+                Get(path: "/people", to: @people.index)
               }
             }
             """));
@@ -512,7 +512,7 @@ public class HttpAppTests
     [InlineData("<KScript.Routes><Get path=\"/a\" view=\"x\" redirect=\"/b\" /></KScript.Routes>", "more than one answer")]
     [InlineData("<KScript.Routes><Get path=\"/a\" to=\"nope\" /></KScript.Routes>", "No function named 'nope'")]
     [InlineData("<KScript.Routes><Get path=\"/a\" to=\"people.show\" /></KScript.Routes>", "Nothing is imported as 'people'")]
-    [InlineData("<KScript.Routes><import src=\"controllers/people.ks.xml\" as=\"people\" /><Get path=\"/a\" to=\"people.shwo\" /></KScript.Routes>", "has no function 'shwo'")]
+    [InlineData("<KScript.Routes><import path=\"controllers/people.ks.xml\" as=\"people\" /><Get path=\"/a\" to=\"people.shwo\" /></KScript.Routes>", "has no function 'shwo'")]
     [InlineData("<KScript.Routes><Get path=\"/a\" name=\"x\" redirect=\"/\" /><Get path=\"/b\" name=\"x\" redirect=\"/\" /></KScript.Routes>", "Two routes are named x")]
     [InlineData("<KScript.Routes><Get path=\"/a/{id}/{id}\" redirect=\"/\" /></KScript.Routes>", "used twice")]
     [InlineData("<KScript.Routes><Route methods=\"get, fetch\" path=\"/a\" redirect=\"/\" /></KScript.Routes>", "'FETCH' isn't an HTTP method")]
@@ -634,7 +634,7 @@ public class HttpAppTests
                 <let name="r" value="@response('hi', type: 'text/plain')->with_status(202)->with_header('X-A', 1)" />
                 <return value="$r" />
               </Get>
-              <Get path="/b"><return value="@response('x')->status() + @response([1])->type()" /></Get>
+              <Get path="/b"><return value="@response('x').status + @response([1]).type" /></Get>
               <Get path="/c"><return value="null" /></Get>
               <Get path="/d"><return value="fn() => 1" /></Get>
             </KScript.Routes>

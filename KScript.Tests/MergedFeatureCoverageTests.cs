@@ -39,7 +39,7 @@ public sealed class MergedFeatureCoverageTests : IDisposable
     [Fact]
     public void Convert_keeps_imports_it_has_no_converted_version_for()
     {
-        string main = Write("main.ks.xml", "<kscript>\n  <import src=\"https://example.com/lib.ks.xml\" />\n  <import src=\"lib/b.kscript\" />\n</kscript>");
+        string main = Write("main.ks.xml", "<kscript>\n  <import path=\"https://example.com/lib.ks.xml\" />\n  <import path=\"lib/b.kscript\" />\n</kscript>");
         Write("lib/b.kscript", "fn b() => 1");
         var output = new StringWriter();
         var error = new StringWriter();

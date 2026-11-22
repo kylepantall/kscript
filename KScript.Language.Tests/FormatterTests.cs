@@ -135,13 +135,13 @@ namespace KScript.Language.Tests
         [Fact]
         public void StartTagsTheAuthorWrappedStayWrapped()
         {
-            string input = "<kscript>\n<test name=\"a\"\n    each=\"c\" in=\"$cases\">\n<echo>x</echo>\n</test>\n</kscript>\n";
+            string input = "<kscript>\n<test name=\"a\"\n    skip=\"c\" timeout=\"$cases\">\n<echo>x</echo>\n</test>\n</kscript>\n";
             Assert.Equal(Lines(
                 "<kscript>",
                 "  <test",
                 "    name=\"a\"",
-                "    each=\"c\"",
-                "    in=\"$cases\">",
+                "    skip=\"c\"",
+                "    timeout=\"$cases\">",
                 "    <echo>x</echo>",
                 "  </test>",
                 "</kscript>"), Fmt(input));
@@ -299,12 +299,12 @@ namespace KScript.Language.Tests
         public void WrapAttributesOffKeepsTagsAsWritten()
         {
             string value = new string('a', 120);
-            string input = $"<kscript>\n<let name=\"x\" value=\"'{value}'\" />\n<test name=\"a\"\n   each=\"c\" in=\"$cases\" />\n</kscript>\n";
+            string input = $"<kscript>\n<let name=\"x\" value=\"'{value}'\" />\n<test name=\"a\"\n   skip=\"c\" timeout=\"$cases\" />\n</kscript>\n";
             Assert.Equal(Lines(
                 "<kscript>",
                 $"  <let name=\"x\" value=\"'{value}'\" />",
                 "  <test name=\"a\"",
-                "   each=\"c\" in=\"$cases\" />",
+                "   skip=\"c\" timeout=\"$cases\" />",
                 "</kscript>"), Fmt(input, options: new FormatOptions { WrapAttributes = false }));
         }
 
@@ -376,9 +376,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void KScriptControlElementsInPagesAreIndented()
         {
-            string input = "<layout src=\"_layout.html\" title=\"Home\">\n<ul>\n<for each=\"p\" in=\"$people\">\n<li>{$p.name}</li>\n</for>\n</ul>\n</layout>\n";
+            string input = "<layout path=\"_layout.html\" title=\"Home\">\n<ul>\n<for each=\"p\" in=\"$people\">\n<li>{$p.name}</li>\n</for>\n</ul>\n</layout>\n";
             Assert.Equal(Lines(
-                "<layout src=\"_layout.html\" title=\"Home\">",
+                "<layout path=\"_layout.html\" title=\"Home\">",
                 "  <ul>",
                 "    <for each=\"p\" in=\"$people\">",
                 "      <li>{$p.name}</li>",

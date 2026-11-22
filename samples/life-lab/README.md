@@ -31,7 +31,7 @@ kscript serve .        # then open http://localhost:8080 (the port is in kscript
 
 Click cells to draw, then press **Play**. **Step**, **+10** and **+50** move on by hand, the pattern menu loads a pattern, **Random soup** fills the board, and **Wrap edges** joins the edges up like a torus.
 
-The page imports the rules with `<import src="lib/life.ks.xml" />`, and **Play** uses an `on-tick` handler that runs every few hundred milliseconds while the game is playing.
+The page imports the rules with `<import path="lib/life.ks.xml" />`, and **Play** uses an `on-tick` handler that runs every few hundred milliseconds while the game is playing.
 
 ## As a desktop app
 

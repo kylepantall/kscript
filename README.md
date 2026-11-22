@@ -9,7 +9,7 @@ KScript is an open source language for scripts, web pages and desktop apps. You 
 ```kscript
 import KScript.Terminal
 
-input(to: name) "What's your name? "
+input(into: name) "What's your name? "
 echo "Hello, { $name->trim()->title() }!"
 ```
 
@@ -37,20 +37,20 @@ import KScript.Terminal
 
 folder = $args[0] ?? @known_folder(downloads)
 big = @files($folder, pattern: '*', recursive)
-  |> filter(fn($f) => $f->size() gt 1000000)
-  |> sort_by(fn($f) => -$f->size())
+  |> filter(fn($f) => $f.size gt 1000000)
+  |> sort_by(fn($f) => -$f.size)
 
 for f in $big {
-  echo "{ @bold($f->name()) }  { ($f->size() / 1000000)->round(digits: 1) } MB"
+  echo "{ @bold($f.name) }  { ($f.size / 1000000)->round(digits: 1) } MB"
 } else {
   echo "Nothing over 1 MB in {$folder}."
 }
 
 if $big->count() gt 0 {
-  confirm(to: ok) "Move them to an archive folder?"
+  confirm(into: ok) "Move them to an archive folder?"
   if $ok {
     for f in $big {
-      @move($f, @join_path(base: $folder, ['archive', $f->name()]))
+      @move($f, @join_path(base: $folder, ['archive', $f.name]))
     }
   }
 }
@@ -128,7 +128,7 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Cache` | A memory and file cache with time limits, and ETags and `Cache-Control` for routes |
 | `KScript.Data` | Models, a query builder whose conditions are lambdas, transactions and safe raw SQL, on SQLite, Postgres, MySQL and MariaDB |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: users, sessions, the `auth` and `guest` middleware, CSRF, password resets and API tokens |
-| `KScript.Queue` | Background jobs: `job`, `dispatch`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
+| `KScript.Queue` | Background jobs: `job`, `->dispatch()`, retries with backoff, failed jobs, chains, and `kscript worker` to run them |
 | `KScript.Document` | Papers, reports, letters and invoices with LaTeX maths, tables, figures and citations, saved as PDF, Word, LaTeX, Markdown or HTML |
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
@@ -141,7 +141,7 @@ A `KScript.Window { }` block opens a native window on macOS, Windows or Linux. I
 KScript.Window(title: Counter, width: 320, height: 200) {
   count = 0
   Text(size: 32) "{$count}"
-  Button(variant: primary, on-click: count += 1) "Add one"
+  Button(variant: primary, on_click: count += 1) "Add one"
 }
 ```
 

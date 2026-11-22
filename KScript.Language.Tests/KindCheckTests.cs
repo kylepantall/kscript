@@ -39,7 +39,7 @@ namespace KScript.Language.Tests
         [InlineData("point = { x: 1, y: 2 }\necho $point.z\n")] // short names are close without being typos
         [InlineData("person = { name: 'Joan' }\n$person.nmae = 'x'\necho $person.nmae\n")] // the field is given a value
         [InlineData("person = { name: 'Joan' }\necho $person.nmae\n$person['nmae'] = 'x'\n")]
-        [InlineData("person = { name: 'Joan' }\necho $person.name.count\nlist = [1]\necho $list.count\n")]
+        [InlineData("person = { name: 'Joan' }\necho $person.name->count()\nlist = [1]\necho $list->count()\n")]
         [InlineData("data = '{}'->json()\necho $data.nmae\n")]
         public void FieldsThatMayBeThereAreLeftAlone(string text)
         {
@@ -58,7 +58,7 @@ namespace KScript.Language.Tests
             d = One("n = 5\necho $n.size\n");
             Assert.Equal("A number has no fields, so .size stops the script.", d.Message);
             Assert.Empty(d.Fixes);
-            Assert.StartsWith("A yes/no value has no fields", One("ok = true\necho $ok.value\n").Message);
+            Assert.StartsWith("A true/false value has no fields", One("ok = true\necho $ok.value\n").Message);
         }
 
         [Theory]

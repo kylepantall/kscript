@@ -1,4 +1,4 @@
-<layout src="_layout.html" title="Home">
+<layout path="_layout.html" title="Home">
   <h1>Welcome to {{ title }}</h1>
   <p>This page is rendered by KScript on each request (today is { @today()->format(pattern: 'd MMMM yyyy') }). Edit index.html and refresh.</p>
   <p>The <a href="/tasks">Tasks</a> page is a small app: its rules are in <code>lib/tasks{{ ext }}</code>{{#if desktop}}, and <code>desktop{{ ext }}</code> shows the same app in a desktop window{{/if}}.</p>

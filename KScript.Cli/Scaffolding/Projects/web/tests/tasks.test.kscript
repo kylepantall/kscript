@@ -8,8 +8,10 @@ describe(name: "tasks") {
     expect(value: $tasks[1], equals: { id: 2, title: 'Test', done: false })
   }
 
-  test(name: "a blank title adds nothing", each: title, in: ['', '   ']) {
-    expect(value: @add_task([], title: $title), count: 0)
+  for title in ['', '   '] {
+    test(name: "a blank title adds nothing") {
+      expect(value: @add_task([], title: $title), count: 0)
+    }
   }
 
   test(name: "titles are trimmed") {
@@ -34,11 +36,13 @@ describe(name: "tasks") {
     { done: 2, text: '0 tasks left' },
   ]
 
-  test(name: "'{$case.text}' when {$case.done} of 2 are done", each: case, in: $counts) {
-    tasks = @starter_tasks()
-    for id in [1, 2]->take($case.done) {
-      tasks = @toggle_task($tasks, id: $id)
+  for case in $counts {
+    test(name: "'{$case.text}' when {$case.done} of 2 are done") {
+      tasks = @starter_tasks()
+      for id in [1, 2]->take($case.done) {
+        tasks = @toggle_task($tasks, id: $id)
+      }
+      expect(value: @tasks_left($tasks), equals: $case.text)
     }
-    expect(value: @tasks_left($tasks), equals: $case.text)
   }
 }

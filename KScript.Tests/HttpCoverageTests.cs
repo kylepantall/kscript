@@ -91,7 +91,7 @@ public class HttpCoverageTests
 
     [Theory]
     [InlineData("""<Resource path="/x" to="nope" />""", "names a controller script imported")]
-    [InlineData("""<import src="controllers/people.ks.xml" as="people" /><Resource path="/x" to="people" only="bogus" />""", "a resource action")]
+    [InlineData("""<import path="controllers/people.ks.xml" as="people" /><Resource path="/x" to="people" only="bogus" />""", "a resource action")]
     [InlineData("""<Get path="/p/{id}" where="id: '[a'" to="people.index" />""", "a valid pattern")]
     [InlineData("""<abort status="403" />""", "")]
     public void RouteFileMistakesAnswerWithAnError(string routes, string message)
@@ -143,7 +143,7 @@ public class HttpCoverageTests
             <KScript.Routes>
               <Get path="/a">
                 <let name="r" value="@response({ a: 1 }, headers: { 'X-A': 'b' })" />
-                <return value="[$r.status, $r.body, $r.type, $r.headers, $r.ok, $r->body(), $r->text(), $r->headers(), $r->ok(), $r->header('X-A'), $r->json().a, $r->with_type('text/csv')->type()]" />
+                <return value="[$r.status, $r.body, $r.type, $r.headers, $r.is_ok, $r.body, $r.body, $r.headers, $r.is_ok, $r->header('X-A'), $r->json().a, $r->with_type('text/csv').type]" />
               </Get>
               <Get path="/b"><return value="@response('x')->nope()" /></Get>
               <Get path="/c"><return value="@response('x').nope" /></Get>

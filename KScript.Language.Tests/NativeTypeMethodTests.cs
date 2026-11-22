@@ -27,12 +27,12 @@ namespace KScript.Language.Tests
         // Each native type written without quotes, as a literal and through a declared variable.
         public static TheoryData<string, string, string> Receivers => new TheoryData<string, string, string>
         {
-            { KType.Uuid, $"echo {Uuid}->‸", "version" },
-            { KType.Uuid, $"u: uuid = {Uuid}\necho $u->‸", "version" },
-            { KType.Uuid, $"u = {Uuid}\necho $u->‸", "version" },
-            { KType.Email, "echo joan@example.com->‸", "domain" },
-            { KType.Email, "e: email = joan@example.com\necho $e->‸", "local" },
-            { KType.Handle, "h: handle = @joan\necho $h->‸", "name" },
+            { KType.Uuid, $"echo {Uuid}->‸", "to_json" },
+            { KType.Uuid, $"u: uuid = {Uuid}\necho $u->‸", "to_json" },
+            { KType.Uuid, $"u = {Uuid}\necho $u->‸", "to_json" },
+            { KType.Email, "echo joan@example.com->‸", "count" },
+            { KType.Email, "e: email = joan@example.com\necho $e->‸", "count" },
+            { KType.Handle, "h: handle = @joan\necho $h->‸", "count" },
             { KType.Regex, "echo /ab+/i->‸", "test" },
             { KType.Regex, "r: regex = /ab+/\necho $r->‸", "match" },
         };
@@ -54,6 +54,20 @@ namespace KScript.Language.Tests
             {
                 Assert.DoesNotContain(missing, methods);
             }
+        }
+
+        [Theory]
+        [InlineData("u: uuid = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\necho $u.‸", "version")]
+        [InlineData("e: email = joan@example.com\necho $e.‸", "local")]
+        [InlineData("e: email = joan@example.com\necho $e.‸", "domain")]
+        [InlineData("h: handle = @joan\necho $h.‸", "name")]
+        [InlineData("r: regex = /ab+/i\necho $r.‸", "flags")]
+        public void Native_values_are_offered_their_fields_after_a_dot(string code, string field)
+        {
+            List<string> offered = MethodsAfter(code);
+            Assert.Contains(field, offered);
+            // A fact is a field, so it isn't offered as a method too.
+            Assert.DoesNotContain(field, MethodsAfter(code.Replace(".‸", "->‸")));
         }
 
         [Fact]

@@ -8,7 +8,7 @@ import KScript.Data
 enum Role { member, editor, admin }
 
 model User {
-  timestamps: yes
+  timestamps: true
   unique: [email]
   hidden: [password]
   guarded: [role]
@@ -38,8 +38,8 @@ import KScript.Data
 
 /// A post on the blog.
 model Post {
-  timestamps: yes
-  soft_deletes: yes
+  timestamps: true
+  soft_deletes: true
   index: [published]
   title: string(max: 200)
   body: string
@@ -60,8 +60,8 @@ Settings go first, one per line:
 | --- | --- |
 | `table: posts` | The table. Default: the plural of the name in snake case (`User` is `users`, `BlogPost` is `blog_posts`). |
 | `key: slug` | The field that is the key. Default: `id`, an `int` the database numbers, added for you. |
-| `timestamps: yes` | Adds `created_at` and `updated_at`, set when records are saved. |
-| `soft_deletes: yes` | Adds `deleted_at`. `->delete()` sets it instead of removing the row, and queries leave those records out. |
+| `timestamps: true` | Adds `created_at` and `updated_at`, set when records are saved. |
+| `soft_deletes: true` | Adds `deleted_at`. `->delete()` sets it instead of removing the row, and queries leave those records out. |
 | `unique: [email, [team_id, slug]]` | Fields no two records may share. A list in the list is a set of fields that is unique together. A save that clashes fails with `UniqueViolation`. |
 | `index: [team_id]` | Fields to index, so queries on them stay fast. |
 | `hidden: [password]` | Fields left out of JSON, so they never reach a route's response. |
@@ -88,7 +88,7 @@ An optional field (`age: int?`) is a column that can be null. A computed field (
 import KScript.Data
 
 model Note {
-  timestamps: yes
+  timestamps: true
   text: string
   pinned: bool = false
 }
@@ -124,7 +124,7 @@ Every query starts from the model, and each step returns a new query, so a query
 import KScript.Data
 
 model Order {
-  timestamps: yes
+  timestamps: true
   customer: string
   total: number
   status: string = 'open'

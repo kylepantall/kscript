@@ -162,15 +162,17 @@ namespace KScript.Language.Analysis
         /// </summary>
         private void CheckMapField(TypeShape target, MemberNode member, ExpressionRegion region)
         {
-            if ((target.Type == KType.String && member.Name != "count") || target.Type == KType.Number || target.Type == KType.Bool)
+            if (target.Type == KType.String || target.Type == KType.Number || target.Type == KType.Bool || (target.Type == KType.List && member.Name is "count" or "length"))
             {
                 // $name.upper: a method needs -> and ( ).
                 TextSpan at = region.Source.ToSource(TextSpan.FromBounds(member.NameSpan.Start - 1, member.NameSpan.End));
-                bool method = catalog.GetMethods(member.Name, target.Type).Any(m => KType.AcceptsMethod(m.ReceiverType, m.Name, target.Type));
-                string what = target.Type == KType.String ? "Text has" : target.Type == KType.Number ? "A number has" : "A yes/no value has";
+                // .length is the habit from other languages: the method is ->count().
+                string called = member.Name == "length" && target.Type is KType.String or KType.List ? "count" : member.Name;
+                bool method = catalog.GetMethods(called, target.Type).Any(m => KType.AcceptsMethod(m.ReceiverType, m.Name, target.Type));
+                string what = target.Type == KType.String ? "Text has" : target.Type == KType.List ? "A list has" : target.Type == KType.Number ? "A number has" : "A true/false value has";
                 Report(at, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownField,
-                    $"{what} no fields, so .{member.Name} stops the script." + (method ? $" To call the method, write ->{member.Name}()." : string.Empty),
-                    method && !member.NullSafe ? new[] { new QuickFix($"Change to ->{member.Name}()", new TextChange(at, "->" + member.Name + "()")) } : null);
+                    $"{what} no fields, so .{member.Name} stops the script." + (method ? $" To call the method, write ->{called}()." : string.Empty),
+                    method && !member.NullSafe ? new[] { new QuickFix($"Change to ->{called}()", new TextChange(at, "->" + called + "()")) } : null);
                 return;
             }
             if (target.Type != KType.Map || target.Name != null || target.Closed || target.Kind != null || target.IsFrozen || member.Name.Length == 0

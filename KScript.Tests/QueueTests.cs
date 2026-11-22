@@ -40,7 +40,7 @@ public sealed class QueueTests : StorageFixture
 
     private const string WelcomeJob = """
         /// Says welcome.
-        job Welcome(queue: "mail", tries: 3, backoff: ['10s', '1m'], timeout: "5s") {
+        job Welcome(queue: "mail", tries: 3, backoff: [10s, 1m], timeout: 5s) {
           user_id: int
           email: email
           name?: string
@@ -174,7 +174,7 @@ public sealed class QueueTests : StorageFixture
     [InlineData("<job name=\"T\" fields=\"a: int\" unique_for=\"1m\" unique_by=\"b\"><fn name=\"handle\" /></job>", "isn't a field")]
     [InlineData("<job name=\"T\" fields=\"a: int\"><fn name=\"handle\" /></job><do>T(1)</do>", "takes its fields by name")]
     [InlineData("<job name=\"T\" fields=\"a: int\"><fn name=\"handle\" /></job><do>T(a: 'x')</do>", "T's fields")]
-    [InlineData("<dispatch value=\"1\" />", "dispatch needs a job")]
+    [InlineData("<dispatch value=\"1\" />", "->dispatch()")]
     [InlineData("<import package=\"KScript.Queue\" /><do>@chain([1])</do>", "isn't a job")]
     [InlineData("<import package=\"KScript.Queue\" /><do>@chain([])</do>", "at least one job")]
     public void BadJobsSayWhatIsWrong(string body, string message) =>
@@ -201,7 +201,7 @@ public sealed class QueueTests : StorageFixture
             import "jobs/welcome.kscript"
             q = Welcome(user_id: 2, email: 'ann@example.com')->dispatch()
             echo "{$q.job} {$q.queue} {$q.connection}"
-            dispatch Welcome(user_id: 3, email: 'bo@example.com', name: 'Bo')
+            Welcome(user_id: 3, email: 'bo@example.com', name: 'Bo')->dispatch()
             """);
         Assert.Equal("Welcome mail file\n", output);
         IQueueDriver driver = Driver();
@@ -221,7 +221,7 @@ public sealed class QueueTests : StorageFixture
     [Fact]
     public void FailedAttemptsRetryAfterTheirBackoffThenFailForGood()
     {
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'x@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 13, email: 'x@example.com')->dispatch()");
         Assert.Contains("Validation: unlucky (retrying in 10s", Work(null, 1, "mail"));
         Assert.Equal(string.Empty, Work(null, 1, "mail"));
         Later(10);
@@ -252,7 +252,7 @@ public sealed class QueueTests : StorageFixture
             error Flaky extends Network {
             }
 
-            job Picky(retry_on: [Network], fail_on: [NotFound], tries: 5, backoff: "1s") {
+            job Picky(retry_on: [Network], fail_on: [NotFound], tries: 5, backoff: 1s) {
               kind: string
 
               fn handle() {
@@ -264,7 +264,7 @@ public sealed class QueueTests : StorageFixture
               }
             }
             """);
-        Code("import \"jobs/picky.kscript\"\ndispatch Picky(kind: 'flaky')\ndispatch Picky(kind: 'missing')\ndispatch Picky(kind: 'other')");
+        Code("import \"jobs/picky.kscript\"\nPicky(kind: 'flaky')->dispatch()\nPicky(kind: 'missing')->dispatch()\nPicky(kind: 'other')->dispatch()");
         string log = Work();
         Assert.Contains("Flaky: try again (retrying in 1s", log);
         Assert.Contains("failed: NotFound: gone", log);
@@ -281,7 +281,7 @@ public sealed class QueueTests : StorageFixture
 
               fn handle() {
                 if $n == 1 {
-                  @release_job(after: '30s')
+                  @release_job(after: 30s)
                 }
                 if $n == 2 {
                   @fail_job(Validation(message: 'no good'))
@@ -296,7 +296,7 @@ public sealed class QueueTests : StorageFixture
               }
             }
             """);
-        Code("import \"jobs/poll.kscript\"\nfor n in [1, 2, 3, 4] {\n  dispatch Poll(n: $n)\n}");
+        Code("import \"jobs/poll.kscript\"\nfor n in [1, 2, 3, 4] {\n  Poll(n: $n)->dispatch()\n}");
         string log = Work();
         Assert.Contains("released, back in 30s", log);
         Assert.Contains("failed: Validation: no good", log);
@@ -316,7 +316,7 @@ public sealed class QueueTests : StorageFixture
     public void ATimeoutStopsTheAttempt()
     {
         FileOf("jobs/slow.kscript", """
-            job Slow(timeout: "0.2s", tries: 1) {
+            job Slow(timeout: 0.2s, tries: 1) {
               fn handle() {
                 n = 0
                 while true {
@@ -325,7 +325,7 @@ public sealed class QueueTests : StorageFixture
               }
             }
             """);
-        Code("import \"jobs/slow.kscript\"\ndispatch Slow()");
+        Code("import \"jobs/slow.kscript\"\nSlow()->dispatch()");
         Assert.Contains("failed: JobTimeout: Slow ran for more than 0.2s, its timeout.", Work());
         Assert.Equal("JobTimeout", Driver().Failed()[0].LastError["type"]);
     }
@@ -335,7 +335,7 @@ public sealed class QueueTests : StorageFixture
     {
         string output = Code("""
             import "jobs/welcome.kscript"
-            a = Welcome(user_id: 1, email: 'a@example.com')->dispatch(delay: '10m', queue: 'later')
+            a = Welcome(user_id: 1, email: 'a@example.com')->dispatch(delay: 10m, queue: 'later')
             b = Welcome(user_id: 2, email: 'b@example.com')->dispatch(at: '2026-11-21T10:00:00Z'->to_date(), queue: 'later')
             c = Welcome(user_id: 3, email: 'c@example.com')->dispatch(delay: 30, queue: 'later', connection: 'memory')
             d = Welcome(user_id: 4, email: 'd@example.com')->dispatch(at: '2000-01-01', queue: 'later')
@@ -354,16 +354,17 @@ public sealed class QueueTests : StorageFixture
     }
 
     [Fact]
-    public void TheDispatchElementTakesOptionsAndAVariable()
+    public void DispatchTakesOptionsAndReturnsWhatWasQueued()
     {
         string output = Run("""
-            <import src="jobs/welcome.kscript" />
-            <dispatch value="Welcome(user_id: 1, email: 'a@example.com')" delay="'1m'" queue="'q1'" connection="file" to="queued" />
-            <dispatch value="@chain([Welcome(user_id: 2, email: 'b@example.com')])" at="'2026-11-21T09:30:00Z'->to_date()" />
+            <import path="jobs/welcome.kscript" />
+            <import package="KScript.Queue" />
+            <let name="queued" value="Welcome(user_id: 1, email: 'a@example.com')->dispatch(delay: 1m, queue: 'q1', connection: 'file')" />
+            <do>@chain([Welcome(user_id: 2, email: 'b@example.com')])->dispatch(at: '2026-11-21T09:30:00Z'->to_date())</do>
             <echo>{ $queued.queue } { $queued.available_at->format('HH:mm') }</echo>
             """, file: "main.ks.xml", setup: h => h.WorkingDirectory = Project);
         Assert.Equal("q1 09:01\n", output);
-        Assert.Contains("at should be a date", Assert.Throws<KScriptException>(() => Run("<import src=\"jobs/welcome.kscript\" /><dispatch value=\"Welcome(user_id: 1, email: 'a@example.com')\" at=\"5\" />", file: "main.ks.xml")).Message);
+        Assert.Contains("should be a date", Assert.Throws<KScriptException>(() => Run("<import path=\"jobs/welcome.kscript\" /><do>Welcome(user_id: 1, email: 'a@example.com')->dispatch(at: 5)</do>", file: "main.ks.xml")).Message);
     }
 
     [Fact]
@@ -401,7 +402,7 @@ public sealed class QueueTests : StorageFixture
     public void UniqueJobsAreQueuedOnce()
     {
         FileOf("jobs/sync.kscript", """
-            job SyncUser(unique_for: "10m", unique_by: [user_id]) {
+            job SyncUser(unique_for: 10m, unique_by: [user_id]) {
               user_id: int
               note?: string
 
@@ -429,7 +430,7 @@ public sealed class QueueTests : StorageFixture
     public void TheMemoryDriverKeepsJobsInThisProcess()
     {
         UseProject("{ \"name\": \"" + app + "\", \"queue\": { \"default\": \"fast\", \"connections\": { \"fast\": { \"driver\": \"memory\" } } } }");
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'x@example.com')\ndispatch Welcome(user_id: 5, email: 'y@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 13, email: 'x@example.com')->dispatch()\nWelcome(user_id: 5, email: 'y@example.com')->dispatch()");
         IQueueDriver driver = Driver();
         Assert.Equal("memory", driver.Kind);
         Assert.Equal(2, driver.Waiting("mail").Count);
@@ -443,7 +444,7 @@ public sealed class QueueTests : StorageFixture
         Assert.False(driver.Forget(failed.Id));
 
         // A worker that stops mid-job loses its lease, and the job waits again.
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 6, email: 'z@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 6, email: 'z@example.com')->dispatch()");
         QueuedJob taken = driver.Reserve(new[] { "mail" }, now);
         Assert.Empty(driver.Waiting("mail"));
         Assert.Single(driver.Running());
@@ -455,7 +456,7 @@ public sealed class QueueTests : StorageFixture
     [Fact]
     public void TheFileDriverRecoversLostJobsAndSkipsBrokenFiles()
     {
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 6, email: 'z@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 6, email: 'z@example.com')->dispatch()");
         var driver = (FileQueueDriver)Driver();
         QueuedJob taken = driver.Reserve(new[] { "mail" }, now);
         Assert.Single(driver.Running());
@@ -479,7 +480,7 @@ public sealed class QueueTests : StorageFixture
     [Fact]
     public void AClaimedJobIsLeftAloneUntilItsClaimIsStale()
     {
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 6, email: 'z@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 6, email: 'z@example.com')->dispatch()");
         var driver = (FileQueueDriver)Driver();
         string id = driver.Waiting("mail")[0].Id;
         string claim = Path.Combine(driver.Folder, "running", id + ".claim");
@@ -509,7 +510,7 @@ public sealed class QueueTests : StorageFixture
     public void SeveralWorkersShareAQueue()
     {
         FileOf("jobs/count.kscript", "job Count {\n  n: int\n\n  fn handle() {\n    echo \"n{$n}\"\n  }\n}");
-        Code("import \"jobs/count.kscript\"\nfor n in 0..20 {\n  dispatch Count(n: $n)\n}");
+        Code("import \"jobs/count.kscript\"\nfor n in 0..20 {\n  Count(n: $n)->dispatch()\n}");
         Work(null, 4);
         // Threads can interleave a line and its line break (\r\n on Windows), so count the jobs' words, not lines.
         string output = JobOutput();
@@ -525,7 +526,7 @@ public sealed class QueueTests : StorageFixture
     public void WorkerLimitsStopIt()
     {
         FileOf("jobs/count.kscript", "job Count {\n  n: int\n\n  fn handle() {\n    echo \"n{$n}\"\n  }\n}");
-        Code("import \"jobs/count.kscript\"\nfor n in 0..5 {\n  dispatch Count(n: $n)\n}");
+        Code("import \"jobs/count.kscript\"\nfor n in 0..5 {\n  Count(n: $n)->dispatch()\n}");
         var options = new WorkerOptions { MaxJobs = 2, Sleep = 0.01, Host = () => JobHost() };
         var worker = new Worker(Context(), options, null);
         worker.Run(CancellationToken.None);
@@ -549,7 +550,7 @@ public sealed class QueueTests : StorageFixture
     public void AJobWhoseFileOrDeclarationIsGoneFails()
     {
         FileOf("jobs/gone.kscript", "job Gone {\n  fn handle() {\n  }\n}");
-        Code("import \"jobs/welcome.kscript\"\nimport \"jobs/gone.kscript\"\ndispatch Welcome(user_id: 1, email: 'a@example.com')\ndispatch Gone()");
+        Code("import \"jobs/welcome.kscript\"\nimport \"jobs/gone.kscript\"\nWelcome(user_id: 1, email: 'a@example.com')->dispatch()\nGone()->dispatch()");
         IQueueDriver driver = Driver();
         QueuedJob first = driver.Reserve(new[] { "mail" }, now);
         first.Fields["email"] = "not an email";
@@ -560,7 +561,7 @@ public sealed class QueueTests : StorageFixture
         File.Delete(Path.Combine(Project, "jobs/gone.kscript"));
         Assert.Contains("isn't there any more", Work());
 
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 1, email: 'a@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 1, email: 'a@example.com')->dispatch()");
         FileOf("jobs/welcome.kscript", "job Other {\n  fn handle() {\n  }\n}");
         Assert.Contains("doesn't declare a job called Welcome", Work(null, 1, "mail"));
     }
@@ -571,7 +572,7 @@ public sealed class QueueTests : StorageFixture
         UseProject("{ \"name\": \"" + app + "\", \"queue\": { \"default\": \"sync\" } }");
         Assert.Equal("Welcome there <a@example.com> #1 attempt 1 of 3 on mail\nnull\n",
             Code("import \"jobs/welcome.kscript\"\nq = Welcome(user_id: 1, email: 'a@example.com')->dispatch()\necho \"{$q ?? 'null'}\""));
-        Assert.Equal("unlucky", CodeFails("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'a@example.com')").Message);
+        Assert.Equal("unlucky", CodeFails("import \"jobs/welcome.kscript\"\nWelcome(user_id: 13, email: 'a@example.com')->dispatch()").Message);
         Assert.Contains("nothing for a worker to do", Assert.Throws<KScriptException>(() => Work()).Message);
         Assert.Contains("no queue to look at", Cli("status").Error);
     }
@@ -580,9 +581,9 @@ public sealed class QueueTests : StorageFixture
     public void TestRunsUseSyncUnlessTheProjectSaysOtherwise()
     {
         void Testing(KScriptHost h) => h.Items[QueueRuntime.TestSessionKey] = new object();
-        Assert.StartsWith("Welcome", Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 1, email: 'a@example.com')", setup: Testing));
+        Assert.StartsWith("Welcome", Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 1, email: 'a@example.com')->dispatch()", setup: Testing));
         UseProject("{ \"name\": \"" + app + "\", \"queue\": { \"env\": { \"test\": { \"default\": \"memory\" } } } }");
-        Assert.Equal(string.Empty, Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 1, email: 'a@example.com')", setup: Testing));
+        Assert.Equal(string.Empty, Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 1, email: 'a@example.com')->dispatch()", setup: Testing));
         Assert.Single(Driver("memory").Waiting(null));
         Assert.Equal("memory", Context("test").DefaultConnection);
         Assert.Equal("file", Context("production").DefaultConnection);
@@ -595,8 +596,8 @@ public sealed class QueueTests : StorageFixture
             import KScript.Queue
             import "jobs/welcome.kscript"
             q = @fake_queue()
-            dispatch Welcome(user_id: 1, email: 'a@example.com')
-            Welcome(user_id: 2, email: 'b@example.com')->dispatch(delay: '1m', queue: 'later', connection: 'x')
+            Welcome(user_id: 1, email: 'a@example.com')->dispatch()
+            Welcome(user_id: 2, email: 'b@example.com')->dispatch(delay: 1m, queue: 'later', connection: 'x')
             @chain([Welcome(user_id: 3, email: 'c@example.com')])->dispatch()
             echo "{$q.count} {$q->count_of($Welcome)} {$q->count_of('Other')} {$q->pushed($Welcome)[1].user_id} {$q->dispatches()[1].queue} {$q->dispatches()[1].connection} {$q->dispatches()[1].delay} {$q}"
             echo "{$q->run_all()} ran, {$q->count()} left, {$q->clear()}"
@@ -608,11 +609,11 @@ public sealed class QueueTests : StorageFixture
             import KScript.Queue
             job Again {
               fn handle() {
-                dispatch Again()
+                Again()->dispatch()
               }
             }
             q = @fake_queue()
-            dispatch Again()
+            Again()->dispatch()
             $q->run_all()
             """).Message);
     }
@@ -620,14 +621,14 @@ public sealed class QueueTests : StorageFixture
     [Fact]
     public void QueueHandlesLookAtAQueue()
     {
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'a@example.com')\ndispatch Welcome(user_id: 2, email: 'b@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 13, email: 'a@example.com')->dispatch()\nWelcome(user_id: 2, email: 'b@example.com')->dispatch()");
         Work(null, 1, "mail");
         Later(10);
         Work(null, 1, "mail");
         Later(60);
         Work(null, 1, "mail");
         string id = Driver().Failed()[0].Id;
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 4, email: 'c@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 4, email: 'c@example.com')->dispatch()");
         string output = Code($$"""
             import KScript.Queue
             q = @queue('mail')
@@ -677,7 +678,7 @@ public sealed class QueueTests : StorageFixture
     public void TheMemoryDriverClearsAndRetries()
     {
         UseProject("{ \"name\": \"" + app + "\", \"queue\": { \"default\": \"memory\" } }");
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'x@example.com')\ndispatch Welcome(user_id: 1, email: 'y@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 13, email: 'x@example.com')->dispatch()\nWelcome(user_id: 1, email: 'y@example.com')->dispatch()");
         IQueueDriver driver = Driver();
         QueuedJob job = driver.Reserve(new[] { "mail" }, now);
         driver.Fail(job);
@@ -691,7 +692,7 @@ public sealed class QueueTests : StorageFixture
     [Fact]
     public void FileJobsAnotherWorkerIsRecoveringAreLeftAlone()
     {
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 6, email: 'z@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 6, email: 'z@example.com')->dispatch()");
         var driver = (FileQueueDriver)Driver();
         QueuedJob taken = driver.Reserve(new[] { "mail" }, now);
         string running = Path.Combine(driver.Folder, "running", taken.Id + ".json");
@@ -710,7 +711,7 @@ public sealed class QueueTests : StorageFixture
     [Fact]
     public void StatusCountsRunningAndFailedJobs()
     {
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 1, email: 'a@example.com')\ndispatch Welcome(user_id: 2, email: 'b@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 1, email: 'a@example.com')->dispatch()\nWelcome(user_id: 2, email: 'b@example.com')->dispatch()");
         IQueueDriver driver = Driver();
         driver.Reserve(new[] { "mail" }, now);
         driver.Fail(driver.Reserve(new[] { "mail" }, now));
@@ -721,21 +722,21 @@ public sealed class QueueTests : StorageFixture
     public void AFailedHookThatThrowsIsReported()
     {
         FileOf("jobs/bad.kscript", "job Bad(tries: 1) {\n  fn handle() {\n    throw Validation \"no\"\n  }\n\n  fn failed(err) {\n    throw Error \"worse\"\n  }\n}");
-        Code("import \"jobs/bad.kscript\"\ndispatch Bad()");
+        Code("import \"jobs/bad.kscript\"\nBad()->dispatch()");
         Assert.Contains("failed: Validation: no", Work());
         Assert.Contains("Bad's fn failed() stopped with an error", JobOutput());
     }
 
     [Fact]
     public void ImportingAJobThatIsntThereSaysWhatScriptsExport() =>
-        Assert.Contains("<error>s, <model>s and <job>s", Assert.Throws<KScriptException>(() => Run("<import src=\"jobs/welcome.kscript\" names=\"Nope\" />", setup: h => h.WorkingDirectory = Project)).Message);
+        Assert.Contains("<error>s, <model>s and <job>s", Assert.Throws<KScriptException>(() => Run("<import path=\"jobs/welcome.kscript\" names=\"Nope\" />", setup: h => h.WorkingDirectory = Project)).Message);
 
     [Fact]
     public void ABrokenKscriptJsonMeansTheDefaults()
     {
         FileOf("kscript.json", "{ broken");
         QueueContext.ForgetProjects();
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 6, email: 'z@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 6, email: 'z@example.com')->dispatch()");
         Assert.Single(new QueueContext(null, Project, null).Driver(null).Waiting(null));
     }
 
@@ -744,7 +745,7 @@ public sealed class QueueTests : StorageFixture
     [Fact]
     public void TheQueueCommandShowsAndFixesTheQueues()
     {
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'a@example.com')\nWelcome(user_id: 2, email: 'b@example.com')->dispatch(delay: '5m')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 13, email: 'a@example.com')->dispatch()\nWelcome(user_id: 2, email: 'b@example.com')->dispatch(delay: 5m)");
         IQueueDriver statusDriver = Driver();
         QueuedJob busy = statusDriver.Reserve(new[] { "mail" }, now);
         statusDriver.Release(busy);
@@ -778,16 +779,17 @@ public sealed class QueueTests : StorageFixture
         string id = Driver().Failed()[0].Id;
         Assert.Equal("   DONE  1 failed job is back on its queue.\n", Cli("retry", id).Out);
         Assert.Contains("There is no failed job", Cli("retry", id).Error);
-        Assert.Contains("needs a failed job's id", Cli("forget").Error);
+        Assert.Contains("needs a failed job's id", Cli("delete").Error);
         Later(400);
         Cli("worker", "--queue", "mail", "--stop-when-empty", "--sleep", "0");
         Later(10);
         Cli("worker", "--queue", "mail", "--stop-when-empty", "--max-jobs", "5", "--max-time", "1h", "--concurrency", "2", "--sleep", "1s");
         Later(60);
         Cli("worker", "--queue", "mail", "--stop-when-empty");
-        Assert.Equal("   DONE  1 failed job deleted.\n", Cli("forget", "--all").Out);
+        Assert.Equal("   DONE  1 failed job deleted.\n", Cli("delete", "--all").Out);
+        Assert.Contains("kscript queue delete", Cli("forget", "--all").Error);
         Assert.Equal("   DONE  0 failed jobs are back on their queues.\n", Cli("retry", "--all").Out);
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 2, email: 'b@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 2, email: 'b@example.com')->dispatch()");
         Assert.Equal("   DONE  Removed 1 waiting job from mail.\n", Cli("clear", "mail").Out);
         Assert.Equal("   DONE  Removed 0 waiting jobs.\n", Cli("clear").Out);
         Assert.Equal("   INFO  No jobs are waiting.\n", Cli("list").Out);
@@ -873,8 +875,8 @@ public sealed class QueueTests : StorageFixture
             import "jobs/welcome.kscript"
             q = Welcome(user_id: 2, email: 'ann@example.com')->dispatch()
             echo "{$q.connection}"
-            dispatch Welcome(user_id: 3, email: 'bo@example.com', name: 'Bo')
-            Welcome(user_id: 4, email: 'cy@example.com')->dispatch(delay: '5m')
+            Welcome(user_id: 3, email: 'bo@example.com', name: 'Bo')->dispatch()
+            Welcome(user_id: 4, email: 'cy@example.com')->dispatch(delay: 5m)
             """);
         Assert.Equal("database\n", output);
         IQueueDriver driver = Driver();
@@ -900,7 +902,7 @@ public sealed class QueueTests : StorageFixture
     public void DatabaseJobsRetryFailAndComeBack()
     {
         UseDatabase();
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'x@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 13, email: 'x@example.com')->dispatch()");
         Assert.Contains("Validation: unlucky (retrying in 10s", Work(null, 1, "mail"));
         Assert.Equal(string.Empty, Work(null, 1, "mail"));
         Later(10);
@@ -923,14 +925,14 @@ public sealed class QueueTests : StorageFixture
         Assert.Equal(0, driver.Clear("other"));
         Assert.Equal(1, driver.Clear("mail"));
 
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 13, email: 'x@example.com', name: 'X')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 13, email: 'x@example.com', name: 'X')->dispatch()");
         QueuedJob taken = driver.Reserve(new[] { "mail" }, now);
         taken.FailedAt = now;
         driver.Fail(taken);
         Assert.Equal(0, driver.Prune(now));
         Assert.Equal(1, driver.Prune(now.AddSeconds(1)));
         Assert.False(driver.Forget(taken.Id));
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 1, email: 'x@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 1, email: 'x@example.com')->dispatch()");
         driver.Fail(driver.Reserve(new[] { "mail" }, now));
         Assert.True(driver.Forget(Assert.Single(driver.Failed()).Id));
         Assert.Equal(0, driver.Clear(null));
@@ -948,7 +950,7 @@ public sealed class QueueTests : StorageFixture
     public void ADatabaseJobWhoseWorkerStoppedRunsAgainAfterItsLease()
     {
         UseDatabase();
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 6, email: 'z@example.com')\ndispatch Welcome(user_id: 7, email: 'w@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 6, email: 'z@example.com')->dispatch()\nWelcome(user_id: 7, email: 'w@example.com')->dispatch()");
         IQueueDriver driver = Driver();
         QueuedJob taken = driver.Reserve(new[] { "other", "mail" }, now);
         Assert.Equal(6.0, taken.Fields["user_id"]);
@@ -1008,7 +1010,7 @@ public sealed class QueueTests : StorageFixture
     {
         UseDatabase();
         FileOf("jobs/count.kscript", "job Count {\n  n: int\n\n  fn handle() {\n    echo \"n{$n}\"\n  }\n}");
-        Code("import \"jobs/count.kscript\"\nfor n in 0..20 {\n  dispatch Count(n: $n)\n}");
+        Code("import \"jobs/count.kscript\"\nfor n in 0..20 {\n  Count(n: $n)->dispatch()\n}");
         Work(null, 4);
         string output = JobOutput();
         List<string> ran = System.Text.RegularExpressions.Regex.Matches(output, @"n\d+").Select(m => m.Value).ToList();
@@ -1024,7 +1026,7 @@ public sealed class QueueTests : StorageFixture
     {
         FileOf("config.json", "{ \"database\": { \"connections\": { \"jobs\": { \"url\": \"sqlite:data/jobs.sqlite\" } } } }");
         UseDatabase("\", \"queue\": { \"default\": \"db\", \"connections\": { \"db\": { \"driver\": \"database\", \"connection\": \"jobs\" }, \"lost\": { \"driver\": \"database\", \"connection\": \"nope\" } } } }");
-        Code("import \"jobs/welcome.kscript\"\ndispatch Welcome(user_id: 2, email: 'b@example.com')");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 2, email: 'b@example.com')->dispatch()");
         Assert.True(File.Exists(Path.Combine(Project, "data", "jobs.sqlite")));
         Assert.False(File.Exists(Path.Combine(Project, "data", "app.sqlite")));
         var status = Cli("status");
@@ -1128,22 +1130,22 @@ public sealed class QueueTests : StorageFixture
               }
             }
 
-            dispatch Hello(who: 'Joan')
+            Hello(who: 'Joan')->dispatch()
             Hello(who: 'Ann')->run()
             """;
         MarkupDocument doc = MarkupParser.Parse(new SourceText(code), DocumentKind.Script, "x.kscript");
         Assert.Empty(doc.Diagnostics);
         string xml = ScriptConverter.ToXml(doc).Text;
         Assert.Contains("<job name=\"Hello\" queue=\"mail\" tries=\"2\" description=\"Says hello.\">", xml);
-        Assert.Contains("<dispatch value=\"Hello(who: 'Joan')\" />", xml);
+        Assert.Contains("<do>Hello(who: 'Joan')->dispatch()</do>", xml);
         string back = ScriptConverter.ToCode(MarkupParser.Parse(new SourceText(xml), DocumentKind.Script, "x.ks.xml")).Text;
         Assert.Contains("job Hello(queue: \"mail\", tries: 2) {", back);
-        Assert.Contains("dispatch Hello(who: 'Joan')", back);
+        Assert.Contains("Hello(who: 'Joan')->dispatch()", back);
         Assert.Contains("Hello(who: 'Ann')->run()", back);
 
-        // dispatch(...) and job(...) without a name stay elements.
-        MarkupDocument generic = MarkupParser.Parse(new SourceText("dispatch(value: Hello())\njob(name: X) {\n}\n"), DocumentKind.Script, "y.kscript");
-        Assert.Equal(new[] { "dispatch", "job" }, generic.RootElements.First().ChildElements.Select(e => e.Name));
+        // job(...) without a name stays an element.
+        MarkupDocument generic = MarkupParser.Parse(new SourceText("job(name: X) {\n}\n"), DocumentKind.Script, "y.kscript");
+        Assert.Equal(new[] { "job" }, generic.RootElements.First().ChildElements.Select(e => e.Name));
         Assert.Equal("job Bare\n", ScriptConverter.ToCode(MarkupParser.Parse(new SourceText("<kscript><job name=\"Bare\" /></kscript>"), DocumentKind.Script, "b.ks.xml")).Text);
         Assert.Contains("  <!-- note -->", ScriptConverter.ToXml(MarkupParser.Parse(new SourceText("job Noted {\n  // note\n  fn handle() {\n  }\n}\n"), DocumentKind.Script, "n.kscript")).Text);
         Assert.Contains("  // note\n", ScriptConverter.ToCode(MarkupParser.Parse(new SourceText("<kscript><job name=\"Noted\"><!-- note --><fn name=\"handle\" /></job></kscript>"), DocumentKind.Script, "n.ks.xml")).Text);

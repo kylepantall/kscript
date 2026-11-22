@@ -2,7 +2,7 @@ using KScript.Runtime;
 
 namespace KScript.Queueing
 {
-    /// <summary>Queues jobs: <c>dispatch Job(...)</c>, <c>->dispatch()</c> and chains.</summary>
+    /// <summary>Queues jobs: <c>Job(...)->dispatch()</c> and chains.</summary>
     internal static class Dispatcher
     {
         /// <summary>
