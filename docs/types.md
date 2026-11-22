@@ -159,6 +159,7 @@ echo "$pay { $pay.brand }"
 | --- | --- | --- | --- |
 | `iban` | A bank account number, checked with its mod-97 digits. | Capitals without spaces. | `.country`, `->formatted()`, `.bban` |
 | `card` | A payment card number, checked with the Luhn digit. Like a password, it prints masked: `•••• 4242`, in logs and JSON too. | Spaces and dashes are dropped. | `.last4`, `.brand`, `->reveal()` |
+| `money` | An amount in a currency: `GBP 9.50`, `9.50 GBP`, `£9.50`, `$12` (USD), `€3.50`, `¥1200` (JPY). The decimal point is always `.`. | The code, a space and the currency's decimal places: `£9.5` is `GBP 9.50`. | `.amount`, `.currency`, `->format(locale?)`, `->split(parts)`, `->allocate(ratios)` |
 
 ### Arguments for the newer types
 
@@ -174,6 +175,83 @@ api: url(schemes: ['https'], hosts: ['api.example.com']) = https://api.example.c
 office: ip(version: 4) = 10.0.0.1
 echo "$api $office"
 ```
+
+## Operators on native types
+
+A native type says which operators work on its values, and only those work. A `duration` adds, subtracts, scales and compares. A `semver` compares by version. An `email` takes none, so `$email + 1` stops with a message that says so. The editor reads the same list, so it knows what `1h + 30m` gives, and warns about `$version * 2` before the script runs.
+
+```kscript
+wait: duration = 1h30m
+echo $wait + 15m                // 1h45m
+echo $wait * 2                  // 3h
+echo $wait / 30m                // 3
+echo 90s < 2m                   // true
+echo @now() + $wait > @now()    // true
+
+v: semver = 1.4.2
+echo $v < '1.10.0'              // true: versions compare by number, not as text
+
+price: money = 'GBP 9.50'
+echo $price * 3                 // GBP 28.50
+echo $price + 'GBP 0.50'        // GBP 10.00
+
+home: ip = 10.0.0.1
+echo $home + 5                  // 10.0.0.6
+echo $home in '10.0.0.0/8'      // true
+```
+
+Text next to a native value is read as that type, so `$wait + '15m'` and `$v < '1.10.0'` work. Joining text with `+` still joins text: `'Wait ' + $wait`.
+
+| Type | Operators | `<` `>` and sorting | `for` | False when |
+| --- | --- | --- | --- | --- |
+| `duration` | `duration + duration`, `duration - duration`, `duration * number`, `number * duration`, `duration / number` (a duration), `duration / duration` (a number), `duration % duration`, `date + duration`, `duration + date`, `date - duration`, `-duration`, `date..date step duration` | by length | | `0s` |
+| `money` | `money + money`, `money - money` (one currency), `money * number`, `number * money`, `money / number` (rounded to the currency's smallest unit), `money / money` (a number), `-money` | by amount, in one currency | | the amount is 0 |
+| `ip` | `ip + number`, `ip - number`, `ip - ip` (a number), `ip..ip step number` | by address, IPv4 first | | |
+| `cidr` | `ip in cidr`, `cidr in cidr` | by network, then prefix | its addresses (up to 65,536) | |
+| `semver` | | by version: `1.0.0-rc.1 < 1.0.0 < 1.10.0`. `==` ignores build metadata. | | |
+| `port` | the number operators (a port is a number) | by number | | |
+| `email`, `handle`, `uuid`, `url`, `domain`, `mac`, `slug`, `mime`, `hex`, `country`, `currency`, `locale`, `timezone` | | alphabetical | | |
+| `password` | | none, and no `==` either: use `->verify()` | | |
+| `regex`, `base64`, `jwt`, `json`, `phone`, `cron`, `color`, `iban`, `card` | | none | | |
+
+A type without an order stops `<` and `->sort()` with a message. Sort by a key instead: `$colors->sort_by(fn(c) => $c.luminance)`. A few types compare by meaning rather than spelling: `json` ignores spacing and key order, `base64` ignores padding, `cron` compares the times it runs (`@daily == '0 0 * * *'`), and `color` compares the colour (`orange == '#ffa500'`).
+
+Ranges of dates step by a duration, and default to a day:
+
+```kscript
+start = '2026-11-23'->to_date()
+for day in $start..$start + 5d {
+  echo $day->format('ddd')      // Mon to Fri
+}
+```
+
+### Lists of one native type
+
+A list whose items are all one native type has that type's list methods as well as every list's. `->only()` and `->without()` take a filter the type declares, or a type name, written without quotes:
+
+```kscript
+versions: semver[] = [1.0.0, 1.1.0-rc.1, 1.1.0-beta.2, 1.0.10]
+echo $versions->only(releases)               // 1.0.0, 1.0.10
+echo $versions->without(release_candidates)  // 1.0.0, 1.1.0-beta.2, 1.0.10
+echo $versions->latest()                     // 1.0.10, the highest release
+echo $versions->max()                        // 1.1.0-rc.1, prereleases included
+
+fees: money[] = ['GBP 9.50', 'GBP 0.50']
+echo $fees->total()                          // GBP 10.00
+
+a: semver = 2.0.0
+mixed = [$a, 'hello', 3]
+echo $mixed->only(semver)->only(releases)    // 2.0.0
+echo $mixed->without(string)                 // 2.0.0, 3
+echo 'hello'->is_a(string)                   // true
+```
+
+| Type | Filters | List methods |
+| --- | --- | --- |
+| `semver` | `releases`, `prereleases`, `release_candidates`, `betas`, `alphas` | `->latest()` |
+| `money` | | `->total()` |
+
+A list of a native type can be written without quotes too, as above: `[1.0.0, 1.1.0-rc.1]`.
 
 ## Values without quotes
 
@@ -337,7 +415,7 @@ A type a script declares itself wins over a project type of the same name.
 
 ### Native types from packages
 
-A package can add a native type with `p.NativeType(...)`, giving its name, description, example, the string methods it keeps and a parser that checks and tidies the text. Its methods are added with `p.Method` as usual. Once the package is imported, the type works like a built-in one: values without quotes, checks in the editor, `->type()` and OpenAPI schemas. Native type names are lowercase, and a name that is taken can't be reused.
+A package adds a native type with `p.NativeType(new IsbnType())`, where `IsbnType` is a subclass of `NativeType` (KScript.Core). The base class makes a type say everything the language does with its values, so none can be left out: its name, description and example, how text becomes a value (`Parse`), how it is written without quotes, what `==` means (`Equality`), whether `<` and sorting work (`Ordering`), whether a `for` loop can walk it (`Iteration`), its operators (`DeclareOperators`), its fields and methods (`DeclareMembers`), the filters and methods of a list of it (`DeclareListMembers`), the string methods it keeps and the values the editor offers. "None" is a fine answer to any of them, written as an empty body or `Ordering.None`. `DurationType` is the one to copy. Once the package is imported, the type works like a built-in one: values without quotes, checks in the editor, `->type()` and OpenAPI schemas. Native type names are lowercase, and a name that is taken can't be reused.
 
 ## Joined types
 
@@ -437,4 +515,4 @@ In XML, the same types are attributes and elements of `<type>`:
 
 ## Ideas for later
 
-These would work the same way and could be added next: `money` (an amount with its currency), `date_range`, and phone numbers written the national way with a default region. Tell us which you would use first.
+These would work the same way and could be added next: `date_range`, and phone numbers written the national way with a default region. Tell us which you would use first.

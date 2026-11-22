@@ -56,13 +56,13 @@ namespace KScript.Runtime
         protected override void DeclareOperators(NativeOperators o)
         {
             const string M = "money", N = "number";
-            o.Binary("+", M, M, M, "The two amounts added, in one currency: 'GBP 9.50' + 'GBP 0.50' is GBP 10.00.", (a, b) => Of(Amount(a) + Amount(Same(a, b, "add")), a))
-             .Binary("-", M, M, M, "The second amount taken from the first, in one currency: 'GBP 10' - 'GBP 0.50' is GBP 9.50.", (a, b) => Of(Amount(a) - Amount(Same(a, b, "subtract")), a))
-             .Binary("*", M, N, M, "The amount times a number, rounded to the currency's smallest unit: 'GBP 9.50' * 3 is GBP 28.50.", (a, b) => Of(Amount(a) * Factor((double)b), a))
-             .Binary("*", N, M, M, "The amount times a number, rounded to the currency's smallest unit: 3 * 'GBP 9.50' is GBP 28.50.", (a, b) => Of(Factor((double)a) * Amount(b), b))
-             .Binary("/", M, N, M, "The amount divided by a number, rounded to the currency's smallest unit: 'GBP 10' / 4 is GBP 2.50. Use ->split(n) to share it without losing pennies.", (a, b) => Of(Amount(a) / Divisor(Factor((double)b)), a))
-             .Binary("/", M, M, N, "How many times the second amount fits in the first, in one currency: 'GBP 10' / 'GBP 2.50' is 4.", (a, b) => (double)(Amount(a) / Divisor(Amount(Same(a, b, "divide")))))
-             .Negate(M, "The amount with its sign turned over: -'GBP 9.50' is GBP -9.50.", v => Of(-Amount(v), v))
+            o.Binary("+", M, M, M, "The two amounts added, in one currency: GBP 9.50 + GBP 0.50 is GBP 10.00.", (a, b) => Of(Amount(a) + Amount(Same(a, b, "add")), a))
+             .Binary("-", M, M, M, "The second amount taken from the first, in one currency: GBP 10 - GBP 0.50 is GBP 9.50.", (a, b) => Of(Amount(a) - Amount(Same(a, b, "subtract")), a))
+             .Binary("*", M, N, M, "The amount times a number, rounded to the currency's smallest unit: GBP 9.50 * 3 is GBP 28.50.", (a, b) => Of(Amount(a) * Factor((double)b), a))
+             .Binary("*", N, M, M, "The amount times a number, rounded to the currency's smallest unit: 3 * GBP 9.50 is GBP 28.50.", (a, b) => Of(Factor((double)a) * Amount(b), b))
+             .Binary("/", M, N, M, "The amount divided by a number, rounded to the currency's smallest unit: GBP 10 / 4 is GBP 2.50. Use ->split(n) to share it without losing pennies.", (a, b) => Of(Amount(a) / Divisor(Factor((double)b)), a))
+             .Binary("/", M, M, N, "How many times the second amount fits in the first, in one currency: GBP 10 / GBP 2.50 is 4.", (a, b) => (double)(Amount(a) / Divisor(Amount(Same(a, b, "divide")))))
+             .Negate(M, "The amount with its sign turned over: -GBP 9.50 is GBP -9.50.", v => Of(-Amount(v), v))
              .Falsy("An amount of 0 (GBP 0.00) is false; every other amount is true.", v => Amount(v) == 0);
         }
 
