@@ -146,6 +146,17 @@ namespace KScript.Syntax
         public TextSpan NameSpan { get; internal set; }
         public bool NullSafe { get; internal set; }
         public override IEnumerable<ExprNode> Children => new[] { Target };
+
+        /// <summary><c>posts.tags</c> when this is bare names joined by dots (no variable, call or <c>?.</c>), for a parameter that reads names; otherwise null.</summary>
+        public string DottedName
+        {
+            get
+            {
+                if (NullSafe) return null;
+                string left = Target is IdentifierNode id && id.Name != "_" ? id.Name : (Target as MemberNode)?.DottedName;
+                return left == null ? null : left + "." + Name;
+            }
+        }
     }
 
     /// <summary><c>target[index]</c>.</summary>

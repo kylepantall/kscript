@@ -62,6 +62,9 @@ namespace KScript.Language.Analysis
         /// <summary>For records of a &lt;type&gt;: the methods its &lt;fn&gt; children declare (<c>$size->width_in(cm)</c>).</summary>
         public IDictionary<string, Symbol> Methods { get; } = new Dictionary<string, Symbol>(StringComparer.Ordinal);
 
+        /// <summary>A KScript.Data model's scopes (<c>fn admins(query) => ...</c>), called on the model and its queries: <c>User->admins()</c>.</summary>
+        public IDictionary<string, Symbol> Scopes { get; } = new Dictionary<string, Symbol>(StringComparer.Ordinal);
+
         /// <summary>Known fields of a map (from a literal, or of a built-in type such as $request).</summary>
         public IDictionary<string, FieldInfo> Fields { get; } = new Dictionary<string, FieldInfo>(StringComparer.Ordinal);
 

@@ -32,7 +32,10 @@ namespace KScript.Runtime
             ("cache", "forget", "Use ->remove(key).", "remove"),
             ("cache", "flush", "Use ->clear().", "clear"),
             ("session", "put", "Use ->set(key, value).", "set"),
-            ("session", "forget", "Use ->remove(key).", "remove"));
+            ("session", "forget", "Use ->remove(key).", "remove"),
+            // One word for the mean everywhere: $list->average(), @average() and a query's ->average(column).
+            ("query", "avg", "Use ->average(column).", "average"),
+            ("model", "avg", "Use ->average(column).", "average"));
 
         /// <summary>The retired methods called <paramref name="name"/>, on any type.</summary>
         public static IEnumerable<RetiredInfo> Named(string name) =>

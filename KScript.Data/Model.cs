@@ -1,3 +1,7 @@
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+
+using KScript.Projects;
 using KScript.Runtime;
 using KScript.Syntax.Markup;
 
@@ -40,13 +44,16 @@ namespace KScript.Data
 
         /// <summary>An integer key the database numbers itself.</summary>
         public bool AutoIncrement { get; init; }
+
+        /// <summary>For the column of a belongs-to relation (<c>author_id</c>): the relation, whose table and key it references.</summary>
+        public Relation References { get; init; }
     }
 
     /// <summary>
     /// What a <c>model</c> declaration says beyond its fields: its table, key, timestamps, soft deletes, indexes and
     /// the fields that are hidden from JSON or can't be filled from a map. Kept on the model's <see cref="RecordType"/>.
     /// </summary>
-    internal sealed class ModelInfo
+    internal sealed partial class ModelInfo : IRecordKind
     {
         public const string CreatedAt = "created_at";
         public const string UpdatedAt = "updated_at";
@@ -79,27 +86,34 @@ namespace KScript.Data
 
         private List<Column> columns;
 
-        /// <summary>The model a record or type value belongs to, or null.</summary>
-        public static ModelInfo Of(object value) => value switch
+        /// <summary>The model a record or type value belongs to, or null. Its relations are worked out first.</summary>
+        public static ModelInfo Of(object value)
         {
-            RecordType t => t.Tag as ModelInfo,
-            Record r => r.Type.Tag as ModelInfo,
-            _ => null,
-        };
+            ModelInfo model = value switch
+            {
+                RecordType t => t.Tag as ModelInfo,
+                Record r => r.Type.Tag as ModelInfo,
+                _ => null,
+            };
+            model?.Ready();
+            return model;
+        }
 
         /// <summary>
         /// The columns, worked out the first time they are needed (by then the enums and types the fields name have
-        /// been declared, wherever they are in the script).
+        /// been declared, wherever they are in the script). Relation fields aren't columns: a belongs-to relation's
+        /// column is its <c>_id</c> field.
         /// </summary>
         public IReadOnlyList<Column> Columns
         {
             get
             {
                 if (columns != null) return columns;
+                Ready();
                 var list = new List<Column>();
-                foreach (FieldDefinition f in Type.Fields.Where(f => !f.Computed))
+                foreach (FieldDefinition f in Type.Fields.Where(f => !f.Computed && !relations.ContainsKey(f.Name)))
                 {
-                    list.Add(ColumnFor(f));
+                    list.Add(ColumnFor(f, foreignKeys.GetValueOrDefault(f.Name)));
                 }
                 columns = list;
                 return columns;
@@ -108,7 +122,107 @@ namespace KScript.Data
 
         public Column Column(string name) => Columns.FirstOrDefault(c => c.Name == name);
 
-        public Column KeyColumn => Column(Key);
+        private Column keyColumn;
+
+        /// <summary>The key's column. It is worked out on its own, without the relations, since other models' relations need it to work out theirs.</summary>
+        public Column KeyColumn => keyColumn ??= ColumnFor(Type.Field(Key), null);
+
+        #region Relations
+
+        /// <summary>The options a relation field's type can have: <c>posts: Post[](by: author)</c>.</summary>
+        internal static readonly string[] RelationOptions = { "by", "through", "pivot", "scope", "on_delete" };
+
+        /// <summary>The relation options of each field that has them, taken off its type when the model is declared.</summary>
+        internal Dictionary<string, IReadOnlyDictionary<string, object>> RelationArgs { get; } = new Dictionary<string, IReadOnlyDictionary<string, object>>(StringComparer.Ordinal);
+
+        private readonly Dictionary<string, Relation> relations = new Dictionary<string, Relation>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Relation> foreignKeys = new Dictionary<string, Relation>(StringComparer.Ordinal);
+        private bool ready;
+        private readonly object readyLock = new object();
+
+        /// <summary>The model's relations by field name, worked out from the fields whose types are models.</summary>
+        public IReadOnlyDictionary<string, Relation> Relations
+        {
+            get
+            {
+                Ready();
+                return relations;
+            }
+        }
+
+        /// <summary>The relation a field is, or null.</summary>
+        public Relation Relation(string name) => Relations.GetValueOrDefault(name);
+
+        /// <summary>The belongs-to relation whose column is <paramref name="column"/> (author_id), or null.</summary>
+        public Relation ForeignKeyOf(string column)
+        {
+            Ready();
+            return foreignKeys.GetValueOrDefault(column);
+        }
+
+        /// <summary>
+        /// Works out the relations, once, when the model is first used: by then every model the fields name has been
+        /// declared. A belongs-to relation adds its column (<c>author: User</c> adds <c>author_id</c>) when the model
+        /// doesn't declare it.
+        /// </summary>
+        public void Ready()
+        {
+            if (ready) return;
+            lock (readyLock)
+            {
+                if (ready) return;
+                foreach (FieldDefinition f in Type.Fields.ToList())
+                {
+                    if (f.Computed) continue;
+                    ModelInfo target = ModelOf(f.Type);
+                    if (target == null) continue;
+                    Relation r = Data.Relation.Infer(this, f, target);
+                    relations[f.Name] = r;
+                    // Relation fields are never required to make a record: a belongs-to one can be given as its _id.
+                    Type.SetField(f.WithType(f.Type, optional: true));
+                    if (r.Kind != RelationKind.BelongsTo) continue;
+                    foreignKeys[r.ForeignKey] = r;
+                    if (Type.Field(r.ForeignKey) == null)
+                    {
+                        FieldDefinition key = target.Type.Field(target.Key);
+                        int at = Type.Fields.ToList().FindIndex(x => x.Name == f.Name) + 1;
+                        Type.InsertField(at, new FieldDefinition(r.ForeignKey, TypeRef.Parse(key.Type.ToString()).WithOptional(true), null, new List<object> { r.ForeignKey }, null, null, null,
+                            $"The {target.Key} of the {f.Name} (a {target.Name}).", optional: true));
+                    }
+                }
+                ready = true;
+            }
+        }
+
+        /// <summary>
+        /// The model a field's type names (an item's, for a list), or null when it isn't a model. A model needn't be
+        /// imported where it is named: one declared anywhere in the run is found, and then one in the project's
+        /// models folder (paths.models), which is loaded. So two models can link to each other from their own files.
+        /// </summary>
+        internal ModelInfo ModelOf(TypeRef type)
+        {
+            if (type.ListDepth > 1) return null;
+            TypeRef item = type.ListDepth == 1 ? type.Item : type;
+            if (item.Inline != null || item.IsBuiltIn || item.Args != null) return null;
+            if (Values.IsDeclarable(item.Name)) return null;
+            if (Type.Closure.TryGet(item.Name, out object found)) return found is RecordType { Tag: ModelInfo m } ? m : null;
+            if (Interpreter == null) return null;
+            ConcurrentDictionary<string, ModelInfo> declared = Declared.GetOrCreateValue(Interpreter);
+            if (declared.TryGetValue(item.Name, out ModelInfo known)) return known;
+            ProjectConfig config = Type.Module?.Directory != null ? ProjectConfig.FindAndLoad(Type.Module.Directory) : null;
+            string file = config == null ? null : ProjectConfig.ModelFileFor(config.ModelFiles(), item.Name);
+            if (file == null) return null;
+            Interpreter.ImportScript(Type.Module, file, Type.Closure.Child());
+            return declared.GetValueOrDefault(item.Name);
+        }
+
+        /// <summary>The interpreter that declared the model, for loading models it names from the models folder.</summary>
+        internal Interpreter Interpreter { get; private set; }
+
+        /// <summary>The models each run has declared, by name.</summary>
+        private static readonly ConditionalWeakTable<Interpreter, ConcurrentDictionary<string, ModelInfo>> Declared = new ConditionalWeakTable<Interpreter, ConcurrentDictionary<string, ModelInfo>>();
+
+        #endregion
 
         /// <summary>A column by name, or an error naming the closest one.</summary>
         public Column Need(string name, string where)
@@ -119,7 +233,7 @@ namespace KScript.Data
             throw new KScriptException($"{Name} has no column '{name}'{where}." + (close != null ? $" Did you mean {close}?" : $" Its columns are: {string.Join(", ", Columns.Select(x => x.Name))}."), "Name");
         }
 
-        private Column ColumnFor(FieldDefinition f)
+        private Column ColumnFor(FieldDefinition f, Relation references)
         {
             TypeRef type = f.Type;
             bool nullable = f.Optional || type.Optional;
@@ -142,8 +256,6 @@ namespace KScript.Data
                         kind = ColumnKind.Enum;
                         words = e.Names;
                         break;
-                    case RecordType r when r.Tag is ModelInfo other:
-                        throw new KScriptException($"{Name}.{f.Name} is a {other.Name}: links between models (relations) aren't in this version of KScript.Data yet. Store the key instead, such as {f.Name}_id: int.", "Type");
                     case RecordType:
                         kind = ColumnKind.Json;
                         break;
@@ -161,6 +273,12 @@ namespace KScript.Data
             bool auto = key && kind == ColumnKind.Integer && !f.HasDefault;
             if (key && kind is not (ColumnKind.Integer or ColumnKind.Text or ColumnKind.Uuid or ColumnKind.Handle or ColumnKind.Email or ColumnKind.Enum))
                 throw new KScriptException($"{Name}.{f.Name} is the model's key, so it must be an int, string, uuid, handle, email or enum, not {f.Type}.", "Type");
+            if (references != null)
+            {
+                // A belongs-to column holds the other model's key, so it is stored the same way; it is null only when the relation is optional.
+                Column target = references.Target.KeyColumn;
+                return new Column { Name = f.Name, Field = f, Kind = target.Kind, Nullable = references.Optional, Length = target.Length, Words = target.Words, References = references };
+            }
             return new Column { Name = f.Name, Field = f, Kind = kind, Nullable = nullable && !key, Length = length, Words = words, IsKey = key, AutoIncrement = auto };
         }
 
@@ -188,6 +306,19 @@ namespace KScript.Data
         {
             // <model> has no with attribute, so what it declares is always a record type.
             var type = (RecordType)Shapes.Declare(run);
+            var relationArgs = new Dictionary<string, IReadOnlyDictionary<string, object>>(StringComparer.Ordinal);
+
+            // A relation's options are written as its type's arguments (posts: Post[](by: author)). They aren't rules
+            // for the type, so they come off it here, and are read when the relations are worked out.
+            foreach (FieldDefinition f in type.Fields.ToList())
+            {
+                if (f.Type.Args == null || !f.Type.Args.Keys.Any(k => RelationOptions.Contains(k))) continue;
+                string unknown = f.Type.Args.Keys.FirstOrDefault(k => !RelationOptions.Contains(k));
+                if (unknown != null) throw run.Error($"{type.Name}.{f.Name}: '{unknown}' isn't an option of a relation. Its options are {Values.OrList(RelationOptions)}.", null, "Syntax");
+                string plain = f.Type.ArgBase + string.Concat(Enumerable.Repeat("[]", f.Type.ListDepth)) + (f.Type.Optional ? "?" : string.Empty);
+                type.SetField(f.WithType(TypeRef.Parse(plain), f.Optional));
+                relationArgs[f.Name] = f.Type.Args;
+            }
 
             var model = new ModelInfo(type)
             {
@@ -226,9 +357,13 @@ namespace KScript.Data
                 }
             }
 
+            foreach (KeyValuePair<string, IReadOnlyDictionary<string, object>> kv in relationArgs) model.RelationArgs[kv.Key] = kv.Value;
+            foreach (FieldDefinition f in type.Fields.Where(f => !f.Optional && !f.Computed)) model.Required.Add(f.Name);
             type.Kind = "model";
             type.RecordKind = "record";
             type.Tag = model;
+            model.Interpreter = run.Interpreter;
+            Declared.GetOrCreateValue(run.Interpreter)[type.Name] = model;
             type.Hidden = model.Hidden.Count > 0 ? model.Hidden : null;
             tables[model.Table] = model;
             return type;
@@ -304,7 +439,10 @@ namespace KScript.Data
         internal static bool IsName(string s) => s.Length > 0 && (char.IsLetter(s[0]) || s[0] == '_') && s.All(c => char.IsLetterOrDigit(c) || c == '_');
 
         /// <summary>A model's table: the plural of its name in snake case. User is users, BlogPost blog_posts, Category categories.</summary>
-        internal static string TableName(string model)
+        internal static string TableName(string model) => Plural(Snake(model));
+
+        /// <summary>A name in snake case: BlogPost is blog_post.</summary>
+        internal static string Snake(string model)
         {
             var sb = new System.Text.StringBuilder();
             for (int i = 0; i < model.Length; i++)
@@ -313,7 +451,17 @@ namespace KScript.Data
                 if (char.IsUpper(c) && i > 0 && (char.IsLower(model[i - 1]) || char.IsDigit(model[i - 1]) || (i + 1 < model.Length && char.IsLower(model[i + 1])))) sb.Append('_');
                 sb.Append(char.ToLowerInvariant(c));
             }
-            return Plural(sb.ToString());
+            return sb.ToString();
+        }
+
+        /// <summary>A list field's name as one of its items: tags is tag, categories category.</summary>
+        internal static string Singular(string word)
+        {
+            if (word.EndsWith("ies") && word.Length > 3) return word.Substring(0, word.Length - 3) + "y";
+            if (word.EndsWith("sses") || word.EndsWith("shes") || word.EndsWith("ches") || word.EndsWith("xes")) return word.Substring(0, word.Length - 2);
+            if (word.EndsWith("people")) return word.Substring(0, word.Length - 6) + "person";
+            if (word.EndsWith('s') && !word.EndsWith("ss") && word.Length > 1) return word.Substring(0, word.Length - 1);
+            return word;
         }
 
         internal static string Plural(string word)

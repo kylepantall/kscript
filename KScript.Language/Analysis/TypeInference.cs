@@ -459,8 +459,17 @@ namespace KScript.Language.Analysis
             return new TypeShape(method.ReturnType);
         }
 
+        /// <summary>A model's scope called on the model or one of its queries: <c>User->admins()</c>, <c>$q->admins()</c>.</summary>
+        internal static Symbol ScopeOf(TypeShape receiver, string name) =>
+            (receiver.Kind == KType.Model || receiver.Type == KType.Query) && receiver.Instance != null && receiver.Instance.Scopes.TryGetValue(name, out Symbol scope) ? scope : null;
+
         private TypeShape InferMethod(string name, TypeShape receiver, int argCount)
         {
+            // A record's relation method (->posts()) or a model's scope: a query of the model's records.
+            if ((receiver.Methods.TryGetValue(name, out Symbol own) || (own = ScopeOf(receiver, name)) != null) && own.ReturnShape.Type == KType.Query)
+            {
+                return own.ReturnShape;
+            }
             if (receiver.Type == KType.List)
             {
                 if (SameShapeListMethods.Contains(name))

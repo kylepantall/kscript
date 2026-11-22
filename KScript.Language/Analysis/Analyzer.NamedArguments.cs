@@ -79,6 +79,9 @@ namespace KScript.Language.Analysis
         /// <summary>Arguments such as <c>@kyle</c> that name no function: a handle, if the parameter takes one.</summary>
         private readonly HashSet<ArgumentNode> pendingHandles = new HashSet<ArgumentNode>();
 
+        /// <summary>Each model scope's symbol, and the fn symbol it was made from.</summary>
+        private readonly Dictionary<Symbol, Symbol> scopeDeclarations = new Dictionary<Symbol, Symbol>();
+
         /// <summary>True for <c>@name</c> (no parentheses) where nothing is called name: it can only be a handle.</summary>
         private bool IsUnknownReference(ExprNode node, Scope scope, ExpressionRegion region) =>
             node is CommandCallNode { ArgumentList: null } c && !c.Name.Contains('.')
@@ -150,9 +153,18 @@ namespace KScript.Language.Analysis
                         AnalyzeBareIdentifier(item, region, scope, ExprContext.Value);
                     }
                 }
-                if (pendingBare.Remove(a) && BareWord(a) is var (_, _, node))
+                if (!pendingBare.Remove(a))
+                {
+                    continue;
+                }
+                if (BareWord(a) is var (_, _, node))
                 {
                     AnalyzeBareIdentifier(node, region, scope, ExprContext.Argument);
+                }
+                else
+                {
+                    // posts.tags that no method claimed.
+                    AnalyzeExpr(a.Value, region, scope, ExprContext.Argument);
                 }
             }
         }
@@ -167,7 +179,11 @@ namespace KScript.Language.Analysis
             bool special = args.Any(a => a.Name != null || BareWord(a) != null);
 
             static int IndexOf(List<ParameterSlot> s, string name) => s.FindIndex(p => !p.Variadic && p.Name == name);
-            List<ParameterSlot> signature = signatures.FirstOrDefault(s => args.Where(a => a.Name != null).All(a => IndexOf(s, a.Name) >= 0))
+            // Of the signatures that have every name given, one that takes as many arguments as were given (->with() on
+            // a logger takes one, on a query any number).
+            int given = piped + args.Count(a => a.Name == null);
+            List<ParameterSlot> signature = signatures.Where(s => args.Where(a => a.Name != null).All(a => IndexOf(s, a.Name) >= 0))
+                .OrderBy(s => s.Any(p => p.Variadic) || given <= s.Count ? 0 : 1).FirstOrDefault()
                 ?? signatures.FirstOrDefault(s => s.Any(p => p.Variadic));
 
             if (signature == null)
