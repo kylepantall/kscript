@@ -91,6 +91,7 @@ namespace KScript.Language.Analysis
             HoistErrors(root);
             HoistJobs(root);
             CheckScriptRoot();
+            CheckOneTypePerFile();
 
             WalkChildren(result.Markup.Children, root, markupMode: Kind != DocumentKind.Script);
         }

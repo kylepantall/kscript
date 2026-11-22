@@ -1,0 +1,6 @@
+/// Not enough of something in stock.
+error OutOfStock(status: 409, message: "Only {$left} {$item} left, {$wanted} wanted") {
+  item: string
+  left: int
+  wanted: int
+}

@@ -1,17 +1,11 @@
 <kscript>
   <import package="KScript.IO" />
   <import package="KScript.Http" />
+  <import src="../requests/new-person.ks.xml" />
+  <import src="../requests/people-query.ks.xml" />
+  <import src="../types/person.ks.xml" />
 
   <const name="file" value="'data/people.json'" />
-
-  <!--- What a client sends to add a person. A body that doesn't fit is answered with 422 and every problem. -->
-  <type name="NewPerson" fields="name: string, age?: int, role?: string" />
-
-  <!--- Someone in data/people.json. -->
-  <type name="Person" fields="id: int, name: string, age: int, role: string" />
-
-  <!--- Filters for the list of people. -->
-  <type name="PeopleQuery" fields="role?: string" />
 
   <fn name="all" value="@read_json($file)" />
 
