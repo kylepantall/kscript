@@ -18,7 +18,8 @@ defaults: base=string
 to: {{ paths.natives }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Every script in the project can now use it like a built-in type, without an import: value: {{ pascal }} = ...
 ---
-/// {{ title }}: a native type built on {{ base }}. A value that breaks a rule fails where it is made, and the editor checks the values written in code.
+/// {{ title }}: a native type built on {{ base }}. A value that breaks a rule
+/// fails where it is made, and the editor checks the values written in code.
 type {{ pascal }} with [{{ base }}] {
 {{#if normalize}}
   normalize: {{ normalize }}
@@ -41,5 +42,6 @@ type {{ pascal }} with [{{ base }}] {
 {{#if validate}}
   validate: {{ validate }}
 {{/if}}
-  // TODO: Add the rules a value must follow: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
+  // TODO: Add the rules a value must follow: normalize, pattern, min, max,
+  // one_of, not and validate. Add methods with fn.
 }

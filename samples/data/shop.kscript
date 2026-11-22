@@ -1,5 +1,5 @@
-// A small shop on KScript.Data: models, relations, queries, a transaction and raw SQL.
-// Run it with: kscript shop.kscript
+// A small shop on KScript.Data: models, relations, queries, a transaction and
+// raw SQL. Run it with: kscript shop.kscript
 import KScript.Data
 import "models/product.kscript"
 import "models/order.kscript"
@@ -38,9 +38,10 @@ $Order->where(customer: 'ben@example.com')->update(status: paid)
 
 echo 'Kitchen things under 20:'
 cheap = 20
-for p in $Product->where(fn($p) => $p.price < $cheap and $p.sku->starts_with('MUG'))->order_by(name)->get() {
-  echo "- { $p.name }: { $p.price } ({ $p.stock } left)"
-}
+for p in $Product->where(fn($p) =>
+  $p.price < $cheap and $p.sku->starts_with('MUG'))->order_by(name)->get() {
+    echo "- { $p.name }: { $p.price } ({ $p.stock } left)"
+  }
 
 echo "Open orders: { $Order->where(status: open)->count() }"
 echo "Paid orders: { $Order->where(status: paid)->count() }"

@@ -1,16 +1,23 @@
-// Typed JSON: the data is checked against Repo, and $repo. completes its fields.
+// Typed JSON: the data is checked against Repo, and $repo. completes its
+// fields.
 import KScript.IO
-import "lib/github.kscript"
+import "types/repo.kscript"
 
 repos = @read_json('../kscript2/data/repos.json', as: Repo)
 for repo in $repos {
   echo "$repo.label by $repo.owner.login, licence: { $repo.license ?? 'none' }"
 }
 
-// The same works for a live API: @api($url)->check()->json(as: Repo) with KScript.Net.
+// The same works for a live API: @api($url)->check()->json(as: Repo) with
+// KScript.Net.
 try {
-  bad = $Repo->from({ name: 'x', stargazers_count: 'lots', visibility: 'secret' })
+  bad = $Repo->from({
+    name: 'x',
+    stargazers_count: 'lots',
+    visibility: 'secret'
+  })
   echo "Not reached: {$bad.name}"
 } catch err {
-  echo "{ $err.problems->count() } problems, the first at { $err.problems[0].path }"
+  echo "{ $err.problems->count() } problems, the first at \
+    { $err.problems[0].path }"
 }

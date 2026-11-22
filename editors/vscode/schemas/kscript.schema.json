@@ -384,7 +384,10 @@
             "finalNewline": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": "End the file with exactly one newline. Off: the file ends as it did." },
             "spacing": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: one space after commas and colons, around assignments and =>, and before a block's '{'. Off: spacing inside lines is kept." },
             "braceStyle": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: put else, elif, catch and finally on the line of the closing '}'. Off: they stay where they are." },
-            "wrapStrings": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: break a string that runs past printWidth at a space, with a \\ at the end of the line (the break isn't part of the string). Off: long strings stay on one line." }
+            "wrapStrings": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: break a string that runs past printWidth at a space, with a \\ at the end of the line (the break isn't part of the string). Off: long strings stay on one line." },
+            "wrapChains": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a -> chain or |> pipe that runs past printWidth puts each call on its own line, indented under where the chain starts. Off: chains stay on one line." },
+            "wrapBodies": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a one-line function (fn name() => body) that runs past printWidth moves its body to the next line. Off: it stays on one line." },
+            "wrapComments": { "type": ["boolean", "string"], "enum": [true, false, "on", "off"], "default": true, "description": ".kscript files: a // or /// comment line that runs past printWidth is broken between words onto a new comment line. Off: comments stay as written." }
           }
         },
         "indent": {
@@ -402,8 +405,8 @@
         "printWidth": {
           "type": "integer",
           "minimum": 20,
-          "default": 120,
-          "description": "A start tag with several attributes that would run past this column gets one attribute per line."
+          "default": 80,
+          "description": "The longest a line should be (80 by default). Longer lines are wrapped: a start tag gets one attribute per line, and in .kscript files a long call, chain, one-line function, string or comment is broken onto more lines."
         },
         "maxBlankLines": {
           "type": "integer",

@@ -1,6 +1,6 @@
 // The app's rules. The web page (tasks.html){{#if desktop}}, the desktop window (desktop{{ ext }}){{/if}}{{#if http}}, the API (controllers/tasks{{ ext }}){{/if}}
-// and the tests (tests/tasks.test{{ ext }}) all import this file, so the logic is written once.
-// A task is a map: { id: 1, title: 'Buy milk', done: false }.
+// and the tests (tests/tasks.test{{ ext }}) all import this file, so the logic
+// is written once. A task is a map: { id: 1, title: 'Buy milk', done: false }.
 
 /// The list with a new task at the end. A blank title leaves the list as it is.
 fn add_task(tasks: list, title: string) {

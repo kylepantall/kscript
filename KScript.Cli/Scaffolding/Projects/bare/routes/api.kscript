@@ -1,7 +1,8 @@
 --- make
 when: api
 ---
-// The JSON API, served by kscript serve under /api (see docs/http.md). kscript routes lists the routes.
+// The JSON API, served by kscript serve under /api (see docs/http.md). kscript
+// routes lists the routes.
 KScript.Routes {
   import "../controllers/hello{{ ext }}" as hello
 

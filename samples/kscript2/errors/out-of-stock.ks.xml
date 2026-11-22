@@ -1,0 +1,11 @@
+<kscript>
+  <error
+    name="OutOfStock"
+    status="409"
+    message="Only {$left} {$item} left, {$wanted} wanted"
+    description="Not enough of something in stock.">
+    <field name="item" type="string" />
+    <field name="left" type="int" />
+    <field name="wanted" type="int" />
+  </error>
+</kscript>

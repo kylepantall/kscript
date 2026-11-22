@@ -8,13 +8,17 @@ kscript {
       queue = @fake_queue()
       dispatch SendWelcome(user_id: 7, email: 'joan@example.com')
       expect(value: $queue->count($SendWelcome), equals: 1)
-      expect(value: $queue->pushed($SendWelcome)[0].email, equals: 'joan@example.com')
+      expect(
+        value: $queue->pushed($SendWelcome)[0].email,
+        equals: 'joan@example.com'
+      )
       expect(value: $queue->dispatches()[0].queue, equals: 'mail')
     }
 
     test(name: an order runs as a chain) {
       queue = @fake_queue()
-      @chain([ChargeCard(order_id: 1, amount: 5), ShipOrder(order_id: 1)])->dispatch()
+      @chain([ChargeCard(order_id: 1, amount: 5), ShipOrder(order_id: 1)])
+        ->dispatch()
       expect(value: $queue->count(), equals: 2)
       expect(value: $queue->run_all(), equals: 2)
     }

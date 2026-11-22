@@ -1,17 +1,11 @@
 <kscript>
   <import package="KScript.IO" />
   <import package="KScript.Http" />
+  <import src="../requests/new-person.ks.xml" />
+  <import src="../requests/people-query.ks.xml" />
+  <import src="../types/person.ks.xml" />
 
   <const name="file" value="'data/people.json'" />
-
-  <!--- What a client sends to add a person. A body that doesn't fit is answered with 422 and every problem. -->
-  <type name="NewPerson" fields="name: string, age?: int, role?: string" />
-
-  <!--- Someone in data/people.json. -->
-  <type name="Person" fields="id: int, name: string, age: int, role: string" />
-
-  <!--- Filters for the list of people. -->
-  <type name="PeopleQuery" fields="role?: string" />
 
   <fn name="all" value="@read_json($file)" />
 
@@ -23,7 +17,9 @@
 
   <fn name="list" params="query: map">
     <let name="min" value="($query.min_age ?? '0')->to_number(default: 0)" />
-    <let name="people" value="@all() |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)" />
+    <let
+      name="people"
+      value="@all() |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)" />
     <return value="@view('people/index', people: $people, min: $min)" />
   </fn>
 
@@ -54,7 +50,9 @@
     @returns Person
   -->
   <fn name="show" params="id: int">
-    <let name="person" value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
+    <let
+      name="person"
+      value="@find($id) ?? @abort(404, message: 'Nobody has that id.')" />
     <!-- A client that already has this version gets 304 Not Modified, and nothing below runs. -->
     <do>@etag($person)</do>
     <return value="$person" />
@@ -82,7 +80,9 @@
   -->
   <fn name="update" params="id: int, json: map?">
     <let name="person" value="@find($id) ?? @abort(404)" />
-    <let name="changed" value="$person->merge($json ?? {})->merge({ id: $person.id })" />
+    <let
+      name="changed"
+      value="$person->merge($json ?? {})->merge({ id: $person.id })" />
     <do>@write_json($file, @all()->map(fn($p) => $p.id == $person.id ? $changed : $p))</do>
     <return value="$changed" />
   </fn>

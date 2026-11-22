@@ -1,6 +1,5 @@
 import KScript.Data
-
-enum OrderStatus { open, paid, shipped, cancelled }
+import "../types/order-status.kscript"
 
 /// An order for one product.
 model Order {

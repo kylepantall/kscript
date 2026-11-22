@@ -24,7 +24,9 @@
   <echo>{ $colours[1] }</echo>
   <let name="person" value="{ name: 'Joan', age: 82 }" />
   <echo>$person.name is { $person['age'] }</echo>
-  <let name="people" value="[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]" />
+  <let
+    name="people"
+    value="[{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]" />
   <let name="names" value="$people
       |> filter(fn($p) => $p.age ge 18)
       |> map(fn($p) => $p.name)
@@ -77,7 +79,9 @@
       <echo>Unknown option</echo>
     </default>
   </match>
-  <let name="label" value="match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }" />
+  <let
+    name="label"
+    value="match $choice { 1 => 'settings', 2 => 'exit', _ => '?' }" />
   <echo>$label</echo>
 
   <!-- Functions -->

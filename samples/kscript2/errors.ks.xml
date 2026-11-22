@@ -1,22 +1,13 @@
 <kscript>
-  <!-- Error types: declare them, throw them with their fields, and catch them by type. -->
+  <!-- Error types: declare each in its own file (errors/), throw them with their fields, and catch them by type. -->
 
-  <error name="OrderNotFound" message="No order {$id}" description="An order that can't be found." extends="NotFound">
-    <field name="id" type="int" />
-  </error>
-
-  <error
-    name="OutOfStock"
-    status="409"
-    message="Only {$left} {$item} left, {$wanted} wanted"
-    description="Not enough of something in stock.">
-    <field name="item" type="string" />
-    <field name="left" type="int" />
-    <field name="wanted" type="int" />
-  </error>
+  <import src="errors/order-not-found.ks.xml" />
+  <import src="errors/out-of-stock.ks.xml" />
 
   <let name="stock" value="{ tea: 2, coffee: 10 }" />
-  <let name="orders" value="[{ id: 1, item: 'tea', qty: 5 }, { id: 2, item: 'coffee', qty: 1 }]" />
+  <let
+    name="orders"
+    value="[{ id: 1, item: 'tea', qty: 5 }, { id: 2, item: 'coffee', qty: 1 }]" />
 
   <fn name="place" params="id: int">
     <let name="order" value="$orders->find(fn($o) => $o.id == $id)" />

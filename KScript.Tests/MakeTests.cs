@@ -254,7 +254,7 @@ public class ScaffolderTests
 
         Assert.Equal(0, Make(site.Root, "document", "annual_report", "--format", "xml", "--template", "report").Code);
         string xml = Read(site, "documents/annual-report.ks.xml");
-        Assert.Contains("<KScript.Document template=\"report\"", xml);
+        Assert.Matches(@"<KScript.Document\s+template=""report""", xml);
         // The .kscript template's [a, b] list is plain text in XML.
         Assert.Contains("to=\"annual-report.pdf, annual-report.docx\"", xml);
     }

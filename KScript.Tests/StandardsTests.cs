@@ -17,7 +17,7 @@ public class StandardsTests
         Assert.Equal("warning", c.SeverityFor("KS6001"));
         Assert.Null(c.SeverityFor("KS3001")); // correctness rules keep their built-in severity
         Assert.Equal(Standards.Recommended, c.Sources["lint.rules.KS6*"]);
-        Assert.Equal(120, c.Format.PrintWidth);
+        Assert.Equal(80, c.Format.PrintWidth);
         Assert.Null(c.Format.IndentSize); // the editor's tab settings still apply unless a standard pins the indent
         Assert.Empty(c.Warnings);
     }
@@ -37,7 +37,7 @@ public class StandardsTests
         Assert.Equal("error", c.SeverityFor("KS6001"));
         Assert.True(c.Lint.WarningsAsErrors);
         Assert.Equal(Standards.Strict, c.Sources["lint.warningsAsErrors"]);
-        Assert.Equal(120, c.Format.PrintWidth); // inherited
+        Assert.Equal(80, c.Format.PrintWidth); // inherited
     }
 
     [Fact]

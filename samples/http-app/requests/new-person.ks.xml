@@ -1,0 +1,4 @@
+<kscript>
+  <!--- What a client sends to add a person. A body that doesn't fit is answered with 422 and every problem. -->
+  <type name="NewPerson" fields="name: string, age?: int, role?: string" />
+</kscript>

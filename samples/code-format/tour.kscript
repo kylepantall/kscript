@@ -17,7 +17,8 @@ $x = 3
 $total += $price * $qty
 echo "$x $total"
 const config = { debug: false, retries: 3 }
-echo "Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for braces."
+echo "Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for \
+  braces."
 
 // Lists, maps, lambdas and pipes
 colours = ['red', 'green', 'blue']

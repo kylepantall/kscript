@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 
+using KScript.Language.Formatting;
 using KScript.Projects;
 using KScript.Syntax.Markup;
 
@@ -41,17 +42,30 @@ namespace KScript.Scaffolding
 
         /// <summary>
         /// A rendered file in the chosen format: a .kscript template's output is converted to XML when the format is
-        /// xml, and a path ending in .kscript then ends in .ks.xml. Other files are left alone.
+        /// xml, and a path ending in .kscript then ends in .ks.xml. Scripts are then laid out as kscript fmt
+        /// would (with the project's format settings, when given), so a new file passes kscript fmt --check whatever
+        /// the names put into it. Other files are left alone.
         /// </summary>
-        public static (string Path, string Content) Apply(string templateFile, string path, string content, string format)
+        public static (string Path, string Content) Apply(string templateFile, string path, string content, string format, FormatOptions options = null)
         {
-            if (format != Xml || !MarkupParser.IsCodePath(templateFile)) return (path, content);
-            // The parser and converter report problems as diagnostics, never by throwing.
-            ConversionResult result = ScriptConverter.ToXml(CodeParser.Parse(content), nameList: global::KScript.Language.Catalog.LanguageCatalog.Default.IsNameList);
-            if (MarkupParser.IsCodePath(path)) path = ScriptConverter.ConvertedPath(path);
-            // Lay it out as kscript fmt would, so a new project passes kscript fmt --check.
-            string text = global::KScript.Language.Formatting.Formatter.Format(result.Text, path)?.Text ?? result.Text;
-            return (path, text);
+            if (format == Xml && MarkupParser.IsCodePath(templateFile))
+            {
+                // The parser and converter report problems as diagnostics, never by throwing.
+                ConversionResult result = ScriptConverter.ToXml(CodeParser.Parse(content), nameList: global::KScript.Language.Catalog.LanguageCatalog.Default.IsNameList);
+                if (MarkupParser.IsCodePath(path)) path = ScriptConverter.ConvertedPath(path);
+                content = result.Text;
+            }
+            return (path, Tidy(path, content, options));
+        }
+
+        /// <summary>A script as kscript fmt lays it out; anything else, or a script it can't format, as it is.</summary>
+        public static string Tidy(string path, string content, FormatOptions options = null)
+        {
+            string name = path.ToLowerInvariant();
+            bool script = name.EndsWith(".kscript", StringComparison.Ordinal) || name.EndsWith(".ks.xml", StringComparison.Ordinal) || name.EndsWith(".ks", StringComparison.Ordinal);
+            if (!script) return content;
+            FormatResult formatted = Formatter.Format(content, path, options);
+            return formatted.Succeeded ? formatted.Text : content;
         }
     }
 }

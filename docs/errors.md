@@ -290,3 +290,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 ## KS6007
 
 **A function parameter with no type.** Write one, so callers and the editor know what it takes: `fn cached(key: string, compute: fn)`. When every call in the file passes the same type, the editor shows it beside the name and the quick fix writes it in. A parameter with a default (`count = 0`) takes its type from the default, and functions inside a `job` are left alone, because the queue calls them.
+
+## KS6008
+
+**A second type in one file.** In a project, each type, model, enum and error type goes in its own file (`types/`, `models/`, `errors/`, or `requests/` for request bodies) and is imported where it is used. The message names the file to move it to. See [One type per file](projects.md#where-files-go-the-recommended-layout).

@@ -84,7 +84,8 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Contains("send POST /users", output);
 
         Assert.Equal(
-            "// Web routes, served by kscript serve (see the Routes and APIs guide). kscript routes lists them.\n" +
+            "// Web routes, served by kscript serve (see the Routes and APIs guide). kscript\n" +
+            "// routes lists them.\n" +
             "KScript.Routes {\n" +
             "  import \"../controllers/users.kscript\" as users\n" +
             "\n" +
@@ -144,7 +145,7 @@ public sealed class MakeGeneratorTests : IDisposable
         // A page-style [slug] works too, and the controller's function takes the parameter by its name.
         Assert.Equal(0, Make(app, "route", "posts/[slug]").Code);
         Assert.Contains("Get(path: \"/posts/{slug}\", to: posts.show)", Read(app, "routes/web.kscript"));
-        Assert.Contains("fn show(slug: string) {\n  // TODO: Find the one asked for, and answer 404 when there is none: @abort(404)\n  return { slug: $slug }", Read(app, "controllers/posts.kscript"));
+        Assert.Contains("fn show(slug: string) {\n  // TODO: Find the one asked for, and answer 404 when there is none:\n  // @abort(404)\n  return { slug: $slug }", Read(app, "controllers/posts.kscript"));
 
         // An admin/users controller doesn't take the users name from another import.
         Assert.Equal(0, Make(app, "route", "users").Code);
@@ -182,7 +183,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Contains("<Resource path=\"/tasks\" to=\"tasks\" />", Read(app, "routes/api.ks.xml"));
         string controller = Read(app, "controllers/users.ks.xml");
         Assert.Contains("<kscript>\n  <import package=\"KScript.Http\" />", controller);
-        Assert.Contains("<fn name=\"store\" params=\"json: map\"", controller);
+        Assert.Matches(@"<fn\s+name=""store""\s+params=""json: map""", controller);
         Assert.False(File.Exists(Path.Combine(app, "controllers", "users.kscript")));
 
         AssertNoErrors(app);
@@ -292,7 +293,7 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Contains("Created extensions/date.kscript", output);
         Assert.Contains("->json(), ->is_weekend()", output);
         Assert.Equal(
-            "/// Methods for every date in the project. $this is the date a method is called on.\n"
+            "/// Methods for every date in the project. $this is the date a method\n/// is called on.\n"
             + "extend date {\n  /// What json does.\n  fn json() {\n    // TODO: Work out the result from $this.\n    return $this\n  }\n\n  /// What is_weekend does.\n  fn is_weekend() {\n    // TODO: Work out the result from $this.\n    return $this\n  }\n}\n",
             Read(app, "extensions/date.kscript"));
         Assert.Equal(0, Make(app, "extension", "text/string").Code);
@@ -378,11 +379,13 @@ public sealed class MakeGeneratorTests : IDisposable
             Assert.True(code == 0, string.Join(" ", args) + ": " + err);
         }
         Assert.Equal("""
-            /// Percent: a native type built on int. A value that breaks a rule fails where it is made, and the editor checks the values written in code.
+            /// Percent: a native type built on int. A value that breaks a rule
+            /// fails where it is made, and the editor checks the values written in code.
             type Percent with [int] {
               min: 0
               max: 100
-              // TODO: Add the rules a value must follow: normalize, pattern, min, max, one_of, not and validate. Add methods with fn.
+              // TODO: Add the rules a value must follow: normalize, pattern, min, max,
+              // one_of, not and validate. Add methods with fn.
             }
 
             """.Replace("\r\n", "\n"), Read(app, "natives/percent.kscript"));

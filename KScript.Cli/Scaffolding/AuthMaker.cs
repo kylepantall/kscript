@@ -46,6 +46,7 @@ namespace KScript.Scaffolding
             values["api"] = api ? "true" : "false";
             values["paths.controllers"] = Folder(project, "controllers");
             values["paths.views"] = Folder(project, "views");
+            values["paths.requests"] = Folder(project, "requests");
             values["api_prefix"] = (project?.Http.ApiPrefix ?? "/api").TrimEnd('/');
             bool hasLayout = File.Exists(Path.Combine(root, "_layout.html"));
             values["layout"] = "/_layout.html";
@@ -57,6 +58,8 @@ namespace KScript.Scaffolding
             values["routes_file"] = webRoutes;
             values["controller_import"] = ImportPath(root, webRoutes, controllerFile);
             values["api_controller_import"] = ImportPath(root, apiRoutes, controllerFile);
+            // The sign-up form's type has its own file, which the controller imports.
+            values["sign_up_import"] = ImportPath(root, controllerFile, Join(values["paths.requests"], "sign-up" + values["ext"]));
 
             // The files: the controller, the views and (when the site has none) a layout.
             var template = new ProjectTemplate { Name = "auth", Files = Resources().Where(f => !RouteTemplates.Contains(f.Path)).ToList() };
@@ -92,7 +95,7 @@ namespace KScript.Scaffolding
                 var imports = lines.TakeWhile(l => Regex.IsMatch(l, xml ? @"^\s*<import\b" : @"^\s*import\b")).ToList();
                 var routes = lines.Skip(imports.Count).SkipWhile(l => l.Trim().Length == 0).ToList();
                 imports = imports.Where(i => !text.Split('\n').Any(l => l.Trim() == i.Trim())).ToList();
-                routeEdits.Add((file, RouteMaker.Insert(text, imports, routes, xml, file), existed));
+                routeEdits.Add((file, ScriptFormat.Tidy(full, RouteMaker.Insert(text, imports, routes, xml, file), global::KScript.Language.Formatting.FormatOptions.From(project)), existed));
             }
 
             // kscript.json: a rule for new passwords, which @register() and @reset_password() check.

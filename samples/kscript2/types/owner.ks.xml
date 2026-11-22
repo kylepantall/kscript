@@ -1,0 +1,7 @@
+<kscript>
+  <!--- The account a GitHub repository belongs to. -->
+  <type name="Owner">
+    <field name="login" type="string" />
+    <field name="id" type="int" />
+  </type>
+</kscript>

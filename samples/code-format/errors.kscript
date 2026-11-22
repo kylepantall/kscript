@@ -1,16 +1,8 @@
-// Error types: declare them, throw them with their fields, and catch them by type.
+// Error types: declare each in its own file (errors/), throw them with their
+// fields, and catch them by type.
 
-/// An order that can't be found.
-error OrderNotFound(message: "No order {$id}") extends NotFound {
-  id: int
-}
-
-/// Not enough of something in stock.
-error OutOfStock(status: 409, message: "Only {$left} {$item} left, {$wanted} wanted") {
-  item: string
-  left: int
-  wanted: int
-}
+import "errors/order-not-found.kscript"
+import "errors/out-of-stock.kscript"
 
 stock = { tea: 2, coffee: 10 }
 orders = [{ id: 1, item: 'tea', qty: 5 }, { id: 2, item: 'coffee', qty: 1 }]

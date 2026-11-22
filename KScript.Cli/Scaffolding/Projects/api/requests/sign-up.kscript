@@ -1,0 +1,9 @@
+--- make
+when: auth
+---
+/// What POST /api/register takes. The email and password types check it (kscript.json can set password rules).
+type SignUp {
+  name: string(min: 1, max: 120)
+  email: email
+  password: password
+}

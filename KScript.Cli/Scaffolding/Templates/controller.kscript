@@ -12,8 +12,9 @@ to: {{ paths.controllers }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Give it a route: kscript make route {{ path }}{{#if resource}} --resource{{/if}}
 ---
 {{#unless append}}
-// The {{ title }} controller: each function answers a route. A map or list it returns is sent as JSON, and text as HTML.
-// Parameters are filled in by name: path parameters such as {id}, json, query, form, input, headers and request.
+// The {{ title }} controller: each function answers a route. A map or list it
+// returns is sent as JSON, and text as HTML. Parameters are filled in by name:
+// path parameters such as {id}, json, query, form, input, headers and request.
 // @response, @view and @abort come from import KScript.Http.
 {{#if actions has store}}
 import KScript.Http
@@ -32,7 +33,8 @@ fn index() {
 {{#if item is show}}
 /// GET /{{ url }}/:{{ params ?? id }}: one of them.
 fn show({{#each params}}{{ item }}: {{#if item is id}}int{{else}}string{{/if}}{{#unless last}}, {{/unless}}{{else}}id: int{{/each}}) {
-  // TODO: Find the one asked for, and answer 404 when there is none: @abort(404)
+  // TODO: Find the one asked for, and answer 404 when there is none:
+  // @abort(404)
   return { {{#each params}}{{ item }}: ${{ item }}{{#unless last}}, {{/unless}}{{else}}id: $id{{/each}} }
 }
 
@@ -54,7 +56,8 @@ fn update({{#each params}}{{ item }}: {{#if item is id}}int{{else}}string{{/if}}
 
 {{/if}}
 {{#if item is destroy}}
-/// DELETE /{{ url }}/:{{ params ?? id }}: removes one. Returning nothing answers 204 No Content.
+/// DELETE /{{ url }}/:{{ params ?? id }}: removes one. Returning nothing
+/// answers 204 No Content.
 fn destroy({{#each params}}{{ item }}: {{#if item is id}}int{{else}}string{{/if}}{{#unless last}}, {{/unless}}{{else}}id: int{{/each}}) {
   // TODO: Remove it from where it is kept.
   log "Removed {{#each params}}{${{ item }}}{{#unless last}} {{/unless}}{{else}}{$id}{{/each}}"

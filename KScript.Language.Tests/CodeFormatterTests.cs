@@ -339,6 +339,140 @@ namespace KScript.Language.Tests
             Assert.Equal("a statement changed kind at line 1", Diff("// note\n", "x = 1\n"));
         }
 
+        // ---- long lines: => bodies, chains, pipes and comments ---------------------------------------------------
+
+        [Fact]
+        public void MovesALongOneLineFunctionsBodyToTheNextLine()
+        {
+            Assert.Equal(Lines(
+                "fn cached(key, compute) =>",
+                "  @app_cache()->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')"),
+                Fmt(Lines("fn cached(key, compute) => @app_cache()->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')")));
+            Assert.Equal(Lines(
+                "double = fn($x) =>",
+                "  $x * 2 + $offset_that_has_a_long_name + $another_offset_with_a_long_name"),
+                Fmt(Lines("double = fn($x) => $x * 2 + $offset_that_has_a_long_name + $another_offset_with_a_long_name")));
+            // A lambda that is a call's only argument breaks after its => once nothing else fits.
+            Assert.Equal(Lines(
+                "fn toggle_task(tasks, id) =>",
+                "  $tasks->map(fn($t) =>",
+                "    $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)"),
+                Fmt(Lines("fn toggle_task(tasks, id) => $tasks->map(fn($t) => $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)")));
+            // A short one stays, and so does a match case (its value can't go on the next line).
+            Assert.Equal(Lines("fn twice(x) => $x * 2"), Fmt(Lines("fn twice(x) => $x * 2")));
+            string match = Lines("label = match $n { 1 => 'one, which is a long label for the number one', _ => 'many' }");
+            Assert.Equal(match, Fmt(match, Without(o => o.WrapAttributes = false)));
+            string input = Lines("fn cached(key, compute) => @app_cache()->remember($key, $compute, ttl: $config.cache.ttl)");
+            Assert.Equal(input, Fmt(input, Without(o => { o.WrapBodies = false; o.WrapChains = false; o.WrapAttributes = false; })));
+        }
+
+        [Fact]
+        public void PutsEachCallOfALongChainOnItsOwnLine()
+        {
+            Assert.Equal(Lines(
+                "fn dashboard(user) =>",
+                "  @records()",
+                "    ->where('owner', $user.id)",
+                "    ->sortBy('changed')",
+                "    ->filter(fn($r) => @can($user, 'view', $r))",
+                "    ->take(20)"),
+                Fmt(Lines("fn dashboard(user) => @records()->where('owner', $user.id)->sortBy('changed')->filter(fn($r) => @can($user, 'view', $r))->take(20)")));
+            // A short receiver keeps its first call; one call on a plain name is left for its arguments to wrap.
+            Assert.Equal(Lines(
+                "x = $s->trim()",
+                "  ->replace('a long thing to find', 'a long thing to put in its place')",
+                "  ->upper()"),
+                Fmt(Lines("x = $s->trim()->replace('a long thing to find', 'a long thing to put in its place')->upper()")));
+            Assert.Equal(Lines(
+                "$user->save(",
+                "  name: 'A person with a long name',",
+                "  email: 'someone@example.com',",
+                "  team: 'kscript'",
+                ")"),
+                Fmt(Lines("$user->save(name: 'A person with a long name', email: 'someone@example.com', team: 'kscript')")));
+            // A call that is itself split over lines lines up under its chain.
+            Assert.Equal(Lines(
+                "total = @orders()",
+                "  ->where('paid', true)",
+                "  ->where('shipped', false)",
+                "  ->sortBy('date')",
+                "  ->map(fn($o) => {",
+                "    return $o.total + $o.shipping_cost_for_the_order_and_the_tax_on_it",
+                "  })",
+                "  ->sum()"),
+                Fmt(Lines(
+                "total = @orders()->where('paid', true)->where('shipped', false)->sortBy('date')->map(fn($o) => {",
+                "  return $o.total + $o.shipping_cost_for_the_order_and_the_tax_on_it",
+                "})->sum()")));
+            string off = Lines("total = @orders()->where('paid', true)->sortBy('date')->map(fn($o) => $o.total)->sum()");
+            Assert.Equal(off, Fmt(off, Without(o => { o.WrapChains = false; o.WrapAttributes = false; o.WrapBodies = false; })));
+        }
+
+        [Fact]
+        public void PutsEachStepOfALongPipeOnItsOwnLine()
+        {
+            Assert.Equal(Lines(
+                "names = $people",
+                "  |> filter(fn($p) => $p.age > 18)",
+                "  |> map(fn($p) => $p.name->upper())",
+                "  |> sort()"),
+                Fmt(Lines("names = $people |> filter(fn($p) => $p.age > 18) |> map(fn($p) => $p.name->upper()) |> sort()")));
+            // Never in a block's head: the { has to stay on its line.
+            string head = Lines("if $people |> filter(fn($p) => $p.age > 18) |> map(fn($p) => $p.name) |> contains('Ada') {", "  echo 'yes'", "}");
+            Assert.Equal(head, Fmt(head, Without(o => { o.WrapAttributes = false; o.WrapBodies = false; })));
+        }
+
+        [Fact]
+        public void BreaksLongCommentsBetweenWords()
+        {
+            Assert.Equal(Lines(
+                "// The app's cache. The store and time limit come from config/config.yaml, and",
+                "// cache.ttl says how long.",
+                "x = 1"),
+                Fmt(Lines("// The app's cache. The store and time limit come from config/config.yaml, and cache.ttl says how long.", "x = 1")));
+            // In a doc comment, a tag's or list item's text hangs under it, so it stays one paragraph.
+            Assert.Equal(Lines(
+                "  /// Loads the records for the dashboard, sorted by the date they were last",
+                "  /// changed.",
+                "  /// @param user The person who is signed in, whose permissions decide which",
+                "  ///   records are shown.",
+                "  /// - a list item that is long enough to need to be broken onto a second line",
+                "  ///   here",
+                "  fn dashboard(user) => @records($user)"),
+                Fmt(Lines(
+                "  /// Loads the records for the dashboard, sorted by the date they were last changed.",
+                "  /// @param user The person who is signed in, whose permissions decide which records are shown.",
+                "  /// - a list item that is long enough to need to be broken onto a second line here",
+                "  fn dashboard(user) => @records($user)")).Replace("\n/// ", "\n  /// ").Replace("\nfn", "\n  fn").Insert(0, "  "));
+        }
+
+        [Fact]
+        public void LeavesExamplesTablesAndLongWordsInComments()
+        {
+            string kept = Lines(
+                "/// Sums a list.",
+                "/// @example",
+                "///   total = @sum([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])",
+                "/// | name | what it does, in a table row that runs a long way past the print width |",
+                "/// ```",
+                "/// x = @sum([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])",
+                "/// ```",
+                "// see https://example.com/a/very/long/link/that/has/no/spaces/in/it/at/all/so/it/stays",
+                "// kscript-fmt-ignore is not a reason to break a long line of comment text, either",
+                "fn sum(xs) => $xs");
+            Assert.Equal(kept, Fmt(kept));
+            string comment = Lines("// " + string.Join(" ", Enumerable.Repeat("word", 30)), "x = 1");
+            Assert.Equal(comment, Fmt(comment, Without(o => o.WrapComments = false)));
+        }
+
+        [Fact]
+        public void TheMeaningCheckReadsABrokenCommentAsTheSameComment()
+        {
+            Assert.True(CodeMeaning.Same(CodeParser.Parse("// one two three\nx = 1\n"), CodeParser.Parse("// one two\n// three\nx = 1\n"), out _));
+            Assert.False(CodeMeaning.Same(CodeParser.Parse("// one two three\nx = 1\n"), CodeParser.Parse("// one two\n// four\nx = 1\n"), out string d));
+            Assert.Equal("a comment changed at line 1", d);
+        }
+
         // ---- every .kscript file in the repository ----------------------------------------------------------------
 
         [Fact]
@@ -359,7 +493,7 @@ namespace KScript.Language.Tests
         public void WrapsALongStringOverAsManyLinesAsItNeeds()
         {
             string words = string.Join(" ", Enumerable.Range(1, 40).Select(i => "word" + i));
-            string result = Fmt(Lines("x = '" + words + "' |> upper()"), new FormatOptions { PrintWidth = 60 });
+            string result = Fmt(Lines("x = '" + words + "' |> upper()"), new FormatOptions { PrintWidth = 60, WrapChains = false });
             string[] lines = result.TrimEnd('\n').Split('\n');
             Assert.True(lines.Length > 4);
             Assert.All(lines, l => Assert.True(l.Length <= 60, l));

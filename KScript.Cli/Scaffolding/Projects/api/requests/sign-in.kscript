@@ -1,0 +1,9 @@
+--- make
+when: auth
+---
+/// What POST /api/tokens takes.
+type SignIn {
+  email: string
+  password: string
+  device: string = 'api'
+}

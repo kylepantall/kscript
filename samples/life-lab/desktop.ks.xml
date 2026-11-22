@@ -3,12 +3,19 @@
   kscript compile (in this folder) builds it as a program: "Life Lab.app" for a Mac, "Life Lab.exe" for Windows.
   The rules come from lib/life.ks.xml, the same script the terminal and browser versions use.
 -->
-<KScript.Window title="Life Lab" width="760" height="720" theme="dark" background="#0f172a">
+<KScript.Window
+  title="Life Lab"
+  width="760"
+  height="720"
+  theme="dark"
+  background="#0f172a">
   <import src="lib/life.ks.xml" />
 
   <let name="cols" value="40" />
   <let name="rows" value="24" />
-  <let name="world" value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
+  <let
+    name="world"
+    value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
   <let name="playing" value="false" />
   <let name="speed" value="150" />
   <let name="pattern" value="'glider_gun'" />
@@ -47,9 +54,17 @@
 
   <Row gap="8" wrap="yes">
     <Button on-click="world = @new_world(@random_grid(width: $cols, height: $rows, density: $soup), wrap: $world.wrap, pattern: 'random soup'); playing = false">Random soup</Button>
-    <Slider bind="soup" min="5" max="80" step="5" width="140" tooltip="How full the soup is" />
+    <Slider
+      bind="soup"
+      min="5"
+      max="80"
+      step="5"
+      width="140"
+      tooltip="How full the soup is" />
     <Text color="#94a3b8" width="40">{$soup}%</Text>
-    <CheckBox bind="wrap" on-change="world = $world->merge({ wrap: $event.value })">Wrap edges</CheckBox>
+    <CheckBox
+      bind="wrap"
+      on-change="world = $world->merge({ wrap: $event.value })">Wrap edges</CheckBox>
     <Button on-click="world = @new_world(@blank(width: $cols, height: $rows), wrap: $world.wrap); playing = false">Clear</Button>
   </Row>
 
