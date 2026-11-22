@@ -20,6 +20,13 @@ namespace KScript.Runtime
             new TimezoneType(),
             new CronType(),
             new ColorType(),
+            new SlugType(),
+            new SemverType(),
+            new MimeType(),
+            new HexType(),
+            new Base64Type(),
+            new JwtType(),
+            new JsonType(),
         };
 
         static NativeTypeRegistry()

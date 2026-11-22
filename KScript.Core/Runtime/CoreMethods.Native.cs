@@ -93,58 +93,6 @@ namespace KScript.Runtime
             p.Field("cidr", "prefix", N, "The prefix length: 8 for 10.0.0.0/8.", (t, _) => Part(t, "prefix"));
             p.Field("cidr", "size", N, "How many addresses the block holds: 256 for a /24.", (t, _) => Math.Pow(2, (int)Part(t, "bits") - (double)Part(t, "prefix")));
 
-            // slug, semver, mime, hex, base64, jwt, json
-            p.Field("slug", "words", L, "The words: ['my', 'first', 'post'].", (t, _) => new List<object>((List<object>)Part(t, "words")));
-            p.Command("slugify", "text: string", "Turns text into a slug: 'Hello, World!' gives hello-world. Accents are dropped.", "slug",
-                c => Native("slug", NativeParsers.Slugify(c.Str(0))), "@slugify('Crème Brûlée recipes!')");
-            p.Field("semver", "major", N, "The first number: 1 in 1.4.2.", (t, _) => Part(t, "major"));
-            p.Field("semver", "minor", N, "The second number: 4 in 1.4.2.", (t, _) => Part(t, "minor"));
-            p.Field("semver", "patch", N, "The third number: 2 in 1.4.2.", (t, _) => Part(t, "patch"));
-            p.Field("semver", "prerelease", S, "What comes after -, such as beta.1, or '' for a release.", (t, _) => Part(t, "prerelease"));
-            p.Method("semver", "compare", "other: semver", "-1, 0 or 1 as this version comes before, with or after the other (build metadata is ignored).", N, (t, c) =>
-                (double)NativeParsers.CompareSemver(T(t), (NativeText)(c.Arg(0) is NativeText o && o.TypeName == "semver" ? o : Native("semver", c.Str(0)))));
-            p.Method("semver", "satisfies", "range: string", "True when the version is in the range: ^1.2.0, ~1.2, >=1.0.0 <2.0.0, 1.x, or several joined with ||.", B, (t, c) =>
-            {
-                bool ok = NativeParsers.Satisfies(T(t), c.Str(0), out string problem);
-                if (problem != null) throw new KScriptException(problem + ".", "Value");
-                return ok;
-            });
-            p.Method("semver", "bump", "part: string", "The next version: bump('major'), bump('minor') or bump('patch'). The prerelease is dropped.", "semver", (t, c) =>
-            {
-                double major = (double)Part(t, "major"), minor = (double)Part(t, "minor"), patch = (double)Part(t, "patch");
-                string text = c.Str(0) switch
-                {
-                    "major" => $"{major + 1}.0.0",
-                    "minor" => $"{major}.{minor + 1}.0",
-                    "patch" => ((string)Part(t, "prerelease")).Length > 0 ? $"{major}.{minor}.{patch}" : $"{major}.{minor}.{patch + 1}",
-                    string other => throw new KScriptException($"bump takes major, minor or patch, not '{other}'.", "Value"),
-                };
-                return Native("semver", text);
-            });
-            p.Field("mime", "main_type", S, "The part before /: text in text/html. (->type() is mime, as for any value.)", (t, _) => Part(t, "type"));
-            p.Field("mime", "subtype", S, "The part after /: html in text/html.", (t, _) => Part(t, "subtype"));
-            p.Field("mime", "essence", S, "The type and subtype without parameters: text/html.", (t, _) => Part(t, "essence"));
-            p.Field("mime", "params", M, "The parameters as a map: { charset: 'utf-8' }.", (t, _) => new Dictionary<string, object>((Dictionary<string, object>)Part(t, "params")));
-            p.Method("mime", "is", "pattern: string", "True when it matches text/html, text/* or */*.", B, (t, c) =>
-            {
-                string[] want = c.Str(0).Trim().ToLowerInvariant().Split('/');
-                return want.Length == 2 && (want[0] == "*" || want[0] == (string)Part(t, "type")) && (want[1] == "*" || want[1] == (string)Part(t, "subtype"));
-            });
-            p.Field("hex", "bytes", N, "How many bytes it holds: half its number of digits.", (t, _) => Math.Ceiling(T(t).Text.Length / 2.0));
-            p.Method("hex", "to_number", "", "Its value as a number: 'ff' gives 255.", N, (t, c) =>
-            {
-                if (T(t).Text.Length > 13) throw new KScriptException("A hex value with more than 13 digits is too big to be a number.", "Value");
-                return (double)long.Parse(T(t).Text, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-            });
-            p.Method("base64", "decode", "", "The text it holds (read as UTF-8).", S, (t, c) => Encoding.UTF8.GetString(NativeParsers.Base64Bytes(T(t).Text)));
-            p.Field("base64", "bytes", N, "How many bytes it holds.", (t, _) => (double)NativeParsers.Base64Bytes(T(t).Text).Length);
-            p.Field("jwt", "header", M, "The token's header: { alg, typ, ... }.", (t, _) => Part(t, "header"));
-            p.Field("jwt", "claims", M, "The token's claims: { sub, exp, ... }. The signature isn't checked, so don't trust them for sign-in.", (t, _) => Part(t, "claims"));
-            p.Field("jwt", "expires", KType.Date, "When the token expires (its exp claim), or null if it doesn't say.", (t, _) =>
-                ((Dictionary<string, object>)Part(t, "claims")).TryGetValue("exp", out object exp) && exp is double seconds ? DateTimeOffset.FromUnixTimeSeconds((long)seconds).LocalDateTime : null);
-            p.Field("jwt", "is_expired", B, "True when its exp claim is in the past.", (t, _) =>
-                ((Dictionary<string, object>)Part(t, "claims")).TryGetValue("exp", out object exp) && exp is double seconds && DateTimeOffset.FromUnixTimeSeconds((long)seconds) < DateTimeOffset.UtcNow);
-
             // phone, country, currency, locale, timezone
             p.Field("phone", "country_code", S, "The country calling code without +: 44 for a UK number.", (t, _) => Part(t, "country_code"));
             p.Field("phone", "national", S, "The number after the country code.", (t, _) => Part(t, "national"));
@@ -207,27 +155,6 @@ namespace KScript.Runtime
                 ("cidr.network", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x.network }</echo>"),
                 ("cidr.prefix", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x.prefix }</echo>"),
                 ("cidr.size", "<let name=\"x\" type=\"cidr\" value=\"'10.0.0.0/8'\" />\n<echo>{ $x.size }</echo>"),
-                ("slug.words", "<let name=\"x\" type=\"slug\" value=\"'my-first-post'\" />\n<echo>{ $x.words }</echo>"),
-                ("semver.major", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x.major }</echo>"),
-                ("semver.minor", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x.minor }</echo>"),
-                ("semver.patch", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x.patch }</echo>"),
-                ("semver.prerelease", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x.prerelease }</echo>"),
-                ("semver->compare", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x->compare('1.4.2') }</echo>"),
-                ("semver->satisfies", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x->satisfies('^1.2.0') }</echo>"),
-                ("semver->bump", "<let name=\"x\" type=\"semver\" value=\"'1.4.2-beta.1'\" />\n<echo>{ $x->bump('minor') }</echo>"),
-                ("mime.main_type", "<let name=\"x\" type=\"mime\" value=\"'text/html; charset=utf-8'\" />\n<echo>{ $x.main_type }</echo>"),
-                ("mime.subtype", "<let name=\"x\" type=\"mime\" value=\"'text/html; charset=utf-8'\" />\n<echo>{ $x.subtype }</echo>"),
-                ("mime.essence", "<let name=\"x\" type=\"mime\" value=\"'text/html; charset=utf-8'\" />\n<echo>{ $x.essence }</echo>"),
-                ("mime.params", "<let name=\"x\" type=\"mime\" value=\"'text/html; charset=utf-8'\" />\n<echo>{ $x.params }</echo>"),
-                ("mime->is", "<let name=\"x\" type=\"mime\" value=\"'text/html; charset=utf-8'\" />\n<echo>{ $x->is('text/*') }</echo>"),
-                ("hex.bytes", "<let name=\"x\" type=\"hex\" value=\"'0xFF80'\" />\n<echo>{ $x.bytes }</echo>"),
-                ("hex->to_number", "<let name=\"x\" type=\"hex\" value=\"'0xFF80'\" />\n<echo>{ $x->to_number() }</echo>"),
-                ("base64->decode", "<let name=\"x\" type=\"base64\" value=\"'aGVsbG8gd29ybGQ='\" />\n<echo>{ $x->decode() }</echo>"),
-                ("base64.bytes", "<let name=\"x\" type=\"base64\" value=\"'aGVsbG8gd29ybGQ='\" />\n<echo>{ $x.bytes }</echo>"),
-                ("jwt.header", "<let name=\"x\" type=\"jwt\" value=\"'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig'\" />\n<echo>{ $x.header }</echo>"),
-                ("jwt.claims", "<let name=\"x\" type=\"jwt\" value=\"'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig'\" />\n<echo>{ $x.claims }</echo>"),
-                ("jwt.expires", "<let name=\"x\" type=\"jwt\" value=\"'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig'\" />\n<echo>{ $x.expires }</echo>"),
-                ("jwt.is_expired", "<let name=\"x\" type=\"jwt\" value=\"'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FuIiwiZXhwIjoxNzAwMDAwMDAwfQ.sig'\" />\n<echo>{ $x.is_expired }</echo>"),
                 ("phone.country_code", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x.country_code }</echo>"),
                 ("phone.national", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x.national }</echo>"),
                 ("phone->tel", "<let name=\"x\" type=\"phone\" value=\"'+44 7700 900123'\" />\n<echo>{ $x->tel() }</echo>"),

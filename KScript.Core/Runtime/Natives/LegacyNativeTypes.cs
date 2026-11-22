@@ -44,22 +44,6 @@ namespace KScript.Runtime
             Add(new NativeTypeInfo("port", "A network port, a whole number from 1 to 65535.", "8080",
                 Array.Empty<string>()));
 
-            // Identifiers and formats.
-            Add(new NativeTypeInfo("slug", "Lowercase words joined by -, for URLs: my-first-post.", "my-first-post",
-                With("split", "upper", "replace")));
-            Add(new NativeTypeInfo("semver", "A semantic version such as 1.4.2, 2.0.0-beta.1 or 1.0.0+build.5. A leading v is dropped.", "1.4.2",
-                With("split")));
-            Add(new NativeTypeInfo("mime", "A media type such as text/html or application/json, lowercased, with any parameters.", "application/json",
-                With("split")) { JsonFormat = "media-type" });
-            Add(new NativeTypeInfo("hex", "Hexadecimal digits, such as a hash: a3f9c0. Lowercased; 0x is dropped.", "a3f9c0",
-                With("upper")) { Options = new[] { "bytes" } });
-            Add(new NativeTypeInfo("base64", "Base64 text (standard or URL-safe). ->decode() gives the text it holds.", "aGVsbG8=",
-                Searchable) { JsonFormat = "byte" });
-            Add(new NativeTypeInfo("jwt", "A JSON Web Token: three base64url parts. Its claims can be read; its signature isn't checked.", "'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig'",
-                Searchable));
-            Add(new NativeTypeInfo("json", "Text that holds valid JSON. ->json() gives the value.", "'{\"a\": 1}'",
-                Searchable));
-
             // People and places.
             Add(new NativeTypeInfo("phone", "A phone number in E.164: + then the country code and number, 8 to 15 digits. Spaces, dots, dashes and brackets are dropped.", "+447700900123",
                 Searchable) { Options = new[] { "countries" } });
