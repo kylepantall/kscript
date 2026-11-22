@@ -17,7 +17,7 @@
 
   <describe name="a shopping cart">
     <let name="cart" value="[]" />
-    <fn name="add" params="item">
+    <fn name="add" params="item: string">
       <set name="cart" value="$cart->push($item)" />
     </fn>
 

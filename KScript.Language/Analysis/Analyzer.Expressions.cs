@@ -260,7 +260,7 @@ namespace KScript.Language.Analysis
             }
         }
 
-        private void AnalyzeCommand(CommandCallNode c, ExpressionRegion region, Scope scope, int piped)
+        private void AnalyzeCommand(CommandCallNode c, ExpressionRegion region, Scope scope, int piped, TypeShape pipedShape = null)
         {
             AnalyzeArguments(c.Arguments, region, scope);
             TextSpan full = region.Source.ToSource(c.NameSpan);
@@ -272,6 +272,10 @@ namespace KScript.Language.Analysis
             {
                 result.References.Add(new SymbolReference(fn, nameSpan, false, false));
                 ReportIfDeprecated(fn, nameSpan);
+                if (count >= 0)
+                {
+                    NoteCallArguments(fn, c.Arguments, piped > 0 ? pipedShape ?? TypeShape.Unknown : null, region);
+                }
                 if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn))
                     && !CheckNamedArguments($"@{fn.Name}()", c.Arguments, piped, SlotsOf(fn, scope), region, full))
                 {
@@ -376,6 +380,7 @@ namespace KScript.Language.Analysis
                         {
                             result.References.Add(new SymbolReference(fn, span, false, false));
                             ReportIfDeprecated(fn, span);
+                            NoteCallArguments(fn, call.Arguments, left ?? TypeShape.Unknown, region);
                             if (!CheckNamedArguments($"@{fn.Name}()", call.Arguments, 1, SlotsOf(fn, scope), region, region.Source.ToSource(call.Span)))
                             {
                                 CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
@@ -450,7 +455,7 @@ namespace KScript.Language.Analysis
                     return;
 
                 case CommandCallNode command:
-                    AnalyzeCommand(command, region, scope, piped: 1);
+                    AnalyzeCommand(command, region, scope, piped: 1, pipedShape: Infer(pipe.Left, region));
                     FlushBare(command.Arguments, region, scope);
                     return;
 

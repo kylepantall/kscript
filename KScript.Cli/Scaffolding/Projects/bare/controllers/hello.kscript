@@ -5,4 +5,4 @@ when: api
 // list it returns is sent as JSON.
 
 /// GET /api/hello, or /api/hello?name=Ellie
-fn show(query) => { message: 'Hello, ' + ($query.name ?? 'world') + '!' }
+fn show(query: map) => { message: 'Hello, ' + ($query.name ?? 'world') + '!' }

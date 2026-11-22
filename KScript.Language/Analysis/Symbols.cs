@@ -201,6 +201,9 @@ namespace KScript.Language.Analysis
 
         public TypeShape Shape { get; internal set; } = TypeShape.Unknown;
 
+        /// <summary>For a parameter with no type of its own: true when its type comes from what every call in the file passes.</summary>
+        public bool TypeFromCalls { get; internal set; }
+
         /// <summary>True once the variable has been given values of different types, so its type is no longer claimed.</summary>
         public bool HoldsSeveralTypes { get; internal set; }
 

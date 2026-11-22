@@ -102,14 +102,14 @@ kscript {
   import KScript.Http
 
   fn all() => @read_json('data/people.json')
-  fn find(id) => @all()->find(fn($p) => $p.id == $id)
+  fn find(id: int) => @all()->find(fn($p) => $p.id == $id)
 
-  fn index(query) {
+  fn index(query: map) {
     // GET /api/people?role=Founder
     return @all() |> filter(fn($p) => $query.role == null or $p.role == $query.role)
   }
 
-  fn page(id) {
+  fn page(id: int) {
     // GET /people/2
     person = @find($id) ?? @abort(404, message: 'Nobody has that id.')
     return @view('people/show', person: $person)
@@ -184,11 +184,11 @@ Middleware is a function that takes the request and `$next`. It can stop the req
 kscript {
   import KScript.Http
 
-  fn secure_headers(request, next) {
+  fn secure_headers(request: map, next: fn) {
     return $next($request)->with_header('X-Frame-Options', 'DENY')
   }
 
-  fn json_only(request, next) {
+  fn json_only(request: map, next: fn) {
     if $request.method == 'POST' and not ($request.headers['content-type'] ?? '')->contains('json') {
       return @response({ error: 'Send JSON.' }, status: 415)
     }
@@ -255,7 +255,7 @@ kscript {
   import KScript.Http
   import KScript.IO
 
-  fn show(id) {
+  fn show(id: int) {
     person = @read_json('data/people.json')->find(fn($p) => $p.id == $id) ?? @abort(404)
     @etag($person.updated_at)
     return @view('people/show', person: $person)

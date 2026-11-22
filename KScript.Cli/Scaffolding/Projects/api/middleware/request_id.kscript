@@ -5,7 +5,7 @@ import KScript.Http
 
 /// Gives every response an X-Request-Id header (the caller's own, or a new one)
 /// so logs and clients can match them up.
-fn request_id(request, next) {
+fn request_id(request: map, next: fn) {
   id = $request.headers['x-request-id'] ?? @uuid()
   return $next($request)->with_header('X-Request-Id', $id)
 }

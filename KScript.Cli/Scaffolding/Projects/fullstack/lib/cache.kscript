@@ -11,7 +11,7 @@ fn app_cache() => @cache($config.cache.store ?? 'memory', name: 'app')
 
 /// The value kept under the key, or else what compute gives, kept for
 /// cache.ttl.
-fn cached(key, compute) => @app_cache()->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
+fn cached(key: string, compute: fn) => @app_cache()->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
 
 /// Forgets a key, so the next request works the value out again.
-fn forget_cached(key) => @app_cache()->forget($key)
+fn forget_cached(key: string) => @app_cache()->forget($key)

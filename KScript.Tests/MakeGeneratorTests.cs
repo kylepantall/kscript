@@ -96,14 +96,14 @@ public sealed class MakeGeneratorTests : IDisposable
 
         string controller = Read(app, "controllers/users.kscript");
         Assert.Contains("fn index() {", controller);
-        Assert.Contains("fn show(id) {", controller);
-        Assert.Contains("fn store(json) {", controller);
+        Assert.Contains("fn show(id: int) {", controller);
+        Assert.Contains("fn store(json: map) {", controller);
         // store() uses @response, so the controller now imports KScript.Http, after its opening comments.
         Assert.Matches(@"come from import KScript.Http\.\nimport KScript.Http\n\n/// GET /users", controller);
 
         AssertNoErrors(app);
         Assert.Equal("[]", Request(app, "GET", "/users").Body.Trim());
-        Assert.Contains("\"id\":\"7\"", Request(app, "GET", "/users/7").Body);
+        Assert.Contains("\"id\":7", Request(app, "GET", "/users/7").Body);
         // /users/abc breaks the where rule, so no route answers it (kscript serve then gives 404).
         Assert.True(Request(app, "GET", "/users/abc") is null or { Status: 404 });
         var stored = Request(app, "POST", "/users", "{\"name\": \"Ann\"}");
@@ -145,7 +145,7 @@ public sealed class MakeGeneratorTests : IDisposable
         // A page-style [slug] works too, and the controller's function takes the parameter by its name.
         Assert.Equal(0, Make(app, "route", "posts/[slug]").Code);
         Assert.Contains("Get(path: \"/posts/{slug}\", to: posts.show)", Read(app, "routes/web.kscript"));
-        Assert.Contains("fn show(slug) {\n  // TODO: Find the one asked for, and answer 404 when there is none:\n  // @abort(404)\n  return { slug: $slug }", Read(app, "controllers/posts.kscript"));
+        Assert.Contains("fn show(slug: string) {\n  // TODO: Find the one asked for, and answer 404 when there is none:\n  // @abort(404)\n  return { slug: $slug }", Read(app, "controllers/posts.kscript"));
 
         // An admin/users controller doesn't take the users name from another import.
         Assert.Equal(0, Make(app, "route", "users").Code);
@@ -183,12 +183,12 @@ public sealed class MakeGeneratorTests : IDisposable
         Assert.Contains("<Resource path=\"/tasks\" to=\"tasks\" />", Read(app, "routes/api.ks.xml"));
         string controller = Read(app, "controllers/users.ks.xml");
         Assert.Contains("<kscript>\n  <import package=\"KScript.Http\" />", controller);
-        Assert.Matches(@"<fn\s+name=""store""\s+params=""json""", controller);
+        Assert.Matches(@"<fn\s+name=""store""\s+params=""json: map""", controller);
         Assert.False(File.Exists(Path.Combine(app, "controllers", "users.kscript")));
 
         AssertNoErrors(app);
         Assert.Equal(201, Request(app, "POST", "/users", "{\"name\": \"Ann\"}").Status);
-        Assert.Contains("\"id\":\"3\"", Request(app, "GET", "/users/3").Body);
+        Assert.Contains("\"id\":3", Request(app, "GET", "/users/3").Body);
     }
 
     [Fact]

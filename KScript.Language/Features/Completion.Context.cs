@@ -67,6 +67,12 @@ namespace KScript.Language.Features
                 return new List<CompletionItem>();
             }
 
+            // A line of a type or model block (hidden: [‸], min: ...), and rules given to a type: string(m‸).
+            if (code && TypeBodyCompletions(analysis, offset) is List<CompletionItem> body)
+            {
+                return body;
+            }
+
             // <import package="‸"> and import ‸ (in a .kscript file).
             if (cursor.InAttributeValue && cursor.TagElement.Name == "import" && cursor.Attribute.Name == "package")
             {

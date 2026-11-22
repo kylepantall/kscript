@@ -17,7 +17,7 @@ fn load() => @exists($file) ? @read_json($file) : @starter_tasks()
 fn index() => @load()
 
 /// POST /api/tasks with a JSON title
-fn store(json) {
+fn store(json: map) {
   tasks = @add_task(@load(), title: $json.title ?? '')
   @write_json($file, $tasks)
   return @response($tasks->last(), status: 201)

@@ -70,7 +70,7 @@ namespace KScript.Language.Tests
         public void ListsCanBeArrays()
         {
             DocumentAnalysis a = Analyzer.Analyze(
-                "KScript.Routes {\n  import \"controllers/people.ks.xml\" as people\n  fn stamp(request, next) => $next($request)\n  Middleware(use: [stamp, cors, throttle:30, admin])\n  Resource(path: \"/people\", to: people, only: [index, show])\n  Route(methods: [get, post], path: \"/both\", to: people.index)\n  Group(middleware: [auth]) {\n    Get(path: \"/\", to: people.show)\n  }\n}\n",
+                "KScript.Routes {\n  import \"controllers/people.ks.xml\" as people\n  fn stamp(request: map, next: fn) => $next($request)\n  Middleware(use: [stamp, cors, throttle:30, admin])\n  Resource(path: \"/people\", to: people, only: [index, show])\n  Route(methods: [get, post], path: \"/both\", to: people.index)\n  Group(middleware: [auth]) {\n    Get(path: \"/\", to: people.show)\n  }\n}\n",
                 Path.Combine(Site, "routes.kscript"), Files);
             TestHelpers.AssertClean(a);
         }
@@ -87,11 +87,11 @@ namespace KScript.Language.Tests
         [Fact]
         public void AStringListSuggestsAnArray()
         {
-            string text = "KScript.Routes {\n  fn stamp(request, next) => $next($request)\n  Middleware(use: \"stamp, cors\")\n}\n";
+            string text = "KScript.Routes {\n  fn stamp(request: map, next: fn) => $next($request)\n  Middleware(use: \"stamp, cors\")\n}\n";
             DocumentAnalysis a = Analyzer.Analyze(text, Path.Combine(Site, "routes.kscript"), Files);
             Diagnostic d = Assert.Single(a.Diagnostics, x => x.Code == DiagnosticCodes.PreferArrayList);
             Assert.Contains("use: [stamp, cors]", d.Message);
-            Assert.Equal("KScript.Routes {\n  fn stamp(request, next) => $next($request)\n  Middleware(use: [stamp, cors])\n}\n", AnalyzerTests.Apply(text, d.Fixes[0].Changes));
+            Assert.Equal("KScript.Routes {\n  fn stamp(request: map, next: fn) => $next($request)\n  Middleware(use: [stamp, cors])\n}\n", AnalyzerTests.Apply(text, d.Fixes[0].Changes));
 
             // XML attributes are always text, and one name needs no list.
             Assert.DoesNotContain(Analyze("<fn name=\"stamp\" params=\"request, next\" value=\"$next($request)\" /><Middleware use=\"stamp, cors\" />").Diagnostics, x => x.Code == DiagnosticCodes.PreferArrayList);

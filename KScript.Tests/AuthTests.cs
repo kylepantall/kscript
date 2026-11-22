@@ -139,7 +139,7 @@ public sealed class AuthKitTests : AuthSiteFixture
         Assert.Contains("Group(middleware: guest) {", web);
         Assert.Contains("Post(path: \"/logout\", to: accounts.sign_out, name: \"logout\")", web);
         Assert.Contains("Post(path: \"/tokens\", to: accounts.issue_token)", Read("routes/api.kscript"));
-        Assert.Contains("fn issue_token(json)", Read("controllers/accounts.kscript"));
+        Assert.Contains("fn issue_token(json: map)", Read("controllers/accounts.kscript"));
         Assert.Contains("{! @csrf_field() }", Read("views/auth/login.html"));
         Assert.Contains("\"types\": { \"password\": { \"min\": 10 } }", Read("kscript.json"));
         Assert.True(File.Exists(Path.Combine(Dir, "_layout.html")));
@@ -330,7 +330,7 @@ public sealed class AuthMakeTests : AuthSiteFixture
         string routes = Read("routes/web.ks.xml");
         Assert.Contains("<import package=\"KScript.Auth\" />", routes);
         Assert.Contains("<Group middleware=\"guest\">", routes);
-        Assert.Matches(@"<fn\s+name=""sign_up""\s+params=""form""", Read("controllers/accounts.ks.xml"));
+        Assert.Matches(@"<fn\s+name=""sign_up""\s+params=""form: map""", Read("controllers/accounts.ks.xml"));
         Assert.DoesNotContain("accounts", Read("routes/api.kscript"));
 
         var b = new Browser(App());

@@ -2,4 +2,4 @@
 // import "../lib/greeting{{ ext }}"
 
 /// A friendly hello for someone.
-fn greeting(name) => 'Hello, ' + $name->trim()->title() + '!'
+fn greeting(name: string) => 'Hello, ' + $name->trim()->title() + '!'

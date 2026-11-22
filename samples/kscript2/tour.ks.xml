@@ -85,7 +85,7 @@
   <echo>$label</echo>
 
   <!-- Functions -->
-  <fn name="greet" params="who, greeting = 'Hello'">
+  <fn name="greet" params="who: string, greeting = 'Hello'">
     <return value="$greeting + ', ' + $who + '!'" />
   </fn>
   <fn name="double" params="x: int" value="$x * 2" />
