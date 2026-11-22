@@ -459,6 +459,28 @@ namespace KScript.Language.Tests
             Assert.Equal("x = 1\nif $x > 0 {\n  echo \"hi\"\n}\n", formatted);
         }
 
+        [Fact]
+        public void TheAgentNotesAreNeverChecked()
+        {
+            Initialize();
+            OpenAs("json", "{ \"name\": \"demo\" }", "file:///work/kscript.json");
+            // AGENTS.md is Markdown for coding agents, not a page: its `<package>` is not a tag.
+            const string agents = "file:///work/AGENTS.md";
+            OpenAs("markdown", "Read `.kscript/agents/packages/<package>.md`.\n", agents);
+            Assert.Empty(Diagnostics(agents));
+            const string claude = "file:///work/CLAUDE.md";
+            OpenAs("markdown", "<package>\n", claude);
+            Assert.Empty(Diagnostics(claude));
+            const string generated = "file:///work/.kscript/agents/index.md";
+            OpenAs("markdown", "<package>\n", generated);
+            Assert.Empty(Diagnostics(generated));
+
+            // Any other Markdown page in the project is still checked.
+            const string page = "file:///work/notes.md";
+            OpenAs("markdown", "<package>\n", page);
+            Assert.NotEmpty(Diagnostics(page));
+        }
+
         private void OpenAs(string languageId, string text, string uri) => Notify("textDocument/didOpen", new JsonObject
         {
             ["textDocument"] = new JsonObject { ["uri"] = uri, ["languageId"] = languageId, ["version"] = 1, ["text"] = text },
