@@ -1,4 +1,5 @@
 using KScript.Data;
+using KScript.Runtime;
 using KScript.Testing;
 
 namespace KScript.Tests;
@@ -151,9 +152,66 @@ public sealed class DataTestingTests : DataFixture
                 $Post->fake_many(1, 'x')
               }
               expect(value: $Post->fake_many(0), count: 0)
+              expect(value: $Post->fake_many(1, { title: 'Mapped' })[0].title, equals: 'Mapped')
+              expect-error(contains: needs) {
+                $Post->create(title: 'x', author: $Post->fake())
+              }
             }
             """);
         Passed(file);
+    }
+
+    [Fact]
+    public void AFakeWhoseRequiredRelationsGoRoundInACircleSaysSo()
+    {
+        FileOf("models/node.kscript", "import KScript.Data\n\nmodel Node {\n  name: string\n  parent: Node\n}\n");
+        TestFileResult file = RunTests("""
+            import "../models/node.kscript"
+
+            test(name: 'circle') {
+              expect-error(contains: circle) {
+                $Node->fake()
+              }
+            }
+            """);
+        Passed(file);
+    }
+
+    [Fact]
+    public void AMigrationThatFailsStopsTheTestFile()
+    {
+        FileOf("database/migrations/2026_01_01_000000_bad.kscript", "KScript.Migration {\n  DropTable(name: nothing_here)\n}\n");
+        TestFileResult file = RunTests("""
+            test(name: 'never runs') {
+              expect(value: $Post->count(), equals: 0)
+            }
+            """);
+        Assert.NotNull(file.Error ?? file.Tests.FirstOrDefault(t => t.Outcome != TestOutcome.Passed)?.Message);
+        Assert.Contains("nothing_here", file.Error?.ToString() ?? file.Tests[0].Message);
+    }
+
+    [Fact]
+    public void BindingsAreShownAsScriptValues()
+    {
+        Assert.Null(QueryLog.Shown(null));
+        Assert.Equal("a", QueryLog.Shown("a"));
+        Assert.Equal(3.0, QueryLog.Shown(3L));
+        Assert.Equal("AQI=", QueryLog.Shown(new byte[] { 1, 2 }));
+        Assert.Equal("d1f9a1a2-0000-0000-0000-000000000000", QueryLog.Shown(Guid.Parse("d1f9a1a2-0000-0000-0000-000000000000")));
+    }
+
+    [Fact]
+    public void WorkAfterATestThatFailsIsTheTestsFailure()
+    {
+        var host = KScriptHost.ForText(new StringWriter());
+        var order = new List<int>();
+        host.AfterTest.Add(() => order.Add(1));
+        host.AfterTest.Add(() => throw new KScriptException("first", "Error"));
+        host.AfterTest.Add(() => throw new KScriptException("last", "Error"));
+        KScriptException failure = TestRunner.EndTest(host);
+        Assert.Contains("last", failure.Message);
+        Assert.Equal(new[] { 1 }, order);
+        Assert.Empty(host.AfterTest);
     }
 
     [Fact]

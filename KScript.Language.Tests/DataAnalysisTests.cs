@@ -441,6 +441,8 @@ namespace KScript.Language.Tests
             Assert.Equal("SELECT name FROM authors\nWHERE …", Sql("echo $Author->where()->pluck('name')", "->pluck"));
             Assert.Null(Sql("p = $Post->first()\necho $p->posts()->count()", "->count"));
             Assert.Null(Sql("echo [1, 2]->count()", "->count"));
+            Assert.Null(Sql("echo $db->tables()", "->tables"));
+            Assert.Equal("SELECT * FROM posts\nWHERE … AND deleted_at IS NULL", Sql("echo $Post->where(fn($p) => [1])->get()", "->get"));
         }
 
         [Fact]

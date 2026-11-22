@@ -535,3 +535,67 @@ $User->create(name: 'Ada', email: 'ada@example.com')
 `kscript db seed` runs every seeder in name order, and `kscript db seed users` runs one. `kscript db migrate --seed` and `kscript db fresh --seed` run them after migrating.
 
 `kscript make migration add_bio_to_users` writes an empty migration to fill in by hand, and `kscript make seeder users` writes a seeder.
+
+## Testing with a database
+
+Under `kscript test`, each test file that uses KScript.Data gets a database of its own in memory, made from the migrations (or from the models when there are none yet), and each test's changes are undone when it ends. Tests don't need `$db->create_table()`, don't touch the project's database, and see none of each other's records:
+
+```kscript
+// tests/post.test.kscript
+import KScript.Data
+import "../models/post.kscript"
+
+test(name: "a post starts with no views") {
+  post = $Post->fake(title: 'Hello')
+  expect(value: $post.views, equals: 0)
+  expect(value: $Post->count(), equals: 1)
+}
+
+test(name: "each test starts empty") {
+  expect(value: $Post->count(), equals: 0)
+}
+```
+
+`test.database` in `kscript.json` chooses: `memory` (the default) or `config`, which uses the configured database (see `test.env` in [Testing](testing.md#settings-in-kscriptjson)) and still undoes each test.
+
+### Fakes
+
+`$Model->fake(fields...)` saves a record with made-up values for the fields you don't give, and `->fake_many(count, fields...)` saves several. The values fit each field's type and limits (a `string(min: 3, max: 12)` is 3 to 12 characters, an `email` ends in `@example.com`, an enum is its first value), and a required relation gets a fake record of its own:
+
+```kscript
+joan = $Author->fake(name: 'Joan')
+posts = $Post->fake_many(3, author: $joan)
+```
+
+### Counting queries
+
+`@queries()` is the SQL sent so far in this test (in a script, so far in the run), each as `{ sql, bindings, database }`. `count-at-most` checks a page doesn't send a query per row:
+
+```kscript
+test(name: "the post list loads authors at once") {
+  $Post->fake_many(10)
+  $Post->with(author)->get()
+  expect(value: @queries(), count-at-most: 2)
+}
+```
+
+## With the rest of KScript
+
+- **Routes**: a controller parameter typed as a model, `fn show(post: Post)`, is the record with the key in the path, or a `404` (see [Controllers](http.md)).
+- **OpenAPI**: a model in a route's input or answer is a schema: the key and timestamps are read-only, a relation is only there when it was loaded with `->with()`, and `->paginate()` answers with a page of records.
+- **Sign-in**: `http.auth.users` keeps [KScript.Auth](auth.md#users-in-a-model)'s users in a model, so `@user()` is a record.
+
+## In the editor
+
+The language server knows each model's fields. It completes them in `->where(`, `->order_by(`, `->create(` and the rest, and relations in `->with(`; a field the model doesn't have is `KS5013` (see [errors](errors.md)). A `where` lambda's parameter is the model's record, so `fn($p) => $p.` completes its fields too.
+
+Hover over a query method to see the SQL the chain sends, roughly, with `?` for the values:
+
+```sql
+SELECT * FROM posts
+WHERE views > ? AND author_id = ?
+ORDER BY created_at DESC
+LIMIT ?
+```
+
+When the project has migrations, a model the migrations don't make as it is now is `KS5014`, with the first change `kscript db diff` would write (`add field users.bio`).

@@ -220,7 +220,11 @@ namespace KScript.Data
         /// <summary>The database a connection name means for a script in <paramref name="folder"/>: the same object for the same settings.</summary>
         public static Database For(KScriptHost host, string folder, string name)
         {
-            if (host?.TestFile != null && (name == null || name == DatabaseSettings.DefaultName) && ForTest(host, folder) is Database test) return test;
+            if (host != null && (name == null || name == DatabaseSettings.DefaultName))
+            {
+                if (host.MemoryDatabase) return ForSandbox(host);
+                if (host.TestFile != null && ForTest(host, folder) is Database test) return test;
+            }
             DatabaseSettings settings = DatabaseSettings.Resolve(host, folder, name);
             return Open.GetOrAdd(settings.Dialect.Name + "|" + settings.ConnectionString, _ => new Database(settings));
         }
@@ -564,20 +568,8 @@ namespace KScript.Data
                     host.Items[TestKey] = "config";
                     return null;
                 }
-                var db = new Database(new DatabaseSettings
-                {
-                    Name = DatabaseSettings.DefaultName,
-                    Dialect = SqliteDialect.Instance,
-                    ConnectionString = "Data Source=kscript-test-" + Guid.NewGuid().ToString("N") + ";Mode=Memory;Cache=Shared",
-                    Where = "memory, for " + Path.GetFileName(host.TestFile),
-                    Memory = true,
-                });
+                Database db = InMemory(host, "memory, for " + Path.GetFileName(host.TestFile));
                 host.Items[TestKey] = db;
-                host.AfterFile.Add(() =>
-                {
-                    db.keeper?.Dispose();
-                    db.keeper = null;
-                });
                 try
                 {
                     new Migrations.Migrator(project?.Directory ?? folder, host, project).Build();
@@ -589,6 +581,37 @@ namespace KScript.Data
                 }
                 return db;
             }
+        }
+
+        /// <summary>A sandbox's main database (see <see cref="KScriptHost.MemoryDatabase"/>): empty, in memory, one per host.</summary>
+        private static Database ForSandbox(KScriptHost host)
+        {
+            lock (host.Items)
+            {
+                if (host.Items.TryGetValue(TestKey, out object made) && made is Database db) return db;
+                db = InMemory(host, "memory");
+                host.Items[TestKey] = db;
+                return db;
+            }
+        }
+
+        /// <summary>A new SQLite database in memory, closed (and so gone) when the host's file or run ends.</summary>
+        private static Database InMemory(KScriptHost host, string where)
+        {
+            var db = new Database(new DatabaseSettings
+            {
+                Name = DatabaseSettings.DefaultName,
+                Dialect = SqliteDialect.Instance,
+                ConnectionString = "Data Source=kscript-test-" + Guid.NewGuid().ToString("N") + ";Mode=Memory;Cache=Shared",
+                Where = where,
+                Memory = true,
+            });
+            host.AfterFile.Add(() =>
+            {
+                db.keeper?.Dispose();
+                db.keeper = null;
+            });
+            return db;
         }
 
         #endregion

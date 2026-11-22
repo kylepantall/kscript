@@ -36,7 +36,7 @@ namespace KScript.Data
         }
 
         /// <summary>A parameter as a script sees it: numbers as numbers, dates and blobs as text.</summary>
-        private static object Shown(object value) => value switch
+        internal static object Shown(object value) => value switch
         {
             null => null,
             string or bool or double => value,

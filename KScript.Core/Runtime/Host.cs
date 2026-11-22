@@ -47,7 +47,16 @@ namespace KScript.Runtime
         /// </summary>
         public List<Action> AfterTest { get; } = new List<Action>();
 
-        /// <summary>Work to do when <see cref="TestFile"/>'s tests have all run, such as closing its database.</summary>
+        /// <summary>
+        /// True for a sandbox, such as the docs playground: KScript.Data's main database is an empty one in memory that
+        /// ends with the run, whatever the config says.
+        /// </summary>
+        public bool MemoryDatabase { get; set; }
+
+        /// <summary>
+        /// Work to do when <see cref="TestFile"/>'s tests have all run (or a sandbox run ends), such as closing its
+        /// database.
+        /// </summary>
         public List<Action> AfterFile { get; } = new List<Action>();
 
         /// <summary>Command line arguments after the script path: <c>$args</c>.</summary>

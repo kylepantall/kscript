@@ -362,7 +362,7 @@ namespace KScript.Testing
         }
 
         /// <summary>Runs what packages left to do when the test ended (newest first), such as undoing its database changes.</summary>
-        private static KScriptException EndTest(KScriptHost host)
+        internal static KScriptException EndTest(KScriptHost host)
         {
             KScriptException failure = null;
             List<Action> work = host.AfterTest.ToList();

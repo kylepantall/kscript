@@ -510,7 +510,7 @@ namespace KScript.Data
                 new A("retries", K.Expression, "Tries the block again this many times when the database is busy or a deadlock stops it."),
                 new A("connection", K.Text, "The database connection, from database.connections in your config. Default: the default connection."))
             {
-                Example = "<transaction>\n  <do>$Order->create({ total: 10 })</do>\n</transaction>",
+                Example = "<model name=\"Order\">\n  <field name=\"total\" type=\"number\" />\n</model>\n<do>$db->create_table($Order)</do>\n<transaction>\n  <do>$Order->create(total: 10)</do>\n</transaction>\n<echo>{ $Order->count() }</echo>",
             }, run =>
             {
                 string connection = run.Raw("connection")?.Trim();
