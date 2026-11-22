@@ -302,7 +302,10 @@ namespace KScript.Language.Analysis
                             new[] { new QuickFix($"Change to {close}", new TextChange(span, close)) });
                         continue;
                     }
-                    positional++; // Left pending: reported as an unknown name after the call.
+                    // Left pending: reported as an unknown name after the call. It is still the value given for this
+                    // parameter, so the call isn't also told that it needs one.
+                    filled[positional] = a;
+                    positional++;
                     continue;
                 }
 

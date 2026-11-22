@@ -53,7 +53,7 @@ namespace KScript.Queueing
                     result = Matching(call).Select(p => (object)new Dictionary<string, object>(p.Queued, StringComparer.Ordinal)).ToList();
                     return true;
                 case "count":
-                    if (call.Count > 0) throw new KScriptException("->count() takes no arguments. To count the jobs of one type, use ->count_of($Job).", "Argument");
+                    if (call.Count > 0) throw new KScriptException("->count() takes no arguments. To count the jobs of one type, use ->count_of(SendWelcome).", "Argument");
                     result = (double)pushed.Count;
                     return true;
                 case "count_of":

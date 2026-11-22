@@ -33,6 +33,27 @@ namespace KScript.Language.Tests
             Assert.All(found, d => Assert.Equal("Write Product", d.Fixes[0].Title));
         }
 
+        [Fact]
+        public void AnUnknownBareNameStillFillsItsParameter()
+        {
+            // The job isn't declared here (as in a docs example): one error for the name, not a second for the argument.
+            DocumentAnalysis a = Code("""
+                import KScript.Queue
+
+                queue = @fake_queue()
+                echo $queue->count_of(SendWelcome)
+                """);
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.ArgumentCount);
+            Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.UndefinedVariable && d.Message.Contains("SendWelcome", StringComparison.Ordinal));
+
+            // With nothing given, the argument is still asked for.
+            DocumentAnalysis none = Code("import KScript.Queue\n\nqueue = @fake_queue()\necho $queue->count_of()\n");
+            Assert.Contains(none.Diagnostics, d => d.Code == DiagnosticCodes.ArgumentCount);
+
+            var files = new AnalyzerCoverageTests.Files(("jobs/send-welcome.kscript", "import KScript.Queue\n\njob SendWelcome {\n  user_id: int\n\n  fn handle() {\n    echo $user_id\n  }\n}\n"));
+            TestHelpers.AssertClean(Code("import KScript.Queue\nimport \"jobs/send-welcome.kscript\"\n\nqueue = @fake_queue()\necho $queue->count_of(SendWelcome)\n", files));
+        }
+
         private static List<string> Names(DocumentAnalysis a) =>
             a.Diagnostics.Where(d => d.Code == DiagnosticCodes.NamingStyle).OrderBy(d => d.Span.Start).Select(d => d.Message.Substring(0, d.Message.IndexOf(':'))).ToList();
 
