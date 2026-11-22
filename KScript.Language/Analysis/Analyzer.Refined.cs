@@ -197,6 +197,10 @@ namespace KScript.Language.Analysis
                 return false;
             }
             string kind = RawTextKindOf(type, scope, offset);
+            if (kind == null && CheckRawListItems(value, type, scope, offset))
+            {
+                return true;
+            }
             ParseResult parsed = ExpressionParser.ParseExpression(value.Value);
             TextSpan span = TrimmedSpan(value);
             if (kind != null && (!parsed.Success || Interpreter.IsRawWord(parsed.Root, kind, null, null)))
@@ -210,6 +214,56 @@ namespace KScript.Language.Analysis
                 CheckLiteralFits(text, type, value.ToSource(literal.Span), scope, offset);
             }
             return false;
+        }
+
+        /// <summary>
+        /// <c>v: semver[] = [1.0.0, 1.0.1-rc]</c>, <c>names: domain[] = [example.com]</c>: in a list of a type read from
+        /// text, each item may be written raw, as at run time. True when at least one item is raw: then the list
+        /// isn't analyzed as one expression (it isn't one): each raw item is checked against the type and each other
+        /// item is analyzed on its own. A list with no raw items ([$a, '2.0.0']) is analyzed as usual.
+        /// </summary>
+        private bool CheckRawListItems(DecodedText value, string type, Scope scope, int offset)
+        {
+            string t = type.Trim();
+            if (!t.EndsWith("[]", StringComparison.Ordinal) || t[..^2].TrimEnd().EndsWith("[]", StringComparison.Ordinal)
+                || RawTextKindOf(t[..^2], scope, offset) is not string itemKind || Interpreter.RawListItems(value.Value) is not List<string> items)
+            {
+                return false;
+            }
+            var raw = new List<(string Text, TextSpan Span)>();
+            var evaluated = new List<DecodedText>();
+            int at = value.Value.IndexOf('[') + 1;
+            foreach (string item in items)
+            {
+                int start = value.Value.IndexOf(item, at, StringComparison.Ordinal);
+                at = start + item.Length;
+                string trimmed = item.Trim();
+                ParseResult parsed = ExpressionParser.ParseExpression(item);
+                if (!parsed.Success || Interpreter.IsRawWord(parsed.Root, itemKind, null, null) || Interpreter.LooksRaw(item, itemKind))
+                {
+                    int lead = start + (item.Length - item.TrimStart().Length);
+                    raw.Add((trimmed, value.ToSource(new TextSpan(lead, trimmed.Length))));
+                }
+                else
+                {
+                    // An item the runtime evaluates ($a): analyzed on its own, at its place in the document.
+                    int from = start;
+                    evaluated.Add(new DecodedText(item, Enumerable.Range(0, item.Length + 1).Select(i => value.ToSource(from + i)).ToArray()));
+                }
+            }
+            if (raw.Count == 0)
+            {
+                return false;
+            }
+            foreach ((string text, TextSpan span) in raw)
+            {
+                CheckLiteralFits(text, t[..^2], span, scope, offset);
+            }
+            foreach (DecodedText item in evaluated)
+            {
+                AnalyzeExpressionRegion(item, RegionKind.Expression, scope, null, null);
+            }
+            return true;
         }
 
         /// <summary>Reports, at the literal, a value that can't be <paramref name="type"/>: a bad email, an out of range Age, a word not in an enum.</summary>
@@ -236,7 +290,7 @@ namespace KScript.Language.Analysis
                 string lower = BuiltInTypeName(name);
                 if (SemanticTypeNames.Contains(lower))
                 {
-                    if (!(literal is string) && lower != "password" && !(literal is double && NativeParsers.Get(lower)?.TakesNumbers == true))
+                    if (!(literal is string) && lower != "password" && !(literal is double && NativeTypeRegistry.Get(lower)?.TakesNumbers == true))
                     {
                         return null;
                     }

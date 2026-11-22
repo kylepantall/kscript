@@ -226,10 +226,14 @@ namespace KScript.Language.Tests
             foreach (CallableInfo m in Catalog.Methods)
             {
                 Assert.False(string.IsNullOrWhiteSpace(m.Description), $"->{m.Name} has no description.");
-                Assert.True(KScript.Metadata.NativeTypes.IsNative(m.ReceiverType) || typeof(KType).GetFields().Any(f => f.FieldType == typeof(string) && (string)f.GetValue(null) == m.ReceiverType), $"->{m.Name} has an unknown receiver type '{m.ReceiverType}'.");
-                Assert.True(KScript.Metadata.NativeTypes.IsNative(m.ReturnType) || typeof(KType).GetFields().Any(f => f.FieldType == typeof(string) && (string)f.GetValue(null) == m.ReturnType), $"->{m.Name} has an unknown return type '{m.ReturnType}'.");
+                // A list of one native type has methods of its own: semver[]->latest().
+                Assert.True(KScript.Metadata.NativeTypes.IsNative(m.ReceiverType) || ListOfNative(m.ReceiverType) || typeof(KType).GetFields().Any(f => f.FieldType == typeof(string) && (string)f.GetValue(null) == m.ReceiverType), $"->{m.Name} has an unknown receiver type '{m.ReceiverType}'.");
+                Assert.True(KScript.Metadata.NativeTypes.IsNative(m.ReturnType) || ListOfNative(m.ReturnType) || typeof(KType).GetFields().Any(f => f.FieldType == typeof(string) && (string)f.GetValue(null) == m.ReturnType), $"->{m.Name} has an unknown return type '{m.ReturnType}'.");
             }
         }
+
+        private static bool ListOfNative(string type) =>
+            type.EndsWith("[]", StringComparison.Ordinal) && KScript.Metadata.NativeTypes.IsNative(type[..^2]);
 
         [Fact]
         public void MethodNamesAreUniquePerReceiverAndArity()

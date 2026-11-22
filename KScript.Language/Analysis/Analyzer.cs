@@ -1580,7 +1580,13 @@ namespace KScript.Language.Analysis
                 if (region.Parse.Root != null)
                 {
                     collection = Infer(region.Parse.Root, region);
-                    itemShape = collection.Type == KType.List ? collection.Element ?? TypeShape.Unknown : TypeShape.Unknown;
+                    itemShape = collection.Type == KType.List ? collection.Element ?? TypeShape.Unknown : TypeInference.NativeItems(collection) ?? TypeShape.Unknown;
+                    // A native type that can't be walked stops the loop when it runs, so say so first.
+                    if (KScript.Metadata.NativeTypes.Get(collection.Type) is { Iterates: null } native)
+                    {
+                        Report(region.Source.ToSource(region.Parse.Root.Span), DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
+                            $"<for> can't loop over {native.WithArticle}: {native.Name} values can't be walked.");
+                    }
                 }
             }
 

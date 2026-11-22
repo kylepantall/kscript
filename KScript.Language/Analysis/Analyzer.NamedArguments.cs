@@ -47,7 +47,7 @@ namespace KScript.Language.Analysis
         private static List<List<ParameterSlot>> SlotsOf(IEnumerable<CallableInfo> callables) =>
             callables.SelectMany(c => c.Signatures)
                 .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null,
-                    RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : null, Type: p.Type)).ToList())
+                    RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : p.Type == "word" ? "word" : null, Type: p.Type)).ToList())
                 .ToList();
 
         private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>

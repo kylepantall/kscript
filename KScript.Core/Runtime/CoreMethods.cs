@@ -27,7 +27,7 @@ namespace KScript.Runtime
 
         /// <summary>The .NET format for a date_format argument: a date_format value, or text that is one (checked, with the reason when it isn't).</summary>
         private static string DateFormatOf(object value) =>
-            NativeParsers.DotNetDateFormat(value is NativeText { TypeName: "date_format" } format ? format : (NativeText)Native("date_format", Values.ToStr(value)));
+            DateFormatType.DotNet(value is NativeText { TypeName: "date_format" } format ? format : (NativeText)Native("date_format", Values.ToStr(value)));
 
         private static string ErrorName(CallContext c, object type) => type switch
         {
@@ -63,47 +63,7 @@ namespace KScript.Runtime
             RegisterNumberMethods(p);
             RegisterDateMethods(p);
             RegisterStringMethods(p);
-            RegisterSemanticMethods(p);
             RegisterNativeMethods(p);
-        }
-
-        private const string StrengthRules = "min?: int, max?: int, upper?: bool, lower?: bool, digit?: bool, symbol?: bool, common?: bool, not?: list, score?: int";
-
-        private static void RegisterSemanticMethods(PackageBuilder p)
-        {
-            p.Field(KType.Email, "local", KType.String, "The part before the @, as it was written.", (t, _) => ((EmailAddress)t).Local);
-            p.Field(KType.Email, "domain", KType.String, "The part after the @, in lower case.", (t, _) => ((EmailAddress)t).Domain);
-            p.Field(KType.Handle, "name", KType.String, "The handle without its @.", (t, _) => ((HandleName)t).Name);
-            p.Field(KType.Uuid, "version", KType.Number, "The UUID's version: 4 for random ones, 8 for custom ones (0 for the nil UUID).", (t, _) => (double)((UuidValue)t).Version);
-
-            string rx = KType.Regex;
-            static System.Text.RegularExpressions.Regex R(object t) => ((RegexValue)t).Regex;
-            static object Safe(object t, Func<object> work) => RegexValue.Run((RegexValue)t, _ => work());
-            p.Method(rx, "test", "text: string", "True when the text matches somewhere (use ^ and $ to match all of it).", KType.Bool, (t, c) => Safe(t, () => R(t).IsMatch(c.Str(0))));
-            p.Method(rx, "match", "text: string", "The first match: { text, index, groups, captures }, where groups holds named groups (?<name>...) and captures numbered ones. null if none.", KType.Map,
-                (t, c) => Safe(t, () => R(t).Match(c.Str(0)) is { Success: true } m ? RegexValue.MatchMap(R(t), m) : null));
-            p.Method(rx, "match_all", "text: string", "Every match, as { text, index, groups, captures } maps.", KType.List,
-                (t, c) => Safe(t, () => R(t).Matches(c.Str(0)).Select(m => (object)RegexValue.MatchMap(R(t), m)).ToList()));
-            p.Method(rx, "replace", "text: string, with", "The text with every match replaced. with is text, where $1 and ${name} are groups, or fn(match) returning text.", KType.String, (t, c) => Safe(t, () =>
-                c.Arg(1) is ICallable f
-                    ? R(t).Replace(c.Str(0), m => Values.ToStr(c.Call(f, RegexValue.MatchMap(R(t), m))))
-                    : R(t).Replace(c.Str(0), c.Str(1))));
-            p.Method(rx, "split", "text: string", "The text split at every match.", KType.List, (t, c) => Safe(t, () => R(t).Split(c.Str(0)).Select(x => (object)x).ToList()));
-            p.Field(rx, "pattern", KType.String, "The pattern, without slashes or flags.", (t, _) => ((RegexValue)t).Pattern);
-            p.Field(rx, "flags", KType.String, "The flags, such as i.", (t, _) => ((RegexValue)t).Flags);
-
-            string pw = KType.Password;
-            p.Method(pw, "hash", "algorithm?: argon2id | bcrypt", "A hash to store instead of the password: argon2id (the default) or bcrypt, with a new random salt each time.", KType.String,
-                (t, c) => ((PasswordValue)t).Hash(c.Arg(0) is null ? ((PasswordValue)t).Algorithm : c.Str(0)));
-            p.Method(pw, "verify", "hash: string", "True when this is the password the stored hash was made from. Takes the same time whether it matches or not.", KType.Bool,
-                (t, c) => ((PasswordValue)t).Verify(c.Str(0)));
-            p.Method(pw, "needs_rehash", "hash: string", "True when the stored hash was made with weaker settings or another algorithm than ->hash() uses now, so it should be replaced after a successful login.", KType.Bool,
-                (t, c) => PasswordValue.NeedsRehash(c.Str(0), ((PasswordValue)t).Algorithm));
-            p.Method(pw, "strength", StrengthRules, "How hard the password is to guess: { score (0 to 4), label, ok, problems }. Rules: min length (8), max, upper, lower, digit, symbol, common (true rejects well-known passwords), not (text it mustn't contain) and score (the lowest score that passes, 3).", KType.Map,
-                (t, c) => ((PasswordValue)t).Strength(c));
-            p.Method(pw, "is_strong", StrengthRules, "True when the password passes ->strength() with these rules.", KType.Bool,
-                (t, c) => (bool)((PasswordValue)t).Strength(c)["ok"]);
-            p.Method(pw, "reveal", "", "The password's text. Only use it to pass the password on, such as to another service's login.", KType.String, (t, c) => ((PasswordValue)t).Secret);
         }
 
         private static void RegisterListMethods(PackageBuilder p)
