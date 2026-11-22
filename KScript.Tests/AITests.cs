@@ -140,7 +140,7 @@ public class AITests
         string output = Run(model,
             "<let name=\"chat\" value=\"@chat('You are friendly.')\" />" +
             "<echo>{ $chat->ask('Hi, I am Kyle') }</echo><echo>{ $chat->ask('What is my name?') }</echo>" +
-            "<echo>{ $chat->history()->count() } { $chat->history()[3].text }</echo>");
+            "<echo>{ $chat.history->count() } { $chat.history[3].text }</echo>");
         Assert.Equal("Hello Kyle!\nYour name is Kyle.\n4 Your name is Kyle.\n", output);
         Assert.Equal("You are friendly.", model.Requests[1].System);
         Assert.Equal(new[] { "Hi, I am Kyle", "Hello Kyle!", "What is my name?" }, model.Sent[1].Select(m => m.Text));
@@ -164,7 +164,7 @@ public class AITests
         var model = new FakeModel().Then(_ => new AiReply { StopReason = "refusal" }).Says("ok");
         string output = Run(model,
             "<let name=\"chat\" value=\"@chat()\" /><try><echo>{ $chat->ask('bad') }</echo><catch><echo>declined</echo></catch></try>" +
-            "<echo>{ $chat->ask('good') } { $chat->history()->count() }</echo>");
+            "<echo>{ $chat->ask('good') } { $chat.history->count() }</echo>");
         Assert.Equal("declined\nok 2\n", output);
     }
 
@@ -189,8 +189,8 @@ public class AITests
         var model = new FakeModel().Says("one").Says("two");
         string output = Run(model,
             "<let name=\"chat\" value=\"@chat('Be kind.', { model: 'claude-test' })\" />" +
-            "<echo>{ $chat.model } { $chat.system } { $chat.nothing ?? 'none' } { $chat->model() } {$chat}</echo>" +
-            "<echo>{ $chat->ask('a') } {$chat} { $chat->reset()->history()->count() } { $chat->ask('b') }</echo>");
+            "<echo>{ $chat.model } { $chat.system } { $chat.nothing ?? 'none' } { $chat.model } {$chat}</echo>" +
+            "<echo>{ $chat->ask('a') } {$chat} { $chat->reset().history->count() } { $chat->ask('b') }</echo>");
         Assert.Equal("claude-test Be kind. none claude-test chat (0 messages)\none chat (1 messages) 0 two\n", output);
         Assert.Single(model.Sent[1]);
     }

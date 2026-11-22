@@ -372,7 +372,7 @@ public sealed class MakeGeneratorTests : IDisposable
             new[] { "native", "Tier", "--one-of", "gold,silver" },
             new[] { "native", "Level", "--base", "int", "--one-of", "1,2,3" },
             new[] { "native", "Note" },
-            new[] { "native", "CompanySite", "--base", "url", "--validate", "$value->host()->ends_with('example.com'), 'Use a company site'" },
+            new[] { "native", "CompanySite", "--base", "url", "--validate", "$value.host->ends_with('example.com'), 'Use a company site'" },
         })
         {
             var (code, _, err) = Make(app, args);
@@ -400,7 +400,7 @@ public sealed class MakeGeneratorTests : IDisposable
             who: Username = @Joan
             tier: Tier = gold
             fn off(p: Percent, l: Level) => $p * $l
-            echo "$sku $who $tier { @off(15, 2) } { $site->path() }"
+            echo "$sku $who $tier { @off(15, 2) } { $site.path }"
             try {
               bad: Sku = zzz-0001
             } catch err {

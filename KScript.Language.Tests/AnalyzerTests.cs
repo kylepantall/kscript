@@ -19,7 +19,7 @@ namespace KScript.Language.Tests
         [InlineData("<if condition=\"yes\"></if>", DiagnosticCodes.RetiredAttribute, "condition", "Use test=")]
         [InlineData("<for in=\"0..3\"></for>", DiagnosticCodes.MissingAttribute, "for", "'each'")]
         [InlineData("<echo format=\"html\">x</echo>", DiagnosticCodes.InvalidAttributeValue, "html", "text, json, markdown")]
-        [InlineData("<let name=\"c\" value=\"1\" const=\"maybe\" />", DiagnosticCodes.InvalidAttributeValue, "maybe", "yes or no")]
+        [InlineData("<let name=\"c\" value=\"1\" const=\"maybe\" />", DiagnosticCodes.InvalidAttributeValue, "maybe", "true or false")]
         [InlineData("<elif test=\"true\"></elif>", DiagnosticCodes.MisplacedElement, "elif", "straight after <if>")]
         [InlineData("<let name=\"a\" value=\"1\" /><else></else>", DiagnosticCodes.MisplacedElement, "else", null)]
         [InlineData("<while test=\"false\"></while><else></else>", DiagnosticCodes.MisplacedElement, "else", "<for>")]
@@ -121,7 +121,7 @@ namespace KScript.Language.Tests
         [InlineData("<if test=\"$args->count() gt 0 and 1 &lt; 2\"></if>")]
         [InlineData("<if test=\"'3' == 3 and '3' !== 3\"></if>")]
         [InlineData("<echo><![CDATA[ raw < text ]]></echo>")]
-        [InlineData("<import package=\"KScript.IO\" /><let name=\"f\" value=\"@files('.')\" /><for each=\"x\" in=\"$f\"><echo>{ $x->extension() }</echo></for>")]
+        [InlineData("<import package=\"KScript.IO\" /><let name=\"f\" value=\"@files('.')\" /><for each=\"x\" in=\"$f\"><echo>{ $x.extension }</echo></for>")]
         [InlineData("<let name=\"x\" value=\"'a'\" /><echo format=\"markdown\">**$x**</echo>")]
         [InlineData("<render into=\"#out\"><li class=\"{ 1 }\">x</li><input type=\"text\"></input></render>")]
         public void AcceptsValidKScript(string body) => AssertClean(Analyze(Script(body)));

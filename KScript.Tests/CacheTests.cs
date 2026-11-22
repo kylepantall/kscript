@@ -23,11 +23,12 @@ public sealed class CacheTests : StorageFixture
     [Fact]
     public void KeepsValuesInMemoryUntilTheyRunOut()
     {
-        Assert.Equal("none 1 true\n", Run("<echo>{ $cache->get('a', default: 'none') } { $cache->put('a', 1, ttl: '1m') } { $cache->has('a') }</echo>"));
-        Assert.Equal("1 60\n", Run("<echo>{ $cache->get('a') } { $cache->ttl('a') }</echo>"));
+        Assert.Equal("none 1 true\n", Run("<echo>{ $cache->get('a', default: 'none') } { $cache->set('a', 1, ttl: 1m) } { $cache->has('a') }</echo>"));
+        Assert.Equal("1 1m\n", Run("<echo>{ $cache->get('a') } { $cache->ttl('a') }</echo>"));
+        Assert.Equal("60\n", Run("<echo>{ $cache->ttl('a').seconds }</echo>"));
         Later(61);
         Assert.Equal("false\n", Run("<echo>{ $cache->has('a') } { $cache->get('a') } { $cache->ttl('a') }</echo>"));
-        Assert.Equal("2\n", Run("<echo>{ $cache->put('forever', 2) } { $cache->ttl('forever') }</echo>"));
+        Assert.Equal("2\n", Run("<echo>{ $cache->set('forever', 2) } { $cache->ttl('forever') }</echo>"));
     }
 
     [Fact]
@@ -35,7 +36,7 @@ public sealed class CacheTests : StorageFixture
     {
         const string script = "<let name=\"n\" value=\"0\" /><let name=\"v\" value=\"$cache->remember('k', fn() => 'computed', ttl: 30)\" /><echo>{ $v }</echo>";
         Assert.Equal("computed\n", Run(script));
-        Assert.Equal("kept\n", Run("<do>$cache->put('k', 'kept')</do><echo>{ $cache->remember('k', fn() => 'computed') }</echo>"));
+        Assert.Equal("kept\n", Run("<do>$cache->set('k', 'kept')</do><echo>{ $cache->remember('k', fn() => 'computed') }</echo>"));
         Assert.Contains("needs a function", Assert.Throws<KScriptException>(() => Run("<echo>{ $cache->remember('other', 5) }</echo>")).Message);
     }
 
@@ -43,10 +44,10 @@ public sealed class CacheTests : StorageFixture
     public void ForgetsIncrementsListsAndFlushes()
     {
         Assert.Equal("1 3 3\n", Run("<echo>{ $cache->increment('n') } { $cache->increment('n', by: 2) } { $cache->get('n') }</echo>"));
-        Assert.Equal("1 60 2 60\n", Run("<echo>{ $cache->increment('t', ttl: '1m') } { $cache->ttl('t') } { $cache->increment('t') } { $cache->ttl('t') }</echo>"));
-        Assert.Equal("n, t true false\n", Run("<echo>{ $cache->keys() } { $cache->forget('t') } { $cache->forget('t') }</echo>"));
-        Assert.Contains("The value of 'word'", Assert.Throws<KScriptException>(() => Run("<do>$cache->put('word', 'abc')</do><echo>{ $cache->increment('word') }</echo>")).Message);
-        Assert.Equal("2 0\n", Run("<echo>{ $cache->flush() } { $cache->keys()->count() }</echo>"));
+        Assert.Equal("1 1m 2 1m\n", Run("<echo>{ $cache->increment('t', ttl: 1m) } { $cache->ttl('t') } { $cache->increment('t') } { $cache->ttl('t') }</echo>"));
+        Assert.Equal("n, t true false\n", Run("<echo>{ $cache->keys() } { $cache->remove('t') } { $cache->remove('t') }</echo>"));
+        Assert.Contains("The value of 'word'", Assert.Throws<KScriptException>(() => Run("<do>$cache->set('word', 'abc')</do><echo>{ $cache->increment('word') }</echo>")).Message);
+        Assert.Equal("2 0\n", Run("<echo>{ $cache->clear() } { $cache->keys()->count() }</echo>"));
     }
 
     [Fact]
@@ -54,12 +55,12 @@ public sealed class CacheTests : StorageFixture
     {
         Assert.Equal("1 1\n", Run("""
             <let name="list" value="[1]" />
-            <do>$cache->put('list', $list); $list->push(2)</do>
+            <do>$cache->set('list', $list); $list->push(2)</do>
             <let name="got" value="$cache->get('list')" />
             <do>$got->push(3)</do>
             <echo>{ $cache->get('list')->count() } { $cache->get('list')[0] }</echo>
             """));
-        Assert.Equal("Joan\n", Run("<do>$cache->put('map', { name: 'Joan', tags: ['a'] })</do><echo>{ $cache->get('map').name }</echo>"));
+        Assert.Equal("Joan\n", Run("<do>$cache->set('map', { name: 'Joan', tags: ['a'] })</do><echo>{ $cache->get('map').name }</echo>"));
     }
 
     [Fact]
@@ -78,7 +79,7 @@ public sealed class CacheTests : StorageFixture
     [InlineData("' 45 '", 45)]
     public void TimeLimitsTakeSecondsOrUnits(string ttl, double seconds)
     {
-        Run($"<do>$cache->put('x', 1, ttl: {ttl})</do>");
+        Run($"<do>$cache->set('x', 1, ttl: {ttl})</do>");
         Later(seconds - 0.25);
         Assert.Equal("true\n", Run("<echo>{ $cache->has('x') }</echo>"));
         Later(0.5);
@@ -88,10 +89,10 @@ public sealed class CacheTests : StorageFixture
     [Theory]
     [InlineData("0", "more than 0 seconds")]
     [InlineData("-5", "more than 0 seconds")]
-    [InlineData("'soon'", "isn't a time limit")]
+    [InlineData("'soon'", "should be a length of time")]
     [InlineData("'0s'", "more than 0 seconds")]
     public void BadTimeLimitsAreExplained(string ttl, string message) =>
-        Assert.Contains(message, Assert.Throws<KScriptException>(() => Run($"<do>$cache->put('x', 1, ttl: {ttl})</do>")).Message);
+        Assert.Contains(message, Assert.Throws<KScriptException>(() => Run($"<do>$cache->set('x', 1, ttl: {ttl})</do>")).Message);
 
     [Fact]
     public void SecondsHandlesEveryKindOfValue()
@@ -108,18 +109,18 @@ public sealed class CacheTests : StorageFixture
     {
         string app = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(ScriptFile));
         Assert.Equal("file default\n", Run("<let name=\"c\" value=\"@cache(file)\" /><echo>{ $c.kind } { $c.name }</echo>"));
-        Assert.Equal("[1,2] true\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->put('today', [1, 2], ttl: '1h')->to_json() } { $c->has('today') }</echo>"));
+        Assert.Equal("[1,2] true\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->set('today', [1, 2], ttl: 1h)->to_json() } { $c->has('today') }</echo>"));
         string folder = Path.Combine(AppFolder(app, "cache"), "kscript-cache", "weather");
         Assert.Single(Directory.GetFiles(folder, "*.json"));
 
-        Assert.Equal("1, 2 3600 today\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->get('today') } { $c->ttl('today') } { $c->keys() }</echo>"));
-        Assert.Equal("true false false\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->forget('today') } { $c->forget('today') } { $c->has('today') }</echo>"));
+        Assert.Equal("1, 2 1h today\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->get('today') } { $c->ttl('today') } { $c->keys() }</echo>"));
+        Assert.Equal("true false false\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->remove('today') } { $c->remove('today') } { $c->has('today') }</echo>"));
 
-        Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><do>$c->put('a', 1, ttl: 10); $c->put('b', 2)</do>");
+        Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><do>$c->set('a', 1, ttl: 10); $c->set('b', 2)</do>");
         Later(11);
         Assert.Equal("b 1\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->keys() } { $c->get('a') ?? 1 }</echo>"));
         Assert.Single(Directory.GetFiles(folder, "*.json"));
-        Assert.Equal("1 0\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->flush() } { $c->flush() } { $c->keys() }</echo>"));
+        Assert.Equal("1 0\n", Run("<let name=\"c\" value=\"@cache(file, name: 'weather')\" /><echo>{ $c->clear() } { $c->clear() } { $c->keys() }</echo>"));
     }
 
     [Fact]

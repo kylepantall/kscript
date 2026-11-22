@@ -233,12 +233,12 @@ Line two""
     Quote(by: ""Someone"") ""A quotation.
 
 Two paragraphs.""
-    Table(caption: ""Data from maps."", id: tab-data, data: $rows, columns: { Name: 'name', Score: 'score', City: 'team.city', Missing: 'nope' })
-    Table(data: [[1, 2], [3, 4]], header: no, rules: grid, widths: [2, 1], size: 0.9)
-    Table(data: $rows, columns: ['name', 'score'], rules: none, align: ""l | c"")
-    Table(data: [['a', 'b'], ['c', 'd']])
-    Table(data: [5, 6])
-    Table(caption: ""Hand made."", align: ""lcr"") {
+    Table(caption: ""Data from maps."", id: tab-data, rows: $rows, columns: { Name: 'name', Score: 'score', City: 'team.city', Missing: 'nope' })
+    Table(rows: [[1, 2], [3, 4]], header: false, rules: grid, widths: [2, 1], size: 0.9)
+    Table(rows: $rows, columns: ['name', 'score'], rules: none, align: ['left', 'center'])
+    Table(rows: [['a', 'b'], ['c', 'd']])
+    Table(rows: [5, 6])
+    Table(caption: ""Hand made."", align: ['left', 'center', 'right']) {
       Tr(header: yes) ""A | B | C""
       Tr ""1 \| one | 2 | 3""
       Tr ""wide cell that keeps going and going and going and going and going and going | x | y""
@@ -438,9 +438,9 @@ KScript.Document(title: ""Values"", to: [""{ $name }.docx""]) {
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  Bibliography(src: \"none.bib\")\n}", "no BibTeX file")]
     [InlineData("s = 'stars'\nKScript.Document(to: \"a.pdf\") {\n  List(style: \"{ $s }\") {\n  }\n}", "should be bullet")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  List {\n    List {\n    }\n  }\n}", "after the Item")]
-    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Table(align: \"lx\")\n}", "isn't a column alignment")]
-    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Table(data: 5)\n}", "list of rows")]
-    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Table(data: [], columns: 5)\n}", "columns:")]
+    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Table(align: ['left', 'x'])\n}", "isn't a column alignment")]
+    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Table(rows: 5)\n}", "list of rows")]
+    [InlineData("KScript.Document(to: \"a.pdf\") {\n  Table(rows: [], columns: 5)\n}", "columns should be a list of keys")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  Table(rules: double)\n}", "rules")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  VSpace(height: tall)\n}", "tall")]
     [InlineData("KScript.Document(to: \"a.pdf\") {\n  Invoice(items: 5)\n}", "items:")]
@@ -485,7 +485,7 @@ KScript.Document(title: ""Values"", to: [""{ $name }.docx""]) {
             sb.Append("  }\n");
         }
         sb.Append("  Code \"").Append(string.Join("\n", Enumerable.Range(0, 120).Select(i => "line " + i + " " + new string('x', i % 140)))).Append("\"\n");
-        sb.Append("  Table(caption: \"Tall.\", data: [").Append(string.Join(", ", Enumerable.Range(0, 90).Select(i => $"{{ n: {i}, word: 'word {i}' }}"))).Append("])\n");
+        sb.Append("  Table(caption: \"Tall.\", rows: [").Append(string.Join(", ", Enumerable.Range(0, 90).Select(i => $"{{ n: {i}, word: 'word {i}' }}"))).Append("])\n");
         sb.Append("  Paragraph \"").Append("https://example.org/" + new string('a', 400)).Append("\"\n");
         sb.Append("}\necho $doc->pages()\n");
         int pages = int.Parse(Run(sb.ToString()).Trim(), CultureInfo.InvariantCulture);

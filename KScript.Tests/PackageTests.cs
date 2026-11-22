@@ -190,7 +190,7 @@ public class PackageTests
                   <do>@write_json('out/data.json', value: { n: 1 })</do>
                   <echo>{ @read_lines('out/a.txt')->count() } { @read_json('out/data.json').n }</echo>
                   <for each="f" in="@files('out', pattern: '*.txt')">
-                    <echo>{ $f->name() } { $f->extension() } { $f->size() gt 0 }</echo>
+                    <echo>{ $f.name } { $f.extension } { $f.size gt 0 }</echo>
                   </for>
                   <mkdir path="'moved'" />
                   <move from="'out/a.txt'" to="'moved'" />

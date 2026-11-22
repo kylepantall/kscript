@@ -110,8 +110,8 @@ public class UIDesktopCoverageTests
           <Row align="end"><Text>c</Text></Row>
           <Row align="stretch"><Text>d</Text></Row>
           <Row><Text>e</Text></Row>
-          <Timer every="10" when="$timing" on-tick="ticks += 1" />
-          <if test="$narrow"><Timer every="10" on-tick="ticks += 0" /></if>
+          <Timer every="10ms" when="$timing" on-tick="ticks += 1" />
+          <if test="$narrow"><Timer every="10ms" on-tick="ticks += 0" /></if>
         </KScript.Window>
         """;
 
@@ -207,8 +207,8 @@ public class UIDesktopCoverageTests
             <KScript.Window title="Ticks">
               <let name="n" value="0" />
               <Text>{ $n }</Text>
-              <Timer every="15" on-tick="n += 1" />
-              <Timer every="15" when="$n ge 3" on-tick="@close_window()" />
+              <Timer every="15ms" on-tick="n += 1" />
+              <Timer every="15ms" when="$n ge 3" on-tick="@close_window()" />
             </KScript.Window>
             <echo>closed</echo>
             </kscript>

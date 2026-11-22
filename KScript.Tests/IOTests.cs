@@ -32,10 +32,10 @@ public sealed class IOTests : IDisposable
         File.WriteAllText(P("notes.txt"), "one\ntwo");
         string output = Run(
             "<let name=\"f\" value=\"@file('notes.txt')\" />" +
-            "<echo>{ $f.name } { $f.extension } { $f.nothing ?? 'n' } { $f.path == $f->path() } { $f->name() } { $f->stem() } { $f->extension() }</echo>" +
-            "<echo>{ $f->exists() } { $f->is_file() } { $f->is_folder() } { $f->size() } { $f->read_text()->length() } { $f->read_lines()->count() }</echo>" +
-            "<echo>{ $f->modified() != null } { $f->created() != null } { $f->directory()->is_folder() } { $f->to_string() == $f.path } { $f == @file('notes.txt') }</echo>" +
-            "<echo>{ $f->directory()->join('a', 'b.txt')->relative_to($f->directory()) } { @file('none.txt')->size() } { @file('none.txt')->exists() }</echo>");
+            "<echo>{ $f.name } { $f.extension } { $f.nothing ?? 'n' } { $f.path == $f.path } { $f.name } { $f.stem } { $f.extension }</echo>" +
+            "<echo>{ $f.exists } { $f.is_file } { $f.is_folder } { $f.size } { $f->read_text()->length() } { $f->read_lines()->count() }</echo>" +
+            "<echo>{ $f.modified != null } { $f.created != null } { $f.directory.is_folder } { $f->to_string() == $f.path } { $f == @file('notes.txt') }</echo>" +
+            "<echo>{ $f.directory->join('a', 'b.txt')->relative_to($f.directory) } { @file('none.txt').size } { @file('none.txt').exists }</echo>");
         string sep = Path.DirectorySeparatorChar.ToString();
         Assert.Equal($"notes.txt txt n true notes.txt notes txt\ntrue true false 7 7 2\ntrue true true true true\na{sep}b.txt 0 false\n", output);
         Assert.Contains("nope", Fails("<do>@file('notes.txt')->nope()</do>").Message);

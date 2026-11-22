@@ -196,7 +196,7 @@ public class WebCoverageTests
             ("_layout.html", "<main>\n  <slot />\n</main>"),
             ("api.html", "<respond type=\"text/plain\" header-x-kind=\"demo\">ok</respond>"),
             ("form.html", "<live id=\"f\"><state name=\"on\" value=\"true\" /><state name=\"note\" value=\"'hi'\" /><input type=\"checkbox\" bind=\"on\" /><textarea bind=\"note\"></textarea><span hidden>x</span></live>"),
-            ("tick.html", "<live id=\"t\"><state name=\"n\" value=\"0\" /><span on-tick=\"n += 1\" every=\"{ 5 }\">{$n}</span></live>"));
+            ("tick.html", "<live id=\"t\"><state name=\"n\" value=\"0\" /><span on-tick=\"n += 1\" every=\"{ 5ms }\">{$n}</span></live>"));
 
         Assert.Equal("<div>\n<b>Ann</b></div>", site.Render("index.html").Body);
         Assert.Equal("<main>\n</main>", site.Render("empty.html").Body);

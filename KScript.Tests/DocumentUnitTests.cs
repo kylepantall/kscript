@@ -231,7 +231,7 @@ public sealed class DocumentStyleTests
         foreach (var (name, value, message) in new[]
         {
             ("font", "comic", "isn't a font"), ("align", "up", "align"), ("rules", "double", "rules"), ("citations", "harvard", "citation style"),
-            ("numbered", "maybe", "yes or no"), ("line-height", "-1", "positive number"), ("paper", "10cm x tall", "paper size"), ("paper", "1 x 2 x 3", "paper size"),
+            ("numbered", "maybe", "true or false"), ("line-height", "-1", "positive number"), ("paper", "10cm x tall", "paper size"), ("paper", "1 x 2 x 3", "paper size"),
             ("margin", "-1cm", "isn't a length"), ("accent", "blurple", "colour"), ("nosuch", "x", "nosuch"),
         })
         {

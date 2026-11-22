@@ -820,7 +820,7 @@ public sealed class DataTransactionTests : DataFixture
         string[] lines = Lines(Accounts + """
             transaction {
               $Account->where(id: 1)->decrement(balance, by: 10)
-              echo $db->in_transaction()
+              echo $db.is_in_transaction
             }
             try {
               transaction {
@@ -830,7 +830,7 @@ public sealed class DataTransactionTests : DataFixture
             } catch Conflict {
               echo 'undone'
             }
-            echo $db->in_transaction()
+            echo $db.is_in_transaction
             echo $Account->find(1).balance
             """);
         Assert.Equal(new[] { "true", "undone", "false", "90" }, lines);

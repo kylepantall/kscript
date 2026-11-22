@@ -199,7 +199,7 @@ public class HttpCachingTests
         Assert.Contains("cache_control needs directives", Send(new HttpApp(noDirectives.Root), "GET", "/x").Body);
 
         using var badTtl = Site("<KScript.Routes><Get path=\"/x\" middleware=\"cache_response:later\"><return value=\"1\" /></Get></KScript.Routes>");
-        Assert.Contains("t a time limit", Send(new HttpApp(badTtl.Root), "GET", "/x").Body);
+        Assert.Contains("should be a length of time", Send(new HttpApp(badTtl.Root), "GET", "/x").Body);
     }
 
     [Fact]

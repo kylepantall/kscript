@@ -50,7 +50,7 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("enum Color { red, green }\nc: Color = red\necho $c")]
-        [InlineData("h: handle = @Joan\necho $h->name()")]
+        [InlineData("h: handle = @Joan\necho $h.name")]
         [InlineData("type Size {\n  pattern: /^(?<w>\\d+)x(?<h>\\d+)$/\n  w: int\n  h: int\n}\ns: Size = 3x4\necho $s.w")]
         [InlineData("type Slug with [string] { pattern: /^[a-z]+$/; normalize: $value->lower() }\ns: Slug = A1\necho $s")]
         [InlineData("type Slug with [string] { pattern: /^[a-z]+$/ }\ns: Slug = 3\necho $s")]
@@ -60,10 +60,10 @@ namespace KScript.Language.Tests
         [InlineData("type Age with [int] { min: 0 }\na: Age = 'x'\necho $a")]
         [InlineData("type Age with [int] { min: 0 }\nfn f(a: Age = 5) => $a\necho @f()")]
         [InlineData("type Who with [handle] {}\nfn f(h: Who = @me) => $h\necho @f()")]
-        [InlineData("fn who(h: handle) => $h->name()\necho @who(@Sam)\necho @who(h: @Ann)")]
+        [InlineData("fn who(h: handle) => $h.name\necho @who(@Sam)\necho @who(h: @Ann)")]
         [InlineData("h: handle = @a\nok = $h == @a\nno = @b != $h\necho \"$ok $no\"")]
-        [InlineData("u: uuid = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\necho $u->version()")]
-        [InlineData("e = joan@example.com\necho $e->domain()\necho $e->upper()")]
+        [InlineData("u: uuid = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\necho $u.version")]
+        [InlineData("e = joan@example.com\necho $e.domain\necho $e->upper()")]
         [InlineData("r = /ab+/i\necho $r->test('abb')")]
         [InlineData("type User { name: string; fn hi(to: string = 'you') => 'hi ' + $to }\nu = $User->from({ name: 'x' })\necho $u->hi()\necho $u->hi('me')\necho $u->hi(to: 'me')")]
         [InlineData("type Slug with [string] { pattern: 'a+' }\ns: Slug = aa\necho $s")]
@@ -76,7 +76,7 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("x = @nobody", "KS5001")]
-        [InlineData("fn who(h: handle, n: int) => $h->name()\necho @who(@Sam, @nobody)", "KS5001")]
+        [InlineData("fn who(h: handle, n: int) => $h.name\necho @who(@Sam, @nobody)", "KS5001")]
         [InlineData("type User { name: string; fn hi() => 'hi' }\nu = $User->from({ name: 'x' })\necho $u->nope()", "KS5003")]
         [InlineData("type User { name: string; fn hi() => 'hi' }\nu = $User->from({ name: 'x' })\necho $u->hi(1, 2)", "KS5004")]
         [InlineData("type User { name: string; fn hi(a: int) => 'hi' }\nu = $User->from({ name: 'x' })\necho $u->hi(b: 1)", null)]
@@ -114,7 +114,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("type Username with [handle] {\n  max: 16\n  not: [@admin, @root]\n  validate: not $value->name()->starts_with('_'), 'A username cannot start with _'\n}")]
+        [InlineData("type Username with [handle] {\n  max: 16\n  not: [@admin, @root]\n  validate: not $value.name->starts_with('_'), 'A username cannot start with _'\n}")]
         [InlineData("type Age with [int] { min: 0; max: 150 }")]
         [InlineData("type Admin with [User, Auditable] {\n  level: int = 1\n  fn up(by: int = 1) => $level + $by\n}")]
         [InlineData("type Slug with [string] {\n  pattern: /^[a-z0-9]+(-[a-z0-9]+)*$/\n  normalize: $value->trim()->lower()\n}")]
