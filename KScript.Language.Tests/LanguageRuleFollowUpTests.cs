@@ -54,6 +54,44 @@ namespace KScript.Language.Tests
             TestHelpers.AssertClean(Code("import KScript.Queue\nimport \"jobs/send-welcome.kscript\"\n\nqueue = @fake_queue()\necho $queue->count_of(SendWelcome)\n", files));
         }
 
+        private static List<string> Completions(string textWithCaret, string file)
+        {
+            var service = new LanguageService(files: EmptyFileSystem.Instance);
+            (string text, int offset) = TestHelpers.WithCaret(textWithCaret);
+            return service.GetCompletions(service.Analyze(text, Path.Combine(Folder, file)), offset).Select(i => i.Label).ToList();
+        }
+
+        [Fact]
+        public void ABooleanArgumentIsOfferedTrueAndFalse()
+        {
+            Assert.Equal(new[] { "true", "false" }, Completions("import KScript.Documents\n\nDocument(to: 'a.pdf') {\n  Section(title: 'One', numbered: ‸) {\n  }\n}\n", "app.kscript"));
+            Assert.Equal(new[] { "true", "false" }, Completions("<kscript><let name=\"x\" value=\"1\" const=\"‸\" /></kscript>", "app.ks.xml"));
+            // The flag on its own is the argument's name.
+            Assert.Contains("numbered", Completions("import KScript.Documents\n\nDocument(to: 'a.pdf') {\n  Section(title: 'One', ‸) {\n  }\n}\n", "app.kscript"));
+        }
+
+        [Theory]
+        [InlineData("<kscript><wait duration=\"2\" /></kscript>", "<kscript><wait duration=\"2s\" /></kscript>")]
+        [InlineData("<kscript><wait duration=\"'500ms'\" /></kscript>", "<kscript><wait duration=\"500ms\" /></kscript>")]
+        [InlineData("<kscript><import package=\"KScript.Cache\" /><do>$cache->set('a', 1, ttl: 90)</do></kscript>", "<kscript><import package=\"KScript.Cache\" /><do>$cache->set('a', 1, ttl: 90s)</do></kscript>")]
+        [InlineData("<kscript><import package=\"KScript.Cache\" /><do>$cache->set('a', 1, ttl: '10m')</do></kscript>", "<kscript><import package=\"KScript.Cache\" /><do>$cache->set('a', 1, ttl: 10m)</do></kscript>")]
+        public void ALengthOfTimeHasItsUnitInXmlToo(string xml, string fixedXml)
+        {
+            DocumentAnalysis a = Code(xml, file: "app.ks.xml");
+            Diagnostic d = Assert.Single(a.Diagnostics, x => x.Code == DiagnosticCodes.DurationUnit);
+            Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+            Assert.Contains("with its unit and no quotes", d.Message);
+            Assert.Equal(fixedXml, Apply(xml, d.Fixes[0]));
+            Assert.Equal(fixedXml, Fixer.Apply(xml, Path.Combine(Folder, "app.ks.xml")).Text);
+            Assert.DoesNotContain(Code(fixedXml, file: "app.ks.xml").Diagnostics, x => x.Code == DiagnosticCodes.DurationUnit || x.Severity == DiagnosticSeverity.Error);
+        }
+
+        [Fact]
+        public void ADurationWithItsUnitIsLeftAloneInXml()
+        {
+            Assert.DoesNotContain(Code("<kscript><wait duration=\"1m30s\" /><let name=\"n\" value=\"2s\" /><wait duration=\"$n\" /></kscript>", file: "app.ks.xml").Diagnostics, x => x.Code == DiagnosticCodes.DurationUnit);
+        }
+
         private static List<string> Names(DocumentAnalysis a) =>
             a.Diagnostics.Where(d => d.Code == DiagnosticCodes.NamingStyle).OrderBy(d => d.Span.Start).Select(d => d.Message.Substring(0, d.Message.IndexOf(':'))).ToList();
 

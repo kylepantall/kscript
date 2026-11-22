@@ -80,7 +80,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void SettingValuesSuggestYesNoAndTheModelsFields()
         {
-            Assert.Equal(new[] { "yes", "no" }, Labels(Model("  timestamps: ‸\n  title: string")));
+            Assert.Equal(new[] { "true", "false" }, Labels(Model("  timestamps: ‸\n  title: string")));
             Assert.Empty(Labels(Model("  timestamps: yes ‸\n  title: string")));
             Assert.Equal(new[] { "title", "body", "id", "created_at", "updated_at", "deleted_at" },
                 Labels(Model("  timestamps: yes\n  soft_deletes: yes\n  hidden: [‸]\n  title: string\n  body?: string")));

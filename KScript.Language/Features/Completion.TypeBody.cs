@@ -183,7 +183,7 @@ namespace KScript.Language.Features
             SortText = "2fn",
         };
 
-        /// <summary>After <c>timestamps: </c>, yes and no; after <c>hidden: [</c> and the other field lists, the model's fields.</summary>
+        /// <summary>After <c>timestamps: </c>, true and false; after <c>hidden: [</c> and the other field lists, the model's fields.</summary>
         private List<CompletionItem> ModelSettingValueCompletions(MarkupElement model, string setting, string valueBefore, int offset)
         {
             int wordLength = 0;
@@ -196,7 +196,7 @@ namespace KScript.Language.Features
             if (a?.Kind == AttributeKind.Bool)
             {
                 return wordLength == valueBefore.Length
-                    ? new[] { "yes", "no" }.Select(v => new CompletionItem { Label = v, Kind = CompletionKind.Value, Detail = setting, ReplaceSpan = replace, SortText = v == "yes" ? "0" : "1" }).ToList()
+                    ? new[] { "true", "false" }.Select(v => new CompletionItem { Label = v, Kind = CompletionKind.Value, Detail = setting, ReplaceSpan = replace, SortText = v == "true" ? "0" : "1" }).ToList()
                     : new List<CompletionItem>();
             }
             if (!FieldListSettings.Contains(setting))
