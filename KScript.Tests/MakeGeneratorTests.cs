@@ -336,7 +336,7 @@ public sealed class MakeGeneratorTests : IDisposable
             ann = @people.save({ name: 'Ann' })
             @people.save({ name: 'Bob' })
             @people.save($ann->set('name', 'Annie'))
-            echo "{ @people.all()->map(fn($p) => $p.name)->join(',') } { @people.find(2).name }"
+            echo "{ @people.all()->map(fn(p) => $p.name)->join(',') } { @people.find(2).name }"
             @people.remove(1)
             echo "{ @people.all()->count() }"
             first = @cache.remember('x', fn() => 42)

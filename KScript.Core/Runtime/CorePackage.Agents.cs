@@ -15,7 +15,7 @@ namespace KScript.Runtime
                 ("list->append", new AgentNotes(pitfall: "Returns a new list and leaves the old one alone: write items = $items->append($x).")),
                 ("map->set", new AgentNotes(pitfall: "Returns a new map: write person = $person->set('age', 3).")),
                 ("list->each", new AgentNotes(prefer: "for item in $list { } for statements; ->each(fn) only calls fn and returns the list.")),
-                ("list->sort", new AgentNotes(pitfall: "fn($a, $b) returns a number (negative, 0, positive), not a bool.", prefer: "->sort_by(fn($p) => $p.age) to sort by a key.")),
+                ("list->sort", new AgentNotes(pitfall: "fn(a, b) returns a number (negative, 0, positive), not a bool.", prefer: "->sort_by(fn(p) => $p.age) to sort by a key.")),
                 ("list->length", new AgentNotes(prefer: "->length() or ->count(); there is no .length property or len().")),
                 ("string->length", new AgentNotes(prefer: "->length(); there is no .length property or len().")),
                 ("string->replace", new AgentNotes(pitfall: "Replaces every match, as plain text. Use ->replace_pattern for a regular expression.")),

@@ -150,11 +150,11 @@ namespace KScript.Language.Tests
         [Fact]
         public void MultiLineAttributeValuesAreNotTouched()
         {
-            string input = "<kscript>\n<let name=\"names\" value=\"$people\n      |> map(fn($p) => $p.name)\n      |> join(', ')\" />\n</kscript>\n";
+            string input = "<kscript>\n<let name=\"names\" value=\"$people\n      |> map(fn(p) => $p.name)\n      |> join(', ')\" />\n</kscript>\n";
             Assert.Equal(Lines(
                 "<kscript>",
                 "  <let name=\"names\" value=\"$people",
-                "      |> map(fn($p) => $p.name)",
+                "      |> map(fn(p) => $p.name)",
                 "      |> join(', ')\" />",
                 "</kscript>"), Fmt(input));
         }

@@ -24,7 +24,7 @@ namespace KScript.Docs
             [KType.List] = "Lists such as `[1, 2, 3]`. Methods that change a list return a new one.",
             [KType.Map] = "Maps such as `{ name: 'Joan', age: 82 }`.",
             [KType.Date] = "Dates and times, from `@now()`, `@date('2026-11-19')` or `->to_date()`.",
-            [KType.Fn] = "Functions: lambdas `fn($x) => $x * 2` and `<fn>` functions.",
+            [KType.Fn] = "Functions: lambdas `fn(x) => $x * 2` and `<fn>` functions.",
             [KType.Any] = "Methods every value has.",
             [KType.Type] = "A `<type>` declared by a script, such as `$Repo`.",
             [KType.File] = "File values, from `@file()`, `@files()` and `@folders()`.",
@@ -62,7 +62,8 @@ namespace KScript.Docs
             ["field"] = "name: type",
             ["for"] = "for item in list",
             ["catch"] = "catch err",
-            ["case"] = "case value",
+            ["case"] = "value => …",
+            ["default"] = "_ => …",
         };
 
         /// <summary>How an element is written in a .kscript file: <c>break</c>, <c>name = value</c>, <c>KScript.Window</c>.</summary>

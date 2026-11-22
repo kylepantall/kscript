@@ -78,15 +78,15 @@ public class PageExpressionTests
     public void Lists_maps_lambdas_and_pipes()
     {
         var people = Values.ParseJson("[{\"name\":\"Joan\",\"age\":82},{\"name\":\"Ellie\",\"age\":12},{\"name\":\"Simon\",\"age\":42}]");
-        Assert.Equal("Simon, Joan", Eval("$people->filter(fn($p) => $p.age ge 18)->sort_by(fn($p) => $p.age)->map(fn($p) => $p.name)->join(', ')", ("people", people)));
-        Assert.Equal("Joan", Eval("($people |> max_by(fn($p) => $p.age)).name", ("people", people)));
+        Assert.Equal("Simon, Joan", Eval("$people->filter(fn(p) => $p.age ge 18)->sort_by(fn(p) => $p.age)->map(fn(p) => $p.name)->join(', ')", ("people", people)));
+        Assert.Equal("Joan", Eval("($people |> max_by(fn(p) => $p.age)).name", ("people", people)));
         Assert.Equal(3d, Eval("$people |> count()", ("people", people)));
-        Assert.Equal(136d, Eval("$people->sum(fn($p) => $p.age)", ("people", people)));
+        Assert.Equal(136d, Eval("$people->sum(fn(p) => $p.age)", ("people", people)));
         Assert.Equal("Ellie", Eval("$people[1].name", ("people", people)));
         Assert.Equal("Simon", Eval("$people[-1]['name']", ("people", people)));
         Assert.Equal(2d, Eval("{ a: 1, b: { c: 2 } }.b.c"));
-        Assert.Equal("HELLO", Eval("'hello' |> fn($s) => $s->upper()"));
-        Assert.Equal(8d, Eval("@double(4)", ("double", Eval("fn($x) => $x * 2"))));
+        Assert.Equal("HELLO", Eval("'hello' |> fn(s) => $s->upper()"));
+        Assert.Equal(8d, Eval("@double(4)", ("double", Eval("fn(x) => $x * 2"))));
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public class PageExpressionTests
     {
         var scope = new Scope();
         var ctx = new PageContext(Path.GetTempPath());
-        scope.Declare("f", PageEvaluator.Evaluate("fn($n) => @f($n + 1)", scope, ctx));
+        scope.Declare("f", PageEvaluator.Evaluate("fn(n) => @f($n + 1)", scope, ctx));
         var ex = Assert.Throws<PageException>(() => PageEvaluator.Evaluate("@f(0)", scope, ctx));
         Assert.Contains("recursion", ex.Message);
     }
@@ -477,7 +477,7 @@ public class PageLiveTests
     {
         const string page = "<live id=\"t\"><state name=\"items\" value=\"['a', 'b', 'c']\" /><state name=\"draft\" value=\"''\" />" +
                             "<input bind=\"draft\"><button on-click=\"items = $items->push($draft); draft = ''\">add</button>" +
-                            "<for each=\"x\" in=\"$items\"><i on-click=\"items = $items->reject(fn($i) => $i == $x)\">{$x}</i></for></live>";
+                            "<for each=\"x\" in=\"$items\"><i on-click=\"items = $items->reject(fn(i) => $i == $x)\">{$x}</i></for></live>";
         using var site = new TempSite(("index.html", page));
         string html = site.Render("index.html").Body;
         Assert.Contains("data-ks-bind=\"draft\" value=\"\" name=\"draft\"", html);
@@ -578,7 +578,7 @@ public class PageRuntimeTests
     [Fact]
     public void Files_are_read_from_the_site_folder()
     {
-        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', pattern: '*.md')->map(fn($f) => $f->name())->join(', ') } { @exists('posts/a.md') }"));
+        using var site = new TempSite(("posts/a.md", "# A"), ("posts/b.md", "# B"), ("posts/index.html", "{ @files('posts', pattern: '*.md')->map(fn(f) => $f->name())->join(', ') } { @exists('posts/a.md') }"));
         Assert.Equal("a.md, b.md true", site.Render("posts/index.html").Body);
     }
 

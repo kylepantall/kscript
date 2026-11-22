@@ -354,7 +354,8 @@ namespace KScript.Syntax.Markup
                             break;
                     }
                 }
-                Result.Text = sb.ToString().TrimEnd('\n') + "\n";
+                // XML's own spellings (lt, gt, eq...) are written the .kscript way.
+                Result.Text = CodeSpellings.Normalize(sb.ToString().TrimEnd('\n') + "\n");
             }
 
             private static string Pad(int indent) => new string(' ', indent * 2);
@@ -601,10 +602,7 @@ namespace KScript.Syntax.Markup
                                 }
                                 else if (node is MarkupElement branch)
                                 {
-                                    string head = branch.Name == "default" ? "default"
-                                        : branch.GetAttribute("when") != null ? "when " + branch.GetAttributeValue("when").Trim()
-                                        : "case " + branch.GetAttributeValue("is")?.Trim();
-                                    WriteBlock(head, branch, indent + 1, chained: false);
+                                    WriteArm(branch, indent + 1);
                                 }
                             }
                             Line(indent, "}");
@@ -1034,6 +1032,34 @@ namespace KScript.Syntax.Markup
                     scopes.Pop();
                 }
                 Line(indent, "}");
+            }
+
+            /// <summary>
+            /// A &lt;case&gt; or &lt;default&gt; as a match arm: <c>1, 2 =&gt; { }</c>, <c>_ when $n &gt; 9 =&gt; { }</c>,
+            /// <c>_ =&gt; { }</c>. An arm that holds one short statement is written on its line: <c>1 =&gt; echo "one"</c>.
+            /// </summary>
+            private void WriteArm(MarkupElement branch, int indent)
+            {
+                string values = branch.Name == "default" ? null : branch.GetAttributeValue("is")?.Trim();
+                string test = branch.Name == "default" ? null : branch.GetAttributeValue("when")?.Trim();
+                string head = (string.IsNullOrEmpty(values) ? "_" : values) + (string.IsNullOrEmpty(test) ? string.Empty : " when " + test) + " =>";
+
+                List<MarkupNode> body = branch.Children.Where(c => !(c is MarkupText t && t.IsWhitespace)).ToList();
+                if (body.Count == 1 && body[0] is MarkupElement)
+                {
+                    int mark = sb.Length;
+                    scopes.Push();
+                    WriteBody(branch.Children, indent);
+                    scopes.Pop();
+                    string statement = sb.ToString(mark, sb.Length - mark).Trim('\n');
+                    sb.Length = mark;
+                    if (statement.IndexOf('\n') < 0 && statement.IndexOf(',') < 0 && statement.IndexOf("//", StringComparison.Ordinal) < 0)
+                    {
+                        Line(indent, head + " " + statement.Trim());
+                        return;
+                    }
+                }
+                WriteBlock(head, branch, indent, chained: false);
             }
 
             /// <summary>The names in a catch's type: <c>NotFound, Conflict</c>, <c>NotFound | Conflict</c> or <c>[IO, Network]</c>.</summary>

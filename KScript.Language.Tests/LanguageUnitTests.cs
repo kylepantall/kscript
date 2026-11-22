@@ -87,7 +87,7 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("{ a: 'x' }['a']", "string")]
         [InlineData("'abc'[0]", "any")]
-        [InlineData("1 |> fn($x) => $x", "any")]
+        [InlineData("1 |> fn(x) => $x", "any")]
         [InlineData("[1] + [2]", "list<number>")]
         public void Expressions_have_types(string expression, string type)
         {

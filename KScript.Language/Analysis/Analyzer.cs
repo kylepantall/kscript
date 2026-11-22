@@ -53,6 +53,7 @@ namespace KScript.Language.Analysis
             DocumentKind documentKind = kind ?? MarkupParser.KindFromPath(path);
             Analyzer analyzer = RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog));
             analyzer.ReportDeferred();
+            analyzer.CheckSpellings();
             analyzer.CheckUnused(projectWide);
             analyzer.SpeakCode();
             return analyzer.result;
@@ -1289,7 +1290,7 @@ namespace KScript.Language.Analysis
                 Symbol declared = DeclareFromAttribute(e, "name", scope, e.Span.End, isConst ? SymbolKind.Constant : SymbolKind.Variable, shape);
                 if (declared != null && region?.Parse?.Root is LambdaNode lambda)
                 {
-                    declared.Description = "fn(" + string.Join(", ", lambda.Parameters.Select(p => "$" + p.Name)) + ")";
+                    declared.Description = "fn(" + string.Join(", ", lambda.Parameters.Select(p => p.Name)) + ")";
                 }
                 if (declared != null && e.Documentation is string doc)
                 {

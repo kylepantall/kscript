@@ -77,7 +77,7 @@ namespace KScript.Runtime
                 (t, c) => Safe(t, () => R(t).Match(c.Str(0)) is { Success: true } m ? RegexValue.MatchMap(R(t), m) : null));
             p.Method(rx, "match_all", "text: string", "Every match, as { text, index, groups, captures } maps.", KType.List,
                 (t, c) => Safe(t, () => R(t).Matches(c.Str(0)).Select(m => (object)RegexValue.MatchMap(R(t), m)).ToList()));
-            p.Method(rx, "replace", "text: string, with", "The text with every match replaced. with is text, where $1 and ${name} are groups, or fn($match) returning text.", KType.String, (t, c) => Safe(t, () =>
+            p.Method(rx, "replace", "text: string, with", "The text with every match replaced. with is text, where $1 and ${name} are groups, or fn(match) returning text.", KType.String, (t, c) => Safe(t, () =>
                 c.Arg(1) is ICallable f
                     ? R(t).Replace(c.Str(0), m => Values.ToStr(c.Call(f, RegexValue.MatchMap(R(t), m))))
                     : R(t).Replace(c.Str(0), c.Str(1))));
@@ -115,10 +115,10 @@ namespace KScript.Runtime
                 if (i < 0) i += list.Count;
                 return i >= 0 && i < list.Count ? list[i] : null;
             });
-            p.Method(l, "filter", "fn", "The items for which fn($item, $index) is true.", l, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
+            p.Method(l, "filter", "fn", "The items for which fn(item, index) is true.", l, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
             p.Method(l, "where", "fn", "The items for which fn is true (the same as filter).", l, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
             p.Method(l, "reject", "fn", "The items for which fn is false.", l, (t, c) => L(t).Where((x, i) => !Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
-            p.Method(l, "map", "fn", "A new list with fn($item, $index) applied to each item.", l, (t, c) => L(t).Select((x, i) => Apply(c, c.Fn(0), x, i)).ToList());
+            p.Method(l, "map", "fn", "A new list with fn(item, index) applied to each item.", l, (t, c) => L(t).Select((x, i) => Apply(c, c.Fn(0), x, i)).ToList());
             p.Method(l, "find", "fn", "The first item for which fn is true, or null.", KType.Any, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).FirstOrDefault());
             p.Method(l, "find_index", "fn", "The index of the first item for which fn is true, or -1.", KType.Number, (t, c) =>
             {
@@ -135,13 +135,13 @@ namespace KScript.Runtime
                 for (int i = 0; i < list.Count; i++) Apply(c, c.Fn(0), list[i], i);
                 return list;
             });
-            p.Method(l, "reduce", "fn, initial?", "Combines the items: fn($total, $item), starting from initial.", KType.Any, (t, c) =>
+            p.Method(l, "reduce", "fn, initial?", "Combines the items: fn(total, item), starting from initial.", KType.Any, (t, c) =>
             {
                 object acc = c.Arg(1);
                 foreach (object item in L(t)) acc = c.Call(c.Fn(0), acc, item);
                 return acc;
             });
-            p.Method(l, "sort", "fn?", "A sorted copy; fn($a, $b) compares (negative, 0 or positive).", l, (t, c) =>
+            p.Method(l, "sort", "fn?", "A sorted copy; fn(a, b) compares (negative, 0 or positive).", l, (t, c) =>
             {
                 var copy = L(t).ToList();
                 if (c.Has(0))
@@ -151,14 +151,14 @@ namespace KScript.Runtime
                 }
                 return copy.OrderBy(x => x, Values.Comparer("sort")).ToList();
             });
-            p.Method(l, "sort_by", "fn, order?", "A copy sorted by fn($item); order 'desc' sorts largest first.", l, (t, c) =>
+            p.Method(l, "sort_by", "fn, order?", "A copy sorted by fn(item); order 'desc' sorts largest first.", l, (t, c) =>
             {
                 var keyed = L(t).Select(x => (x, k: c.Call(c.Fn(0), x))).ToList();
                 bool desc = c.Str(1, "asc").Equals("desc", StringComparison.OrdinalIgnoreCase);
                 return (desc ? keyed.OrderByDescending(e => e.k, Values.Comparer("sort_by")) : keyed.OrderBy(e => e.k, Values.Comparer("sort_by"))).Select(e => e.x).ToList();
             });
-            p.Method(l, "max_by", "fn", "The item with the largest fn($item).", KType.Any, (t, c) => ExtremeBy(t, c, max: true));
-            p.Method(l, "min_by", "fn", "The item with the smallest fn($item).", KType.Any, (t, c) => ExtremeBy(t, c, max: false));
+            p.Method(l, "max_by", "fn", "The item with the largest fn(item).", KType.Any, (t, c) => ExtremeBy(t, c, max: true));
+            p.Method(l, "min_by", "fn", "The item with the smallest fn(item).", KType.Any, (t, c) => ExtremeBy(t, c, max: false));
             p.Method(l, "max", "", "The largest item.", KType.Any, (t, c) => L(t).Count == 0 ? null : L(t).Aggregate((a, b) => Values.Compare(a, b, "max") >= 0 ? a : b));
             p.Method(l, "min", "", "The smallest item.", KType.Any, (t, c) => L(t).Count == 0 ? null : L(t).Aggregate((a, b) => Values.Compare(a, b, "min") <= 0 ? a : b));
             p.Method(l, "sum", "fn?", "The total of the items (or of fn for each item).", KType.Number, (t, c) =>
@@ -216,7 +216,7 @@ namespace KScript.Runtime
                 return L(t).Select((x, i) => (x, i)).GroupBy(e => e.i / size).Select(g => (object)g.Select(e => e.x).ToList()).ToList();
             });
             p.Method(l, "zip", "other", "Pairs of items from both lists: [[a1, b1], [a2, b2]...].", l, (t, c) => L(t).Zip(c.List(0), (a, b) => (object)new List<object> { a, b }).ToList());
-            p.Method(l, "to_map", "fn", "A map with fn($item) as each item's key.", KType.Map, (t, c) =>
+            p.Method(l, "to_map", "fn", "A map with fn(item) as each item's key.", KType.Map, (t, c) =>
             {
                 var map = new Dictionary<string, object>();
                 foreach (object item in L(t)) map[Values.ToStr(c.Call(c.Fn(0), item))] = item;
@@ -260,8 +260,8 @@ namespace KScript.Runtime
             p.Method(m, "count", "", "The number of keys.", KType.Number, (t, c) => (double)M(t).Count);
             p.Method(m, "length", "", "The number of keys.", KType.Number, (t, c) => (double)M(t).Count);
             p.Method(m, "is_empty", "", "yes if the map has no keys.", KType.Bool, (t, c) => M(t).Count == 0);
-            p.Method(m, "map", "fn", "A new map with fn($value, $key) applied to each value.", m, (t, c) => M(t).ToDictionary(kv => kv.Key, kv => c.Call(c.Fn(0), kv.Value, kv.Key)));
-            p.Method(m, "filter", "fn", "The entries for which fn($value, $key) is true.", m, (t, c) => M(t).Where(kv => Values.Truthy(c.Call(c.Fn(0), kv.Value, kv.Key))).ToDictionary(kv => kv.Key, kv => kv.Value));
+            p.Method(m, "map", "fn", "A new map with fn(value, key) applied to each value.", m, (t, c) => M(t).ToDictionary(kv => kv.Key, kv => c.Call(c.Fn(0), kv.Value, kv.Key)));
+            p.Method(m, "filter", "fn", "The entries for which fn(value, key) is true.", m, (t, c) => M(t).Where(kv => Values.Truthy(c.Call(c.Fn(0), kv.Value, kv.Key))).ToDictionary(kv => kv.Key, kv => kv.Value));
         }
 
         private static void RegisterNumberMethods(PackageBuilder p)
@@ -282,7 +282,7 @@ namespace KScript.Runtime
             p.Method(n, "decrement", "", "The number minus 1.", n, (t, c) => N(t) - 1);
             p.Method(n, "is_even", "", "yes if the number is even.", KType.Bool, (t, c) => N(t) % 2 == 0);
             p.Method(n, "is_odd", "", "yes if the number is odd.", KType.Bool, (t, c) => Math.Abs(N(t) % 2) == 1);
-            p.Method(n, "times", "fn", "Calls fn($i) for $i from 0 up to the number, and returns the results.", KType.List, (t, c) =>
+            p.Method(n, "times", "fn", "Calls fn(i) for i from 0 up to the number, and returns the results.", KType.List, (t, c) =>
                 Enumerable.Range(0, Math.Max(0, (int)N(t))).Select(i => c.Call(c.Fn(0), (double)i)).ToList());
         }
 

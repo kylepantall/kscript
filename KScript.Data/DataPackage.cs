@@ -46,7 +46,7 @@ namespace KScript.Data
                 new A("unique", K.Text, "Fields no two records may share: `[email]`, or `[email, [team_id, slug]]` for a pair that is unique together. Saving a clash fails with UniqueViolation."),
                 new A("index", K.Text, "Fields to index, so queries on them are fast: `[team_id, [team_id, created_at]]`."),
                 new A("hidden", K.Text, "Fields left out of JSON (and so out of route responses): `[password]`."),
-                new A("guarded", K.Text, "Fields ->create($form) and ->update($form) don't set, so a form can't change them: `[role]`. Set them on the record instead: `$user.role = 'admin'`."),
+                new A("guarded", K.Text, "Fields ->create($form) and ->update($form) don't set, so a form can't change them: `[role]`. Set them on the record instead: `user.role = 'admin'`."),
                 new A("extra", K.Enum, "Keys ->create() is given that the model doesn't have: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
                 new A("description", K.Text, "What the model is, shown on hover."),
             };
@@ -102,11 +102,11 @@ namespace KScript.Data
                     case Dictionary<string, object>:
                         break;
                     default:
-                        throw new KScriptException($"->{method}() takes conditions as a lambda, fn($u) => $u.age >= 18, or as names and values, role: admin, not {Values.Describe(a)}.", "Argument");
+                        throw new KScriptException($"->{method}() takes conditions as a lambda, fn(u) => $u.age >= 18, or as names and values, role: admin, not {Values.Describe(a)}.", "Argument");
                 }
             }
             if (c.Named.Count > 0) Add(q.Equalities(c.Named, method));
-            if (all == null) throw new KScriptException($"->{method}() needs a condition: a lambda, fn($u) => $u.active, or names and values, role: admin.", "Argument");
+            if (all == null) throw new KScriptException($"->{method}() needs a condition: a lambda, fn(u) => $u.active, or names and values, role: admin.", "Argument");
             return all;
         }
 
@@ -134,13 +134,13 @@ namespace KScript.Data
 
         private static readonly QueryMethod[] QueryMethods =
         {
-            new("where", "conditions...", "Keeps the rows that match: a lambda compiled to SQL, `fn($u) => $u.age >= 18 and $u.name->starts_with('J')`, or names and values, `role: admin, team_id: 3` (a list means any of them; null means none).", KType.Query,
+            new("where", "conditions...", "Keeps the rows that match: a lambda compiled to SQL, `fn(u) => $u.age >= 18 and $u.name->starts_with('J')`, or names and values, `role: admin, team_id: 3` (a list means any of them; null means none).", KType.Query,
                 (q, c) => q.And(Conditions(q, c, "where")), Bare: true),
             new("or_where", "conditions...", "Like ->where(), joined with or: rows that match the conditions so far, or these.", KType.Query,
                 (q, c) => q.Or(Conditions(q, c, "or_where")), Bare: true),
             new("where_not", "conditions...", "Leaves out the rows that match.", KType.Query,
                 (q, c) => q.And(new SqlUnary("NOT", Conditions(q, c, "where_not"))), Bare: true),
-            new("when", "test, then: fn, otherwise?: fn", "Changes the query only when the test is true: `->when($search != null, fn($q) => $q->where(fn($u) => $u.name->contains($search)))`.", KType.Query,
+            new("when", "test, then: fn, otherwise?: fn", "Changes the query only when the test is true: `->when($search != null, fn(q) => $q->where(fn(u) => $u.name->contains($search)))`.", KType.Query,
                 (q, c) =>
                 {
                     ICallable fn = Values.Truthy(c.Arg(0)) ? c.Fn(1) : c.Has(2) && c.Arg(2) != null ? c.Fn(2) : null;

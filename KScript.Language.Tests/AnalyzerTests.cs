@@ -36,10 +36,10 @@ namespace KScript.Language.Tests
         [InlineData("<let name=\"x\" value=\"$x + 1\" />", DiagnosticCodes.UndefinedVariable, "x", null)]
         [InlineData("<if test=\"true\"><let name=\"inner\" value=\"1\" /></if><echo>$inner</echo>", DiagnosticCodes.UndefinedVariable, "inner", null)]
         [InlineData("<for each=\"i\" in=\"0..3\"></for><echo>$i</echo>", DiagnosticCodes.UndefinedVariable, "i", null)]
-        [InlineData("<let name=\"f\" value=\"fn($a) => $a + $b\" />", DiagnosticCodes.UndefinedVariable, "b", null)]
-        [InlineData("<let name=\"f\" value=\"fn($a) => $a\" /><echo>$a</echo>", DiagnosticCodes.UndefinedVariable, "a", null)]
+        [InlineData("<let name=\"f\" value=\"fn(a) => $a + $b\" />", DiagnosticCodes.UndefinedVariable, "b", null)]
+        [InlineData("<let name=\"f\" value=\"fn(a) => $a\" /><echo>$a</echo>", DiagnosticCodes.UndefinedVariable, "a", null)]
         [InlineData("<set name=\"ghost\" value=\"1\" />", DiagnosticCodes.SetUndeclared, "ghost", "<let")]
-        [InlineData("<do>$ghost = 1</do>", DiagnosticCodes.SetUndeclared, "ghost", null)]
+        [InlineData("<do>ghost = 1</do>", DiagnosticCodes.SetUndeclared, "ghost", null)]
         [InlineData("<let name=\"c\" value=\"1\" const=\"yes\" /><set name=\"c\" value=\"2\" />", DiagnosticCodes.AssignConst, "c", "constant")]
         [InlineData("<let name=\"c\" value=\"1\" const=\"yes\" /><do>c += 1</do>", DiagnosticCodes.AssignConst, "c", null)]
         [InlineData("<set name=\"args\" value=\"1\" />", DiagnosticCodes.AssignConst, "args", "provided by KScript")]
@@ -77,7 +77,7 @@ namespace KScript.Language.Tests
         [InlineData("<echo>{ 'a' |> upper }</echo>", DiagnosticCodes.ExpressionSyntax, "upper", "upper()")]
         [InlineData("<echo>{ upper('a') }</echo>", DiagnosticCodes.UnknownMethod, "upper", "method")]
         [InlineData("<fn name=\"f\" params=\"x\" value=\"$x\" /><echo>{ f(1) }</echo>", DiagnosticCodes.UnknownCommand, "f", "@f")]
-        [InlineData("<echo>{ 'a' |> fn($a, $b) => $a }</echo>", DiagnosticCodes.ArgumentCount, "fn($a, $b) => $a", "one parameter")]
+        [InlineData("<echo>{ 'a' |> fn(a, b) => $a }</echo>", DiagnosticCodes.ArgumentCount, "fn(a, b) => $a", "one parameter")]
         public void ReportsProblem(string body, string code, string marked, string messagePart)
         {
             DocumentAnalysis a = Analyze(Script(body));
@@ -94,8 +94,8 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("<let name=\"x\" value=\"1\" /><echo>$x { $x + 1 }</echo>")]
         [InlineData("<let>x = 3; y = $x * 2</let><echo>$y</echo>")]
-        [InlineData("<let name=\"x\" value=\"1\" /><set>x += 1</set><do>$x = $x * 2; x ??= 0</do>")]
-        [InlineData("<let name=\"p\" value=\"{ a: [1, 2] }\" /><do>$p.a[0] = 3</do>")]
+        [InlineData("<let name=\"x\" value=\"1\" /><set>x += 1</set><do>x = $x * 2; x ??= 0</do>")]
+        [InlineData("<let name=\"p\" value=\"{ a: [1, 2] }\" /><do>p.a[0] = 3</do>")]
         [InlineData("<for each=\"i\" index=\"n\" in=\"0..10 step 2\"><echo>$n: $i</echo><if test=\"$i gt 4\"><break /></if></for>")]
         [InlineData("<let name=\"m\" value=\"{ a: 1 }\" /><for each=\"k, v\" in=\"$m\"><echo>$k=$v</echo></for>")]
         [InlineData("<while test=\"true\"><continue /></while>")]
@@ -106,9 +106,9 @@ namespace KScript.Language.Tests
         [InlineData("<fn name=\"f\" params=\"a: int, b: string = 'x'\"><return value=\"$a + $b\" /></fn><echo>{ 1 |> @f() } { @f(1, b: 'y') }</echo>")]
         [InlineData("<fn name=\"twice\" params=\"x\" value=\"$x * 2\" /><echo>{ 3 |> twice() }</echo>")]
         [InlineData("<fn name=\"g\" params=\"x\" value=\"$x\" /><let name=\"r\" value=\"[1]->map(@g)\" />")]
-        [InlineData("<let name=\"f\" value=\"fn($x) => $x\" /><echo>{ $f->call(1) } { 1 |> $f }</echo>")]
-        [InlineData("<let name=\"names\" value=\"[1, 2] |> map(fn($n) => $n + 1) |> join(', ')\" />")]
-        [InlineData("<let name=\"s\" value=\"[3, 1]->sort(fn($a, $b) => $a - $b)->first()\" />")]
+        [InlineData("<let name=\"f\" value=\"fn(x) => $x\" /><echo>{ $f->call(1) } { 1 |> $f }</echo>")]
+        [InlineData("<let name=\"names\" value=\"[1, 2] |> map(fn(n) => $n + 1) |> join(', ')\" />")]
+        [InlineData("<let name=\"s\" value=\"[3, 1]->sort(fn(a, b) => $a - $b)->first()\" />")]
         [InlineData("<try><throw type=\"Validation\" message=\"bad {1}\" /><catch as=\"err\" when=\"$err.type eq 'Validation'\"><echo>{$err.message} {$err.line}</echo></catch><finally></finally></try>")]
         [InlineData("<import package=\"KScript.Terminal\" /><input to=\"name\">Name: </input><echo>Hi $name</echo>")]
         [InlineData("<echo>email kyle@example.com, it's $args fine</echo>")]
@@ -150,8 +150,8 @@ namespace KScript.Language.Tests
         {
             DocumentAnalysis a = Analyze(Script(
                 "<let name=\"people\" value=\"[{ name: 'Joan', age: 82 }]\" />" +
-                "<let name=\"oldest\" value=\"$people->max_by(fn($p) => $p.age)\" />" +
-                "<let name=\"names\" value=\"$people->map(fn($p) => $p.name)->join(', ')\" />" +
+                "<let name=\"oldest\" value=\"$people->max_by(fn(p) => $p.age)\" />" +
+                "<let name=\"names\" value=\"$people->map(fn(p) => $p.name)->join(', ')\" />" +
                 "<let name=\"r\" value=\"0..3\" />" +
                 "<let name=\"t\" value=\"'a' + 1\" />" +
                 "<let name=\"b\" value=\"1 lt 2\" />"));
@@ -258,7 +258,7 @@ namespace KScript.Language.Tests
         {
             string page = "<live id=\"todos\">\n<state name=\"items\" value=\"[{ id: 1, text: 'a' }]\" />\n<state name=\"draft\" value=\"''\" />\n" +
                           "<form on-submit=\"items = $items->push({ id: 2, text: $draft->trim() }); draft = ''\"><input bind=\"draft\"></form>\n" +
-                          "<for each=\"t\" in=\"$items\"><p on-click=\"items = $items->reject(fn($x) => $x.id eq $t.id)\">{$t.text}</p></for>\n" +
+                          "<for each=\"t\" in=\"$items\"><p on-click=\"items = $items->reject(fn(x) => $x.id eq $t.id)\">{$t.text}</p></for>\n" +
                           "<else><p>Nothing yet.</p></else>\n</live>";
             AssertClean(Analyze(page, Path.Combine(Site, "todo.html"), SiteFiles()));
         }

@@ -178,7 +178,7 @@ namespace KScript.Language.Tests
             string body =
                 "<let name=\"n\" value=\"3\" />\n" +
                 "<let name=\"people\" value=\"[{ name: 'Joan', age: 82 }]\" />\n" +
-                "<let name=\"names\" value=\"$people->map(fn($p) => $p.name)\" />\n" +
+                "<let name=\"names\" value=\"$people->map(fn(p) => $p.name)\" />\n" +
                 "<let name=\"t\" type=\"int\" value=\"@now()->year\" />\n" +
                 "<for each=\"p\" in=\"$people\"><echo>$p.name</echo></for>\n" +
                 "<fn name=\"double\" params=\"x: int, by = 2\" value=\"$x * $by\" />\n" +
@@ -189,7 +189,7 @@ namespace KScript.Language.Tests
 
             Assert.Contains("<let name=\"people⟦: list<{ name: string, age: number }>⟧", hints);
             Assert.Contains("<let name=\"names⟦: list<string>⟧", hints);
-            Assert.Contains("<let name=\"names\" value=\"$people->map(fn($p⟦: { name: string, age: number }⟧", hints);
+            Assert.Contains("<let name=\"names\" value=\"$people->map(fn(p⟦: { name: string, age: number }⟧", hints);
             Assert.Contains("<for each=\"p⟦: { name: string, age: number }⟧", hints);
             Assert.Contains("<fn name=\"double\" params=\"x: int, by = 2\"⟦ → number⟧", hints);
             // Written-down types get none: a literal, type="int", x: int, by = 2, or nothing known.

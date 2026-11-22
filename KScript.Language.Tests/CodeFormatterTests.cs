@@ -349,15 +349,15 @@ namespace KScript.Language.Tests
                 "  @app_cache()->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')"),
                 Fmt(Lines("fn cached(key, compute) => @app_cache()->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')")));
             Assert.Equal(Lines(
-                "double = fn($x) =>",
+                "double = fn(x) =>",
                 "  $x * 2 + $offset_that_has_a_long_name + $another_offset_with_a_long_name"),
-                Fmt(Lines("double = fn($x) => $x * 2 + $offset_that_has_a_long_name + $another_offset_with_a_long_name")));
+                Fmt(Lines("double = fn(x) => $x * 2 + $offset_that_has_a_long_name + $another_offset_with_a_long_name")));
             // A lambda that is a call's only argument breaks after its => once nothing else fits.
             Assert.Equal(Lines(
                 "fn toggle_task(tasks, id) =>",
-                "  $tasks->map(fn($t) =>",
+                "  $tasks->map(fn(t) =>",
                 "    $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)"),
-                Fmt(Lines("fn toggle_task(tasks, id) => $tasks->map(fn($t) => $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)")));
+                Fmt(Lines("fn toggle_task(tasks, id) => $tasks->map(fn(t) => $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)")));
             // A short one stays, and so does a match case (its value can't go on the next line).
             Assert.Equal(Lines("fn twice(x) => $x * 2"), Fmt(Lines("fn twice(x) => $x * 2")));
             string match = Lines("label = match $n { 1 => 'one, which is a long label for the number one', _ => 'many' }");
@@ -374,9 +374,9 @@ namespace KScript.Language.Tests
                 "  @records()",
                 "    ->where('owner', $user.id)",
                 "    ->sortBy('changed')",
-                "    ->filter(fn($r) => @can($user, 'view', $r))",
+                "    ->filter(fn(r) => @can($user, 'view', $r))",
                 "    ->take(20)"),
-                Fmt(Lines("fn dashboard(user) => @records()->where('owner', $user.id)->sortBy('changed')->filter(fn($r) => @can($user, 'view', $r))->take(20)")));
+                Fmt(Lines("fn dashboard(user) => @records()->where('owner', $user.id)->sortBy('changed')->filter(fn(r) => @can($user, 'view', $r))->take(20)")));
             // A short receiver keeps its first call; one call on a plain name is left for its arguments to wrap.
             Assert.Equal(Lines(
                 "x = $s->trim()",
@@ -396,15 +396,15 @@ namespace KScript.Language.Tests
                 "  ->where('paid', true)",
                 "  ->where('shipped', false)",
                 "  ->sortBy('date')",
-                "  ->map(fn($o) => {",
+                "  ->map(fn(o) => {",
                 "    return $o.total + $o.shipping_cost_for_the_order_and_the_tax_on_it",
                 "  })",
                 "  ->sum()"),
                 Fmt(Lines(
-                "total = @orders()->where('paid', true)->where('shipped', false)->sortBy('date')->map(fn($o) => {",
+                "total = @orders()->where('paid', true)->where('shipped', false)->sortBy('date')->map(fn(o) => {",
                 "  return $o.total + $o.shipping_cost_for_the_order_and_the_tax_on_it",
                 "})->sum()")));
-            string off = Lines("total = @orders()->where('paid', true)->sortBy('date')->map(fn($o) => $o.total)->sum()");
+            string off = Lines("total = @orders()->where('paid', true)->sortBy('date')->map(fn(o) => $o.total)->sum()");
             Assert.Equal(off, Fmt(off, Without(o => { o.WrapChains = false; o.WrapAttributes = false; o.WrapBodies = false; })));
         }
 
@@ -413,12 +413,12 @@ namespace KScript.Language.Tests
         {
             Assert.Equal(Lines(
                 "names = $people",
-                "  |> filter(fn($p) => $p.age > 18)",
-                "  |> map(fn($p) => $p.name->upper())",
+                "  |> filter(fn(p) => $p.age > 18)",
+                "  |> map(fn(p) => $p.name->upper())",
                 "  |> sort()"),
-                Fmt(Lines("names = $people |> filter(fn($p) => $p.age > 18) |> map(fn($p) => $p.name->upper()) |> sort()")));
+                Fmt(Lines("names = $people |> filter(fn(p) => $p.age > 18) |> map(fn(p) => $p.name->upper()) |> sort()")));
             // Never in a block's head: the { has to stay on its line.
-            string head = Lines("if $people |> filter(fn($p) => $p.age > 18) |> map(fn($p) => $p.name) |> contains('Ada') {", "  echo 'yes'", "}");
+            string head = Lines("if $people |> filter(fn(p) => $p.age > 18) |> map(fn(p) => $p.name) |> contains('Ada') {", "  echo 'yes'", "}");
             Assert.Equal(head, Fmt(head, Without(o => { o.WrapAttributes = false; o.WrapBodies = false; })));
         }
 

@@ -68,7 +68,7 @@ namespace KScript.Runtime
             return parsed.Nodes.Select(n => Evaluate(n, scope, ctx)).ToList();
         }
 
-        /// <summary>Runs <c>x = 3; $total += $price</c> statements. With <paramref name="declare"/>, plain names are declared (as &lt;let&gt; does).</summary>
+        /// <summary>Runs <c>x = 3; total += $price</c> statements. With <paramref name="declare"/>, plain names are declared (as &lt;let&gt; does).</summary>
         /// <summary>
         /// Runs assignment statements and calls. <paramref name="declare"/> declares every assigned name in this scope
         /// (&lt;let&gt;); <paramref name="declareNew"/> declares only names not yet in scope and changes the rest
@@ -288,7 +288,11 @@ namespace KScript.Runtime
                     object subject = Evaluate(match.Subject, scope, ctx);
                     foreach (MatchArmNode arm in match.Arms)
                     {
-                        if (arm.Pattern == null || Matches(subject, arm.Pattern, scope, ctx)) return Evaluate(arm.Result, scope, ctx);
+                        if ((arm.Patterns.Count == 0 || arm.Patterns.Any(p => Matches(subject, p, scope, ctx)))
+                            && (arm.Guard == null || Values.Truthy(Evaluate(arm.Guard, scope, ctx))))
+                        {
+                            return Evaluate(arm.Result, scope, ctx);
+                        }
                     }
                     return null;
                 }
@@ -844,7 +848,7 @@ namespace KScript.Runtime
                 case CallNode call:
                     return EvaluateCall(call, left, scope, ctx);
                 case MethodCallNode:
-                    throw Fail(pipe.Right, ctx, "After |> write the method name without ->: $list |> filter(fn($x) => ...).", "Syntax");
+                    throw Fail(pipe.Right, ctx, "After |> write the method name without ->: $list |> filter(fn(x) => ...).", "Syntax");
             }
             object right = Evaluate(pipe.Right, scope, ctx);
             return CallResolved(right, SourceOf(pipe.Right, ctx), new List<object> { left }, null, scope, ctx, pipe.Right);

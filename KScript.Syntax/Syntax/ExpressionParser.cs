@@ -16,6 +16,7 @@ namespace KScript.Syntax
     ///   not        := 'not' not | equality
     ///   equality   := relational ( ( '==' | '!=' | '===' | '!==' | 'eq' | 'ne' ) relational )*
     ///   relational := pipe ( ( 'lt' | 'le' | 'gt' | 'ge' | '&gt;' | '&gt;=' | '&lt;' | '&lt;=' | 'in' ) pipe )*
+    ///                 (the words eq ne lt le gt ge are the XML spellings; a .kscript file writes the symbols)
     ///   pipe       := range ( '|&gt;' postfix )*
     ///   range      := additive ( '..' additive ( 'step' additive )? )?
     ///   additive   := term ( ( '+' | '-' ) term )*
@@ -25,6 +26,9 @@ namespace KScript.Syntax
     ///   postfix    := primary ( '-&gt;' name args | '.' name | '?.' name | '[' expression ']' | args )*
     ///   primary    := number | string | true | false | null | $name | @name args? | name | '(' expression ')'
     ///               | '[' list ']' | '{' map '}' | 'fn' '(' params ')' '=&gt;' expression | 'match' nullish '{' arms '}'
+    ///   params     := ( name ( ',' name )* )?                           declared bare: fn(a, b) =&gt; $a + $b
+    ///   arms       := arm ( ( ',' | new line ) arm )*
+    ///   arm        := ( '_' | nullish ( ',' nullish )* ) ( 'when' nullish )? '=&gt;' expression
     ///   args       := '(' ( ( name ':' )? expression ( ',' ... )* )? ')'
     /// </code>
     /// </summary>
@@ -36,6 +40,9 @@ namespace KScript.Syntax
         private readonly List<Token> buffer = new List<Token>();
         private readonly List<SyntaxError> errors = new List<SyntaxError>();
         private bool textMode;
+
+        // Inside the braces of a match, where a new line ends an arm.
+        private bool inMatchArms;
         private int index;
         private int lastEnd;
 
@@ -189,7 +196,7 @@ namespace KScript.Syntax
             string name = root is VariableNode v ? v.Name : root is IdentifierNode id ? id.Name : null;
             if (name == null)
             {
-                Error(target.Span, "Only a variable can be assigned to, as in x = 3 or $x.total += 1.", DiagnosticCodes.StatementSyntax);
+                Error(target.Span, "Only a variable can be assigned to, as in x = 3 or x.total += 1.", DiagnosticCodes.StatementSyntax);
             }
 
             ExprNode value = ParseExpr();
@@ -240,7 +247,7 @@ namespace KScript.Syntax
         private ExprNode ParseAnd() => ParseLeftAssociative(ParseNot, t =>
         {
             if (t.IsWord("and")) return "and";
-            if (t.Is("&&")) { Error(t.Span, "Use 'and' instead of '&&' (a raw & isn't allowed in XML)."); return "and"; }
+            if (t.Is("&&")) { Error(t.Span, "Use 'and' instead of '&&'."); return "and"; }
             return null;
         });
 
@@ -433,6 +440,12 @@ namespace KScript.Syntax
                     continue;
                 }
 
+                if ((t.Is("[") || t.Is("(")) && inMatchArms && StartsLine(t))
+                {
+                    // In a match, an arm on a new line starts a new arm: [1, 2] => ... doesn't index the result above.
+                    return node;
+                }
+
                 if (t.Is("["))
                 {
                     Advance();
@@ -595,7 +608,7 @@ namespace KScript.Syntax
                 }
                 else
                 {
-                    Error(p.Span, $"Expected a parameter such as $x, found '{Raw(p)}'.");
+                    Error(p.Span, $"Expected a parameter name such as x, found '{Raw(p)}'.");
                     break;
                 }
                 if (!Peek().Is(","))
@@ -611,37 +624,75 @@ namespace KScript.Syntax
             return lambda;
         }
 
+        /// <summary>
+        /// <c>match subject { arms }</c>. An arm is <c>pattern =&gt; result</c>: one value or several
+        /// (<c>1, 2 =&gt;</c>), <c>_</c> for anything, and an optional <c>when test</c> after the pattern
+        /// (<c>_ when $n &gt; 9 =&gt;</c>). Arms are separated by a comma or a new line. The statement form in a .kscript
+        /// file (<see cref="Markup.CodeParser"/>) writes its arms the same way.
+        /// </summary>
         private ExprNode ParseMatch()
         {
             Token keyword = Advance();
             MatchNode match = new MatchNode { Subject = ParseNullish() };
             Expect("{", "after the match value");
+            bool outer = inMatchArms;
+            inMatchArms = true;
             while (!Peek().Is("}") && Peek().Kind != TokenKind.EndOfInput)
             {
                 MatchArmNode arm = new MatchArmNode();
-                if (Peek().IsWord("_") || (Peek().Kind == TokenKind.Identifier && Peek().Text == "_"))
+                Token first = Peek();
+                if (first.IsWord("default") && Peek(1).Is("=>"))
                 {
-                    Token underscore = Advance();
-                    arm.Span = underscore.Span;
+                    Error(first.Span, "Write _ for the arm that matches anything: _ => ...");
+                }
+                if (first.IsWord("_") || (first.IsWord("default") && Peek(1).Is("=>")))
+                {
+                    Advance();
+                }
+                else if (first.IsWord("when"))
+                {
+                    Error(first.Span, "Write the test after a pattern: _ when $n > 9 => ...");
                 }
                 else
                 {
-                    arm.Pattern = ParseNullish();
+                    while (true)
+                    {
+                        arm.Patterns.Add(ParseNullish());
+                        if (!Peek().Is(","))
+                        {
+                            break;
+                        }
+                        Advance();
+                    }
+                }
+                if (Peek().IsWord("when"))
+                {
+                    Advance();
+                    arm.Guard = ParseNullish();
                 }
                 Expect("=>", "in a match arm");
                 arm.Result = ParseExpr();
-                arm.Span = TextSpan.FromBounds(arm.Pattern?.Span.Start ?? arm.Span.Start, arm.Result.Span.End);
+                arm.Span = TextSpan.FromBounds(first.Span.Start, Math.Max(first.Span.End, arm.Result.Span.End));
                 match.Arms.Add(arm);
-                if (!Peek().Is(","))
+                if (Peek().Is(","))
+                {
+                    Advance();
+                    continue;
+                }
+                if (Peek().Is("}") || Peek().Kind == TokenKind.EndOfInput || !StartsLine(Peek()))
                 {
                     break;
                 }
-                Advance();
             }
+            inMatchArms = outer;
             Token close = Expect("}", "to close the match");
             match.Span = TextSpan.FromBounds(keyword.Span.Start, Math.Max(close.Span.End, lastEnd));
             return match;
         }
+
+        /// <summary>True when a new line comes between the token before and this one.</summary>
+        private bool StartsLine(Token t) =>
+            t.Span.Start <= lexer.Text.Length && lastEnd <= t.Span.Start && lexer.Text.IndexOf('\n', lastEnd, t.Span.Start - lastEnd) >= 0;
 
         private ExprNode ParseList()
         {

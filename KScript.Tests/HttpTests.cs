@@ -86,10 +86,10 @@ public class HttpAppTests
           <const name="people" value="[{ id: 1, name: 'Joan' }, { id: 2, name: 'Ellie' }]" />
 
           <fn name="index" params="query">
-            <return value="$people |> filter(fn($p) => $query.name == null or $p.name == $query.name)" />
+            <return value="$people |> filter(fn(p) => $query.name == null or $p.name == $query.name)" />
           </fn>
           <fn name="show" params="id">
-            <return value="$people->find(fn($p) => $p.id == $id) ?? @abort(404, message: 'No such person.')" />
+            <return value="$people->find(fn(p) => $p.id == $id) ?? @abort(404, message: 'No such person.')" />
           </fn>
           <fn name="store" params="json">
             <return value="@response({ id: 3, name: $json.name }, status: 201, headers: { Location: @route('people.show', id: 3) })" />

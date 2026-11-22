@@ -22,7 +22,7 @@ namespace KScript.Language.Analysis
         private static readonly Dictionary<string, (string Use, string Example)> ForeignKeywords = new Dictionary<string, (string, string)>(StringComparer.Ordinal)
         {
             ["foreach"] = ("for", "for item in $list { }"),
-            ["switch"] = ("match", "match $value { case 1 { } default { } }"),
+            ["switch"] = ("match", "match $value { 1 => { } _ => { } }"),
             ["elseif"] = ("elif", "} elif $n > 1 { }"),
             ["elsif"] = ("elif", "} elif $n > 1 { }"),
             ["require"] = ("import", "import \"lib/tools.kscript\""),
@@ -247,7 +247,6 @@ namespace KScript.Language.Analysis
             {
                 Diagnostic d = result.Diagnostics[i];
                 string message = d.Message
-                    .Replace(" (a raw & isn't allowed in XML)", string.Empty, StringComparison.Ordinal)
                     .Replace("assign with <let>, <set> or <do>.", "assign on a line of its own: x = 1.", StringComparison.Ordinal)
                     .Replace("Assign with <set> or <do>.", "Assign on a line of its own: x += 1.", StringComparison.Ordinal);
                 message = ElementInAngles.Replace(message, m => catalog.GetElement(m.Groups[1].Value) != null ? m.Groups[1].Value : m.Value);

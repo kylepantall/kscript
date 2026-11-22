@@ -34,7 +34,7 @@ namespace KScript.Runtime
 
         #region Elements
 
-        private static readonly A Test = new A("test", K.Expression, "The condition, for example `$n lt 10 and $name ne ''`.", true);
+        private static readonly A Test = new A("test", K.Expression, "The condition, for example `$n < 10 and $name != ''` (in an XML attribute, `$n lt 10 and $name ne ''`).", true);
 
         private static void RegisterElements(PackageBuilder p)
         {
@@ -179,7 +179,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("do", "Runs assignment statements and calls, separated by `;`.", ContentKind.AssignmentStatements)
             {
-                Example = "<let name=\"total\" value=\"10\" />\n<do>$total += 5; $total *= 2</do>\n<echo>$total</echo>",
+                Example = "<let name=\"total\" value=\"10\" />\n<do>total += 5; total *= 2</do>\n<echo>$total</echo>",
             }, run =>
             {
                 // In a .kscript file x = 3 declares x if it isn't in scope yet.
@@ -263,14 +263,14 @@ namespace KScript.Runtime
                 Example = "<let name=\"choice\" value=\"3\" />\n<match $choice>\n  <case is=\"1\"><echo>One</echo></case>\n  <case is=\"2, 3\"><echo>Two or three</echo></case>\n  <case when=\"$choice gt 9\"><echo>Big</echo></case>\n  <default><echo>Unknown</echo></default>\n</match>",
             }, Match);
 
-            p.Element(new ElementInfo("case", "A branch of <match>: runs when the value equals one of `is`, or when `when` is true.", ContentKind.Statements,
+            p.Element(new ElementInfo("case", "A branch of <match>: runs when the value equals one of `is`, or when `when` is true (with both, the value must match and `when` must be true). In a .kscript file a branch is an arm: `1, 2 => ...`, `_ when $n > 9 => ...`.", ContentKind.Statements,
                 new A("is", K.ExpressionList, "Values to compare with, comma separated."),
                 new A("when", K.Expression, "A condition."))
             {
                 MustBeInside = new[] { "match" },
             }, run => throw run.Error("<case> must be directly inside <match>.", null, "Syntax"));
 
-            p.Element(new ElementInfo("default", "The branch of <match> that runs when no case matched.", ContentKind.Statements)
+            p.Element(new ElementInfo("default", "The branch of <match> that runs when no case matched. In a .kscript file it is the arm `_ => ...`.", ContentKind.Statements)
             {
                 MustBeInside = new[] { "match" },
             }, run => throw run.Error("<default> must be directly inside <match>.", null, "Syntax"));
@@ -335,7 +335,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("catch", "Handles an error thrown in the <try> around it. `type` picks which errors (and the types that extend them); `as` names the error: $err.type, $err.message, $err.line, $err.status, $err.cause and its fields. A bare <throw /> inside rethrows it.", ContentKind.Statements,
                 new A("as", K.DeclareVariable, "A variable for the error. Defaults to err."),
-                new A("when", K.Expression, "Only handle errors for which this is true, such as `$err.status eq 404`."),
+                new A("when", K.Expression, "Only handle errors for which this is true, such as `$err.status == 404`."),
                 new A("type", K.ErrorType, "Only handle errors of these types, or types that extend them: `NotFound`, `[IO, Network]`. Error catches everything."))
             {
                 MustBeInside = new[] { "try" },
@@ -559,18 +559,15 @@ namespace KScript.Runtime
                 }
                 else if (kind == "case")
                 {
-                    if (c.GetAttribute("is")?.Value is DecodedText isText)
-                    {
-                        hit = run.Interpreter.EvaluateList(isText, scope, run.Module).Any(o => o is List<object> options ? options.Any(x => Values.LooseEquals(x, value)) : Values.LooseEquals(o, value));
-                    }
-                    else if (c.GetAttribute("when")?.Value is DecodedText whenText)
-                    {
-                        hit = Values.Truthy(run.Interpreter.EvaluateText(whenText, scope, run.Module));
-                    }
-                    else
+                    DecodedText isText = c.GetAttribute("is")?.Value;
+                    DecodedText whenText = c.GetAttribute("when")?.Value;
+                    if (isText == null && whenText == null)
                     {
                         throw new KScriptException("<case> needs is=\"...\" or when=\"...\".", "Syntax") { Offset = c.Span.Start, OffsetModule = run.Module };
                     }
+                    // With both, the value must be one of `is` and `when` must hold: 1, 2 when $ready => ...
+                    hit = (isText == null || run.Interpreter.EvaluateList(isText, scope, run.Module).Any(o => o is List<object> options ? options.Any(x => Values.LooseEquals(x, value)) : Values.LooseEquals(o, value)))
+                        && (whenText == null || Values.Truthy(run.Interpreter.EvaluateText(whenText, scope, run.Module)));
                 }
                 else
                 {

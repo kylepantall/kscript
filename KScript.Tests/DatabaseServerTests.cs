@@ -112,10 +112,10 @@ public sealed class DatabaseServerTests : DataFixture
     }
 
     private const string Queries = """
-        echo $User->where(fn($u) => $u.age > 18 and $u.name->contains('50%'))->order_by(name: desc)->limit(5)->offset(10)->sql().sql
-        echo $User->where(fn($u) => $u.name->matches(/^a.b$/im) or $u.email->ends_with('.org'))->offset(3)->sql().sql
-        echo $User->where(fn($u) => ($u.name + '!')->length() > 3)->lock_for_update()->skip_locked()->sql().sql
-        echo $User->where(fn($u) => $u.name->test(/x/sx))->order_by(age)->sql().sql
+        echo $User->where(fn(u) => $u.age > 18 and $u.name->contains('50%'))->order_by(name: desc)->limit(5)->offset(10)->sql().sql
+        echo $User->where(fn(u) => $u.name->matches(/^a.b$/im) or $u.email->ends_with('.org'))->offset(3)->sql().sql
+        echo $User->where(fn(u) => ($u.name + '!')->length() > 3)->lock_for_update()->skip_locked()->sql().sql
+        echo $User->where(fn(u) => $u.name->test(/x/sx))->order_by(age)->sql().sql
         echo @db(visits)->where(n: 1)->sql().sql
         """;
 
@@ -344,15 +344,15 @@ public sealed class DatabaseServerTests : DataFixture
             $Person->create(name: 'Ada', email: 'Ada@Example.com', note: @json('"two\nlines"'))
             echo $Person->where(name: 'ada')->count()
             echo $Person->where(email: 'ADA@example.com')->count()
-            echo $Person->where(fn($p) => $p.name->contains('AD'))->count()
-            echo $Person->where(fn($p) => $p.email->starts_with('ada'))->count()
-            echo $Person->where(fn($p) => $p.name->matches(/^ada$/i))->count()
-            echo $Person->where(fn($p) => $p.name->matches(/^ada$/))->count()
-            echo $Person->where(fn($p) => $p.note->matches(/^lines/m))->count()
-            echo $Person->where(fn($p) => $p.note->matches(/two.lines/))->count()
-            echo $Person->where(fn($p) => $p.note->matches(/two.lines/s))->count()
-            echo $Person->where(fn($p) => $p.name + '!' == 'Ada!')->count()
-            echo $Person->where(fn($p) => $p.name->length() == 3)->count()
+            echo $Person->where(fn(p) => $p.name->contains('AD'))->count()
+            echo $Person->where(fn(p) => $p.email->starts_with('ada'))->count()
+            echo $Person->where(fn(p) => $p.name->matches(/^ada$/i))->count()
+            echo $Person->where(fn(p) => $p.name->matches(/^ada$/))->count()
+            echo $Person->where(fn(p) => $p.note->matches(/^lines/m))->count()
+            echo $Person->where(fn(p) => $p.note->matches(/two.lines/))->count()
+            echo $Person->where(fn(p) => $p.note->matches(/two.lines/s))->count()
+            echo $Person->where(fn(p) => $p.name + '!' == 'Ada!')->count()
+            echo $Person->where(fn(p) => $p.name->length() == 3)->count()
             try {
               $Person->create(name: 'Ada 2', email: 'ADA@example.com')
             } catch UniqueViolation as e {

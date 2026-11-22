@@ -128,7 +128,7 @@ namespace KScript.Language.Analysis
 
         /// <summary>
         /// The shapes of a lambda's parameters when it is passed to a list method: in
-        /// <c>$people-&gt;filter(fn($p) =&gt; $p.age gt 18)</c>, $p is one of $people's items, so $p. completes its fields.
+        /// <c>$people-&gt;filter(fn(p) =&gt; $p.age &gt; 18)</c>, $p is one of $people's items, so $p. completes its fields.
         /// </summary>
         private static TypeShape[] LambdaParameterShapes(string method, TypeShape receiver)
         {

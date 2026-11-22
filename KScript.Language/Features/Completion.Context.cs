@@ -34,12 +34,10 @@ namespace KScript.Language.Features
             ["throw"] = "throw '$0'",
             ["import"] = "import $0",
             ["const"] = "const ${1:name} = $0",
-            ["case"] = "case ${1:value} {\n\t$0\n}",
-            ["default"] = "default {\n\t$0\n}",
         };
 
         /// <summary>Elements a .kscript statement can't start with: they're written another way (x = 3, name: type).</summary>
-        private static readonly HashSet<string> NotCodeStatements = new HashSet<string> { "kscript", "do", "let", "set", "field" };
+        private static readonly HashSet<string> NotCodeStatements = new HashSet<string> { "kscript", "do", "let", "set", "field", "case", "default" };
 
         /// <summary>Words after which an expression starts (<c>echo ‸</c>, <c>if ‸</c>, <c>$a and ‸</c>).</summary>
         private static readonly HashSet<string> ExpressionKeywordsBefore = new HashSet<string>
@@ -249,13 +247,17 @@ namespace KScript.Language.Features
                 return ElementCompletions(analysis, parent, replace, previous, snippets: true, openBracket: "<");
             }
 
-            List<CompletionItem> items = CodeStatementItems(analysis, parent, previous, replace, followOn: false);
             if (parent?.Name == "match")
             {
-                // A match block holds only its cases.
-                items.Add(new CompletionItem { Label = "when", Kind = CompletionKind.Keyword, Detail = "case", Documentation = "A case taken when its condition is true: `when $n > 10 { }`.", InsertText = "when ${1:condition} {\n\t$0\n}", IsSnippet = true, ReplaceSpan = replace, SortText = "0when" });
-                return items;
+                // A match block holds only its arms: pattern => result.
+                return new List<CompletionItem>
+                {
+                    new CompletionItem { Label = "value =>", Kind = CompletionKind.Keyword, Detail = "arm", Documentation = "An arm taken when the value is one of these: `1, 2 => echo \"low\"`, or `1, 2 => { }` for several statements.", InsertText = "${1:value} => $0", IsSnippet = true, ReplaceSpan = replace, SortText = "0a" },
+                    new CompletionItem { Label = "_ when", Kind = CompletionKind.Keyword, Detail = "arm", Documentation = "An arm taken when its test is true: `_ when $n > 10 => { }`.", InsertText = "_ when ${1:condition} => $0", IsSnippet = true, ReplaceSpan = replace, SortText = "0b" },
+                    new CompletionItem { Label = "_ =>", Kind = CompletionKind.Keyword, Detail = "arm", Documentation = "The arm taken when no other matched: `_ => { }`.", InsertText = "_ => $0", IsSnippet = true, ReplaceSpan = replace, SortText = "0c" },
+                };
             }
+            List<CompletionItem> items = CodeStatementItems(analysis, parent, previous, replace, followOn: false);
 
             // x = 3 assigns: offer the variables in scope by their bare names.
             Scope scope = analysis.ScopeAt(offset);

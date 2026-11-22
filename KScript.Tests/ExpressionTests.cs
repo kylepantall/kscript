@@ -58,7 +58,7 @@ public class ExpressionTests
     [InlineData("'abc'->contains('b')", "true")]
     [InlineData("'42'->to_number() + 1", "43")]
     [InlineData("[3, 1, 2]->sort()->join('')", "123")]
-    [InlineData("[1, 2, 3]->reduce(fn($t, $x) => $t + $x, initial: 0)", "6")]
+    [InlineData("[1, 2, 3]->reduce(fn(t, x) => $t + $x, initial: 0)", "6")]
     [InlineData("[1, 2, 2, 3]->unique()->count()", "3")]
     [InlineData("{ a: 1, b: 2 }->keys()->join(',')", "a,b")]
     [InlineData("{ a: 1 }->merge({ b: 2 })->to_json()", "{\"a\":1,\"b\":2}")]

@@ -65,7 +65,7 @@ namespace KScript.Testing
             }, run => Hook(run, before: false));
 
             p.Element(new ElementInfo("assert", "Fails the test unless the condition is true. A failed comparison shows the value of each side.", ContentKind.Empty,
-                new A("test", K.Expression, "The condition, for example `$total eq 30` or `$names->contains('Joan')`.", true),
+                new A("test", K.Expression, "The condition, for example `$total == 30` or `$names->contains('Joan')`.", true),
                 new A("message", K.Template, "What to say when it fails, instead of the condition and its values."))
             {
                 Context = ElementContext.Script,

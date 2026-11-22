@@ -19,7 +19,7 @@ namespace KScript.Runtime
             ("aecho", "Use <echo>{ $list->join(', ') }</echo>.", null),
             ("ainsert", "Use <set name=\"list\" value=\"$list->push($item)\" />.", null),
             ("aremove", "Use <set name=\"list\" value=\"$list->remove_at($index)\" />.", null),
-            ("minsert", "Use <set name=\"map\" value=\"$map->set($key, $value)\" />, or <do>$map.key = $value</do>.", null),
+            ("minsert", "Use <set name=\"map\" value=\"$map->set($key, $value)\" />, or <do>map.key = $value</do>.", null),
             ("afor", "Use <for each=\"item\" in=\"$list\">.", "for"),
             ("forxy", "Use <for each=\"i\" in=\"0..10\">.", "for"),
             ("dowhile", "Use <while test=\"...\">.", "while"),
@@ -54,13 +54,13 @@ namespace KScript.Runtime
             ("checkfor", "Write the condition with not: test=\"not $x\".", null),
             ("condition", "Use test=\"...\" with a KScript 2 expression.", "test"),
             ("method", "Use fn=\"...\" with a <fn> function.", "fn"),
-            ("_insertion", "Closures on arrays were removed in KScript 2. Use list methods with fn() lambdas, such as $list->map(fn($x) => ...).", null),
-            ("_removal", "Closures on arrays were removed in KScript 2. Use list methods with fn() lambdas, such as $list->map(fn($x) => ...).", null));
+            ("_insertion", "Closures on arrays were removed in KScript 2. Use list methods with fn() lambdas, such as $list->map(fn(x) => ...).", null),
+            ("_removal", "Closures on arrays were removed in KScript 2. Use list methods with fn() lambdas, such as $list->map(fn(x) => ...).", null));
 
         public static readonly IReadOnlyDictionary<string, RetiredInfo> Commands = Table(
             ("math", "Write the arithmetic directly: $total + $price * $qty.", null),
             ("math_previous", "Write the arithmetic directly and store it with <let> or <set>.", null),
-            ("more_less", "Use the comparison operators: $a lt $b, le, gt, ge.", null),
+            ("more_less", "Use the comparison operators: $a < $b, <=, >, >= (in an XML attribute: lt, le, gt, ge).", null),
             ("equals", "Use == (loose) or === (strict).", null),
             ("iftrue", "Use the conditional operator: $test ? 'yes' : 'no'.", null),
             ("if", "Use the conditional operator: $test ? 'yes' : 'no'.", null),
@@ -82,7 +82,7 @@ namespace KScript.Runtime
             ("this", "Not part of KScript 2.", null),
             ("parent", "Not part of KScript 2.", null),
             ("getfiles", "Use @files(folder), which returns a list of file values (KScript.IO).", "files"),
-            ("find_file", "Use @files(folder)->find(fn($f) => ...) (KScript.IO).", null),
+            ("find_file", "Use @files(folder)->find(fn(f) => ...) (KScript.IO).", null),
             ("dir_exists", "Use @is_folder(path) (KScript.IO).", "is_folder"),
             ("extension_of", "Use $file->extension() or @file(path)->extension() (KScript.IO).", null),
             ("path", "Use @file(path) and its methods: ->name(), ->directory(), ->extension() (KScript.IO).", "file"),

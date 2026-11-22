@@ -76,7 +76,7 @@ public sealed class LoggingTests : IDisposable
             "<fn name=\"alert\" params=\"entry\"><echo>ALERT {$entry.level}: {$entry.message} ({$entry.fields.order})</echo><do>$log->error('inside')</do></fn>" +
             "<log-provider fn=\"alert\" level=\"error\" replace=\"yes\" />" +
             "<log level=\"warn\">ignored</log><log level=\"error\" fields=\"{ order: 9 }\">Card declined</log>" +
-            "<log-provider type=\"memory\" /><let name=\"hook\" value=\"fn($e) => @echo('fn ' + $e.message)\" />");
+            "<log-provider type=\"memory\" /><let name=\"hook\" value=\"fn(e) => @echo('fn ' + $e.message)\" />");
         Assert.Equal("ALERT error: Card declined (9)\n", output);
     }
 

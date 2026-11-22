@@ -92,9 +92,9 @@ public class CodeFormatTests
             echo $total
             for x in [] { echo "never" } else { echo "empty" }
             match 'b' {
-              case 'a' { echo "A" }
-              case 'b', 'c' { echo "B or C" }
-              default { echo "?" }
+              'a' => echo "A"
+              'b', 'c' => { echo "B or C" }
+              _ => echo "?"
             }
             """;
         Assert.Equal("-2 is negative\n0 is zero\n5 is positive\n7\nempty\nB or C\n", Run(code));

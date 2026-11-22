@@ -45,7 +45,7 @@ namespace KScript.Language.Tests
                 $u->save()
                 echo $u->label()
                 echo [$u.id, $u.created_at, $u.updated_at, $u.deleted_at]
-                adults = $User->where(role: admin, name: ['a', 'b'])->or_where(fn($x) => $x.name->starts_with('A'))->order_by(name: desc, email)->get()
+                adults = $User->where(role: admin, name: ['a', 'b'])->or_where(fn(x) => $x.name->starts_with('A'))->order_by(name: desc, email)->get()
                 for one in $adults {
                   echo $one.name
                   $one->delete()

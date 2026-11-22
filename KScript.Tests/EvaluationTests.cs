@@ -40,7 +40,7 @@ public sealed class EvaluationTests : IDisposable
     [InlineData("<let name=\"x\" value=\"10\" /><do>$x -= 1; $x *= 2; $x /= 3; $x ??= 4</do><echo>$x</echo>", "6\n")]
     [InlineData("<let name=\"l\" value=\"[1]\" /><do>$l += 2; $l[2] = 5; $l[-1] += 1; $l[0] *= 7</do><echo>{ $l }</echo>", "7, 2, 6\n")]
     [InlineData("<echo>{ 'abc' |> to_upper() } { 'abc' |> @to_upper() } { 'abc' |> upper() }</echo>", "ABC ABC ABC\n")]
-    [InlineData("<let name=\"f\" value=\"fn($x) => $x * 2\" /><fn name=\"g\" params=\"x\" value=\"$x * 3\" /><echo>{ 3 |> $f } { 2 |> g() } { g(4) } { to_upper('x') }</echo>", "6 6 12 X\n")]
+    [InlineData("<let name=\"f\" value=\"fn(x) => $x * 2\" /><fn name=\"g\" params=\"x\" value=\"$x * 3\" /><echo>{ 3 |> $f } { 2 |> g() } { g(4) } { to_upper('x') }</echo>", "6 6 12 X\n")]
     [InlineData("<import package=\"KScript.IO\" /><echo>{ @file('a.txt') |> stem() } { @file('a.txt') |> name() }</echo>", "a a.txt\n")]
     [InlineData("<echo>{ '5'->round() } { { a: fn() => 1 }.a() }</echo>", "5 1\n")]
     public void Expressions_give_values(string body, string expected)

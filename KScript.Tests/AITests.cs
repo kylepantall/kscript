@@ -172,7 +172,7 @@ public class AITests
     public void Tools_must_be_fn_functions()
     {
         var model = new FakeModel();
-        var ex = Assert.Throws<KScriptException>(() => Run(model, "<echo>{ @llm('x', { tools: [fn($x) => $x] }) }</echo>"));
+        var ex = Assert.Throws<KScriptException>(() => Run(model, "<echo>{ @llm('x', { tools: [fn(x) => $x] }) }</echo>"));
         Assert.Contains("tools are <fn> functions", ex.Message);
     }
 

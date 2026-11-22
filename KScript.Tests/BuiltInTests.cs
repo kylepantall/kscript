@@ -96,13 +96,13 @@ public sealed class BuiltInTests : IDisposable
 
     [Theory]
     [InlineData("{ [1, 2, 3]->at(-1) } { [1, 2, 3]->at(5) ?? 'none' }", "3 none")]
-    [InlineData("{ [1, 2, 3]->find_index(fn($x) => $x > 1) } { [1]->find_index(fn($x) => $x > 5) }", "1 -1")]
-    [InlineData("{ [1, 2]->each(fn($x, $i) => $x)->count() }", "2")]
-    [InlineData("{ ['ab', 'ac', 'b']->group_by(fn($x) => $x[0])->to_json() }", "{\"a\":[\"ab\",\"ac\"],\"b\":[\"b\"]}")]
+    [InlineData("{ [1, 2, 3]->find_index(fn(x) => $x > 1) } { [1]->find_index(fn(x) => $x > 5) }", "1 -1")]
+    [InlineData("{ [1, 2]->each(fn(x, i) => $x)->count() }", "2")]
+    [InlineData("{ ['ab', 'ac', 'b']->group_by(fn(x) => $x[0])->to_json() }", "{\"a\":[\"ab\",\"ac\"],\"b\":[\"b\"]}")]
     [InlineData("{ [1, 2, 3, 4]->slice(1, -1) } { [1, 2, 3]->slice(-2) } { [1, 2]->slice(5, 1)->count() }", "2, 3 2, 3 0")]
     [InlineData("{ [1, 3]->insert(1, 2) } { [1, 2, 3]->remove_at(-1) } { [1]->remove_at(9) }", "1, 2, 3 1, 2 1")]
     [InlineData("{ [1, 2, 3]->chunk(2)->to_json() } { [1]->chunk(0)->count() }", "[[1,2],[3]] 1")]
-    [InlineData("{ [{ id: 'a' }, { id: 'b' }]->to_map(fn($x) => $x.id)->keys() }", "a, b")]
+    [InlineData("{ [{ id: 'a' }, { id: 'b' }]->to_map(fn(x) => $x.id)->keys() }", "a, b")]
     [InlineData("{ 'hello'->slice(1, -1) } { 'hello'->slice(-3) } { 'hello world'->truncate(5) } { 'hi'->truncate(5) } { 'abcdef'->truncate(3, '...') }", "ell llo hello… hi abc...")]
     public void List_and_text_methods(string expression, string expected)
     {
@@ -225,8 +225,8 @@ public sealed class BuiltInTests : IDisposable
 
         var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
         var interpreter = new Interpreter(KScriptHost.ForText(output));
-        interpreter.RunText("<kscript><fn name=\"f\" params=\"x\" value=\"$x\" /><let name=\"l\" value=\"fn($a, $b) => $a\" /><echo>{ $l } | {@f} | {@to_upper} | { ['a']->map(@to_upper) } { ['b']->map(@f) }</echo><fn name=\"g\" params=\"x, i\" value=\"$x + $i\" /><echo>{ ['c']->map(@g) }</echo></kscript>");
-        Assert.Equal("fn($a, $b) => $a | fn f(x) | @to_upper | A b\nc0\n", output.ToString());
+        interpreter.RunText("<kscript><fn name=\"f\" params=\"x\" value=\"$x\" /><let name=\"l\" value=\"fn(a, b) => $a\" /><echo>{ $l } | {@f} | {@to_upper} | { ['a']->map(@to_upper) } { ['b']->map(@f) }</echo><fn name=\"g\" params=\"x, i\" value=\"$x + $i\" /><echo>{ ['c']->map(@g) }</echo></kscript>");
+        Assert.Equal("fn(a, b) => $a | fn f(x) | @to_upper | A b\nc0\n", output.ToString());
 
         Assert.Contains("has no parameter named 'y'", Fails("<fn name=\"f\" params=\"x\" value=\"$x\" /><echo>{ @f(y: 1) }</echo>").Message);
         Assert.Contains("@f() takes 1 argument but was given 2", Fails("<fn name=\"f\" params=\"x\" value=\"$x\" /><echo>{ @f(1, 2) }</echo>").Message);
@@ -323,7 +323,7 @@ public sealed class BuiltInTests : IDisposable
             return output.ToString();
         }
 
-        Assert.Equal("hi you a, b\n", Run("<echo>{ @probe() |> hello('you') } { @lambda_params(fn($a, $b) => 1) }</echo>"));
+        Assert.Equal("hi you a, b\n", Run("<echo>{ @probe() |> hello('you') } { @lambda_params(fn(a, b) => 1) }</echo>"));
         Assert.Contains("<needs-x> needs a x attribute: Something.", Assert.Throws<KScriptException>(() => Run("<needs-x />")).Message);
         Assert.Contains("<needs-y> needs a y attribute.", Assert.Throws<KScriptException>(() => Run("<needs-y />")).Message);
         Assert.Equal("hi you\n", Run("<echo>{ @probe()->hello(x: 1, 'you') }</echo>"));

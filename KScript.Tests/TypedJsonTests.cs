@@ -94,7 +94,7 @@ public class TypedJsonTests
     {
         string output = RunBody(Types + "<try><let name=\"r\" value=\"$Repo->from({})\" />"
             + "<catch as=\"err\"><echo>{ $err.type } { $err.problems->count() } { $err.problems[0].path } { $err.problems[2].field }</echo></catch></try>"
-            + "<echo>{ $Repo->check({ name: 1 })->map(fn($p) => $p.path)->join(' ') }</echo>"
+            + "<echo>{ $Repo->check({ name: 1 })->map(fn(p) => $p.path)->join(' ') }</echo>"
             + "<echo>{ $Repo->check(3)[0].message }</echo>");
         Assert.Equal("Shape 5 $.name owner\n$.stargazers_count $.owner $.owner.login $.visibility\nneeds a Repo (a map), but got a number (3).\n", output);
     }
@@ -102,7 +102,7 @@ public class TypedJsonTests
     [Fact]
     public void LongProblemListsAreCutShort()
     {
-        KScriptException error = Fails("<type name=\"N\" fields=\"n: int\" /><echo>{ $N->from(@range(0, 30)->map(fn($i) => { n: 'x' })) }</echo>");
+        KScriptException error = Fails("<type name=\"N\" fields=\"n: int\" /><echo>{ $N->from(@range(0, 30)->map(fn(i) => { n: 'x' })) }</echo>");
         Assert.Contains("(30 problems)", error.Message);
         Assert.Contains("...and 10 more.", error.Message);
         Assert.Equal(30, ((List<object>)error.Fields["problems"]).Count);
@@ -255,8 +255,8 @@ public class TypedJsonTests
                 + "<type name=\"Repo\" sample=\"repo.json\"><field name=\"stars\" type=\"int\" from=\"stargazers_count\" /><field name=\"name\" type=\"string\" description=\"Mine.\" /></type>"
                 + "<echo>{ $Repo->fields()[0].description }</echo>"
                 + "<type name=\"Item\" sample=\"list.json\" />"
-                + "<echo>{ $Repo->fields()->map(fn($f) => $f.name + ':' + $f.type + ($f.optional ? '?' : ''))->join(' ') }</echo>"
-                + "<echo>{ $Item->fields()->map(fn($f) => $f.name + ($f.optional ? '?' : ''))->join(' ') }</echo>"
+                + "<echo>{ $Repo->fields()->map(fn(f) => $f.name + ':' + $f.type + ($f.optional ? '?' : ''))->join(' ') }</echo>"
+                + "<echo>{ $Item->fields()->map(fn(f) => $f.name + ($f.optional ? '?' : ''))->join(' ') }</echo>"
                 + "<let name=\"r\" value=\"$Repo->from({ name: 'k', stargazers_count: 5, stars: 9, private: true, owner: { login: 'k' }, topics: [], mixed: [], empty: [], nums: [], flags: [], 'avatar-url': 'y', '2x': 1, items: [{ id: 3 }], deep: { a: { b: { c: { d: { e: { f: { g: { h: { i: 1 } } } } } } } } }, lists: [] })\" />"
                 + "<echo>{ $r.stars } { $r.avatar_url } { $r.items[0].note ?? '-' } { $Item->from({ id: 1 }).tag ?? '-' }</echo>"
                 + "</kscript>");
@@ -297,7 +297,7 @@ public class TypedJsonTests
             File.WriteAllText(Path.Combine(dir, "users.json"), "[{ \"login\": \"a\", \"id\": 1 }, { \"login\": \"b\", \"id\": 2 }]");
             string script = Path.Combine(dir, "t.ks.xml");
             File.WriteAllText(script, "<kscript><import package=\"KScript.IO\" /><type name=\"User\" fields=\"login: string, id: int\" />"
-                + "<echo>{ @read_json('users.json', as: User)->map(fn($u) => $u.login + @type($u))->join(',') } { @read_json('users.json')[0]->type() }</echo></kscript>");
+                + "<echo>{ @read_json('users.json', as: User)->map(fn(u) => $u.login + @type($u))->join(',') } { @read_json('users.json')[0]->type() }</echo></kscript>");
             Assert.Equal("aUser,bUser map\n", RunScriptFile(script));
         }
         finally
@@ -464,7 +464,7 @@ public class TypedJsonTests
         {
             string url = $"http://127.0.0.1:{port}";
             string output = RunBody($"<type name=\"User\" fields=\"login: string, id: int\" />"
-                + $"<echo>{{ @api('{url}/list')->json(as: User)->map(fn($u) => $u.login)->join(',') }}</echo>"
+                + $"<echo>{{ @api('{url}/list')->json(as: User)->map(fn(u) => $u.login)->join(',') }}</echo>"
                 + $"<echo>{{ @api('{url}/one')->json().login }}</echo>"
                 + $"<try><echo>{{ @api('{url}/one')->json(as: User) }}</echo><catch as=\"err\"><echo>{{ $err.message->split('\n')[0] }}</echo></catch></try>", "", "KScript.Net");
             Assert.Equal($"a,b\nkyle\nThe response from {url}/one doesn't fit User (1 problem):\n", output);

@@ -43,7 +43,7 @@ public class HttpCoverageTests
         using var site = new TempSite(("routes.ks.xml", """
             <KScript.Routes>
               <import package="KScript.Math" as="m" />
-              <let name="hello" value="fn($request) => 'Hello ' + $request.path" />
+              <let name="hello" value="fn(request) => 'Hello ' + $request.path" />
               <Get path="/lambda" to="hello" />
               <Get path="/command" to="to_json" />
               <Get path="/package" to="m.round" />

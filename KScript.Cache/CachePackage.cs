@@ -374,7 +374,7 @@ namespace KScript.Caching
                 ("cache->get", "<do>$cache->put('greeting', 'hello')</do>\n<echo>{ $cache->get('greeting') } { $cache->get('missing', default: 'none') }</echo>"),
                 ("cache->has", "<do>$cache->put('token', 'abc', ttl: '5m')</do>\n<echo>{ $cache->has('token') }</echo>"),
                 ("cache->put", "<do>$cache->put('user:1', { name: 'Joan' }, ttl: 600)</do>"),
-                ("cache->remember", "<let name=\"squares\" value=\"$cache->remember('squares', fn() => [1, 2, 3]->map(fn($n) => $n * $n), ttl: '10m')\" />"),
+                ("cache->remember", "<let name=\"squares\" value=\"$cache->remember('squares', fn() => [1, 2, 3]->map(fn(n) => $n * $n), ttl: '10m')\" />"),
                 ("cache->forget", "<do>$cache->put('draft', 'hi'); $cache->forget('draft')</do>\n<echo>{ $cache->has('draft') }</echo>"),
                 ("cache->increment", "<do>$cache->increment('visits'); $cache->increment('visits', by: 2)</do>\n<echo>{ $cache->get('visits') }</echo>"),
                 ("cache->ttl", "<do>$cache->put('code', 1234, ttl: '1m')</do>\n<echo>{ $cache->ttl('code') } seconds left</echo>"),

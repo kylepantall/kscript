@@ -124,7 +124,7 @@ namespace KScript.Runtime
         }
     }
 
-    /// <summary><c>fn($x) => expression</c>, closed over the scope it was written in.</summary>
+    /// <summary><c>fn(x) => expression</c>, closed over the scope it was written in.</summary>
     public sealed class Lambda : ICallable
     {
         internal Lambda(LambdaNode node, Scope closure, EvalContext context, string source)
@@ -154,7 +154,7 @@ namespace KScript.Runtime
             return call.Interpreter.Evaluate(Node.Body, scope, Context);
         }
 
-        public override string ToString() => Source ?? "fn(" + string.Join(", ", Parameters.Select(p => "$" + p)) + ") => …";
+        public override string ToString() => Source ?? "fn(" + string.Join(", ", Parameters) + ") => …";
     }
 
     /// <summary>A function declared with &lt;fn name params&gt;, called as <c>@name(args)</c>.</summary>
@@ -350,7 +350,7 @@ namespace KScript.Runtime
 
         public bool Bool(int i, bool fallback = false) => Has(i) ? Values.Truthy(Arg(i)) : fallback;
 
-        public ICallable Fn(int i) => Need(i) as ICallable ?? throw Error($"{Display} needs a function like fn($x) => ... as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
+        public ICallable Fn(int i) => Need(i) as ICallable ?? throw Error($"{Display} needs a function like fn(x) => ... as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
 
         public List<object> List(int i) => Need(i) as List<object> ?? throw Error($"{Display} needs a list as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
 
