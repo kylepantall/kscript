@@ -110,7 +110,7 @@ describe(name: "a shopping cart") {
 `@assert(condition, message?)` checks a condition, on a line of its own or inside an expression such as a lambda. When a comparison fails it shows the value of each side:
 
 ```text
-Expected $order.total eq 30 to be true.
+Expected $order.total == 30 to be true.
   $order.total is 25
 ```
 
@@ -226,6 +226,6 @@ test(name: "a note is saved") {
 
 ## In the editor
 
-The language server treats `*.test.kscript` and `*.test.ks.xml` files as importing KScript.Test, so `test`, `expect` and the rest get completion, hover and checking, and `$case` from `each` is known inside the test. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.
+The language server treats `*.test.kscript` and `*.test.ks.xml` files as importing KScript.Test, so `test`, `expect` and the rest get completion, hover and checking, and the variables of a `for` loop round a test are known inside it. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.
 
 `expect`, `@assert` and `capture` also work in ordinary scripts that `import KScript.Test`: a failed check stops the script with an `Assertion` error. `test` and `describe` only work under `kscript test`.

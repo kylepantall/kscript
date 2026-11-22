@@ -122,7 +122,7 @@ namespace KScript.Documents
                 new A("path", K.Path, "The image, relative to the script.", true),
                 new A("caption", K.Template, "The caption, shown below as 'Figure 1: ...'."), Id,
                 new A("width", K.Expression, "The share of the text width, from 0 to 1 (or '60%').")), DocumentElements.Figure);
-            p.Element(new ElementInfo("Math", "A displayed equation in LaTeX, numbered unless numbered: no. Its text is used as written, so braces are LaTeX's. Inside matrix, cases and aligned, a new line ends a row.", ContentKind.Template,
+            p.Element(new ElementInfo("Math", "A displayed equation in LaTeX, numbered unless numbered: false. Its text is used as written, so braces are LaTeX's. Inside matrix, cases and aligned, a new line ends a row.", ContentKind.Template,
                 Id, new A("numbered", K.Bool, "no leaves it without an equation number."))
             {
                 Context = ElementContext.Script,

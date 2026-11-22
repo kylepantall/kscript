@@ -16,7 +16,7 @@
   <set>x += 1</set>
   <do>x = 3; total += $price * $qty</do>
   <echo>$x $total</echo>
-  <let name="config" const="yes">{ debug: false, retries: 3 }</let>
+  <const name="config" value="{ debug: false, retries: 3 }" />
   <echo>Hello, $name! Total: { ($price * $qty)->round(digits: 2) }. Use {{ and }} for braces.</echo>
 
   <!-- Lists, maps, lambdas and pipes -->

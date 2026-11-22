@@ -1163,7 +1163,7 @@ namespace KScript.Projects
                     case "routes":
                         if (p.Value.ValueKind != JsonValueKind.Array)
                         {
-                            config.Warnings.Add("http.routes should be a list of route files, e.g. [\"routes.ks.xml\", { \"file\": \"api.ks.xml\", \"prefix\": \"/api\", \"api\": true }].");
+                            config.Warnings.Add("http.routes should be a list of route files, e.g. [\"routes.kscript\", { \"file\": \"api.kscript\", \"prefix\": \"/api\", \"api\": true }].");
                             break;
                         }
                         http.Routes = new List<HttpSettings.RouteFile>();

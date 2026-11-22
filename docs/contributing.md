@@ -129,7 +129,7 @@ The compiler turns that string into a `Wording` (`KScript.Syntax/Text/Wording.cs
 
 GitHub highlights code with [Linguist](https://github.com/github-linguist/linguist), which only knows the languages that have been added to it. A repository can't bring its own grammar, so until KScript is in Linguist:
 
-- Code blocks in Markdown use ` ```xml ` for scripts and ` ```html ` for `kscript serve` pages. GitHub highlights the markup, though not KScript's `{ }` expressions.
-- `.gitattributes` marks `*.ks` and `*.ks.xml` files as XML, so they are highlighted in the file view and counted as XML in the language bar.
+- Code blocks in Markdown use ` ```kscript ` for scripts (GitHub shows them as plain text; the docs site and the editor colour them), ` ```xml ` for the XML form and ` ```html ` for `kscript serve` pages.
+- `.gitattributes` marks `*.ks.xml` files as XML, so they are highlighted in the file view and counted as XML in the language bar.
 
 KScript already has a full TextMate grammar in [`editors/vscode/syntaxes/kscript.tmLanguage.json`](../editors/vscode/syntaxes/kscript.tmLanguage.json), the format Linguist uses. Linguist adds a new language once its file extension is used in at least 200 different repositories on GitHub. When KScript gets there, the grammar can be submitted to Linguist, and ` ```kscript ` code blocks and `.ks.xml` files will then be highlighted as KScript everywhere on GitHub.

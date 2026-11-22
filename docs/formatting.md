@@ -1,6 +1,6 @@
 # Formatting: kscript fmt
 
-`kscript fmt` tidies scripts (`.ks.xml`, `.ks`, `.kscript` and `.xml` files that start with `<kscript>`) and the `.html` pages that `kscript serve` runs. The editor uses the same formatter for **Format Document** and format on save, so the command line and every editor agree.
+`kscript fmt` tidies scripts (`.kscript` and `.ks.xml` files) and the `.html` pages that `kscript serve` runs. The editor uses the same formatter for **Format Document** and format on save, so the command line and every editor agree.
 
 ```sh
 kscript fmt                     # format every script and page in the current project
@@ -160,7 +160,7 @@ Put style settings under `"format"` in `kscript.json`. Every setting is optional
     "preserve": ["pre-like"], // elements whose content is kept exactly
     "rules": {},              // turn rules off, e.g. { "statement_per_line": false }; see below
     "enabled": true,          // false: no formatting anywhere in this project
-    "include": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html"],
+    "include": ["**/*.kscript", "**/*.ks.xml", "**/*.html"],
     "exclude": ["_templates", "node_modules", ".git"]
   }
 }

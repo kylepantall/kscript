@@ -3,7 +3,7 @@
 `kscript compile` turns a script into a program that runs on computers without kscript or .NET. It works for all three kinds of KScript:
 
 - a terminal script, which becomes a command-line program;
-- a `<KScript.Window>` desktop app, which becomes a Mac `.app`, a Windows `.exe` with its icon, or a Linux program with a launcher entry;
+- a desktop app (a script with a `Window { }` block), which becomes a Mac `.app`, a Windows `.exe` with its icon, or a Linux program with a launcher entry;
 - a `kscript serve` site, which becomes a program that serves it.
 
 ```sh

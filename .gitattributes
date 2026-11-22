@@ -68,5 +68,4 @@
 # GitHub doesn't know KScript yet, so show KScript files as XML until a
 # KScript grammar is accepted into github-linguist (see docs/contributing.md).
 ###############################################################################
-*.ks      linguist-language=XML
 *.ks.xml  linguist-language=XML

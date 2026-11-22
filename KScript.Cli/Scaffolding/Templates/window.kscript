@@ -1,5 +1,5 @@
 --- make
-description: A desktop window (KScript.Window): a native app on macOS, Windows and Linux
+description: A desktop window (Window, from KScript.UI): a native app on macOS, Windows and Linux
 category: Desktop apps
 usage: <name> [--title "Title"] [--width 480] [--height 360]
 --title: The window title (default from the name)

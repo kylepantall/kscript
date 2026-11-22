@@ -64,7 +64,7 @@
       "properties": {
         "routes": {
           "type": "array",
-          "description": "The route files, relative to the site folder. Without this, kscript serve loads routes.ks.xml (or .kscript) and api.ks.xml (under /api).",
+          "description": "The route files, relative to the site folder. Without this, kscript serve loads routes.kscript and api.kscript (under /api), or their .ks.xml forms.",
           "items": {
             "oneOf": [
               { "type": "string" },
@@ -213,7 +213,7 @@
       "description": "Settings for kscript make.",
       "additionalProperties": false,
       "properties": {
-        "syntax": { "enum": ["kscript", "xml"], "default": "kscript", "description": "The syntax kscript make writes scripts, tests, routes and desktop apps in: kscript (.kscript files) or xml (.ks.xml). --format on the command line wins." }
+        "syntax": { "enum": ["kscript", "xml"], "default": "kscript", "description": "The syntax kscript make writes scripts, tests, routes and desktop apps in: kscript (.kscript files) or xml (.ks.xml). --syntax on the command line wins." }
       }
     },
     "app": {
