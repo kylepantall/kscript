@@ -94,7 +94,7 @@ namespace KScript.Documents
             doc.Date = Blank(run.Template("date"));
             foreach (string name in (run.Template("author") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 doc.Authors.Add(new Author { Name = name });
-            doc.Keywords.AddRange((run.Template("keywords") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            doc.Keywords.AddRange(KScript.Metadata.NameList.Names(run.Template("keywords")));
 
             string into = run.Has("into") ? run.VariableName("into") : null;
             string to = run.Template("to");
