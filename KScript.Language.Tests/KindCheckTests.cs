@@ -37,8 +37,8 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("person = { name: 'Joan', age: 82 }\necho $person.email ?? 'none'\n")] // not close to a field: may be optional
         [InlineData("point = { x: 1, y: 2 }\necho $point.z\n")] // short names are close without being typos
-        [InlineData("person = { name: 'Joan' }\n$person.nmae = 'x'\necho $person.nmae\n")] // the field is given a value
-        [InlineData("person = { name: 'Joan' }\necho $person.nmae\n$person['nmae'] = 'x'\n")]
+        [InlineData("person = { name: 'Joan' }\nperson.nmae = 'x'\necho $person.nmae\n")] // the field is given a value
+        [InlineData("person = { name: 'Joan' }\necho $person.nmae\nperson['nmae'] = 'x'\n")]
         [InlineData("person = { name: 'Joan' }\necho $person.name->count()\nlist = [1]\necho $list->count()\n")]
         [InlineData("data = '{}'->json()\necho $data.nmae\n")]
         public void FieldsThatMayBeThereAreLeftAlone(string text)

@@ -255,7 +255,7 @@ public class WebCoverageTests
     [Fact]
     public void While_loops_slots_markdown_components_and_attribute_braces()
     {
-        Assert.Equal("12", Render("<let name=\"i\" value=\"0\" /><while test=\"$i < 2\"><do>$i += 1</do>{$i}</while>"));
+        Assert.Equal("12", Render("<let name=\"i\" value=\"0\" /><while test=\"$i < 2\"><do>i += 1</do>{$i}</while>"));
         Assert.Equal("<main>fallback</main>", Render("<main><slot>fallback</slot></main>"));
         Assert.Equal("<p title=\"2\">x</p>", Render("<p title=\"{ { a: 2 }.a }\">x</p>"));
         Assert.Contains("never closed", RenderFails("<p title=\"{ 'a' \">x</p>"));

@@ -45,7 +45,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void Package_elements_with_expression_and_assignment_content_are_checked()
         {
-            DocumentAnalysis a = AnalyzerCoverageTests.Check("<import package=\"KScript.Shapes\" /><let name=\"n\" value=\"1\" /><total>$n + $missing</total><steps>$n = 2; $other = 3</steps><total> </total><steps></steps>", catalog: Catalog());
+            DocumentAnalysis a = AnalyzerCoverageTests.Check("<import package=\"KScript.Shapes\" /><let name=\"n\" value=\"1\" /><total>$n + $missing</total><steps>$n = 2; other = 3</steps><total> </total><steps></steps>", catalog: Catalog());
             Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.UndefinedVariable && d.Message.Contains("$missing"));
             Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.SetUndeclared || d.Message.Contains("other"));
         }

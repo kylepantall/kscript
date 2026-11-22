@@ -89,6 +89,6 @@ public class ExpressionTests
     [Fact]
     public void MembersAndIndexesCanBeAssigned()
     {
-        Assert.Equal("{\"a\":5,\"list\":[1,9]}\n", RunBody("<let name=\"m\" value=\"{ a: 1, list: [1, 2] }\" /><do>$m.a = 5; $m.list[1] = 9</do><echo>{ $m->to_json() }</echo>"));
+        Assert.Equal("{\"a\":5,\"list\":[1,9]}\n", RunBody("<let name=\"m\" value=\"{ a: 1, list: [1, 2] }\" /><do>m.a = 5; m.list[1] = 9</do><echo>{ $m->to_json() }</echo>"));
     }
 }

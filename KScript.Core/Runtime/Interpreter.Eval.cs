@@ -630,7 +630,7 @@ namespace KScript.Runtime
                 {
                     object container = Evaluate(AssignedThrough(member.Target), scope, ctx);
                     if (container is not Dictionary<string, object> map)
-                        throw Fail(member, ctx, $"Only map fields can be set, but {SourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
+                        throw Fail(member, ctx, $"Only map fields can be set, but {ReadSourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
                     if (node.Operator != "=") value = Combine(map.TryGetValue(member.Name, out object cur) ? cur : null, node.Operator, value, node, ctx);
                     SetKey(map, member.Name, value, member, ctx);
                     return;
@@ -659,10 +659,18 @@ namespace KScript.Runtime
                             return;
                         }
                     }
-                    throw Fail(index, ctx, $"Only list items and map keys can be set, but {SourceOf(index.Target, ctx)} is {Values.Describe(container)}.", "Type");
+                    throw Fail(index, ctx, $"Only list items and map keys can be set, but {ReadSourceOf(index.Target, ctx)} is {Values.Describe(container)}.", "Type");
                 }
             }
             throw Fail(target, ctx, "Only a variable, a map field or a list item can be assigned to.", "Syntax");
+        }
+
+        /// <summary>How an assignment's target is read, for a message: <c>s.a = 1</c> sets a field of <c>$s</c>.</summary>
+        private string ReadSourceOf(ExprNode node, EvalContext ctx)
+        {
+            ExprNode root = node;
+            while (root is MemberNode or IndexNode) root = root is MemberNode m ? m.Target : ((IndexNode)root).Target;
+            return (root is IdentifierNode ? "$" : string.Empty) + SourceOf(node, ctx);
         }
 
         /// <summary>

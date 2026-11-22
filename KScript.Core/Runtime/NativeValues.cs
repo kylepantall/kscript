@@ -656,7 +656,9 @@ namespace KScript.Runtime
                 }
                 catch (Exception e) when (e is TimeZoneNotFoundException or InvalidTimeZoneException)
                 {
-                    return No("it isn't an IANA time zone, such as Europe/London");
+                    // Names are found whatever their case (europe/london), which the system only does once it has listed its zones.
+                    zone = TimeZoneInfo.GetSystemTimeZones().FirstOrDefault(z => z.Id.Equals(t, StringComparison.OrdinalIgnoreCase));
+                    if (zone == null) return No("it isn't an IANA time zone, such as Europe/London");
                 }
                 string id = zone.HasIanaId ? zone.Id : TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out string iana) ? iana : zone.Id;
                 if (!t.Contains('/') && t != "UTC" && id != t) return No($"it isn't an IANA time zone; use {id}");

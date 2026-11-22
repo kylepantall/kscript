@@ -146,9 +146,9 @@ public class TypedJsonTests
     [InlineData("<let name=\"r\" type=\"Repo\" value=\"null\" />", "$r doesn't fit Repo: needs a Repo, but it is null.")]
     [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><echo>{ $r.starz }</echo>", "Repo has no field 'starz'. Did you mean stars?")]
     [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><echo>{ $r.zzzzzz }</echo>", "Repo has no field 'zzzzzz'. Its fields are: name, stars")]
-    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>$r.starz = 3</set>", "Repo has no field 'starz'. Did you mean stars?")]
-    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>$r['stars'] = 'many'</set>", "Repo.stars must be an int, but got the string 'many'.")]
-    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>$r.owner = { login: 'x' }</set>", "Repo.owner doesn't fit User (1 problem)")]
+    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>r.starz = 3</set>", "Repo has no field 'starz'. Did you mean stars?")]
+    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>r['stars'] = 'many'</set>", "Repo.stars must be an int, but got the string 'many'.")]
+    [InlineData("<let name=\"r\" value=\"Repo(" + Good + ")\" /><set>r.owner = { login: 'x' }</set>", "Repo.owner doesn't fit User (1 problem)")]
     [InlineData("<echo>{ Repo->nope() }</echo>", "nope")]
     [InlineData("<echo>{ Repo.nope }</echo>", "has no field 'nope'")]
     [InlineData("<fn name=\"f\" params=\"x: 1a\" value=\"1\" />", "Unknown type '1a' for parameter 'x'.")]
@@ -163,8 +163,8 @@ public class TypedJsonTests
     public void SettingAFieldConvertsTheValue()
     {
         Assert.Equal("13 number\nmap\n", RunBody(Types + "<let name=\"r\" value=\"Repo(" + Good + ")\" />"
-            + "<set>$r.stars = '13'</set><set>$r['label'] = 'x'</set><echo>{ $r.stars } { $r.stars->type() }</echo>"
-            + "<let name=\"m\" value=\"{}\" /><set>$m.a = 1</set><set>$m['b'] = 2</set><echo>{ $m->type() }</echo>"));
+            + "<set>r.stars = '13'</set><set>r['label'] = 'x'</set><echo>{ $r.stars } { $r.stars->type() }</echo>"
+            + "<let name=\"m\" value=\"{}\" /><set>m.a = 1</set><set>m['b'] = 2</set><echo>{ $m->type() }</echo>"));
     }
 
     [Theory]
@@ -181,7 +181,7 @@ public class TypedJsonTests
     {
         Assert.Contains("$.b: T has no field 'b'.", Fails("<type name=\"T\" fields=\"a: int\" extra=\"error\" /><echo>{ T({ a: 1, b: 2 }) }</echo>").Message);
         Assert.Contains("$['odd key']: T has no field 'odd key'.", Fails("<type name=\"T\" fields=\"a: int\" extra=\"error\" /><echo>{ T({ a: 1, 'odd key': 2 }) }</echo>").Message);
-        Assert.Equal("5\n", RunBody("<type name=\"T\" fields=\"a: int\" extra=\"keep\" /><let name=\"t\" value=\"T({ a: 1 })\" /><set>$t.z = 5</set><echo>{ $t.z }</echo>"));
+        Assert.Equal("5\n", RunBody("<type name=\"T\" fields=\"a: int\" extra=\"keep\" /><let name=\"t\" value=\"T({ a: 1 })\" /><set>t.z = 5</set><echo>{ $t.z }</echo>"));
     }
 
     [Theory]
