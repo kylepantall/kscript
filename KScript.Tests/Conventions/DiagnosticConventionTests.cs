@@ -56,7 +56,7 @@ public sealed class DiagnosticConventionTests
     /// Codes declared and documented ahead of the rule that reports them, which is being written separately.
     /// Take a code out of this list when its rule lands; the list should end up empty.
     /// </summary>
-    private static readonly string[] ReportedElsewhere = { DiagnosticCodes.NamingStyle };
+    private static readonly string[] ReportedElsewhere = { };
 
     [Fact]
     public void Every_diagnostic_code_is_reported_somewhere()
