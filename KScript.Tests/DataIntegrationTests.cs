@@ -138,4 +138,121 @@ public sealed class DataIntegrationTests : DataFixture
         Assert.Equal("boolean", page.GetProperty("properties").GetProperty("has_more").GetProperty("type").GetString());
         Assert.Contains("\"total\":2", Send(app, "GET", "/api/posts").Body);
     }
+
+    private const string Member = """
+        import KScript.Data
+
+        model User {
+          timestamps: yes
+          hidden: [password]
+          email: email
+          password: password
+          name: string = 'Someone'
+          nickname: string?
+          posts: Post[]
+        }
+        """;
+
+    private Browser Members(string model = Member, string users = "User")
+    {
+        Database.CloseAll();
+        if (Server != null) DatabaseServer.Reset(Server);
+        FileOf("kscript.json", "{ \"name\": \"members-" + Guid.NewGuid().ToString("N") + "\", \"http\": { \"auth\": { \"users\": \"" + users + "\", \"folder\": \"storage\" } } }");
+        FileOf("models/post.kscript", PostModel);
+        FileOf("models/user.kscript", model);
+        FileOf("controllers/members.kscript", """
+            import KScript.Http
+            import KScript.Auth
+            import KScript.Data
+
+            fn reg(json) => @register($json.email, $json.password, name: $json.name)
+            fn colour(json) => @register($json.email, $json.password, colour: 'red')
+            fn sign_in(json) => { user: @attempt($json.email, $json.password) }
+            fn me() {
+              me = @user()
+              return { name: $me.name, posts: $me.posts->count(), json: @json($me) }
+            }
+            fn people(json) {
+              u = @users()
+              return { count: $u.count, all: $u->all(), found: $u->find($json.id), none: $u->find('99'), email: $u->find_email('JOAN@example.com'), ok: $u->verify('joan@example.com', $json.password) }
+            }
+            fn update(json) => @users()->update($json.id, nickname: $json.nickname)
+            fn renew(json) => @users()->set_password($json.id, $json.password)
+            fn remove(json) => { first: @users()->delete($json.id), second: @users()->delete($json.id) }
+            """);
+        FileOf("routes/api.kscript", """
+            KScript.Routes {
+              import "../controllers/members.kscript" as m
+
+              Post(path: "/reg", to: m.reg)
+              Post(path: "/colour", to: m.colour)
+              Post(path: "/attempt", to: m.sign_in)
+              Get(path: "/me", to: m.me, middleware: auth)
+              Post(path: "/users", to: m.people)
+              Post(path: "/update", to: m.update)
+              Post(path: "/renew", to: m.renew)
+              Post(path: "/remove", to: m.remove)
+            }
+            """);
+        if (model == Member) Keep("$db->create_table($User)\n$db->create_table($Post)");
+        return new Browser(new HttpApp(Project, ProjectConfig.FindAndLoad(Project), new StringWriter()));
+    }
+
+    private static Dictionary<string, object> Json(PageResult r)
+    {
+        Assert.True(r.Status == 200, r.Status + " " + r.Body);
+        return (Dictionary<string, object>)KScript.Runtime.Values.ParseJson(r.Body);
+    }
+
+    [Fact]
+    public void SignInUsersCanBeAModel()
+    {
+        Browser b = Members();
+        const string joan = "{ \"email\": \"Joan@Example.com\", \"password\": \"correct horse battery\", \"name\": \"Joan\" }";
+        Dictionary<string, object> made = Json(b.Send("POST", "/api/reg", json: joan));
+        Assert.Equal(1.0, made["id"]);
+        Assert.Equal("Joan@example.com", made["email"]);
+        Assert.False(made.ContainsKey("password"));
+        Assert.Contains("already signed up", b.Send("POST", "/api/reg", json: joan).Body);
+        Assert.Contains("User has no field 'colour'", b.Send("POST", "/api/colour", json: "{ \"email\": \"amy@example.com\", \"password\": \"correct horse battery\" }").Body);
+
+        // The user is a row of the users table, with a hash in its password field.
+        Assert.Equal("1 Joan true", Keep("u = $User->find(1)\nok = $u.password->verify('correct horse battery')\necho \"$u.id $u.name $ok\""));
+        Keep("$Post->create(title: 'Mine', author_id: 1)");
+
+        Assert.Equal(401, b.Send("GET", "/api/me", headers: new Dictionary<string, object> { ["accept"] = "application/json" }).Status);
+        Assert.Equal("Joan@example.com", ((Dictionary<string, object>)Json(b.Send("POST", "/api/attempt", json: joan))["user"])["email"]);
+        Dictionary<string, object> me = Json(b.Send("GET", "/api/me"));
+        Assert.Equal("Joan", me["name"]);
+        Assert.Equal(1.0, me["posts"]);
+        Assert.DoesNotContain("password", KScript.Runtime.Values.ToStr(me["json"]));
+
+        Dictionary<string, object> users = Json(b.Send("POST", "/api/users", json: "{ \"id\": \"1\", \"password\": \"correct horse battery\" }"));
+        Assert.Equal(1.0, users["count"]);
+        Assert.Single((List<object>)users["all"]);
+        Assert.Equal("Joan", ((Dictionary<string, object>)users["found"])["name"]);
+        Assert.Null(users["none"]);
+        Assert.Equal(1.0, ((Dictionary<string, object>)users["email"])["id"]);
+        Assert.NotNull(users["ok"]);
+
+        Assert.Equal("Jo", Json(b.Send("POST", "/api/update", json: "{ \"id\": \"1\", \"nickname\": \"Jo\" }"))["nickname"]);
+        Assert.Null(Json(b.Send("POST", "/api/update", json: "{ \"id\": \"1\", \"nickname\": null }"))["nickname"]);
+        Json(b.Send("POST", "/api/renew", json: "{ \"id\": \"1\", \"password\": \"a new long password\" }"));
+        Assert.Null(Json(b.Send("POST", "/api/users", json: "{ \"id\": \"1\", \"password\": \"correct horse battery\" }"))["ok"]);
+
+        Keep("$Post->query()->delete()");
+        Dictionary<string, object> removed = Json(b.Send("POST", "/api/remove", json: "{ \"id\": \"1\" }"));
+        Assert.Equal(true, removed["first"]);
+        Assert.Equal(false, removed["second"]);
+        Assert.Equal("0", Keep("echo $User->count()"));
+    }
+
+    [Fact]
+    public void AUsersModelNeedsAnEmailAndAPassword()
+    {
+        Assert.Contains("there is no Member model in models", Members(users: "Member").Send("POST", "/api/reg", json: "{}").Body);
+        Assert.Contains("doesn't declare a model called User", Members("import KScript.Data\n\nmodel Person {\n  email: email\n}\n").Send("POST", "/api/reg", json: "{}").Body);
+        Assert.Contains("User needs an email field", Members("import KScript.Data\n\nmodel User {\n  name: string\n}\n").Send("POST", "/api/reg", json: "{}").Body);
+        Assert.Contains("User needs a password field", Members("import KScript.Data\n\nmodel User {\n  email: email\n}\n").Send("POST", "/api/reg", json: "{}").Body);
+    }
 }

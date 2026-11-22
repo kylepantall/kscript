@@ -375,6 +375,12 @@ namespace KScript.Projects
         /// <summary>A folder for users, sessions and tokens, relative to the site folder. Null means the app's own data and state folders.</summary>
         public string Folder { get; set; }
 
+        /// <summary>
+        /// A KScript.Data model (in the models folder) that holds the users, such as "User". Null keeps them as JSON
+        /// files in the app's data folder.
+        /// </summary>
+        public string Users { get; set; }
+
         /// <summary>Seconds a session lasts without a request before it ends.</summary>
         public double Lifetime { get; set; } = 2 * 60 * 60;
 
@@ -404,7 +410,7 @@ namespace KScript.Projects
 
         public static readonly string[] SameSiteValues = { "Lax", "Strict", "None" };
 
-        public static readonly string[] SettingNames = { "token_env", "login", "home", "sessions", "folder", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime" };
+        public static readonly string[] SettingNames = { "token_env", "login", "home", "sessions", "folder", "users", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime" };
     }
 
     public sealed class ProjectConfig
@@ -1316,6 +1322,7 @@ namespace KScript.Projects
                 case "login": auth.Login = String(a.Value, name, config) ?? auth.Login; break;
                 case "home": auth.Home = String(a.Value, name, config) ?? auth.Home; break;
                 case "folder": auth.Folder = String(a.Value, name, config) ?? auth.Folder; break;
+                case "users": auth.Users = String(a.Value, name, config) ?? auth.Users; break;
                 case "cookie": auth.Cookie = String(a.Value, name, config) ?? auth.Cookie; break;
                 case "secure": auth.Secure = Bool(a.Value, name, config) ?? auth.Secure; break;
                 case "csrf": auth.Csrf = Bool(a.Value, name, config) ?? auth.Csrf; break;

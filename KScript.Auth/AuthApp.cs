@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
+using KScript.Data;
 using KScript.Projects;
 using KScript.Runtime;
 
@@ -24,6 +25,26 @@ namespace KScript.Auth
 
         /// <summary>Every record, by key.</summary>
         public abstract IEnumerable<KeyValuePair<string, Dictionary<string, object>>> All();
+
+        /// <summary>Adds a record under a new key (a random uuid), sets its id to the key, and returns the key.</summary>
+        public virtual string Add(Dictionary<string, object> record)
+        {
+            string key = UuidValue.New(4).Text;
+            record["id"] = key;
+            Put(key, record);
+            return key;
+        }
+
+        /// <summary>The first record whose <paramref name="field"/> is this text (case doesn't matter), or null.</summary>
+        public virtual Dictionary<string, object> FindBy(string field, string value) =>
+            All().Select(kv => kv.Value)
+                .FirstOrDefault(r => string.Equals(AuthApp.Text(r.GetValueOrDefault(field)), value, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>How many records there are.</summary>
+        public virtual int Count() => All().Count();
+
+        /// <summary>A record as scripts see it: <paramref name="shown"/>, the record without its private fields, by default.</summary>
+        public virtual Dictionary<string, object> Present(Dictionary<string, object> record, Dictionary<string, object> shown) => shown;
 
         /// <summary>Keys are made by KScript.Auth (ids and hashes), never by a request, but are checked all the same.</summary>
         protected static string Check(string key)
@@ -126,7 +147,9 @@ namespace KScript.Auth
             string own = settings.Folder != null ? Path.GetFullPath(Path.Combine(root, settings.Folder)) : null;
             string data = own ?? Path.Combine(AppFolders.Folder(name, "data"), "auth");
             string state = own ?? Path.Combine(AppFolders.Folder(name, "state"), "auth");
-            Users = new FileRecordStore(Path.Combine(data, "users"));
+            Users = settings.Users != null
+                ? new ModelRecordStore(ModelStore.Load(KScriptHost.ForText(new StringWriter()), root, settings.Users, "http.auth.users"))
+                : new FileRecordStore(Path.Combine(data, "users"));
             Sessions = settings.Sessions == "memory" ? new MemoryRecordStore() : new FileRecordStore(Path.Combine(state, "sessions"));
             Tokens = new FileRecordStore(Path.Combine(state, "tokens"));
             Resets = new FileRecordStore(Path.Combine(state, "resets"));
@@ -172,6 +195,7 @@ namespace KScript.Auth
         private static Dictionary<string, object> Describe(AuthSettings s) => new Dictionary<string, object>
         {
             ["folder"] = s.Folder,
+            ["users"] = s.Users,
             ["sessions"] = s.Sessions,
             ["login"] = s.Login,
             ["home"] = s.Home,

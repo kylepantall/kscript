@@ -136,7 +136,7 @@ namespace KScript.Data
         }
 
         /// <summary>A record made with <c>$User->from()</c>, or a new one, as a row of the table.</summary>
-        private static void Insert(CallContext call, ModelInfo model, Record record)
+        internal static void Insert(CallContext call, ModelInfo model, Record record)
         {
             foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.BelongsTo && !r.Optional))
             {
