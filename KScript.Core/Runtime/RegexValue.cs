@@ -18,6 +18,27 @@ namespace KScript.Runtime
         public string Flags { get; }
         public System.Text.RegularExpressions.Regex Regex { get; }
 
+        private System.Text.RegularExpressions.Regex wholeWord;
+
+        internal bool MatchesWholeWord(string word) =>
+            Run(this, regex => (wholeWord ??= WholeWordPattern(regex)).IsMatch(word));
+
+        private static System.Text.RegularExpressions.Regex WholeWordPattern(System.Text.RegularExpressions.Regex regex)
+        {
+            // Anchor outside the alternatives, so /a|abc/ can match the entire word "abc".
+            string start = @"\A(?:" + regex;
+            try
+            {
+                return new System.Text.RegularExpressions.Regex(start + @")\z", regex.Options, regex.MatchTimeout);
+            }
+            catch (System.Text.RegularExpressions.RegexParseException error)
+                when (error.Error == System.Text.RegularExpressions.RegexParseError.InsufficientClosingParentheses)
+            {
+                // In x mode a final # comment can consume the closing group we just appended.
+                return new System.Text.RegularExpressions.Regex(start + "\n" + @")\z", regex.Options, regex.MatchTimeout);
+            }
+        }
+
         /// <summary>The literal: /pattern/flags.</summary>
         public string Text => "/" + Pattern + "/" + Flags;
         public string TypeName => SemanticTypes.Regex;

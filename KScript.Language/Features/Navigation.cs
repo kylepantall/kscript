@@ -333,7 +333,9 @@ namespace KScript.Language.Features
                     continue;
                 }
                 string text = Files.ReadText(full);
-                if (text == null || text.IndexOf(s.Name, StringComparison.Ordinal) < 0 || (full != target && text.IndexOf(stem, StringComparison.OrdinalIgnoreCase) < 0))
+                // A project-native refinement can be used by a literal in a file that never spells its type name.
+                if (text == null || (s.Shape.LiteralPattern == null && (text.IndexOf(s.Name, StringComparison.Ordinal) < 0
+                    || (full != target && text.IndexOf(stem, StringComparison.OrdinalIgnoreCase) < 0))))
                 {
                     continue;
                 }
@@ -355,13 +357,13 @@ namespace KScript.Language.Features
         public TextSpan? PrepareRename(DocumentAnalysis analysis, int offset)
         {
             SymbolReference at = analysis.ReferenceAt(offset);
-            return at != null && at.Symbol.CanRename && at.Symbol.Kind != SymbolKind.FrontMatter ? at.Span : null;
+            return at != null && !at.IsPatternLiteral && at.Symbol.CanRename && at.Symbol.Kind != SymbolKind.FrontMatter ? at.Span : null;
         }
 
         public RenameResult Rename(DocumentAnalysis analysis, int offset, string newName)
         {
             SymbolReference at = analysis.ReferenceAt(offset);
-            if (at == null || !at.Symbol.CanRename || at.Symbol.Kind == SymbolKind.FrontMatter)
+            if (at == null || at.IsPatternLiteral || !at.Symbol.CanRename || at.Symbol.Kind == SymbolKind.FrontMatter)
             {
                 return new RenameResult { Error = "Nothing to rename here." };
             }
@@ -386,7 +388,7 @@ namespace KScript.Language.Features
             }
 
             RenameResult result = new RenameResult();
-            foreach (SymbolReference r in analysis.ReferencesTo(at.Symbol))
+            foreach (SymbolReference r in analysis.ReferencesTo(at.Symbol).Where(r => !r.IsPatternLiteral))
             {
                 result.Changes.Add(new TextChange(r.Span, name));
             }

@@ -261,6 +261,7 @@ namespace KScript.Runtime
                     if (scope.TryGet(id.Name, out object declaredType) && declaredType is IDeclaredType) return declaredType;
                     // So is an error type: catch NotFound, $err->is(NotFound).
                     if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType) return errorType;
+                    if (InferredLiteral(id.Name, scope, ctx.Module) is PatternLiteral literal) return literal.Convert(this);
                     throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
 
                 case ListNode list:
@@ -318,11 +319,22 @@ namespace KScript.Runtime
 
                 case CastNode cast:
                 {
-                    object input = Evaluate(cast.Value, scope, ctx);
-                    TypeRef type = TypeRef.Parse(cast.TypeName)
+                    CastSite site = castSites.GetValue(cast, static node => new CastSite(node));
+                    TypeRef type = site.Target ?? TypeRef.Parse(cast.TypeName)
                         ?? throw Fail(cast, ctx, $"'{cast.TypeName}' isn't a valid cast type.", "Type");
+                    object input = cast.Value is IdentifierNode word && CanBeLiteral(word.Name, scope, ctx.Module)
+                        && Shapes.RawTextKind(type, scope, ctx.Module) != null
+                        ? word.Name : Evaluate(cast.Value, scope, ctx);
                     // Validate the target even when a null or an empty list has no values to convert.
-                    if (!Values.IsDeclarable(type.Name)) Shapes.Resolve(type, scope, ctx.Module);
+                    if (!Values.IsDeclarable(type.Name))
+                    {
+                        object target = Shapes.Resolve(type, scope, ctx.Module);
+                        if (type.IsSimple && type.Args == null && target is RefinedType refined && refined.StaticStringRoot != null
+                            && input is string text && text.Length <= MaxCachedTextLength)
+                        {
+                            return ConvertRepeatedText(site, refined, text);
+                        }
+                    }
                     if (type.Args != null) type.Refined(scope, ctx.Module);
                     return Shapes.Convert(this, input, type, "The value", scope, ctx.Module);
                 }
@@ -410,6 +422,14 @@ namespace KScript.Runtime
         private static string TextAsWritten(ExprNode node, string callName) =>
             callName != null && TemplateParser.KeepsText(callName) && node is LiteralNode { Kind: LiteralKind.String } text ? text.Value : null;
 
+        private static bool CanBeLiteral(string word, Scope scope, Module module) =>
+            scope != null && word != "_" && !Lexer.Keywords.Contains(word) && !scope.Has(word)
+            && module?.Commands.ContainsKey(word) != true && module?.Variables.ContainsKey(word) != true
+            && module?.Aliases.ContainsKey(word) != true && ErrorTypes.FindExact(word, null) == null;
+
+        internal static PatternLiteral InferredLiteral(string word, Scope scope, Module module) =>
+            CanBeLiteral(word, scope, module) ? scope.PatternTypes().Resolve(word) : null;
+
         private (List<object>, Dictionary<string, object>) EvaluateArguments(IReadOnlyList<ArgumentNode> arguments, Scope scope, EvalContext ctx, string callName = null)
         {
             var args = new List<object>(arguments.Count);
@@ -458,7 +478,7 @@ namespace KScript.Runtime
                 && !(!negated && scope.TryGet(id.Name, out object value) && value is IDeclaredType)
                 && !(!negated && ErrorTypes.FindExact(id.Name, null) != null))
             {
-                return new BareWord(id.Name, negated, afterNamed);
+                return new BareWord(id.Name, negated, afterNamed) { IsIdentifier = !negated };
             }
             return null;
         }
@@ -976,15 +996,35 @@ namespace KScript.Runtime
             switch (type)
             {
                 case RecordType record:
+                    foreach (string name in named.Keys.Where(k => named[k] is BareWord or BareList).ToArray())
+                    {
+                        TypeRef field = record.Fields.FirstOrDefault(f => f.Name == name)?.Type;
+                        named[name] = ConstructorValue(named[name], field, record.Closure, record.Module);
+                    }
+                    if (args.Count == 1 && args[0] is BareWord or BareList)
+                        args[0] = ConstructorValue(args[0], TypeRef.Of(record), record.Closure, record.Module);
                     return record.Construct(this, args, named);
                 case RefinedType refined:
                     if (args.Count != 1 || named.Count > 0) throw new KScriptException($"{refined.Name}() takes one value to check: {refined.Name}($value).", "Argument");
-                    return Shapes.Convert(this, args[0], TypeRef.Of(refined), "The value", refined.Closure, refined.Module);
+                    TypeRef target = TypeRef.Of(refined);
+                    return Shapes.Convert(this, ConstructorValue(args[0], target, refined.Closure, refined.Module), target, "The value", refined.Closure, refined.Module);
                 case EnumType e:
                     if (args.Count != 1 || named.Count > 0) throw new KScriptException($"{e.Name}() takes one value to check: {e.Name}($value).", "Argument");
-                    return e.Check(args[0], "The value");
+                    return e.Check(args[0] is BareWord { IsIdentifier: true } word ? word.Name : args[0], "The value");
                 default:
                     throw new KScriptException($"{Values.Describe(type)} can't be called.", "Type");
+            }
+
+            object ConstructorValue(object value, TypeRef expected, Scope closure, Module module)
+            {
+                if (value is BareList list)
+                {
+                    TypeRef item = expected?.ListDepth > 0 ? expected.Item : null;
+                    return list.Items.Select(i => ConstructorValue(i, item, closure, module)).ToList();
+                }
+                if (value is not BareWord { IsIdentifier: true } word) return value;
+                if (Shapes.RawTextKind(expected, closure, module) != null) return word.Name;
+                return InferredLiteral(word.Name, scope, ctx.Module)?.Convert(this) ?? value;
             }
         }
 
