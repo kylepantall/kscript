@@ -141,7 +141,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.True(File.Exists(Path.Combine(root, ".dockerignore")));
         Assert.Contains("up:\n\tdocker compose up --build", File.ReadAllText(Path.Combine(root, "Makefile")));
         Assert.Contains("postgres://shop:secret@localhost:5432/shop", File.ReadAllText(Path.Combine(root, "config", "config.yaml")));
-        Assert.Contains("Note: this version of KScript.Data connects to SQLite only. config/config.yaml and compose.yaml are set up for postgres", output);
+        Assert.Contains("Note: the app keeps its data in postgres, at the url in config/config.yaml (DATABASE_URL overrides it), and docker compose up starts the database too.", output);
         Assert.Contains("docker compose up       run the API and its database in containers", output);
 
         Assert.Equal(0, Make(parent.Root, "lite", "--template", "api", "--docker").Code);

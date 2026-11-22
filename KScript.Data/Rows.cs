@@ -63,8 +63,17 @@ namespace KScript.Data
     {
         internal const string DateFormat = "yyyy-MM-dd HH:mm:ss.fffffff";
 
-        /// <summary>What the clock says now. Tests replace it.</summary>
-        internal static Func<DateTime> Clock = () => DateTime.Now;
+        /// <summary>
+        /// What the clock says now, to the microsecond: Postgres and MySQL keep no finer times, so a record reads back
+        /// the times it was saved with. Tests replace it.
+        /// </summary>
+        internal static Func<DateTime> Clock = Now;
+
+        internal static DateTime Now()
+        {
+            DateTime now = DateTime.Now;
+            return now.AddTicks(-(now.Ticks % 10));
+        }
 
         /// <summary>A value as a parameter, for a column (or, with no column, as the value itself suggests).</summary>
         public static object ToDb(object value, Column column, Dialect dialect)
@@ -84,7 +93,7 @@ namespace KScript.Data
                 case string s when column?.Kind == ColumnKind.Integer && long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out long n):
                     return n;
                 case DateTime dt:
-                    return dt.ToString(DateFormat, CultureInfo.InvariantCulture);
+                    return dialect.Date(dt);
                 case PasswordValue password:
                     return password.Hash(password.Algorithm);
                 case PasswordHash hash:
@@ -181,9 +190,13 @@ namespace KScript.Data
             null => null,
             DBNull => null,
             long l => (double)l,
+            ulong l => (double)l,
             int i => (double)i,
+            uint i => (double)i,
             short s => (double)s,
+            ushort s => (double)s,
             byte b => (double)b,
+            sbyte b => (double)b,
             decimal m => (double)m,
             float f => (double)f,
             double d => d,

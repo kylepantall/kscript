@@ -17,7 +17,7 @@ namespace KScript.Data
     {
         public override string Name => "KScript.Data";
 
-        public override string Description => "Databases: models, a query builder, transactions and raw SQL, on SQLite.";
+        public override string Description => "Databases: models, a query builder, transactions and raw SQL, on SQLite, Postgres, MySQL and MariaDB.";
 
         /// <summary>A query method: its name, parameters, what it does, what it returns, and the work it does on a query.</summary>
         private sealed record QueryMethod(string Name, string Params, string Description, string Returns, Func<Query, CallContext, object> Run, bool Bare = false);
@@ -171,8 +171,8 @@ namespace KScript.Data
             new("offset", "count: number", "Skips this many rows first.", KType.Query, (q, c) => q.Skipping(Count(c.Arg(0), "->offset()"))),
             new("with_trashed", "", "For models with soft_deletes: keeps the deleted records, which queries leave out by default.", KType.Query, (q, c) => q.WithTrashed("with")),
             new("only_trashed", "", "For models with soft_deletes: reads only the deleted records.", KType.Query, (q, c) => q.WithTrashed("only")),
-            new("lock_for_update", "", "Locks the rows read until the transaction ends, so nobody else changes them first. Use it inside a transaction. SQLite locks the whole database for a transaction's writes instead, so this changes nothing there.", KType.Query, (q, c) => q.Locking("update", false)),
-            new("skip_locked", "", "With ->lock_for_update(): skips rows another transaction has locked, instead of waiting. Good for taking jobs from a queue. SQLite has no row locks, so this changes nothing there.", KType.Query, (q, c) => q.Locking(null, true)),
+            new("lock_for_update", "", "Locks the rows read until the transaction ends, so nobody else changes them first. Use it inside a transaction. On SQLite, which locks the whole database for a transaction's writes instead, it changes nothing.", KType.Query, (q, c) => q.Locking("update", false)),
+            new("skip_locked", "", "With ->lock_for_update(): skips rows another transaction has locked, instead of waiting. Good for taking jobs from a queue. On SQLite, which has no row locks, it changes nothing.", KType.Query, (q, c) => q.Locking(null, true)),
 
             new("get", "", "Runs the query: a list of records (maps, for a table with no model).", KType.List, (q, c) => q.Get(c)),
             new("first", "", "The first row, or null when none match.", KType.Any, (q, c) => q.First(c)),
