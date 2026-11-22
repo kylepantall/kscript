@@ -52,12 +52,12 @@ namespace KScript.Runtime
                 new A("name", K.DeclareVariable, "The variable to declare."),
                 new A("value", K.Expression, "The initial value. Can be written as the element's text instead."),
                 new A("type", K.TypeName, "Convert the value to this type, or fail early: a built-in such as int, an <enum>, a <type>, T[] for a list, T? to allow null.", false, Values.DeclarableTypes.ToArray()),
-                new A("const", K.Bool, "yes makes a later <set> an error."))
+                new A("const", K.Bool, "true makes a later <set> an error."))
             {
                 Example = "<let name=\"count\" value=\"0\" />\n<let name=\"people\">[{ name: 'Joan', age: 82 }]</let>\n<let>x = 3</let>",
             }, run => Assign(run, declare: true));
 
-            p.Element(new ElementInfo("const", "Declares a value that can't change: the same as <let const=\"yes\">. Top-level consts are exported to scripts that import this one.",
+            p.Element(new ElementInfo("const", "Declares a value that can't change: the same as <let const=\"true\">. Top-level consts are exported to scripts that import this one.",
                 ContentKind.Expression,
                 new A("name", K.DeclareVariable, "The constant to declare.", true),
                 new A("value", K.Expression, "Its value. Can be written as the element's text instead."),
@@ -140,7 +140,7 @@ namespace KScript.Runtime
                 new A("type", K.TypeName, "The field's type: a built-in such as string or int, an <enum>, another <type>, T[] for a list, T? to allow null. Defaults to any.", false, Values.DeclarableTypes.ToArray()),
                 new A("from", K.Text, "Where to read the value, when it isn't the field's name: `stargazers_count`, `owner.login`, `items[0].name`."),
                 new A("default", K.Expression, "The value when the data has none (makes the field optional)."),
-                new A("optional", K.Bool, "yes lets the value be missing or null."),
+                new A("optional", K.Bool, "true lets the value be missing or null."),
                 new A("value", K.Expression, "Works the field out from the others (they are $name) instead of reading it: `$first + ' ' + $last`."),
                 new A("min", K.Text, "The smallest value allowed: a number, a date, or the length of text or a list."),
                 new A("max", K.Text, "The largest value allowed: a number, a date, or the length of text or a list."),
@@ -291,7 +291,7 @@ namespace KScript.Runtime
                 new A("name", K.DeclareFunction, "The function's name.", true),
                 new A("params", K.Parameters, "Parameters, with optional types and defaults: `who, greeting = 'Hello'` or `count: int = 1`."),
                 new A("value", K.Expression, "For one-line functions: the result, instead of a body."),
-                new A("override", K.Bool, "Inside <extend>: yes replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
+                new A("override", K.Bool, "Inside <extend>: true replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
                 new A("description", K.Text, "What the function does. Shown in hover, and to a model when used as an <llm> tool."))
             {
                 Example = "<fn name=\"greet\" params=\"who, greeting = 'Hello'\">\n  <return value=\"$greeting + ', ' + $who + '!'\" />\n</fn>\n<echo>@greet('World')</echo>",
@@ -376,20 +376,19 @@ namespace KScript.Runtime
             }, run => throw new ExitSignal((int)run.Number("code", 0)));
 
             p.Element(new ElementInfo("wait", "Pauses the script.", ContentKind.Empty,
-                new A("ms", K.Expression, "How long to wait, in milliseconds."),
-                new A("seconds", K.Expression, "How long to wait, in seconds."))
+                new A("duration", K.Expression, "How long to wait: 500ms, 2s, 1m30s. A plain number is seconds.", true) { Type = Duration.TypeName })
             {
-                Example = "<wait seconds=\"1.5\" />",
+                Example = "<wait duration=\"1.5s\" />",
             }, run =>
             {
-                double ms = run.Has("seconds") ? run.Number("seconds", 0) * 1000 : run.Number("ms", 0);
+                double ms = (run.Seconds("duration") ?? 0) * 1000;
                 if (ms > 0) Task.Delay(TimeSpan.FromMilliseconds(ms), run.Interpreter.Options.Cancellation).GetAwaiter().GetResult();
                 return null;
             });
 
             p.Element(new ElementInfo("marray", "Builds a list or map from nested <item> elements, for data that reads better as markup than as a literal.", ContentKind.Statements,
                 new A("name", K.DeclareVariable, "The variable to declare.", true),
-                new A("const", K.Bool, "yes makes a later <set> an error."))
+                new A("const", K.Bool, "true makes a later <set> an error."))
             {
                 Example = "<marray name=\"person\">\n  <item key=\"name\">Joan</item>\n  <item key=\"age\">82</item>\n</marray>",
             }, run =>
@@ -817,7 +816,7 @@ namespace KScript.Runtime
                 Values.TryNumber(c.Arg(0), out double n) ? n : c.Has(1) ? c.Arg(1) : throw c.Error($"{Values.Describe(c.Arg(0))} is not a number.", "Type"));
             p.Command("string", "value", "Converts a value to text.", KType.String, c => Values.ToStr(c.Arg(0)));
             p.Command("uuid", "v?: int, name?: string, namespace?: string", "A new UUID. Version 4 (the default) is random. Version 8 is custom: with a name it is a SHA-256 hash of the namespace and the name, so the same name always gives the same UUID; without one it starts with the time, so newer ones sort later.", KType.Uuid,
-                c => UuidValue.New(c.Int(0, 4), c.Arg(1) == null ? null : c.Str(1), c.Arg(2) == null ? null : c.Str(2)), "@uuid()->version()");
+                c => UuidValue.New(c.Int(0, 4), c.Arg(1) == null ? null : c.Str(1), c.Arg(2) == null ? null : c.Str(2)), "@uuid().version");
             p.Command("type", "value", "The type of a value: string, number, bool, list, map, fn, date or null, or the name of the <type> that made a record.", KType.String, c => Shapes.TypeName(c.Arg(0)));
             p.Command("min", "values...", "The smallest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: true));
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));

@@ -74,7 +74,7 @@ namespace KScript.Caching
                 case "has":
                     result = TryGet(Key(call), out _, out _);
                     return true;
-                case "put":
+                case "set":
                     Put(Key(call), call.Arg(1), Expires(call.Arg(2)));
                     result = call.Arg(1);
                     return true;
@@ -92,7 +92,7 @@ namespace KScript.Caching
                     Put(key, result, expires);
                     return true;
                 }
-                case "forget":
+                case "remove":
                     result = Forget(Key(call));
                     return true;
                 case "increment":
@@ -107,12 +107,12 @@ namespace KScript.Caching
                     return true;
                 }
                 case "ttl":
-                    result = TryGet(Key(call), out _, out DateTime? ends) && ends != null ? (object)Math.Max(0, Math.Ceiling((ends.Value - Clock()).TotalSeconds)) : null;
+                    result = TryGet(Key(call), out _, out DateTime? ends) && ends != null ? Duration.Of(Math.Max(0, Math.Ceiling((ends.Value - Clock()).TotalSeconds))) : null;
                     return true;
                 case "keys":
                     result = Keys().OrderBy(k => k, StringComparer.Ordinal).Cast<object>().ToList();
                     return true;
-                case "flush":
+                case "clear":
                     result = (double)Flush();
                     return true;
                 default:
@@ -142,17 +142,23 @@ namespace KScript.Caching
             _ => value,
         };
 
+        internal static readonly (string Name, string Type, string Description)[] Fields =
+        {
+            ("name", KType.String, "The store's name, which keeps its keys apart from other stores'."),
+            ("kind", KType.String, "Where the values are kept: memory or file."),
+        };
+
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
             ("get", "key, default?", "The value kept under a key, or default (null) when it isn't there or has run out.", KType.Any),
             ("has", "key", "True when a value is kept under the key and hasn't run out.", KType.Bool),
-            ("put", "key, value, ttl?", "Keeps a value under a key. ttl is how long: seconds, or text such as '30s', '10m', '2h' or '1d'. Without it the value is kept until it is forgotten.", KType.Any),
-            ("remember", "key, compute: fn, ttl?", "The value under a key; when there isn't one, calls compute, keeps what it returns and returns that.", KType.Any),
-            ("forget", "key", "Removes a key. True if it was there.", KType.Bool),
-            ("increment", "key, by?: number, ttl?", "Adds to the number under a key (1 by default; 0 when it isn't there) and returns the new number.", KType.Number),
-            ("ttl", "key", "The seconds until a key runs out, or null when it never does or isn't there.", KType.Number),
+            ("set", "key, value, ttl?: duration", "Keeps a value under a key. ttl is how long, such as 30s, 10m, 2h or 1d (a plain number is seconds). Without it the value is kept until it is removed.", KType.Any),
+            ("remember", "key, compute: fn, ttl?: duration", "The value under a key; when there isn't one, calls compute, keeps what it returns and returns that.", KType.Any),
+            ("remove", "key", "Removes a key. True when it was there.", KType.Bool),
+            ("increment", "key, by?: number, ttl?: duration", "Adds to the number under a key (1 by default; 0 when it isn't there) and returns the new number.", KType.Number),
+            ("ttl", "key", "How long until a key runs out, as a duration, or null when it never does or isn't there.", "duration"),
             ("keys", "", "The keys that are kept and haven't run out.", KType.List),
-            ("flush", "", "Removes every key. Returns how many there were.", KType.Number),
+            ("clear", "", "Removes every key. Returns how many there were.", KType.Number),
         };
     }
 
@@ -315,33 +321,17 @@ namespace KScript.Caching
 
         public override string Description => "A cache of values by key, with time limits: in memory, or in files in the app's cache folder.";
 
-        private static readonly Regex Duration = new Regex(@"^\s*(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)?\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
         /// <summary>
-        /// A time limit in seconds: a number of seconds, or text such as 90, '30s', '10m', '2h', '1d' or '1w'.
-        /// Null (no limit) for null. Throws for anything else.
+        /// A time limit in seconds: a duration (30s, 10m, 2h, 1d), text that reads as one, or a plain number of
+        /// seconds. Null (no limit) for null. Throws for anything else, and for a limit that isn't more than 0.
         /// </summary>
         public static double? Seconds(object ttl)
         {
             if (ttl == null) return null;
-            if (ttl is double d)
-            {
-                if (d <= 0 || double.IsNaN(d) || double.IsInfinity(d)) throw new KScriptException($"A time limit must be more than 0 seconds, not {Values.ToStr(ttl)}.", "Argument");
-                return d;
-            }
-            Match m = Duration.Match(Values.ToStr(ttl));
-            if (!m.Success) throw new KScriptException($"'{Values.ToStr(ttl)}' isn't a time limit. Use seconds (90) or text such as '30s', '10m', '2h' or '1d'.", "Argument");
-            double amount = double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
-            double seconds = amount * (m.Groups[2].Value.ToLowerInvariant() switch
-            {
-                "ms" => 0.001,
-                "m" => 60,
-                "h" => 3600,
-                "d" => 86400,
-                "w" => 604800,
-                _ => 1,
-            });
-            return Seconds(seconds);
+            if (ttl is double n && (double.IsNaN(n) || double.IsInfinity(n))) throw new KScriptException($"A time limit must be more than 0 seconds, not {Values.ToStr(ttl)}.", "Argument");
+            double seconds = Duration.Seconds(ttl, "A time limit (ttl)");
+            if (seconds <= 0) throw new KScriptException($"A time limit must be more than 0 seconds, not {Values.ToStr(ttl)}.", "Argument");
+            return seconds;
         }
 
         /// <summary>The store a script asks for: memory (the default) or file, with an optional name.</summary>
@@ -358,28 +348,30 @@ namespace KScript.Caching
 
         protected override void Register(PackageBuilder p)
         {
+            foreach (var f in CacheStore.Fields)
+                p.Field(KType.Cache, f.Name, f.Type, f.Description);
             foreach (var m in CacheStore.Methods)
                 p.Method(KType.Cache, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((CacheStore)t).Invoke(c, m.Name, out object r) ? r : null);
 
             p.Variable("cache", KType.Cache,
-                "The app's cache in memory: $cache->remember('repos', fn() => @get_json($url), ttl: '10m'). It lasts while kscript runs, so in kscript serve it is shared by every request. @cache(file) keeps values between runs.",
+                "The app's cache in memory: $cache->remember('repos', fn() => @get_json($url), ttl: 10m). It lasts while kscript runs, so in kscript serve it is shared by every request. @cache(file) keeps values between runs.",
                 (i, m) => MemoryCacheStore.Named(AppFolders.CleanName(AppFolders.AppNameFor(m?.Directory ?? i.Host.WorkingDirectory, m?.Path)) + "/default"));
 
             p.Command("cache", "store?: memory|file, name?",
                 "A cache store: memory (the default, like $cache) or file, which keeps values in files in the app's cache folder so they last between runs. A name keeps a store's keys apart from other stores'.",
                 KType.Cache, c => Store(c, 0, 1),
-                "<let name=\"weather\" value=\"@cache(file, name: 'weather')\" />\n<echo>{ $weather->remember('today', fn() => 'sunny', ttl: '1h') }</echo>");
+                "<let name=\"weather\" value=\"@cache(file, name: 'weather')\" />\n<echo>{ $weather->remember('today', fn() => 'sunny', ttl: 1h) }</echo>");
 
             p.Examples(
-                ("cache->get", "<do>$cache->put('greeting', 'hello')</do>\n<echo>{ $cache->get('greeting') } { $cache->get('missing', default: 'none') }</echo>"),
-                ("cache->has", "<do>$cache->put('token', 'abc', ttl: '5m')</do>\n<echo>{ $cache->has('token') }</echo>"),
-                ("cache->put", "<do>$cache->put('user:1', { name: 'Joan' }, ttl: 600)</do>"),
-                ("cache->remember", "<let name=\"squares\" value=\"$cache->remember('squares', fn() => [1, 2, 3]->map(fn($n) => $n * $n), ttl: '10m')\" />"),
-                ("cache->forget", "<do>$cache->put('draft', 'hi'); $cache->forget('draft')</do>\n<echo>{ $cache->has('draft') }</echo>"),
+                ("cache->get", "<do>$cache->set('greeting', 'hello')</do>\n<echo>{ $cache->get('greeting') } { $cache->get('missing', default: 'none') }</echo>"),
+                ("cache->has", "<do>$cache->set('token', 'abc', ttl: 5m)</do>\n<echo>{ $cache->has('token') }</echo>"),
+                ("cache->set", "<do>$cache->set('user:1', { name: 'Joan' }, ttl: 600)</do>"),
+                ("cache->remember", "<let name=\"squares\" value=\"$cache->remember('squares', fn() => [1, 2, 3]->map(fn($n) => $n * $n), ttl: 10m)\" />"),
+                ("cache->remove", "<do>$cache->set('draft', 'hi'); $cache->remove('draft')</do>\n<echo>{ $cache->has('draft') }</echo>"),
                 ("cache->increment", "<do>$cache->increment('visits'); $cache->increment('visits', by: 2)</do>\n<echo>{ $cache->get('visits') }</echo>"),
-                ("cache->ttl", "<do>$cache->put('code', 1234, ttl: '1m')</do>\n<echo>{ $cache->ttl('code') } seconds left</echo>"),
-                ("cache->keys", "<do>$cache->put('a', 1); $cache->put('b', 2)</do>\n<echo>{ $cache->keys() }</echo>"),
-                ("cache->flush", "<echo>{ $cache->flush() } keys removed</echo>"));
+                ("cache->ttl", "<do>$cache->set('code', 1234, ttl: 1m)</do>\n<echo>{ $cache->ttl('code') } left</echo>"),
+                ("cache->keys", "<do>$cache->set('a', 1); $cache->set('b', 2)</do>\n<echo>{ $cache->keys() }</echo>"),
+                ("cache->clear", "<echo>{ $cache->clear() } keys removed</echo>"));
         }
     }
 }

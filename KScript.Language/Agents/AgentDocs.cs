@@ -512,11 +512,12 @@ namespace KScript.Language.Agents
         }
 
         internal const string Rules = """
-            - `$name` reads a variable; `name = value` sets it. `@name(...)` calls a fn or command; `$x->name(...)` calls a method; `$x |> name()` pipes.
+            - `$name` reads a variable; `name = value` sets it. `@name(...)` calls a fn or command; `$x->name(...)` calls a method; `$x.name` reads a field (a plain fact: `$response.status`, `$file.size`); `$x |> name()` pipes.
             - Text: `"Hi { $name }"` or `"Hi $name"`; `{{ }}` for literal braces. Lambdas: `fn($x) => $x * 2`.
             - Operators: `== !=` (loose) `=== !==` (strict) `lt le gt ge eq ne` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
             - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enums are `enum Size { small, large }`, and their values are bare: `@known_folder(downloads)`.
             - Lists of names are arrays: `use: [log, cors]`, never `"log, cors"`.
+            - Lengths of time are durations, a number and a unit with no quotes: `timeout: 30s`, `ttl: 10m`, `wait(duration: 500ms)`. A plain number is seconds.
 
             """;
 
@@ -589,10 +590,21 @@ namespace KScript.Language.Agents
                 entries.Add("\n## Commands\n\n");
                 entries.AddRange(commands.Select(CallableLine));
             }
-            foreach (IGrouping<string, CallableInfo> type in catalog.Methods.Where(m => m.Package == package).GroupBy(m => m.ReceiverType).OrderBy(g => g.Key, StringComparer.Ordinal))
+            // A type's fields (plain facts, read with a dot) come before its methods.
+            ILookup<string, ValueFieldInfo> fields = catalog.Fields.Where(f => f.Package == package).ToLookup(f => f.Receiver, StringComparer.Ordinal);
+            ILookup<string, CallableInfo> methods = catalog.Methods.Where(m => m.Package == package).ToLookup(m => m.ReceiverType, StringComparer.Ordinal);
+            foreach (string type in fields.Select(g => g.Key).Concat(methods.Select(g => g.Key)).Distinct(StringComparer.Ordinal).OrderBy(t => t, StringComparer.Ordinal))
             {
-                entries.Add($"\n## {type.Key} methods\n\n");
-                entries.AddRange(type.OrderBy(m => m.Name, StringComparer.Ordinal).Select(CallableLine));
+                if (fields.Contains(type))
+                {
+                    entries.Add($"\n## {type} fields\n\n");
+                    entries.AddRange(fields[type].OrderBy(f => f.Name, StringComparer.Ordinal).Select(FieldLine));
+                }
+                if (methods.Contains(type))
+                {
+                    entries.Add($"\n## {type} methods\n\n");
+                    entries.AddRange(methods[type].OrderBy(m => m.Name, StringComparer.Ordinal).Select(CallableLine));
+                }
             }
             List<ElementInfo> elements = catalog.Elements.Where(e => e.Package == package && (xml || !CodeSyntax.Contains(e.Name)))
                 .OrderBy(e => e.Name, StringComparer.Ordinal).ToList();
@@ -607,6 +619,14 @@ namespace KScript.Language.Agents
                 return w.ToString();
             }
             return Join(w.ToString(), entries, PackageBudget, "entries");
+        }
+
+        /// <summary>One field of a type of value: <c>- `.status: number` The status code.</c></summary>
+        internal static string FieldLine(ValueFieldInfo f)
+        {
+            string type = f.Type != null && f.Type != KType.Any ? ": " + f.Type : string.Empty;
+            string summary = Summarize(f.Description);
+            return $"- `.{f.Name}{type}`{(summary != null ? " " + summary : string.Empty)}\n";
         }
 
         internal static string CallableLine(CallableInfo c)

@@ -6,7 +6,7 @@ import KScript.Net
 describe(name: "api") {
   test(name: "GET /api/health says the API is up") {
     health = @api('/api/health')
-    expect(value: $health->status(), equals: 200)
+    expect(value: $health.status, equals: 200)
     expect(value: $health->json().ok, equals: true)
   }
 
@@ -18,7 +18,7 @@ describe(name: "api") {
 
   test(name: "a path with no route is a JSON 404") {
     missing = @api('/api/nothing-here')
-    expect(value: $missing->status(), equals: 404)
+    expect(value: $missing.status, equals: 404)
     expect(value: $missing->json().error, contains: 'No route')
   }
 }

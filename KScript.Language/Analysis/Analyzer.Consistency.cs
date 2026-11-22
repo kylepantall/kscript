@@ -48,6 +48,12 @@ namespace KScript.Language.Analysis
                 return;
             }
             TextSpan written = ValueSpan(attr);
+            if (a.Type == DurationType && DurationAsWritten(attr.Quote == '\0' ? Unquoted(text) ?? text : Unquoted(source.Text.Substring(written.Start, written.Length))) is string duration
+                && (attr.Quote != '\0' || duration != text))
+            {
+                ReportDurationUnit(written, attr.Name, duration);
+                return;
+            }
             if (attr.Quote == '\0' && a.IsNameList)
             {
                 // Text in a list is quoted like any other text: to: ['paper.pdf', 'paper.docx']. Names stay bare.
@@ -90,6 +96,40 @@ namespace KScript.Language.Analysis
                     new[] { new QuickFix($"Write {array}", new TextChange(written, array)) });
             }
         }
+
+        private const string DurationType = "duration";
+
+        private static readonly System.Text.RegularExpressions.Regex DurationText =
+            new System.Text.RegularExpressions.Regex(@"^(?:\d+(?:\.\d+)?(?:ms|min|w|d|h|m|s))+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        private static readonly System.Text.RegularExpressions.Regex PlainNumber =
+            new System.Text.RegularExpressions.Regex(@"^\d+(?:\.\d+)?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// KS6018. How a length of time given as a plain number (<c>30</c>, which is seconds) or as text
+        /// (<c>'10m'</c>) is written as a duration: <c>30s</c>, <c>10m</c>. Null for anything else, and for 0.
+        /// </summary>
+        private static string DurationAsWritten(string text)
+        {
+            text = text?.Trim();
+            if (string.IsNullOrEmpty(text)) return null;
+            if (DurationText.IsMatch(text)) return text;
+            return PlainNumber.IsMatch(text) && text.Trim('0', '.').Length > 0 ? text + "s" : null;
+        }
+
+        /// <summary>Text without the quotes around it, or null when it isn't one plain quoted string.</summary>
+        private static string Unquoted(string written)
+        {
+            written = written.Trim();
+            return written.Length >= 2 && written[0] is '\'' or '"' && written[^1] == written[0] && written.IndexOf(written[0], 1) == written.Length - 1
+                ? written.Substring(1, written.Length - 2)
+                : null;
+        }
+
+        private void ReportDurationUnit(TextSpan span, string name, string duration) =>
+            Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.DurationUnit,
+                $"Write the length of time with its unit and no quotes: {name}: {duration}. A plain number is seconds.",
+                new[] { new QuickFix($"Write {duration}", new TextChange(span, duration)) });
 
         /// <summary>A number, a list, a map, true, false or null: a value as it stands, never mistaken for a name.</summary>
         private static bool IsPlainValue(string text) =>

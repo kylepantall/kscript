@@ -46,30 +46,30 @@ describe(name: "api") {
 
   test(name: "a new note is saved and listed") {
     added = @notes_api('', method: 'POST', body: { title: 'Write the docs' }{{#if auth}}, as: $me{{/if}})
-    expect(value: $added->status(), equals: 201)
+    expect(value: $added.status, equals: 201)
     note = $added->json()
     expect(value: @notes_api('/' + $note.id{{#if auth}}, as: $me{{/if}})->json().title, equals: 'Write the docs')
     expect(value: @notes_api(''{{#if auth}}, as: $me{{/if}})->json()->map(fn($n) => $n.title), equals: ['Write the docs'])
   }
 
   test(name: "a note without a title is turned away with 422") {
-    expect(value: @notes_api('', method: 'POST', body: { title: '' }{{#if auth}}, as: $me{{/if}})->status(), equals: 422)
+    expect(value: @notes_api('', method: 'POST', body: { title: '' }{{#if auth}}, as: $me{{/if}}).status, equals: 422)
   }
 
   test(name: "a note is changed and deleted") {
     note = @notes_api('', method: 'POST', body: { title: 'Ship it' }{{#if auth}}, as: $me{{/if}})->json()
     changed = @notes_api('/' + $note.id, method: 'PUT', body: { title: 'Ship it', done: true }{{#if auth}}, as: $me{{/if}})
     expect(value: $changed->json().done, equals: true)
-    expect(value: @notes_api('/' + $note.id, method: 'DELETE'{{#if auth}}, as: $me{{/if}})->status(), equals: 204)
-    expect(value: @notes_api('/' + $note.id{{#if auth}}, as: $me{{/if}})->status(), equals: 404)
+    expect(value: @notes_api('/' + $note.id, method: 'DELETE'{{#if auth}}, as: $me{{/if}}).status, equals: 204)
+    expect(value: @notes_api('/' + $note.id{{#if auth}}, as: $me{{/if}}).status, equals: 404)
   }
 {{#if auth}}
 
   test(name: "notes need a session or a token, and only their owner sees them") {
-    expect(value: @notes_api('')->status(), equals: 401)
+    expect(value: @notes_api('').status, equals: 401)
     note = @notes_api('', method: 'POST', body: { title: 'Mine' }, as: $me)->json()
     other = @test_user()
-    expect(value: @notes_api('/' + $note.id, as: $other)->status(), equals: 404)
+    expect(value: @notes_api('/' + $note.id, as: $other).status, equals: 404)
     @users()->delete($other.id)
   }
 {{/if}}

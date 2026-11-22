@@ -29,7 +29,7 @@ namespace KScript.Language.Catalog
         private readonly List<CallableInfo> methods = new List<CallableInfo>();
         private readonly Dictionary<string, (string Type, string Description)> builtInVariables = new Dictionary<string, (string, string)>(StringComparer.Ordinal);
         private readonly Dictionary<string, string> variablePackages = new Dictionary<string, string>(StringComparer.Ordinal);
-        private readonly Dictionary<string, Dictionary<string, string>> typeFields = new Dictionary<string, Dictionary<string, string>>();
+        private readonly Dictionary<string, Dictionary<string, ValueFieldInfo>> typeFields = new Dictionary<string, Dictionary<string, ValueFieldInfo>>();
         private readonly Dictionary<string, string> packages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<string>> packageRequires = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -132,9 +132,37 @@ namespace KScript.Language.Catalog
             }
         }
 
-        /// <summary>Known fields of a value type (<c>$request.query</c>, <c>$err.message</c>).</summary>
-        public IReadOnlyDictionary<string, string> FieldsOf(string type) =>
-            type != null && typeFields.TryGetValue(type, out Dictionary<string, string> f) ? f : new Dictionary<string, string>();
+        /// <summary>The fields of a type of value, read with a dot: <c>$request.query</c>, <c>$response.status</c>, <c>$date.year</c>.</summary>
+        public IReadOnlyDictionary<string, ValueFieldInfo> FieldsOf(string type) =>
+            type != null && typeFields.TryGetValue(type, out Dictionary<string, ValueFieldInfo> f) ? f : NoFields;
+
+        /// <summary>The field called <paramref name="name"/> on values of <paramref name="type"/>, or null.</summary>
+        public ValueFieldInfo GetField(string type, string name) =>
+            type != null && name != null && typeFields.TryGetValue(type, out Dictionary<string, ValueFieldInfo> f) && f.TryGetValue(name, out ValueFieldInfo field) ? field : null;
+
+        /// <summary>Every field of every type of value.</summary>
+        public IEnumerable<ValueFieldInfo> Fields => typeFields.Values.SelectMany(f => f.Values);
+
+        /// <summary>Every type that has methods or fields, such as date, list or response.</summary>
+        public IEnumerable<string> MemberTypes =>
+            methods.Where(m => !m.Planned).Select(m => m.ReceiverType).Concat(typeFields.Keys).Distinct(StringComparer.Ordinal);
+
+        /// <summary>A method that was renamed, with what to write instead, or null.</summary>
+        public RetiredInfo GetRetiredMethod(string type, string name) => RetiredMembers.Method(type, name);
+
+        /// <summary>A method of this name that was renamed on some type, for a value whose type is not known, or null.</summary>
+        public RetiredInfo GetRetiredMethod(string name) => RetiredMembers.Named(name).FirstOrDefault();
+
+        private static readonly IReadOnlyDictionary<string, ValueFieldInfo> NoFields = new Dictionary<string, ValueFieldInfo>();
+
+        private void AddField(ValueFieldInfo field)
+        {
+            if (!typeFields.TryGetValue(field.Receiver, out Dictionary<string, ValueFieldInfo> fields))
+            {
+                typeFields[field.Receiver] = fields = new Dictionary<string, ValueFieldInfo>(StringComparer.Ordinal);
+            }
+            fields.TryAdd(field.Name, field);
+        }
 
         #endregion
 
@@ -156,6 +184,10 @@ namespace KScript.Language.Catalog
             foreach (MethodDefinition m in package.Methods)
             {
                 if (!methods.Any(x => x.Name == m.Name && x.ReceiverType == m.Info.ReceiverType)) methods.Add(m.Info);
+            }
+            foreach (ValueFieldDefinition f in package.Fields)
+            {
+                AddField(f.Info);
             }
             foreach (VariableDefinition v in package.Variables.Values)
             {
@@ -190,7 +222,7 @@ namespace KScript.Language.Catalog
         {
             AddPlannedElement(new ElementInfo("render", "Replaces the content of a page element. Non-KScript elements inside are output as HTML, with `{ }` values escaped.", ContentKind.Markup,
                 new A("into", K.Selector, "The element to fill, as a CSS selector.", true),
-                new A("raw", K.Bool, "yes outputs values without HTML escaping.")));
+                new A("raw", K.Bool, "true outputs values without HTML escaping.")));
             AddPlannedElement(new ElementInfo("on", "Runs its body when a DOM event fires (browser). `$event` holds the event.", ContentKind.Statements,
                 new A("event", K.Text, "The event name, such as click or input.", true),
                 new A("target", K.Selector, "The element to listen on.", true)));
@@ -235,41 +267,33 @@ namespace KScript.Language.Catalog
         {
             builtInVariables.TryAdd("event", (KType.Map, "The DOM event inside <on>: value, key, target."));
 
-            typeFields[KType.Request] = new Dictionary<string, string>
+            foreach ((string name, string type, string description) in new[]
             {
-                ["method"] = "GET, POST...",
-                ["path"] = "The path, such as /people.",
-                ["query"] = "Query string values: $request.query.page.",
-                ["form"] = "Posted form fields: $request.form.email.",
-                ["headers"] = "Request headers.",
-                ["cookies"] = "Cookies.",
-                ["params"] = "Route parameters from [name].html files: $request.params.id.",
-                ["body"] = "The raw body: $request.body->json().",
-            };
-            typeFields[KType.Error] = new Dictionary<string, string>
+                ("method", KType.String, "GET, POST..."),
+                ("path", KType.String, "The path, such as /people."),
+                ("query", KType.Map, "Query string values: $request.query.page."),
+                ("form", KType.Map, "Posted form fields: $request.form.email."),
+                ("headers", KType.Map, "Request headers."),
+                ("cookies", KType.Map, "Cookies."),
+                ("params", KType.Map, "Route parameters from [name].html files: $request.params.id."),
+                ("body", KType.String, "The raw body: $request.body->json()."),
+            })
             {
-                ["type"] = "The error type, such as FileNotFound.",
-                ["message"] = "What went wrong.",
-                ["file"] = "The script the error came from.",
-                ["line"] = "The line the error came from.",
-                ["column"] = "The column the error came from.",
-                ["status"] = "The HTTP status its error type carries, such as 404, or null.",
-                ["cause"] = "The error that led to this one, or null.",
-            };
-            typeFields[KType.File] = new Dictionary<string, string>
+                AddField(new ValueFieldInfo(KType.Request, name, type, description));
+            }
+            foreach ((string name, string type, string description) in new[]
             {
-                ["path"] = "The full path.",
-                ["name"] = "The file name with its extension.",
-                ["extension"] = "The extension without the dot.",
-            };
-            typeFields[KType.Response] = new Dictionary<string, string>
+                ("type", KType.String, "The error type, such as FileNotFound."),
+                ("message", KType.String, "What went wrong."),
+                ("file", KType.String, "The script the error came from."),
+                ("line", KType.Number, "The line the error came from."),
+                ("column", KType.Number, "The column the error came from."),
+                ("status", KType.Number, "The HTTP status its error type carries, such as 404, or null."),
+                ("cause", KType.Error, "The error that led to this one, or null."),
+            })
             {
-                ["status"] = "The HTTP status code.",
-                ["ok"] = "True for a 2xx status.",
-                ["url"] = "The address that was fetched.",
-                ["headers"] = "The response headers.",
-                ["text"] = "The body as text.",
-            };
+                AddField(new ValueFieldInfo(KType.Error, name, type, description));
+            }
         }
 
         #endregion

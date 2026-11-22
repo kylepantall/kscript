@@ -99,6 +99,8 @@ namespace KScript.Runtime
         internal readonly Dictionary<string, ElementDefinition> Elements = new Dictionary<string, ElementDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, CommandDefinition> Commands = new Dictionary<string, CommandDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, MethodDefinition> Methods = new Dictionary<string, MethodDefinition>(StringComparer.Ordinal);
+        /// <summary>Fields the imported packages add to values, by "receiver:name".</summary>
+        internal readonly Dictionary<string, ValueFieldDefinition> Fields = new Dictionary<string, ValueFieldDefinition>(StringComparer.Ordinal);
         /// <summary>Methods this script's extend blocks add, and those of the scripts it imports, by "receiver:name".</summary>
         internal readonly Dictionary<string, ExtensionMethod> Extensions = new Dictionary<string, ExtensionMethod>(StringComparer.Ordinal);
 

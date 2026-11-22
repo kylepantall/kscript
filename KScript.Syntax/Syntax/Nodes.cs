@@ -48,6 +48,9 @@ namespace KScript.Syntax
 
         /// <summary><c>https://example.com/docs</c>, written without quotes.</summary>
         Url,
+
+        /// <summary>A length of time written without quotes: <c>30s</c>, <c>500ms</c>, <c>1h30m</c>.</summary>
+        Duration,
     }
 
     public sealed class LiteralNode : ExprNode

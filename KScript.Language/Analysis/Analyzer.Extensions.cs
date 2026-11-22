@@ -294,13 +294,13 @@ namespace KScript.Language.Analysis
             if (builtIn && !isOverride)
             {
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration,
-                    $"{article} already has ->{name}(). To replace it, write " + (code ? $"override fn {name}(...)" : $"override=\"yes\"") + "; to add a new method, give it another name.");
+                    $"{article} already has ->{name}(). To replace it, write " + (code ? $"override fn {name}(...)" : $"override=\"true\"") + "; to add a new method, give it another name.");
                 return;
             }
             if (isOverride && !builtIn)
             {
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
-                    $"{article} has no built-in ->{name}() to override. " + (code ? "Drop override" : "Drop override=\"yes\"") + " to add it as a new method.");
+                    $"{article} has no built-in ->{name}() to override. " + (code ? "Drop override" : "Drop override=\"true\"") + " to add it as a new method.");
                 return;
             }
         }

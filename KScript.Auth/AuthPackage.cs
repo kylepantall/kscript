@@ -20,10 +20,13 @@ namespace KScript.Auth
 
         public override string ToString() => ToText();
 
+        /// <summary>The session's own facts: <c>$session.token</c>. Values kept in it are read with <c>->get(key)</c>.</summary>
         public bool TryGetMember(string name, out object value)
         {
             value = null;
-            return false;
+            if (name != "token") return false;
+            value = (Auth ?? throw new KScriptException("$session.token works while kscript serve handles a request.", "Context")).CsrfToken;
+            return true;
         }
 
         public bool TryCallMethod(CallContext call, string name, out object result)
@@ -39,12 +42,12 @@ namespace KScript.Auth
             {
                 case "get": return auth.Has(Key(c)) ? auth.Get(Key(c)) : c.Arg(1);
                 case "has": return auth.Has(Key(c));
-                case "put": auth.Put(Key(c), c.Arg(1)); return c.Arg(1);
+                case "set": auth.Put(Key(c), c.Arg(1)); return c.Arg(1);
                 case "flash": auth.Flash(Key(c), c.Arg(1)); return c.Arg(1);
-                case "forget": return auth.Forget(Key(c));
+                case "remove": return auth.Forget(Key(c));
                 case "all": return auth.All();
                 case "regenerate": auth.Regenerate(); return null;
-                default: return auth.CsrfToken;
+                default: throw c.Error($"$session has no method ->{name}().", "Name");
             }
         }
 
@@ -59,12 +62,16 @@ namespace KScript.Auth
         {
             ("get", "key, default?", "The value kept under a key, or default (null).", KType.Any),
             ("has", "key", "True when a value is kept under the key.", KType.Bool),
-            ("put", "key, value", "Keeps a value in the session, for this request and the ones after it. It starts a session (and sends its cookie) if there isn't one.", KType.Any),
+            ("set", "key, value", "Keeps a value in the session, for this request and the ones after it. It starts a session (and sends its cookie) if there isn't one.", KType.Any),
             ("flash", "key, value", "Keeps a value for this request and the next one only: a message to show after a redirect, or the form's input to fill it in again.", KType.Any),
-            ("forget", "key", "Removes a value. True if it was there.", KType.Bool),
+            ("remove", "key", "Removes a value. True when it was there.", KType.Bool),
             ("all", "", "Every value in the session, as a map.", KType.Map),
             ("regenerate", "", "Gives the session a new id, keeping its values. @login() does this for you.", KType.Null),
-            ("token", "", "The session's CSRF token, which forms send back as _token. Same as @csrf_token().", KType.String),
+        };
+
+        internal static readonly (string Name, string Type, string Description)[] Fields =
+        {
+            ("token", KType.String, "The session's CSRF token, which forms send back as _token. Same as @csrf_token()."),
         };
     }
 
@@ -92,25 +99,27 @@ namespace KScript.Auth
 
         protected override void Register(PackageBuilder p)
         {
+            foreach (var f in SessionValue.Fields)
+                p.Field(SessionType, f.Name, f.Type, f.Description);
             foreach (var m in SessionValue.Methods)
                 p.Method(SessionType, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((SessionValue)t).Invoke(c, m.Name));
             foreach (var m in UserStore.Methods)
                 p.Method(UsersType, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((UserStore)t).Invoke(c, m.Name));
 
             p.Variable("session", SessionType,
-                "The request's session: values kept between requests by a cookie. $session->put('cart', $items), $session->get('cart'), and $session->flash('status', 'Saved') for a message after a redirect.",
+                "The request's session: values kept between requests by a cookie. $session->set('cart', $items), $session->get('cart'), and $session->flash('status', 'Saved') for a message after a redirect.",
                 (i, m) => new SessionValue(AuthRequest.Current(i.Host)));
 
             p.Command("user", "", "The signed-in user (a map with id, email and the fields they registered with), or null for a guest. It comes from the session cookie, or from an API token (Authorization: Bearer).",
                 KType.Map, c => AuthRequest.Current(c.Host)?.User,
                 "<if test=\"@user() != null\"><echo>Hello { @user().email }</echo></if>");
-            p.Command("signed_in", "", "True when someone is signed in (by the session or an API token).", KType.Bool,
+            p.Command("is_signed_in", "", "True when someone is signed in (by the session or an API token).", KType.Bool,
                 c => AuthRequest.Current(c.Host)?.User != null,
-                "<if test=\"@signed_in()\"><echo>Welcome back</echo></if>");
+                "<if test=\"@is_signed_in()\"><echo>Welcome back</echo></if>");
             p.Command("login", "user, remember?: bool",
                 "Signs a user in: the session gets a new id and the user. remember keeps them signed in for http.auth.remember (30 days) after the browser closes. The user is a map with an id: from @register(), @users()->find(), or a store of your own.",
                 KType.Map, c => Need(c).Login(c.Arg(0, "user"), c.Bool(1, false) || Values.Truthy(c.Named.GetValueOrDefault("remember"))),
-                "<do>@login($user, remember: yes)</do>");
+                "<do>@login($user, remember: true)</do>");
             p.Command("logout", "everywhere?: bool", "Signs out: the session ends and its cookie is removed. everywhere ends the user's sessions on every device.",
                 KType.Null, c =>
                 {
@@ -145,8 +154,8 @@ namespace KScript.Auth
                 "Finishes a password reset: gives the token's user the new password (checked by the password type) and ends their sessions. Returns the user, or null when the token is wrong, used or too old.",
                 KType.Map, ResetPassword,
                 "<let name=\"user\" value=\"@reset_password($form.token, $form.password)\" />");
-            p.Command("api_token", "user, name?, expires?",
-                "Makes an API token for a user and returns it. Show it once: only its hash is kept. Requests that send it as Authorization: Bearer <token> are signed in as the user (the auth middleware lets them through). expires is a time such as '30d'; by default it lasts until it is revoked.",
+            p.Command("api_token", "user, name?, expires?: duration",
+                "Makes an API token for a user and returns it. Show it once: only its hash is kept. Requests that send it as Authorization: Bearer <token> are signed in as the user (the auth middleware lets them through). expires is how long it works for, such as 30d; by default it lasts until it is revoked.",
                 KType.String, ApiToken,
                 "<let name=\"token\" value=\"@api_token(@user(), name: 'laptop')\" />");
             p.Command("api_tokens", "user", "A user's API tokens, without the tokens themselves: [{ id, name, created_at, last_used_at, expires_at }].",
@@ -159,12 +168,12 @@ namespace KScript.Auth
             p.Examples(
                 ("session->get", "<echo>{ $session->get('cart', default: []) }</echo>"),
                 ("session->has", "<if test=\"$session->has('cart')\"><echo>You have a cart</echo></if>"),
-                ("session->put", "<do>$session->put('theme', 'dark')</do>"),
+                ("session->set", "<do>$session->set('theme', 'dark')</do>"),
                 ("session->flash", "<do>$session->flash('status', 'Your profile was saved.')</do>"),
-                ("session->forget", "<do>$session->forget('cart')</do>"),
+                ("session->remove", "<do>$session->remove('cart')</do>"),
                 ("session->all", "<echo>{ $session->all() }</echo>"),
                 ("session->regenerate", "<do>$session->regenerate()</do>"),
-                ("session->token", "<echo>{ $session->token() }</echo>"),
+                ("session.token", "<echo>{ $session.token }</echo>"),
                 ("users->find", "<let name=\"user\" value=\"@users()->find($id)\" />"),
                 ("users->find_email", "<let name=\"user\" value=\"@users()->find_email('joan@example.com')\" />"),
                 ("users->all", "<for each=\"u\" in=\"@users()->all()\"><echo>{ $u.email }</echo></for>"),
@@ -256,8 +265,8 @@ namespace KScript.Auth
             };
             if (c.Has(2, "expires") && c.Arg(2, "expires") != null)
             {
-                double seconds = Projects.ProjectConfig.Seconds(AuthApp.Text(c.Arg(2, "expires")))
-                    ?? throw c.Error($"'{AuthApp.Text(c.Arg(2, "expires"))}' isn't a length of time. Use seconds (3600) or text such as '12h' or '30d'.", "Argument");
+                double seconds = Duration.Seconds(c.Arg(2, "expires"), "expires");
+                if (seconds <= 0) throw c.Error("expires should be more than 0 seconds, such as 12h or 30d.", "Argument");
                 record["expires"] = AuthApp.Now() + seconds;
                 record["expires_at"] = AuthApp.Clock().AddSeconds(seconds).ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture);
             }

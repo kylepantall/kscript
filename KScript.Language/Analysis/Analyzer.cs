@@ -164,10 +164,9 @@ namespace KScript.Language.Analysis
         {
             (string type, string description) = catalog.BuiltInVariables[name];
             TypeShape shape = new TypeShape(type);
-            foreach (KeyValuePair<string, string> field in catalog.FieldsOf(type))
+            foreach (KeyValuePair<string, ValueFieldInfo> field in catalog.FieldsOf(type))
             {
-                shape.Fields[field.Key] = new FieldInfo(field.Key, field.Key == "query" || field.Key == "form" || field.Key == "params" || field.Key == "headers" || field.Key == "cookies"
-                    ? new TypeShape(KType.Map) : TypeShape.Unknown, null, field.Value);
+                shape.Fields[field.Key] = new FieldInfo(field.Key, field.Value.Type is null or KType.Any ? TypeShape.Unknown : new TypeShape(field.Value.Type), null, field.Value.Description);
             }
             Symbol symbol = new Symbol { Name = name, Kind = SymbolKind.BuiltIn, Shape = shape, Description = description };
             result.Symbols.Add(symbol);
@@ -1043,7 +1042,7 @@ namespace KScript.Language.Analysis
             }
             else if (a.Kind == AttributeKind.Bool && KScript.Runtime.Values.ParseBool(value) == null)
             {
-                Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{a.Name}' takes yes or no, not '{value}'.");
+                Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{a.Name}' takes true or false, not '{value}'.");
             }
         }
 

@@ -109,6 +109,7 @@ namespace KScript.Runtime
                 foreach (var c in package.Commands) module.Commands[c.Key] = c.Value;
             }
             foreach (MethodDefinition m in package.Methods) module.Methods[m.Receiver + ":" + m.Name] = m;
+            foreach (ValueFieldDefinition f in package.Fields) module.Fields[f.Receiver + ":" + f.Name] = f;
             foreach (var v in package.Variables) module.Variables[v.Key] = v.Value;
             foreach (var f in package.EchoFormats) module.EchoFormats[f.Key] = f.Value;
         }
@@ -423,7 +424,7 @@ namespace KScript.Runtime
                         break;
                     case AttributeKind.Bool:
                         if (Values.ParseBool(a.Value.Value) == null && !a.Value.Value.Contains('{'))
-                            throw Located(new KScriptException($"{a.Name}=\"{a.Value.Value}\" should be yes or no.", "Syntax"), module, a.Value.SourceSpan.Start);
+                            throw Located(new KScriptException($"{a.Name}=\"{a.Value.Value}\" should be true or false.", "Syntax"), module, a.Value.SourceSpan.Start);
                         break;
                 }
             }

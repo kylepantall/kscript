@@ -21,7 +21,7 @@ namespace KScript.Language.Features
             [KType.List] = new[] { "count", "map", "filter", "first", "last", "join", "sort", "push", "contains", "each" },
             [KType.Map] = new[] { "keys", "values", "has", "get", "set", "merge" },
             [KType.Number] = new[] { "round", "format", "abs", "floor", "ceil" },
-            [KType.Date] = new[] { "format", "add_days", "year", "month", "day" },
+            [KType.Date] = new[] { "format", "add_days", "add_months", "iso" },
         };
 
         /// <summary>A sort key that puts the names of <paramref name="common"/> first, in its order, and the rest after by name.</summary>

@@ -81,10 +81,17 @@ namespace KScript.Output
 
         /// <summary>Pads text on the left to <paramref name="width"/> visible columns.</summary>
         public static string PadLeft(string text, int width) => new string(' ', Math.Max(0, width - VisibleLength(text))) + (text ?? string.Empty);
+
+        /// <summary>Pads text on both sides to <paramref name="width"/> visible columns, with any odd space on the right.</summary>
+        public static string PadBoth(string text, int width)
+        {
+            int space = Math.Max(0, width - VisibleLength(text));
+            return new string(' ', space / 2) + (text ?? string.Empty) + new string(' ', space - space / 2);
+        }
     }
 
     /// <summary>How a table column lines up its cells.</summary>
-    public enum CliAlign { Left, Right }
+    public enum CliAlign { Left, Right, Center }
 
     /// <summary>
     /// The kscript command line's output, styled like Laravel's artisan: INFO / DONE / WARN / ERROR labels, headings,
@@ -305,6 +312,9 @@ namespace KScript.Output
         public string RenderTable(IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<string>> rows, IReadOnlyList<CliAlign> align = null)
         {
             List<IReadOnlyList<string>> all = rows.ToList();
+            // No headers: the table has no heading row.
+            bool headed = headers != null;
+            headers ??= Array.Empty<string>();
             int columns = Math.Max(headers.Count, all.Count == 0 ? 0 : all.Max(r => r.Count));
             string Cell(IReadOnlyList<string> row, int i) => i < row.Count ? (row[i] ?? string.Empty).Replace("\n", " ") : string.Empty;
             int[] widths = Enumerable.Range(0, columns)
@@ -321,15 +331,18 @@ namespace KScript.Output
                 {
                     string text = Cell(cells, i);
                     if (header) text = Style.Apply(text, "1;32");
-                    bool right = !header && align != null && i < align.Count && align[i] == CliAlign.Right;
-                    sb.Append(' ').Append(right ? CliStyle.PadLeft(text, widths[i]) : CliStyle.Pad(text, widths[i])).Append(' ').Append(Style.Gray("│"));
+                    CliAlign side = !header && align != null && i < align.Count ? align[i] : CliAlign.Left;
+                    sb.Append(' ').Append(side == CliAlign.Right ? CliStyle.PadLeft(text, widths[i]) : side == CliAlign.Center ? CliStyle.PadBoth(text, widths[i]) : CliStyle.Pad(text, widths[i])).Append(' ').Append(Style.Gray("│"));
                 }
                 sb.Append('\n');
             }
 
             sb.Append(Border('┌', '┬', '┐')).Append('\n');
-            Row(headers, header: true);
-            sb.Append(Border('├', '┼', '┤')).Append('\n');
+            if (headed)
+            {
+                Row(headers, header: true);
+                sb.Append(Border('├', '┼', '┤')).Append('\n');
+            }
             foreach (var row in all) Row(row, header: false);
             sb.Append(Border('└', '┴', '┘')).Append('\n');
             return sb.ToString();

@@ -264,25 +264,13 @@ namespace KScript.Documents
                 Rules = run.Has("rules") ? Located(run, () => Units.Rules(run.Template("rules")), "rules") : b.Doc.Style.TableRules,
                 Scale = run.Number("size", 1),
             };
-            if (run.Has("align"))
-            {
-                foreach (char c in run.Template("align").Where(ch => !char.IsWhiteSpace(ch) && ch != '|'))
-                {
-                    table.Align.Add(char.ToLowerInvariant(c) switch
-                    {
-                        'l' => ColumnAlign.Left,
-                        'c' => ColumnAlign.Center,
-                        'r' => ColumnAlign.Right,
-                        _ => throw run.Error($"align: '{c}' isn't a column alignment. Use l, c or r for each column, such as lrr.", "align", "Argument"),
-                    });
-                }
-            }
             if (run.Has("widths"))
             {
                 foreach (object w in run.EvalList("widths").SelectMany(x => x is List<object> l ? l : new List<object> { x }))
                     table.Widths.Add(Values.ToNumber(w, "Table widths"));
             }
-            if (run.Has("data")) FromData(run, table, run.Eval("data"), run.Has("columns") ? run.Eval("columns") : null, run.Flag("header", true));
+            if (run.Has("rows")) FromRows(run, table);
+            else if (run.Has("align")) table.Align.AddRange(AlignWords(TableArguments.Read(new List<object>(), null, run.Eval("align"), false, (m, a) => run.Error(m, a, "Argument")).Align));
             b.Target.Add(table);
             Table outer = b.Table;
             b.Table = table;
@@ -297,53 +285,28 @@ namespace KScript.Documents
             return null;
         }
 
-        private static void FromData(ElementRun run, Table table, object data, object columns, bool header)
+        /// <summary>Fills a table from rows:, columns:, align: and header:, read the way the terminal's table reads them.</summary>
+        private static void FromRows(ElementRun run, Table table)
         {
-            if (!(data is List<object> rows)) throw run.Error("data: should be a list of rows: maps such as { name: 'Ada', age: 36 }, or lists.", "data", "Argument");
-            List<(string Heading, string Key)> cols = null;
-            if (columns is Dictionary<string, object> map) cols = map.Select(kv => (kv.Key, Values.ToStr(kv.Value))).ToList();
-            else if (columns is List<object> list) cols = list.Select(k => (Values.ToStr(k), Values.ToStr(k))).ToList();
-            else if (columns != null) throw run.Error("columns: should be a list of keys ['name', 'age'] or a map from heading to key { Name: 'name' }.", "columns", "Argument");
-            if (cols == null && rows.FirstOrDefault() is Dictionary<string, object> first) cols = first.Keys.Select(k => (k, k)).ToList();
-
-            if (cols != null && header)
+            TableArguments given = TableArguments.Read(run.Eval("rows"), run.Has("columns") ? run.Eval("columns") : null, run.Has("align") ? run.Eval("align") : null,
+                run.Flag("header", true), (message, argument) => run.Error(message, argument, "Argument"));
+            if (given.Headings != null)
             {
                 var head = new TableRow { Header = true };
-                foreach (var (heading, _) in cols) head.Cells.Add(new TableCell { Inlines = new List<Inline> { new TextInline(heading) } });
+                foreach (string heading in given.Headings) head.Cells.Add(new TableCell { Inlines = new List<Inline> { new TextInline(heading) } });
                 table.Rows.Add(head);
             }
-            for (int i = 0; i < rows.Count; i++)
+            foreach (List<object> cells in given.Cells)
             {
-                var row = new TableRow { Header = cols == null && header && i == 0 };
-                IEnumerable<object> cells = rows[i] switch
-                {
-                    Dictionary<string, object> m when cols != null => cols.Select(c => Path(m, c.Key)),
-                    List<object> l => l,
-                    object other => new[] { other },
-                };
+                var row = new TableRow();
                 foreach (object cell in cells) row.Cells.Add(new TableCell { Inlines = InlineParser.Parse(Format(cell)) });
                 table.Rows.Add(row);
             }
-            // Numbers line up on the right unless the columns were given.
-            if (table.Align.Count == 0 && rows.Count > 0)
-            {
-                IList<object> sample = rows[0] is Dictionary<string, object> d && cols != null ? cols.Select(c => Path(d, c.Key)).ToList() : rows[0] as List<object>;
-                if (sample != null) foreach (object v in sample) table.Align.Add(v is double ? ColumnAlign.Right : ColumnAlign.Left);
-            }
+            table.Align.AddRange(AlignWords(Enumerable.Range(0, given.ColumnCount).Select(given.AlignOf)));
         }
 
-        /// <summary>A value from a map by key, or by a dotted path such as address.city.</summary>
-        private static object Path(Dictionary<string, object> map, string key)
-        {
-            if (map.TryGetValue(key, out object v)) return v;
-            object at = map;
-            foreach (string part in key.Split('.'))
-            {
-                if (at is Dictionary<string, object> m && m.TryGetValue(part, out object next)) at = next;
-                else return null;
-            }
-            return at;
-        }
+        private static IEnumerable<ColumnAlign> AlignWords(IEnumerable<string> words) =>
+            words.Select(w => w switch { "right" => ColumnAlign.Right, "center" => ColumnAlign.Center, _ => ColumnAlign.Left });
 
         private static string Format(object value) => value switch
         {

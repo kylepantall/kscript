@@ -20,6 +20,7 @@ namespace KScript.Language.Analysis
             DiagnosticCodes.BoolWords,
             DiagnosticCodes.OneSpelling,
             DiagnosticCodes.TypeForm,
+            DiagnosticCodes.DurationUnit,
         };
 
         private static readonly bool Migrating = Environment.GetEnvironmentVariable("KSCRIPT_MIGRATE") == "1";

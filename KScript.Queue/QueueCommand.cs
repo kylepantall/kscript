@@ -7,14 +7,14 @@ using KScript.Runtime;
 namespace KScript.Queueing
 {
     /// <summary>
-    /// <c>kscript worker</c> (runs queued jobs until stopped) and <c>kscript queue status|list|failed|retry|forget|clear</c>
+    /// <c>kscript worker</c> (runs queued jobs until stopped) and <c>kscript queue status|list|failed|retry|delete|clear</c>
     /// (looks after the queues). Both work on the project of the current folder, or of --project.
     /// </summary>
     public static class QueueCommand
     {
         public const string WorkerUsage = "kscript worker [--connection name] [--queue a,b] [--concurrency n] [--once] [--stop-when-empty] [--max-jobs n] [--max-time 1h] [--sleep 1s] [--env name]";
 
-        public const string QueueUsage = "kscript queue status|list [queue]|failed|retry <id>|--all|forget <id>|--all|clear [queue] [--connection name] [--format json]";
+        public const string QueueUsage = "kscript queue status|list [queue]|failed|retry <id>|--all|delete <id>|--all|clear [queue] [--connection name] [--format json]";
 
         /// <summary>kscript worker. Returns 0, or 1 when a job failed with --stop-when-empty or --once, so scripts can tell.</summary>
         public static int RunWorker(string[] args, TextWriter output, TextWriter error, CancellationToken stop, string workingDirectory = null, string environment = null, Func<KScriptHost> host = null)
@@ -229,11 +229,13 @@ namespace KScript.Queueing
                     failedOut.Table(new[] { "Id", "Job", "Queue", "Failed", "Tries", "Error" },
                         jobs.Select(j => new[] { j.Id, j.Job, j.Queue, When(j.FailedAt ?? j.AvailableAt), j.Attempts + "/" + j.Tries, failedOut.Style.Red(Error(j)) }));
                     failedOut.NewLine();
-                    failedOut.Info("kscript queue retry <id> (or --all) runs one again; kscript queue forget <id> deletes it.");
+                    failedOut.Info("kscript queue retry <id> (or --all) runs one again; kscript queue delete <id> deletes it.");
                     return 0;
                 }
-                case "retry":
                 case "forget":
+                    return Fail(error, "kscript queue forget is now kscript queue delete: kscript queue delete <id> (or --all) deletes failed jobs.");
+                case "retry":
+                case "delete":
                 {
                     bool retry = rest[0] == "retry";
                     if (!all && target == null) return Fail(error, $"kscript queue {rest[0]} needs a failed job's id (from kscript queue failed), or --all.");

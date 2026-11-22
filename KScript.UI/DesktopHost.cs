@@ -508,7 +508,7 @@ namespace KScript.UI
             for (int i = 0; i < active.Count; i++)
             {
                 UINode node = active[i];
-                double every = Math.Max(15, node.Number("every") ?? 1000);
+                double every = Math.Max(15, node.Prop("every") is object length ? Duration.Seconds(length, "<Timer every>") * 1000 : 1000);
                 if (i < timers.Count)
                 {
                     var (timer, _) = timers[i];

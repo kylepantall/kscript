@@ -44,7 +44,7 @@ namespace KScript.Runtime
             ("end", "Use <exit /> (or <exit code=\"1\" />).", "exit"),
             ("anykey", "Use <pause /> from KScript.Terminal.", "pause"),
             ("new_dir", "Use <mkdir path=\"...\" /> from KScript.IO.", "mkdir"),
-            ("file_info", "Use @file(path), which returns a file value with ->size(), ->modified() and more (KScript.IO).", null),
+            ("file_info", "Use @file(path), which returns a file value with .size, .modified and more (KScript.IO).", null),
             ("registry", "The Windows registry isn't part of KScript 2.", null));
 
         public static readonly IReadOnlyDictionary<string, RetiredInfo> Attributes = Table(
@@ -55,7 +55,13 @@ namespace KScript.Runtime
             ("condition", "Use test=\"...\" with a KScript 2 expression.", "test"),
             ("method", "Use fn=\"...\" with a <fn> function.", "fn"),
             ("_insertion", "Closures on arrays were removed in KScript 2. Use list methods with fn() lambdas, such as $list->map(fn($x) => ...).", null),
-            ("_removal", "Closures on arrays were removed in KScript 2. Use list methods with fn() lambdas, such as $list->map(fn($x) => ...).", null));
+            ("_removal", "Closures on arrays were removed in KScript 2. Use list methods with fn() lambdas, such as $list->map(fn($x) => ...).", null),
+            // Lengths of time are durations with a unit (docs/contributing.md).
+            ("ms", "Give the length of time with its unit: duration=\"500ms\".", null),
+            ("seconds", "Give the length of time with its unit: duration=\"2s\".", null),
+            // Tables take the same arguments in a terminal and in a document.
+            ("data", "A table's rows are given as rows.", "rows"),
+            ("headers", "Give the headings with the columns: columns=\"{ Name: 'name', Age: 'age' }\".", null));
 
         public static readonly IReadOnlyDictionary<string, RetiredInfo> Commands = Table(
             ("math", "Write the arithmetic directly: $total + $price * $qty.", null),
@@ -84,8 +90,8 @@ namespace KScript.Runtime
             ("getfiles", "Use @files(folder), which returns a list of file values (KScript.IO).", "files"),
             ("find_file", "Use @files(folder)->find(fn($f) => ...) (KScript.IO).", null),
             ("dir_exists", "Use @is_folder(path) (KScript.IO).", "is_folder"),
-            ("extension_of", "Use $file->extension() or @file(path)->extension() (KScript.IO).", null),
-            ("path", "Use @file(path) and its methods: ->name(), ->directory(), ->extension() (KScript.IO).", "file"),
+            ("extension_of", "Use $file.extension or @file(path).extension (KScript.IO).", null),
+            ("path", "Use @file(path) and its methods: .name, .directory, .extension (KScript.IO).", "file"),
             ("directory", "Use @known_folder('desktop') or @cwd() (KScript.IO).", "known_folder"),
             ("k", "Use $os, $script and $env: $os.name, $script.path, $env.HOME.", null),
             ("args", "Use the $args list: $args[0].", null),
@@ -101,7 +107,10 @@ namespace KScript.Runtime
             ("to_base64", "Use ->to_base64().", null),
             ("to_md5", "Use ->md5().", null),
             ("xpath", "XPath isn't part of KScript 2; read XML with @read_text() and string methods, or use JSON.", null),
-            ("registry", "The Windows registry isn't part of KScript 2.", null));
+            ("registry", "The Windows registry isn't part of KScript 2.", null),
+            // Renamed so the standard packages follow one set of conventions (docs/contributing.md).
+            ("config", "Read a setting as $config.database.port, or $config->get('database.port', 5432) for a path held in a variable or a default.", null),
+            ("signed_in", "Use @is_signed_in() (KScript.Auth).", "is_signed_in"));
 
         private static IReadOnlyDictionary<string, RetiredInfo> Table(params (string Name, string Replacement, string Rename)[] rows) =>
             rows.ToDictionary(r => r.Name, r => new RetiredInfo(r.Name, r.Replacement, r.Rename), StringComparer.Ordinal);

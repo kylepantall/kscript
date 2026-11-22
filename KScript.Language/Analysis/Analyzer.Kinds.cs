@@ -167,7 +167,7 @@ namespace KScript.Language.Analysis
                 // $name.upper: a method needs -> and ( ).
                 TextSpan at = region.Source.ToSource(TextSpan.FromBounds(member.NameSpan.Start - 1, member.NameSpan.End));
                 bool method = catalog.GetMethods(member.Name, target.Type).Any(m => KType.AcceptsMethod(m.ReceiverType, m.Name, target.Type));
-                string what = target.Type == KType.String ? "Text has" : target.Type == KType.Number ? "A number has" : "A yes/no value has";
+                string what = target.Type == KType.String ? "Text has" : target.Type == KType.Number ? "A number has" : "A true/false value has";
                 Report(at, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownField,
                     $"{what} no fields, so .{member.Name} stops the script." + (method ? $" To call the method, write ->{member.Name}()." : string.Empty),
                     method && !member.NullSafe ? new[] { new QuickFix($"Change to ->{member.Name}()", new TextChange(at, "->" + member.Name + "()")) } : null);

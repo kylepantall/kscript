@@ -185,7 +185,7 @@ namespace KScript.Language.Analysis
                 result.References.Add(new SymbolReference(symbol, span, false, isWrite));
                 if (mustBeMutable && symbol.IsConst)
                 {
-                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.AssignConst, $"${name} is a constant (const=\"yes\") and can't be changed.");
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.AssignConst, $"${name} is a constant (const=\"true\") and can't be changed.");
                 }
                 else if (mustBeMutable && (symbol.Kind == SymbolKind.BuiltIn || symbol.Kind == SymbolKind.FrontMatter))
                 {

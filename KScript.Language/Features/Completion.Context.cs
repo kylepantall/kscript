@@ -312,7 +312,7 @@ namespace KScript.Language.Features
             return items;
         }
 
-        /// <summary>An element as a .kscript statement: <c>describe(name: "$1") { }</c>, <c>wait(ms: $1)</c>; null for a bare word.</summary>
+        /// <summary>An element as a .kscript statement: <c>describe(name: "$1") { }</c>, <c>wait(duration: $1)</c>; null for a bare word.</summary>
         internal static string CodeElementSnippet(ElementInfo e)
         {
             int n = 1;

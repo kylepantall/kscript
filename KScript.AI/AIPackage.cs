@@ -6,7 +6,7 @@ using K = KScript.Metadata.AttributeKind;
 
 namespace KScript.AI
 {
-    /// <summary>A conversation that keeps its history: <c>$chat->ask('...')</c>, <c>->history()</c>, <c>->reset()</c>.</summary>
+    /// <summary>A conversation that keeps its history: <c>$chat->ask('...')</c>, <c>.history</c>, <c>->reset()</c>.</summary>
     public sealed class ChatValue : IKObject
     {
         internal ChatValue(string system, string model, List<AiTool> tools, int maxTokens)
@@ -33,6 +33,10 @@ namespace KScript.AI
             {
                 "model" => Model,
                 "system" => System,
+                "history" => Messages
+                    .Where(m => m.Blocks.Any(b => b.Kind == AiBlockKind.Text) && m.Text.Trim().Length > 0)
+                    .Select(m => (object)new Dictionary<string, object> { ["role"] = m.Role, ["text"] = m.Text.Trim() })
+                    .ToList(),
                 _ => null,
             };
             return value != null;
@@ -68,18 +72,9 @@ namespace KScript.AI
                     }
                     return true;
                 }
-                case "history":
-                    result = Messages
-                        .Where(m => m.Blocks.Any(b => b.Kind == AiBlockKind.Text) && m.Text.Trim().Length > 0)
-                        .Select(m => (object)new Dictionary<string, object> { ["role"] = m.Role, ["text"] = m.Text.Trim() })
-                        .ToList();
-                    return true;
                 case "reset":
                     Messages.Clear();
                     result = this;
-                    return true;
-                case "model":
-                    result = Model;
                     return true;
             }
             result = null;
@@ -128,9 +123,10 @@ namespace KScript.AI
                 "<let name=\"chat\" value=\"@chat('You are a helpful assistant.')\" />\n<echo>{ $chat->ask('Hello!') }</echo>");
 
             p.Method(KType.Chat, "ask", "message, schema?", "Sends a message and returns the answer, keeping the history. With a schema the answer is a map.", KType.Any, Chat("ask"));
-            p.Method(KType.Chat, "history", "", "The conversation so far: a list of { role, text }.", KType.List, Chat("history"));
+            p.Field(KType.Chat, "history", KType.List, "The conversation so far: a list of { role, text }.");
+            p.Field(KType.Chat, "model", KType.String, "The model the chat uses.");
+            p.Field(KType.Chat, "system", KType.String, "The system prompt, or null.");
             p.Method(KType.Chat, "reset", "", "Forgets the conversation (keeps the system prompt).", KType.Chat, Chat("reset"));
-            p.Method(KType.Chat, "model", "", "The model the chat uses.", KType.String, Chat("model"));
 
             p.Element(new ElementInfo("llm", "Sends its text as a prompt to a language model (Claude) and stores the answer.", ContentKind.Template,
                 new A("to", K.DeclareVariable, "The variable that receives the answer.", true),

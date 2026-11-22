@@ -204,7 +204,7 @@ namespace KScript.Language.Analysis
                 CheckLiteralFits(value.Value.Trim(), type, span, scope, offset);
                 return true;
             }
-            if (parsed.Success && parsed.Root is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Regex or LiteralKind.Number } literal)
+            if (parsed.Success && parsed.Root is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.Duration or LiteralKind.Regex or LiteralKind.Number } literal)
             {
                 object text = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, CultureInfo.InvariantCulture) : literal.Value;
                 CheckLiteralFits(text, type, value.ToSource(literal.Span), scope, offset);

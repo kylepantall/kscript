@@ -37,8 +37,8 @@ namespace KScript.Language.Features
             ["%"] = "Remainder: `7 % 3` is 1.",
             ["fn"] = "A lambda: `fn($a, $b) => $a + $b`. Lambdas are values; store them, pass them, pipe into them.",
             ["match"] = "Picks a result by value: `match $x { 1 => 'one', 2 => 'two', _ => 'other' }`.",
-            ["true"] = "The boolean true (prints as yes).",
-            ["false"] = "The boolean false (prints as no).",
+            ["true"] = "The boolean true.",
+            ["false"] = "The boolean false.",
             ["null"] = "No value.",
         };
 
@@ -154,6 +154,11 @@ namespace KScript.Language.Features
                     {
                         return new HoverResult($"```kscript\n.{field.Name}: {field.Shape.Pretty()}\n```" + (field.Description != null ? "\n\n" + field.Description : string.Empty),
                             region.Source.ToSource(member.NameSpan));
+                    }
+                    if ((Catalog.GetField(target.Kind, member.Name) ?? Catalog.GetField(target.Type, member.Name)) is ValueFieldInfo builtIn)
+                    {
+                        return new HoverResult($"```kscript\n{builtIn.Receiver}.{builtIn.Name}: {builtIn.Type ?? KType.Any}\n```\n\n{builtIn.Description}"
+                            + (builtIn.Example != null ? "\n\n```kscript\n" + builtIn.Example + "\n```" : string.Empty), region.Source.ToSource(member.NameSpan));
                     }
                     break;
                 }
