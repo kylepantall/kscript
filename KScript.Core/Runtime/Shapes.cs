@@ -432,6 +432,28 @@ namespace KScript.Runtime
 
         /// <summary>Called after a field of a record is set, with its converted value.</summary>
         void FieldSet(Record record, string name, object value);
+
+        /// <summary>
+        /// The record a key names, for a route's path parameter typed with the type (<c>fn show(post: Post)</c> on
+        /// <c>/posts/{post}</c>). False when the kind has no such lookup; otherwise it returns the record or throws
+        /// the kind's not found error.
+        /// </summary>
+        bool TryFind(CallContext call, RecordType type, object key, out object record);
+
+        /// <summary>
+        /// Adjusts the OpenAPI schema of the type's records (hidden fields are already left out): a model marks the
+        /// fields the database fills in as read-only, and its relations as there only when loaded.
+        /// </summary>
+        void DescribeSchema(RecordType type, Dictionary<string, object> schema);
+
+        /// <summary>
+        /// The fields an OpenAPI schema of the type lists, each with the record type it links to when that type can't be
+        /// found by name where the field is declared (a model in the models folder), or null.
+        /// </summary>
+        IEnumerable<(FieldDefinition Field, RecordType Links)> SchemaFields(RecordType type);
+
+        /// <summary>The OpenAPI schema of a key that names one of the type's records in a path, or null when it has none.</summary>
+        Dictionary<string, object> KeySchema(RecordType type);
     }
 
     /// <summary>
@@ -1016,9 +1038,14 @@ namespace KScript.Runtime
         {
             var properties = new Dictionary<string, object>(StringComparer.Ordinal);
             var required = new List<object>();
-            foreach (FieldDefinition f in type.Fields)
+            IEnumerable<(FieldDefinition Field, RecordType Links)> fields = (type.Tag as IRecordKind)?.SchemaFields(type) ?? type.Fields.Select(f => (f, (RecordType)null));
+            foreach ((FieldDefinition f, RecordType links) in fields)
             {
-                Dictionary<string, object> property = SchemaOf(f.Type, type.Closure, type.Module, root, defs, refBase, named: false);
+                // Hidden fields are never in a record's JSON.
+                if (type.Hidden?.Contains(f.Name) == true) continue;
+                Dictionary<string, object> property = links != null
+                    ? WithListDepth(RecordSchema(links, root, defs, refBase), f.Type.ListDepth)
+                    : SchemaOf(f.Type, type.Closure, type.Module, root, defs, refBase, named: false);
                 if (f.Description != null) property["description"] = f.Description;
                 if (f.Computed) property["readOnly"] = true;
                 properties[f.Name] = property;
@@ -1029,6 +1056,7 @@ namespace KScript.Runtime
             schema["properties"] = properties;
             if (required.Count > 0) schema["required"] = required;
             schema["additionalProperties"] = type.Extra == ExtraKeys.Keep;
+            (type.Tag as IRecordKind)?.DescribeSchema(type, schema);
             return schema;
         }
 
@@ -1090,7 +1118,12 @@ namespace KScript.Runtime
                 return new Dictionary<string, object> { ["$ref"] = refBase + e.Name };
             }
             if (resolved is RefinedType r) return RefinedSchema(r, root, defs, refBase);
-            var record = (RecordType)resolved;
+            return RecordSchema((RecordType)resolved, root, defs, refBase);
+        }
+
+        /// <summary>A reference to a record type's schema, which is added to <paramref name="defs"/> the first time.</summary>
+        private static Dictionary<string, object> RecordSchema(RecordType record, RecordType root, Dictionary<string, object> defs, string refBase)
+        {
             if (root != null && record == root) return new Dictionary<string, object> { ["$ref"] = "#" };
             if (!defs.ContainsKey(record.Name))
             {
@@ -1099,6 +1132,9 @@ namespace KScript.Runtime
             }
             return new Dictionary<string, object> { ["$ref"] = refBase + record.Name };
         }
+
+        private static Dictionary<string, object> WithListDepth(Dictionary<string, object> schema, int depth) =>
+            depth == 0 ? schema : new Dictionary<string, object> { ["type"] = "array", ["items"] = WithListDepth(schema, depth - 1) };
 
         /// <summary>The base type's schema, with the rules JSON Schema can say: min and max, pattern, and the plain lists of one_of and not.</summary>
         private static Dictionary<string, object> RefinedSchema(RefinedType type, RecordType root, Dictionary<string, object> defs, string refBase)

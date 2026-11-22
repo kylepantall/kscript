@@ -501,6 +501,13 @@ namespace KScript.Http
                     "input" => "The request's input",
                     _ => $"The request's {p.Name}",
                 };
+                // A path parameter typed with a model is the record its key names: fn show(post: Post) on /posts/{post}.
+                if (fromPath && TypeRef.Parse(p.Type) is { IsSimple: true, IsBuiltIn: false } t && Shapes.Resolve(t, fn.Closure, fn.Module) is RecordType { Tag: IRecordKind kind } type
+                    && kind.TryFind(new CallContext(interpreter, p.Name, Array.Empty<object>(), scope: fn.Closure, module: fn.Module), type, value, out object found))
+                {
+                    named[p.Name] = found;
+                    continue;
+                }
                 try
                 {
                     named[p.Name] = Shapes.Convert(interpreter, value, p.Type, what, fn.Closure, fn.Module);
