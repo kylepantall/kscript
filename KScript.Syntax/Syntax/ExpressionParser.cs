@@ -47,7 +47,7 @@ namespace KScript.Syntax
         private int index;
         private int lastEnd;
         private int bracketDepth;
-        private readonly Stack<int> pendingConditionalDepths = new();
+        private Stack<int> pendingConditionalDepths;
 
         private ExpressionParser(string text, int start, bool textMode)
         {
@@ -228,7 +228,7 @@ namespace KScript.Syntax
                 return condition;
             }
             Advance();
-            pendingConditionalDepths.Push(bracketDepth);
+            (pendingConditionalDepths ??= new Stack<int>()).Push(bracketDepth);
             ExprNode whenTrue = ParseExpr();
             pendingConditionalDepths.Pop();
             Expect(":", "in a ? b : c conditional");
@@ -547,7 +547,7 @@ namespace KScript.Syntax
             // Indexing and arithmetic can also start the true branch ([...], +n, -n).
             // A ':' outside any brackets, before the end of this expression, distinguishes it.
             int depth = 0;
-            int neededColons = 1 + pendingConditionalDepths.Count(d => d == bracketDepth);
+            int neededColons = 1 + (pendingConditionalDepths?.Count(d => d == bracketDepth) ?? 0);
             for (int offset = 1; ; offset++)
             {
                 Token token = Peek(offset);

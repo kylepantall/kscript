@@ -249,6 +249,9 @@
           "include": "#constants"
         },
         {
+          "include": "#cast"
+        },
+        {
           "include": "#operators"
         },
         {
@@ -319,6 +322,9 @@
           "include": "#constants"
         },
         {
+          "include": "#cast"
+        },
+        {
           "include": "#operators"
         },
         {
@@ -381,9 +387,6 @@
     },
     "operators": {
       "patterns": [
-        {
-          "include": "#cast"
-        },
         {
           "comment": "Logic is written in words. Comparisons are symbols in a .kscript file (lt, gt, eq and the rest are the XML spellings).",
           "match": "(?<![\\w$@.-])(and|or|not|is|in)(?![\\w-])",

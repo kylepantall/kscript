@@ -2190,6 +2190,7 @@ namespace KScript.Syntax.Markup
                 return true;
             }
             string line = WithoutTrailingComments(text.Substring(start, end - start));
+            if (CastSyntax.ContinuesAfter(line) is bool cast) return cast;
             if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal))
                 && !(line.EndsWith('/') && Lexer.Tokenize(line) is { Count: > 0 } tokens && tokens[^1].Kind == TokenKind.Regex))
             {
@@ -2221,6 +2222,7 @@ namespace KScript.Syntax.Markup
             {
                 p++;
             }
+            if (CastSyntax.StartsLine(text, p)) return true;
             if (LeadingContinuations.Any(op => string.CompareOrdinal(text, p, op, 0, op.Length) == 0))
             {
                 // "..." would be a spread, but a line starting with '.' is always a continuation here.
