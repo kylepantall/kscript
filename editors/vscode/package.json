@@ -426,42 +426,65 @@
             "id": "install",
             "title": "Install KScript",
             "description": "The editor uses the kscript command for errors, suggestions and running scripts.\n[Open the Install Guide](command:kscript.showSetup)",
-            "media": { "markdown": "walkthrough/install.md" },
-            "completionEvents": ["onCommand:kscript.showSetup", "onCommand:kscript.run"]
+            "media": {
+              "markdown": "walkthrough/install.md"
+            },
+            "completionEvents": [
+              "onCommand:kscript.showSetup",
+              "onCommand:kscript.run"
+            ]
           },
           {
             "id": "newScript",
             "title": "Write your first script",
             "description": "Open a short script that is ready to run.\n[New Script](command:kscript.newScript)",
-            "media": { "markdown": "walkthrough/first-script.md" },
-            "completionEvents": ["onCommand:kscript.newScript"]
+            "media": {
+              "markdown": "walkthrough/first-script.md"
+            },
+            "completionEvents": [
+              "onCommand:kscript.newScript"
+            ]
           },
           {
             "id": "run",
             "title": "Run it",
             "description": "Run the script you have open and see what it prints.\n[Run Script](command:kscript.run)",
-            "media": { "markdown": "walkthrough/run.md" },
-            "completionEvents": ["onCommand:kscript.run"]
+            "media": {
+              "markdown": "walkthrough/run.md"
+            },
+            "completionEvents": [
+              "onCommand:kscript.run"
+            ]
           },
           {
             "id": "mistakes",
             "title": "Fix a mistake",
             "description": "Mistakes are underlined as you type, and most come with a fix you can pick.",
-            "media": { "markdown": "walkthrough/mistakes.md" }
+            "media": {
+              "markdown": "walkthrough/mistakes.md"
+            }
           },
           {
             "id": "explore",
             "title": "Find out what you can write",
             "description": "Suggestions and hovers show what is there. The docs have the rest.\n[Open Docs](command:kscript.openDocs)",
-            "media": { "markdown": "walkthrough/explore.md" },
-            "completionEvents": ["onCommand:kscript.openDocs"]
+            "media": {
+              "markdown": "walkthrough/explore.md"
+            },
+            "completionEvents": [
+              "onCommand:kscript.openDocs"
+            ]
           },
           {
             "id": "project",
             "title": "Start a project",
             "description": "Keep scripts, tests and settings together in one folder.\n[New Project…](command:kscript.newProject)",
-            "media": { "markdown": "walkthrough/project.md" },
-            "completionEvents": ["onCommand:kscript.newProject"]
+            "media": {
+              "markdown": "walkthrough/project.md"
+            },
+            "completionEvents": [
+              "onCommand:kscript.newProject"
+            ]
           }
         ]
       }
@@ -519,7 +542,7 @@
   },
   "devDependencies": {
     "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^3.2.1",
+    "@vscode/vsce": "^4.1.1",
     "esbuild": "^0.28.1",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
