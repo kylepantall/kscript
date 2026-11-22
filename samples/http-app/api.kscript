@@ -1,7 +1,7 @@
 // API routes: everything here is under /api and answers errors with JSON.
 import KScript.Http
-import "controllers/people.ks.xml" as people
-import "middleware/security.ks.xml"
+import "controllers/people.kscript" as people
+import "middleware/security.kscript"
 
 Routes(middleware: api) {
   // Every API response gets the security headers.

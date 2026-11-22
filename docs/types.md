@@ -298,7 +298,7 @@ Calling a type makes a value of it, checked the same way: `Age(42)`, `Slug(' Hel
 
 ### Your own native types
 
-`kscript make native` writes a refinement type to `natives/` that works like a built-in one. Every script in the project can use it without an import, the same way the `extensions/` folder works. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, `->from()` and request bodies), and the editor checks the values written in code:
+`kscript make native` writes a refinement type to `natives/` that works like a built-in one. Every script in the project can use it without an import, the same way the `extensions/` folder works. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, a call of the type and request bodies), and the editor checks the values written in code:
 
 ```sh
 kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/" --normalize "$value->trim()->upper()"

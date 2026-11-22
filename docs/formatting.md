@@ -1,6 +1,6 @@
 # Formatting: kscript fmt
 
-`kscript fmt` tidies scripts (`.ks.xml`, `.ks`, `.kscript` and `.xml` files that start with `<kscript>`) and the `.html` pages that `kscript serve` runs. The editor uses the same formatter for **Format Document** and format on save, so the command line and every editor agree.
+`kscript fmt` tidies scripts (`.kscript` and `.ks.xml` files) and the `.html` pages that `kscript serve` runs. The editor uses the same formatter for **Format Document** and format on save, so the command line and every editor agree.
 
 ```sh
 kscript fmt                     # format every script and page in the current project
@@ -71,9 +71,9 @@ import KScript.IO
 import KScript.Cache
 
 /// The value kept under the key, or else what compute gives, kept for cache.ttl, which says how long.
-fn cached(key, compute) => @cache('memory', name: 'app')->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
+fn cached(key: string, compute: fn) => @cache('memory', name: 'app')->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
 
-fn adults(people) => $people->filter(fn(p) => $p.age >= 18)->sort_by(fn(p) => $p.name)->map(fn(p) => $p.name)->take(20)
+fn adults(people: list) => $people->filter(fn(p) => $p.age >= 18)->sort_by(fn(p) => $p.name)->map(fn(p) => $p.name)->take(20)
 
 people = @read_json('people.json')
 names = $people |> filter(fn(p) => $p.age > 18) |> map(fn(p) => $p.name->upper()) |> sort()
@@ -87,11 +87,11 @@ import KScript.Cache
 
 /// The value kept under the key, or else what compute gives, kept for
 /// cache.ttl, which says how long.
-fn cached(key, compute) =>
+fn cached(key: string, compute: fn) =>
   @cache('memory', name: 'app')
     ->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
 
-fn adults(people) =>
+fn adults(people: list) =>
   $people
     ->filter(fn(p) => $p.age >= 18)
     ->sort_by(fn(p) => $p.name)
@@ -160,7 +160,7 @@ Put style settings under `"format"` in `kscript.json`. Every setting is optional
     "preserve": ["pre-like"], // elements whose content is kept exactly
     "rules": {},              // turn rules off, e.g. { "statement_per_line": false }; see below
     "enabled": true,          // false: no formatting anywhere in this project
-    "include": ["**/*.ks.xml", "**/*.ks", "**/*.kscript", "**/*.html"],
+    "include": ["**/*.kscript", "**/*.ks.xml", "**/*.html"],
     "exclude": ["_templates", "node_modules", ".git"]
   }
 }

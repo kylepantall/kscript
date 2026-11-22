@@ -313,7 +313,7 @@ namespace KScript.Runtime
                 ("duration->iso", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->iso() }</echo>"),
                 ("duration->after", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->after('2026-11-21T09:00:00'->to_date()) }</echo>"),
                 ("duration->before", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->before('2026-11-21T09:00:00'->to_date()) }</echo>"),
-                ("duration->plus", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->plus('45m') }</echo>"),
+                ("duration->plus", "<let name=\"x\" type=\"duration\" value=\"'1h30m'\" />\n<echo>{ $x->plus(45m) }</echo>"),
                 ("cron->next", "<let name=\"x\" type=\"cron\" value=\"'0 9 * * mon-fri'\" />\n<echo>{ $x->next('2026-11-21T10:00:00'->to_date()) }</echo>"),
                 ("cron->next_times", "<let name=\"x\" type=\"cron\" value=\"'0 9 * * mon-fri'\" />\n<echo>{ $x->next_times(3, '2026-11-21T10:00:00'->to_date()) }</echo>"),
                 ("color->rgb", "<let name=\"x\" type=\"color\" value=\"'#ff8800'\" />\n<echo>{ $x->rgb() }</echo>"),

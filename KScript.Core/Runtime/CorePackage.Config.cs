@@ -22,7 +22,7 @@ namespace KScript.Runtime
                 new A("prefix", K.Text, "Environment variables with this prefix override the files: with prefix=\"APP_\", APP_DATABASE__HOST sets database.host."),
                 new A("root", K.Path, "The folder the files are in. Default: the script's folder."),
                 new A("defaults", K.Expression, "A map of settings used when no file sets them."),
-                new A("require", K.Text, "Settings that must be set, comma separated, such as `database.host, api.key`."),
+                new A("require", K.Text, "Settings that must be set, as a list: `['database.host', 'api.key']` (in XML, `database.host, api.key`).") { NameList = true },
                 new A("user", K.Bool, "true also reads the person's own settings: config.json (or .yaml) in the app's config folder (see KScript.Storage), layered over the other files."),
                 new A("export_env", K.Bool, "no stops values in .env files becoming environment variables (they always do for @env() unless this is no)."),
                 new A("into", K.DeclareVariable, "Store the settings in this variable instead of changing $config."))
@@ -75,7 +75,7 @@ namespace KScript.Runtime
             }, "@parse_env('PORT=8080').PORT");
         }
 
-        private static List<string> List(string raw) => (raw ?? string.Empty).Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+        private static List<string> List(string raw) => KScript.Metadata.NameList.Names(raw);
 
         private static MethodHandler ConfigMethod(string name) => (t, c) => ((ConfigValue)t).TryCallMethod(c, name, out object r) ? r : null;
     }

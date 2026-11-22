@@ -38,7 +38,8 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
 | `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |
 | `editors/vscode/` | The VS Code extension. |
-| `samples/kscript2/` | Sample scripts. |
+| `samples/scripts/` | Sample scripts. Every sample is a `.kscript` file. |
+| `samples/xml/` | The scripts of `samples/scripts/` in the XML form: the one set of samples kept in XML. |
 | `samples/life-lab/` | Life Lab: one KScript program that runs in a terminal, in the browser and as a desktop app. |
 | `samples/auth-app/` | A site with accounts, made by `kscript make auth --api` (see [Sign-in](auth.md)). |
 | `Example Sites/team` | A sample `kscript serve` site. |
@@ -47,7 +48,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 
 `KScript.Tests` covers the interpreter, every package, `kscript serve` pages, `kscript make`, `kscript.json` and the sample scripts; `KScript.Language.Tests` covers the analyzer, the editor features and the language server. Run them with `dotnet test KScript.sln`.
 
-Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/kscript2/oldest.ks.xml`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
+Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/scripts/oldest.kscript`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
 
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
@@ -85,17 +86,50 @@ The first text says why and the second is what to use instead, as written in a s
 
 The guides in `docs/` and the README are written by hand, so a test keeps them honest: `DocsTests.Every_example_in_the_guides_and_readme_matches_the_code` checks every `kscript` and `xml` example with the analyzer. It fails if an example uses an element, attribute, command, method or parameter that no longer exists, passes the wrong number of arguments, or uses something deprecated.
 
+## The rules the engine enforces
+
+The naming and shape rules are not only tests: the engine applies them as a package registers. They live in one class, `Conventions` (`KScript.Core/Runtime/Conventions.cs`), as lists of names and one small check per rule. `PackageBuilder` (`p.Element`, `p.Command`, `p.Method`, `p.Field`, `p.Variable`, `p.EchoFormat`, `p.LogProvider`, `p.NativeType`) asks it about every registration and throws a `ConventionException` for one that breaks a rule, so the package doesn't load:
+
+```
+KScript.Cache registers argument 'max-age' on 'cache': arguments are snake_case (max_age).
+```
+
+Each registration is checked on its own:
+
+- **Elements.** A name is PascalCase or snake_case, with no hyphen. PascalCase is for the packages whose elements describe things (`Conventions.ThingPackages`: KScript.UI, KScript.Http, KScript.Document) and for the steps written inside a migration in KScript.Data (`Conventions.ThingsInside`); every other element is an action in snake_case. A name in `Retired` can't come back.
+- **Arguments.** snake_case, each listed once. `to` is a destination and never declares a variable; `into` always does; an argument that declares a variable is called `name`, `into`, `as`, `each` or `at` (never `index`). A file is `path` (not `src`, `file`, `filename`, `source` or `sample`). A list is a list kind or `NameList = true`, never text "separated by commas". An argument that names a function shows `@name` in its description. An argument renamed in `Retired.RenamedAttributes` can't come back.
+- **Commands, methods and parameters.** snake_case. Something that returns `bool` is named `is_x` or `has_x`, unless it is in `Conventions.VerbQuestions` (`contains`, `starts_with`, ...) and takes an argument, or in `Conventions.ActionsThatReport` (`remove`, `save`, ...); and an `is_x` or `has_x` returns `bool`. `count` takes no arguments and there is no `length`. Keyed things use `get`, `set`, `has` and `remove` (no `put`, `forget`, ...), and only the logger has `flush`. A description doesn't call its command another name for something ("the same as", "alias"). Nothing in `Retired.Commands` or `RetiredMembers` comes back.
+- **Fields.** snake_case; a `bool` field is `is_x` or `has_x` (or `exists`) and the other way round; `count` and `length` are never fields.
+- **Lengths of time.** An argument or parameter called `timeout`, `ttl`, `every`, `delay`, `wait`, `backoff`, `duration`, `expires`, `lockout` or ending in `_for`, `_after`, `_until`, `_timeout` or `_ttl` is declared as a duration, and none is named for a unit (`ms`, `seconds`, ...).
+- **Words.** Every name says `color`. Descriptions say true and false, never yes and no, and the description of an `is_x` or `has_x` starts with "True".
+- **Variables, echo formats, log providers and native types** are snake_case; **error types** are PascalCase and only `Error` itself ends in Error; the **settings** a section of `kscript.json` declares (`Conventions.Settings`) are snake_case.
+
+Rules about several registrations are checked by `Conventions.Together`, when a package has finished registering and again when the registry has loaded every package (`PackageRegistry.LoadAll`), so they hold across packages too:
+
+- a type has each method and each field once, and a name is a field or a method of a type, never both;
+- a method with no arguments on a type that has fields is a field, unless it is in `Conventions.ZeroArgumentMethods` with the work it does;
+- a type with `get` and `set` has `has` and `remove`, and no `delete`;
+- no two commands, and no two methods of a type, share a description;
+- a name is a statement or a command, not both, apart from `Conventions.StatementAndCommand`;
+- no command only repeats a method of its first argument, apart from `Conventions.DeliberatePairs`, and those pairs take the same parameter names.
+
+Every allow-list is in `Conventions`, is short, and gives the reason for each entry; to allow a new exception, add it there with its reason. `Conventions.Tables` checks the lists and the retired tables against everything that ships (a retired name points at one that exists, no entry has gone stale); it needs every package installed, so the tests run it rather than the runtime.
+
+The checks are plain string comparisons, with no reflection and no regular expressions, so they are cheap: in the released (Native AOT) kscript a script starts as fast as before, within a millisecond or two. A build that runs under the JIT (`dotnet run`, the tests) pays about 25 ms once to compile them. The tests in `KScript.Tests/Conventions/` call the same checks: `ConventionEngineTests` proves that every package that ships loads clean and that each rule fires (it registers something wrong in a throwaway package and reads the message), and the other files apply one rule at a time to the whole catalog, including the elements that are only planned. To add a rule, add a check to `Conventions`, call it from `Element`, `Callable`, `Field` or `Together`, list it here, and add a test that breaks it.
+
+Rules about what a script, a sample or a guide writes (quotes, `true`/`false`, one spelling per piece of syntax) are lint rules (KS6xxx) with their own tests, not part of `Conventions`.
+
 ## How the standard packages behave
 
-Every package follows the same rules, so what you learn in one works in the next. `StdlibBehaviourConventionTests` walks the whole catalog and fails when a package breaks one.
+Every package follows the same rules, so what you learn in one works in the next. The engine refuses a package that breaks one (see above), and `StdlibBehaviourConventionTests` applies them to the whole catalog.
 
-**A name that answers true or false starts with `is_` or `has_`.** `$ip.is_private`, `$response.is_ok`, `$password->is_strong()`, `@is_signed_in()`, `$cache->has(key)`. The only other names allowed are verbs that ask a question about an argument, such as `->contains(x)`, `->starts_with(x)`, `->matches(x)` and `@exists(path)`, and actions that report whether they worked, such as `->remove(key)`. Both lists are short and are written out in the test. Descriptions say "True when ...".
+**A name that answers true or false starts with `is_` or `has_`.** `$ip.is_private`, `$response.is_ok`, `$password->is_strong()`, `@is_signed_in()`, `$cache->has(key)`. The only other names allowed are verbs that ask a question about an argument, such as `->contains(x)`, `->starts_with(x)`, `->matches(x)` and `@exists(path)`, and actions that report whether they worked, such as `->remove(key)`. Both lists are short and are written out in `Conventions`. Descriptions say "True when ...".
 
 **A plain fact is a field; a method takes arguments or does work.** A field is read with a dot and no brackets: `$response.status`, `$file.name`, `$file.size`, `$date.year`, `$e.status`. A method is called with `->`: `$response->json()`, `$file->read_text()`, `$date->format('yyyy')`. A package adds a field with `p.Field(receiver, name, type, description)`. Calling a field (`$response->status()`) is an error that says to drop the brackets. A value whose fields are the user's own (a record's columns, a map's keys, `$config`'s settings) keeps its own facts as methods, so they can't clash with a column or setting of the same name.
 
 **Counting is `->count()` everywhere.** A list, a text and a map have no fields of their own (a map's are the user's keys), so "how many" is the method on all three, and on a query, a range and a fake queue too: `$list->count()`, `$name->count()`, `$map->count()`. It takes no arguments. "How many match" is `->count_of(match)`. There is no `->length()` and no `.count` or `.length` field.
 
-**One name for each thing.** `StdlibNameConventionTests` walks every command and method and fails on a second spelling. Methods are the main form: there is no command that only repeats a method of its first argument (`$text->upper()`, not `@to_upper($text)`), apart from a short list in the test, such as KScript.Math's `@sqrt(x)` beside `$x->sqrt()`. A command and a method with the same name take the same parameter names. An action has one form: a command when it takes values and gives a value back (`@move(from, to)`, `@download(url, to)`, `@assert(condition)`, `Job(...)->dispatch()`), a statement only when it needs a block or prompt text (`transaction { }`, `llm`, `<respond>` in a page). Every identifier says `color`; prose stays British.
+**One name for each thing.** The engine refuses a second spelling, and `StdlibNameConventionTests` walks every command and method to prove none ships. Methods are the main form: there is no command that only repeats a method of its first argument (`$text->upper()`, not `@to_upper($text)`), apart from a short list (`Conventions.DeliberatePairs`), such as KScript.Math's `@sqrt(x)` beside `$x->sqrt()`. A command and a method with the same name take the same parameter names. An action has one form: a command when it takes values and gives a value back (`@move(from, to)`, `@download(url, to)`, `@assert(condition)`, `Job(...)->dispatch()`), a statement only when it needs a block or prompt text (`transaction { }`, `llm`, `<respond>` in a page). Every identifier says `color`; prose stays British.
 
 **A name that is taken away says what to write instead.** `Retired` (KScript.Core/Runtime/Retired.cs) holds removed statements, arguments and commands, and `RetiredMembers` holds removed methods by receiver type. The runtime stops with the replacement and the editor offers a quick fix when it is a plain rename. Nothing retired keeps working.
 
@@ -128,7 +162,7 @@ The compiler turns that string into a `Wording` (`KScript.Syntax/Text/Wording.cs
 
 GitHub highlights code with [Linguist](https://github.com/github-linguist/linguist), which only knows the languages that have been added to it. A repository can't bring its own grammar, so until KScript is in Linguist:
 
-- Code blocks in Markdown use ` ```xml ` for scripts and ` ```html ` for `kscript serve` pages. GitHub highlights the markup, though not KScript's `{ }` expressions.
-- `.gitattributes` marks `*.ks` and `*.ks.xml` files as XML, so they are highlighted in the file view and counted as XML in the language bar.
+- Code blocks in Markdown use ` ```kscript ` for scripts (GitHub shows them as plain text; the docs site and the editor colour them), ` ```xml ` for the XML form and ` ```html ` for `kscript serve` pages.
+- `.gitattributes` marks `*.ks.xml` files as XML, so they are highlighted in the file view and counted as XML in the language bar.
 
 KScript already has a full TextMate grammar in [`editors/vscode/syntaxes/kscript.tmLanguage.json`](../editors/vscode/syntaxes/kscript.tmLanguage.json), the format Linguist uses. Linguist adds a new language once its file extension is used in at least 200 different repositories on GitHub. When KScript gets there, the grammar can be submitted to Linguist, and ` ```kscript ` code blocks and `.ks.xml` files will then be highlighted as KScript everywhere on GitHub.

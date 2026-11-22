@@ -7,8 +7,8 @@ KScript has a test framework built in. Tests are KScript files whose names end i
 kscript {
   import "../lib/strings.kscript"
 
-  describe(name: slugify) {
-    test(name: lower-cases and joins words with dashes) {
+  describe(name: "slugify") {
+    test(name: "lower-cases and joins words with dashes") {
       expect(value: @slugify('Hello World'), equals: 'hello-world')
     }
 
@@ -73,17 +73,17 @@ What a test prints with `echo` is kept, and shown under the test only when it fa
 | `timeout: 30` | On a `test`: fail it if it runs longer than this many seconds. |
 
 ```kscript
-describe(name: a shopping cart) {
+describe(name: "a shopping cart") {
   cart = []
   before_each {
     cart = ['apple']
   }
 
-  test(name: starts with one item) {
+  test(name: "starts with one item") {
     expect(value: $cart, count: 1)
   }
 
-  test(name: adds items) {
+  test(name: "adds items") {
     cart = $cart->push('pear')
     expect(value: $cart, equals: ['apple', 'pear'])
   }
@@ -111,7 +111,7 @@ describe(name: a shopping cart) {
 `@assert(condition, message?)` checks a condition, on a line of its own or inside an expression such as a lambda. When a comparison fails it shows the value of each side:
 
 ```text
-Expected $order.total eq 30 to be true.
+Expected $order.total == 30 to be true.
   $order.total is 25
 ```
 
@@ -122,7 +122,7 @@ Expected $order.total eq 30 to be true.
 `expect_error { }` fails unless its body stops with an error. `type` checks the error type (an error type that extends it counts too), `contains` checks the message, and `as` keeps the error (`type`, `message`, `line`, `file`, `status`, `cause` and its fields) for more checks:
 
 ```kscript
-expect_error(type: Validation, contains: positive, as: err) {
+expect_error(type: Validation, contains: "positive", as: err) {
   @set_age(-1)
 }
 expect(value: $err.line, type: number)
@@ -159,7 +159,7 @@ expect(value: $out, contains: 'Welcome, Joan')
 `@run_script(path, { args, input })` runs another script on its own, as `kscript path args…` would, and returns `{ output, code, error }`: what it printed, its exit code (3 when it stopped with an error), and the error or `null`. The path is relative to the test file. The script gets the project's packages, but not KScript.Test.
 
 ```kscript
-test(name: hello.kscript greets the name it is given) {
+test(name: "hello.kscript greets the name it is given") {
   run = @run_script('../scripts/hello.kscript', options: { args: ['Ellie'] })
   expect(value: $run.code, equals: 0)
   expect(value: $run.output, equals: 'Hello, Ellie!')
@@ -230,6 +230,6 @@ test(name: "a note is saved") {
 
 ## In the editor
 
-The language server treats `*.test.kscript` and `*.test.ks.xml` files as importing KScript.Test, so `test`, `expect` and the rest get completion, hover and checking, and `$case` from `each` is known inside the test. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.
+The language server treats `*.test.kscript` and `*.test.ks.xml` files as importing KScript.Test, so `test`, `expect` and the rest get completion, hover and checking, and the variables of a `for` loop round a test are known inside it. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.
 
 `expect`, `@assert` and `capture` also work in ordinary scripts that `import KScript.Test`: a failed check stops the script with an `Assertion` error. `test` and `describe` only work under `kscript test`.

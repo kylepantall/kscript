@@ -127,7 +127,7 @@ namespace KScript.Auth
                     return null;
                 }, "<do>@logout()</do>");
             p.Command("attempt", "email, password, remember?: bool, session?: bool",
-                "Signs someone in with an email and password: returns the user, or null when they don't match. session: no only checks them, for an API that answers with a token instead of a cookie. After http.auth.attempts (5) failures for the same email and address in http.auth.lockout (a minute), it throws a TooManyRequests error that says how long to wait (kscript serve answers it with 429).",
+                "Signs someone in with an email and password: returns the user, or null when they don't match. session: false only checks them, for an API that answers with a token instead of a cookie. After http.auth.attempts (5) failures for the same email and address in http.auth.lockout (a minute), it throws a TooManyRequests error that says how long to wait (kscript serve answers it with 429).",
                 KType.Map, Attempt,
                 "<let name=\"user\" value=\"@attempt($form.email, $form.password, remember: $form.remember)\" />");
             p.Command("register", "email, password, fields...",

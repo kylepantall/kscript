@@ -8,16 +8,16 @@ import KScript.Document
 Document(template: paper, title: "How Gliders Move", author: "Ada Lovelace", to: "gliders.pdf") {
   Abstract "A glider returns to its own shape every \( p = 4 \) generations, one cell further on."
 
-  Section(title: Introduction) {
+  Section(title: "Introduction") {
     Paragraph "The Game of Life [@gardner1970] is played on a square grid. Each cell has **eight neighbours**."
 
-    Math(id: eq-speed) "v = \frac{\max(|\Delta x|, |\Delta y|)}{p} \, c"
+    Math(id: "eq-speed") "v = \frac{\max(|\Delta x|, |\Delta y|)}{p} \, c"
 
     Paragraph "Equation [#eq-speed] gives a pattern's speed."
   }
 
   Bibliography {
-    Source(id: gardner1970, type: article, author: "Martin Gardner", title: "Mathematical Games", journal: "Scientific American", year: 1970)
+    Source(id: "gardner1970", type: "article", author: "Martin Gardner", title: "Mathematical Games", journal: "Scientific American", year: 1970)
   }
 }
 ```
@@ -33,7 +33,7 @@ The [samples/documents](https://github.com/kylepantall/kscript/tree/master/sampl
 ```kscript
 import KScript.Document
 
-Document(title: "Notes", to: [notes.pdf, notes.docx, notes.tex]) {
+Document(title: "Notes", to: ['notes.pdf', 'notes.docx', 'notes.tex']) {
   Paragraph "Saved three ways."
 }
 ```
@@ -108,10 +108,10 @@ import KScript.Document
 Document(template: report, title: "Annual Report", author: "The team", to: "report.pdf") {
   Contents
 
-  Section(title: Summary, id: summary) {
+  Section(title: "Summary", id: "summary") {
     Paragraph "Visits rose every quarter."
 
-    Section(title: Details) {
+    Section(title: "Details") {
       List(style: number) {
         Item "First point."
         Item "Second point."
@@ -122,9 +122,9 @@ Document(template: report, title: "Annual Report", author: "The team", to: "repo
     }
   }
 
-  Section(title: Appendix, numbered: false, new_page: true) {
+  Section(title: "Appendix", numbered: false, new_page: true) {
     Quote(by: "John Conway") "I'm not a mathematician who's interested in applications."
-    Code(language: python) "print('hello')"
+    Code(language: "python") "print('hello')"
   }
 }
 ```
@@ -150,7 +150,7 @@ Document(template: report, title: "Annual Report", author: "The team", to: "repo
 import KScript.Document
 
 Document(title: "Maths", to: "maths.pdf") {
-  Math(id: eq-gauss) "\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}"
+  Math(id: "eq-gauss") "\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}"
   Math(numbered: false) "\sum_{k=1}^{n} k = \frac{n(n+1)}{2}"
   Math "A = \begin{pmatrix} a & b \\\\ c & d \end{pmatrix}, \quad \det A = ad - bc"
 }
@@ -191,7 +191,7 @@ people = [{ name: 'Ada', born: 1815 }, { name: 'Alan', born: 1912 }]
 import KScript.Document
 
 Document(title: "People", to: "people.pdf") {
-  Table(caption: "Two mathematicians.", id: tab-people, rows: $people, columns: { Name: 'name', Born: 'born' }, align: ['left', 'right'])
+  Table(caption: "Two mathematicians.", id: "tab-people", rows: $people, columns: { Name: 'name', Born: 'born' }, align: ['left', 'right'])
 }
 ```
 
@@ -219,7 +219,7 @@ Document(title: "Scores", to: "scores.pdf") {
 import KScript.Document
 
 Document(title: "Gliders", to: "gliders.pdf") {
-  Figure(path: "glider.png", caption: "A glider over four generations.", id: fig-glider, width: 0.8)
+  Figure(path: "glider.png", caption: "A glider over four generations.", id: "fig-glider", width: 0.8)
 }
 ```
 
@@ -236,7 +236,7 @@ Document(template: paper, title: "Cited", to: "cited.pdf") {
   Paragraph "Life is universal [@berlekamp1982; @rendell2002]."
 
   Bibliography(path: "refs.bib") {
-    Source(id: rendell2002, type: inproceedings, author: "Paul Rendell", title: "Turing Universality of the Game of Life", booktitle: "Collision-Based Computing", year: 2002)
+    Source(id: "rendell2002", type: "inproceedings", author: "Paul Rendell", title: "Turing Universality of the Game of Life", booktitle: "Collision-Based Computing", year: 2002)
   }
 }
 ```
@@ -291,7 +291,7 @@ items = [{ description: 'Consulting', quantity: 3, price: 450 }, { description: 
 import KScript.Document
 
 Document(template: invoice, to: "invoice.pdf") {
-  Invoice(number: "INV-042", from: "Life Lab Ltd\n12 Grid Street", to: "Example University", due: "20 December 2026", items: $items, currency: GBP, tax: 20, notes: "Please pay within 30 days.")
+  Invoice(number: "INV-042", from: "Life Lab Ltd\n12 Grid Street", to: "Example University", due: "20 December 2026", items: $items, currency: "GBP", tax: 20, notes: "Please pay within 30 days.")
 }
 ```
 

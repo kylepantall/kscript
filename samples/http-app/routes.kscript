@@ -1,0 +1,26 @@
+// Web routes: pages that controllers render with data. kscript serve loads this
+// file first.
+import KScript.Http
+import "controllers/people.kscript" as people
+import "middleware/security.kscript"
+
+Routes {
+  Middleware(use: secure_headers)
+
+  Get(path: "/", view: "home", name: "home")
+  // etag: browsers that already have this version get 304 Not Modified; cache:
+  // they may keep it for a minute.
+  Get(path: "/people", to: @people.list, name: "people.list", etag, cache: 60)
+  Get(
+    path: "/people/{id}",
+    to: @people.page,
+    name: "people.page",
+    where: "id: int",
+    etag
+  )
+  Get(path: "/team", redirect: "/people", status: 301)
+
+  Get(path: "/ping") {
+    return 'pong'
+  }
+}

@@ -1,8 +1,8 @@
 // Life Lab as a desktop app, in the .kscript format: kscript desktop.kscript
-// opens it in a window. The rules come from lib/life.ks.xml, the same script
+// opens it in a window. The rules come from lib/life.kscript, the same script
 // the terminal and browser versions use.
 import KScript.UI
-import "lib/life.ks.xml"
+import "lib/life.kscript"
 
 Window(
   title: "Life Lab",
@@ -50,7 +50,11 @@ Window(
   }
 
   Row(gap: 8, wrap) {
-    Button(on_click: { world = @new_world(@random_grid($cols, $rows, $soup), $world.wrap, 'random soup'); playing = false }) "Random soup"
+    Button(on_click: { world = @new_world(
+      @random_grid($cols, $rows, $soup),
+      $world.wrap,
+      'random soup'
+    ); playing = false }) "Random soup"
     Slider(
       bind: soup,
       min: 5,
@@ -98,6 +102,6 @@ Window(
   }
 
   Text(size: 12, color: "#64748b") "Also runs in a terminal (kscript \
-    life.ks.xml) and a browser (kscript serve). Same rules, one script: \
-    lib/life.ks.xml."
+    life.kscript) and a browser (kscript serve). Same rules, one script: \
+    lib/life.kscript."
 }

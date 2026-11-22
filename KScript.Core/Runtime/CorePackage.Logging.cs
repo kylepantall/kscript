@@ -66,7 +66,7 @@ namespace KScript.Runtime
                 new A("replace", K.Bool, "true removes the providers already set up, including the default console one."))
             {
                 Context = ElementContext.Script,
-                Example = "<log_provider type=\"file\" path=\"logs/app.log\" format=\"json\" level=\"debug\" />\n<fn name=\"alert\" params=\"entry\"><echo>ALERT: {$entry.message}</echo></fn>\n<log_provider fn=\"alert\" level=\"error\" />",
+                Example = "<log_provider type=\"file\" path=\"logs/app.log\" format=\"json\" level=\"debug\" />\n<fn name=\"alert\" params=\"entry: map\"><echo>ALERT: {$entry.message}</echo></fn>\n<log_provider fn=\"alert\" level=\"error\" />",
             }, run =>
             {
                 LogHub hub = run.Host.Logs;

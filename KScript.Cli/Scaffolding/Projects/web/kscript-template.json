@@ -12,7 +12,7 @@
     "desktop": {
       "question": "Add a desktop app (the same app in a window)?",
       "default": true,
-      "description": "Add desktop.kscript (the app in a <KScript.Window>) and the kscript.json app settings kscript compile uses. --no-desktop leaves them out."
+      "description": "Add desktop.kscript (the app, in a Window block) and the kscript.json app settings kscript compile uses. --no-desktop leaves them out."
     },
     "http": {
       "question": "Add a JSON API under /api?",

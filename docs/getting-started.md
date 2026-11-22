@@ -38,7 +38,7 @@ After `=`, a value is an expression, so text needs quotes. `"Double quotes"` fil
 ```kscript try
 name = 'Joan'
 greeting = "Hello $name, you are { 80 + 2 }."
-label = 'Write $name to use a variable.'
+label = 'Curly { braces } stay as written, and so does C:\temp.'
 echo $greeting
 echo $label
 ```
@@ -71,13 +71,17 @@ The [reference](/reference) lists every method of [strings](/reference/methods/s
 for n in 1..16 {
   if $n % 15 == 0 {
     echo "FizzBuzz"
-  } elif $n % 3 == 0 {
-    echo "Fizz"
-  } elif $n % 5 == 0 {
-    echo "Buzz"
-  } else {
-    echo "$n"
+    continue
   }
+  if $n % 3 == 0 {
+    echo "Fizz"
+    continue
+  }
+  if $n % 5 == 0 {
+    echo "Buzz"
+    continue
+  }
+  echo "$n"
 }
 ```
 

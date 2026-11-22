@@ -205,16 +205,15 @@ namespace KScript.Language.Tests
 
         /// <summary>Each .kscript sample is a rewrite of an XML one; both must give the same elements and attributes.</summary>
         [Theory]
-        [InlineData("samples/kscript2/oldest.ks.xml", "samples/code-format/oldest.kscript")]
-        [InlineData("samples/kscript2/move-files.ks.xml", "samples/code-format/move-files.kscript")]
-        [InlineData("samples/kscript2/lib/strings.ks.xml", "samples/code-format/lib/strings.kscript")]
-        [InlineData("samples/life-lab/desktop.ks.xml", "samples/life-lab/desktop.kscript")]
-        [InlineData("samples/kscript2/types/repo.ks.xml", "samples/code-format/types/repo.kscript")]
-        [InlineData("samples/kscript2/types/owner.ks.xml", "samples/code-format/types/owner.kscript")]
-        [InlineData("samples/kscript2/types/visibility.ks.xml", "samples/code-format/types/visibility.kscript")]
-        [InlineData("samples/kscript2/errors/order-not-found.ks.xml", "samples/code-format/errors/order-not-found.kscript")]
-        [InlineData("samples/kscript2/errors/out-of-stock.ks.xml", "samples/code-format/errors/out-of-stock.kscript")]
-        [InlineData("samples/kscript2/repos.ks.xml", "samples/code-format/repos.kscript")]
+        [InlineData("samples/xml/oldest.ks.xml", "samples/scripts/oldest.kscript")]
+        [InlineData("samples/xml/move-files.ks.xml", "samples/scripts/move-files.kscript")]
+        [InlineData("samples/xml/lib/strings.ks.xml", "samples/scripts/lib/strings.kscript")]
+        [InlineData("samples/xml/types/repo.ks.xml", "samples/scripts/types/repo.kscript")]
+        [InlineData("samples/xml/types/owner.ks.xml", "samples/scripts/types/owner.kscript")]
+        [InlineData("samples/xml/types/visibility.ks.xml", "samples/scripts/types/visibility.kscript")]
+        [InlineData("samples/xml/errors/order-not-found.ks.xml", "samples/scripts/errors/order-not-found.kscript")]
+        [InlineData("samples/xml/errors/out-of-stock.ks.xml", "samples/scripts/errors/out-of-stock.kscript")]
+        [InlineData("samples/xml/repos.ks.xml", "samples/scripts/repos.kscript")]
         public void SameTreeAsTheXmlVersion(string xmlFile, string codeFile)
         {
             MarkupDocument xml = MarkupParser.Parse(File.ReadAllText(RepoFile(xmlFile.Split('/'))), DocumentKind.Script);

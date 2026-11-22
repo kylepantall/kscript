@@ -1,0 +1,89 @@
+import KScript.IO
+import KScript.Http
+import "../requests/new-person.kscript"
+import "../requests/people-query.kscript"
+import "../types/person.kscript"
+
+const file = 'data/people.json'
+
+fn all() => @read_json($file)
+
+fn find(id: int) {
+  return @all()->find(fn(p) => $p.id == $id)
+}
+
+// Pages
+fn list(query: map) {
+  min = ($query.min_age ?? '0')->to_number(default: 0)
+  people = @all()
+    |> filter(fn(p) => $p.age >= $min)
+    |> sort_by(fn(p) => $p.name)
+  return @view('people/index', people: $people, min: $min)
+}
+
+fn page(id: int) {
+  person = @find($id)
+  if $person == null {
+    @abort(404, message: 'Nobody has that id.')
+  }
+  return @view('people/show', person: $person)
+}
+
+// JSON API: a map or list is sent as JSON
+/// Says the API is up.
+fn health() => { ok: true }
+
+/// Lists everyone, or only the people with a role.
+/// @returns Person[]
+fn index(query: PeopleQuery) {
+  return @all()
+    |> filter(fn(p) => $query.role == null or $p.role == $query.role)
+}
+
+/// One person.
+/// @param id The person's id.
+/// @returns Person
+fn show(id: int) {
+  person = @find($id) ?? @abort(404, message: 'Nobody has that id.')
+  // A client that already has this version gets 304 Not Modified, and nothing
+  // below runs.
+  @etag($person)
+  return $person
+}
+
+/// Adds a person. The answer's Location header is the new person's address.
+/// @returns Person the person, with their new id
+fn store(json: NewPerson) {
+  if $json.name->trim() == '' {
+    return @response({ error: 'A person needs a name.' }, status: 422)
+  }
+  people = @all()
+  person = {
+    id: $people->map(fn(p) => $p.id)->max() + 1,
+    name: $json.name,
+    age: $json.age ?? 0,
+    role: $json.role ?? 'Member'
+  }
+  @write_json($file, $people->push($person))
+  return @response(
+    $person,
+    status: 201,
+    headers: { Location: @route('people.show', id: $person.id) }
+  )
+}
+
+/// Changes some of a person's fields.
+/// @returns Person
+fn update(id: int, json: map?) {
+  person = @find($id) ?? @abort(404)
+  changed = $person->merge($json ?? {})->merge({ id: $person.id })
+  @write_json($file, @all()->map(fn(p) => $p.id == $person.id ? $changed : $p))
+  return $changed
+}
+
+/// Removes a person.
+fn destroy(id: int) {
+  person = @find($id) ?? @abort(404)
+  @write_json($file, @all()->reject(fn(p) => $p.id == $person.id))
+  return @response(null, status: 204)
+}

@@ -34,7 +34,7 @@ function untitledPath(name, languageId, tmp = os.tmpdir()) {
   return path.join(tmp, 'kscript-untitled', base + (languageId === 'kscript' ? '.ks.xml' : '.kscript'));
 }
 
-/** True for name.test.kscript, name.test.ks.xml and name.test.xml: files `kscript test` runs. */
+/** True for name.test.kscript and name.test.ks.xml: files `kscript test` runs. */
 function isTestFile(file) {
   return /\.test\.(kscript|ks\.xml)$/i.test(String(file));
 }

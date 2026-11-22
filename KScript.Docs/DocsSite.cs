@@ -91,6 +91,7 @@ namespace KScript.Docs
             new Guide("errors", "errors.md", "Tools", "Error codes", "kscript"),
             new Guide("mcp", "mcp.md", "Tools", "AI assistants (MCP)"),
             new Guide("agents", "agents.md", "Tools", "Coding agents", "kscript"),
+            new Guide("upgrading", "upgrading.md", "More", "What changed", "kscript"),
             new Guide("roadmap", "roadmap.md", "More", "Roadmap"),
         };
 

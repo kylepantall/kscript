@@ -10,7 +10,7 @@ kscript routes samples/http-app     # print the route table
 kscript openapi samples/http-app    # the OpenAPI document, made from the routes
 ```
 
-[`samples/http-app`](../samples/http-app) is a complete site: web routes in XML, API routes in the `.kscript` format, a controller, views, custom middleware and a `kscript.json`.
+[`samples/http-app`](../samples/http-app) is a complete site: web routes, API routes, a controller, views, custom middleware and a `kscript.json`.
 
 ## Route files
 
@@ -32,12 +32,12 @@ import "middleware/security.kscript"
 Routes {
   Middleware(use: secure_headers)
 
-  Get(path: /, view: home, name: home)
-  Get(path: /people, to: @people.list, name: people.list)
-  Get(path: /people/{id}, to: @people.page, name: people.page, where: id: int)
-  Get(path: /team, redirect: /people, status: 301)
+  Get(path: "/", view: "home", name: "home")
+  Get(path: "/people", to: @people.list, name: "people.list")
+  Get(path: "/people/{id}", to: @people.page, name: "people.page", where: "id: int")
+  Get(path: "/team", redirect: "/people", status: 301)
 
-  Get(path: /ping) {
+  Get(path: "/ping") {
     return 'pong'
   }
 }
@@ -253,8 +253,8 @@ import KScript.Http
 import "controllers/people.kscript" as people
 
 Routes {
-  Get(path: /people, to: @people.index, etag: true, cache: 60)
-  Get(path: /people/{id}, to: @people.show, etag: true, cache: "private, max-age=0, must-revalidate")
+  Get(path: "/people", to: @people.index, etag: true, cache: 60)
+  Get(path: "/people/{id}", to: @people.show, etag: true, cache: "private, max-age=0, must-revalidate")
 }
 ```
 

@@ -252,7 +252,7 @@ type Repo {
 
 The type itself takes options in brackets: `type Repo(extra: error) { … }`. `extra` says what happens to keys the type doesn't list: `drop` (the default), `keep` or `error`. `path: "data/repo.json"` takes the fields from a saved sample of the data: objects become nested types, and keys only some list items have become optional. Lines in the block replace the sampled fields they name. Types can refer to each other in any order and to themselves, and top-level types are exported to scripts that import the file. In a project, give each type its own file (`types/repo.kscript`, `types/owner.kscript`) and import the ones it uses: `import "owner.kscript"` at the top of `types/repo.kscript` (see [One type per file](projects.md#where-files-go-the-recommended-layout)).
 
-A small type can also go on one line, with the fields written like `fn` parameters: `type Point(fields: "x: int, y: int")`. `kscript convert` writes it as a block.
+A small type can also go on one line, with the fields written like `fn` parameters: `type Point(fields: [x: int, y: int])`. `kscript convert` writes it as a block.
 
 In XML, a type is `<type name="Repo">` with a `<field name="stars" type="int" from="stargazers_count" />` element for each line, or a `fields="..."` attribute for the one-line form. Switch the examples to **XML** to see them.
 
@@ -471,7 +471,7 @@ key = $config->require('api.key') // stops with a clear message when it's missin
 **`config`** reads the settings again with other options. Without `into`, it changes `$config`:
 
 ```kscript
-config(env: production, prefix: SHOP_, files: ['settings', 'secrets.yaml?', '.env'], root: conf, defaults: { server: { port: 8080 } }, require: "database.host, api.key")
+config(env: "production", prefix: "SHOP_", files: ['settings', 'secrets.yaml?', '.env'], root: "conf", defaults: { server: { port: 8080 } }, require: ['database.host', 'api.key'])
 config(files: ['themes/dark.json'], into: theme) // a separate set of settings in $theme
 ```
 
@@ -485,7 +485,7 @@ Every script has a logger. Entries at `info` and above go to the terminal (stder
 
 ```kscript
 log "Import started"
-log(level: warn, category: payments, fields: { order: $order.id }) "Card declined for {$customer.name}"
+log(level: warn, category: "payments", fields: { order: $order.id }) "Card declined for {$customer.name}"
 $log->info('Saved', { id: $id, size: $bytes })
 
 db = $log->named('db')->with({ host: $config.database.host })
@@ -542,7 +542,7 @@ cart:
 ```
 
 ```kscript
-locale(set: fr)
+locale(set: "fr")
 echo "{ @t('hello', { name: $user.name }) }" // Bonjour, Ann !
 echo "{ @t('cart.items', { count: $cart->count() }) }" // 3 articles
 echo "{ @format_currency($total, 'EUR') } { @format_date(@today(), 'long') }" // 9,50 € 20 novembre 2026
@@ -589,7 +589,7 @@ import slugify from "lib/strings.kscript"
 | `KScript.UI` | Desktop windows: a `Window { }` block opens one. `Column` `Row` `Grid` `Text` `Button` `TextBox` `CheckBox` `Select` `Slider` `Box` `Spacer` `Timer`, `@close_window()`. See [Desktop apps](desktop.md). |
 | `KScript.Test` | `test`, `describe`, `before_each`, `after_each`, `expect`, `expect_error`, `capture`, `@assert`, `@fail`, `@run_script`. Test files import it on their own (see [Testing scripts](testing.md)). |
 
-Using something from a package that isn't imported stops with `<input> is part of KScript.Terminal. Add <import package="KScript.Terminal" />`, and the editor offers to add the import. A package is named only in an `import`: a statement is never written with the `KScript.` prefix (`input`, not `KScript.input`), and nothing is imported silently, `job` and `dispatch` included (`import KScript.Queue`). A project can import packages for every script in `kscript.json` (below).
+Using something from a package that isn't imported stops with `input is part of KScript.Terminal. Add import KScript.Terminal at the top of the script.`, and the editor offers to add the import. A package is named only in an `import`: a statement is never written with the `KScript.` prefix (`input`, not `KScript.input`), and nothing is imported silently, `job` and `dispatch` included (`import KScript.Queue`). A project can import packages for every script in `kscript.json` (below).
 
 ### Names of statements and arguments
 
@@ -621,7 +621,7 @@ import KScript.Terminal
 
 people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 9 }]
 heading "Report"
-detail(name: People) "{ $people->count() }"
+detail(name: "People") "{ $people->count() }"
 task(name: "Adding up") {
   total = 1 + 2
 }
@@ -659,7 +659,7 @@ echo "{ @llm('Write a haiku about XML.') }"
 // A prompt written as a template, with a system prompt.
 customer = { name: 'Ann' }
 message = 'My order is late arrived.'
-llm(into: reply, system: You answer customer emails politely and briefly.) "{$customer.name} wrote: {$message}"
+llm(into: reply, system: "You answer customer emails politely and briefly.") "{$customer.name} wrote: {$message}"
 
 // Structured output: the answer is a map with these fields.
 report = 'The login page spins forever on Safari.'

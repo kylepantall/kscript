@@ -140,7 +140,7 @@ After `import KScript.UI`, a `Window { }` block opens a native window on macOS, 
 ```kscript
 import KScript.UI
 
-Window(title: Counter, width: 320, height: 200) {
+Window(title: "Counter", width: 320, height: 200) {
   count = 0
   Text(size: 32) "{$count}"
   Button(variant: primary, on_click: count += 1) "Add one"
@@ -179,7 +179,7 @@ The editor extension shows errors as you type and gives completion, hover docs, 
 Tests are KScript too:
 
 ```kscript
-test(name: greets by name) {
+test(name: "greets by name") {
   expect(value: @greeting('Joan'), equals: 'Hello, Joan!')
 }
 ```
@@ -209,7 +209,7 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/kylepantall/kscript/master/install.ps1 | iex
 ```
 
-Then save the first example above as `hello.kscript`, run `kscript hello.kscript`, and run `kscript ide install` to set up your editor. [`samples/kscript2/`](samples/kscript2) and [`Example Sites/team`](Example%20Sites/team) have more to read and run.
+Then save the first example above as `hello.kscript`, run `kscript hello.kscript`, and run `kscript ide install` to set up your editor. [`samples/scripts/`](samples/scripts) and [`Example Sites/team`](Example%20Sites/team) have more to read and run, and [`samples/xml/`](samples/xml) has the same scripts in the XML form.
 
 ## Documentation
 
@@ -222,7 +222,7 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Stylesheets](docs/stylesheets.md): `.ks.css`, `.ks.scss` and `.ks.sass`, and `kscript css`
 - [Routes, controllers and middleware](docs/http.md): KScript.Http route files, JSON APIs, views and middleware
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`
-- [Desktop apps](docs/desktop.md): `KScript.Window` and its elements
+- [Desktop apps](docs/desktop.md): `Window { }` and its elements, from `KScript.UI`
 - [Programs](docs/compile.md): `kscript compile`, targets, icons and what a program holds
 - [Testing](docs/testing.md): `kscript test` and every check
 - [Formatting](docs/formatting.md): `kscript fmt`, Format Document and the `format` settings
@@ -230,6 +230,7 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Standards](docs/standards.md): shareable lint and format standards, `kscript:recommended` and `kscript check --print-config`
 - [Error codes](docs/errors.md): what each `KS` code means and how to fix it
 - [Language server](docs/language-server.md): how the editor features work, and the diagnostic codes
+- [What changed](docs/upgrading.md): every spelling that was renamed or removed, with what to write now
 - [Working on KScript](docs/contributing.md): building from source, the repository layout and CI
 - [Roadmap](docs/roadmap.md): what's planned next, such as compiling KScript to TypeScript
 

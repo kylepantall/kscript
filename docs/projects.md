@@ -23,7 +23,7 @@ What it makes:
 | `index.html`, `about.md`, `_layout.html`, `_components/site-nav.html`, `site.css` | The site: two pages, the layout they share and a navigation component. |
 | `tasks.html` | A to-do list in a [`<live>`](web.md#reactive-pages-with-live-no-javascript) block, with no JavaScript. |
 | `lib/tasks.kscript` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app, the API and the tests. |
-| `desktop.kscript` | The same to-do list as a [`<KScript.Window>`](desktop.md) desktop app. |
+| `desktop.kscript` | The same to-do list as a [desktop app](desktop.md): a `Window { }` block. |
 | `routes/api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). While `kscript serve` runs, its docs are at `/_api` ([OpenAPI](http.md#api-docs-openapi)). |
 | `config/config.yaml` | Settings every script and page reads as `$config` (`config.root` in `kscript.json` points there). |
 | `lib/greeting.kscript`, `scripts/hello.kscript` | A function and a command-line script that uses it. |
@@ -44,7 +44,7 @@ Add pieces to a bare project with options, in any mix:
 ```sh
 kscript make project my-app --bare --web --api   # an empty website and JSON API
 kscript make project my-api --bare --api         # just the API: routes/api.kscript, controllers/hello.kscript and its test
-kscript make project my-app --bare --desktop     # a script plus an empty KScript.Window desktop app
+kscript make project my-app --bare --desktop     # a script plus an empty desktop app (a Window block)
 ```
 
 `--web` adds `index.html`, `_layout.html` and `site.css`; `--api` adds `routes/api.kscript` (a `Routes` file served under `/api`), `controllers/hello.kscript` and `tests/hello.test.kscript`; `--desktop` adds `desktop.kscript` and the `app` section of `kscript.json`. `kscript.json` gets `serve` settings (and `--port`) whenever there is a website or API.

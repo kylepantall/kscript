@@ -1,5 +1,5 @@
 <kscript>
-  <!-- Run with: kscript test (from samples/kscript2), or kscript test tests/strings.test.ks.xml -->
+  <!-- Run with: kscript test (from samples/xml), or kscript test tests/strings.test.ks.xml -->
   <import path="../lib/strings.ks.xml" />
 
   <describe name="slugify">

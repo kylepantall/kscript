@@ -756,12 +756,12 @@ public sealed class DocsTests
             p.Command("fetch_text", "url, retries?", "Fetches text.", KType.String, call => null);
             p.Method(KType.String, "shout", "", "Upper-cases text.", KType.String, (target, call) => null);
             p.Element(new ElementInfo("beep", "Beeps.", ContentKind.Empty, new AttributeInfo("tone", AttributeKind.Template, "The sound.")), run => null);
-            p.Element(new ElementInfo("old-beep", "Beeps.", ContentKind.Empty), run => null);
+            p.Element(new ElementInfo("old_beep", "Beeps.", ContentKind.Empty), run => null);
             p.Deprecate("@old_sum", "Sums moved to `KScript.Math`", "@sum");
             p.Deprecate("@fetch_text(retries)", "Requests are retried for you");
             p.Deprecate("string->shout", "", "->upper");
             p.Deprecate("<beep tone>", "Renamed", "sound");
-            p.Deprecate("<old-beep>", "");
+            p.Deprecate("<old_beep>", "");
         }
     }
 
@@ -782,7 +782,7 @@ public sealed class DocsTests
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Requests are retried for you.</p>", package);
         Assert.Contains("<tr class=\"deprecated\"><td><del><code>tone</code></del>", package);
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong> Renamed. Use <code>sound</code> instead.</p>", package);
-        Assert.Contains("<del><span class=\"f-xml\"><code>&lt;old-beep&gt;</code></span><span class=\"f-ks\"><code>old-beep</code></span></del>", package);
+        Assert.Contains("<del><span class=\"f-xml\"><code>&lt;old_beep&gt;</code></span><span class=\"f-ks\"><code>old_beep</code></span></del>", package);
         Assert.Contains("<p class=\"deprecation\"><strong>Deprecated.</strong></p>", package);
         Assert.Contains("title=\"Deprecated\"><del><code>-&gt;shout()</code></del></a>", package);
         Assert.Contains("<del class=\"param\"", site.Find("/reference/retiring").Body);
@@ -793,7 +793,7 @@ public sealed class DocsTests
 
         var search = JsonDocument.Parse(site.SearchJson()).RootElement.EnumerateArray().ToList();
         Assert.StartsWith("Deprecated. ", search.Single(e => e.GetProperty("t").GetString() == "@old_sum()").GetProperty("d").GetString());
-        Assert.StartsWith("Deprecated. ", search.Single(e => e.GetProperty("t").GetString() == "<old-beep>").GetProperty("d").GetString());
+        Assert.StartsWith("Deprecated. ", search.Single(e => e.GetProperty("t").GetString() == "<old_beep>").GetProperty("d").GetString());
         Assert.Contains(".badge.deprecated-badge", DocsSite.ReadAsset("docs.css"));
     }
 

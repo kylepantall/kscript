@@ -178,8 +178,8 @@ test('types: with lists, annotations, rules and typed literals', async () => {
 test('every sample tokenizes without leaving a string or block open', async () => {
   const grammar = await load();
   const root = path.resolve(__dirname, '../../../../samples');
-  const files = [...fs.readdirSync(path.join(root, 'code-format'), { recursive: true })]
-    .filter((f) => f.endsWith('.kscript')).map((f) => path.join(root, 'code-format', f));
+  const files = [...fs.readdirSync(path.join(root, 'scripts'), { recursive: true })]
+    .filter((f) => f.endsWith('.kscript')).map((f) => path.join(root, 'scripts', f));
   files.push(path.join(root, 'life-lab', 'desktop.kscript'));
   assert.ok(files.length > 3);
   for (const file of files) {

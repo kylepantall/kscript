@@ -78,14 +78,14 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("enum", "Declares a set of named values. `Size.small` is 'small', and a parameter typed with it (`params=\"size: Size\"`) only takes those values, which calls can write bare: `@pack(large)`.",
                 ContentKind.Empty,
                 new A("name", K.DeclareVariable, "The enum's name, used as a parameter type and as Name (Size.small).", true),
-                new A("values", K.Text, "The values, comma separated: small, medium, large.", true),
+                new A("values", K.Text, "The values, as a list: `[small, medium, large]` (in XML, `small, medium, large`).", true) { NameList = true },
                 new A("description", K.Text, "What the enum is for, shown on hover."))
             {
                 Example = "<enum name=\"Size\" values=\"small, medium, large\" />\n<fn name=\"pack\" params=\"size: Size\" value=\"'Packing ' + $size\" />\n<echo>{ @pack(large) }</echo>",
             }, run =>
             {
                 string name = run.VariableName("name");
-                List<string> names = (run.Raw("values") ?? string.Empty).Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).ToList();
+                List<string> names = KScript.Metadata.NameList.Names(run.Raw("values"));
                 if (names.Count == 0) throw run.Error($"<enum name=\"{name}\"> needs its values: values=\"a, b, c\".", "values", "Syntax");
                 string bad = names.FirstOrDefault(v => !Lexer.IsIdentStart(v[0]) || !v.All(Lexer.IsIdentChar));
                 if (bad != null) throw run.Error($"'{bad}' can't be an enum value: use letters, digits and _, starting with a letter.", "values", "Syntax");
@@ -294,7 +294,7 @@ namespace KScript.Runtime
                 new A("override", K.Bool, "Inside <extend>: true replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
                 new A("description", K.Text, "What the function does. Shown in hover, and to a model when used as an <llm> tool."))
             {
-                Example = "<fn name=\"greet\" params=\"who, greeting = 'Hello'\">\n  <return value=\"$greeting + ', ' + $who + '!'\" />\n</fn>\n<echo>@greet('World')</echo>",
+                Example = "<fn name=\"greet\" params=\"who: string, greeting = 'Hello'\">\n  <return value=\"$greeting + ', ' + $who + '!'\" />\n</fn>\n<echo>@greet('World')</echo>",
             }, run =>
             {
                 // Declared when the block it is in starts (so it can be called before it's written).
@@ -313,14 +313,14 @@ namespace KScript.Runtime
                 new A("args", K.ExpressionList, "Arguments, comma separated."),
                 new A("into", K.DeclareVariable, "A variable for the result."))
             {
-                Example = "<fn name=\"greet\" params=\"who\"><echo>Hello, $who!</echo></fn>\n<call fn=\"greet\" args=\"'World'\" />",
+                Example = "<fn name=\"greet\" params=\"who: string\"><echo>Hello, $who!</echo></fn>\n<call fn=\"greet\" args=\"'World'\" />",
             }, Call);
 
             p.Element(new ElementInfo("spawn", "Runs a function in the background. The script waits for it before it ends.", ContentKind.Empty,
                 new A("fn", K.FunctionReference, "The function to run: `@count_to` (in XML, fn=\"count_to\").", true),
                 new A("args", K.ExpressionList, "Arguments, comma separated."))
             {
-                Example = "<fn name=\"count_to\" params=\"n\"><echo>Counted to { @range(1, $n + 1)->last() }</echo></fn>\n<spawn fn=\"count_to\" args=\"1000\" />\n<echo>Started counting</echo>",
+                Example = "<fn name=\"count_to\" params=\"n: int\"><echo>Counted to { @range(1, $n + 1)->last() }</echo></fn>\n<spawn fn=\"count_to\" args=\"1000\" />\n<echo>Started counting</echo>",
             }, run =>
             {
                 ICallable fn = FindFunction(run, run.RequiredRaw("fn"));
