@@ -79,7 +79,7 @@ namespace KScript.Language.Features
                 {
                     continue;
                 }
-                Add(s.DeclarationSpan.End, ": " + s.Shape.Brief(), $"```kscript\n${s.Name}: {s.Shape.Pretty()}\n```");
+                Add(s.DeclarationSpan.End, ": " + s.Shape.Brief(), $"```kscript\n${s.Name}: {s.Shape.Pretty()}\n```" + (s.TypeFromCalls ? "\n\nWhat every call in this file passes." : string.Empty));
             }
 
             AddParameterNames(analysis, Add);

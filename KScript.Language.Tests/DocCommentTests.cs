@@ -19,7 +19,7 @@ namespace KScript.Language.Tests
             /// @returns The greeting, ending with '!'.
             /// @example
             ///   @greet('Kyle')   // Hello, Kyle!
-            fn greet(who, greeting = 'Hello') {
+            fn greet(who: string, greeting = 'Hello') {
               return $greeting + ', ' + $who + '!'
             }
             """;
@@ -51,7 +51,7 @@ namespace KScript.Language.Tests
             (DocumentAnalysis a, int offset) = At(Greet + "\necho @gre‸et('Kyle')", "test.kscript");
             AssertClean(a);
             string hover = Service.GetHover(a, offset).Markdown;
-            Assert.Contains("@greet(who, greeting = 'Hello')", hover);
+            Assert.Contains("@greet(who: string, greeting = 'Hello')", hover);
             Assert.Contains("Greets someone politely.", hover);
             Assert.Contains("- `who`: The person to greet.", hover);
             Assert.Contains("**Returns** The greeting, ending with '!'.", hover);
@@ -87,7 +87,7 @@ namespace KScript.Language.Tests
                     @param x The number.
                     @returns Twice x.
                   -->
-                  <fn name="double" params="x" value="$x * 2" />
+                  <fn name="double" params="x: int" value="$x * 2" />
                   <echo>{ @dou‸ble(2) }</echo>
                 </kscript>
                 """;

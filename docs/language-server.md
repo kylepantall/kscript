@@ -98,6 +98,11 @@ with their docs on hover. After `timestamps: ` it offers yes and no, and inside 
 it offers the model's fields. A type given rules where it is used, `title: string(min: 1)`, offers the rules and the
 native type's own options (`uuid(v: 4)`). This lives in `Features/Completion.TypeBody.cs`.
 
+A parameter with no type takes one from the calls in its file when they all agree (`Analyzer.Parameters.cs`): the
+analysis runs again until those types settle, as it does for return types. The type shows as an inlay hint, and KS6007
+warns about the missing type with a quick fix that writes it in. Functions inside a `job` are skipped, because the
+queue calls them.
+
 The `kscript serve` page engine (`KScript.Web/Pages`) runs pages, including `<live>`, `<state>`, `on-*` handlers and
 `bind`. `PageEngineContractTests` read the engine's source and fail when one of its methods, commands or elements is
 missing from the catalog. The tests also check that `Example Sites/team` analyzes without errors.

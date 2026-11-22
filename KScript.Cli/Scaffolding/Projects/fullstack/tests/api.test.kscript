@@ -12,7 +12,7 @@ fn test_user() {
 {{/if}}
 
 /// Sends a request to the notes API{{#if auth}} as a test user{{/if}}.
-fn notes_api(path, method: string = 'GET', body = null{{#if auth}}, as = {}{{/if}}) {
+fn notes_api(path: string, method: string = 'GET', body = null{{#if auth}}, as = {}{{/if}}) {
   return @api('/api/notes' + $path, options: { method: $method, body: $body{{#if auth}}, headers: $as.headers ?? {}{{/if}} })
 }
 

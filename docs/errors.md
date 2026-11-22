@@ -174,7 +174,7 @@ echo "Hello $name"   // right
 
 ## KS4005
 
-**A function that doesn't exist is named.** Check the spelling, or declare it: `fn greet(who) { }`.
+**A function that doesn't exist is named.** Check the spelling, or declare it: `fn greet(who: string) { }`.
 
 ## KS4006
 
@@ -286,3 +286,7 @@ Style rules keep code easy to read. They are warnings, and a [standard](standard
 ## KS6006
 
 **A list of names written as one string.** In a `.kscript` file write an array: `use: [log, cors]`.
+
+## KS6007
+
+**A function parameter with no type.** Write one, so callers and the editor know what it takes: `fn cached(key: string, compute: fn)`. When every call in the file passes the same type, the editor shows it beside the name and the quick fix writes it in. A parameter with a default (`count = 0`) takes its type from the default, and functions inside a `job` are left alone, because the queue calls them.

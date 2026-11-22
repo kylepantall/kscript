@@ -2,12 +2,12 @@
   <import package="KScript.Http" />
 
   <!--- Adds headers that stop other sites framing these pages or browsers guessing content types. -->
-  <fn name="secure_headers" params="request, next">
+  <fn name="secure_headers" params="request: map, next: fn">
     <return value="$next($request)->with_header('X-Frame-Options', 'DENY')->with_header('X-Content-Type-Options', 'nosniff')" />
   </fn>
 
   <!--- Turns away writes that don't send JSON, before the controller runs. -->
-  <fn name="json_only" params="request, next">
+  <fn name="json_only" params="request: map, next: fn">
     <if $request.method != 'GET' and $request.method != 'DELETE' and not ($request.headers['content-type'] ?? '')->contains('json')>
       <return value="@response({ error: 'Send JSON (Content-Type: application/json).' }, status: 415)" />
     </if>

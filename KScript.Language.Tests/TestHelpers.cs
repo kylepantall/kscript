@@ -20,14 +20,17 @@ namespace KScript.Language.Tests
 
         public static string Script(string body) => "<kscript>\n" + body + "\n</kscript>";
 
-        /// <summary>Analyzes a document, without the unused-code rules (KS6002-KS6005): most test snippets declare things they never use.</summary>
+        /// <summary>
+        /// Analyzes a document, without the unused-code rules (KS6002-KS6005) and the parameter-type rule (KS6007):
+        /// most test snippets declare things they never use, and leave parameters untyped to stay short.
+        /// </summary>
         public static DocumentAnalysis Analyze(string text, string path = "test.ks.xml", IFileSystem files = null) =>
             WithoutUnused(Analyzer.Analyze(text, path, files ?? EmptyFileSystem.Instance));
 
-        /// <summary>Drops the unused-code diagnostics (UnusedCodeTests covers them).</summary>
+        /// <summary>Drops the unused-code diagnostics (UnusedCodeTests covers them) and KS6007 (ParameterTypeTests covers it).</summary>
         public static DocumentAnalysis WithoutUnused(DocumentAnalysis a)
         {
-            a.Diagnostics.RemoveAll(d => DiagnosticCodes.IsUnnecessary(d.Code));
+            a.Diagnostics.RemoveAll(d => DiagnosticCodes.IsUnnecessary(d.Code) || d.Code == DiagnosticCodes.MissingParameterType);
             return a;
         }
 
