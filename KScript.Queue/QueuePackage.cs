@@ -114,7 +114,8 @@ namespace KScript.Queueing
             Method(p, KType.Queue, "retry", "id: string", "Puts a failed job back on its queue, with its tries reset. True if there was one with that id.", KType.Bool);
             Method(p, KType.FakeQueue, "pushed", "job?", "The jobs dispatched so far, or only those of one job type: pushed($SendWelcome).", KType.List);
             Method(p, KType.FakeQueue, "dispatches", "job?", "What each dispatch asked for: job, queue, connection, delay, available_at.", KType.List);
-            Method(p, KType.FakeQueue, "count", "job?", "How many jobs were dispatched, or how many of one job type.", KType.Number);
+            Method(p, KType.FakeQueue, "count", "", "How many jobs were dispatched.", KType.Number);
+            Method(p, KType.FakeQueue, "count_of", "match", "How many jobs of one job type were dispatched: count_of($SendWelcome).", KType.Number);
             Method(p, KType.FakeQueue, "run_all", "", "Runs the dispatched jobs in order (and any they dispatch), then forgets them. Returns how many ran.", KType.Number);
             Method(p, KType.FakeQueue, "clear", "", "Forgets the dispatched jobs.", KType.Number);
 
@@ -135,7 +136,8 @@ namespace KScript.Queueing
                 ("queue->retry", "<echo>{ @queue('default', connection: 'memory')->retry('no-such-id') }</echo>"),
                 ("fake_queue->pushed", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" />\n<echo>{ $q->pushed($Hello)[0].who }</echo>"),
                 ("fake_queue->dispatches", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" delay=\"60\" />\n<echo>{ $q->dispatches()[0].delay }</echo>"),
-                ("fake_queue->count", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" />\n<echo>{ $q->count($Hello) }</echo>"),
+                ("fake_queue->count", "<let name=\"q\" value=\"@fake_queue()\" />\n<echo>{ $q->count() }</echo>"),
+                ("fake_queue->count_of", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" />\n<echo>{ $q->count_of($Hello) }</echo>"),
                 ("fake_queue->run_all", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<dispatch value=\"Hello(who: 'Joan')\" />\n<echo>{ $q->run_all() } ran</echo>"),
                 ("fake_queue->clear", "<let name=\"q\" value=\"@fake_queue()\" />\n<echo>{ $q->clear() }</echo>"));
         }

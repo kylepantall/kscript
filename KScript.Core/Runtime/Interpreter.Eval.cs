@@ -249,7 +249,7 @@ namespace KScript.Runtime
                         return found is CommandDefinition cmd ? new NativeFunction(cmd.Name, call => InvokeCommand(cmd, call)) : found;
                     }
                     (List<object> args, Dictionary<string, object> named) = EvaluateArguments(command.Arguments, scope, ctx, command.Name);
-                    return CallCommand(command.Name, args, named, scope, ctx, command);
+                    return CallCommand(command.Name, args, named, scope, ctx, command, new CallSite(command, command.Arguments, ctx));
                 }
 
                 case CallNode call:
@@ -537,10 +537,12 @@ namespace KScript.Runtime
                     }
                 case Dictionary<string, object> map:
                     return map.TryGetValue(name, out object v) ? v : null;
-                case List<object> list when name == "count" || name == "length":
+                case List<object> list when name == "count":
                     return (double)list.Count;
-                case string s when name == "length":
+                case string s when name == "count":
                     return (double)s.Length;
+                case List<object> or string when name == "length":
+                    throw Fail(node, ctx, ".length was removed. Use .count (or ->count()).", "Retired");
                 case ImportNamespace ns:
                     if (ns.TryGet(name, out object member))
                     {
@@ -734,18 +736,18 @@ namespace KScript.Runtime
             throw Fail(node, ctx, $"Unknown command @{name}()." + Suggest(name, known).Replace("Did you mean ", "Did you mean @"), "Name");
         }
 
-        private object CallCommand(string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
+        private object CallCommand(string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node, CallSite site = null)
         {
             object target = ResolveCallable(name, scope, ctx, node);
-            return CallResolved(target, name, args, named, scope, ctx, node);
+            return CallResolved(target, name, args, named, scope, ctx, node, site);
         }
 
-        private object CallResolved(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
+        private object CallResolved(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node, CallSite site = null)
         {
             switch (target)
             {
                 case CommandDefinition command:
-                    return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module));
+                    return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module) { Site = site });
                 case ICallable fn:
                     return Call(fn, args, named, scope, ctx.Module);
             }
@@ -754,7 +756,9 @@ namespace KScript.Runtime
 
         internal object InvokeCommand(CommandDefinition command, CallContext call)
         {
+            CallSite site = call.Site;
             call = ArgumentBinder.Bind(command.Info, call);
+            call.Site = site;
             CallableInfoCheck(command.Info, call);
             return command.Handler(call);
         }
@@ -807,14 +811,14 @@ namespace KScript.Runtime
                     }
                     if (ctx.Module != null && ctx.Module.Commands.TryGetValue(id.Name, out CommandDefinition command))
                     {
-                        return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module));
+                        return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module) { Site = piped ? null : new CallSite(call, call.Arguments, ctx) });
                     }
                     if (piped) return InvokeMethod(pipedValue, id.Name, args.Skip(1).ToList(), named, scope, ctx, call);
-                    return CallCommand(id.Name, args, named, scope, ctx, call.Callee);
+                    return CallCommand(id.Name, args, named, scope, ctx, call.Callee, new CallSite(call, call.Arguments, ctx));
                 }
 
                 case MemberNode member when member.Target is IdentifierNode alias && ctx.Module != null && ctx.Module.Aliases.ContainsKey(alias.Name):
-                    return CallCommand(alias.Name + "." + member.Name, args, named, scope, ctx, call.Callee);
+                    return CallCommand(alias.Name + "." + member.Name, args, named, scope, ctx, call.Callee, new CallSite(call, call.Arguments, ctx));
             }
 
             object callee = Evaluate(call.Callee, scope, ctx);
@@ -928,6 +932,8 @@ namespace KScript.Runtime
             }
 
             string type = Values.TypeOf(target);
+            if (Retired.Method(type, name) is RetiredInfo retired)
+                throw Fail(node, ctx, $"->{name}() on a {type} was removed. {retired.Replacement}", "Retired");
             KScriptPackage owner = Packages.FindMethod(name, ctx.Module?.Packages).FirstOrDefault(p => p.Methods.Any(m => m.Name == name && (m.Receiver == type || m.Receiver == "any")));
             if (owner != null)
                 throw Fail(node, ctx, $"->{name}() on a {type} is part of {owner.Name}. Add {ImportHint(ctx.Module, owner.Name)} at the top of the script.", "Import");

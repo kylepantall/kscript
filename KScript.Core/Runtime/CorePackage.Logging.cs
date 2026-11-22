@@ -8,7 +8,7 @@ namespace KScript.Runtime
     public sealed partial class CorePackage
     {
         /// <summary>The attributes of &lt;log-provider&gt; that are passed to the provider as options.</summary>
-        private static readonly string[] ProviderOptions = { "type", "name", "level", "format", "path", "roll", "stream", "colour", "time", "url", "batch" };
+        private static readonly string[] ProviderOptions = { "type", "name", "level", "format", "path", "roll", "stream", "color", "time", "url", "batch" };
 
         /// <summary>Logging: $log, &lt;log&gt; and &lt;log-provider&gt;.</summary>
         private static void RegisterLogging(PackageBuilder p)
@@ -55,7 +55,7 @@ namespace KScript.Runtime
                 new A("path", K.Template, "The file to append to (file)."),
                 new A("roll", K.Enum, "daily starts a new file each day: app-2026-11-20.log (file).", false, "never", "daily"),
                 new A("stream", K.Enum, "Where console entries go (default stderr).", false, "stderr", "stdout"),
-                new A("colour", K.Bool, "Colour console entries by level (default: when at a terminal)."),
+                new A("color", K.Bool, "Colour console entries by level (default: when at a terminal)."),
                 new A("time", K.Text, "The console's time format, such as HH:mm:ss.fff (default HH:mm:ss). Empty leaves the time out."),
                 new A("url", K.Template, "Where entries are sent (http, from KScript.Net)."),
                 new A("headers", K.Expression, "A map of request headers (http)."),

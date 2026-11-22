@@ -112,18 +112,18 @@ namespace KScript.AI
 
         protected override void Register(PackageBuilder p)
         {
-            p.Command("llm", "prompt, options?",
-                "Asks a language model (Claude) and returns its answer. options is a model name, or a map: model, system, schema (a map of fields; the answer is then a map), tools (<fn> functions it may call), max_tokens.",
+            p.Command("llm", "prompt, system?, schema?, tools?, model?, max_tokens?: number",
+                "Asks a language model (Claude) and returns its answer. The options are the llm statement's, given by name: system (the system prompt), schema (a map of fields; the answer is then a map), tools (<fn> functions it may call), model and max_tokens.",
                 KType.Any, Llm,
-                "<let name=\"summary\" value=\"@llm('Summarise in one line: ' + $text)\" />");
+                "<let name=\"summary\" value=\"@llm('Summarise in one line: ' + $text, system: 'Answer in plain English.')\" />");
 
-            p.Command("chat", "system?, options?",
-                "A conversation with a language model that keeps its history: $chat->ask(text). options is a map: model, tools, max_tokens.",
+            p.Command("chat", "system?, tools?, model?, max_tokens?: number",
+                "A conversation with a language model that keeps its history: $chat->ask(text). tools, model and max_tokens are given by name, as for @llm().",
                 KType.Chat, c =>
                 {
-                    Dictionary<string, object> options = c.Arg(1, "options") as Dictionary<string, object> ?? new Dictionary<string, object>();
+                    ByName(c, 1, "@chat(system, model: '...')");
                     string system = c.Arg(0, "system") is object s ? Values.ToStr(s) : null;
-                    return new ChatValue(system, ModelName(Option(options, "model")), Tools(Option(options, "tools"), "@chat() tools"), MaxTokens(Option(options, "max_tokens")));
+                    return new ChatValue(system, ModelName(c.Arg(2, "model")), Tools(c.Arg(1, "tools"), "@chat() tools"), MaxTokens(c.Arg(3, "max_tokens")));
                 },
                 "<let name=\"chat\" value=\"@chat('You are a helpful assistant.')\" />\n<echo>{ $chat->ask('Hello!') }</echo>");
 
@@ -132,7 +132,7 @@ namespace KScript.AI
             p.Method(KType.Chat, "reset", "", "Forgets the conversation (keeps the system prompt).", KType.Chat, Chat("reset"));
             p.Method(KType.Chat, "model", "", "The model the chat uses.", KType.String, Chat("model"));
 
-            p.Element(new ElementInfo("llm", "Sends its text as a prompt to a language model (Claude) and stores the answer.", ContentKind.Template,
+            p.Element(new ElementInfo("llm", "Sends its text as a prompt to a language model (Claude) and stores the answer. @llm(prompt, ...) takes the same options and returns the answer instead, for a prompt that is already a value.", ContentKind.Template,
                 new A("to", K.DeclareVariable, "The variable that receives the answer.", true),
                 new A("system", K.Template, "The system prompt."),
                 new A("schema", K.Expression, "Ask for structured output: a map describing the fields, such as `{ category: 'bug|feature', urgency: 'int 1-5' }`. The answer is then a map."),
@@ -172,17 +172,15 @@ namespace KScript.AI
 
         private static object Llm(CallContext c)
         {
-            object second = c.Arg(1, "options");
-            Dictionary<string, object> options = second as Dictionary<string, object> ?? new Dictionary<string, object>();
-            object model = second is string ? second : Option(options, "model");
-            object schema = Option(options, "schema");
+            ByName(c, 1, "@llm(prompt, system: '...', model: '...')");
+            object schema = c.Arg(2, "schema");
             var request = new AiRequest
             {
-                Model = ModelName(model),
-                System = Option(options, "system") is object s ? Values.ToStr(s) : null,
-                Tools = Tools(Option(options, "tools"), "@llm() tools"),
+                Model = ModelName(c.Arg(4, "model")),
+                System = c.Arg(1, "system") is object s ? Values.ToStr(s) : null,
+                Tools = Tools(c.Arg(3, "tools"), "@llm() tools"),
                 Schema = schema == null ? null : Schemas.FromValue(schema, "@llm() schema"),
-                MaxTokens = MaxTokens(Option(options, "max_tokens")),
+                MaxTokens = MaxTokens(c.Arg(5, "max_tokens")),
             };
             string prompt = Values.ToStr(c.Need(0));
             if (prompt.Trim().Length == 0) throw new KScriptException("@llm() needs a prompt.", "Argument");
@@ -190,7 +188,16 @@ namespace KScript.AI
             return Conversation.Ask(ModelFor(c.Host), request, c.Interpreter, c.Scope, c.Module);
         }
 
-        private static object Option(Dictionary<string, object> options, string key) => options.TryGetValue(key, out object v) ? v : null;
+        /// <summary>
+        /// The options of @llm() and @chat() are named, like the llm statement's arguments: a second value without a
+        /// name (the old options map, or a model name) is refused, so it can't be taken for the system prompt.
+        /// </summary>
+        private static void ByName(CallContext c, int firstOption, string example)
+        {
+            bool unnamed = c.Site != null ? c.Site.Argument(firstOption) != null : c.Arg(firstOption) is Dictionary<string, object>;
+            if (unnamed || c.Arg(firstOption) is Dictionary<string, object>)
+                throw new KScriptException($"{c.Display} takes its options by name: {example}.", "Argument");
+        }
 
         private static List<AiTool> Tools(object value, string where) => value switch
         {

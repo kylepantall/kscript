@@ -108,8 +108,6 @@ namespace KScript.IO
         /// <summary>A path argument (text or a file value) resolved against the script's folder.</summary>
         public static string PathOf(object value, CallContext c) => Resolve(value, c.Host, c.Module?.Directory ?? c.Host.WorkingDirectory);
 
-        private static string PathOf(ElementRun run, string attribute) => Resolve(run.Eval(attribute), run.Interpreter.Host, run.Module.Directory);
-
         private static string Resolve(object value, KScriptHost host, string baseDirectory)
         {
             if (value is FileValue f)
@@ -128,7 +126,7 @@ namespace KScript.IO
             p.Command("file", "path", "A file value for a path, with methods like ->name(), ->extension() and ->size().", KType.File, c => new FileValue(PathOf(c.Need(0), c)),
                 "<let name=\"report\" value=\"@file('out/report.pdf')\" />");
             p.Command("read_text", "path", "The text of a file. Relative paths are from the script's folder.", KType.String, c => File.ReadAllText(PathOf(c.Need(0), c)),
-                "<do>@write_text('config.json', '{ \"port\": 8080 }')</do>\n<let name=\"config\" value=\"@read_text('config.json') |> @json()\" />\n<echo>$config.port</echo>");
+                "<do>@write_text('config.json', '{ \"port\": 8080 }')</do>\n<let name=\"config\" value=\"@read_text('config.json')->json()\" />\n<echo>$config.port</echo>");
             p.Command("read_lines", "path", "The lines of a file.", KType.List, c => File.ReadAllLines(PathOf(c.Need(0), c)).Cast<object>().ToList());
             p.Command("read_json", "path, as?: type", "A JSON file read into maps and lists. With as: a <type>, the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))), 1));
             p.Command("read_yaml", "path", "A YAML file read into maps and lists.", KType.Any, c =>
@@ -168,64 +166,24 @@ namespace KScript.IO
             p.Command("temp_folder", "", "The folder for temporary files.", KType.String, c => System.IO.Path.GetTempPath());
             p.Command("known_folder", "name: home|desktop|documents|downloads|music|pictures|videos|appdata|temp", "A standard folder: home, desktop, documents, downloads, music, pictures, videos, appdata or temp.", KType.String, c => KnownFolder(c, c.Str(0)));
 
-            p.Element(new ElementInfo("write", "Writes the element text (or value) to a file. Folders are created as needed.", ContentKind.Template,
-                new A("to", K.Expression, "The file to write.", true),
-                new A("value", K.Expression, "Write this value instead of the text (maps and lists are written as JSON)."),
-                new A("append", K.Bool, "yes adds to the end instead of replacing the file."))
+            p.Command("move", "from, to, overwrite?: bool", "Moves (or renames) a file or folder, and returns it as a file value. to is a full path, or an existing folder to move it into. overwrite: true replaces a file that is already there.", KType.File,
+                c => Transfer(c, move: true));
+            p.Command("copy", "from, to, overwrite?: bool", "Copies a file or folder, and returns the copy as a file value. to is a full path, or an existing folder to copy it into. overwrite: true replaces files that are already there.", KType.File,
+                c => Transfer(c, move: false));
+            p.Command("delete", "path", "Deletes a file, or a folder and everything in it. Does nothing if it isn't there.", KType.Null, c =>
             {
-                Context = ElementContext.Script,
-                Example = "<write to=\"'log.txt'\" append=\"yes\">{ @now() }: done</write>",
-            }, run =>
-            {
-                run.Interpreter.Host.CheckWrite("<write>");
-                string path = PathOf(run, "to");
-                object value = run.Has("value") ? run.Eval("value") : null;
-                string text = run.Has("value") ? value is Dictionary<string, object> or List<object> ? Values.ToJson(value, indented: true) : Values.ToStr(value) : run.Text();
-                EnsureFolder(path);
-                if (run.Flag("append")) AppendLine(path, text);
-                else File.WriteAllText(path, text);
-                return null;
-            });
-
-            p.Element(new ElementInfo("move", "Moves (or renames) a file or folder.", ContentKind.Empty,
-                new A("from", K.Expression, "The file or folder to move.", true),
-                new A("to", K.Expression, "Where it goes: a full path, or an existing folder to move it into.", true),
-                new A("overwrite", K.Bool, "yes replaces a file that is already there."))
-            {
-                Context = ElementContext.Script,
-                Example = "<do>@write_text('report.txt', 'Q3')</do>\n<mkdir path=\"'archive'\" />\n<let name=\"file\" value=\"@file('report.txt')\" />\n<move from=\"$file\" to=\"@join_path('archive', $file->name())\" />\n<echo>{ @exists('archive/report.txt') }</echo>",
-            }, run => Transfer(run, move: true));
-
-            p.Element(new ElementInfo("copy", "Copies a file or folder.", ContentKind.Empty,
-                new A("from", K.Expression, "The file or folder to copy.", true),
-                new A("to", K.Expression, "Where the copy goes: a full path, or an existing folder to copy it into.", true),
-                new A("overwrite", K.Bool, "yes replaces files that are already there."))
-            {
-                Context = ElementContext.Script,
-            }, run => Transfer(run, move: false));
-
-            p.Element(new ElementInfo("delete", "Deletes a file, or a folder and everything in it. Does nothing if it isn't there.", ContentKind.Empty,
-                new A("path", K.Expression, "The file or folder to delete.", true))
-            {
-                Context = ElementContext.Script,
-            }, run =>
-            {
-                run.Interpreter.Host.CheckWrite("<delete>");
-                string path = PathOf(run, "path");
+                c.Host.CheckWrite("@delete()");
+                string path = PathOf(c.Need(0), c);
                 if (File.Exists(path)) File.Delete(path);
                 else if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
                 return null;
             });
-
-            p.Element(new ElementInfo("mkdir", "Creates a folder (and any folders above it).", ContentKind.Empty,
-                new A("path", K.Expression, "The folder to create.", true))
+            p.Command("create_folder", "path", "Creates a folder (and any folders above it), and returns it as a file value. Does nothing if it is already there.", KType.File, c =>
             {
-                Context = ElementContext.Script,
-            }, run =>
-            {
-                run.Interpreter.Host.CheckWrite("<mkdir>");
-                Directory.CreateDirectory(PathOf(run, "path"));
-                return null;
+                c.Host.CheckWrite("@create_folder()");
+                string path = PathOf(c.Need(0), c);
+                Directory.CreateDirectory(path);
+                return new FileValue(path);
             });
             RegisterExamples(p);
             p.AgentNotes(
@@ -249,14 +207,18 @@ namespace KScript.IO
                 ("@write_yaml", "<do>@write_yaml('settings.yaml', { theme: 'dark', size: 14 })</do>\n<echo>{ @read_text('settings.yaml') }</echo>"),
                 ("@exists", "<do>@write_text('a.txt', 'a')</do>\n<echo>{ @exists('a.txt') } { @exists('b.txt') }</echo>"),
                 ("@is_file", "<do>@write_text('a.txt', 'a')</do>\n<echo>{ @is_file('a.txt') } { @is_file('.') }</echo>"),
-                ("@is_folder", "<mkdir path=\"'photos'\" />\n<echo>{ @is_folder('photos') }</echo>"),
-                ("@folders", "<mkdir path=\"'2025'\" />\n<mkdir path=\"'2026'\" />\n<echo>{ @folders('.')->map(fn($f) => $f->name())->sort() }</echo>"),
+                ("@is_folder", "<do>@create_folder('photos')</do>\n<echo>{ @is_folder('photos') }</echo>"),
+                ("@folders", "<do>@create_folder('2025'); @create_folder('2026')</do>\n<echo>{ @folders('.')->map(fn($f) => $f->name())->sort() }</echo>"),
+                ("@move", "<do>@write_text('report.txt', 'Q3')</do>\n<do>@create_folder('archive')</do>\n<let name=\"file\" value=\"@file('report.txt')\" />\n<do>@move($file, @join_path('archive', $file->name()))</do>\n<echo>{ @exists('archive/report.txt') } { @exists('report.txt') }</echo>"),
+                ("@copy", "<do>@write_text('a.txt', 'a')</do>\n<echo>{ @copy('a.txt', 'b.txt')->name() }</echo>"),
+                ("@delete", "<do>@write_text('old.txt', 'x')</do>\n<do>@delete('old.txt')</do>\n<echo>{ @exists('old.txt') }</echo>"),
+                ("@create_folder", "<echo>{ @create_folder('out/reports')->name() }</echo>"),
                 ("@join_path", "@join_path('reports', '2026', 'november.pdf')"),
                 ("@full_path", "@full_path('notes.txt')->ends_with('notes.txt')"),
-                ("@cwd", "@cwd()->length() gt 0"),
-                ("@home", "@home()->length() gt 0"),
-                ("@temp_folder", "@temp_folder()->length() gt 0"),
-                ("@known_folder", "@known_folder(downloads)->length() gt 0"),
+                ("@cwd", "@cwd()->count() gt 0"),
+                ("@home", "@home()->count() gt 0"),
+                ("@temp_folder", "@temp_folder()->count() gt 0"),
+                ("@known_folder", "@known_folder(downloads)->count() gt 0"),
                 ("file->path", "@file('notes.txt')->path()->ends_with('notes.txt')"),
                 ("file->name", "@file('reports/q3.pdf')->name()"),
                 ("file->stem", "@file('reports/q3.pdf')->stem()"),
@@ -264,7 +226,7 @@ namespace KScript.IO
                 ("file->directory", "@file('reports/q3.pdf')->directory()->name()"),
                 ("file->exists", "@file('missing.txt')->exists()"),
                 ("file->is_file", "<do>@write_text('a.txt', 'a')</do>\n<echo>{ @file('a.txt')->is_file() }</echo>"),
-                ("file->is_folder", "<mkdir path=\"'photos'\" />\n<echo>{ @file('photos')->is_folder() }</echo>"),
+                ("file->is_folder", "<do>@create_folder('photos')</do>\n<echo>{ @file('photos')->is_folder() }</echo>"),
                 ("file->size", "<do>@write_text('a.txt', 'hello')</do>\n<echo>{ @file('a.txt')->size() } bytes</echo>"),
                 ("file->modified", "<do>@write_text('a.txt', 'hello')</do>\n<echo>{ @file('a.txt')->modified()->year() ge 2026 }</echo>"),
                 ("file->created", "<do>@write_text('a.txt', 'hello')</do>\n<echo>{ @file('a.txt')->created()->year() ge 2000 }</echo>"),
@@ -284,19 +246,6 @@ namespace KScript.IO
             return null;
         }
 
-        /// <summary>Adds text to a file as a line of its own: after a line break, and ending with one.</summary>
-        private static void AppendLine(string path, string text)
-        {
-            string before = string.Empty;
-            if (File.Exists(path) && new FileInfo(path).Length > 0)
-            {
-                using FileStream f = File.OpenRead(path);
-                f.Seek(-1, SeekOrigin.End);
-                if (f.ReadByte() != '\n') before = Environment.NewLine;
-            }
-            File.AppendAllText(path, before + text + (text.EndsWith("\n", StringComparison.Ordinal) ? string.Empty : Environment.NewLine));
-        }
-
         private static void EnsureFolder(string path)
         {
             string dir = System.IO.Path.GetDirectoryName(path);
@@ -312,18 +261,18 @@ namespace KScript.IO
             return enumerate(folder, pattern, option).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).Select(x => (object)new FileValue(x)).ToList();
         }
 
-        private static bool? Transfer(ElementRun run, bool move)
+        private static object Transfer(CallContext c, bool move)
         {
-            run.Interpreter.Host.CheckWrite(move ? "<move>" : "<copy>");
-            string from = PathOf(run, "from");
-            string to = PathOf(run, "to");
-            bool overwrite = run.Flag("overwrite");
+            c.Host.CheckWrite($"@{c.Name}()");
+            string from = PathOf(c.Need(0), c);
+            string to = PathOf(c.Need(1), c);
+            bool overwrite = c.Bool(2);
             bool isFolder = Directory.Exists(from);
-            if (!isFolder && !File.Exists(from)) throw run.Error($"There is no file or folder at '{from}'.", "from", "FileNotFound");
+            if (!isFolder && !File.Exists(from)) throw new KScriptException($"There is no file or folder at '{from}'.", "FileNotFound");
             if (Directory.Exists(to)) to = System.IO.Path.Combine(to, System.IO.Path.GetFileName(from.TrimEnd(System.IO.Path.DirectorySeparatorChar)));
-            if (string.Equals(from, to, StringComparison.Ordinal)) return null;
+            if (string.Equals(from, to, StringComparison.Ordinal)) return new FileValue(to);
             if (!overwrite && (File.Exists(to) || Directory.Exists(to)))
-                throw run.Error($"'{to}' already exists. Add overwrite=\"yes\" to replace it.", "to", "IO");
+                throw new KScriptException($"'{to}' already exists. Add overwrite: true to replace it.", "IO");
             EnsureFolder(to);
 
             if (!isFolder)
@@ -340,7 +289,7 @@ namespace KScript.IO
             {
                 CopyFolder(from, to, overwrite);
             }
-            return null;
+            return new FileValue(to);
         }
 
         private static void CopyFolder(string from, string to, bool overwrite)

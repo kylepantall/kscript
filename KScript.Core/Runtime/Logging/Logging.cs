@@ -396,7 +396,8 @@ namespace KScript.Runtime
                 _ => throw new KScriptException($"{c.Where}: stream should be stdout or stderr.", "Config"),
             };
             json = Format(c) == "json";
-            colour = c.Get("colour") is object v ? Flag(v) : c.Host.IsInteractive;
+            if (c.Get("colour") != null) throw new KScriptException($"{c.Where}: colour is spelled color.", "Config");
+            colour = c.Get("color") is object v ? Flag(v) : c.Host.IsInteractive;
             timeFormat = c.Str("time", "HH:mm:ss");
         }
 

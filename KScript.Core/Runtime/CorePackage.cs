@@ -330,7 +330,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("try", "Runs its body, handing errors to its <catch> elements. <finally> always runs.", ContentKind.Statements)
             {
-                Example = "<let name=\"text\" value=\"'not json'\" />\n<try>\n  <let name=\"data\" value=\"@json($text)\" />\n  <catch as=\"err\" when=\"$err.type eq 'Json'\">\n    <echo>That isn't JSON: {$err.message}</echo>\n  </catch>\n  <finally><echo>done</echo></finally>\n</try>",
+                Example = "<let name=\"text\" value=\"'not json'\" />\n<try>\n  <let name=\"data\" value=\"$text->json()\" />\n  <catch as=\"err\" when=\"$err.type eq 'Json'\">\n    <echo>That isn't JSON: {$err.message}</echo>\n  </catch>\n  <finally><echo>done</echo></finally>\n</try>",
             }, Try);
 
             p.Element(new ElementInfo("catch", "Handles an error thrown in the <try> around it. `type` picks which errors (and the types that extend them); `as` names the error: $err.type, $err.message, $err.line, $err.status, $err.cause and its fields. A bare <throw /> inside rethrows it.", ContentKind.Statements,
@@ -792,13 +792,9 @@ namespace KScript.Runtime
 
         private static void RegisterCommands(PackageBuilder p)
         {
-            p.Command("json", "text, as?: type", "Parses JSON text into a value. With as: a <type> (or 'Repo[]'), the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(c.Str(0)), 1), "@json('{ \"a\": 1 }').a");
-            p.Command("to_json", "value, indented?: bool", "A value as JSON text.", KType.String, c => Values.ToJson(c.Arg(0), c.Bool(1)));
             p.Command("now", "", "The current date and time.", KType.Date, c => DateTime.Now, "@now()->format('d MMMM yyyy')");
             p.Command("today", "", "Today's date, at midnight.", KType.Date, c => DateTime.Today);
-            p.Command("date", "text", "Parses a date such as 2026-11-19 or 2026-11-19 14:30.", KType.Date, c =>
-                DateTime.TryParse(c.Str(0), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime d) ? d : throw c.Error($"'{c.Str(0)}' is not a date.", "Format"));
-            p.Command("range", "start, end?, step?", "Numbers from start up to (not including) end; with one argument, from 0. The same as start..end.", KType.List, c =>
+            p.Command("range", "start, end?, step?", "Numbers from start up to (not including) end; with one argument, from 0. start..end is the short form when the step is 1.", KType.List, c =>
             {
                 double start = c.Count > 1 ? c.Num(0) : 0;
                 double end = c.Count > 1 ? c.Num(1) : c.Num(0);
@@ -812,23 +808,13 @@ namespace KScript.Runtime
                 }
                 return list;
             });
-            p.Command("guid", "", "A new random GUID.", KType.String, c => Guid.NewGuid().ToString());
-            p.Command("number", "value, default?", "Converts a value to a number (or returns default when it isn't one).", KType.Number, c =>
-                Values.TryNumber(c.Arg(0), out double n) ? n : c.Has(1) ? c.Arg(1) : throw c.Error($"{Values.Describe(c.Arg(0))} is not a number.", "Type"));
-            p.Command("string", "value", "Converts a value to text.", KType.String, c => Values.ToStr(c.Arg(0)));
             p.Command("uuid", "v?: int, name?: string, namespace?: string", "A new UUID. Version 4 (the default) is random. Version 8 is custom: with a name it is a SHA-256 hash of the namespace and the name, so the same name always gives the same UUID; without one it starts with the time, so newer ones sort later.", KType.Uuid,
                 c => UuidValue.New(c.Int(0, 4), c.Arg(1) == null ? null : c.Str(1), c.Arg(2) == null ? null : c.Str(2)), "@uuid()->version()");
-            p.Command("type", "value", "The type of a value: string, number, bool, list, map, fn, date or null, or the name of the <type> that made a record.", KType.String, c => Shapes.TypeName(c.Arg(0)));
             p.Command("min", "values...", "The smallest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: true));
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));
-            p.Command("to_lower", "text", "The text in lower case.", KType.String, c => c.Str(0).ToLowerInvariant());
-            p.Command("to_upper", "text", "The text in upper case.", KType.String, c => c.Str(0).ToUpperInvariant());
             p.Command("char_of", "code: number", "The character with this character code: @char_of(65) is A.", KType.String, c => char.ConvertFromUtf32(c.Int(0)));
-            p.Command("escape", "text", "HTML-escapes text.", KType.String, c => Values.HtmlEscape(c.Str(0)));
             p.Command("env", "name, default?", "An environment variable, or default when it isn't set.", KType.String, c =>
                 Environment.GetEnvironmentVariable(c.Str(0)) ?? (c.Has(1) ? c.Arg(1) : null));
-            p.Command("exit", "code?", "Ends the script with an exit code.", KType.Null, c => throw new ExitSignal(c.Int(0, 0)));
-            p.Command("error", "message, type?", "Raises an error, like <throw>, from inside an expression.", KType.Null, c => throw new KScriptException(c.Str(0), c.Str(1, "Error")));
         }
 
         private static object MinMax(CallContext c, bool min)

@@ -40,6 +40,7 @@ namespace KScript.Runtime
             p.Method(KType.Any, "type", "", "The value's type: string, number, bool, list, map, fn, date, error or null, or the name of the <type> that made a record.", KType.String, (t, c) => Shapes.TypeName(t));
             p.Method(KType.Any, "to_string", "", "The value as text.", KType.String, (t, c) => Values.ToStr(t));
             p.Method(KType.Any, "to_json", "indented?: bool", "The value as JSON text.", KType.String, (t, c) => Values.ToJson(t, c.Bool(0)));
+            p.Method(KType.Any, "to_yaml", "", "The value as YAML text.", KType.String, (t, c) => Yaml.Write(t));
             p.Method(KType.Any, "is_null", "", "yes if the value is null.", KType.Bool, (t, c) => t == null);
             p.Method(KType.Any, "or", "fallback", "The value if it is truthy, otherwise fallback.", KType.Any, (t, c) => Values.Truthy(t) ? t : c.Arg(0));
             p.Method(KType.Fn, "call", "args...", "Calls the function with these arguments.", KType.Any, (t, c) => c.Interpreter.Call((ICallable)t, c.Args.ToList(), c.Named, c.Scope, c.Module));
@@ -102,9 +103,10 @@ namespace KScript.Runtime
         private static void RegisterListMethods(PackageBuilder p)
         {
             string l = KType.List;
-            p.Method(l, "count", "fn?", "The number of items (or of items for which fn is true).", KType.Number, (t, c) =>
-                c.Has(0) ? (double)L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).Count() : (double)L(t).Count);
-            p.Method(l, "length", "", "The number of items.", KType.Number, (t, c) => (double)L(t).Count);
+            p.Method(l, "count", "", "The number of items.", KType.Number, (t, c) =>
+                c.Has(0) ? throw c.Error("->count() takes no arguments. To count the items that match, use ->count_of(fn).", "Argument") : (double)L(t).Count);
+            p.Method(l, "count_of", "match", "How many items match: the items for which a function is true, or the items equal to a value.", KType.Number, (t, c) =>
+                c.Arg(0) is ICallable ? (double)L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).Count() : (double)L(t).Count(x => Values.StrictEquals(x, c.Arg(0))));
             p.Method(l, "is_empty", "", "yes if the list has no items.", KType.Bool, (t, c) => L(t).Count == 0);
             p.Method(l, "first", "", "The first item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[0] : null);
             p.Method(l, "last", "", "The last item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[^1] : null);
@@ -116,7 +118,6 @@ namespace KScript.Runtime
                 return i >= 0 && i < list.Count ? list[i] : null;
             });
             p.Method(l, "filter", "fn", "The items for which fn($item, $index) is true.", l, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
-            p.Method(l, "where", "fn", "The items for which fn is true (the same as filter).", l, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
             p.Method(l, "reject", "fn", "The items for which fn is false.", l, (t, c) => L(t).Where((x, i) => !Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
             p.Method(l, "map", "fn", "A new list with fn($item, $index) applied to each item.", l, (t, c) => L(t).Select((x, i) => Apply(c, c.Fn(0), x, i)).ToList());
             p.Method(l, "find", "fn", "The first item for which fn is true, or null.", KType.Any, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).FirstOrDefault());
@@ -191,7 +192,6 @@ namespace KScript.Runtime
             p.Method(l, "skip", "count: number", "All but the first count items.", l, (t, c) => L(t).Skip(c.Int(0)).ToList());
             p.Method(l, "unique", "", "The list without duplicates.", l, (t, c) => L(t).Aggregate(new List<object>(), (acc, x) => { if (!acc.Any(y => Values.StrictEquals(x, y))) acc.Add(x); return acc; }));
             p.Method(l, "push", "items...", "A new list with items added to the end.", l, (t, c) => L(t).Concat(c.Args).ToList());
-            p.Method(l, "append", "items...", "A new list with items added to the end (the same as push).", l, (t, c) => L(t).Concat(c.Args).ToList());
             p.Method(l, "prepend", "items...", "A new list with items added to the start.", l, (t, c) => c.Args.Concat(L(t)).ToList());
             p.Method(l, "insert", "index: number, item", "A new list with item inserted at index.", l, (t, c) =>
             {
@@ -258,7 +258,6 @@ namespace KScript.Runtime
                 return copy;
             });
             p.Method(m, "count", "", "The number of keys.", KType.Number, (t, c) => (double)M(t).Count);
-            p.Method(m, "length", "", "The number of keys.", KType.Number, (t, c) => (double)M(t).Count);
             p.Method(m, "is_empty", "", "yes if the map has no keys.", KType.Bool, (t, c) => M(t).Count == 0);
             p.Method(m, "map", "fn", "A new map with fn($value, $key) applied to each value.", m, (t, c) => M(t).ToDictionary(kv => kv.Key, kv => c.Call(c.Fn(0), kv.Value, kv.Key)));
             p.Method(m, "filter", "fn", "The entries for which fn($value, $key) is true.", m, (t, c) => M(t).Where(kv => Values.Truthy(c.Call(c.Fn(0), kv.Value, kv.Key))).ToDictionary(kv => kv.Key, kv => kv.Value));
@@ -314,9 +313,10 @@ namespace KScript.Runtime
             p.Method(s, "trim", "characters?", "The text without spaces (or the given characters) at either end.", s, (t, c) => c.Has(0) ? S(t).Trim(c.Str(0).ToCharArray()) : S(t).Trim());
             p.Method(s, "trim_start", "characters?", "The text without spaces (or the given characters) at the start.", s, (t, c) => c.Has(0) ? S(t).TrimStart(c.Str(0).ToCharArray()) : S(t).TrimStart());
             p.Method(s, "trim_end", "characters?", "The text without spaces (or the given characters) at the end.", s, (t, c) => c.Has(0) ? S(t).TrimEnd(c.Str(0).ToCharArray()) : S(t).TrimEnd());
-            p.Method(s, "length", "", "The number of characters.", KType.Number, (t, c) => (double)S(t).Length);
-            p.Method(s, "count", "text?", "The number of characters, or how many times text occurs.", KType.Number, (t, c) =>
-                c.Has(0) ? (double)(c.Str(0).Length == 0 ? 0 : (S(t).Length - S(t).Replace(c.Str(0), string.Empty, StringComparison.Ordinal).Length) / c.Str(0).Length) : (double)S(t).Length);
+            p.Method(s, "count", "", "The number of characters.", KType.Number, (t, c) =>
+                c.Has(0) ? throw c.Error("->count() takes no arguments. To count how often text occurs, use ->count_of(text).", "Argument") : (double)S(t).Length);
+            p.Method(s, "count_of", "match", "How many times a piece of text occurs.", KType.Number, (t, c) =>
+                (double)(c.Str(0).Length == 0 ? 0 : (S(t).Length - S(t).Replace(c.Str(0), string.Empty, StringComparison.Ordinal).Length) / c.Str(0).Length));
             p.Method(s, "is_empty", "", "yes if the text is empty or only spaces.", KType.Bool, (t, c) => S(t).Trim().Length == 0);
             p.Method(s, "contains", "text", "yes if the text contains this text.", KType.Bool, (t, c) => S(t).Contains(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "starts_with", "text", "yes if the text starts with this text.", KType.Bool, (t, c) => S(t).StartsWith(c.Str(0), StringComparison.Ordinal));
@@ -352,7 +352,8 @@ namespace KScript.Runtime
             p.Method(s, "escape", "", "The text HTML-escaped.", s, (t, c) => Values.HtmlEscape(S(t)));
             p.Method(s, "url_encode", "", "The text escaped for a URL.", s, (t, c) => Uri.EscapeDataString(S(t)));
             p.Method(s, "url_decode", "", "URL-escaped text decoded.", s, (t, c) => Uri.UnescapeDataString(S(t)));
-            p.Method(s, "json", "as?: type", "Parses the text as JSON. With as: a <type>, the data is checked and turned into records.", KType.Any, (t, c) => Shapes.MapJson(c, Values.ParseJson(S(t)), 0));
+            p.Method(s, "json", "as?: type", "Parses the text as JSON. With as: a <type> (or 'Repo[]'), the data is checked and turned into records.", KType.Any, (t, c) => Shapes.MapJson(c, Values.ParseJson(S(t)), 0));
+            p.Method(s, "yaml", "", "Parses the text as YAML.", KType.Any, (t, c) => Yaml.Parse(S(t)));
             foreach (var m in RecordType.Methods)
                 p.Method(KType.Type, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((IKObject)t).TryCallMethod(c, m.Name, out object r)
                     ? r : throw c.Error($"{((IKObject)t).ToText()} is made from another type, so it has no ->{m.Name}(). It has ->from(), ->check() and ->name().", "Name"));
@@ -364,7 +365,12 @@ namespace KScript.Runtime
                 Values.ParseBool(S(t)) ?? throw c.Error($"'{S(t)}' is not a yes/no value.", "Type"));
             p.Method(s, "to_date", "", "Parses the text as a date.", KType.Date, (t, c) =>
                 DateTime.TryParse(S(t), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime dt) ? dt : throw c.Error($"'{S(t)}' is not a date.", "Format"));
-            p.Method(s, "to_base64", "", "The text encoded as Base64.", s, (t, c) => Convert.ToBase64String(Encoding.UTF8.GetBytes(S(t))));
+            p.Method(s, "to_base64", "url?: bool", "The text encoded as base64. With url: true, it is URL-safe base64 without padding.", "base64", (t, c) =>
+            {
+                string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(S(t)));
+                if (Values.Truthy(c.Arg(0, "url"))) b64 = b64.TrimEnd('=').Replace('+', '-').Replace('/', '_');
+                return Native("base64", b64);
+            });
             p.Method(s, "from_base64", "", "Base64 text decoded.", s, (t, c) => Encoding.UTF8.GetString(Convert.FromBase64String(S(t))));
             p.Method(s, "md5", "", "The MD5 hash of the text, in hex.", s, (t, c) => Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(S(t)))).ToLowerInvariant());
             p.Method(s, "sha256", "", "The SHA-256 hash of the text, in hex.", s, (t, c) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(S(t)))).ToLowerInvariant());

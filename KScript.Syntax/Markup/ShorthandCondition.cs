@@ -16,13 +16,13 @@ namespace KScript.Syntax.Markup
         /// <summary>The attribute a shorthand start tag fills in for an element, or null if it has no shorthand.</summary>
         public static string AttributeFor(string element) => element switch
         {
-            "if" or "elif" or "while" or "assert" => "test",
+            "if" or "elif" or "while" => "test",
             "match" => "value",
             _ => null,
         };
 
         /// <summary>The elements that have a shorthand start tag.</summary>
-        public static IReadOnlyList<string> Elements { get; } = new[] { "if", "elif", "while", "match", "assert" };
+        public static IReadOnlyList<string> Elements { get; } = new[] { "if", "elif", "while", "match" };
 
         /// <summary>The result of <see cref="Scan"/>.</summary>
         public readonly struct Head

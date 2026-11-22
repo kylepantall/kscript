@@ -89,7 +89,7 @@ namespace KScript.Runtime
         public object Value { get; }
     }
 
-    /// <summary>Thrown by &lt;exit&gt; and @exit() to end the script with an exit code.</summary>
+    /// <summary>Thrown by &lt;exit&gt; to end the script with an exit code.</summary>
     public sealed class ExitSignal : ControlSignal
     {
         public ExitSignal(int code) : base("exit") { Code = code; }

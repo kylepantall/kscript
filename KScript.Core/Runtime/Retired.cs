@@ -43,9 +43,17 @@ namespace KScript.Runtime
             ("ginput", "Use <input to=\"...\"> from KScript.Terminal.", "input"),
             ("end", "Use <exit /> (or <exit code=\"1\" />).", "exit"),
             ("anykey", "Use <pause /> from KScript.Terminal.", "pause"),
-            ("new_dir", "Use <mkdir path=\"...\" /> from KScript.IO.", "mkdir"),
+            ("new_dir", "Use @create_folder(path) from KScript.IO.", null),
             ("file_info", "Use @file(path), which returns a file value with ->size(), ->modified() and more (KScript.IO).", null),
-            ("registry", "The Windows registry isn't part of KScript 2.", null));
+            ("registry", "The Windows registry isn't part of KScript 2.", null),
+            // One form per action: these statements became commands (or were a second spelling of one).
+            ("write", "Use @write_text(path, text), @append_text(path, text) or @write_json(path, value) from KScript.IO.", null),
+            ("move", "Use @move(from, to) from KScript.IO.", null),
+            ("copy", "Use @copy(from, to) from KScript.IO.", null),
+            ("delete", "Use @delete(path) from KScript.IO.", null),
+            ("mkdir", "Use @create_folder(path) from KScript.IO.", null),
+            ("assert", "Use @assert(condition, message?) from KScript.Test.", null),
+            ("stylesheet", "Use @stylesheet(path, vars?) from KScript.Style, which returns the CSS: @write_text('theme.css', @stylesheet('theme.ks.css')).", null));
 
         public static readonly IReadOnlyDictionary<string, RetiredInfo> Attributes = Table(
             ("version", "There is only one KScript now; the version attribute isn't needed.", null),
@@ -89,7 +97,7 @@ namespace KScript.Runtime
             ("directory", "Use @known_folder('desktop') or @cwd() (KScript.IO).", "known_folder"),
             ("k", "Use $os, $script and $env: $os.name, $script.path, $env.HOME.", null),
             ("args", "Use the $args list: $args[0].", null),
-            ("length", "Use ->length() (or ->count()).", null),
+            ("length", "Use ->count().", null),
             ("contains", "Use ->contains(): $text->contains('x').", null),
             ("split", "Use ->split(separator), which returns a list.", null),
             ("time", "Use @now()->format('HH:mm').", null),
@@ -101,7 +109,48 @@ namespace KScript.Runtime
             ("to_base64", "Use ->to_base64().", null),
             ("to_md5", "Use ->md5().", null),
             ("xpath", "XPath isn't part of KScript 2; read XML with @read_text() and string methods, or use JSON.", null),
-            ("registry", "The Windows registry isn't part of KScript 2.", null));
+            ("registry", "The Windows registry isn't part of KScript 2.", null),
+            // One name per thing: commands that only repeated a method, a statement or an operator.
+            ("to_upper", "Use ->upper(): $text->upper().", null),
+            ("to_lower", "Use ->lower(): $text->lower().", null),
+            ("string", "Use ->to_string(): $value->to_string().", null),
+            ("number", "Use ->to_number(): $text->to_number(), or ->to_number(0) for a default.", null),
+            ("json", "Use ->json(): $text->json(), or ->json(as: Repo).", null),
+            ("to_json", "Use ->to_json(): $value->to_json().", null),
+            ("yaml", "Use ->yaml(): $text->yaml().", null),
+            ("to_yaml", "Use ->to_yaml(): $value->to_yaml().", null),
+            ("guid", "Use @uuid().", "uuid"),
+            ("date", "Use ->to_date(): '2026-11-19'->to_date().", null),
+            ("type", "Use ->type(): $value->type().", null),
+            ("escape", "Use ->escape(): $text->escape().", null),
+            ("base64", "Use ->to_base64(): $text->to_base64().", null),
+            ("url_encode", "Use ->url_encode(): $text->url_encode().", null),
+            ("url_decode", "Use ->url_decode(): $text->url_decode().", null),
+            ("pow", "Use the ** operator: $base ** $exponent.", null),
+            ("contrast", "Use @contrast_color(color, dark?, light?) (KScript.Style).", "contrast_color"),
+            ("exit", "Use the exit statement: exit 1.", null),
+            ("error", "Use the throw statement: throw Validation \"Too short\".", null),
+            ("transaction", "Use the transaction statement around the work, or $db->transaction(fn) when you need its result (KScript.Data).", null));
+
+        /// <summary>
+        /// Methods that were a second name for another one, keyed by the receiver's type and the name
+        /// (<c>list->where</c>). The runtime and the editor say what to write instead.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, RetiredInfo> Methods = Table(
+            ("list->where", "Use ->filter(fn).", "filter"),
+            ("list->append", "Use ->push(items).", "push"),
+            ("list->length", "Use ->count().", "count"),
+            ("map->length", "Use ->count().", "count"),
+            ("string->length", "Use ->count().", "count"),
+            ("json->parse", "Use ->json().", "json"),
+            ("number->pow", "Use the ** operator: $n ** 2.", null),
+            ("color->contrast", "Use ->contrast_ratio(other).", "contrast_ratio"),
+            ("query->avg", "Use ->average(column).", "average"),
+            ("model->avg", "Use ->average(column).", "average"));
+
+        /// <summary>The retired method called <paramref name="name"/> on a value of <paramref name="type"/>, or null.</summary>
+        public static RetiredInfo Method(string type, string name) =>
+            type != null && name != null && Methods.TryGetValue(type + "->" + name, out RetiredInfo r) ? r : null;
 
         private static IReadOnlyDictionary<string, RetiredInfo> Table(params (string Name, string Replacement, string Rename)[] rows) =>
             rows.ToDictionary(r => r.Name, r => new RetiredInfo(r.Name, r.Replacement, r.Rename), StringComparer.Ordinal);

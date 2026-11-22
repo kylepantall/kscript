@@ -67,7 +67,7 @@ namespace KScript.Metadata
         /// <summary>The string methods most native types keep: searching, measuring, cutting up and showing their text.</summary>
         public static readonly string[] Searchable =
         {
-            "contains", "starts_with", "ends_with", "index_of", "length", "slice", "matches", "truncate",
+            "contains", "starts_with", "ends_with", "index_of", "count", "slice", "matches", "truncate",
             "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json",
         };
 
@@ -81,13 +81,13 @@ namespace KScript.Metadata
             Add(new NativeTypeInfo("password", "A secret. It prints as ********, can't be compared with ==, and is hashed to be stored.", "'correct horse battery staple'",
                 Array.Empty<string>()) { Secret = true, Options = new[] { "upper", "lower", "digit", "symbol", "common", "score", "algorithm" }, JsonFormat = "password" });
             Add(new NativeTypeInfo("handle", "@ followed by letters, digits, _, . or -: a username such as @joan. Lowercased.", "@joan",
-                new[] { "contains", "starts_with", "ends_with", "length", "upper", "slice", "matches", "truncate", "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json" })
+                new[] { "contains", "starts_with", "ends_with", "count", "upper", "slice", "matches", "truncate", "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json" })
                 { RawKind = "handle" });
             Add(new NativeTypeInfo("uuid", "A UUID, versions 1 to 8 and the nil and max UUIDs, lowercased to 8-4-4-4-12.", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f",
                 new[] { "contains", "starts_with", "ends_with", "upper", "slice", "split", "pad_left", "pad_right", "escape", "url_encode", "markdown_escape", "json" })
                 { Options = new[] { "v" }, JsonFormat = "uuid" });
             Add(new NativeTypeInfo("regex", "A regular expression with flags i, m, s and x, written /.../ in code.", "/^[a-z]+$/i",
-                new[] { "contains", "starts_with", "ends_with", "length", "escape", "markdown_escape", "json" }) { JsonFormat = "regex" });
+                new[] { "contains", "starts_with", "ends_with", "count", "escape", "markdown_escape", "json" }) { JsonFormat = "regex" });
 
             // Web and network.
             Add(new NativeTypeInfo("url", "An absolute http, https, ftp, ws or wss URL. The scheme and host are lowercased.", "https://example.com/docs?page=2",
@@ -116,7 +116,7 @@ namespace KScript.Metadata
                 Searchable) { JsonFormat = "byte" });
             Add(new NativeTypeInfo("jwt", "A JSON Web Token: three base64url parts. Its claims can be read; its signature isn't checked.", "'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig'",
                 Searchable));
-            Add(new NativeTypeInfo("json", "Text that holds valid JSON. ->parse() gives the value.", "'{\"a\": 1}'",
+            Add(new NativeTypeInfo("json", "Text that holds valid JSON. ->json() gives the value.", "'{\"a\": 1}'",
                 Searchable));
 
             // People and places.

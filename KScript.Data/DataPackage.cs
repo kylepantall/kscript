@@ -149,7 +149,7 @@ namespace KScript.Data
                 }),
             new("select", "columns...", "Reads only these columns: `->select(id, name)`. Records get null for the others.", KType.Query,
                 (q, c) => q.Selecting(Flatten(c.Args).Select(a => { string w = Word(a, "->select()"); q.ColumnNamed(w, " for ->select()"); return w; }).ToList()), Bare: true),
-            new("distinct", "", "Leaves out rows that are the same as another, in the columns selected.", KType.Query, (q, c) => q.Unique()),
+            new("distinct", "", "Leaves out rows that repeat an earlier one, in the columns selected.", KType.Query, (q, c) => q.Unique()),
             new("order_by", "columns...", "Sorts the rows: `->order_by(name)`, `->order_by(created_at: desc, name: asc)`.", KType.Query,
                 (q, c) =>
                 {
@@ -182,7 +182,7 @@ namespace KScript.Data
             new("exists", "", "yes if any row matches.", KType.Bool, (q, c) => q.Exists(c)),
             new("count", "", "How many rows match.", KType.Number, (q, c) => q.Count(c)),
             new("sum", "column", "The total of a column over the rows that match (0 when none do).", KType.Number, (q, c) => q.Aggregate(c, "SUM", Word(c.Arg(0), "->sum()")), Bare: true),
-            new("avg", "column", "The average of a column, or null when no rows match.", KType.Number, (q, c) => q.Aggregate(c, "AVG", Word(c.Arg(0), "->avg()")), Bare: true),
+            new("average", "column", "The average of a column, or null when no rows match.", KType.Number, (q, c) => q.Aggregate(c, "AVG", Word(c.Arg(0), "->average()")), Bare: true),
             new("min", "column", "The smallest value of a column, or null when no rows match.", KType.Any, (q, c) => q.Aggregate(c, "MIN", Word(c.Arg(0), "->min()")), Bare: true),
             new("max", "column", "The largest value of a column, or null when no rows match.", KType.Any, (q, c) => q.Aggregate(c, "MAX", Word(c.Arg(0), "->max()")), Bare: true),
             new("pluck", "column", "One column of every row that matches, as a list: `$User->pluck(email)`.", KType.List, (q, c) => q.Pluck(c, Word(c.Arg(0), "->pluck()")), Bare: true),
@@ -404,13 +404,6 @@ namespace KScript.Data
                     return RunSql(c, Database.For(c, connection), c.Str(0), c.Arg(1, "as"));
                 }).Info.KeepsBareWords = true;
 
-            p.Command("transaction", "work: fn, retries?: number, connection?", "Runs work in a transaction and returns what it returns: everything it saves is kept together, or (when it fails) not at all. retries tries again when the database is busy.", KType.Any,
-                c =>
-                {
-                    string connection = c.Arg(2, "connection") != null ? Word(c.Arg(2, "connection"), "connection") : null;
-                    return Transaction(c, Database.For(c, connection), c.Fn(0), c.Arg(1, "retries"));
-                }).Info.KeepsBareWords = true;
-
             p.Element(new ElementInfo("transaction", "Runs its statements in a transaction: what they save is kept when the block ends, and undone if anything in it fails (the error then carries on). A transaction inside another is a savepoint, so only its own changes are undone.",
                 ContentKind.Statements,
                 new A("retries", K.Expression, "Tries the block again this many times when the database is busy or a deadlock stops it."),
@@ -469,7 +462,7 @@ namespace KScript.Data
                     db.Execute(c.Interpreter, new SqlStatement("DROP TABLE IF EXISTS " + db.Dialect.Quote(table), Array.Empty<object>()), table);
                     return existed;
                 }).Info.KeepsBareWords = true;
-            p.Method(KType.Database, "transaction", "work: fn, retries?: number", "Runs work in a transaction on this connection, like @transaction.", KType.Any,
+            p.Method(KType.Database, "transaction", "work: fn, retries?: number", "Runs work in a transaction on this connection and returns what it returns: everything it saves is kept together, or (when it fails) not at all. retries tries again when the database is busy.", KType.Any,
                 (t, c) => Transaction(c, DatabaseOf(t, c), c.Fn(0), c.Arg(1, "retries")));
             p.Method(KType.Database, "in_transaction", "", "yes while a transaction is open on this connection.", KType.Bool,
                 (t, c) => DatabaseOf(t, c).InTransaction(c.Interpreter));
