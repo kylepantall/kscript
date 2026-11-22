@@ -34,13 +34,13 @@ public sealed class EvaluationTests : IDisposable
     [InlineData("<echo>{ ({ a: 1 } + { b: 2, a: 3 })->to_json() } { [1] + [2] } { 'a' + 1 } { 1 + 'a' }</echo>", "{\"a\":3,\"b\":2} 1, 2 a1 1a\n")]
     [InlineData("<echo>{ @now() + 1 > @now() }</echo>", "true\n")]
     [InlineData("<echo>{ [1, 2][5] ?? 'n' } { [1, 2][-1] } { 'abc'[1] } { 'abc'[-1] } { 'abc'[9] ?? 'n' } { { a: 1 }['a'] }</echo>", "n 2 b c n 1\n")]
-    [InlineData("<echo>{ $list.count } { $list.length } { 'abc'.length }</echo>", "3 3 3\n")]
+    [InlineData("<echo>{ $list.count } { $list->count() } { 'abc'.count }</echo>", "3 3 3\n")]
     [InlineData("<import package=\"KScript.Math\" as=\"m\" /><import src=\"lib.ks.xml\" as=\"lib\" /><echo>{ m.pi > 3 } { m.sqrt(16) } { lib.pi2 } { lib.helper() } { @lib.pi2 } { @m.sqrt(9) } { m.e > 2 }</echo>", "true 4 6.28 1 6.28 3 true\n")]
     [InlineData("<let name=\"m\" value=\"{ a: 1 }\" /><do>$m['a'] += 2; $m['b'] ??= 5; $m.c ??= 1; $m.c += 1</do><echo>{ $m->to_json() }</echo>", "{\"a\":3,\"b\":5,\"c\":2}\n")]
     [InlineData("<let name=\"x\" value=\"10\" /><do>$x -= 1; $x *= 2; $x /= 3; $x ??= 4</do><echo>$x</echo>", "6\n")]
     [InlineData("<let name=\"l\" value=\"[1]\" /><do>$l += 2; $l[2] = 5; $l[-1] += 1; $l[0] *= 7</do><echo>{ $l }</echo>", "7, 2, 6\n")]
-    [InlineData("<echo>{ 'abc' |> to_upper() } { 'abc' |> @to_upper() } { 'abc' |> upper() }</echo>", "ABC ABC ABC\n")]
-    [InlineData("<let name=\"f\" value=\"fn($x) => $x * 2\" /><fn name=\"g\" params=\"x\" value=\"$x * 3\" /><echo>{ 3 |> $f } { 2 |> g() } { g(4) } { to_upper('x') }</echo>", "6 6 12 X\n")]
+    [InlineData("<echo>{ 65 |> char_of() } { 65 |> @char_of() } { 'abc' |> upper() }</echo>", "A A ABC\n")]
+    [InlineData("<let name=\"f\" value=\"fn($x) => $x * 2\" /><fn name=\"g\" params=\"x\" value=\"$x * 3\" /><echo>{ 3 |> $f } { 2 |> g() } { g(4) } { char_of(88) }</echo>", "6 6 12 X\n")]
     [InlineData("<import package=\"KScript.IO\" /><echo>{ @file('a.txt') |> stem() } { @file('a.txt') |> name() }</echo>", "a a.txt\n")]
     [InlineData("<echo>{ '5'->round() } { { a: fn() => 1 }.a() }</echo>", "5 1\n")]
     public void Expressions_give_values(string body, string expected)
@@ -69,12 +69,12 @@ public sealed class EvaluationTests : IDisposable
     [InlineData("<echo>{ [1] |> 5 }</echo>", "Type", "5 is a number (5), not a function.")]
     [InlineData("<echo>{ @math('1 + 1') }</echo>", "Retired", "@math() was removed in KScript 2.")]
     [InlineData("<echo>{ @sqrt(4) }</echo>", "Import", "@sqrt() is part of KScript.Math.")]
-    [InlineData("<echo>{ @to_uper('a') }</echo>", "Name", "Unknown command @to_uper(). Did you mean @to_upper?")]
+    [InlineData("<echo>{ @char_off(65) }</echo>", "Name", "Unknown command @char_off(). Did you mean @char_of?")]
     [InlineData("<echo>{ zork(1) }</echo>", "Name", "Unknown command @zork().")]
-    [InlineData("<echo>{ @to_upper() }</echo>", "Argument", "@to_upper() needs 1 argument: @to_upper(text).")]
+    [InlineData("<echo>{ @char_of() }</echo>", "Argument", "@char_of() needs 1 argument: @char_of(code: number).")]
     [InlineData("<echo>{ @range() }</echo>", "Argument", "@range() needs at least 1 argument")]
     [InlineData("<echo>{ @now(1, 2) }</echo>", "Argument", "@now() takes at most 0 arguments")]
-    [InlineData("<echo>{ @to_upper('a', 'b') }</echo>", "Argument", "@to_upper() takes at most 1 argument: @to_upper(text).")]
+    [InlineData("<echo>{ @char_of(65, 66) }</echo>", "Argument", "@char_of() takes at most 1 argument: @char_of(code: number).")]
     [InlineData("<echo>{ [1]->sum(1, 2, 3) }</echo>", "Argument", "takes at most")]
     [InlineData("<let name=\"l\" value=\"[1]\" /><echo>{ [2] |> $l->count() }</echo>", "Syntax", "After |> write the method name without ->")]
     [InlineData("<echo>{ null->to_upper() }</echo>", "Null", "Can't call ->to_upper() on null.")]
@@ -87,7 +87,7 @@ public sealed class EvaluationTests : IDisposable
     [InlineData("<echo>{ @today()->json() }</echo>", "Name", "Dates have no method ->json(). To write it as JSON text, use ->to_json().")]
     [InlineData("<echo>{ @today()->upper() }</echo>", "Name", "Dates have no method ->upper(). Use ->to_string()->upper() to work on its text.")]
     [InlineData("<echo>{ 5->upper() }</echo>", "Name", "Numbers have no method ->upper(). Use ->to_string()->upper() to work on its text.")]
-    [InlineData("<echo>{ true->length() }</echo>", "Name", "Bools have no method ->length(). Use ->to_string()->length() to work on its text.")]
+    [InlineData("<echo>{ true->count() }</echo>", "Name", "Bools have no method ->count(). Use ->to_string()->count() to work on its text.")]
     [InlineData("<echo>{ 'a'->zz() }</echo>", "Name", "Text values have no method ->zz()")]
     [InlineData("<echo>{ 1->zz() }</echo>", "Name", "Numbers have no method ->zz()")]
     [InlineData("<echo>{ $config->zz() }</echo>", "Name", "Values of type config have no method ->zz()")]
@@ -126,7 +126,7 @@ public sealed class EvaluationTests : IDisposable
     public void Package_commands_and_objects_work_as_values()
     {
         Assert.Equal("3 a.txt\n", Run("<import package=\"KScript.Math\" as=\"m\" /><import package=\"KScript.IO\" /><let name=\"f\" value=\"m.sqrt\" /><echo>{ $f(9) } { @file('a.txt')['name'] }</echo>"));
-        Assert.Equal("claude-x\n", Run("<import package=\"KScript.AI\" /><echo>{ @chat('s', { model: 'claude-x' }) |> model() }</echo>"));
+        Assert.Equal("claude-x\n", Run("<import package=\"KScript.AI\" /><echo>{ @chat('s', model: 'claude-x') |> model() }</echo>"));
         Assert.Equal("x", Run("<let name=\"nl\" value=\"false\" /><echo newline=\"{ $nl }\">x</echo>"));
         Assert.Equal("x\n", Run("<echo newline=\"{ 'y' }{ 'es' }\">x</echo>"));
     }

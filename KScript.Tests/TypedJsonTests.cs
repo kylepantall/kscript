@@ -38,10 +38,10 @@ public class TypedJsonTests
     [InlineData("$Repo->from(" + Good + ").visibility", "public")]
     [InlineData("$Repo->from(" + Good + ").license ?? 'none'", "none")]
     [InlineData("$Repo->from(" + Good + ")->keys()->join(',')", "name,stars,owner,owner_name,topics,license,visibility,label")]
-    [InlineData("@type($Repo->from(" + Good + "))", "Repo")]
     [InlineData("$Repo->from(" + Good + ")->type()", "Repo")]
-    [InlineData("@type($Repo->from(" + Good + ").owner)", "User")]
-    [InlineData("@type($Repo)", "type")]
+    [InlineData("$Repo->from(" + Good + ") |> type()", "Repo")]
+    [InlineData("$Repo->from(" + Good + ").owner->type()", "User")]
+    [InlineData("$Repo->type()", "type")]
     [InlineData("$Repo", "Repo")]
     [InlineData("$Repo.name + ' ' + $Repo->name() + ' ' + $Repo.description", "Repo Repo A repository.")]
     [InlineData("$Repo.fields->count() + $Repo->fields()->count()", "16")]
@@ -53,14 +53,14 @@ public class TypedJsonTests
     [InlineData("$Repo->from(" + Good + ") == $Repo->from(" + Good + ")", "true")]
     [InlineData("$Repo->from(" + Good + ").owner == { login: 'kyle', id: 1, avatar_url: null }", "true")]
     [InlineData("$User->from('{\"login\": \"kyle\", \"id\": 7}').id", "7")]
-    [InlineData("@json('{\"login\": \"kyle\", \"id\": 7}', as: User).login", "kyle")]
     [InlineData("'{\"login\": \"kyle\", \"id\": 7}'->json(as: User).login", "kyle")]
+    [InlineData("('{\"login\": \"kyle\", \"id\": 7}' |> json(as: User)).login", "kyle")]
     [InlineData("'[{\"login\": \"kyle\", \"id\": 7}]'->json(User)[0].login", "kyle")]
     [InlineData("'[{\"login\": \"kyle\", \"id\": 7}]'->json(as: 'User[]')->count()", "1")]
     [InlineData("'[1, 2]'->json(as: 'int[]')->count()", "2")]
     [InlineData("'\"public\"'->json(as: $Visibility)", "public")]
     [InlineData("'{\"a\": 1}'->json().a", "1")]
-    [InlineData("@json('{\"a\": 1}').a", "1")]
+    [InlineData("('{\"a\": 1}' |> json()).a", "1")]
     [InlineData("($Repo |> from(" + Good + ")).stars", "12")]
     [InlineData("$User.description ?? 'none'", "none")]
     [InlineData("$Repo->from(" + Good + ") === 'x'", "false")]
@@ -118,7 +118,7 @@ public class TypedJsonTests
     [Theory]
     [InlineData("<let name=\"r\" type=\"Repo\" value=\"" + Good + "\" /><echo>{ $r.stars + 1 }</echo>", "13")]
     [InlineData("<const name=\"r\" type=\"Repo\" value=\"" + Good + "\" /><echo>{ $r.stars + 1 }</echo>", "13")]
-    [InlineData("<let name=\"r\" value=\"null\" /><set name=\"r\" type=\"Repo\" value=\"" + Good + "\" /><echo>{ @type($r) }</echo>", "Repo")]
+    [InlineData("<let name=\"r\" value=\"null\" /><set name=\"r\" type=\"Repo\" value=\"" + Good + "\" /><echo>{ $r->type() }</echo>", "Repo")]
     [InlineData("<let name=\"rs\" type=\"Repo[]\" value=\"[" + Good + "]\" /><echo>{ $rs[0].name }</echo>", "kscript")]
     [InlineData("<let name=\"r\" type=\"Repo?\" value=\"null\" /><echo>{ $r ?? 'none' }</echo>", "none")]
     [InlineData("<let name=\"n\" type=\"int\" value=\"'4.5'\" /><echo>{ $n }</echo>", "4")]
@@ -162,8 +162,8 @@ public class TypedJsonTests
     public void SettingAFieldConvertsTheValue()
     {
         Assert.Equal("13 number\nmap\n", RunBody(Types + "<let name=\"r\" value=\"$Repo->from(" + Good + ")\" />"
-            + "<set>$r.stars = '13'</set><set>$r['label'] = 'x'</set><echo>{ $r.stars } { @type($r.stars) }</echo>"
-            + "<let name=\"m\" value=\"{}\" /><set>$m.a = 1</set><set>$m['b'] = 2</set><echo>{ @type($m) }</echo>"));
+            + "<set>$r.stars = '13'</set><set>$r['label'] = 'x'</set><echo>{ $r.stars } { $r.stars->type() }</echo>"
+            + "<let name=\"m\" value=\"{}\" /><set>$m.a = 1</set><set>$m['b'] = 2</set><echo>{ $m->type() }</echo>"));
     }
 
     [Theory]
@@ -297,7 +297,7 @@ public class TypedJsonTests
             File.WriteAllText(Path.Combine(dir, "users.json"), "[{ \"login\": \"a\", \"id\": 1 }, { \"login\": \"b\", \"id\": 2 }]");
             string script = Path.Combine(dir, "t.ks.xml");
             File.WriteAllText(script, "<kscript><import package=\"KScript.IO\" /><type name=\"User\" fields=\"login: string, id: int\" />"
-                + "<echo>{ @read_json('users.json', as: User)->map(fn($u) => $u.login + @type($u))->join(',') } { @read_json('users.json')[0]->type() }</echo></kscript>");
+                + "<echo>{ @read_json('users.json', as: User)->map(fn($u) => $u.login + $u->type())->join(',') } { @read_json('users.json')[0]->type() }</echo></kscript>");
             Assert.Equal("aUser,bUser map\n", RunScriptFile(script));
         }
         finally
@@ -387,7 +387,7 @@ public class TypedJsonTests
         {
             File.WriteAllText(Path.Combine(dir, "lib.ks.xml"), "<kscript><type name=\"User\" fields=\"login: string\" /></kscript>");
             string script = Path.Combine(dir, "t.ks.xml");
-            File.WriteAllText(script, "<kscript><import src=\"lib.ks.xml\" /><echo>{ @json('{\"login\": \"k\"}', as: User)->type() }</echo></kscript>");
+            File.WriteAllText(script, "<kscript><import src=\"lib.ks.xml\" /><echo>{ '{\"login\": \"k\"}'->json(as: User)->type() }</echo></kscript>");
             Assert.Equal("User\n", RunScriptFile(script));
         }
         finally

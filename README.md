@@ -50,7 +50,7 @@ if $big->count() gt 0 {
   confirm(to: ok) "Move them to an archive folder?"
   if $ok {
     for f in $big {
-      move(from: $f, to: @join_path(base: $folder, ['archive', $f->name()]))
+      @move($f, @join_path(base: $folder, ['archive', $f->name()]))
     }
   }
 }

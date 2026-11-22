@@ -13,7 +13,7 @@
     each="file"
     in="@files($old_dir) |> filter(fn($f) => $types->contains($f->extension()))">
     <let name="target" value="@join_path(base: $new_dir, $file->name())" />
-    <move from="$file" to="$target" />
+    <do>@move($file, $target)</do>
     <echo>Moved {$file->name()} to {$target}</echo>
   </for>
 </kscript>

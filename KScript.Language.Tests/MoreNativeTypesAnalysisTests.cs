@@ -40,7 +40,7 @@ namespace KScript.Language.Tests
         [InlineData("d: domain = example.com\necho $d->tld()")]
         [InlineData("z: timezone = Europe/London\necho $z->offset()")]
         [InlineData("p: port = 8080\necho $p + 1")]
-        [InlineData("c: color = red\necho $c->contrast(white)")]
+        [InlineData("c: color = red\necho $c->contrast_ratio(white)")]
         [InlineData("ip: ip = 10.0.0.1\necho $ip->in('10.0.0.0/8')")]
         [InlineData("c: country = gb\necho $c->currency()->symbol()")]
         [InlineData("enum Color { red, green }\nc: Color = green\necho $c")]

@@ -141,7 +141,7 @@ public sealed class QueueTests : StorageFixture
             import "jobs/welcome.kscript"
             Welcome(user_id: 1, email: 'joan@example.com', name: 'Joan')->run()
             job = Welcome(user_id: 2, email: 'ann@example.com')
-            echo "{$job.user_id} {$job.email} {$job.job} {$job.fields.user_id} {@type($job)}"
+            echo "{$job.user_id} {$job.email} {$job.job} {$job.fields.user_id} {$job->type()}"
             echo "{$job}"
             """);
         Assert.Equal("Welcome Joan <joan@example.com> #1 attempt 1 of 3 on mail\n2 ann@example.com Welcome 2 job\nWelcome(user_id: 2, email: ann@example.com, name: null)\n", output);
@@ -336,7 +336,7 @@ public sealed class QueueTests : StorageFixture
         string output = Code("""
             import "jobs/welcome.kscript"
             a = Welcome(user_id: 1, email: 'a@example.com')->dispatch(delay: '10m', queue: 'later')
-            b = Welcome(user_id: 2, email: 'b@example.com')->dispatch(at: @date('2026-11-21T10:00:00Z'), queue: 'later')
+            b = Welcome(user_id: 2, email: 'b@example.com')->dispatch(at: '2026-11-21T10:00:00Z'->to_date(), queue: 'later')
             c = Welcome(user_id: 3, email: 'c@example.com')->dispatch(delay: 30, queue: 'later', connection: 'memory')
             d = Welcome(user_id: 4, email: 'd@example.com')->dispatch(at: '2000-01-01', queue: 'later')
             echo "{$a.available_at->format('HH:mm')} {$b.available_at->format('HH:mm')} {$c.connection} {$d.available_at->format('HH:mm')}"
@@ -359,7 +359,7 @@ public sealed class QueueTests : StorageFixture
         string output = Run("""
             <import src="jobs/welcome.kscript" />
             <dispatch value="Welcome(user_id: 1, email: 'a@example.com')" delay="'1m'" queue="'q1'" connection="file" to="queued" />
-            <dispatch value="@chain([Welcome(user_id: 2, email: 'b@example.com')])" at="@date('2026-11-21T09:30:00Z')" />
+            <dispatch value="@chain([Welcome(user_id: 2, email: 'b@example.com')])" at="'2026-11-21T09:30:00Z'->to_date()" />
             <echo>{ $queued.queue } { $queued.available_at->format('HH:mm') }</echo>
             """, file: "main.ks.xml", setup: h => h.WorkingDirectory = Project);
         Assert.Equal("q1 09:01\n", output);
@@ -598,7 +598,7 @@ public sealed class QueueTests : StorageFixture
             dispatch Welcome(user_id: 1, email: 'a@example.com')
             Welcome(user_id: 2, email: 'b@example.com')->dispatch(delay: '1m', queue: 'later', connection: 'x')
             @chain([Welcome(user_id: 3, email: 'c@example.com')])->dispatch()
-            echo "{$q.count} {$q->count($Welcome)} {$q->count('Other')} {$q->pushed($Welcome)[1].user_id} {$q->dispatches()[1].queue} {$q->dispatches()[1].connection} {$q->dispatches()[1].delay} {$q}"
+            echo "{$q.count} {$q->count_of($Welcome)} {$q->count_of('Other')} {$q->pushed($Welcome)[1].user_id} {$q->dispatches()[1].queue} {$q->dispatches()[1].connection} {$q->dispatches()[1].delay} {$q}"
             echo "{$q->run_all()} ran, {$q->count()} left, {$q->clear()}"
             """);
         Assert.Equal("3 3 0 2 later x 60 fake queue (3 pushed)\nWelcome there <a@example.com> #1 attempt 1 of 3 on mail\nWelcome there <b@example.com> #2 attempt 1 of 3 on mail\nWelcome there <c@example.com> #3 attempt 1 of 3 on mail\n3 ran, 0 left, 0\n", output);

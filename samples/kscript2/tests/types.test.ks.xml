@@ -9,7 +9,7 @@
       <expect value="$repos[0].stars" equals="12" />
       <expect value="$repos[0].license" equals="'MIT License'" />
       <expect value="$repos[1].license" equals="null" />
-      <expect value="@type($repos[0])" equals="'Repo'" />
+      <expect value="$repos[0]->type()" equals="'Repo'" />
     </test>
 
     <test name="reports every problem">

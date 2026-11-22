@@ -143,7 +143,7 @@ public sealed class BuiltInTests : IDisposable
     {
         Assert.Equal("A 3 6\n", Body(
             "<import package=\"KScript.Math\" as=\"m\" /><import src=\"lib.ks.xml\" as=\"lib\" />" +
-            "<call fn=\"to_upper\" args=\"'a'\" to=\"a\" /><call fn=\"m.sqrt\" args=\"9\" to=\"b\" /><call fn=\"lib.helper\" args=\"5\" to=\"c\" />" +
+            "<call fn=\"char_of\" args=\"65\" to=\"a\" /><call fn=\"m.sqrt\" args=\"9\" to=\"b\" /><call fn=\"lib.helper\" args=\"5\" to=\"c\" />" +
             "<echo>$a $b $c</echo>"));
         Assert.Contains("There is no function called nope. Declare it with <fn name=\"nope\"", Fails("<call fn=\"nope\" />").Message);
         Assert.Contains("Did you mean greet?", Fails("<fn name=\"greet\" value=\"1\" /><call fn=\"gret\" />").Message);
@@ -225,8 +225,8 @@ public sealed class BuiltInTests : IDisposable
 
         var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
         var interpreter = new Interpreter(KScriptHost.ForText(output));
-        interpreter.RunText("<kscript><fn name=\"f\" params=\"x\" value=\"$x\" /><let name=\"l\" value=\"fn($a, $b) => $a\" /><echo>{ $l } | {@f} | {@to_upper} | { ['a']->map(@to_upper) } { ['b']->map(@f) }</echo><fn name=\"g\" params=\"x, i\" value=\"$x + $i\" /><echo>{ ['c']->map(@g) }</echo></kscript>");
-        Assert.Equal("fn($a, $b) => $a | fn f(x) | @to_upper | A b\nc0\n", output.ToString());
+        interpreter.RunText("<kscript><fn name=\"f\" params=\"x\" value=\"$x\" /><let name=\"l\" value=\"fn($a, $b) => $a\" /><echo>{ $l } | {@f} | {@char_of} | { [65]->map(@char_of) } { ['b']->map(@f) }</echo><fn name=\"g\" params=\"x, i\" value=\"$x + $i\" /><echo>{ ['c']->map(@g) }</echo></kscript>");
+        Assert.Equal("fn($a, $b) => $a | fn f(x) | @char_of | A b\nc0\n", output.ToString());
 
         Assert.Contains("has no parameter named 'y'", Fails("<fn name=\"f\" params=\"x\" value=\"$x\" /><echo>{ @f(y: 1) }</echo>").Message);
         Assert.Contains("@f() takes 1 argument but was given 2", Fails("<fn name=\"f\" params=\"x\" value=\"$x\" /><echo>{ @f(1, 2) }</echo>").Message);
@@ -353,7 +353,7 @@ public sealed class BuiltInTests : IDisposable
         var registry = new PackageRegistry();
         registry.Register(new DateJsonPackage());
         var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
-        new Interpreter(KScriptHost.ForText(output), registry).RunText("<kscript><import package=\"KScript.DateJson\" /><echo>{ @date('2026-11-21')->json() }</echo></kscript>");
+        new Interpreter(KScriptHost.ForText(output), registry).RunText("<kscript><import package=\"KScript.DateJson\" /><echo>{ '2026-11-21'->to_date()->json() }</echo></kscript>");
         Assert.Equal("\"2026-11-21\"\n", output.ToString());
     }
 

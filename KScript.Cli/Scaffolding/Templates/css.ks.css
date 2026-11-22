@@ -27,7 +27,7 @@ hint: Link it from a page as /{{ paths.styles }}/{{ dir }}{{ kebab }}.css, or bu
 
 .{{ kebab }} .button {
   background: var(--color-primary);
-  color: {@contrast($primary)};
+  color: {@contrast_color($primary)};
 }
 
 .{{ kebab }} .button:hover { background: {@darken($primary, '10%')}; }

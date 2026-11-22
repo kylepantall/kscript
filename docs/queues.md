@@ -204,11 +204,11 @@ import "jobs/send-welcome.kscript"
 queue = @fake_queue()
 dispatch SendWelcome(user_id: 7, email: 'joan@example.com')
 
-echo "{$queue->count($SendWelcome)} welcome email queued for user {$queue->pushed($SendWelcome)[0].user_id}"
+echo "{$queue->count_of($SendWelcome)} welcome email queued for user {$queue->pushed($SendWelcome)[0].user_id}"
 $queue->run_all()
 ```
 
-`->pushed(Job)` lists the dispatched jobs, `->dispatches()` what each dispatch asked for (queue, connection, delay), `->count(Job)` counts them, `->run_all()` runs them here, and `->clear()` forgets them.
+`->pushed(Job)` lists the dispatched jobs, `->dispatches()` what each dispatch asked for (queue, connection, delay), `->count()` counts them (`->count_of(Job)` those of one job), `->run_all()` runs them here, and `->clear()` forgets them.
 
 ## Errors
 

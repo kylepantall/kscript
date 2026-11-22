@@ -54,7 +54,7 @@ public sealed class NetTests : IDisposable
         string output = Run(
             $"<let name=\"r\" value=\"@api('{server.Url}/json')\" />" +
             "<echo>{ $r->status() } { $r->ok() } { $r->reason() } { $r->json().name } { $r->json().tags[1] } { $r->header('content-type') } { $r->header('X-None') ?? 'none' }</echo>" +
-            "<echo>{ $r.status } { $r.ok } { $r.text->length() } { $r.headers['Content-Type'] } { $r->url() == $r.url } { $r->text() == $r.text } { $r->headers()->count() > 0 } { $r.nothing ?? 'n' }</echo>" +
+            "<echo>{ $r.status } { $r.ok } { $r.text->count() } { $r.headers['Content-Type'] } { $r->url() == $r.url } { $r->text() == $r.text } { $r->headers()->count() > 0 } { $r.nothing ?? 'n' }</echo>" +
             "<echo>{ $r->check()->status() } {$r}</echo>");
         Assert.Equal("200 true OK Ann 2 application/json none\n200 true 33 application/json true true true n\n200 { \"name\": \"Ann\", \"tags\": [1, 2] }\n", output);
     }
@@ -114,7 +114,7 @@ public sealed class NetTests : IDisposable
     [Fact]
     public void Url_helpers()
     {
-        Assert.Equal("a%20b%26c a b&c a=1&b=two%20words\n", Run("<echo>{ @url_encode('a b&amp;c') } { @url_decode('a%20b%26c') } { @query_string({ a: 1, b: 'two words', c: null }) }</echo>"));
+        Assert.Equal("a%20b%26c a b&c a=1&b=two%20words\n", Run("<echo>{ 'a b&amp;c'->url_encode() } { 'a%20b%26c'->url_decode() } { @query_string({ a: 1, b: 'two words', c: null }) }</echo>"));
     }
 
     [Fact]

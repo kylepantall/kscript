@@ -13,7 +13,7 @@ namespace KScript.Language.Tests
               <before-each><set name="cart" value="['apple']" /></before-each>
               <test name="has {$case.n} items" each="case" index="i" in="[{ n: 1 }]">
                 <expect value="$cart" count="$case.n" />
-                <assert test="$i ge 0" />
+                <do>@assert($i ge 0)</do>
               </test>
               <test name="errors">
                 <expect-error type="Validation" as="err"><throw type="Validation" message="no" /></expect-error>

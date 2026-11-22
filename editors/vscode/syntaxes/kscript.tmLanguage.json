@@ -421,8 +421,8 @@
       ]
     },
     "tag-shorthand": {
-      "comment": "<if $ready>, <while $n lt 3>, <match $choice>, <assert $total eq 30 />: the start tag holds the expression itself (it means test=\"...\", or value=\"...\" for match). A '>' with a space on both sides and more after it on the line is the greater-than operator, as in KScript's parser.",
-      "begin": "(<)(if|elif|while|match|assert)(?=\\s+(?![A-Za-z_][\\w.:-]*\\s*=(?![=>]))(?!/?>))",
+      "comment": "<if $ready>, <while $n lt 3>, <match $choice>: the start tag holds the expression itself (it means test=\"...\", or value=\"...\" for match). A '>' with a space on both sides and more after it on the line is the greater-than operator, as in KScript's parser.",
+      "begin": "(<)(if|elif|while|match)(?=\\s+(?![A-Za-z_][\\w.:-]*\\s*=(?![=>]))(?!/?>))",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.tag.kscript"

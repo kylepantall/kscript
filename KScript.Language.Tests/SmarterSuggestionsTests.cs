@@ -131,7 +131,7 @@ namespace KScript.Language.Tests
         {
             // 'ab' * 3 repeats the text, so the result has text's methods.
             Assert.Contains("upper", Labels("line = '-' * 20\necho $line->‸"));
-            Assert.Equal("length", Labels("line = '-' * 20\necho $line->‸")[0]);
+            Assert.Equal("count", Labels("line = '-' * 20\necho $line->‸")[0]);
         }
 
         [Fact]

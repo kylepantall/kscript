@@ -260,15 +260,15 @@ Two paragraphs.""
     Source(id: extra, type: book, author: ""Jane Doe"", title: ""Uncited"", year: 2000)
   }
 }
-echo ""{ $doc.title } | { $doc.sections } | { $doc->pages() } | { $doc->words() } | { @type($doc) } | { $doc }""
+echo ""{ $doc.title } | { $doc.sections } | { $doc->pages() } | { $doc->words() } | { $doc->type() } | { $doc }""
 $doc->save('out/sink.tex')
 $doc->save('out/sink.md')
 $doc->save('out/sink.markdown')
 $doc->save('out/sink.html')
 $doc->save('out/sink.htm')
-echo $doc->latex()->length() > 0
-echo $doc->markdown()->length() > 0
-echo $doc->html()->length() > 0
+echo $doc->latex()->count() > 0
+echo $doc->markdown()->count() > 0
+echo $doc->html()->count() > 0
 ");
         Assert.StartsWith("Kitchen Sink | 7 | ", output);
         Assert.Contains("| document | document 'Kitchen Sink'", output);

@@ -98,7 +98,7 @@ namespace KScript.Language.Tests
         [InlineData("echo @today()->to_json()")]
         [InlineData("echo @today()->to_string()->upper()")]
         [InlineData("echo @today()->format('d MMMM yyyy')")]
-        [InlineData("n = 5\necho $n->to_string()->length()")]
+        [InlineData("n = 5\necho $n->to_string()->count()")]
         public void Methods_the_interpreter_runs_are_clean(string code) => AssertClean(Analyze(code, "types.kscript"));
     }
 }

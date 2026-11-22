@@ -40,15 +40,15 @@ namespace KScript.Language.Tests
             Assert.DoesNotContain("elif", Labels("<if test=\"true\"></if>text <‸"));
             Assert.Empty(Labels("<on event=\"click\" target=\"‸\"></on>", "page.html"));
             Assert.NotEmpty(Labels("<let name=\"total\" value=\"1\" /><echo>$‸</echo>"));
-            Assert.Contains("to_upper", Labels("<echo>@‸</echo>"));
+            Assert.Contains("today", Labels("<echo>@‸</echo>"));
             Assert.Empty(Labels("<import src=\"‸\" />", null));
             Assert.Empty(Labels("<echo>{ foo.‸ }</echo>"));
             Assert.DoesNotContain("elif", Labels("<if test=\"true\"></if>text <el‸"));
             Assert.NotEmpty(Labels("<let name=\"total\" value=\"1\" /><echo>Hi $to‸</echo>"));
-            Assert.Contains("to_upper", Labels("<echo>Hi @to‸</echo>"));
+            Assert.Contains("today", Labels("<echo>Hi @to‸</echo>"));
             Assert.Contains("total", Labels("<let name=\"total\" value=\"1\" /><echo>{1} $to‸</echo>"));
             Assert.Contains("total", Labels("<let name=\"total\" value=\"1\" /><echo>{1} $‸</echo>"));
-            Assert.Contains("to_upper", Labels("<echo>{1} @to‸</echo>"));
+            Assert.Contains("today", Labels("<echo>{1} @to‸</echo>"));
             Assert.Null(Service.ComponentFile(null, "x"));
             Assert.Empty(Service.ComponentProps(Path.Combine(AnalyzerCoverageTests.Folder, "missing.html")));
             Assert.Equal("Function ok", Service.GetCompletions(At("<import src=\"nameless.ks.xml\" as=\"lib\" /><echo>{ lib.‸ }</echo>").Analysis, At("<import src=\"nameless.ks.xml\" as=\"lib\" /><echo>{ lib.‸ }</echo>").Offset).First(c => c.Label == "ok").ToString());

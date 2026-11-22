@@ -67,7 +67,7 @@
           </li>
         </for>
       </ul>
-      <p class="note">{$todos->count(fn($t) => not $t.done)} left</p>
+      <p class="note">{$todos->count_of(fn($t) => not $t.done)} left</p>
       <button
         on-click="todos = $todos->reject(fn($t) => $t.done)"
         disabled="{ not $todos->any(fn($t) => $t.done) }">Clear done</button>

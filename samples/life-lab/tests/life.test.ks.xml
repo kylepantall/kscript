@@ -50,7 +50,7 @@
 
     <test name="every built-in pattern fits a 40 by 24 board">
       <for each="name" in="$patterns->keys()">
-        <assert @population(@pattern_world($name, width: 40, height: 24).grid) gt 0 />
+        <do>@assert(@population(@pattern_world($name, width: 40, height: 24).grid) gt 0)</do>
       </for>
     </test>
   </describe>

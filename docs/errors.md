@@ -192,7 +192,7 @@ echo "Hello $name"   // right
 
 ## KS5001
 
-**A command that doesn't exist is called.** Commands start with `@`, including your own functions: `@greet('World')`. Some things are methods in KScript and not commands: the length of a list is `$list->length()`.
+**A command that doesn't exist is called.** Commands start with `@`, including your own functions: `@greet('World')`. Some things are methods in KScript and not commands: the length of a list is `$list->count()`.
 
 ## KS5002
 

@@ -33,31 +33,31 @@ A native value is still text, and it compares equal to the same text once tidied
 
 | Type | String methods it keeps |
 | --- | --- |
-| `email` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `lower`, `upper`, `slice`, `split`, `replace`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `handle` | `contains`, `starts_with`, `ends_with`, `length`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `email` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `lower`, `upper`, `slice`, `split`, `replace`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `handle` | `contains`, `starts_with`, `ends_with`, `count`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 | `uuid` | `contains`, `starts_with`, `ends_with`, `upper`, `slice`, `split`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `regex` | `contains`, `starts_with`, `ends_with`, `length`, `escape`, `markdown_escape`, `json` |
-| `url` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `replace`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `domain` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `ip` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `cidr` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `mac` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `slug` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `upper`, `replace`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `semver` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `mime` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `hex` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `base64` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `jwt` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `json` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `phone` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `country` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `currency` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `locale` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `timezone` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `duration` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `cron` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `color` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
-| `iban` | `contains`, `starts_with`, `ends_with`, `index_of`, `length`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `regex` | `contains`, `starts_with`, `ends_with`, `count`, `escape`, `markdown_escape`, `json` |
+| `url` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `replace`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `domain` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `ip` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `cidr` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `mac` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `slug` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `upper`, `replace`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `semver` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `mime` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `hex` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `base64` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `jwt` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `json` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `phone` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `country` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `currency` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `locale` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `timezone` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `split`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `duration` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `cron` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `color` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `upper`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
+| `iban` | `contains`, `starts_with`, `ends_with`, `index_of`, `count`, `slice`, `matches`, `truncate`, `pad_left`, `pad_right`, `escape`, `url_encode`, `markdown_escape`, `json` |
 
 A `port`, `card` or `password` keeps none. The rest, such as `->to_date()` on a uuid, are reported in the editor and fail when the script runs. To use one on the text anyway, call `->to_string()` first: `$id->to_string()->to_date()`.
 
@@ -106,7 +106,7 @@ wait: duration = 1h30m
 echo "{ $wait->minutes() } { $wait->plus('45m') }"
 
 brand: color = '#ff8800'
-echo "{ $brand->lighten(0.5) } { $brand->contrast(white) }"
+echo "{ $brand->lighten(0.5) } { $brand->contrast_ratio(white) }"
 
 pay: card = '4242 4242 4242 4242'
 echo "$pay { $pay->brand() }"
@@ -131,9 +131,9 @@ echo "$pay { $pay->brand() }"
 | `semver` | A semantic version such as `1.4.2` or `2.0.0-beta.1`. | A leading `v` is dropped. | `->major()`, `->minor()`, `->patch()`, `->prerelease()`, `->compare(other)`, `->satisfies(range)`, `->bump(part)` |
 | `mime` | A media type such as `application/json; charset=utf-8`. | The type is lowercased. | `->main_type()`, `->subtype()`, `->essence()`, `->params()`, `->is('text/*')` |
 | `hex` | Hexadecimal digits, such as a hash. | Lowercased; `0x` is dropped. | `->bytes()`, `->to_number()` |
-| `base64` | Base64 text, standard or URL-safe. `@base64(text)` makes one. | | `->decode()`, `->bytes()` |
+| `base64` | Base64 text, standard or URL-safe. `$text->to_base64()` makes one. | | `->decode()`, `->bytes()` |
 | `jwt` | A JSON Web Token. Its signature isn't checked, so don't trust its claims for sign-in. | | `->header()`, `->claims()`, `->expires()`, `->expired()` |
-| `json` | Text that holds valid JSON. | | `->parse()` |
+| `json` | Text that holds valid JSON. | | `->json()` |
 
 ### People and places
 
@@ -151,7 +151,7 @@ echo "$pay { $pay->brand() }"
 | --- | --- | --- | --- |
 | `duration` | A length of time: `1h30m`, `90s`, `2d`, ISO 8601 such as `PT1H30M`, or a number of seconds. | The short form: `90m` is `1h30m`. | `->seconds()`, `->minutes()`, `->hours()`, `->ms()`, `->iso()`, `->after(time?)`, `->before(time?)`, `->plus(other)` |
 | `cron` | A cron schedule of five fields, or `@daily`, `@hourly` and the like. | Lowercased. | `->next(after?)`, `->next_times(count, after?)` |
-| `color` | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb(...)` or a CSS colour name. | `#rrggbb`, or `#rrggbbaa` with transparency. | `->rgb()`, `->hex()`, `->css()`, `->mix(other, amount?)`, `->lighten(amount?)`, `->darken(amount?)`, `->luminance()`, `->contrast(other)` |
+| `color` | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb(...)` or a CSS colour name. | `#rrggbb`, or `#rrggbbaa` with transparency. | `->rgb()`, `->hex()`, `->css()`, `->mix(other, amount?)`, `->lighten(amount?)`, `->darken(amount?)`, `->luminance()`, `->contrast_ratio(other)` |
 
 ### Money
 
@@ -181,7 +181,7 @@ Some values need no quotes, the same way a regex needs none in JavaScript.
 
 - **Emails, URLs, UUIDs and regexes** are literals anywhere: `joan@example.com`, `https://example.com/docs`, `3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f`, `/^[a-z]+$/i`. The editor checks them as you type. A URL starts with `http://`, `https://`, `ftp://`, `ws://` or `wss://`, so its `//` is never a comment, and it ends at a space, a comma, a bracket or `->`.
 - **Handles** are written as `@joan` only where a handle is expected: a `handle` variable or parameter, a `not:` or `one_of:` list on a handle type, or next to a handle in `==`. Everywhere else, `@joan` still names the function `joan`.
-- **Words** need no quotes where the type is read from text. That covers an enum (`color: Color = red`), a type with a `pattern` (`size: Size = 1920x1080`), a refinement of text (`slug: Slug = my-post`) and the native types: `domain = example.com`, `ip = 10.0.0.1`, `cidr = 10.0.0.0/8`, `timezone = Europe/London`, `semver = 1.4.2`, `duration = 1h30m`, `color = red`, `country = GB` and the rest. Method arguments of those types work the same way: `$brand->contrast(white)`.
+- **Words** need no quotes where the type is read from text. That covers an enum (`color: Color = red`), a type with a `pattern` (`size: Size = 1920x1080`), a refinement of text (`slug: Slug = my-post`) and the native types: `domain = example.com`, `ip = 10.0.0.1`, `cidr = 10.0.0.0/8`, `timezone = Europe/London`, `semver = 1.4.2`, `duration = 1h30m`, `color = red`, `country = GB` and the rest. Method arguments of those types work the same way: `$brand->contrast_ratio(white)`.
 
 Quoted text always works too: `who: handle = '@joan'`.
 

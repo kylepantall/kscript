@@ -18,7 +18,7 @@
 
   <describe name="titlecase">
     <test name="upper-cases">
-      <assert @titlecase('abc') eq 'ABC' />
+      <do>@assert(@titlecase('abc') eq 'ABC')</do>
     </test>
   </describe>
 </kscript>

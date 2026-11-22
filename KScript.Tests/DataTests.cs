@@ -100,7 +100,7 @@ public sealed class DataModelTests : DataFixture
             u = $User->find(1)
             echo [$u.id, $u.name, $u.age, $u.role, $u.active, $u.label]
             echo $u.tags
-            echo @type($u)
+            echo $u->type()
             echo $User->count()
             echo $User->all()->count()
             """);
@@ -373,7 +373,7 @@ public sealed class DataQueryTests : DataFixture
             echo $User->where(fn($u) => $u.name->starts_with('B'))->pluck(name)
             echo $User->where(fn($u) => $u.email->ends_with('.org'))->pluck(name)
             echo $User->where(fn($u) => $u.name->lower() == 'cy')->pluck(name)
-            echo $User->where(fn($u) => $u.name->upper()->length() == 3)->pluck(name)
+            echo $User->where(fn($u) => $u.name->upper()->count() == 3)->pluck(name)
             echo $User->where(fn($u) => $u.name->trim() == 'Ada')->count()
             echo $User->where(fn($u) => $u.name->matches(/^[AB]/))->pluck(name)
             echo $User->where(fn($u) => $u.role == member and $u.active)->pluck(name)
@@ -438,11 +438,11 @@ public sealed class DataQueryTests : DataFixture
     {
         string[] lines = Lines(Users + """
             echo $User->sum(age)
-            echo $User->avg(age)
+            echo $User->average(age)
             echo $User->min(age)
             echo $User->max(name)
             echo $User->where(name: 'nobody')->sum(age)
-            echo $User->where(name: 'nobody')->avg(age) ?? 'none'
+            echo $User->where(name: 'nobody')->average(age) ?? 'none'
             echo $User->exists()
             echo $User->where(name: 'nobody')->exists()
             echo $User->order_by(name)->limit(2)->count()
@@ -708,7 +708,7 @@ public sealed class DataSqlTests : DataFixture
               age: int?
             }
             people = @sql('select name, age from users order by name', as: $Person)
-            echo @type($people[0])
+            echo $people[0]->type()
             echo $people[1].age
             """);
         Assert.Equal(new[] { "Person", "17" }, lines);
@@ -885,20 +885,20 @@ public sealed class DataTransactionTests : DataFixture
     }
 
     [Fact]
-    public void TransactionCommandReturnsWhatTheFunctionReturns()
+    public void TransactionMethodReturnsWhatTheFunctionReturns()
     {
         string[] lines = Lines(Accounts + """
-            echo @transaction(fn() => $Account->where(id: 1)->update(balance: 7))
+            echo $db->transaction(fn() => $Account->where(id: 1)->update(balance: 7))
             echo $db->transaction(fn() => $Account->sum(balance), retries: 2)
-            echo @transaction(fn() => 'x', retries: 1, connection: main)
+            echo @db(connection: main)->transaction(fn() => 'x', retries: 1)
             try {
-              @transaction(fn() => $Account->create(owner: 'c') and @fail('stop'))
+              $db->transaction(fn() => $Account->create(owner: 'c') and @fail('stop'))
             } catch {
               echo $Account->count()
             }
             """);
         Assert.Equal(new[] { "1", "7", "x", "2" }, lines);
-        Assert.Contains("retries", Fails(Accounts + "@transaction(fn() => 1, retries: -1)").Message);
+        Assert.Contains("retries", Fails(Accounts + "$db->transaction(fn() => 1, retries: -1)").Message);
     }
 
     [Fact]
@@ -959,7 +959,7 @@ public sealed class DataConnectionTests : DataFixture
             echo $db.file->ends_with('main.sqlite')
             echo @db(connection: plain).file->ends_with('plain.sqlite')
             echo @db(connection: driver).file->ends_with('driver.sqlite')
-            echo @type($db)
+            echo $db->type()
             echo $db
             echo $db.nope ?? 'none'
             """);
@@ -1058,7 +1058,7 @@ public sealed class DataCoverageTests : DataFixture
             p = $Profile->create(handle: '@ada', token: '0b7e2d4c-7c4b-4a63-9b8a-3f5f1b2c9d10', age: 36, address: { city: 'London' }, extra: { a: 1 }, born: '1815-12-10')
             again = $Profile->find($p.id)
             echo [$again.handle, $again.age, $again.address.city, $again.extra.a, $again.ratio]
-            echo @type($again.address)
+            echo $again.address->type()
             echo $again.born->format('yyyy')
             echo $Profile->where(handle: '@ada', token: '0b7e2d4c-7c4b-4a63-9b8a-3f5f1b2c9d10')->count()
             echo $Profile->where(fn($p) => $p.age > 30)->count()
@@ -1105,7 +1105,7 @@ public sealed class DataCoverageTests : DataFixture
     [Fact]
     public void QueriesPrintTheirSql()
     {
-        string[] lines = Lines(Users + "q = $User->where(name: 'Ada')\necho $q\necho @type($q)\necho [$q.table, $q.model == $User, @db(users).model ?? 'none', $q.nope ?? 'none']\necho \"{ $q }\"");
+        string[] lines = Lines(Users + "q = $User->where(name: 'Ada')\necho $q\necho $q->type()\necho [$q.table, $q.model == $User, @db(users).model ?? 'none', $q.nope ?? 'none']\necho \"{ $q }\"");
         if (Server == null) Assert.Equal("query on users: SELECT * FROM \"users\" WHERE \"name\" = @p1", lines[0]);
         Assert.Equal("query", lines[1]);
         Assert.Equal("users, true, none, none", lines[2]);

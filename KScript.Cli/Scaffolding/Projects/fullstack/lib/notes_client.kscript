@@ -39,6 +39,6 @@ fn delete_note(id: int) {
 
 /// How many notes are not done yet, as text: '1 note left'.
 fn notes_left(notes: list) {
-  n = $notes->count(fn($n) => not $n.done)
+  n = $notes->count_of(fn($n) => not $n.done)
   return $n + ($n == 1 ? ' note left' : ' notes left')
 }

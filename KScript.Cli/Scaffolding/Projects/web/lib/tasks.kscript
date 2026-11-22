@@ -23,7 +23,7 @@ fn clear_done(tasks: list) => $tasks->reject(fn($t) => $t.done)
 
 /// How many tasks are not done yet, as text: '1 task left'.
 fn tasks_left(tasks: list) {
-  n = $tasks->count(fn($t) => not $t.done)
+  n = $tasks->count_of(fn($t) => not $t.done)
   return $n + ($n == 1 ? ' task left' : ' tasks left')
 }
 

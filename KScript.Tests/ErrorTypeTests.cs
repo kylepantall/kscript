@@ -32,7 +32,7 @@ public class ErrorTypeTests
             try {
               throw PersonNotFound(id: 42)
             } catch NotFound as e {
-              echo "{ $e.message } | { $e.type } | { $e.status } | { $e.id } | { $e->is(NotFound) } | { $e->is(PersonNotFound) } | { $e->is('Validation') } | { $e->chain() } | { @type($e) }"
+              echo "{ $e.message } | { $e.type } | { $e.status } | { $e.id } | { $e->is(NotFound) } | { $e->is(PersonNotFound) } | { $e->is('Validation') } | { $e->chain() } | { $e->type() }"
             }
             """);
         Assert.Equal("No person with id 42 | PersonNotFound | 404 | 42 | true | true | false | PersonNotFound, NotFound, Error | error\n", output);
@@ -48,7 +48,7 @@ public class ErrorTypeTests
                   @raise_stock()
                 }
                 if $which == 2 {
-                  x = @json('nope')
+                  x = 'nope'->json()
                 }
                 @missing_file()
               } catch OutOfStock as e {
@@ -111,7 +111,7 @@ public class ErrorTypeTests
         string output = Run(Declarations + """
             echo "{ $PersonNotFound.name } { $PersonNotFound.extends } { $PersonNotFound.status } { $PersonNotFound.description }"
             echo "{ $OutOfStock->fields()->map(fn($f) => $f.name + ':' + $f.type) } { $OutOfStock.fields->count() } { $Plain.extends } { $Plain.status ?? 'none' }"
-            echo "{ NotFound.status } { NotFound.extends } { Shape.extends } { @type($Plain) }"
+            echo "{ NotFound.status } { NotFound.extends } { Shape.extends } { $Plain->type() }"
             """);
         Assert.Equal("PersonNotFound NotFound 404 Nothing has that id.\nitem:string, left:int 2 Error none\n404 Error Type error_type\n", output);
     }
@@ -338,7 +338,7 @@ public class ErrorTypeTests
                 }
                 test(name: "throws") {
                   expect(value: @find(2), throws: PersonNotFound)
-                  expect(value: @json('nope'), throws: Format)
+                  expect(value: 'nope'->json(), throws: Format)
                 }
                 test(name: "throws the wrong type") {
                   expect(value: @find(3), throws: IO)

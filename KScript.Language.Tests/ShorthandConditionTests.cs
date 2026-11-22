@@ -70,9 +70,9 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("<assert $total eq 30 />", "$total eq 30")]
-        [InlineData("<assert $total eq 30/>", "$total eq 30")]
-        [InlineData("<assert $a / 2 eq 1 />", "$a / 2 eq 1")]
+        [InlineData("<match $total eq 30 />", "$total eq 30")]
+        [InlineData("<match $total eq 30/>", "$total eq 30")]
+        [InlineData("<match $a / 2 eq 1 />", "$a / 2 eq 1")]
         public void ReadsSelfClosingTags(string tag, string expression)
         {
             var r = Scan(tag);
@@ -113,7 +113,7 @@ namespace KScript.Language.Tests
             Assert.Equal("test", ShorthandCondition.AttributeFor("if"));
             Assert.Equal("test", ShorthandCondition.AttributeFor("elif"));
             Assert.Equal("test", ShorthandCondition.AttributeFor("while"));
-            Assert.Equal("test", ShorthandCondition.AttributeFor("assert"));
+            Assert.Null(ShorthandCondition.AttributeFor("assert")); // @assert() is a command
             Assert.Equal("value", ShorthandCondition.AttributeFor("match"));
             Assert.Null(ShorthandCondition.AttributeFor("for"));
             Assert.Null(ShorthandCondition.AttributeFor("IF"));
@@ -301,10 +301,10 @@ namespace KScript.Language.Tests
         [Fact]
         public void TheFormatterKeepsTheShorthand()
         {
-            const string text = "<kscript>\n<let name=\"n\" value=\"5\" />\n<if   $n > 3  ><echo>big</echo></if>\n<assert $n eq 5/>\n</kscript>\n";
+            const string text = "<kscript>\n<let name=\"n\" value=\"5\" />\n<if   $n > 3  ><echo>big</echo></if>\n<while   $n > 9><break /></while>\n</kscript>\n";
             FormatResult result = Formatter.Format(text, "test.ks.xml");
             Assert.True(result.Succeeded, result.Error);
-            Assert.Equal("<kscript>\n  <let name=\"n\" value=\"5\" />\n  <if $n > 3>\n    <echo>big</echo>\n  </if>\n  <assert $n eq 5 />\n</kscript>\n", result.Text);
+            Assert.Equal("<kscript>\n  <let name=\"n\" value=\"5\" />\n  <if $n > 3>\n    <echo>big</echo>\n  </if>\n  <while $n > 9>\n    <break />\n  </while>\n</kscript>\n", result.Text);
             Assert.Equal(result.Text, Formatter.Format(result.Text, "test.ks.xml").Text);
         }
 
