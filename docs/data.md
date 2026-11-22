@@ -249,7 +249,7 @@ A relation's options go in brackets after its type:
 | `pivot: memberships` | Names the pivot table of a many to many relation. |
 | `on_delete: cascade` | For a belongs-to field: what deleting the other record does to this one. `cascade` deletes it too (the default for a field that isn't optional), `set_null` empties the field (the default for one that is), and `restrict` refuses the delete with a `ForeignKeyViolation`. |
 
-Two models that link to each other can each live in their own file without importing the other: a model a field names is found in the project's models folder (`paths.models` in `kscript.json`) when it isn't imported.
+Two models that link to each other can each live in their own file without importing the other: a model a field names is found in the project's models folder (`paths.models` in `kscript.json`) when it isn't imported. This is the one place a model is found without an import, because the two files would otherwise import each other, and circular imports aren't allowed. Scripts and controllers that use a model still import its file. See [one type per file](projects.md#where-files-go-the-recommended-layout).
 
 ### Reading relations
 
@@ -266,7 +266,7 @@ for post in $Post->latest()->get() {
 ```kscript
 import KScript.Data
 
-users = $User->with(profile, 'posts.tags')->get()
+users = $User->with(profile, posts.tags)->get()
 users = $User->with(posts: fn($q) => $q->where(published: true))->get()
 $post->load(author, tags)
 ```

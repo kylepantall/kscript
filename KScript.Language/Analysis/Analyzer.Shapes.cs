@@ -136,6 +136,7 @@ namespace KScript.Language.Analysis
                         ReturnShape = new TypeShape(KType.Query) { Name = shape.Name, Instance = shape } };
                     scope.Parameters.AddRange(method.Parameters.Skip(1));
                     shape.Scopes[fnName] = scope;
+                    scopeDeclarations[scope] = method;
                     continue;
                 }
                 shape.Methods[fnName] = method;

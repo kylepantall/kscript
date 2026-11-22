@@ -160,6 +160,12 @@ namespace KScript.Language.Analysis
                     pendingBare.Add(arg);
                     continue;
                 }
+                if ((arg.Value as MemberNode)?.DottedName != null)
+                {
+                    // posts.tags: names for a method that reads them (->with), otherwise checked as an expression.
+                    pendingBare.Add(arg);
+                    continue;
+                }
                 if (IsUnknownReference(arg.Value, scope, region))
                 {
                     pendingHandles.Add(arg);
@@ -542,8 +548,8 @@ namespace KScript.Language.Analysis
             }
             if (own != null || receiver.Methods.TryGetValue(name, out own) || TypeInference.ScopeOf(receiver, name) is Symbol scope && (own = scope) != null)
             {
-                // A method the record's <type> declares with <fn>.
-                result.References.Add(new SymbolReference(own, nameSpan, false, false));
+                // A method the record's <type> declares with <fn>, or a model's scope (which uses the fn it was made from).
+                result.References.Add(new SymbolReference(scopeDeclarations.GetValueOrDefault(own) ?? own, nameSpan, false, false));
                 if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(own, result.RootScope), region, nameSpan))
                 {
                     return;

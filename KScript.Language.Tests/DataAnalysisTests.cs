@@ -215,7 +215,7 @@ namespace KScript.Language.Tests
                 echo $q->first().title
                 echo $u->posts()->create(title: 'x').author.name
                 echo $p->tags()->attach([1, 2])
-                echo $Post->drafts()->popular(5)->with(author, tags)->with_count(tags)->get()
+                echo $Post->drafts()->popular(5)->with(author, tags, author.posts)->with_count(tags)->get()
                 echo $Post->where(fn($x) => $x.author.name == 'Ada')->drafts()->first().title
                 echo $p->load(author).title
                 """);
@@ -227,11 +227,13 @@ namespace KScript.Language.Tests
                 echo $u->postz()
                 echo $Post->popular(1, 2, 3)
                 echo $Post->draftz()
+                echo @len(author.posts)
                 """);
             Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("User has no field 'profile_id'"));
             Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("->postz()"));
             Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("->popular() takes 0 to 1 argument"));
             Assert.Contains(wrong.Diagnostics, d => d.Message.Contains("Unknown method ->draftz()"));
+            Assert.Contains(wrong.Diagnostics, d => d.Code == "KS2004" && d.Message.Contains("'author' isn't a value"));
         }
 
         [Fact]
@@ -284,6 +286,32 @@ namespace KScript.Language.Tests
                 fn size(text) => $text->lenght()
                 """);
             Assert.Contains(plain.Diagnostics, d => d.Code == DiagnosticCodes.UnknownMethod);
+        }
+
+        [Fact]
+        public void ScopesNeedNoTypeAndAreCalledThroughTheModel()
+        {
+            const string post = """
+                import KScript.Data
+
+                model Post {
+                  title: string
+                  views: int = 0
+
+                  fn popular(query, at_least: int = 10) => $query->where(fn($p) => $p.views >= $at_least)
+                  fn unused(query) => $query
+                }
+
+                echo $Post->popular()->count()
+                """;
+            DocumentAnalysis a = Analyzer.Analyze(post, Path.Combine(Folder, "app.kscript"), EmptyFileSystem.Instance);
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.MissingParameterType);
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.UnusedFunction && d.Message.Contains("popular", StringComparison.Ordinal));
+            Assert.Contains(a.Diagnostics, d => d.Code == DiagnosticCodes.UnusedFunction && d.Message.Contains("unused", StringComparison.Ordinal));
+
+            // Outside a model, query is a parameter like any other.
+            DocumentAnalysis plain = Analyzer.Analyze("fn f(query) => $query\necho f(1)\n", Path.Combine(Folder, "app.kscript"), EmptyFileSystem.Instance);
+            Assert.Contains(plain.Diagnostics, d => d.Code == DiagnosticCodes.MissingParameterType);
         }
 
         [Fact]

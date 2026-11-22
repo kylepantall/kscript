@@ -79,6 +79,9 @@ namespace KScript.Language.Analysis
         /// <summary>Arguments such as <c>@kyle</c> that name no function: a handle, if the parameter takes one.</summary>
         private readonly HashSet<ArgumentNode> pendingHandles = new HashSet<ArgumentNode>();
 
+        /// <summary>Each model scope's symbol, and the fn symbol it was made from.</summary>
+        private readonly Dictionary<Symbol, Symbol> scopeDeclarations = new Dictionary<Symbol, Symbol>();
+
         /// <summary>True for <c>@name</c> (no parentheses) where nothing is called name: it can only be a handle.</summary>
         private bool IsUnknownReference(ExprNode node, Scope scope, ExpressionRegion region) =>
             node is CommandCallNode { ArgumentList: null } c && !c.Name.Contains('.')
@@ -143,9 +146,18 @@ namespace KScript.Language.Analysis
                         AnalyzeBareIdentifier(item, region, scope, ExprContext.Value);
                     }
                 }
-                if (pendingBare.Remove(a) && BareWord(a) is var (_, _, node))
+                if (!pendingBare.Remove(a))
+                {
+                    continue;
+                }
+                if (BareWord(a) is var (_, _, node))
                 {
                     AnalyzeBareIdentifier(node, region, scope, ExprContext.Argument);
+                }
+                else
+                {
+                    // posts.tags that no method claimed.
+                    AnalyzeExpr(a.Value, region, scope, ExprContext.Argument);
                 }
             }
         }

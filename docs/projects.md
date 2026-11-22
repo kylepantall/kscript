@@ -300,6 +300,8 @@ model Order {
 
 The generators and project templates all work this way, and in a project `kscript check` warns (KS6008) about a file that declares a second type, saying where to move it. A script outside a project, run on its own, can keep its types with it.
 
+Two things are found without an import. Native types in `natives/` work in every script (they are part of the language, like `email`). And a model's field can name another model in the models folder (`paths.models`) without importing it, because two models that link to each other (`author: User` in one, `posts: Post[]` in the other) would otherwise import each other, and circular imports aren't allowed. That lookup is only for the types of model fields: a controller or script that uses `User` still imports `models/user.kscript`.
+
 Pages stay where they are, because a page's path is its URL. Desktop windows (`make window`) go at the top, next to `desktop.kscript`. Move any folder with `paths` in `kscript.json`:
 
 ```jsonc

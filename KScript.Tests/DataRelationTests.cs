@@ -131,7 +131,7 @@ public sealed class DataRelationTests : DataFixture
     {
         Database.Log = new List<SqlStatement>();
         string[] lines = Lines(Blog + """
-            users = $User->with(profile, posts: fn($q) => $q->where(published: true))->with('posts.tags', 'posts.comments')->order_by(name)->get()
+            users = $User->with(profile, posts: fn($q) => $q->where(published: true))->with(posts.tags, 'posts.comments')->order_by(name)->get()
             for u in $users {
               echo "{$u.name}: {$u.posts->map(fn($p) => $p.title + ' ' + $p.tags->count() + ' ' + $p.comments->count())}"
             }

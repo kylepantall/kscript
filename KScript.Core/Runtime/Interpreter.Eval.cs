@@ -372,6 +372,8 @@ namespace KScript.Runtime
             {
                 return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed);
             }
+            // posts.tags names a path of names, for a parameter that reads them: ->with(posts.tags).
+            if ((node as MemberNode)?.DottedName is string path) return new BareWord(path, false, afterNamed);
             bool negated = false;
             if (node is UnaryNode { Operator: "not", Operand: IdentifierNode inner })
             {

@@ -208,7 +208,7 @@ namespace KScript.Data
             new("restore", "", "For models with soft_deletes: brings back the deleted records that match. Returns how many.", KType.Number, (q, c) => q.Restore(c)),
             new("insert", "rows", "Adds rows: a map, or a list of maps. On a model each one is checked like ->create(). Returns how many were added.", KType.Number, (q, c) => q.Insert(c, c.Arg(0))),
             new("sql", "", "The SQL the query runs and its parameters, without running it: { sql, params }.", KType.Map, (q, c) => q.Describe()),
-            new("with", "relations...", "Loads relations with the records, one query per relation rather than one per record: `->with(author, tags)`, `->with('posts.tags')`, or `->with(posts: fn($q) => $q->where(published: true))` to load only some.", KType.Query,
+            new("with", "relations...", "Loads relations with the records, one query per relation rather than one per record: `->with(author, tags)`, `->with(posts.tags)`, or `->with(posts: fn($q) => $q->where(published: true))` to load only some.", KType.Query,
                 (q, c) => Relations(c, "with").Aggregate(q, (acc, r) => acc.Loading(r.Path, r.Constrain)), Bare: true),
             new("with_count", "relations...", "Counts a list relation for each record, as a field named after it: `->with_count(posts)` gives each user posts_count. `->with_count(posts: fn($q) => $q->where(published: true))` counts only some.", KType.Query,
                 (q, c) => Relations(c, "with_count").Aggregate(q, (acc, r) => acc.Counting(r.Path, r.Constrain)), Bare: true),
