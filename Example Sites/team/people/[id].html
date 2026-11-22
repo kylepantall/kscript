@@ -1,6 +1,6 @@
 <let
   name="person"
-  value="@read_json('data/people.json')->find(fn($p) => $p.id == $request.params.id)" />
+  value="@read_json('data/people.json')->find(fn(p) => $p.id == $request.params.id)" />
 
 <if $person === null>
   <respond status="404">No one has id {$request.params.id}.</respond>

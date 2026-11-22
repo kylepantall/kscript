@@ -14,7 +14,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 <layout src="_layout.html" title="People">
   <h1>People aged {$min} and over</h1>
   <ul>
-    <for each="p" in="$people |> filter(fn($p) => $p.age ge $min) |> sort_by(fn($p) => $p.name)">
+    <for each="p" in="$people |> filter(fn(p) => $p.age ge $min) |> sort_by(fn(p) => $p.name)">
       <li class="{ $p.age ge 65 ? 'senior' : '' }">
         <a href="/people/{$p.id}">{$p.name}</a> ({$p.age})
       </li>
@@ -29,7 +29,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 | Element | Use |
 | --- | --- |
 | `<let name value>` / `<let>x = 3</let>` | Declare a variable in the current block. |
-| `<set name value op>` / `<set>x += 1</set>` / `<do>$a = 1; $b += 2</do>` | Change existing variables. |
+| `<set name value op>` / `<set>x += 1</set>` / `<do>a = 1; b += 2</do>` | Change existing variables. |
 | `<if test>`, `<elif test>`, `<else>` | Branches. `<else>` after a `<for>` runs when the loop had nothing to loop over. |
 | `<for each="p" in="$list" index="i">`, `<for each="key, value" in="$map">` | Loops. `$loop.index` and `$loop.first` are set too. |
 | `<while test>` | Loop while true (stopped after 100,000 runs). |
@@ -40,7 +40,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 | `<markdown>` | Render Markdown, with `{ }` values escaped. |
 | `<respond status json type header-x>` / `<redirect to>` | Send a different response, e.g. JSON or a 404. |
 
-- **Expressions**: `+ - * / %`, `== !=` (loose: `'3' == 3`), `=== !==` (strict: type and value), `lt le gt ge` (or `> >=`), `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]`, `->method()`, `|>` and `fn($x) => …`. Use the words `lt`, `le`, `and`, `or` in attributes, since XML can't hold a raw `<` or `&&` there.
+- **Expressions**: `+ - * / %`, `== !=` (loose: `'3' == 3`), `=== !==` (strict: type and value), `lt le gt ge` (or `> >=`), `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]`, `->method()`, `|>` and `fn(x) => …`. Use the words `lt`, `le`, `and`, `or` in attributes, since XML can't hold a raw `<` or `&&` there.
 - **Escaping**: `{ value }` is HTML-escaped (Markdown-escaped in `.md` pages); `{! value }` outputs trusted HTML; `{{` and `}}` are literal braces. An attribute that is exactly `{ value }` is left out when the value is `false` or `null`, so `checked="{$done}"` just works.
 - **Markdown pages**: `.md` files can start with `---` front matter (`title: About`, `layout: _layout.html`); its keys become variables.
 - **Routing**: `/people` serves `people.html`, `people.md` or `people/index.html`; `/people/42` can match `people/[id].html` (`$request.params.id`). Files and folders starting with `_` or `.` and KScript sources (`.xml`) are never served. `_404.html` is used for missing pages.
@@ -91,14 +91,14 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 <live id="search">
   <state name="query" value="''" />
   <input bind="query" placeholder="Search…">
-  <for each="p" in="$people->filter(fn($p) => $p.name->lower()->contains($query->lower()))">
+  <for each="p" in="$people->filter(fn(p) => $p.name->lower()->contains($query->lower()))">
     <li>{$p.name}</li>
   </for>
 </live>
 ```
 
 - `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server keeps nothing between requests.
-- `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn($i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
+- `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn(i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
 - `on-tick="…" every="200"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if $playing><span on-tick="frame += 1" every="100"></span></if>`.
 - `bind="name"` ties an input to a state variable both ways and redraws the block as you type.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.

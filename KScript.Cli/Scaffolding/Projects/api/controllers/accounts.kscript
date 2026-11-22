@@ -21,7 +21,7 @@ fn sign_up(json: SignUp) {
   user = null
   try {
     user = @register($json.email, $json.password, name: $json.name->trim())
-  } catch err when $err.type eq 'Validation' {
+  } catch err when $err.type == 'Validation' {
     return @response({ error: $err.message, problems: $err.problems ?? [] }, status: 422)
   }
   return @response({ user: $user, token: @api_token($user, name: 'register') }, status: 201)

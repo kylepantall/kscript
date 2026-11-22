@@ -51,12 +51,12 @@ Lists are written `[1, 2, 3]` and maps `{ name: 'Joan', age: 82 }`. Every value 
 people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }, { name: 'Ada', age: 36 }]
 
 echo "{ $people->count() } people"
-echo "Oldest: { $people->max_by(fn($p) => $p.age).name }"
-echo "Names: { $people->map(fn($p) => $p.name)->join(', ') }"
-echo "Over 35: { $people->filter(fn($p) => $p.age gt 35)->map(fn($p) => $p.name) }"
+echo "Oldest: { $people->max_by(fn(p) => $p.age).name }"
+echo "Names: { $people->map(fn(p) => $p.name)->join(', ') }"
+echo "Over 35: { $people->filter(fn(p) => $p.age > 35)->map(fn(p) => $p.name) }"
 ```
 
-`fn($p) => $p.age` is a lambda: a small function you pass to a method. `|>` pipes a value into the next call, which reads well for longer chains:
+`fn(p) => $p.age` is a lambda: a small function you pass to a method. `|>` pipes a value into the next call, which reads well for longer chains:
 
 ```kscript try
 words = 'the quick brown fox jumps over the lazy dog'
@@ -69,11 +69,11 @@ The [reference](/reference) lists every method of [strings](/reference/methods/s
 
 ```kscript try
 for n in 1..16 {
-  if $n % 15 eq 0 {
+  if $n % 15 == 0 {
     echo "FizzBuzz"
-  } elif $n % 3 eq 0 {
+  } elif $n % 3 == 0 {
     echo "Fizz"
-  } elif $n % 5 eq 0 {
+  } elif $n % 5 == 0 {
     echo "Buzz"
   } else {
     echo "$n"
@@ -81,19 +81,15 @@ for n in 1..16 {
 }
 ```
 
-`1..16` counts from 1 up to 15 (the end is left out). Comparisons can be written as words (`lt`, `le`, `gt`, `ge`, `eq`) or as `<`, `>=` and so on.
+`1..16` counts from 1 up to 15 (the end is left out). Comparisons are written `<`, `<=`, `>`, `>=`, `==` and `!=`, and conditions are joined with the words `and`, `or` and `not`.
 
-`match` picks one case:
+`match` picks one arm. Each arm is `pattern => result`, with `_` for anything else:
 
 ```kscript try
 day = 'Sat'
 match $day {
-  case 'Sat', 'Sun' {
-    echo "Weekend"
-  }
-  default {
-    echo "Weekday"
-  }
+  'Sat', 'Sun' => echo "Weekend"
+  _ => echo "Weekday"
 }
 ```
 
@@ -116,7 +112,7 @@ Your own functions and the built-in commands are both called with `@`. Arguments
 
 ```kscript try
 fn check_age(age: int) {
-  if $age lt 0 {
+  if $age < 0 {
     throw Validation "Age must be positive, got {$age}"
   }
   return $age
@@ -163,7 +159,7 @@ Everything above can also be written as XML, which looks like HTML: `name = 'Joa
 ```kscript try
 people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }]
 for p in $people {
-  if $p.age gt 40 {
+  if $p.age > 40 {
     echo "$p.name is over 40"
     continue
   }

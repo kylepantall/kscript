@@ -102,11 +102,11 @@ kscript {
   import KScript.Http
 
   fn all() => @read_json('data/people.json')
-  fn find(id: int) => @all()->find(fn($p) => $p.id == $id)
+  fn find(id: int) => @all()->find(fn(p) => $p.id == $id)
 
   fn index(query: map) {
     // GET /api/people?role=Founder
-    return @all() |> filter(fn($p) => $query.role == null or $p.role == $query.role)
+    return @all() |> filter(fn(p) => $query.role == null or $p.role == $query.role)
   }
 
   fn page(id: int) {
@@ -256,7 +256,7 @@ kscript {
   import KScript.IO
 
   fn show(id: int) {
-    person = @read_json('data/people.json')->find(fn($p) => $p.id == $id) ?? @abort(404)
+    person = @read_json('data/people.json')->find(fn(p) => $p.id == $id) ?? @abort(404)
     @etag($person.updated_at)
     return @view('people/show', person: $person)
   }

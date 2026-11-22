@@ -396,7 +396,7 @@ found = $date->match('Due 2026-11')
 echo "{ $found.groups.year } { $date->test('no date') }"
 echo "{ $date->replace('2026-11', '${month}/${year}') }"
 echo "{ /\s*,\s*/->split('tea, coffee ,milk') }"
-echo "{ /\d+/->match_all('3 cats, 12 dogs')->map(fn($m) => $m.text) }"
+echo "{ /\d+/->match_all('3 cats, 12 dogs')->map(fn(m) => $m.text) }"
 ```
 
 `->match()` returns `{ text, index, groups, captures }`, or null when nothing matches. A regex that takes longer than a second to match stops with an error, so a bad pattern can't hang a server. In XML, write `<` inside an attribute or text as `&lt;`.

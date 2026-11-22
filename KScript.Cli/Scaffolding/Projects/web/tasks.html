@@ -29,6 +29,6 @@
     <p class="note">{ @tasks_left($tasks) }</p>
     <button
       on-click="tasks = @clear_done($tasks)"
-      disabled="{ not $tasks->any(fn($t) => $t.done) }">Clear done</button>
+      disabled="{ not $tasks->any(fn(t) => $t.done) }">Clear done</button>
   </live>
 </layout>

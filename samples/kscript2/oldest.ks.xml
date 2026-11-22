@@ -4,7 +4,7 @@
     { name: 'Joan',   age: 82 },
     { name: 'Ellie',  age: 12 }
   ]</let>
-  <let name="oldest" value="$people->max_by(fn($p) => $p.age)" />
+  <let name="oldest" value="$people->max_by(fn(p) => $p.age)" />
   <echo>{$oldest.name} is the oldest at {$oldest.age} years old.</echo>
 
   <!-- Or the loop, if you want one -->

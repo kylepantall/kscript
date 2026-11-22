@@ -20,7 +20,7 @@ KScript.Window(
   wrap = true
   pattern_choices = $patterns
     ->keys()
-    ->map(fn($k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
+    ->map(fn(k) => { label: $k->replace('_', ' ')->capitalize(), value: $k })
 
   fn tick() {
     world = @advance($world, 1)

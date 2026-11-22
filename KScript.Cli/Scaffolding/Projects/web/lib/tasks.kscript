@@ -8,22 +8,22 @@ fn add_task(tasks: list, title: string) {
   if $clean == '' {
     return $tasks
   }
-  id = $tasks->count() == 0 ? 1 : $tasks->map(fn($t) => $t.id)->max() + 1
+  id = $tasks->count() == 0 ? 1 : $tasks->map(fn(t) => $t.id)->max() + 1
   return $tasks->push({ id: $id, title: $clean, done: false })
 }
 
 /// The list with one task ticked or unticked.
-fn toggle_task(tasks: list, id: int) => $tasks->map(fn($t) => $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)
+fn toggle_task(tasks: list, id: int) => $tasks->map(fn(t) => $t.id == $id ? $t->set(key: 'done', value: not $t.done) : $t)
 
 /// The list without one task.
-fn remove_task(tasks: list, id: int) => $tasks->reject(fn($t) => $t.id == $id)
+fn remove_task(tasks: list, id: int) => $tasks->reject(fn(t) => $t.id == $id)
 
 /// The list without the finished tasks.
-fn clear_done(tasks: list) => $tasks->reject(fn($t) => $t.done)
+fn clear_done(tasks: list) => $tasks->reject(fn(t) => $t.done)
 
 /// How many tasks are not done yet, as text: '1 task left'.
 fn tasks_left(tasks: list) {
-  n = $tasks->count(fn($t) => not $t.done)
+  n = $tasks->count(fn(t) => not $t.done)
   return $n + ($n == 1 ? ' task left' : ' tasks left')
 }
 

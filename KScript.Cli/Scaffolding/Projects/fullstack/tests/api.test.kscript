@@ -49,7 +49,7 @@ describe(name: "api") {
     expect(value: $added->status(), equals: 201)
     note = $added->json()
     expect(value: @notes_api('/' + $note.id{{#if auth}}, as: $me{{/if}})->json().title, equals: 'Write the docs')
-    expect(value: @notes_api(''{{#if auth}}, as: $me{{/if}})->json()->map(fn($n) => $n.title), equals: ['Write the docs'])
+    expect(value: @notes_api(''{{#if auth}}, as: $me{{/if}})->json()->map(fn(n) => $n.title), equals: ['Write the docs'])
   }
 
   test(name: "a note without a title is turned away with 422") {

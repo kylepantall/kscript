@@ -3,9 +3,9 @@
 <let name="min" value="$request.query.min_age ?? 0" />
 <layout src="_layout.html" title="People">
   <h1>People over {$min}</h1>
-  <if $people->any(fn($p) => $p.age ge $min)>
+  <if $people->any(fn(p) => $p.age ge $min)>
     <ul>
-      <for each="p" in="$people |> filter(fn($p) => $p.age ge $min)">
+      <for each="p" in="$people |> filter(fn(p) => $p.age ge $min)">
         <li class="{ $p.age ge 65 ? 'senior' : '' }">
           <a href="/people/{$p.id}">{$p.name}</a> ({$p.age})
         </li>

@@ -6,7 +6,7 @@ Most apps keep a few files of their own: settings, saved data, a cache, recent f
 import KScript.Storage
 
 settings = @storage(config)->read_json('settings.json', default: { theme: 'light' })
-$settings.theme = 'dark'
+settings.theme = 'dark'
 @storage(config)->write_json('settings.json', $settings)
 
 @storage(data)->write('notes/today.txt', 'Buy milk')

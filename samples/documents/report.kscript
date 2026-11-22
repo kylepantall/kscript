@@ -9,7 +9,7 @@ quarters = [
   { quarter: 'Q3', visitors: 17800, signups: 1020 },
   { quarter: 'Q4', visitors: 21300, signups: 1310 },
 ]
-total = $quarters->map(fn($q) => $q.signups)->sum()
+total = $quarters->map(fn(q) => $q.signups)->sum()
 
 KScript.Document(
   template: report,
