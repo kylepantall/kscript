@@ -336,7 +336,7 @@ namespace KScript.Data
         #region Writing
 
         /// <summary>UPDATE ... SET for every row the query reads. Returns how many rows changed.</summary>
-        public double Update(CallContext call, IEnumerable<KeyValuePair<string, object>> values)
+        public double Update(CallContext call, IEnumerable<KeyValuePair<string, object>> values, bool converted = false)
         {
             Dialect d = Database.Dialect;
             var w = new SqlWriter(d).Append("UPDATE ").Name(Table).Append(" SET ");
@@ -347,7 +347,7 @@ namespace KScript.Data
             foreach (KeyValuePair<string, object> v in list)
             {
                 SqlColumn c = ColumnNamed(v.Key, " for ->update()");
-                object value = Model != null ? Records.Convert(call, Model, v.Key, v.Value) : v.Value;
+                object value = Model != null && !converted ? Records.Convert(call, Model, v.Key, v.Value) : v.Value;
                 if (any) w.Append(", ");
                 w.Name(v.Key).Append(" = ").Expr(new SqlValue(value, c.Column));
                 any = true;

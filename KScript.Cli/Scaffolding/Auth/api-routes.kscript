@@ -5,7 +5,9 @@ when: api
 import KScript.Auth
 import "{{ api_controller_import }}" as accounts
 
+{{#unless passkeys}}
 // API tokens (kscript make auth --api): POST an email and password for a token,
 // then send it as Authorization: Bearer.
 Post(path: /tokens, to: @accounts.issue_token)
+{{/unless}}
 Get(path: /me, to: @accounts.me, middleware: auth)

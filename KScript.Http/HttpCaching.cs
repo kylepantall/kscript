@@ -109,7 +109,7 @@ namespace KScript.Http
         {
             double seconds = CachePackage.Seconds(string.IsNullOrWhiteSpace(argument) ? "60" : argument.Trim()).Value;
             // Requests that carry a login are never answered from (or kept in) the shared cache.
-            if (!IsRead(request) || BuiltInMiddleware.Header(request, "authorization") != null) return next();
+            if (ctx.Live != null || !IsRead(request) || BuiltInMiddleware.Header(request, "authorization") != null) return next();
 
             CacheStore store = MemoryCacheStore.Named("http:" + ctx.App.SiteRoot);
             string key = Values.ToStr(request["url"]);

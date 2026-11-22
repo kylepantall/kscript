@@ -86,6 +86,7 @@ namespace KScript.Runtime
             p.Method(l, "filter", "fn", "The items for which fn(item, index) is true.", l, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
             p.Method(l, "reject", "fn", "The items for which fn is false.", l, (t, c) => L(t).Where((x, i) => !Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
             p.Method(l, "map", "fn", "A new list with fn(item, index) applied to each item.", l, (t, c) => L(t).Select((x, i) => Apply(c, c.Fn(0), x, i)).ToList());
+            p.Method(l, "pluck", "key", "One field from each item, or a map of the selected fields for each item when given a list of keys.", l, Pluck).Info.KeepsBareWords = true;
             p.Method(l, "find", "fn", "The first item for which fn is true, or null.", KType.Any, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).FirstOrDefault());
             p.Method(l, "find_index", "fn", "The index of the first item for which fn is true, or -1.", KType.Number, (t, c) =>
             {
@@ -188,6 +189,26 @@ namespace KScript.Runtime
                 foreach (object item in L(t)) map[Values.ToStr(c.Call(c.Fn(0), item))] = item;
                 return map;
             });
+        }
+
+        private static object Pluck(object target, CallContext call)
+        {
+            string Key(object value) => value switch
+            {
+                string name => name,
+                BareWord { Negated: false } word => word.Name,
+                _ => throw call.Error($"->pluck() needs a field name or list of field names, but got {Values.Describe(value)}.", "Argument"),
+            };
+
+            object selector = call.Need(0);
+            if (selector is List<object> list)
+            {
+                var keys = list.Select(Key).Distinct(StringComparer.Ordinal).ToList();
+                return L(target).Select(item => (object)keys.ToDictionary(key => key,
+                    key => call.Interpreter.GetMember(item, key, call.Module), StringComparer.Ordinal)).ToList();
+            }
+            string key = Key(selector);
+            return L(target).Select(item => call.Interpreter.GetMember(item, key, call.Module)).ToList();
         }
 
         private static object ExtremeBy(object t, CallContext c, bool max)

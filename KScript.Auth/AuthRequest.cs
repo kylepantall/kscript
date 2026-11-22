@@ -211,6 +211,8 @@ namespace KScript.Auth
             session[Flashed] = old[Flashed];
         }
 
+        internal string PasskeySessionKey(bool create) => Session(create) == null ? null : AuthApp.KeyOf(sessionId);
+
         /// <summary>The CSRF token forms send back as _token (and scripts as an X-CSRF-Token header). It starts a session if there isn't one.</summary>
         public string CsrfToken => AuthApp.Text(Session(create: true)[Csrf]);
 
@@ -251,8 +253,14 @@ namespace KScript.Auth
                 Dictionary<string, object> s = Session(create: false);
                 string id = s != null ? AuthApp.Text(s.GetValueOrDefault(UserId)) : null;
                 if (id == null) return null;
+                bool stored = Values.Truthy(s.GetValueOrDefault("stored"));
+                if (!stored && PasskeyStore.IsUserId(id))
+                {
+                    Logout(everywhere: false);
+                    return null;
+                }
                 Dictionary<string, object> record = Users.Find(id);
-                if (record == null && s.GetValueOrDefault(UserCopy) is Dictionary<string, object> copy && !Values.Truthy(s.GetValueOrDefault("stored")))
+                if (record == null && s.GetValueOrDefault(UserCopy) is Dictionary<string, object> copy && !stored)
                     record = copy;
                 if (record == null)
                 {
@@ -292,9 +300,15 @@ namespace KScript.Auth
         /// fields for users from a store of your own. With <paramref name="remember"/> the cookie lasts for
         /// http.auth.remember (30 days) instead of ending with the browser.
         /// </summary>
-        public Dictionary<string, object> Login(object user, bool remember)
+        public Dictionary<string, object> Login(object user, bool remember) => Login(user, remember, passkeyVerified: false);
+
+        internal Dictionary<string, object> LoginPasskey(string id) => Login(id, remember: false, passkeyVerified: true);
+
+        private Dictionary<string, object> Login(object user, bool remember, bool passkeyVerified)
         {
             string id = UserStore.IdOf(user, "@login()");
+            if (!passkeyVerified && PasskeyStore.IsUserId(id))
+                throw new KScriptException("This account signs in with a verified passkey.", "Unauthorized");
             Dictionary<string, object> record = Users.Find(id);
             Dictionary<string, object> copy = record ?? (user is Dictionary<string, object> map ? UserStore.Public(map) : null)
                 ?? throw new KScriptException($"There is no user with the id '{id}'. Give @login() a user map, such as what @register() or @users()->find() return.", "NotFound");

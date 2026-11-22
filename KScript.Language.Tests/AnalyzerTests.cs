@@ -179,6 +179,21 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void PluckInfersTheSelectedFields()
+        {
+            var a = Analyze(Script("""
+                <let name="rows" value="[{ name: 'Joan', age: 82 }]" />
+                <let name="names" value="$rows->pluck(name)" />
+                <let name="cards" value="$rows |> pluck([age, 'name'])" />
+                """));
+            AssertClean(a);
+            Assert.Equal("string", a.Symbols.Single(s => s.Name == "names").Shape.Element.Type);
+            var fields = a.Symbols.Single(s => s.Name == "cards").Shape.Element.Fields;
+            Assert.Equal(new[] { "age", "name" }, fields.Keys);
+            Assert.Equal("number", fields["age"].Shape.Type);
+        }
+
+        [Fact]
         public void LoopVariablesGetTheItemShape()
         {
             DocumentAnalysis a = Analyze(Script("<let name=\"people\" value=\"[{ name: 'Joan' }]\" /><for each=\"p\" in=\"$people\"><echo>$p.name</echo></for>"));

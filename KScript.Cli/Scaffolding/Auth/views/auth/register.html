@@ -4,6 +4,9 @@ to: {{ paths.views }}/auth/register.html
 <import package="KScript.Auth" />
 <layout path="{{ layout }}" title="Create an account">
   <h1>Create an account</h1>
+{{#if passkeys}}
+  <p><button passkey="signup" passkey-redirect="/account">Create account with a passkey</button></p>
+{{else}}
   <if test="$data.problems != null">
     <ul class="error">
       <for each="problem" in="$data.problems"><li><if test="$problem.field != null"><strong>{ $problem.field }</strong>: </if>{ $problem.message }</li></for>
@@ -16,5 +19,6 @@ to: {{ paths.views }}/auth/register.html
     <p><label>Password<br><input type="password" name="password" required autocomplete="new-password"></label></p>
     <p><button>Create account</button></p>
   </form>
+{{/if}}
   <p>Already have one? <a href="/login">Sign in</a></p>
 </layout>

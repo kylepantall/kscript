@@ -617,6 +617,10 @@ namespace KScript.Runtime
 
         #region Members and indexes
 
+        internal object GetMember(object target, string name, Module module) =>
+            target == null ? throw new KScriptException($"Can't read .{name} of null.", "Null")
+                : GetMember(target, name, null, new EvalContext(module, null));
+
         private object GetMember(object target, string name, ExprNode node, EvalContext ctx)
         {
             switch (target)

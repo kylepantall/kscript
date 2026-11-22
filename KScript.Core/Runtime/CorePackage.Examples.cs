@@ -28,6 +28,7 @@ namespace KScript.Runtime
                 ("list->at", "['a', 'b', 'c']->at(-1)"),
                 ("list->filter", "[1, 2, 3, 4, 5]->filter(fn(n) => $n % 2 == 1)"),
                 ("list->reject", "[1, 2, 3, 4, 5]->reject(fn(n) => $n % 2 == 1)"),
+                ("list->pluck", "[{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }]->pluck([name, age])"),
                 ("list->map", "[1, 2, 3]->map(fn(n) => $n * 10)"),
                 ("list->find", "[{ id: 1, name: 'Joan' }, { id: 2, name: 'Sam' }]->find(fn(p) => $p.id == 2).name"),
                 ("list->find_index", "['a', 'b', 'c']->find_index(fn(x) => $x == 'b')"),

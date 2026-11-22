@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Fido2" Version="4.3.3" />
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
     <ProjectReference Include="..\KScript.Data\KScript.Data.csproj" />
   </ItemGroup>

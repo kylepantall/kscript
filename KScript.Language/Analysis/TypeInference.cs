@@ -202,7 +202,7 @@ namespace KScript.Language.Analysis
                     {
                         return asType;
                     }
-                    return InferMethod(m.Name, receiver, m.Arguments.Count);
+                    return InferMethod(m.Name, receiver, m.Arguments);
                 }
 
                 case PipeNode pipe:
@@ -220,7 +220,7 @@ namespace KScript.Language.Analysis
                             {
                                 return asPiped;
                             }
-                            return InferMethod(id.Name, left, call.Arguments.Count);
+                            return InferMethod(id.Name, left, call.Arguments);
                         case CommandCallNode command:
                             return Infer(command, region);
                         default:
@@ -590,11 +590,33 @@ namespace KScript.Language.Analysis
             return ShapeOfTypeName(method.ReturnType);
         }
 
+        private static TypeShape PluckedShape(TypeShape item, ExprNode selector)
+        {
+            static string Key(ExprNode node) => node switch
+            {
+                IdentifierNode id => id.Name,
+                LiteralNode { Kind: LiteralKind.String } text => text.Value,
+                MemberNode member => member.DottedName,
+                _ => null,
+            };
+
+            FieldInfo Field(string key) => item != null && item.Fields.TryGetValue(key, out var field)
+                ? field : new FieldInfo(key, TypeShape.Unknown, null);
+            if (selector is ListNode keys)
+            {
+                var projected = new TypeShape(KType.Map);
+                foreach (var expression in keys.Items)
+                    if (Key(expression) is string key) projected.Fields.TryAdd(key, Field(key));
+                return new TypeShape(KType.List) { Element = projected };
+            }
+            return new TypeShape(KType.List) { Element = Key(selector) is string single ? Field(single).Shape : TypeShape.Unknown };
+        }
+
         /// <summary>A model's scope called on the model or one of its queries: <c>User->admins()</c>, <c>$q->admins()</c>.</summary>
         internal static Symbol ScopeOf(TypeShape receiver, string name) =>
             (receiver.Kind == KType.Model || receiver.Type == KType.Query) && receiver.Instance != null && receiver.Instance.Scopes.TryGetValue(name, out Symbol scope) ? scope : null;
 
-        private TypeShape InferMethod(string name, TypeShape receiver, int argCount)
+        private TypeShape InferMethod(string name, TypeShape receiver, IReadOnlyList<ArgumentNode> args)
         {
             // A record's relation method (->posts()) or a model's scope: a query of the model's records.
             if ((receiver.Methods.TryGetValue(name, out Symbol own) || (own = ScopeOf(receiver, name)) != null) && own.ReturnShape.Type == KType.Query)
@@ -603,6 +625,7 @@ namespace KScript.Language.Analysis
             }
             if (receiver.Type == KType.List)
             {
+                if (name == "pluck" && args.Count == 1) return PluckedShape(receiver.Element, args[0].Value);
                 if (SameShapeListMethods.Contains(name))
                 {
                     return receiver;
@@ -615,7 +638,7 @@ namespace KScript.Language.Analysis
 
             string type = ReceiverType(name, receiver);
             List<CallableInfo> methods = catalog.GetMethods(name, type).Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, type)).ToList();
-            CallableInfo method = methods.FirstOrDefault(m => argCount >= m.MinArgs && argCount <= m.MaxArgs) ?? methods.FirstOrDefault();
+            CallableInfo method = methods.FirstOrDefault(m => args.Count >= m.MinArgs && args.Count <= m.MaxArgs) ?? methods.FirstOrDefault();
             if (method != null && ModelResult(method, receiver) is TypeShape records)
             {
                 return records;

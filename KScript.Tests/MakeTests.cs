@@ -96,6 +96,30 @@ public class ScaffolderTests
     private static string Read(TempSite site, string path) => File.ReadAllText(Path.Combine(site.Root, path)).Replace("\r\n", "\n");
 
     [Fact]
+    public void ModelComponentGeneratorRequiresExplicitFieldsAndRendersAWorkingBinding()
+    {
+        using var site = new TempSite();
+        var missing = Make(site.Root, "component", "ProfileEditor", "--model-update", "edit_profile");
+        Assert.Equal(2, missing.Code);
+        Assert.Contains("--fields", missing.Err);
+        var made = Make(site.Root, "component", "ProfileEditor", "--model-update", "edit_profile", "--fields", "bio,website", "--autosave");
+        Assert.True(made.Code == 0, made.Err);
+        string source = Read(site, "_components/profile-editor.html");
+        Assert.Contains("model-update=\"edit_profile\" key=\"{$record.id}\" autosave", source);
+        Assert.Contains("name=\"bio\" value=\"{$record.bio}\"", source);
+        Assert.Contains("name=\"website\" value=\"{$record.website}\"", source);
+        Assert.Contains("record=\"{$record}\"", made.Out);
+        Assert.Equal(0, Make(site.Root, "component", "ProfileEditor", "--model-update", "edit_profile", "--fields", "bio", "--autosave", "750ms", "--force").Code);
+        Assert.Contains("autosave=\"750ms\"", Read(site, "_components/profile-editor.html"));
+        var live = Make(site.Root, "component", "OrderDetails", "--live");
+        Assert.Equal(0, live.Code);
+        site.Write("index.html", "<order-details>Order contents</order-details>");
+        string html = site.Render("index.html").Body;
+        Assert.Contains("data-ks-on-click", html);
+        Assert.DoesNotContain("Order contents", html);
+    }
+
+    [Fact]
     public void ComponentIsCreatedAndRendersInAPage()
     {
         using var site = new TempSite(("_layout.html", "<main><slot /></main>"));
@@ -290,6 +314,50 @@ public class ScaffolderTests
         var forced = Make(site.Root, "component", "Hero", "--force");
         Assert.Equal(0, forced.Code);
         Assert.Contains("Replaced _components/hero.html", forced.Out);
+    }
+
+    [Fact]
+    public void DockerKitHonoursTheProjectConfigAndChecksEveryOutputBeforeWriting()
+    {
+        using var site = new TempSite(("kscript.json", """{"serve":{"root":"public","port":4820}}"""), ("public/index.html", "Ready"));
+        string web = Path.Combine(site.Root, "public");
+        Assert.Contains("kscript make docker", Make(web, "docker", "--help").Out);
+        Assert.Contains("Would create Dockerfile", Make(web, "docker", "--dry-run").Out);
+        Assert.False(File.Exists(Path.Combine(site.Root, "compose.yaml")));
+        File.WriteAllText(Path.Combine(site.Root, ".dockerignore"), "mine");
+        Assert.NotEqual(0, Make(web, "docker").Code);
+        Assert.False(File.Exists(Path.Combine(site.Root, "Dockerfile")));
+        Assert.Equal("mine", Read(site, ".dockerignore"));
+
+        Assert.Equal(0, Make(web, "docker", "--force").Code);
+        Assert.False(File.Exists(Path.Combine(web, "Dockerfile")));
+        Assert.Contains("4820:4820", Read(site, "compose.yaml"));
+        Assert.Contains("USER app", Read(site, "Dockerfile"));
+        Assert.Contains("EXPOSE 4820", Read(site, "Dockerfile"));
+        Assert.Contains("HEALTHCHECK", Read(site, "Dockerfile"));
+        Assert.Contains("KSCRIPT_SOURCE", Read(site, "compose.yaml"));
+    }
+
+    [Fact]
+    public void DockerSourceIsPinnedForReleasesAndExplicitForDevelopmentBuilds()
+    {
+        const string sha = "0123456789abcdef0123456789abcdef01234567";
+        Assert.Contains(".git#" + sha, DockerMaker.SourceContext(sha));
+        Assert.Contains("KSCRIPT_SOURCE:?", DockerMaker.SourceContext(null));
+        Assert.Contains("KSCRIPT_SOURCE:?", DockerMaker.SourceContext("main"));
+    }
+
+    [Fact]
+    public void BareDockerOptionRendersTheSameKitInADryRun()
+    {
+        using var parent = new TempSite();
+        var project = ProjectScaffolder.Create(parent.Root, "portal", new Dictionary<string, string>
+        {
+            ["template"] = "bare", ["web"] = "true", ["api"] = "true", ["port"] = "4820", ["docker"] = "true",
+        }, dryRun: true);
+        Assert.Contains("4820:4820", project.Contents["compose.yaml"]);
+        Assert.Contains("**/*.sqlite*", project.Contents[".dockerignore"]);
+        Assert.False(Directory.Exists(project.Directory));
     }
 
     [Fact]

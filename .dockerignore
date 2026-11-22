@@ -1,0 +1,13 @@
+# Source context used by the Docker kit when KSCRIPT_SOURCE names a local checkout.
+*
+!Directory.Build.props
+!KScript.*/
+!KScript.*/**
+!KScriptApp/
+!KScriptApp/**
+!docs/
+!docs/**
+**/bin
+**/obj
+**/node_modules
+**/.*

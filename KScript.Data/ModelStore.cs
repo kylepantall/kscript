@@ -124,6 +124,56 @@ namespace KScript.Data
             return Records.Save(call, record);
         });
 
+        /// <summary>Checks the server's allowlist before exposing a model update through a form.</summary>
+        internal void CheckFormFields(string owner, IReadOnlySet<string> fields)
+        {
+            if (model.Column(owner)?.Kind is not (ColumnKind.Text or ColumnKind.Integer or ColumnKind.Uuid or ColumnKind.Handle))
+                throw new KScriptException($"{Name}.{owner} must be a stored user ID field for a model form.", "Config");
+            foreach (string field in fields)
+            {
+                Column column = model.Column(field);
+                if (column == null || column.IsKey || column.References != null || column.Kind == ColumnKind.Password ||
+                    field == owner || field is ModelInfo.CreatedAt or ModelInfo.UpdatedAt or ModelInfo.DeletedAt ||
+                    model.Hidden.Contains(field) || model.Guarded.Contains(field))
+                    throw new KScriptException($"{Name}.{field} cannot be exposed through a model form.", "Config");
+            }
+        }
+
+        /// <summary>Validates a partial form update and writes it only while this record belongs to this user.</summary>
+        public bool UpdateOwned(string key, string owner, string userId, IReadOnlySet<string> fields, Dictionary<string, object> input) => Locked(() =>
+        {
+            CheckFormFields(owner, fields);
+            if (input.Count == 0 || input.Keys.Any(k => !fields.Contains(k)))
+                throw new KScriptException("The form contained missing or unexpected fields.", "Validation");
+            if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(userId)) return false;
+
+            CallContext call = Call("model form");
+            Query rows = Rows().ById(key);
+            rows = rows.And(rows.Equalities(new[] { KeyValuePair.Create(owner, (object)userId) }, "model form"));
+            return rows.Database.InTransaction(interpreter, () =>
+            {
+                // Compare the identities exactly as well: some databases compare text case-insensitively or
+                // coerce numeric keys. Hold this row while validating rules that may depend on other fields.
+                var record = (Record)rows.Locking("update", false).First(call);
+                if (record == null || Values.ToStr(record[owner]) != userId || Values.ToStr(record[Key]) != key) return false;
+                var changes = new Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var (field, value) in input)
+                {
+                    FieldDefinition definition = model.Type.Field(field);
+                    record[field] = changes[field] = Shapes.Convert(interpreter, value, definition.Type.WithOptional(definition.Optional),
+                        $"{Name}.{field}", model.Type.Closure, model.Type.Module);
+                }
+                if (model.Type.Validators.Count != 0)
+                {
+                    Records.Compute(call, record);
+                    var failures = Shapes.Failures(interpreter, record);
+                    if (failures.Count != 0) throw new KScriptException($"{Name} {failures[0]}.", "Validation");
+                }
+                rows.Update(call, changes, converted: true);
+                return true;
+            });
+        });
+
         /// <summary>Deletes a record for good, even from a model with soft_deletes.</summary>
         public bool Delete(Record record) => Locked(() => Records.Delete(Call("delete"), record, force: true));
 

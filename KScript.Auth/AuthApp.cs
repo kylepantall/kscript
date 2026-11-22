@@ -139,20 +139,29 @@ namespace KScript.Auth
 
         private readonly Dictionary<string, (DateTime Start, int Count)> failures = new Dictionary<string, (DateTime, int)>(StringComparer.Ordinal);
 
+        private DateTime lastAttemptCleanup;
+
         private AuthApp(string root, string name, AuthSettings settings)
         {
             Root = root;
             Name = name;
             Settings = settings;
-            string own = settings.Folder != null ? Path.GetFullPath(Path.Combine(root, settings.Folder)) : null;
-            string data = own ?? Path.Combine(AppFolders.Folder(name, "data"), "auth");
-            string state = own ?? Path.Combine(AppFolders.Folder(name, "state"), "auth");
+            var (data, state) = StorageFolders(root, name, settings);
             Users = settings.Users != null
                 ? new ModelRecordStore(ModelStore.Load(KScriptHost.ForText(new StringWriter()), root, settings.Users, "http.auth.users"))
                 : new FileRecordStore(Path.Combine(data, "users"));
             Sessions = settings.Sessions == "memory" ? new MemoryRecordStore() : new FileRecordStore(Path.Combine(state, "sessions"));
             Tokens = new FileRecordStore(Path.Combine(state, "tokens"));
             Resets = new FileRecordStore(Path.Combine(state, "resets"));
+            PasskeyStore = new PasskeyStore(Path.Combine(data, "_passkeys", "passkeys.sqlite"));
+        }
+
+        /// <summary>The actual locations of the application's auth data and session state.</summary>
+        public static (string Data, string State) StorageFolders(string root, string name, AuthSettings settings)
+        {
+            string own = settings.Folder == null ? null : AppFolders.ProjectDataPath(root, settings.Folder);
+            return (own ?? Path.Combine(AppFolders.Folder(name, "data"), "auth"),
+                own ?? Path.Combine(AppFolders.Folder(name, "state"), "auth"));
         }
 
         /// <summary>The site (or script) folder.</summary>
@@ -167,6 +176,7 @@ namespace KScript.Auth
         public RecordStore Sessions { get; }
         public RecordStore Tokens { get; }
         public RecordStore Resets { get; }
+        internal PasskeyStore PasskeyStore { get; }
 
         /// <summary>The app for a site folder, with the settings the server read from kscript.json.</summary>
         public static AuthApp For(string root, AuthSettings settings)
@@ -208,6 +218,9 @@ namespace KScript.Auth
             ["attempts"] = (double)s.Attempts,
             ["lockout"] = s.Lockout,
             ["reset_lifetime"] = s.ResetLifetime,
+            ["passkey_origin"] = s.PasskeyOrigin,
+            ["passkey_signup"] = s.PasskeySignup,
+            ["passkey_rp_id"] = s.PasskeyRpId,
         };
 
         #region Secrets
@@ -258,11 +271,27 @@ namespace KScript.Auth
             }
         }
 
+        /// <summary>Reserves one attempt before an anonymous request can create persistent session state.</summary>
+        internal void ReserveAttempt(string key)
+        {
+            lock (failures)
+            {
+                CheckAttempts(key);
+                Failed(key);
+            }
+        }
+
         internal void Failed(string key)
         {
             lock (failures)
             {
                 DateTime now = Clock();
+                if ((now - lastAttemptCleanup).TotalSeconds >= Settings.Lockout)
+                {
+                    foreach (string expired in failures.Where(f => (now - f.Value.Start).TotalSeconds >= Settings.Lockout).Select(f => f.Key).ToArray())
+                        failures.Remove(expired);
+                    lastAttemptCleanup = now;
+                }
                 if (!failures.TryGetValue(key, out var entry) || (now - entry.Start).TotalSeconds >= Settings.Lockout) entry = (now, 0);
                 failures[key] = (entry.Start, entry.Count + 1);
             }

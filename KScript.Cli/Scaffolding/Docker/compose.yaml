@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      # For an unpublished or modified runtime, set KSCRIPT_SOURCE to the path of its checkout.
+      additional_contexts:
+        kscript_source: '{{ source }}'
+      args:
+        KSCRIPT_VERSION: '{{ version }}'
+    ports:
+      - "{{ port }}:{{ port }}"
+    volumes:
+      - app-state:/var/lib/kscript
+    read_only: true
+    tmpfs:
+      - /tmp
+
+volumes:
+  app-state:

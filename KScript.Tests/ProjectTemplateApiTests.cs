@@ -275,7 +275,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.True(File.Exists(Path.Combine(t.Root, "made", "one.md")));
         Assert.False(File.Exists(Path.Combine(t.Root, "made", "two.md")));
 
-        Assert.Contains("only auth can be made with a project", Make(t.Root, "other", "--template", Path.Combine(t.Root, "kit"), "--db", "b").Err);
+        Assert.Contains("only auth and docker can be made with a project", Make(t.Root, "other", "--template", Path.Combine(t.Root, "kit"), "--db", "b").Err);
         Assert.Contains("db.choices should be a list", Make(t.Root, "bad", "--template", Path.Combine(t.Root, "bad")).Err);
     }
 
@@ -342,7 +342,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     public void TheWizardChecksTheFolderName()
     {
         using var parent = new TempSite();
-        Answer("!!!\nnamed\nbare\n\n\n\n\n\n");
+        Answer("!!!\nnamed\nbare\n" + new string('\n', ProjectTemplate.BuiltInTemplate("bare").Options.Count));
         var (code, output, err) = Make(parent.Root);
         Assert.True(code == 0, err);
         Assert.Contains("Use at least one letter or digit.", output);
