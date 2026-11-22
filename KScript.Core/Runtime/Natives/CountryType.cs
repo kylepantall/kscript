@@ -22,6 +22,10 @@ namespace KScript.Runtime
 
         public override IReadOnlyList<string> Completions => new[] { "GB", "US", "IE", "FR", "DE", "ES", "IT", "NL", "CA", "AU" };
 
+        /// <summary>Every country's two-letter code.</summary>
+        public override IEnumerable<NativeValueSuggestion> Suggest(NativeValueContext context) =>
+            CountryCodes.TwoLetterCodes().Select(c => new NativeValueSuggestion(c, CountryCodes.Find(c)?.EnglishName));
+
         public override Equality Equality => Equality.ByText;
 
         public override Ordering Ordering => Ordering.ByText;

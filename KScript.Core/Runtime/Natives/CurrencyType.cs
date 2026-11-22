@@ -22,6 +22,10 @@ namespace KScript.Runtime
 
         public override IReadOnlyList<string> Completions => new[] { "GBP", "USD", "EUR", "JPY", "CHF", "CAD", "AUD" };
 
+        /// <summary>Every currency code.</summary>
+        public override IEnumerable<NativeValueSuggestion> Suggest(NativeValueContext context) =>
+            CountryCodes.CurrencyCodes().Select(c => new NativeValueSuggestion(c, CountryCodes.Currency(c)?.Name));
+
         public override Equality Equality => Equality.ByText;
 
         public override Ordering Ordering => Ordering.ByText;

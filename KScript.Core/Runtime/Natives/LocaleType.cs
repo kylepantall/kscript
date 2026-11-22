@@ -22,6 +22,12 @@ namespace KScript.Runtime
 
         public override IReadOnlyList<string> Completions => new[] { "en", "en-GB", "en-US", "fr", "fr-FR", "de", "de-DE", "es", "pt-BR", "ja" };
 
+        /// <summary>Language tags of the cultures the system knows: en, en-GB, pt-BR.</summary>
+        public override IEnumerable<NativeValueSuggestion> Suggest(NativeValueContext context) =>
+            CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
+                .Select(c => c.Name).Where(n => n.Length >= 2 && n.Split('-').Length <= 2).Distinct().OrderBy(n => n, StringComparer.Ordinal)
+                .Select(n => new NativeValueSuggestion(n));
+
         public override Equality Equality => Equality.ByText;
 
         public override Ordering Ordering => Ordering.ByText;

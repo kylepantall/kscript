@@ -86,6 +86,14 @@ namespace KScript.Runtime
         /// <summary>Values the editor offers where the type is expected (UTC, Europe/London for a timezone). Empty for none.</summary>
         public abstract IReadOnlyList<string> Completions { get; }
 
+        /// <summary>
+        /// The values the editor suggests where the type is expected, worked out from where it is written: the
+        /// file, the project, what is typed so far, the type's options and the project's routes. By default its
+        /// <see cref="Completions"/>; a type with a full list (every time zone) or one that depends on the project
+        /// (a path that names a route) overrides it.
+        /// </summary>
+        public virtual IEnumerable<NativeValueSuggestion> Suggest(NativeValueContext context) => Completions.Select(v => new NativeValueSuggestion(v));
+
         // ---- Optional details -----------------------------------------------------------------------------------
 
         /// <summary>"a" or "an", when the usual rule gets it wrong.</summary>

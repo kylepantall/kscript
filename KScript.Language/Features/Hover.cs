@@ -53,6 +53,10 @@ namespace KScript.Language.Features
             {
                 return body;
             }
+            if (TypeNameHover(analysis, offset) is HoverResult typeName)
+            {
+                return typeName;
+            }
             Cursor cursor = Locate(analysis, offset);
 
             if (cursor.InElementName || cursor.InEndTagName)
@@ -124,7 +128,7 @@ namespace KScript.Language.Features
             {
                 case CommandCallNode c when c.NameSpan.Contains(index):
                 {
-                    CallableInfo command = Catalog.GetCommand(c.Name);
+                    CallableInfo command = Catalog.GetCommand(c.Name) ?? PackageAliasCommand(analysis, region, c.Name);
                     TextSpan span = region.Source.ToSource(c.NameSpan);
                     if (command != null)
                     {
@@ -192,6 +196,72 @@ namespace KScript.Language.Features
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// A native type or enum named where a type is written (<c>tz: timezone</c>, <c>fn f(size: Size)</c>,
+        /// <c>type="timezone"</c>): what it is and what it accepts.
+        /// </summary>
+        private HoverResult TypeNameHover(DocumentAnalysis analysis, int offset)
+        {
+            string text = analysis.Source.Text;
+            int start = WordStart(text, offset), end = offset;
+            while (end < text.Length && Lexer.IsIdentChar(text[end]))
+            {
+                end++;
+            }
+            if (start == end || (start > 0 && (text[start - 1] == '$' || text[start - 1] == '@' || text[start - 1] == '.')))
+            {
+                return null;
+            }
+            int p = start;
+            while (p > 0 && (text[p - 1] == ' ' || text[p - 1] == '\t'))
+            {
+                p--;
+            }
+            bool typePosition = (p > 0 && text[p - 1] == ':' && !(p > 1 && text[p - 2] == ':'))
+                || (p >= 6 && text.Substring(p - 6, 6) == "type=\"");
+            string name = text.Substring(start, end - start);
+            return typePosition && TypeMarkdown(analysis, name) is string markdown ? new HoverResult(markdown, TextSpan.FromBounds(start, end)) : null;
+        }
+
+        /// <summary>Markdown for a native type or enum: what it is, an example, and the values it accepts. Null for other names.</summary>
+        internal string TypeMarkdown(DocumentAnalysis analysis, string name)
+        {
+            if (EnumValuesOf(analysis, name) is IReadOnlyList<string> members)
+            {
+                return $"```kscript\nenum {name}\n```\n\nOne of: " + string.Join(", ", members.Select(m => "`" + m + "`")) + ".";
+            }
+            if (KScript.Metadata.NativeTypes.Get(name) is not KScript.Metadata.NativeTypeInfo native)
+            {
+                return null;
+            }
+            StringBuilder sb = new StringBuilder($"```kscript\n{name}\n```\n\n{native.Description}");
+            sb.Append("\n\nExample: `").Append(native.Example.Trim('\'')).Append('`');
+            if (native.Options.Count > 0)
+            {
+                sb.Append("\n\nOptions: ").Append(string.Join(", ", native.Options.Select(o => "`" + o + "`")));
+            }
+            List<KScript.Runtime.NativeValueSuggestion> values = AcceptedValues(analysis, name);
+            if (values.Count > 0)
+            {
+                sb.Append("\n\nAccepts ").Append(values.Count > 12 ? $"{values.Count} values, such as " : string.Empty)
+                  .Append(string.Join(", ", values.Take(12).Select(v => "`" + v.Value + "`"))).Append(values.Count > 12 ? ", ..." : string.Empty)
+                  .Append(". The editor suggests them where a ").Append(name).Append(" is expected.");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary><c>math.sqrt</c> through <c>import KScript.Math as math</c>: the package's command, or null.</summary>
+        private CallableInfo PackageAliasCommand(DocumentAnalysis analysis, ExpressionRegion region, string name)
+        {
+            int dot = name.IndexOf('.');
+            if (dot <= 0 || analysis.RootScope?.Lookup(name.Substring(0, dot), int.MaxValue) is not Symbol { Kind: SymbolKind.Import, Package: string package })
+            {
+                return null;
+            }
+            CallableInfo command = Catalog.GetCommand(name.Substring(dot + 1));
+            return command?.Package == package ? command : null;
         }
 
         private HoverResult MethodHover(DocumentAnalysis analysis, ExpressionRegion region, string name, ExprNode target, TextSpan nameSpan, MethodCallNode call = null)
@@ -383,6 +453,13 @@ namespace KScript.Language.Features
                 case SymbolKind.Import:
                     sb.Append("import ").Append(s.Name);
                     break;
+                case SymbolKind.Constant when s.Alias != null:
+                    sb.Append("const ").Append(s.Alias.Name).Append('.').Append(s.Name);
+                    if (s.Shape.Type != KType.Any)
+                    {
+                        sb.Append(": ").Append(s.Shape.Pretty());
+                    }
+                    break;
                 default:
                     sb.Append(s.Kind switch
                     {
@@ -419,6 +496,23 @@ namespace KScript.Language.Features
                 && paramDoc.Length > 0)
             {
                 sb.Append("\n\n").Append(paramDoc);
+            }
+            if (s.Kind == SymbolKind.Import && s.Members.Count > 0)
+            {
+                List<string> fns = s.Members.Values.Where(m => m.Kind == SymbolKind.Function).Select(m => "`" + m.Name + "`").ToList();
+                List<string> others = s.Members.Values.Where(m => m.Kind != SymbolKind.Function).Select(m => "`" + m.Name + "`").ToList();
+                if (fns.Count > 0)
+                {
+                    sb.Append("\n\nFunctions: ").Append(string.Join(", ", fns));
+                }
+                if (others.Count > 0)
+                {
+                    sb.Append("\n\nConstants and types: ").Append(string.Join(", ", others));
+                }
+            }
+            if (s.Alias?.SourcePath != null)
+            {
+                sb.Append("\n\nFrom `").Append(s.Alias.DeclaringElement?.GetAttributeValue("path")?.Trim() ?? System.IO.Path.GetFileName(s.Alias.SourcePath)).Append("`, imported as ").Append(s.Alias.Name).Append('.');
             }
             if (s.ExtensionOf != null)
             {

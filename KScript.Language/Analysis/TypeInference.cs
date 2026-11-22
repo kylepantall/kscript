@@ -274,7 +274,9 @@ namespace KScript.Language.Analysis
                                 // 'ab' * 3 repeats the text.
                                 return new TypeShape(KType.String);
                             default:
-                                return NativeTypes.IsNative(OperandType(l)) || NativeTypes.IsNative(OperandType(r)) ? TypeShape.Unknown : new TypeShape(KType.Number);
+                                // dd-MM-yyyy is unquoted text, not a sum: a bare word in the arithmetic leaves the type unknown.
+                                return NativeTypes.IsNative(OperandType(l)) || NativeTypes.IsNative(OperandType(r)) || IsBareWord(binary.Left, region) || IsBareWord(binary.Right, region)
+                                    ? TypeShape.Unknown : new TypeShape(KType.Number);
                         }
                     }
 
@@ -362,6 +364,23 @@ namespace KScript.Language.Analysis
         /// <summary>What a for loop over a native value gives, or null when the shape isn't a native type that can be walked.</summary>
         internal static TypeShape NativeItems(TypeShape collection) =>
             NativeTypes.Get(collection?.Type)?.Iterates is string item ? ShapeOfTypeName(item) : null;
+
+        /// <summary>A word that isn't a variable, function or type here, or arithmetic that already has one.</summary>
+        private bool IsBareWord(ExprNode node, ExpressionRegion region)
+        {
+            switch (node)
+            {
+                case IdentifierNode id:
+                {
+                    int offset = region.Source.ToSource(id.Span.Start);
+                    return result.RootScope?.Innermost(offset).Lookup(id.Name, offset) == null;
+                }
+                case BinaryNode { Operator: "+" or "-" or "*" or "/" or "%" or "**" } b:
+                    return IsBareWord(b.Left, region) || IsBareWord(b.Right, region);
+                default:
+                    return false;
+            }
+        }
 
         /// <summary>True for a symbol that is a declared type: a type, model, enum, error type or job.</summary>
         internal static bool IsTypeSymbol(Symbol symbol) =>

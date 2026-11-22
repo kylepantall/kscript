@@ -24,6 +24,18 @@ namespace KScript.Runtime
 
         public override IReadOnlyList<string> Completions => new[] { "UTC", "Europe/London", "Europe/Paris", "America/New_York", "America/Los_Angeles", "Asia/Tokyo", "Australia/Sydney" };
 
+        /// <summary>Every IANA time zone the system knows, and UTC (Windows lists its own names, so they are given as IANA).</summary>
+        public override IEnumerable<NativeValueSuggestion> Suggest(NativeValueContext context)
+        {
+            var names = new SortedSet<string>(StringComparer.Ordinal) { "UTC" };
+            foreach (TimeZoneInfo z in TimeZoneInfo.GetSystemTimeZones())
+            {
+                string id = z.HasIanaId ? z.Id : TimeZoneInfo.TryConvertWindowsIdToIanaId(z.Id, out string iana) ? iana : null;
+                if (id != null && id.Contains('/') && !id.StartsWith("Etc/", StringComparison.Ordinal)) names.Add(id);
+            }
+            return names.Select(n => new NativeValueSuggestion(n));
+        }
+
         public override Equality Equality => Equality.ByText;
 
         // By name: a zone's offset changes with summer time, so there is no one order by time.

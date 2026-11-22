@@ -291,6 +291,66 @@ namespace KScript.Language.Features
             return analysis.ReferencesTo(at.Symbol).Where(r => includeDeclaration || !r.IsDeclaration).OrderBy(r => r.Span.Start).ToList();
         }
 
+        /// <summary>
+        /// Find all references across the project: for a function or constant one script declares and others import
+        /// (<c>@accounts.show_login</c>, <c>import show_login from "..."</c>), its uses in every file of the project as
+        /// well as this one, and its declaration. Anything else gives this document's references, as
+        /// <see cref="GetReferences"/> does. Locations in this document have no path.
+        /// </summary>
+        public List<SourceLocation> GetProjectReferences(DocumentAnalysis analysis, int offset, bool includeDeclaration)
+        {
+            List<SourceLocation> local = GetReferences(analysis, offset, includeDeclaration).Select(r => new SourceLocation(null, r.Span)).ToList();
+            SymbolReference at = analysis.ReferenceAt(offset);
+            if (at == null || analysis.Path == null || at.Symbol.Kind is not (SymbolKind.Function or SymbolKind.Constant) || at.Symbol.ExtensionOf != null)
+            {
+                return local;
+            }
+            Symbol s = at.Symbol;
+            string self = Path.GetFullPath(analysis.Path);
+            string target = s.SourcePath ?? (s.DeclaringElement != null && IsTopLevel(analysis, s) ? self : null);
+            if (target == null)
+            {
+                return local;
+            }
+
+            List<SourceLocation> found = new List<SourceLocation>();
+            if (target == self)
+            {
+                found.AddRange(local);
+            }
+            else
+            {
+                // Here: every use of the imported name, whichever way it was imported.
+                found.AddRange(analysis.References.Where(r => r.Symbol.SourcePath == target && r.Symbol.Name == s.Name && !r.IsDeclaration).Select(r => new SourceLocation(null, r.Span)));
+            }
+
+            string stem = Path.GetFileName(target).Split('.')[0];
+            foreach (string file in ProjectUsage.FilesUnder(ProjectFolder(target) ?? Path.GetDirectoryName(target), Files))
+            {
+                string full = Path.GetFullPath(file);
+                if (full == self)
+                {
+                    continue;
+                }
+                string text = Files.ReadText(full);
+                if (text == null || text.IndexOf(s.Name, StringComparison.Ordinal) < 0 || (full != target && text.IndexOf(stem, StringComparison.OrdinalIgnoreCase) < 0))
+                {
+                    continue;
+                }
+                DocumentAnalysis other = Analyze(text, full);
+                IEnumerable<SymbolReference> uses = full == target
+                    ? other.References.Where(r => r.Symbol.SourcePath == null && r.Symbol.Name == s.Name && r.Symbol.Kind == s.Kind && (includeDeclaration || !r.IsDeclaration))
+                    : other.References.Where(r => r.Symbol.SourcePath == target && r.Symbol.Name == s.Name && !r.IsDeclaration);
+                found.AddRange(uses.Select(r => new SourceLocation(full, other.Source.GetPosition(r.Span.Start), other.Source.GetPosition(r.Span.End))));
+            }
+            return found;
+        }
+
+        /// <summary>True for a function or constant at the top of its script, which other scripts can import.</summary>
+        private static bool IsTopLevel(DocumentAnalysis analysis, Symbol s) =>
+            s.Kind == SymbolKind.Function || analysis.RootScope.Symbols.Any(r => r.Symbol == s)
+            || analysis.RootScope.Children.Any(c => analysis.Markup.RootElements.Any(e => e.ContentSpan.Equals(c.Span)) && c.Symbols.Any(r => r.Symbol == s));
+
         /// <summary>The span that would be renamed at the offset, or null if nothing can be renamed there.</summary>
         public TextSpan? PrepareRename(DocumentAnalysis analysis, int offset)
         {

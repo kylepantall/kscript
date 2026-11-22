@@ -20,6 +20,16 @@ namespace KScript.Runtime
 
         public override IReadOnlyList<string> Completions => new[] { "/" };
 
+        /// <summary>The paths of the project's routes, each once, with what answers it; / when there are none.</summary>
+        public override IEnumerable<NativeValueSuggestion> Suggest(NativeValueContext context)
+        {
+            List<NativeValueSuggestion> routes = context.Routes().GroupBy(r => r.Path, StringComparer.Ordinal)
+                .Select(g => new NativeValueSuggestion(g.Key, string.Join(", ", g.Select(r => r.Method).Distinct())
+                    + (g.First().Handler is string handler && handler.Length > 0 ? " → " + handler : string.Empty)))
+                .ToList();
+            return routes.Count > 0 ? routes : base.Suggest(context);
+        }
+
         public override Equality Equality => Equality.ByText;
 
         public override Ordering Ordering => Ordering.ByText;

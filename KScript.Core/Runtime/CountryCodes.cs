@@ -71,6 +71,13 @@ namespace KScript.Runtime
             Values.Closest(text, Data.Value.ByKey.Values.Select(r => r.TwoLetterISORegionName).Distinct()) is string code ? code
             : Values.Closest(text, Data.Value.ByKey.Values.Select(r => r.EnglishName).Distinct());
 
+        /// <summary>Every country's two-letter code, in order: AD, AE, AF...</summary>
+        public static IEnumerable<string> TwoLetterCodes() =>
+            Data.Value.ByKey.Values.Select(r => r.TwoLetterISORegionName).Distinct().OrderBy(c => c, StringComparer.Ordinal);
+
+        /// <summary>Every currency code, in order: AED, AFN, ALL...</summary>
+        public static IEnumerable<string> CurrencyCodes() => Data.Value.Currencies.Keys.OrderBy(c => c, StringComparer.Ordinal);
+
         public static CurrencyInfo Currency(string code) => Data.Value.Currencies.TryGetValue(code, out CurrencyInfo c) ? c : null;
 
         /// <summary>ITU country calling codes (E.164), as prefixes: at most one of them starts a number.</summary>
