@@ -165,11 +165,9 @@ namespace KScript.Projects
         public Dictionary<string, bool> Rules { get; } = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>The formatter's rules, each of which can be turned off in format.rules.</summary>
-        public static readonly string[] RuleNames =
-        {
+        public static readonly string[] RuleNames = KScript.Runtime.Conventions.Settings("format.rules",
             "indent", "statement_per_line", "tidy_tags", "wrap_attributes", "trim_trailing_whitespace", "collapse_blank_lines", "final_newline",
-            "spacing", "brace_style", "wrap_strings", "wrap_chains", "wrap_bodies", "wrap_comments",
-        };
+            "spacing", "brace_style", "wrap_strings", "wrap_chains", "wrap_bodies", "wrap_comments");
     }
 
     /// <summary>
@@ -226,7 +224,7 @@ namespace KScript.Projects
 
         public static readonly string[] Drivers = { "sync", "memory", "file", "database" };
 
-        public static readonly string[] SettingNames = { "default", "connections", "queues", "failed", "worker", "env" };
+        public static readonly string[] SettingNames = KScript.Runtime.Conventions.Settings("queue", "default", "connections", "queues", "failed", "worker", "env");
 
         /// <summary>The connection jobs use unless they name one.</summary>
         public string Default { get; set; } = "file";
@@ -398,7 +396,7 @@ namespace KScript.Projects
 
         public static readonly string[] SameSiteValues = { "Lax", "Strict", "None" };
 
-        public static readonly string[] SettingNames = { "token_env", "login", "home", "sessions", "folder", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime" };
+        public static readonly string[] SettingNames = KScript.Runtime.Conventions.Settings("auth", "token_env", "login", "home", "sessions", "folder", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime");
     }
 
     public sealed class ProjectConfig

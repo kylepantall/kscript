@@ -262,8 +262,11 @@ namespace KScript.Runtime
 
         static ErrorTypes()
         {
-            void Add(string name, string parent, string description, int? status = null) =>
+            void Add(string name, string parent, string description, int? status = null)
+            {
+                Conventions.Enforce(Conventions.ErrorTypeName(name));
                 builtIn[name] = new ErrorType(name, parent, status, description);
+            }
 
             Add(Root, null, "Any error. Every error type extends Error.");
             Add("Syntax", Root, "A script that can't be read: bad syntax, an unknown element or a misplaced one.");
