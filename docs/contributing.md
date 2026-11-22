@@ -50,7 +50,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 
 Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/scripts/oldest.kscript`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
 
-- **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine. The solution is built once, in the `Build (linux)` job, and the Linux jobs that run kscript or the tests (the tests, the project templates, the VS Code extension and the database servers) download that build instead of compiling their own.
+- **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine. The solution is built once, in the `Build and test (linux)` job, and the other Linux jobs (the project templates, the VS Code extension and the database servers) download that build instead of compiling their own.
 - **Windows** and **macOS** run on GitHub-hosted `windows-latest` and `macos-latest` runners.
 
 ### Native AOT

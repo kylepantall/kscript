@@ -23,15 +23,18 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
-  # One Release build of the solution on Linux, shared by every Linux job that runs kscript or the unit tests (the
-  # tests, the project templates, the VS Code extension and the databases), so it compiles once instead of in each
-  # of them. They download it and run it in their own checkout, where the tests find the repository by KScript.sln as
-  # they do after a local build. Windows and macOS build their own in the test job.
+  # The one Release build of the solution on Linux, then the unit tests and the sample checks with it. It runs on
+  # home-ci (home-ci-linux, via runner-warden); pull requests from forks build on a GitHub-hosted runner so untrusted
+  # code never executes on home-ci.
+  #
+  # Right after the build it uploads kscript and the test assemblies for the other Linux jobs (the project templates,
+  # the VS Code extension and the databases), so they don't compile their own. They run on GitHub-hosted runners,
+  # which download it in seconds (home-ci took over two minutes). They run it in their own checkout, where the tests
+  # find the repository by KScript.sln as they do after a local build. Windows and macOS build their own below.
   build-linux:
-    name: Build (linux)
+    name: Build and test (linux)
     if: github.event.action != 'closed'
-    timeout-minutes: 15
-    # Pull requests from forks build on a GitHub-hosted runner so untrusted code never executes on home-ci.
+    timeout-minutes: 25
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON('["home-ci-linux"]') }}
     steps:
       - uses: actions/checkout@v5
@@ -58,12 +61,16 @@ jobs:
       - name: Build
         run: dotnet build KScript.sln --configuration Release
 
-      # Only what the other jobs run: kscript and the two test projects. One tar keeps file modes and uploads as one
-      # file instead of thousands.
+      # Only what the other jobs run: kscript and KScript.Tests, without the native libraries for other platforms. One
+      # tar keeps file modes and uploads as one file instead of thousands.
       - name: Pack the build
         run: |
-          tar -cf "$RUNNER_TEMP/kscript-linux-release.tar" KScriptApp/bin/Release/net8.0 \
-            KScript.Tests/bin/Release/net8.0 KScript.Language.Tests/bin/Release/net8.0
+          tar -cf "$RUNNER_TEMP/kscript-linux-release.tar" \
+            --exclude='*/runtimes/win*' --exclude='*/runtimes/osx*' --exclude='*/runtimes/maccatalyst*' \
+            --exclude='*/runtimes/ios*' --exclude='*/runtimes/tvos*' --exclude='*/runtimes/android*' \
+            --exclude='*/runtimes/browser*' --exclude='*/runtimes/linux-arm*' --exclude='*/runtimes/linux-musl*' \
+            --exclude='*/runtimes/linux-x86' --exclude='*/runtimes/linux-bionic*' \
+            KScriptApp/bin/Release/net8.0 KScript.Tests/bin/Release/net8.0
           ls -lh "$RUNNER_TEMP/kscript-linux-release.tar"
 
       - uses: actions/upload-artifact@v6
@@ -72,6 +79,12 @@ jobs:
           path: ${{ runner.temp }}/kscript-linux-release.tar
           retention-days: 1
 
+      - name: Test
+        run: dotnet test KScript.sln --configuration Release --no-build --verbosity normal
+
+      - name: Check the samples and new projects
+        run: .github/scripts/check-samples.sh "dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
+
   # Every kscript make project template, with the option mixes in .github/scripts/check-templates.sh, made and
   # checked, formatted, tested and served. It skips the unit tests, so it fails within minutes when a change to the
   # language, the formatter or a package breaks a template.
@@ -79,13 +92,11 @@ jobs:
     name: Project templates
     needs: build-linux
     timeout-minutes: 15
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON('["home-ci-linux"]') }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-dotnet@v5
-        env:
-          DOTNET_INSTALL_DIR: ${{ runner.environment == 'self-hosted' && format('{0}/dotnet', runner.tool_cache) || '' }}
         with:
           dotnet-version: 8.0.x
 
@@ -99,37 +110,6 @@ jobs:
 
       - name: Make, check, test and serve every template
         run: .github/scripts/check-templates.sh "dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
-
-  # The unit tests and the sample checks on Linux, with the build from build-linux. It runs on home-ci (home-ci-linux,
-  # via runner-warden); pull requests from forks fall back to a GitHub-hosted runner.
-  test-linux:
-    name: Test (linux)
-    needs: build-linux
-    timeout-minutes: 20
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON('["home-ci-linux"]') }}
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-dotnet@v5
-        env:
-          DOTNET_INSTALL_DIR: ${{ runner.environment == 'self-hosted' && format('{0}/dotnet', runner.tool_cache) || '' }}
-        with:
-          dotnet-version: 8.0.x
-
-      - uses: actions/download-artifact@v7
-        with:
-          name: kscript-linux-release
-          path: ${{ runner.temp }}
-
-      - name: Unpack the Linux build
-        run: tar -xf "$RUNNER_TEMP/kscript-linux-release.tar"
-      - name: Test
-        run: >-
-          dotnet test KScript.Tests/bin/Release/net8.0/KScript.Tests.dll
-          KScript.Language.Tests/bin/Release/net8.0/KScript.Language.Tests.dll --logger "console;verbosity=normal"
-
-      - name: Check the samples and new projects
-        run: .github/scripts/check-samples.sh "dotnet $PWD/KScriptApp/bin/Release/net8.0/KScript.dll"
 
   # Windows and macOS build their own: a Linux build can't stand in for them. They run on GitHub-hosted runners,
   # which are free for this public repo and faster than queueing for a Windows machine at home.
