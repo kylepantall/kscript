@@ -264,6 +264,8 @@ for post in $Post->latest()->get() {
 `->with()` loads relations with the records, and `->load()` loads them onto a record you have. A dotted name loads a relation's relations, and a function changes a relation's query:
 
 ```kscript
+import KScript.Data
+
 users = $User->with(profile, 'posts.tags')->get()
 users = $User->with(posts: fn($q) => $q->where(published: true))->get()
 $post->load(author, tags)
@@ -278,6 +280,8 @@ A relation that hasn't been loaded is left out of JSON, so a route's response on
 `$user->posts()` is a query of the user's posts, to filter, count and add to:
 
 ```kscript
+import KScript.Data
+
 echo $ada->posts()->where(published: false)->count()
 $ada->posts()->create(title: 'A second post')
 ```

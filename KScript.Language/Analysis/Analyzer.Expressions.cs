@@ -559,6 +559,13 @@ namespace KScript.Language.Analysis
 
             string type = (types ??= new TypeInference(catalog, result)).ReceiverType(name, receiver);
             List<CallableInfo> candidates = catalog.GetMethods(name, type).ToList();
+            // A record or query of a model this file can't see (declared in another file): its relations and scopes aren't known here.
+            // A value of no known type may be such a record too, once KScript.Data is imported: $user->posts() in fn(user).
+            if (candidates.Count == 0 && (receiver.Type is KType.Record or KType.Query && receiver.Instance == null && receiver.Name == null
+                || receiver.Type == KType.Any && !receiver.Declared && importedPackages.Contains("KScript.Data")))
+            {
+                return;
+            }
             if (candidates.Count == 0)
             {
                 IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Concat(receiver.Kind != null ? catalog.MethodsFor(receiver.Kind) : Enumerable.Empty<CallableInfo>()).Select(m => m.Name).Concat(receiver.Methods.Keys)

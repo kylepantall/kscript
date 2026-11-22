@@ -160,7 +160,11 @@ namespace KScript.Language.Analysis
             bool special = args.Any(a => a.Name != null || BareWord(a) != null);
 
             static int IndexOf(List<ParameterSlot> s, string name) => s.FindIndex(p => !p.Variadic && p.Name == name);
-            List<ParameterSlot> signature = signatures.FirstOrDefault(s => args.Where(a => a.Name != null).All(a => IndexOf(s, a.Name) >= 0))
+            // Of the signatures that have every name given, one that takes as many arguments as were given (->with() on
+            // a logger takes one, on a query any number).
+            int given = piped + args.Count(a => a.Name == null);
+            List<ParameterSlot> signature = signatures.Where(s => args.Where(a => a.Name != null).All(a => IndexOf(s, a.Name) >= 0))
+                .OrderBy(s => s.Any(p => p.Variadic) || given <= s.Count ? 0 : 1).FirstOrDefault()
                 ?? signatures.FirstOrDefault(s => s.Any(p => p.Variadic));
 
             if (signature == null)

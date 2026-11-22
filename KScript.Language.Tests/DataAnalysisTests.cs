@@ -269,6 +269,24 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ValuesOfNoKnownTypeMayBeRecordsWithRelations()
+        {
+            DocumentAnalysis a = Code("""
+                import KScript.Data
+
+                fn titles(user) => $user->posts()->where(published: true)->count()
+                fn loaded(query) => $query->with(author, tags)->get()
+                """);
+            TestHelpers.AssertClean(a);
+
+            // Without KScript.Data there are no relations, so a misspelt method is still found.
+            DocumentAnalysis plain = Code("""
+                fn size(text) => $text->lenght()
+                """);
+            Assert.Contains(plain.Diagnostics, d => d.Code == DiagnosticCodes.UnknownMethod);
+        }
+
+        [Fact]
         public void TheErrorTypesAreKnown()
         {
             DocumentAnalysis a = Code(Users + """
