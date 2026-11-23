@@ -1,0 +1,66 @@
+error StockShortage(message: 'Insufficient stock') extends Conflict {
+  available: int
+  requested: int
+}
+
+fn take_stock(bin: map, count: int) {
+  throw if $count < 1 {
+    type: 'Validation'
+    message: 'Request at least one unit'
+  }
+  if $count > $bin.units {
+    throw StockShortage(available: $bin.units, requested: $count)
+  }
+  bin.units = $bin.units - $count
+  return $count
+}
+
+fn fulfil(bin: map, count: int, allow_partial: bool) {
+  try {
+    return @take_stock($bin, $count)
+  } catch StockShortage as err when $allow_partial {
+    throw if $err['available'] == 0
+    return @take_stock($bin, $err['available'])
+  }
+}
+
+describe(name: 'Fulfilling a stock reservation') {
+  test(name: 'an exact reservation consumes the last unit without recovery') {
+    bin = { units: 2 }
+    expect(value: @fulfil($bin, 2, false), same: 2)
+    expect(value: $bin.units, same: 0)
+  }
+
+  test(name: 'partial fulfilment uses the available quantity reported by the error') {
+    bin = { units: 3 }
+    expect(value: @fulfil($bin, 8, true), same: 3)
+    expect(value: $bin.units, same: 0)
+  }
+
+  test(name: 'a filtered-out shortage reaches callers catching its parent type') {
+    bin = { units: 3 }
+    expect_error(type: Conflict, as: err) {
+      @fulfil($bin, 8, false)
+    }
+    expect(value: $err.type, same: 'StockShortage')
+    expect(value: $err['available'], same: 3)
+    expect(value: $err['requested'], same: 8)
+    expect(value: $bin.units, same: 3)
+  }
+
+  test(name: 'the conditional rethrow retains the original shortage at zero stock') {
+    bin = { units: 0 }
+    expect_error(type: StockShortage, as: err) {
+      @fulfil($bin, 2, true)
+    }
+    expect(value: $err.message, same: 'Insufficient stock')
+    expect(value: $err['requested'], same: 2)
+    expect(value: $err['available'], same: 0)
+  }
+
+  test(name: 'an invalid request bypasses partial fulfilment and leaves stock intact') {
+    bin = { units: 3 }
+    expect(value: @fulfil($bin, 0, true), throws: Validation)
+    expect(value: $bin.units, same: 3)
+  }
+}

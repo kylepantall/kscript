@@ -214,7 +214,7 @@ namespace KScript.Language.Analysis
         private string PatternLiteralProblem(Symbol type, string word, Scope scope, int offset) =>
             type.Shape.Instance?.Type is string root && root != KType.String
                 ? LiteralProblem(word, type.Name, scope, offset)
-                : RefinementProblem(type.Name, word, word, "string", type.Shape.LiteralRules);
+                : RefinementProblem(type.Name, word, "string", type.Shape.LiteralRules.Select(rule => (rule, (object)word)));
 
         private bool IsModelElement(MarkupElement e) =>
             IsKScriptElementName(e, "model") && catalog.GetElement("model")?.Package == "KScript.Data";
@@ -330,7 +330,7 @@ namespace KScript.Language.Analysis
             TextSpan span = TrimmedSpan(value);
             if (kind != null && (!parsed.Success || Interpreter.IsRawWord(parsed.Root, kind, null, null, typed: true)))
             {
-                CheckLiteralFits(value.Value.Trim(), type, span, scope, offset);
+                CheckLiteralFits(value.Value.Trim(), type, span, scope, offset, raw: true);
                 return true;
             }
             if (parsed.Success)
@@ -381,7 +381,7 @@ namespace KScript.Language.Analysis
             }
             foreach ((string text, TextSpan span) in raw)
             {
-                CheckLiteralFits(text, t[..^2], span, scope, offset);
+                CheckLiteralFits(text, t[..^2], span, scope, offset, raw: true);
             }
             foreach (DecodedText item in evaluated)
             {
@@ -400,11 +400,13 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>Reports, at the literal, a value that can't be <paramref name="type"/>: a bad email, an out of range Age, a word not in an enum.</summary>
-        private void CheckLiteralFits(object literal, string type, TextSpan span, Scope scope, int offset)
+        private void CheckLiteralFits(object literal, string type, TextSpan span, Scope scope, int offset, bool raw = false)
         {
             string problem = LiteralProblem(literal, type, scope, offset);
             if (problem != null)
             {
+                if (raw && literal is string text && text.Contains("{$", StringComparison.Ordinal))
+                    problem += " Unquoted text keeps {$...} literally. Use double quotes to interpolate a variable.";
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidTypedValue, problem);
             }
         }
@@ -500,9 +502,7 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            // Each refinement, innermost first, as the runtime checks them. A type that normalizes changes the value first,
-            // so the check stops there; validate: rules need the running script.
-            return RefinementProblem(name, shown, value, root, StaticRefinementRules(element));
+            return RefinementProblem(name, shown, root, StaticRefinementRules(element, value));
         }
 
         private IReadOnlyList<string> RefinementChoices(MarkupElement type, string root)
@@ -545,21 +545,37 @@ namespace KScript.Language.Analysis
             }).Select(Values.ToStr).Distinct(StringComparer.Ordinal).ToArray();
         }
 
-        private IEnumerable<TypeRules> StaticRefinementRules(MarkupElement element)
+        private IEnumerable<(TypeRules Rules, object Value)> StaticRefinementRules(MarkupElement element, object value)
         {
             var chain = RefinementChain(element);
             chain.Reverse();
             foreach (MarkupElement level in chain)
             {
-                if (level.ChildElements.Any(c => IsKScriptElementName(c, "normalize")) || RulesOf(level) is not TypeRules rules)
-                    yield break;
-                yield return rules;
+                if (level.ChildElements.FirstOrDefault(c => IsKScriptElementName(c, "normalize")) is MarkupElement normalize)
+                {
+                    // A normalizer can run user code. Fold only a known call to the built-in string trim.
+                    if (value is not string text || !IsPlainStringTrim(level, normalize)) yield break;
+                    value = text.Trim();
+                }
+                if (RulesOf(level) is not TypeRules rules) yield break;
+                yield return (rules, value);
             }
         }
 
-        private static string RefinementProblem(string name, string shown, object value, string root, IEnumerable<TypeRules> levels)
+        private bool IsPlainStringTrim(MarkupElement level, MarkupElement normalize)
         {
-            foreach (TypeRules rules in levels)
+            if (WithNames(level) is not [KType.String] || result.ExtensionMethods.TryGetValue(KType.String, out var methods) && methods.ContainsKey("trim"))
+                return false;
+            // An implicitly loaded native type can have imports private to its own module.
+            if (level.Parent != result.Markup.RootElements.FirstOrDefault() && level.Parent?.ChildElements.Any(e => e.Name == "extend" || e.Name == "import" && e.GetAttribute("path") != null) == true)
+                return false;
+            return normalize.GetAttributeValue("value") is string expression && ExpressionParser.ParseExpression(expression) is
+                { Success: true, Root: MethodCallNode { Name: "trim", Target: VariableNode { Name: "value" }, ArgumentList: { Closed: true, Arguments.Count: 0 } } };
+        }
+
+        private static string RefinementProblem(string name, string shown, string root, IEnumerable<(TypeRules Rules, object Value)> levels)
+        {
+            foreach (var (rules, value) in levels)
             {
                 string problem = rules.CheckPlain(value, item => PlainAs(root, item)).FirstOrDefault();
                 if (problem != null)

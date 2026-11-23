@@ -98,7 +98,7 @@ const diagnostics = new Promise((resolve) => {
   assert.deepStrictEqual(testLenses.map((l) => l.command.command), ['kscript.runTestsInFile', 'kscript.runTest', 'kscript.runTest'], 'Run test lenses');
 
   await require('./language-scenarios')(connection, init.capabilities,
-    (args) => execFile(executable, [...cliArgs, ...args], { timeout: 60000 }));
+    (args, options) => execFile(executable, [...cliArgs, ...args], { timeout: 60000, ...options }));
   await require('./interpolation')(connection, init.capabilities);
 
   await connection.sendRequest('shutdown');

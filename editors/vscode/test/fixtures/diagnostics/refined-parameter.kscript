@@ -1,0 +1,5 @@
+import "../../../../../samples/scripts/tests/language/types/prefixed-key.kscript"
+
+fn describe_key(key: PrefixedKey) => $key->upper()
+
+echo @describe_key(null)

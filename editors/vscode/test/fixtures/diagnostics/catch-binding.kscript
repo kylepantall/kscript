@@ -1,0 +1,6 @@
+try {
+  throw Validation "invalid product"
+} catch Validation as err {
+  echo "🔑 {$er.message}"
+  echo $err.type
+}

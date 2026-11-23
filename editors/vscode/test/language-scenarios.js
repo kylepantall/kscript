@@ -134,10 +134,11 @@ async function modelFields(connection, capabilities) {
   await connection.sendNotification('textDocument/didClose', { textDocument: { uri } });
 }
 
-function testFiles(dir) {
+function scriptFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(dir, entry.name);
-    return entry.isDirectory() ? testFiles(file) : isTestFile(file) ? [file] : [];
+    if (entry.isDirectory()) return scriptFiles(file);
+    return file.endsWith('.kscript') || isTestFile(file) ? [file] : [];
   });
 }
 
@@ -191,17 +192,26 @@ async function discoverCorpus(connection, runCli) {
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
-  const files = testFiles(corpus).sort();
+  const files = scriptFiles(corpus).sort();
+  const suites = files.filter(isTestFile);
+  const { stdout } = await runCli(['check', corpus, '--warnings-as-errors', '--output', 'json']);
+  const report = JSON.parse(stdout);
+  assert.equal(report.files, files.length, 'CLI and editor enumerate the same scripts and helpers');
+  assert.deepEqual(report.problems, [], 'the runnable corpus checks without diagnostics');
   assert.ok(files.length > 0);
-  assert.deepEqual([...new Set(results.map((r) => path.resolve(r.file)))].sort(), files, 'every script runs');
+  assert.deepEqual([...new Set(results.map((r) => path.resolve(r.file)))].sort(), suites, 'every suite runs');
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
     const uri = pathToFileURL(file).href;
     const textDocument = { uri };
     const diagnostics = await diagnosticsAfter(connection, 'didOpen', {
-      textDocument: { uri, languageId: 'kscript-code', version: 1, text },
+      textDocument: { uri, languageId: file.endsWith('.kscript') ? 'kscript-code' : 'kscript', version: 1, text },
     });
     assert.deepEqual(diagnostics, [], file + ' opens without diagnostics');
+    if (!isTestFile(file)) {
+      await connection.sendNotification('textDocument/didClose', { textDocument });
+      continue;
+    }
     if (path.basename(file) === 'declaration-catches.test.kscript') {
       const hover = await connection.sendRequest('textDocument/hover', {
         textDocument, position: position(text, '@fetch_name($mode)', 4),
@@ -263,11 +273,12 @@ async function discoverCorpus(connection, runCli) {
     assert.equal(covered.size, cases.length, file + ' exposes every runtime test in the editor');
     await connection.sendNotification('textDocument/didClose', { textDocument });
   }
-  console.log('Language corpus matched ' + results.length + ' JUnit tests across ' + files.length + ' files.');
+  console.log('Language corpus matched ' + results.length + ' JUnit tests across ' + suites.length + ' suites; checked ' + files.length + ' scripts and helpers.');
 }
 
 module.exports = async function languageScenarios(connection, capabilities, runCli) {
   await discoverCorpus(connection, runCli);
+  await require('./diagnostic-files')(connection, runCli, diagnosticsAfter, position);
   await scriptBoundary(connection, runCli);
   await normalizers(connection);
   await checkoutEdits(connection);

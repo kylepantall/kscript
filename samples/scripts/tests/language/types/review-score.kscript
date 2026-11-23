@@ -1,0 +1,6 @@
+type ReviewScore with [int] {
+  min: 0
+  max: 100
+
+  fn passes() => $value >= 60
+}

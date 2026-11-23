@@ -23,6 +23,9 @@ const { runTests } = require('@vscode/test-electron');
   fs.writeFileSync(path.join(workspace, 'stops.kscript'), "stock = 0\nthrow \"out of stock\"\necho $stock\n");
   fs.writeFileSync(path.join(workspace, 'cart.test.kscript'),
     "test(name: \"starts empty\") {\n  expect(value: 0, equals: 0)\n}\ntest(name: \"fails\") {\n  expect(value: 1, equals: 2)\n}\n");
+  for (const folder of ['tools', 'lib']) {
+    fs.cpSync(path.join(__dirname, '../fixtures/diagnostics', folder), path.join(workspace, folder), { recursive: true });
+  }
   const languageSamples = path.resolve(__dirname, '../../../../samples/scripts/tests/language');
   fs.mkdirSync(path.join(workspace, 'types'));
   for (const file of [

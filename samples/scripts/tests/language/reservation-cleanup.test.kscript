@@ -1,0 +1,66 @@
+fn with_slot(slot: map, action: fn) {
+  throw if $slot.busy {
+    type: 'Conflict'
+    message: 'Slot in use'
+  }
+  slot.busy = true
+  try {
+    return $action($slot)
+  } finally {
+    slot.busy = false
+    slot.releases = $slot.releases + 1
+  }
+}
+
+fn validate_batch(slot: map) {
+  throw Validation "Invalid batch in {$slot.name}"
+}
+
+describe(name: 'Releasing a reserved processing slot') {
+  before_each {
+    slot = { name: 'intake', busy: false, releases: 0 }
+  }
+
+  test(name: 'normal return keeps the callback result and releases exactly once') {
+    expect(value: @with_slot($slot, fn(current) => $current.busy), same: true)
+    expect(value: $slot.busy, same: false)
+    expect(value: $slot.releases, same: 1)
+  }
+
+  test(name: 'a callback failure unwinds before the caller sees the original error') {
+    expect_error(type: Validation, as: err) {
+      @with_slot($slot, @validate_batch)
+    }
+    expect(value: $err.message, same: 'Invalid batch in intake')
+    expect(value: $slot.busy, same: false)
+    expect(value: $slot.releases, same: 1)
+  }
+
+  test(name: 'a retry can reacquire the same slot after a rejected batch') {
+    try {
+      @with_slot($slot, @validate_batch)
+    } catch Validation as err {
+      expect(value: $err.message, contains: 'Invalid batch')
+    }
+    expect(
+      value: @with_slot($slot, fn(current) => $current.name),
+      same: 'intake'
+    )
+    expect(value: $slot.releases, same: 2)
+  }
+
+  test(name: 'an already held slot is left in the hands of its original owner') {
+    slot.busy = true
+    expect(value: @with_slot($slot, @validate_batch), throws: Conflict)
+    expect(value: $slot.busy, same: true)
+    expect(value: $slot.releases, same: 0)
+  }
+
+  test(name: 'nested acquisition unwinds only the outer reservation') {
+    expect_error(type: Conflict, contains: 'Slot in use') {
+      @with_slot($slot, fn(current) => @with_slot($current, @validate_batch))
+    }
+    expect(value: $slot.busy, same: false)
+    expect(value: $slot.releases, same: 1)
+  }
+}

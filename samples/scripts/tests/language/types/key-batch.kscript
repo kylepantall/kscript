@@ -1,0 +1,7 @@
+import "prefixed-key.kscript"
+
+type KeyBatch {
+  active: PrefixedKey
+  previous?: PrefixedKey
+  candidates: PrefixedKey[]
+}

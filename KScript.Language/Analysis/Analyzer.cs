@@ -101,6 +101,7 @@ namespace KScript.Language.Analysis
             CheckOneTypePerFile();
 
             WalkChildren(result.Markup.Children, root, markupMode: Kind != DocumentKind.Script);
+            WalkTestBodies();
         }
 
         private static bool IsPartialPath(string path)
@@ -781,6 +782,11 @@ namespace KScript.Language.Analysis
 
                 case "do":
                     AnalyzeStatementsContent(e, scope, declare: false);
+                    return;
+
+                case "test" or "before_each" or "after_each" when info.Package == "KScript.Test" && testBodies != null && inner != scope:
+                    AnalyzeAttributes(e, info, scope);
+                    testBodies.Add((e, inner, markupMode));
                     return;
 
                 case "expect_error" when info.Package == "KScript.Test":
