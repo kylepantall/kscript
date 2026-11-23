@@ -808,6 +808,11 @@ namespace KScript.Runtime
 
         private static void RegisterCommands(PackageBuilder p)
         {
+            p.Command("set_exchange_rate", "from: currency, to: currency, rate: number", "Sets a rate for this run. One unit of from buys rate units of to. Overrides the project's money.exchange_rates entry for this direction.", KType.Null, c =>
+            {
+                MoneyExchangeRates.Set(c.Host, Values.ToStr(c.Arg(0, "from")), Values.ToStr(c.Arg(1, "to")), c.Arg(2, "rate"));
+                return null;
+            }, "@set_exchange_rate(from: 'EUR', to: 'GBP', rate: 0.80)");
             p.Command("now", "", "The current date and time.", KType.Date, c => DateTime.Now, "@now()->format('d MMMM yyyy')");
             p.Command("today", "", "Today's date, at midnight.", KType.Date, c => DateTime.Today);
             p.Command("range", "start, end?, step?", "Numbers from start up to (not including) end; with one argument, from 0. start..end is the short form when the step is 1.", KType.List, c =>

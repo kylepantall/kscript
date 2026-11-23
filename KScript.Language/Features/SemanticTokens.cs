@@ -100,6 +100,7 @@ namespace KScript.Language.Features
         public List<SemanticToken> GetSemanticTokens(DocumentAnalysis analysis)
         {
             List<SemanticToken> tokens = new List<SemanticToken>();
+            var money = analysis.MoneyLiterals.Values.Distinct().ToDictionary(span => span.Start);
             Dictionary<int, SymbolReference> references = new Dictionary<int, SymbolReference>();
             foreach (SymbolReference r in analysis.References)
             {
@@ -142,6 +143,12 @@ namespace KScript.Language.Features
                         Token prev = i > 0 ? list[i - 1] : default;
                         Token next = i + 1 < list.Count ? list[i + 1] : default;
                         TextSpan span = region.Source.ToSource(t.Span);
+                        if (money.TryGetValue(span.Start, out TextSpan amount))
+                        {
+                            tokens.Add(new SemanticToken(amount, SemanticTokenType.Number, SemanticTokenModifiers.None));
+                            while (i + 1 < list.Count && region.Source.ToSource(list[i + 1].Span.Start) < amount.End) i++;
+                            continue;
+                        }
 
                         switch (t.Kind)
                         {

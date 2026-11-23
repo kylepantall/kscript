@@ -192,7 +192,7 @@ namespace KScript.Runtime
         {
             string kind = Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module);
             if (kind == null || p.DefaultText == null) return null;
-            return p.Default == null || Interpreter.IsRawWord(p.Default, kind, Closure, Module) || Interpreter.LooksRaw(p.DefaultText, kind) ? p.DefaultText : null;
+            return p.Default == null || Interpreter.IsRawWord(p.Default, kind, Closure, Module, typed: true) || Interpreter.LooksRaw(p.DefaultText, kind) ? p.DefaultText : null;
         }
 
         public object Call(CallContext call)

@@ -534,6 +534,8 @@ if $config->has('features') {
 key = $config->require('api.key') // stops with a clear message when it's missing
 ```
 
+Money arithmetic reads directed exchange rates from `money.exchange_rates` in these settings. For example, `money.exchange_rates.EUR.GBP` supplies pounds per euro when adding a euro amount to a pound balance. See [Money](types.md#money) for the configuration and a runnable example.
+
 **Environments.** `kscript --env staging script.kscript` (or `KSCRIPT_ENV=staging`, or `config(env: staging)`) layers the environment's files over the base files. Later files win, and maps merge field by field:
 
 1. `config.json`, `config.yaml`, `config.yml`, then `.env`

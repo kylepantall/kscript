@@ -16,7 +16,7 @@ namespace KScript.Runtime
         public static readonly IReadOnlySet<string> BasicTypes = new HashSet<string>(StringComparer.Ordinal) { "number", "string", "bool", "date", "list", "map" };
 
         private readonly NativeType owner;
-        private readonly List<NativeOperator> binary = new List<NativeOperator>();
+        private readonly List<NativeBinaryOperator> binary = new();
         private readonly List<NativeOperator> ranges = new List<NativeOperator>();
         private readonly List<NativeOperatorInfo> infos = new List<NativeOperatorInfo>();
 
@@ -25,7 +25,7 @@ namespace KScript.Runtime
         /// <summary>The binary operators, ranges and unary -, as the editor sees them.</summary>
         public IReadOnlyList<NativeOperatorInfo> Infos => infos;
 
-        internal IReadOnlyList<NativeOperator> BinaryList => binary;
+        internal IReadOnlyList<NativeBinaryOperator> BinaryList => binary;
 
         internal IReadOnlyList<NativeOperator> RangeList => ranges;
 
@@ -41,7 +41,11 @@ namespace KScript.Runtime
         /// <c>left op right</c> gives a <paramref name="result"/>. <paramref name="run"/> gets the two values already as
         /// the declared types: text on a native side has been parsed (<c>$d + '30m'</c>), so it can cast them.
         /// </summary>
-        public NativeOperators Binary(string op, string left, string right, string result, string summary, Func<object, object, object> run)
+        public NativeOperators Binary(string op, string left, string right, string result, string summary, Func<object, object, object> run) =>
+            BinaryInHost(op, left, right, result, summary, (a, b, _, _) => run(a, b));
+
+        internal NativeOperators BinaryInHost(string op, string left, string right, string result, string summary,
+            Func<object, object, KScriptHost, string, object> run)
         {
             if (!BinaryOperators.Contains(op))
                 throw new ConventionException($"Native type {owner.Name} declares operator '{op}': a native type declares {string.Join(", ", BinaryOperators)}, unary - (Negate), ranges (Range) and Falsy. == comes from Equality and < > from Ordering.");
@@ -53,7 +57,7 @@ namespace KScript.Runtime
             if (binary.Any(b => b.Operator == op && b.Left == left && b.Right == right))
                 throw new ConventionException($"Native type {owner.Name} declares {left} {op} {right} twice.");
             Require(summary, $"{left} {op} {right}");
-            binary.Add(new NativeOperator(op, left, right, result, (a, b, _) => run(a, b)));
+            binary.Add(new NativeBinaryOperator(op, left, right, run));
             infos.Add(new NativeOperatorInfo(op, left, right, result, summary, owner.Name));
             return this;
         }
@@ -114,7 +118,9 @@ namespace KScript.Runtime
         }
     }
 
-    /// <summary>One declared operator, with the code that runs it.</summary>
+    internal sealed record NativeBinaryOperator(string Operator, string Left, string Right, Func<object, object, KScriptHost, string, object> Run);
+
+    /// <summary>A range or unary operator, with the code that runs it.</summary>
     internal sealed class NativeOperator
     {
         public NativeOperator(string op, string left, string right, string result, Func<object, object, object, object> run)

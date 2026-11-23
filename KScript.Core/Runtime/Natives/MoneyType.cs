@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Numerics;
 using System.Text.RegularExpressions;
 
 using KScript.Metadata;
@@ -16,10 +18,10 @@ namespace KScript.Runtime
     /// An amount with more decimal places than its currency has (GBP 9.505) is refused too.
     /// </para>
     /// <para>
-    /// Amounts of one currency add, subtract, divide into each other and compare; any amount scales by a number,
-    /// rounding to the currency's smallest unit (half away from zero). Mixing currencies is an error that says so,
-    /// since there is no rate to convert with. ->split(n) and ->allocate(ratios) share an amount without losing a
-    /// penny.
+    /// Amounts of one currency add, subtract, divide into each other and compare. Addition also accepts a foreign
+    /// amount when a rate is supplied on ->add(), on the receiver, or in the host. Conversion and scaling round
+    /// to the currency's smallest unit (half away from zero). ->split(n) and ->allocate(ratios) share an amount
+    /// without losing a penny.
     /// </para>
     /// </summary>
     public sealed class MoneyType : NativeType
@@ -37,11 +39,13 @@ namespace KScript.Runtime
 
         public override string Name => "money";
 
-        public override string Description => "An amount of money in a currency: GBP 9.50, 9.50 GBP, £9.50 or $12. Kept as the code and the amount, with the currency's decimal places.";
+        public override string Description => "An amount with a currency. Write GBP9.50 directly in expressions. Typed money also accepts text such as 'GBP 9.50', '£9.50' and '$12'. Displays the code and the currency's decimal places.";
 
-        public override string Example => "'GBP 9.50'";
+        public override string Example => "GBP9.50";
 
         public override RawText RawText => RawText.Word;
+
+        public override IReadOnlyList<string> Options => new[] { "rates" };
 
         public override IReadOnlyList<string> StringMethods => Array.Empty<string>();
 
@@ -56,7 +60,7 @@ namespace KScript.Runtime
         protected override void DeclareOperators(NativeOperators o)
         {
             const string M = "money", N = "number";
-            o.Binary("+", M, M, M, "The two amounts added, in one currency: GBP 9.50 + GBP 0.50 is GBP 10.00.", (a, b) => Of(Amount(a) + Amount(Same(a, b, "add")), a))
+            o.BinaryInHost("+", M, M, M, "Adds in the left currency. For a foreign amount, uses the left amount's rates table, then @set_exchange_rate() or the project's money.exchange_rates setting.", (a, b, host, directory) => Add(a, b, host, directory))
              .Binary("-", M, M, M, "The second amount taken from the first, in one currency: GBP 10 - GBP 0.50 is GBP 9.50.", (a, b) => Of(Amount(a) - Amount(Same(a, b, "subtract")), a))
              .Binary("*", M, N, M, "The amount times a number, rounded to the currency's smallest unit: GBP 9.50 * 3 is GBP 28.50.", (a, b) => Of(Amount(a) * Factor((double)b), a))
              .Binary("*", N, M, M, "The amount times a number, rounded to the currency's smallest unit: 3 * GBP 9.50 is GBP 28.50.", (a, b) => Of(Factor((double)a) * Amount(b), b))
@@ -68,8 +72,8 @@ namespace KScript.Runtime
 
         protected override void DeclareListMembers(NativeListMembers l)
         {
-            l.Method("total", "", "The amounts added, in one currency: ['GBP 9.50', 'GBP 0.50'] gives GBP 10.00. An empty list gives null.", "money", (items, c) =>
-                items.Skip(1).Aggregate(items.FirstOrDefault(), (sum, x) => Of(Amount(sum) + Amount(Same(sum, x, "add")), sum)),
+            l.Method("total", "", "Adds the amounts in list order in the first currency, using the same exchange rates and rounding as +. An empty list gives null.", "money", (items, c) =>
+                items.Skip(1).Aggregate(items.FirstOrDefault(), (sum, x) => Add(sum, x, c.Host, c.Module?.Directory)),
                 "<let name=\"x\" type=\"money[]\" value=\"['GBP 9.50', 'GBP 0.50']\" />\n<echo>{ $x->total() }</echo>");
         }
 
@@ -79,6 +83,8 @@ namespace KScript.Runtime
             const string Let = "<let name=\"x\" type=\"money\" value=\"'GBP 10.00'\" />\n";
             m.Field("amount", N, "The amount as a number, without the currency: 9.5 for GBP 9.50.", (t, _) => (double)Amount(t), Let + "<echo>{ $x.amount }</echo>");
             m.Field("currency", "currency", "The currency the amount is in: GBP.", (t, _) => ((NativeText)t).Part("currency"), Let + "<echo>{ $x.currency.name }</echo>");
+            m.Method("add", "other: money, rate?: number", "Adds another amount in this amount's currency. For a foreign amount, rate gives units of the receiving currency per unit of the other. Omitting rate uses the receiving amount's rates table, then @set_exchange_rate(), then the project's money.exchange_rates setting. The incoming amount rounds to the nearest minor unit, with ties away from zero.", "money", (t, c) => AddWithRate((NativeText)t, c),
+                Let + "<let name=\"euros\" type=\"money\" value=\"'EUR 5.00'\" />\n<echo>{ $x->add($euros, rate: 0.8) }</echo>");
             m.Method("format", "locale?: string", "The amount written for a locale, or the current one: £10.00 in en, 10,00 £ in fr.", S, (t, c) =>
             {
                 string locale = c.Arg(0) is object l && Values.ToStr(l).Length > 0
@@ -145,7 +151,10 @@ namespace KScript.Runtime
             int places = point < 0 ? 0 : number.Length - point - 1;
             if (places > digits)
                 return (null, digits == 0 ? $"{code} amounts are whole numbers" : $"{code} amounts have at most {digits} decimal place{(digits == 1 ? string.Empty : "s")}");
-            decimal amount = decimal.Parse(number.Replace(",", string.Empty), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
+            string ungrouped = number.Replace(",", string.Empty);
+            if (!decimal.TryParse(ungrouped, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal amount)
+                || amount.ToString("F" + places, CultureInfo.InvariantCulture).TrimStart('0') != ungrouped.TrimStart('0'))
+                return (null, "the amount is too large to represent exactly in money arithmetic");
             return (Of(negative ? -amount : amount, currency), null);
         }
 
@@ -156,16 +165,131 @@ namespace KScript.Runtime
         public static NativeText Of(decimal amount, object currency)
         {
             var c = (NativeText)currency;
+            object rates = c.Part("rates");
             if (c.TypeName == "money") c = (NativeText)c.Part("currency");
             int digits = (int)(double)c.Part("digits");
-            decimal rounded = Math.Round(amount, digits, MidpointRounding.AwayFromZero);
+            decimal rounded = Round(amount, digits);
             if (rounded == 0) rounded = 0m; // no -0.00
             string text = c.Text + " " + rounded.ToString("F" + digits, CultureInfo.InvariantCulture);
-            return new NativeText("money", text, new Dictionary<string, object>
+            var parts = new Dictionary<string, object>
             {
                 ["amount"] = rounded,
                 ["currency"] = c,
-            });
+            };
+            if (rates != null) parts["rates"] = rates;
+            return new NativeText("money", text, parts);
+        }
+
+        private static decimal Round(decimal amount, int digits) => Math.Round(amount, digits, MidpointRounding.AwayFromZero);
+
+        internal static bool HasRates(NativeText money) => money.Part("rates") != null;
+
+        internal static NativeText WithRates(NativeText money, object rates)
+        {
+            string problem = ReadRates(rates, out var snapshot);
+            if (problem != null) throw new KScriptException(problem, "Type");
+            var parts = new Dictionary<string, object>(money.Parts) { ["rates"] = new ReadOnlyDictionary<string, decimal>(snapshot) };
+            return new NativeText("money", money.Text, parts);
+        }
+
+        internal static string RatesProblem(object rates) => ReadRates(rates, out _);
+
+        private static string ReadRates(object value, out Dictionary<string, decimal> rates)
+        {
+            rates = new Dictionary<string, decimal>(StringComparer.Ordinal);
+            if (Values.Unwrap(value) is not Dictionary<string, object> map)
+                return "Money rates must be a map of currency codes to positive numbers, such as { EUR: 0.8 }.";
+            foreach (var (key, input) in map)
+            {
+                NativeText currency = CurrencyType.Find(key);
+                if (currency == null) return $"'{key}' in money rates must be an ISO 4217 currency code.";
+                if (!TryRate(input, out decimal rate)) return $"The money rate for {currency.Text} must be a positive finite number in decimal range.";
+                if (!rates.TryAdd(currency.Text, rate)) return $"The money rates map lists {currency.Text} more than once.";
+            }
+            return null;
+        }
+
+        private static bool TryRate(object value, out decimal rate)
+        {
+            rate = 0;
+            if (Values.Unwrap(value) is not double d || !double.IsFinite(d) || d <= 0) return false;
+            var culture = CultureInfo.InvariantCulture;
+            if (!decimal.TryParse(d.ToString("R", culture), NumberStyles.Float, culture, out rate)) return false;
+            // Decimal parsing can succeed after rounding a tiny rate to a different quote.
+            return double.Parse(rate.ToString(culture), culture) == d;
+        }
+
+        internal static decimal RequireRate(object value) => TryRate(value, out decimal rate) ? rate
+            : throw new KScriptException("An exchange rate must be a positive finite number in decimal range.", "Argument");
+
+        private NativeText AddWithRate(NativeText left, CallContext call)
+        {
+            object input = call.Arg(0, "other");
+            if (Coerce(input) is not NativeText other)
+                throw new KScriptException($"->add() needs a money amount for other, but got {Values.Describe(input)}.", "Type");
+            decimal? rate = call.Has(1, "rate") ? RequireRate(call.Arg(1, "rate")) : null;
+            return Add(left, other, call.Host, call.Module?.Directory, rate);
+        }
+
+        private static NativeText Add(object left, object right, KScriptHost host, string directory, decimal? exchangeRate = null)
+        {
+            decimal rate = 1m;
+            if (Code(right) != Code(left))
+                rate = exchangeRate ?? IncomingRate((NativeText)left, (NativeText)right, host, directory);
+            else if (exchangeRate.HasValue && exchangeRate.Value != 1)
+                throw new KScriptException($"The rate for ->add() must be 1 when both amounts are in {Code(left)}.", "Argument");
+            int digits = Digits(left);
+            BigInteger units = MinorUnits(Amount(left), 1m, digits) + MinorUnits(Amount(right), rate, digits);
+            return Of(FromMinorUnits(units, digits), left);
+        }
+
+        // Keep the exact base-ten product until we round to the receiving currency's smallest unit.
+        private static BigInteger MinorUnits(decimal amount, decimal rate, int digits)
+        {
+            var (coefficient, scale) = DecimalParts(amount);
+            if (rate != 1m)
+            {
+                var (rateCoefficient, rateScale) = DecimalParts(rate);
+                coefficient *= rateCoefficient;
+                scale += rateScale;
+            }
+            if (scale <= digits) return coefficient * BigInteger.Pow(10, digits - scale);
+            BigInteger divisor = BigInteger.Pow(10, scale - digits);
+            BigInteger units = BigInteger.DivRem(coefficient, divisor, out var remainder);
+            return 2 * BigInteger.Abs(remainder) >= divisor ? units + coefficient.Sign : units;
+        }
+
+        private static (BigInteger Coefficient, int Scale) DecimalParts(decimal value)
+        {
+            Span<int> bits = stackalloc int[4];
+            decimal.GetBits(value, bits);
+            BigInteger coefficient = ((BigInteger)(uint)bits[2] << 64) | ((BigInteger)(uint)bits[1] << 32) | (uint)bits[0];
+            return (bits[3] < 0 ? -coefficient : coefficient, (bits[3] >> 16) & 0xFF);
+        }
+
+        private static decimal FromMinorUnits(BigInteger units, int scale)
+        {
+            // A very large whole amount can still fit if its trailing fractional zeroes are removed.
+            while (BigInteger.Abs(units).GetBitLength() > 96)
+            {
+                if (scale == 0) throw SumOutOfRange();
+                units = BigInteger.DivRem(units, 10, out var remainder);
+                if (!remainder.IsZero) throw SumOutOfRange();
+                scale--;
+            }
+            return (decimal)units / (decimal)BigInteger.Pow(10, scale);
+        }
+
+        private static KScriptException SumOutOfRange() =>
+            new KScriptException("The result of adding these amounts is too large to represent exactly in money arithmetic.", "Math");
+
+        private static decimal IncomingRate(NativeText left, NativeText right, KScriptHost host, string directory)
+        {
+            string from = Code(right), to = Code(left);
+            if (left.Part("rates") is IReadOnlyDictionary<string, decimal> rates && rates.TryGetValue(from, out decimal rate))
+                return rate;
+            if (MoneyExchangeRates.TryGet(host, directory, from, to, out rate)) return rate;
+            throw new KScriptException($"Can't add {left.Text} and {right.Text}: they are in different currencies. Pass a rate to ->add() or register {from} to {to} with @set_exchange_rate().", "Type");
         }
 
         /// <summary>The amount in a money value, as a decimal.</summary>

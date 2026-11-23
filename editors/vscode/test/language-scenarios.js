@@ -81,6 +81,34 @@ async function normalizers(connection) {
   await connection.sendNotification('textDocument/didClose', { textDocument });
 }
 
+async function checkoutEdits(connection) {
+  const file = path.join(corpus, 'checkout-workflow.test.kscript');
+  const uri = pathToFileURL(file).href;
+  const textDocument = { uri };
+  const text = fs.readFileSync(file, 'utf8');
+  const diagnostics = await diagnosticsAfter(connection, 'didOpen', {
+    textDocument: { uri, languageId: 'kscript-code', version: 1, text },
+  });
+  assert.deepEqual(diagnostics, [], 'checkout opens cleanly with its record methods and catches');
+  const definitions = await connection.sendRequest('textDocument/definition', {
+    textDocument, position: position(text, '@checkout($lines', 4),
+  });
+  assert.deepEqual(definitions.map((d) => [d.uri, d.range.start]), [[uri, position(text, 'fn checkout(', 3)]]);
+
+  const invalid = text.replace('unit_price: GBP4.50', 'unit_price: GBP4.501');
+  const errors = await diagnosticsAfter(connection, 'didChange', {
+    textDocument: { uri, version: 2 }, contentChanges: [{ text: invalid }],
+  });
+  const precision = errors.filter((d) => d.code === 'KS5012');
+  assert.deepEqual(precision.map((d) => d.range), [{
+    start: position(invalid, 'GBP4.501'), end: position(invalid, 'GBP4.501', 8),
+  }], 'the editor flags the precise line-item literal');
+  assert.deepEqual(await diagnosticsAfter(connection, 'didChange', {
+    textDocument: { uri, version: 3 }, contentChanges: [{ text }],
+  }), [], 'restoring the invoice clears its diagnostic');
+  await connection.sendNotification('textDocument/didClose', { textDocument });
+}
+
 async function modelFields(connection, capabilities) {
   assert.ok(capabilities.completionProvider.triggerCharacters.includes(' '));
   const uri = 'file:///tmp/kscript-smoke/license.kscript';
@@ -233,5 +261,6 @@ module.exports = async function languageScenarios(connection, capabilities, runC
   await discoverCorpus(connection, runCli);
   await scriptBoundary(connection, runCli);
   await normalizers(connection);
+  await checkoutEdits(connection);
   await modelFields(connection, capabilities);
 };

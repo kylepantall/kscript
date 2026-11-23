@@ -33,14 +33,14 @@ namespace KScript.Runtime
                 return items.Select(item => RawOrEvaluated(item, itemKind, text, scope, module)).ToList();
             if (kind == null) return EvaluateText(text, scope, module);
             ParseResult parsed = ExpressionParser.ParseExpression(text.Value);
-            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(text.Value, kind)) return text.Value.Trim();
+            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module, typed: true) || LooksRaw(text.Value, kind)) return text.Value.Trim();
             return EvaluateText(text, scope, module);
         }
 
         private object RawOrEvaluated(string item, string kind, DecodedText whole, Scope scope, Module module)
         {
             ParseResult parsed = ExpressionParser.ParseExpression(item);
-            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module) || LooksRaw(item, kind)) return item.Trim();
+            if (!parsed.Success || IsRawWord(parsed.Root, kind, scope, module, typed: true) || LooksRaw(item, kind)) return item.Trim();
             return Evaluate(parsed.Root, scope, new EvalContext(module, whole));
         }
 
@@ -84,12 +84,12 @@ namespace KScript.Runtime
             kind == "handle" && RawHandle.IsMatch(text.Trim()) || kind == "slash" && text.TrimStart().StartsWith('/') && !Lexer.SlashPathFillsIn(text);
 
         /// <summary>True if <paramref name="node"/> is only bare words, numbers and the operators between them (<c>my-post</c>, <c>H4cmW12in</c>, <c>Europe/London</c>).</summary>
-        internal static bool IsRawWord(ExprNode node, string kind, Scope scope, Module module)
+        internal static bool IsRawWord(ExprNode node, string kind, Scope scope, Module module, bool typed = false)
         {
             switch (node)
             {
                 case IdentifierNode id:
-                    return !(module != null && module.Aliases.ContainsKey(id.Name));
+                    return !(module != null && module.Aliases.ContainsKey(id.Name)) && (typed || !MoneyLiterals.IsAmountName(id.Name));
                 case CommandCallNode { ArgumentList: null }:
                     return kind == "handle";
                 case LiteralNode { Kind: LiteralKind.SlashPath or LiteralKind.Regex, Template: null } when kind == "slash":
@@ -231,6 +231,8 @@ namespace KScript.Runtime
 
         private object EvaluateCore(ExprNode node, Scope scope, EvalContext ctx)
         {
+            if (MoneyLiterals.TryRead(node, out string moneyName, out string money) && CanBeLiteral(moneyName, scope, ctx.Module))
+                return MoneyLiterals.Read(money);
             // my-post, api.corp.com, 1.4.2: words read as the type whose pattern fits them.
             if (node is BinaryNode or MemberNode && CompoundLiteral(node, scope, ctx) is Func<object> compound) return compound();
             switch (node)
@@ -473,6 +475,10 @@ namespace KScript.Runtime
 
         private BareWord BareWordOf(ExprNode node, Scope scope, EvalContext ctx, bool afterNamed)
         {
+            if (MoneyLiterals.TryRead(node, out string name, out _) && CanBeLiteral(name, scope, ctx.Module))
+                return node is IdentifierNode ? new BareWord(name, false, afterNamed) { IsIdentifier = true, IsMoney = true } : null;
+            if (node is MemberNode moneyField && MoneyLiterals.AmountReceiverName(moneyField) is string amount
+                && CanBeLiteral(amount, scope, ctx.Module)) return null;
             // @kyle names a function when there is one; otherwise it can only be a handle, for a parameter that takes one.
             if (node is CommandCallNode { ArgumentList: null } reference && !CanResolve(reference, scope, ctx))
                 return new BareWord("@" + reference.Name, false, afterNamed);
@@ -600,7 +606,7 @@ namespace KScript.Runtime
             {
                 try
                 {
-                    if (NativeTypeRegistry.TryBinary(op, a, b, out object native)) return native;
+                    if (NativeTypeRegistry.TryBinary(op, a, b, Host, ctx.Module?.Directory, out object native)) return native;
                 }
                 catch (KScriptException ex) when (ex.Line == 0)
                 {
@@ -1054,6 +1060,7 @@ namespace KScript.Runtime
                 }
                 if (value is not BareWord { IsIdentifier: true } word) return value;
                 if (Shapes.RawTextKind(expected, closure, module) != null) return word.Name;
+                if (word.IsMoney) return MoneyLiterals.Read(word.Name);
                 return InferredLiteral(word.Name, scope, ctx.Module)?.Convert(this) ?? value;
             }
         }

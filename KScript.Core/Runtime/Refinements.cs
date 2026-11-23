@@ -351,6 +351,7 @@ namespace KScript.Runtime
                 return $"v on {owner} must be a UUID version from 1 to 8, or any.";
             if (Text("algorithm") is string a && a.ToLowerInvariant() is not ("argon2id" or "bcrypt")) return $"algorithm on {owner} must be argon2id or bcrypt.";
             if (Options.TryGetValue("domains", out object d) && d is not List<object>) return $"domains on {owner} must be a list, such as domains: ['example.com'].";
+            if (root == "money" && Options.TryGetValue("rates", out object rates)) return MoneyType.RatesProblem(rates);
             return null;
         }
     }

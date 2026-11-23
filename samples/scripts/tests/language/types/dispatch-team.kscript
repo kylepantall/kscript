@@ -1,0 +1,4 @@
+type DispatchTeam with [string] {
+  normalize: fn(text) => $text->trim()->lower()
+  pattern: /^[a-z]+$/
+}

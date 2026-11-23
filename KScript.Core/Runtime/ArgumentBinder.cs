@@ -27,6 +27,9 @@ namespace KScript.Runtime
         /// <summary>A plain name, which a pattern type can read (passkey_abc).</summary>
         internal bool IsIdentifier { get; init; }
 
+        /// <summary>An unbound name, such as GBP5, which can be a money value when no parameter claims the word.</summary>
+        internal bool IsMoney { get; init; }
+
         /// <summary>Words joined by - + / or . (my-post, 1.4.2), which a pattern type can read like a name.</summary>
         internal bool IsCompound { get; init; }
 
@@ -162,6 +165,7 @@ namespace KScript.Runtime
             if (!call.Args.Concat(call.Named.Values).Any(a => a is BareWord or BareList or LatePositional)) return call;
             object Value(object a) => a switch
             {
+                BareWord { IsMoney: true } money => MoneyLiterals.Read(money.Name),
                 BareWord word => Infer(word, call)?.Convert(call.Interpreter) ?? throw NotAValue(call, word, null),
                 BareList list => list.Items.Select(Value).ToList(),
                 LatePositional late => Value(late.Value),
@@ -192,8 +196,9 @@ namespace KScript.Runtime
             int Index(string name) => slots.FindIndex(s => !s.Variadic && s.Name == name);
             bool variadic = slots.Any(s => s.Variadic);
             bool hasPatterns = false;
-            PatternLiteral PatternValue(BareWord word, Slot slot)
+            object InferredValue(BareWord word, Slot slot)
             {
+                if (word.IsMoney && slot?.IsEnum != true && infer) return MoneyLiterals.Read(word.Name);
                 if (!infer || slot?.IsEnum == true || Infer(word, call) is not PatternLiteral match) return null;
                 hasPatterns = true;
                 return match;
@@ -232,7 +237,7 @@ namespace KScript.Runtime
                     named.Add(new KeyValuePair<string, object>(bare.Name, !bare.Negated));
                     flags.Add(bare.Name);
                 }
-                else if (PatternValue(bare, slot) is PatternLiteral match)
+                else if (InferredValue(bare, slot) is object match)
                 {
                     positional.Add(match);
                 }
@@ -256,7 +261,7 @@ namespace KScript.Runtime
                         named.Add(new KeyValuePair<string, object>(pair.Key, bare));
                         continue;
                     }
-                    resolved ??= PatternValue(bare, slot);
+                    resolved ??= InferredValue(bare, slot);
                     if (resolved == null)
                     {
                         error = NotAValue(call, bare, index >= 0 ? slots[index] : null, slots);
@@ -325,7 +330,7 @@ namespace KScript.Runtime
                 if (a is BareWord bare2)
                 {
                     value = !bare2.Negated ? EnumValue(target, bare2.Name) : null;
-                    value ??= PatternValue(bare2, target);
+                    value ??= InferredValue(bare2, target);
                     if (value == null)
                     {
                         error = NotAValue(call, bare2, target, slots);
@@ -361,7 +366,7 @@ namespace KScript.Runtime
                     else if (slot?.RawItemText != null && !word.Negated && (slot.RawItemText == "handle" || !word.Name.StartsWith('@')))
                         value = word.Name;
                     else
-                        value = PatternValue(word, null);
+                        value = InferredValue(word, null);
                     if (value == null)
                     {
                         problem = slot?.IsEnumList == true

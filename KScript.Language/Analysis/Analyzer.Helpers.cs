@@ -436,6 +436,7 @@ namespace KScript.Language.Analysis
             if (report && type != null)
             {
                 int typeStart = start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length);
+                CheckMoneyRates(type, value.ToSource(new TextSpan(typeStart, type.Length)));
                 ReferenceImportedType(type, value.ToSource(new TextSpan(typeStart, TypeInference.WithoutTypeArguments(type).TrimEnd('?').TrimEnd().Length)));
             }
             if (report && type != null && !IsBuiltInTypeName(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))

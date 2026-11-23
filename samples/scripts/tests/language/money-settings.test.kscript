@@ -1,0 +1,32 @@
+config(defaults: { money: { exchange_rates: {
+  SEK: { NOK: 1.25 },
+  CAD: { USD: 0.75 }
+} } })
+
+fn deposit(balance: money, credit: money) {
+  balance += $credit
+  return $balance
+}
+
+describe(name: "Money settings across a script") {
+  test(name: "a function and a list can use the same project quote") {
+    expect(value: $config.money.exchange_rates.SEK.NOK, same: 1.25)
+    receipt = @deposit(NOK1.00, SEK2.00)
+    amounts: money[] = [$receipt, SEK0.04]
+    expect(value: $receipt->to_string(), same: 'NOK 3.50')
+    expect(value: $amounts->total()->to_string(), same: 'NOK 3.55')
+    expect(value: SEK2 + NOK1, throws: Type)
+  }
+
+  test(name: "a runtime quote takes precedence without changing the file setting") {
+    @set_exchange_rate(from: 'CAD', to: 'USD', rate: 0.50)
+    expect(value: @deposit(USD1, CAD2)->to_string(), same: 'USD 2.00')
+    expect(value: $config.money.exchange_rates.CAD.USD, same: 0.75)
+    negotiated: money(rates: { CAD: 0.60 }) = USD1
+    expect(value: @deposit($negotiated, CAD2)->to_string(), same: 'USD 2.20')
+    expect(
+      value: $negotiated->add(CAD2, rate: 0.70)->to_string(),
+      same: 'USD 2.40'
+    )
+  }
+}

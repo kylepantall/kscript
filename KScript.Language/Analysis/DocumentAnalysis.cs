@@ -94,6 +94,9 @@ namespace KScript.Language.Analysis
         /// <summary>The inferred type for each bare pattern literal, by source offset.</summary>
         internal Dictionary<int, Symbol> PatternLiteralTypes { get; } = new Dictionary<int, Symbol>();
 
+        /// <summary>A compact money literal's expression span and its source text excluding parentheses.</summary>
+        internal Dictionary<TextSpan, TextSpan> MoneyLiterals { get; } = new();
+
         /// <summary>Words joined by - + / or . that a pattern type reads (my-post, 1.4.2), by the word's span.</summary>
         internal Dictionary<TextSpan, Symbol> PatternLiteralWords { get; } = new Dictionary<TextSpan, Symbol>();
 

@@ -24,18 +24,21 @@ namespace KScript.Language.Analysis
         private static bool IsTextRoot(string root) => root == "string" || (KScript.Metadata.NativeTypes.IsNative(root) && root != "port");
 
         /// <summary>The types named in with="..." (<c>with [User, Auditable]</c>), without brackets.</summary>
-        internal static List<string> WithNames(MarkupElement type)
+        internal static List<string> WithNames(MarkupElement type) => Shapes.TypeNames(type.GetAttributeValue("with"));
+
+        private void CheckMoneyRates(string text, TextSpan span)
         {
-            string with = type.GetAttributeValue("with")?.Trim();
-            if (string.IsNullOrEmpty(with))
+            if (!text.Contains('(') || !text.Contains("rates", StringComparison.Ordinal)) return;
+            string name = TypeBase(text);
+            if (name != "money" && (TypeElementNamed(name) is not MarkupElement definition || RefinedRoot(definition) != "money")) return;
+            TypeRef type = TypeRef.Parse(text);
+            string problem = type == null ? "money rates need a literal map of currency codes to positive numbers, such as rates: { EUR: 0.8 }." : null;
+            for (; type != null && problem == null; type = type.ArgBase)
             {
-                return new List<string>();
+                if (type.Args != null && type.Args.TryGetValue("rates", out object rates))
+                    problem = type.ArgBase.ListDepth > 0 ? "Give rates to the money item type before [], as in money(rates: { EUR: 0.8 })[]." : MoneyType.RatesProblem(rates);
             }
-            if (with.StartsWith('[') && with.EndsWith(']'))
-            {
-                with = with.Substring(1, with.Length - 2);
-            }
-            return with.Split(',').Select(n => n.Trim()).Where(n => n.Length > 0).ToList();
+            if (problem != null) Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, problem);
         }
 
         private MarkupElement TypeElementNamed(string name) =>
@@ -133,7 +136,7 @@ namespace KScript.Language.Analysis
 
         /// <summary>Consider the spelling only when the normal name and argument rules have given it no meaning.</summary>
         private bool TryPatternLiteral(IdentifierNode id, ExpressionRegion region, Scope scope = null, bool record = true) =>
-            !partsOfUnfitWords.Contains(id) && TryPatternLiteral(id, id.Name, region, scope, record);
+            CheckMoneyLiteral(id, region, scope, record) || (!partsOfUnfitWords.Contains(id) && TryPatternLiteral(id, id.Name, region, scope, record));
 
         /// <summary>The names in a word no pattern type fits (api in api.corp.com): not read as a type on their own, as at run time.</summary>
         private readonly HashSet<IdentifierNode> partsOfUnfitWords = new HashSet<IdentifierNode>();
@@ -325,7 +328,7 @@ namespace KScript.Language.Analysis
             }
             ParseResult parsed = ExpressionParser.ParseExpression(value.Value);
             TextSpan span = TrimmedSpan(value);
-            if (kind != null && (!parsed.Success || Interpreter.IsRawWord(parsed.Root, kind, null, null)))
+            if (kind != null && (!parsed.Success || Interpreter.IsRawWord(parsed.Root, kind, null, null, typed: true)))
             {
                 CheckLiteralFits(value.Value.Trim(), type, span, scope, offset);
                 return true;
@@ -360,7 +363,7 @@ namespace KScript.Language.Analysis
                 at = start + item.Length;
                 string trimmed = item.Trim();
                 ParseResult parsed = ExpressionParser.ParseExpression(item);
-                if (!parsed.Success || Interpreter.IsRawWord(parsed.Root, itemKind, null, null) || Interpreter.LooksRaw(item, itemKind))
+                if (!parsed.Success || Interpreter.IsRawWord(parsed.Root, itemKind, null, null, typed: true) || Interpreter.LooksRaw(item, itemKind))
                 {
                     int lead = start + (item.Length - item.TrimStart().Length);
                     raw.Add((trimmed, value.ToSource(new TextSpan(lead, trimmed.Length))));
@@ -575,21 +578,8 @@ namespace KScript.Language.Analysis
             {
                 return null;
             }
-            ParseResult parsed = ExpressionParser.ParseExpression("{" + type.Substring(open + 1, type.Length - open - 2) + "}");
-            if (!parsed.Success || !(parsed.Root is MapNode map))
-            {
-                return null;
-            }
-            var options = new List<KeyValuePair<string, object>>();
-            foreach (MapEntryNode entry in map.Entries)
-            {
-                object plain = TypeRules.PlainValue(entry.Value);
-                if (plain == TypeRules.Unplain.Value)
-                {
-                    return null;
-                }
-                options.Add(new KeyValuePair<string, object>(entry.Key, plain));
-            }
+            var options = TypeRef.ParseArgs(type.Substring(open + 1, type.Length - open - 2));
+            if (options == null) return null;
             TypeRules rules = TypeRules.FromOptions(options, out _);
             string problem = rules?.CheckPlain(value, item => PlainAs(root, item)).FirstOrDefault();
             return problem != null ? $"This doesn't fit {type}: it {problem}." : null;

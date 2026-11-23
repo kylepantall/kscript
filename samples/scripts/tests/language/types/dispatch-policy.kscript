@@ -1,0 +1,27 @@
+import "work-order.kscript"
+import "dispatch-ticket.kscript"
+
+type DispatchPolicy {
+  queues: map
+  fallback: string
+
+  fn route(order: WorkOrder) {
+    throw if not $this.queues->has($order.team) {
+      type: 'NotFound'
+      message: "No queue for {$order.team}"
+    }
+    return $this.queues->get($order.team)
+  } catch NotFound {
+    throw if $this.fallback->is_blank()
+    return $this.fallback
+  }
+
+  fn dispatch(orders: WorkOrder[]) {
+    return $orders
+      |> sort_by(fn(order) => $order.priority, 'desc')
+      |> map(fn(order) => DispatchTicket(
+        id: $order.id,
+        queue: $this->route($order)
+      ))
+  }
+}

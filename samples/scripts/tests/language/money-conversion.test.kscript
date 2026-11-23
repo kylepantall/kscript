@@ -1,0 +1,114 @@
+type Till {
+  balance: money(rates: { EUR: 0.80 })
+}
+
+fn post_credit(balance: money, credit: money) => $balance + $credit
+
+describe(name: "Adding money with exchange rates") {
+  test(name: "the incoming amount is converted into the balance's currency") {
+    balance: money(rates: { EUR: 0.80 }) = 'GBP 1.00'
+    change: money = 'EUR 0.75'
+    expect(value: ($balance + $change)->to_string(), same: 'GBP 1.60')
+    expect(value: $balance->add($change)->to_string(), same: 'GBP 1.60')
+    expect(value: $balance->to_string(), same: 'GBP 1.00')
+    expect(value: $change->add($balance), throws: Type)
+  }
+
+  test(name: "a one-off quote overrides the stored rate for one addition") {
+    balance: money(rates: { EUR: 0.80 }) = 'GBP 1.00'
+    euro: money = 'EUR 1.00'
+    credited = $balance->add($euro, rate: 0.70)
+    expect(value: $credited->to_string(), same: 'GBP 1.70')
+    expect(value: $credited->add($euro)->to_string(), same: 'GBP 2.50')
+  }
+
+  test(name: "an ordinary balance accepts an explicit quote without sharing it") {
+    balance: money = 'GBP 1.00'
+    dollar: money = 'USD 2.00'
+    result = $balance->add($dollar, rate: 0.75)
+    expect(value: $result->to_string(), same: 'GBP 2.50')
+    expect(value: $result->add($dollar), throws: Type)
+  }
+
+  test(name: "same-currency additions work and missing rates are reported") {
+    balance: money(rates: { EUR: 0.80 }) = 'GBP 1.00'
+    pound: money = 'GBP 1.00'
+    dollar: money = 'USD 1.00'
+    expect(value: ($balance + $pound)->to_string(), same: 'GBP 2.00')
+    expect(value: $pound->add($pound)->to_string(), same: 'GBP 2.00')
+    expect(value: $balance->add($dollar), throws: Type)
+    expect(value: $pound->add($dollar), throws: Type)
+  }
+
+  test(name: "conversion rounds each incoming adjustment to the receiving minor unit") {
+    balance: money(rates: { USD: 0.005 }) = 'GBP 1.00'
+    debit: money = 'USD -1.00'
+    credit: money = 'USD 1.00'
+    expect(value: $balance->add($debit)->to_string(), same: 'GBP 0.99')
+    expect(value: $balance->add($credit)->to_string(), same: 'GBP 1.01')
+    yen: money = 'JPY 100'
+    expect(
+      value: $yen->add($credit, rate: 150.50)->to_string(),
+      same: 'JPY 251'
+    )
+  }
+
+  test(name: "a configured record field supplies the same rate after splitting a balance") {
+    till = Till(balance: 'GBP 3.00')
+    parts = $till.balance->split(2)
+    euro: money = 'EUR 1.00'
+    expect(value: $parts[0]->add($euro)->to_string(), same: 'GBP 2.30')
+  }
+
+  test(name: "two tills can use independent quotes for the same currency") {
+    morning: money(rates: { EUR: 0.80 }) = 'GBP 0.00'
+    afternoon: money(rates: { EUR: 0.90 }) = 'GBP 0.00'
+    euro: money = 'EUR 1.00'
+    expect(value: $morning->add($euro)->to_string(), same: 'GBP 0.80')
+    expect(value: $afternoon->add($euro)->to_string(), same: 'GBP 0.90')
+  }
+
+  test(name: "a list total uses the first amount as the receiving balance") {
+    balance: money(rates: { EUR: 0.80 }) = 'GBP 1.00'
+    euro: money = 'EUR 1.00'
+    mixed: money[] = [$balance, $euro, $euro]
+    expect(value: $mixed->total()->to_string(), same: 'GBP 2.60')
+    expect(value: $mixed->reverse()->total(), throws: Type)
+    local: money[] = [$balance, 'GBP 0.25']
+    expect(value: $local->total()->to_string(), same: 'GBP 1.25')
+  }
+
+  test(name: "registered rates apply to existing values and can be updated") {
+    balance: money = 'CAD 1.00'
+    credit: money = 'CHF 2.00'
+    @set_exchange_rate(from: 'CHF', to: 'CAD', rate: 1.50)
+    expect(
+      value: @post_credit($balance, $credit)->to_string(),
+      same: 'CAD 4.00'
+    )
+    @set_exchange_rate(from: 'CHF', to: 'CAD', rate: 1.60)
+    expect(value: $balance->add($credit)->to_string(), same: 'CAD 4.20')
+    amounts: money[] = [$balance, $credit]
+    expect(value: $amounts->total()->to_string(), same: 'CAD 4.20')
+
+    quoted: money(rates: { CHF: 1.75 }) = 'CAD 1.00'
+    expect(value: ($quoted + $credit)->to_string(), same: 'CAD 4.50')
+    expect(value: $quoted->add($credit, rate: 2)->to_string(), same: 'CAD 5.00')
+    expect(value: $credit + $balance, throws: Type)
+  }
+
+  test(name: "two quoted exchange pairs do not imply a third pair") {
+    @set_exchange_rate(from: 'AUD', to: 'NZD', rate: 1.10)
+    @set_exchange_rate(from: 'NZD', to: 'JPY', rate: 100)
+    balance: money = 'JPY 100'
+    incoming: money = 'AUD 1'
+    expect(value: $balance + $incoming, throws: Type)
+  }
+
+  test(name: "a quote too precise for money arithmetic is rejected") {
+    balance: money = 'GBP 0'
+    incoming: money = 'USD 10000000000000000000000000000'
+    tiny_quote = 0.00000000000000000000000000006
+    expect(value: $balance->add($incoming, rate: $tiny_quote), throws: Argument)
+  }
+}
