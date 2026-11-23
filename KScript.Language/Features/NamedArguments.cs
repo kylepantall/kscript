@@ -2,6 +2,7 @@ using KScript.Syntax.Markup;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Metadata;
+using TypeRef = KScript.Runtime.TypeRef;
 using KScript.Syntax;
 using KScript.Syntax.Text;
 
@@ -22,7 +23,7 @@ namespace KScript.Language.Features
                 .FirstOrDefault();
 
         /// <summary>The signatures of a call node; <paramref name="piped"/> is 1 when a pipe supplies the first argument.</summary>
-        private List<SignatureInfo> SignaturesFor(DocumentAnalysis analysis, ExpressionRegion region, ExprNode node, out int piped)
+        private List<SignatureInfo> SignaturesFor(DocumentAnalysis analysis, ExpressionRegion region, ExprNode node, out int piped, bool suggestValues = true)
         {
             var signatures = new List<SignatureInfo>();
             piped = 0;
@@ -36,12 +37,17 @@ namespace KScript.Language.Features
                         Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
                         Documentation = c.Description,
                         Parameters = s.Parameters.Select(p => (p.Label, WithAccepts(p.Deprecated != null ? DeprecationLine(p.Deprecated, p.Name) + p.Description : p.Description, p.Values.Count > 0 ? null : p.Type))).ToList(),
-                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : p.Type == KType.Type ? TypeNames(analysis) : NativeValues(analysis, p.Type), p.IsFlag)).ToList(),
+                        Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : suggestValues && p.Type == KType.Type ? TypeNames(analysis) : ValuesOf(p.Type), p.IsFlag)).ToList(),
+                        ParameterTypes = s.Parameters.Select(p => p.Type).ToList(),
                         ModelParameters = s.Parameters.Where(p => p.AcceptsModel).Select(p => p.Name).ToList(),
                         DeprecatedParameters = s.Parameters.Where(p => p.Deprecated != null).Select(p => p.Name).ToList(),
                     });
                 }
             }
+
+            // Binding bare flags needs enum names. Ranking variables needs no native value suggestions.
+            IReadOnlyList<string> ValuesOf(string type) => suggestValues ? ParameterValues(analysis, type)
+                : type == null ? null : EnumValuesOf(analysis, type);
 
             // A parameter typed with a native type or enum says what it takes: timezone gives its description and some zones.
             string WithAccepts(string doc, string type)
@@ -65,12 +71,8 @@ namespace KScript.Language.Features
                     Label = fn.TypedSignature,
                     Documentation = doc != null ? doc.ToMarkdown(includeParams: false) : fn.Description,
                     Parameters = fn.Parameters.Select(p => (p.Label, WithAccepts(doc?.ParamText(p.Name), p.Type))).ToList(),
-                    Details = fn.Parameters.Select(p => (p.Name,
-                        p.Type != null ? EnumValuesOf(analysis, SplitType(p.Type).Name) ?? NativeValues(analysis, p.Type) : null,
-                        p.Type == KType.Bool)).ToList(),
-                    ItemValues = fn.Parameters.Select(p => p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal)
-                        ? EnumValuesOf(analysis, p.Type.Substring(0, p.Type.Length - 2).Trim()) ?? NativeValues(analysis, p.Type.Substring(0, p.Type.Length - 2).Trim())
-                        : null).ToList(),
+                    Details = fn.Parameters.Select(p => (p.Name, ValuesOf(p.Type), p.Type == KType.Bool)).ToList(),
+                    ParameterTypes = fn.Parameters.Select(p => p.Type).ToList(),
                 });
             }
 
@@ -160,17 +162,37 @@ namespace KScript.Language.Features
         /// else (Europe/London, image/png, @daily) in quotes, since an argument reads unquoted text as code.
         /// </summary>
         internal static string ArgumentText(string value) =>
-            value.Length > 0 && (Lexer.IsIdentStart(value[0]) || char.IsDigit(value[0])) && value.All(c => Lexer.IsIdentChar(c) || c == '.') ? null : "'" + value + "'";
+            value.Length > 0 && (Lexer.IsIdentStart(value[0]) || char.IsDigit(value[0])) && value.All(c => Lexer.IsIdentChar(c) || c == '.') ? null : QuotedValue(value);
 
-        /// <summary>The values a native type such as timezone suggests for an argument (quoted when they aren't one word), or null.</summary>
-        private IReadOnlyList<string> NativeValues(DocumentAnalysis analysis, string type)
+        private static bool QuoteArgumentChoices(DocumentAnalysis analysis, string type) =>
+            type != null && IsFiniteRefinement(analysis, type) && IsTextualChoice(analysis, type);
+
+        /// <summary>Scalar choices offered by the parameter's declared type. Lists offer their choices inside brackets.</summary>
+        private IReadOnlyList<string> ParameterValues(DocumentAnalysis analysis, string type)
         {
-            if (type == null || KScript.Metadata.NativeTypes.Get(SplitType(type).Name) == null)
+            if (type == null || TypeRef.Parse(type) is not { ListDepth: 0 })
             {
                 return null;
             }
             List<string> values = AcceptedValues(analysis, type).Select(v => v.Value).ToList();
             return values.Count > 0 ? values : null;
+        }
+
+        private static IEnumerable<CompletionItem> ParameterValueItems(DocumentAnalysis analysis, SignatureInfo signature, int index, TextSpan replace)
+        {
+            (string name, IReadOnlyList<string> values, _) = signature.Details[index];
+            bool quoted = QuoteArgumentChoices(analysis, signature.ParameterTypes[index]);
+            return (values ?? Array.Empty<string>()).Select(value => new CompletionItem
+            {
+                Label = value,
+                Kind = CompletionKind.Value,
+                Detail = name,
+                Documentation = $"A value of `{name}` in `{signature.Label}`.",
+                InsertText = quoted ? QuotedValue(value) : ArgumentText(value),
+                FilterText = value,
+                ReplaceSpan = replace,
+                SortText = "000" + value,
+            });
         }
 
         /// <summary>The name in a parameter label: <c>name?</c>, <c>rest...</c>, <c>count: int = 1</c>.</summary>
@@ -203,7 +225,7 @@ namespace KScript.Language.Features
             }
 
             (ExprNode node, ArgumentList args) = InnermostCall(region, wordStart);
-            if (node == null)
+            if (node == null || args.Arguments.Any(a => a.Value?.Span.ContainsStrict(p - 1) == true))
             {
                 return new List<CompletionItem>();
             }
@@ -218,28 +240,12 @@ namespace KScript.Language.Features
             items.AddRange(ColumnCompletions(analysis, region, node, named, replace));
 
             // Bare values of the enum parameter this argument lands on: @known_folder(‸) offers downloads, home...
-            bool afterNamed = others.Any(a => a.Name != null && a.Span.End <= wordStart);
-            foreach (SignatureInfo signature in signatures.Where(sig => sig.Details != null && !afterNamed && positional < sig.Details.Count))
+            foreach (SignatureInfo signature in signatures.Where(sig => sig.Details != null))
             {
-                (string name, IReadOnlyList<string> values, _) = signature.Details[positional];
-                acceptsModel |= signature.ModelParameters.Contains(name);
-                foreach (string value in values ?? Array.Empty<string>())
-                {
-                    if (seen.Add("=" + value))
-                    {
-                        items.Add(new CompletionItem
-                        {
-                            Label = value,
-                            Kind = CompletionKind.Value,
-                            Detail = name,
-                            Documentation = $"A value of `{name}` in `{signature.Label}`.",
-                            InsertText = ArgumentText(value),
-                            FilterText = value,
-                            ReplaceSpan = replace,
-                            SortText = "000" + value,
-                        });
-                    }
-                }
+                int index = PositionalParameter(signature, args, wordStart, piped);
+                if (index >= signature.Details.Count) continue;
+                acceptsModel |= signature.ModelParameters.Contains(signature.Details[index].Name);
+                items.AddRange(ParameterValueItems(analysis, signature, index, replace).Where(item => seen.Add("=" + item.Label)));
             }
 
             // Yes/no parameters can be written as flags: recursive, not recursive.
@@ -339,11 +345,92 @@ namespace KScript.Language.Features
         /// <summary>The flag a bare-word argument sets (<c>recursive</c> or <c>not recursive</c>), or null.</summary>
         internal static string FlagName(ArgumentNode a) => a.Name == null ? Analysis.Analyzer.BareWord(a)?.Word : null;
 
-        /// <summary>Inside an array argument (<c>@pack_all([large, ‸])</c>), the values of the enum its parameter is a list of.</summary>
+        /// <summary>After a named argument, positional values fill the remaining slots in order.</summary>
+        private static int PositionalParameter(SignatureInfo signature, ArgumentList args, int at, int piped)
+        {
+            var reserved = args.Arguments.Where(a => a.Name != null).Select(a => a.Name).ToHashSet(StringComparer.Ordinal);
+            int slot = piped;
+            bool afterNamed = false;
+            void SkipReserved()
+            {
+                while (afterNamed && slot < signature.Details.Count && reserved.Contains(signature.Details[slot].Name)) slot++;
+            }
+            foreach (ArgumentNode previous in args.Arguments.TakeWhile(a => a.Span.Start < at))
+            {
+                if (previous.Name != null)
+                {
+                    afterNamed = true;
+                    continue;
+                }
+                SkipReserved();
+                if (Analyzer.BareWord(previous) is var (word, negated, _) && signature.Details.Any(d => d.Flag && d.Name == word)
+                    && (negated || afterNamed || slot >= signature.Details.Count || signature.Details[slot].Values?.Contains(word, StringComparer.OrdinalIgnoreCase) != true))
+                {
+                    reserved.Add(word);
+                    continue;
+                }
+                slot++;
+            }
+            SkipReserved();
+            return slot;
+        }
+
+        private static int BoundParameterIndex(SignatureInfo signature, ArgumentList args, ArgumentNode arg, int piped) =>
+            arg.Name != null ? signature.Details.ToList().FindIndex(d => d.Name == arg.Name)
+                : PositionalParameter(signature, args, arg.Span.Start, piped);
+
+        /// <summary>The type a call expects where a variable or list item starts. Overloads must agree.</summary>
+        private string CallArgumentTypeAt(DocumentAnalysis analysis, int offset)
+        {
+            ExpressionRegion region = analysis.RegionAt(offset);
+            if (region == null) return null;
+            int index = region.Source.FromSource(offset);
+            bool AtVariable(ExprNode value) => value is VariableNode or ErrorNode && value.Span.Start == index;
+            (ExprNode call, ArgumentList args) = InnermostCall(region, index);
+            ArgumentNode arg = args?.Arguments.FirstOrDefault(a => AtVariable(a.Value) || a.Value is ListNode list && list.Items.Any(AtVariable));
+            if (arg == null) return null;
+
+            var signatures = SignaturesFor(analysis, region, call, out int piped, suggestValues: false);
+            var types = signatures.Select(s => s.ParameterTypes.ElementAtOrDefault(BoundParameterIndex(s, args, arg, piped))).Distinct().Take(2).ToList();
+            if (types.Count != 1 || TypeRef.Parse(types[0]) is not TypeRef type) return null;
+            return arg.Value is ListNode ? type.ListDepth > 0 ? type.Item.ToString() : null : types[0];
+        }
+
+        /// <summary>Promote compatible variables, retaining the existing proximity order within each group.</summary>
+        private List<CompletionItem> RankVariables(DocumentAnalysis analysis, int offset, List<CompletionItem> variables, string type)
+        {
+            if (type == null || new TypeInference(Catalog, analysis).TypeNamed(type, offset) is not TypeShape expected || expected.Type == KType.Any)
+                return variables;
+            bool Matches(TypeShape want, TypeShape actual) => actual != null && want.Type == actual.Type
+                && (want.Name == null || want.Name == actual.Name)
+                && (want.Element == null || Matches(want.Element, actual.Element));
+
+            Scope scope = analysis.ScopeAt(offset);
+            string name = TypeRef.Parse(type)?.Name;
+            bool isEnum = name != null && scope.Lookup(name, offset)?.EnumValues != null;
+            // Enum values have the ordinary string shape. Only an explicit enum annotation proves membership.
+            bool HasEnumType(Symbol s)
+            {
+                string declared = s.Kind == SymbolKind.Parameter && s.DeclaringElement?.Name == "fn"
+                    ? analysis.Symbols.FirstOrDefault(f => f.Kind == SymbolKind.Function && f.DeclaringElement == s.DeclaringElement)?.Parameters.FirstOrDefault(p => p.Name == s.Name)?.Type
+                    : s.DeclaringElement?.GetAttributeValue("type");
+                return TypeRef.Parse(declared)?.Name == name;
+            }
+            var matching = scope.VisibleAt(offset)
+                .Where(s => !s.IsTypeDeclaration && s.Kind is not (SymbolKind.Function or SymbolKind.Import) && !s.HoldsSeveralTypes && Matches(expected, s.Shape))
+                .Where(s => !isEnum || HasEnumType(s))
+                .Select(s => s.Name).ToHashSet(StringComparer.Ordinal);
+            if (matching.Count == 0) return variables;
+            return variables.Select(i => matching.Contains(i.Label) ? WithSort(i, "!" + i.SortText) : i)
+                .OrderByDescending(i => i.SortText.StartsWith('!')).ToList();
+        }
+
+        /// <summary>At the start of a list item, ask the bound parameter's element type for its available values.</summary>
         private List<CompletionItem> ListItemCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)
         {
             string text = region.Source.Value;
-            int p = wordStart;
+            int start = RawValueStart(text, wordStart);
+            int p = start;
             while (p > 0 && char.IsWhiteSpace(text[p - 1]))
             {
                 p--;
@@ -353,30 +440,42 @@ namespace KScript.Language.Features
                 return new List<CompletionItem>();
             }
             (ExprNode node, ArgumentList args) = InnermostCall(region, wordStart);
-            ArgumentNode arg = args?.Arguments.FirstOrDefault(a => a.Value is ListNode && a.Value.Span.Start < wordStart && wordStart <= a.Value.Span.End);
+            int delimiter = p - 1;
+            ArgumentNode arg = args?.Arguments.FirstOrDefault(a => a.Value is ListNode list && list.Span.Contains(delimiter)
+                && list.Span.Contains(wordStart) && !list.Items.Any(item => item.Span.ContainsStrict(delimiter)));
             if (arg == null)
             {
                 return new List<CompletionItem>();
             }
-            List<SignatureInfo> signatures = SignaturesFor(analysis, region, node, out int piped);
-            int position = piped + args.Arguments.TakeWhile(a => a != arg).Count(a => a.Name == null);
-            var items = new List<CompletionItem>();
-            foreach (SignatureInfo signature in signatures.Where(s => s.ItemValues != null && s.Details != null))
+            int caret = Math.Max(wordStart, region.Source.FromSource(replace.End));
+            if (start < caret && text[start] is '$' or '@' or '\'' or '"')
             {
-                int index = arg.Name != null ? signature.Details.ToList().FindIndex(d => d.Name == arg.Name) : position;
-                if (index < 0 || index >= signature.ItemValues.Count || signature.ItemValues[index] == null)
+                return new List<CompletionItem>();
+            }
+            string typed = text.Substring(start, caret - start);
+            replace = region.Source.ToSource(TextSpan.FromBounds(start, RawValueEnd(text, caret)));
+            List<SignatureInfo> signatures = SignaturesFor(analysis, region, node, out int piped);
+            var items = new List<CompletionItem>();
+            foreach (SignatureInfo signature in signatures.Where(s => s.ParameterTypes != null))
+            {
+                int index = BoundParameterIndex(signature, args, arg, piped);
+                if (index < 0 || index >= signature.ParameterTypes.Count || TypeRef.Parse(signature.ParameterTypes[index]) is not { ListDepth: 1 } type)
                 {
                     continue;
                 }
                 string name = signature.Details[index].Name;
-                items.AddRange(signature.ItemValues[index].Select(value => new CompletionItem
+                string itemType = type.Item.ToString();
+                bool quoted = QuoteArgumentChoices(analysis, itemType);
+                items.AddRange(AcceptedValues(analysis, itemType, typed).Select(value => new CompletionItem
                 {
-                    Label = value,
+                    Label = value.Value,
                     Kind = CompletionKind.Value,
-                    Detail = name,
-                    Documentation = $"A value for the items of `{name}` in `{signature.Label}`.",
+                    Detail = value.Detail ?? name,
+                    Documentation = value.Documentation ?? $"A value for the items of `{name}` in `{signature.Label}`.",
+                    InsertText = quoted ? QuotedValue(value.Value) : ArgumentText(value.Value),
                     ReplaceSpan = replace,
-                    SortText = "000" + value,
+                    FilterText = value.Value,
+                    SortText = "000" + value.Value,
                 }));
             }
             return items.GroupBy(i => i.Label).Select(g => g.First()).ToList();
@@ -418,18 +517,8 @@ namespace KScript.Language.Features
             List<SignatureInfo> signatures = SignaturesFor(analysis, region, node, out _);
             acceptsModel = signatures.Any(sig => sig.ModelParameters.Contains(name));
             return signatures.Where(sig => sig.Details != null)
-                .SelectMany(signature => signature.Details.Where(d => d.Name == name)
-                    .SelectMany(d => (d.Values ?? Array.Empty<string>()).Select(value => new CompletionItem
-                    {
-                        Label = value,
-                        Kind = CompletionKind.Value,
-                        Detail = d.Name,
-                        Documentation = $"A value of `{d.Name}` in `{signature.Label}`.",
-                        InsertText = ArgumentText(value),
-                        FilterText = value,
-                        ReplaceSpan = replace,
-                        SortText = "000" + value,
-                    })))
+                .SelectMany(signature => Enumerable.Range(0, signature.Details.Count).Where(i => signature.Details[i].Name == name)
+                    .SelectMany(i => ParameterValueItems(analysis, signature, i, replace)))
                 .GroupBy(item => item.Label)
                 .Select(g => g.First())
                 .ToList();

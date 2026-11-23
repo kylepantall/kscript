@@ -41,6 +41,35 @@ namespace KScript.Language.Analysis
                 $"This argument needs {expected}, but its type is {shape.Display()}.");
         }
 
+        /// <summary>Each field named in a model option must exist when the model is declared.</summary>
+        private void CheckModelOptions(MarkupElement model, ElementInfo element, string modelName)
+        {
+            foreach (MarkupAttribute option in model.Attributes)
+            {
+                ModelFieldKind kind = element.GetAttribute(option.Name)?.ModelFields ?? ModelFieldKind.None;
+                if (kind == ModelFieldKind.None || option.Value == null)
+                {
+                    continue;
+                }
+
+                string[] known = result.ModelOptionFields(model, option.Name).Select(f => f.Name).ToArray();
+                if (kind == ModelFieldKind.Single)
+                {
+                    string key = option.ValueText.Trim();
+                    if (key.Length > 0)
+                    {
+                        CheckColumnName(modelName, key, TrimmedSpan(option.Value), "field", known, DiagnosticSeverity.Error);
+                    }
+                    continue;
+                }
+                foreach ((string name, int start) in NameList.Split(option.ValueText))
+                {
+                    TextSpan span = option.Value.ToSource(new TextSpan(start, name.Length));
+                    CheckColumnName(modelName, name, span, "field", known, DiagnosticSeverity.Error);
+                }
+            }
+        }
+
         /// <summary>
         /// Checks the column names a KScript.Data method is given against the model's fields:
         /// <c>User->where(nmae: 'Joan')</c> and <c>->order_by(agee)</c> are warnings that suggest the closest one.
@@ -108,16 +137,20 @@ namespace KScript.Language.Analysis
 
         private void Column(TypeShape record, string name, TextSpan span, bool relationsOnly)
         {
-            IEnumerable<string> known = record.Fields.Values.Where(f => !relationsOnly || DataColumns.IsRelation(f)).Select(f => f.Name).ToList();
+            string[] known = record.Fields.Values.Where(f => !relationsOnly || DataColumns.IsRelation(f)).Select(f => f.Name).ToArray();
+            CheckColumnName(record.Name, name, span, relationsOnly ? "relation" : "field", known, DiagnosticSeverity.Warning);
+        }
+
+        private void CheckColumnName(string modelName, string name, TextSpan span, string what, string[] known, DiagnosticSeverity severity)
+        {
             if (known.Contains(name, StringComparer.Ordinal))
             {
                 return;
             }
             string close = Suggestions.Closest(name, known);
-            string what = relationsOnly ? "relation" : "field";
-            Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownColumn,
-                $"{record.Name} has no {what} '{name}'." + (close != null ? $" Did you mean {close}?" : known.Any() ? $" Its {what}s are: {string.Join(", ", known)}." : $" {record.Name} has no {what}s."),
-                SuggestFix(span, name, known, n => n));
+            Report(span, severity, DiagnosticCodes.UnknownColumn,
+                $"{modelName} has no {what} '{name}'." + (close != null ? $" Did you mean {close}?" : known.Length > 0 ? $" Its {what}s are: {string.Join(", ", known)}." : $" {modelName} has no {what}s."),
+                close == null ? null : new[] { new QuickFix($"Change to {close}", new TextChange(span, close)) });
         }
     }
 }

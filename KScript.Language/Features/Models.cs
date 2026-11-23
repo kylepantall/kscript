@@ -78,8 +78,8 @@ namespace KScript.Language.Features
 
         internal IReadOnlyCollection<string> ModelParameters { get; init; } = Array.Empty<string>();
 
-        /// <summary>Per parameter: the enum values its items take when it is a list of an enum (<c>sizes: Size[]</c>), or null.</summary>
-        internal IReadOnlyList<IReadOnlyList<string>> ItemValues { get; init; }
+        /// <summary>The declared parameter types, including list depth and native type options.</summary>
+        internal IReadOnlyList<string> ParameterTypes { get; init; }
     }
 
     public sealed class SignatureHelpResult

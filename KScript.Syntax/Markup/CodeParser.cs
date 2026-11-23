@@ -1870,7 +1870,8 @@ namespace KScript.Syntax.Markup
                     }
                     else
                     {
-                        (int s, int end) = ReadExpression(Stop.Argument);
+                        bool modelList = e.Name == "model" && Peek(0) == '[' && ModelSettings.Contains(name);
+                        (int s, int end) = ReadExpression(Stop.Argument, recoverModelList: modelList);
                         if (end == s)
                         {
                             Error(new TextSpan(pos, 0), DiagnosticCodes.InvalidAttribute, $"Write a value for {name}.");
@@ -1971,7 +1972,7 @@ namespace KScript.Syntax.Markup
         /// Reads an expression as raw text, keeping brackets and strings balanced. A new line ends it unless a bracket
         /// is open, the line ends with an operator, or the next line starts with one (such as |>).
         /// </summary>
-        private (int Start, int End) ReadExpression(Stop stop, bool plainRuleList = false)
+        private (int Start, int End) ReadExpression(Stop stop, bool plainRuleList = false, bool recoverModelList = false)
         {
             SkipSpaces();
             int start = pos;
@@ -2039,13 +2040,19 @@ namespace KScript.Syntax.Markup
                 }
                 if (c == ')' || c == ']' || c == '}')
                 {
-                    if (brackets.Count == 0)
+                    if (brackets.Count == 0 || (recoverModelList && c == ')' && brackets.Peek() == '['))
                     {
                         break;
                     }
                     brackets.Pop();
                     pos++;
                     continue;
+                }
+                // In an unfinished model list, leave the next named option for the header parser.
+                // Without this boundary, a missing ] can absorb a custom key and the whole model body.
+                if (c == ',' && recoverModelList && brackets.TryPeek(out char opener) && opener == '[' && NamedOptionAfterComma())
+                {
+                    break;
                 }
                 if (brackets.Count == 0)
                 {
@@ -2086,11 +2093,27 @@ namespace KScript.Syntax.Markup
             }
 
             int end = pos;
+            if (recoverModelList && brackets.Contains('['))
+            {
+                Error(new TextSpan(start, 1), DiagnosticCodes.UnclosedElement, "This [ is missing its closing ].");
+                return (start, end);
+            }
             while (end > start && char.IsWhiteSpace(text[end - 1]))
             {
                 end--;
             }
             return (start, end);
+        }
+
+        private bool NamedOptionAfterComma()
+        {
+            int comma = pos++;
+            SkipTriviaLookingAhead();
+            bool named = ReadName().Length != 0;
+            SkipSpaces();
+            bool follows = named && Peek(0) is ':' or '=';
+            pos = comma;
+            return follows;
         }
 
         /// <summary>True where a value can start, so a / begins a regex rather than dividing: after =, (, a comma, an operator or a keyword.</summary>

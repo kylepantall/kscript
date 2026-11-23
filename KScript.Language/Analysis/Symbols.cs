@@ -65,6 +65,9 @@ namespace KScript.Language.Analysis
         /// <summary>The statically checkable rules in this literal type's declaring module.</summary>
         internal IReadOnlyList<KScript.Runtime.TypeRules> LiteralRules { get; init; }
 
+        /// <summary>Finite scalar values declared by one_of on this refinement or its bases.</summary>
+        internal IReadOnlyList<string> ValueChoices { get; init; }
+
         /// <summary>For records of a &lt;type&gt;: the methods its &lt;fn&gt; children declare (<c>$size->width_in(cm)</c>).</summary>
         public IDictionary<string, Symbol> Methods { get; } = new Dictionary<string, Symbol>(StringComparer.Ordinal);
 

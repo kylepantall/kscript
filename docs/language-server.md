@@ -117,11 +117,16 @@ string, name: string }>")`), read by `Analysis/ShapeText.cs`, so a loop over `$d
 Completion only offers what the file can use: built-ins and items from the packages it imports, at the top level, inside
 functions and after `->`. Using an item from a package that isn't imported is KS3009, with a quick fix that adds the import.
 
-In the block of a .kscript `type` or `model`, a line is a field, a rule or a setting, so completion there offers the
-model's settings it doesn't have yet (`timestamps`, `hidden`...) or the type's rules (`min`, `pattern`, `validate`...),
-with their docs on hover. After `timestamps: ` it offers yes and no, and inside `hidden: [ ]` and the other field lists
-it offers the model's fields. A type given rules where it is used, `title: string(min: 1)`, offers the rules and the
-native type's own options (`uuid(v: 4)`). This lives in `Features/Completion.TypeBody.cs`.
+In a model header, completion reads field names and types from the model being declared. In
+`hidden: [key_hash, ‸]`, it suggests the remaining fields, including fields declared later in the body.
+The same lookup powers `key`, `guarded`, `index` and `unique`, including multiline headers and composite
+indexes. An unknown field gets a diagnostic with a spelling fix when a close match exists.
+
+The expected type also guides value completion. An enum parameter or typed array offers its members.
+A record constructor or typed map offers the values accepted by each field. A refinement with literal
+`one_of` choices offers those choices. When you type `$` for a known parameter type, compatible variables appear first.
+Inside a type declaration, completion offers rules such as
+`min`, `pattern` and `validate`, with documentation on hover.
 
 A parameter with no type takes one from the calls in its file when they all agree (`Analyzer.Parameters.cs`): the
 analysis runs again until those types settle, as it does for return types. The type shows as an inlay hint, and KS6007

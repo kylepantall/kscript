@@ -10,10 +10,10 @@ namespace KScript.Language.Tests
 
         private static string Path => System.IO.Path.Combine(AnalyzerCoverageTests.Folder, "app.kscript");
 
-        private static List<CompletionItem> Complete(string textWithCaret)
+        private static List<CompletionItem> Complete(string textWithCaret, string trigger = null)
         {
             (string text, int offset) = TestHelpers.WithCaret(textWithCaret);
-            return Service.GetCompletions(Service.Analyze(text, Path), offset);
+            return Service.GetCompletions(Service.Analyze(text, Path), offset, trigger);
         }
 
         private static List<string> Labels(string textWithCaret) => Complete(textWithCaret).Select(i => i.Label).ToList();
@@ -65,6 +65,62 @@ namespace KScript.Language.Tests
             Assert.DoesNotContain("title", Labels(import + "model Note(hidden: [title], ‸) {\n  title: string\n}\n"));
         }
 
+        private const string License = """
+            import KScript.Data
+            type ProductName with [string] { min: 1 }
+            model Other { other_field: string }
+            model PortalLicense(
+              key: 'key_hash',
+              index: [owner_id],
+              hidden: [FIELDS]
+            ) {
+              key_hash: string
+              product: ProductName
+              owner_id?: string
+              registered_at?: string
+            }
+            """;
+
+        [Fact]
+        public void OpeningTheHiddenListSuggestsOnlyTheFieldsOfThisModel()
+        {
+            var fields = Complete(License.Replace("FIELDS", "‸"), "[");
+            Assert.Equal(new[] { "key_hash", "product", "owner_id", "registered_at" }, fields.Select(i => i.Label));
+            Assert.All(fields, i => Assert.Equal(CompletionKind.Field, i.Kind));
+            Assert.Equal("ProductName", fields.Single(i => i.Label == "product").Detail);
+            Assert.True(Complete(License.Replace("hidden: [FIELDS]", "hi‸")).Single(i => i.Label == "hidden").SuggestAgain);
+        }
+
+        [Fact]
+        public void EditingAFieldListUsesTheWholeTokenAndOmitsSiblingsOnEitherSide()
+        {
+            var fields = Complete(License.Replace("FIELDS", "key_hash,\n    ow‸ner, registered_at"));
+            Assert.Equal(new[] { "product", "owner_id" }, fields.Select(i => i.Label));
+            Assert.Equal(5, fields.Single(i => i.Label == "owner_id").ReplaceSpan.Length);
+
+            fields = Complete(License.Replace("FIELDS", "key_hash,‸"), ",");
+            Assert.Equal(new[] { "product", "owner_id", "registered_at" }, fields.Select(i => i.Label));
+            Assert.Equal(" owner_id", fields.Single(i => i.Label == "owner_id").InsertText);
+        }
+
+        [Theory]
+        [InlineData("key: 'ke‸y_hash'")]
+        [InlineData("key: \"ke‸y_hash\"")]
+        public void AKeyOffersDeclaredFieldsAndReplacesJustTheName(string key)
+        {
+            var fields = Complete(License.Replace("key: 'key_hash'", key).Replace("FIELDS", "key_hash"));
+            Assert.Equal(new[] { "key_hash", "product", "owner_id", "registered_at" }, fields.Select(i => i.Label));
+            Assert.Equal(8, fields[0].ReplaceSpan.Length);
+        }
+
+        [Fact]
+        public void CompositeIndexesCanReuseFieldsFromOtherIndexes()
+        {
+            var fields = Complete(License.Replace("index: [owner_id]", "index: [owner_id, [product, ‸]]").Replace("FIELDS", ""));
+            Assert.Equal(new[] { "key_hash", "owner_id", "registered_at" }, fields.Select(i => i.Label));
+            Assert.Empty(Complete("x = [‸]", "["));
+        }
+
         [Fact]
         public void ALineInAModelSuggestsRulesAndFnNotOptions()
         {
@@ -89,7 +145,7 @@ namespace KScript.Language.Tests
             Assert.Equal(new[] { "body", "id" }, items.Select(i => i.Label));
             Assert.Equal(2, items[0].ReplaceSpan.Length);
             Assert.Equal("string", items[0].Detail);
-            Assert.Equal(new[] { "title", "id" }, Labels(Model("  key: ‸\n  title: string")));
+            Assert.Equal(new[] { "title" }, Labels(Model("  key: ‸\n  title: string")));
             // After a value, or for settings that aren't fields, nothing.
             Assert.Empty(Labels(Model("  hidden: [title] ‸\n  title: string")));
             Assert.Empty(Labels(Model("  table: ‸\n  title: string")));

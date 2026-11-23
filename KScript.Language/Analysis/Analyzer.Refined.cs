@@ -454,6 +454,25 @@ namespace KScript.Language.Analysis
             return RefinementProblem(name, shown, value, root, StaticRefinementRules(element));
         }
 
+        private IReadOnlyList<string> RefinementChoices(MarkupElement type, string root)
+        {
+            List<MarkupElement> chain = RefinementChain(type);
+            MarkupElement finite = chain.FirstOrDefault(level => level.GetAttribute("one_of") != null);
+            TypeRules declared = finite == null ? null : RulesOf(finite);
+            return ChoicesFromRules(declared, chain.Select(RulesOf), root);
+        }
+
+        internal static IReadOnlyList<string> ChoicesFromRules(TypeRules declared, IEnumerable<TypeRules> levels, string root)
+        {
+            if (declared?.OneOf is not List<object> choices) return null;
+            // Offer the nearest declared order and apply statically known restrictions from every level.
+            // A user validator or normalizer is never executed to obtain editor suggestions.
+            var rules = levels.Where(r => r != null && (r != declared || r.Options.Count > 1)).ToArray();
+            return choices.Where(item => item is string or bool or double)
+                .Where(item => rules.All(rule => !rule.CheckPlain(PlainAs(root, item), value => PlainAs(root, value)).Any()))
+                .Select(Values.ToStr).Distinct(StringComparer.Ordinal).ToArray();
+        }
+
         private IEnumerable<TypeRules> StaticRefinementRules(MarkupElement element)
         {
             var chain = RefinementChain(element);
