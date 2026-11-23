@@ -453,35 +453,38 @@ kscript shows every failure this way, in scripts, `kscript serve` error pages an
 
 ### Handlers on functions and types
 
-Place a `catch` after a function or method to handle errors from its call. Place it after a type's closing brace to share a handler across its methods. The nearest matching handler runs first. Return a non-null fallback to recover. Values such as `false`, `0` and `''` all work. A bare `throw`, reaching the end of the handler, or returning a value that evaluates to `null` passes the original error to the next enclosing handler. Its type, message, location, custom fields and cause stay available to the caller.
+Attach a `catch` to a function or method to handle errors for every caller. Attach it to a type to share a handler across its methods.
 
-A handler that only calls `$log->warn($err.message)` records the failure and lets it propagate. An ordinary `try`/`catch` at the call site can handle it and continue with the next statement. The [runnable catch tests](../samples/scripts/tests/language/catch-propagation.test.kscript) exercise both behaviors.
+The nearest matching handler runs first. Return a non-null value to recover. Values such as `false`, `0`, and `''` all work. A bare `throw`, a `null` return, or reaching the end of the handler passes the original error to the next enclosing handler.
 
-```kscript
+```kscript try
 type Directory {
   fallback: string
 
   fn lookup(key: string) {
-    throw if $key->is_blank() {
-      type: 'Validation'
-      message: 'A key is required'
+    if !$key->is_blank() {
+      return $key
     }
-    return $key
-  } catch Validation {
-    throw if $this.fallback->is_blank()
-    return $this.fallback
+    if !$this.fallback->is_blank() {
+      return $this.fallback
+    }
+    throw Validation "A key is required"
   }
 } catch Validation as err {
   return $err.message
 }
 
 directory = Directory(fallback: 'guest')
-echo $directory->lookup('')  // guest
+echo $directory->lookup('owner')  // owner
+echo $directory->lookup('')       // guest
+
+empty = Directory(fallback: '')
+echo $empty->lookup('')           // A key is required
 ```
 
-Inside a catch, `throw if condition` rethrows the current error when the condition holds. With a nonblank fallback, `lookup` returns it. When the key and fallback are both blank, the same `Validation` error reaches the type handler and it returns `'A key is required'`. Supply a payload block after the condition to create a new error.
+Inside a handler, `throw if condition` rethrows the current error when the condition holds. Add a payload block to raise a new error. A handler that only logs the error lets it propagate. The [runnable catch tests](../samples/scripts/tests/language/catch-propagation.test.kscript) show a method handler passing an error to its type's handler and a caller catching an error after it was logged.
 
-Use `/// @throws Network` to document an error that callers may need to handle, including an error from a dynamically chosen function. Hover and signature help show known errors. A helper can let an error reach its caller. At a top-level script statement, `kscript check` and the editor warn when a known error can still escape ([KS5016](errors.md#ks5016)).
+Use `/// @throws Network` to document an error that can reach the caller. Hover and signature help show known errors. At the top level of a script, `kscript check` and the editor warn when a known error can escape ([KS5016](errors.md#ks5016)).
 
 For a single call, recover the result inline with `catch`.
 
