@@ -73,6 +73,7 @@ namespace KScript.Cli
         {
             internal string Repository => Owner + "/" + Repo;
             internal bool Named => Ref == null && Folder.Length > 0;
+            internal bool CatalogEntry => Folder.StartsWith("libraries/", StringComparison.Ordinal) && Folder.LastIndexOf('/') == "libraries".Length;
             internal string Name => Folder.Length == 0 ? Repo : Folder.Split('/')[^1];
             internal string Url
             {
@@ -183,26 +184,66 @@ namespace KScript.Cli
             string destination = Path.Combine(libraryFolder, source.Name);
             CheckDestination(libraryFolder, destination);
             if (Existing(source.Url, destination, site, output)) return;
-            byte[] bytes = await client.GetByteArrayAsync($"https://codeload.github.com/{source.Owner}/{source.Repo}/zip/{commit}");
+            var submodule = source.CatalogEntry ? await ResolveSubmodule(client, source, commit) : null;
+            string archiveRepo = submodule?.Repository ?? source.Repository;
+            string archiveCommit = submodule?.Commit ?? commit;
+            byte[] bytes = await client.GetByteArrayAsync($"https://codeload.github.com/{archiveRepo}/zip/{archiveCommit}");
             using var archive = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
+            // An upstream catalog can host several libraries or SDKs in other languages.
+            string folder = source.Folder;
+            if (submodule != null && !archive.Entries.Any(e => ArchivePath(e).StartsWith(folder + "/", StringComparison.Ordinal)))
+                folder = "";
             string parent = Path.GetDirectoryName(destination);
             Directory.CreateDirectory(parent);
             string stage = Path.Combine(parent, ".kscript-install-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(stage);
             try
             {
-                string entry = Extract(archive, source, stage);
+                string entry = Extract(archive, folder, archiveRepo, stage);
                 var receipt = new JsonObject { ["source"] = source.Url, ["commit"] = commit, ["entry"] = entry };
+                if (submodule != null) receipt["submodule"] = new JsonObject { ["repository"] = archiveRepo, ["commit"] = archiveCommit };
                 if (requested != source.Url) receipt["requested"] = requested;
                 File.WriteAllText(Path.Combine(stage, Receipt), receipt.ToJsonString() + "\n");
                 try { Directory.Move(stage, destination); }
                 catch (IOException) when (Directory.Exists(destination)) { if (Existing(source.Url, destination, site, output)) return; throw; }
-                Report(output, "Installed", commit, site, destination, entry);
+                Report(output, "Installed", archiveCommit, site, destination, entry);
             }
             finally { if (Directory.Exists(stage)) Directory.Delete(stage, recursive: true); }
         }
 
         private static bool IsCommit(string value) => value != null && Regex.IsMatch(value, @"\A[0-9a-f]{40}\z");
+
+        private sealed record Submodule(string Repository, string Commit);
+
+        private static async Task<Submodule> ResolveSubmodule(HttpClient client, Source source, string commit)
+        {
+            string path = "libraries/" + Uri.EscapeDataString(source.Name);
+            byte[] contents;
+            try { contents = await client.GetByteArrayAsync($"https://api.github.com/repos/{source.Repository}/contents/{path}?ref={commit}"); }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw new InvalidDataException($"Folder {source.Folder}/ was not found in {source.Repository}.", ex);
+            }
+            using var doc = JsonDocument.Parse(contents);
+            var item = doc.RootElement;
+            if (item.ValueKind == JsonValueKind.Array) return null; // A source folder in the catalog itself.
+            string Field(string key) => item.ValueKind == JsonValueKind.Object && item.TryGetProperty(key, out var field)
+                && field.ValueKind == JsonValueKind.String ? field.GetString() : null;
+            string sha = Field("sha"), url = Field("submodule_git_url");
+            if (Field("type") is not ("submodule" or "file") || !IsCommit(sha) || string.IsNullOrEmpty(url))
+                throw new InvalidDataException($"{source.Folder} must be a source directory or a Git submodule pinned to a commit.");
+
+            // Git records remote URLs in multiple forms. Downloads always use codeload.github.com.
+            const string scp = "git@github.com:", ssh = "ssh://git@github.com/";
+            if (url.StartsWith(scp, StringComparison.OrdinalIgnoreCase)) url = "https://github.com/" + url[scp.Length..];
+            else if (url.StartsWith(ssh, StringComparison.OrdinalIgnoreCase)) url = "https://github.com/" + url[ssh.Length..];
+            else if (url.StartsWith("../", StringComparison.Ordinal) && !url.Contains('\\') &&
+                     Uri.TryCreate(new Uri($"https://github.com/{source.Repository}/"), url, out var resolved))
+                url = resolved.AbsoluteUri;
+            if (!url.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase) || !TryParseRepository(url, out string repo))
+                throw new InvalidDataException($"The submodule at {source.Folder} must point to a public GitHub repository.");
+            return new Submodule(repo, sha);
+        }
 
         private static bool Existing(string source, string destination, string site, TextWriter output, bool probe = false)
         {
@@ -219,7 +260,8 @@ namespace KScript.Cli
                 {
                     CheckDestination(destination, Path.Combine(destination, entry));
                     if (!File.Exists(Path.Combine(destination, entry))) throw new IOException($"The installed library is missing {entry}.");
-                    Report(output, "Already installed", commit, site, destination, entry);
+                    string pinned = (saved["submodule"] as JsonObject)?["commit"]?.ToString();
+                    Report(output, "Already installed", IsCommit(pinned) ? pinned : commit, site, destination, entry);
                     return true;
                 }
             }
@@ -233,19 +275,24 @@ namespace KScript.Cli
             output.WriteLine($"From a script in {site}: import \"{Path.GetRelativePath(site, Path.Combine(destination, entry)).Replace('\\', '/')}\"");
         }
 
-        private static string Extract(ZipArchive archive, Source source, string stage)
+        private static string ArchivePath(ZipArchiveEntry file)
+        {
+            int slash = file.FullName.IndexOf('/');
+            if (slash < 1 || !SafePart(file.FullName[..slash])) throw new InvalidDataException("Invalid GitHub archive root.");
+            return file.FullName[(slash + 1)..];
+        }
+
+        private static string Extract(ZipArchive archive, string folder, string repository, string stage)
         {
             var scripts = new List<string>();
-            string prefix = source.Folder.Length == 0 ? "" : source.Folder + "/";
+            string prefix = folder.Length == 0 ? "" : folder + "/";
             byte[] buffer = new byte[81920];
             long total = 0;
             bool foundFolder = false;
             foreach (var file in archive.Entries)
             {
                 // GitHub prefixes every archive path with a generated root directory.
-                int slash = file.FullName.IndexOf('/');
-                if (slash < 1 || !SafePart(file.FullName[..slash])) throw new InvalidDataException("Invalid GitHub archive root.");
-                string path = file.FullName[(slash + 1)..];
+                string path = ArchivePath(file);
                 if (!path.StartsWith(prefix, StringComparison.Ordinal)) continue;
                 foundFolder = true;
                 string relative = path[prefix.Length..].TrimEnd('/');
@@ -274,7 +321,7 @@ namespace KScript.Cli
                 if (relative.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase))
                     scripts.Add(relative);
             }
-            if (!foundFolder && source.Folder.Length > 0) throw new InvalidDataException($"Folder {source.Folder}/ was not found in {source.Repository}.");
+            if (!foundFolder && folder.Length > 0) throw new InvalidDataException($"Folder {folder}/ was not found in {repository}.");
             return scripts.OrderBy(s => s == "index.kscript" ? 0 : s == "index.ks.xml" ? 1 : 2).ThenBy(s => s.Count(c => c == '/')).ThenBy(s => s, StringComparer.Ordinal).FirstOrDefault()
                 ?? throw new InvalidDataException("The selected library contains no .kscript or .ks.xml files.");
         }

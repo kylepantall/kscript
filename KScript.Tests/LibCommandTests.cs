@@ -2,12 +2,14 @@ using System.IO.Compression;
 using System.Net;
 using System.Text.Json;
 using KScript.Cli;
+using KScript.Runtime;
 
 namespace KScript.Tests;
 
 public sealed class LibCommandTests : IDisposable
 {
     private const string Sha = "1234567890abcdef1234567890abcdef12345678";
+    private const string UpstreamSha = "abcdef1234567890abcdef1234567890abcdef12";
     private readonly string root = Directory.CreateTempSubdirectory("kscript-lib-tests-").FullName;
     private readonly GitHub github = new();
 
@@ -16,6 +18,9 @@ public sealed class LibCommandTests : IDisposable
     private sealed class GitHub : HttpMessageHandler
     {
         internal byte[] Archive { get; set; }
+        internal string Contents { get; set; } = "[]";
+        internal HttpStatusCode? ContentsStatus { get; set; }
+        internal HttpStatusCode? ArchiveStatus { get; set; }
         internal List<string> Requests { get; } = new();
         internal HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
         internal Dictionary<string, HttpStatusCode> RefErrors { get; } = new();
@@ -24,15 +29,25 @@ public sealed class LibCommandTests : IDisposable
         {
             Requests.Add(request.RequestUri.AbsoluteUri);
             HttpStatusCode status = Status;
-            if (request.RequestUri.Host == "api.github.com")
+            HttpContent body;
+            if (request.RequestUri.Host == "codeload.github.com")
+            {
+                status = ArchiveStatus ?? status;
+                body = new ByteArrayContent(Archive ?? Array.Empty<byte>());
+            }
+            else if (request.RequestUri.Host == "api.github.com" && request.RequestUri.AbsolutePath.Contains("/commits/"))
             {
                 string revision = Uri.UnescapeDataString(request.RequestUri.AbsolutePath.Split("/commits/")[1]);
                 status = RefErrors.GetValueOrDefault(revision, Status);
+                body = new StringContent("{\"sha\":\"" + Sha + "\"}");
             }
-            var response = new HttpResponseMessage(status);
-            if (status == HttpStatusCode.OK)
-                response.Content = request.RequestUri.Host == "api.github.com" ? new StringContent("{\"sha\":\"" + Sha + "\"}") : new ByteArrayContent(Archive);
-            return Task.FromResult(response);
+            else if (request.RequestUri.Host == "api.github.com" && request.RequestUri.AbsolutePath.Contains("/contents/"))
+            {
+                status = ContentsStatus ?? status;
+                body = new StringContent(Contents);
+            }
+            else throw new InvalidOperationException($"Unexpected request {request.RequestUri}");
+            return Task.FromResult(new HttpResponseMessage(status) { Content = body });
         }
     }
 
@@ -92,12 +107,14 @@ public sealed class LibCommandTests : IDisposable
         var result = Add("isolink-connect");
         Assert.True(result.Code == ExitCodes.Ok, result.Error);
         Assert.Equal(new[] { "https://api.github.com/repos/kylepantall/kscript/commits/HEAD",
+            $"https://api.github.com/repos/kylepantall/kscript/contents/libraries/isolink-connect?ref={Sha}",
             $"https://codeload.github.com/kylepantall/kscript/zip/{Sha}" }, github.Requests);
         Assert.Contains("import \"lib/isolink-connect/index.kscript\"", result.Output);
         string installed = Path.Combine(root, "lib", "isolink-connect");
         using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(installed, ".kscript-lib.json")));
         Assert.Equal("https://github.com/kylepantall/kscript/tree/HEAD/libraries/isolink-connect", receipt.RootElement.GetProperty("source").GetString());
         Assert.Equal(Sha, receipt.RootElement.GetProperty("commit").GetString());
+        Assert.False(receipt.RootElement.TryGetProperty("submodule", out _));
         Assert.Equal("library", File.ReadAllText(Path.Combine(installed, "index.kscript")));
         Assert.False(Directory.Exists(Path.Combine(installed, "libraries")));
         File.WriteAllText(Path.Combine(installed, "index.kscript"), "edited");
@@ -105,8 +122,49 @@ public sealed class LibCommandTests : IDisposable
         github.Status = HttpStatusCode.ServiceUnavailable;
         Assert.Contains("Already installed", Add("KylePantall/KScript@isolink-connect").Output);
         Assert.Contains("Already installed", Add("https://github.com/kylepantall/kscript/tree/HEAD/libraries/isolink-connect").Output);
-        Assert.Equal(2, github.Requests.Count);
+        Assert.Equal(3, github.Requests.Count);
         Assert.Equal("edited", File.ReadAllText(Path.Combine(installed, "index.kscript")));
+    }
+
+    [Fact]
+    public void TheTemplateLibrariesCanBeInstalledAndUsedWithoutGeneratingAProject()
+    {
+        string[] libraries = { "app-cache", "request-id" };
+        string repository = Conventions.CliConventionTests.RepoRoot();
+        github.Archive = Archive(libraries.Select(name =>
+        {
+            string path = $"libraries/{name}/index.kscript";
+            return (path, File.ReadAllText(Path.Combine(repository, path)), 0);
+        }).ToArray());
+        foreach (string name in libraries)
+        {
+            var result = Add(name);
+            Assert.True(result.Code == 0, result.Error);
+        }
+        string script = Path.Combine(root, "app.kscript");
+        File.WriteAllText(script, """
+            import KScript.Http
+            import "lib/app-cache/index.kscript" as cache
+            import "lib/request-id/index.kscript"
+
+            key = @uuid()
+            echo @cache.cached($key, fn() => 'first')
+            echo @cache.cached($key, fn() => 'second')
+            @cache.forget_cached($key)
+            echo @cache.cached($key, fn() => 'third')
+            next = fn(r) => @response($r.path, status: 202)
+            existing = @request_id({ headers: { 'x-request-id': 'from-caller' }, path: '/test' }, $next)
+            echo $existing->header('X-Request-Id')
+            echo $existing.status
+            echo $existing.body
+            generated = @request_id({ headers: {}, path: '/' }, $next)
+            echo $generated->header('X-Request-Id')
+            """);
+        using var output = new StringWriter();
+        new Interpreter(KScriptHost.ForText(output)).RunFile(script);
+        string[] lines = output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(new[] { "first", "first", "third", "from-caller", "202", "/test" }, lines[..^1]);
+        Assert.True(Guid.TryParseExact(lines[^1], "D", out _));
     }
 
     [Fact]
@@ -129,7 +187,7 @@ public sealed class LibCommandTests : IDisposable
         var conflict = Add("Slug", subdir);
         Assert.Equal(ExitCodes.Failed, conflict.Code);
         Assert.Contains("already exists", conflict.Error);
-        Assert.Equal(2, github.Requests.Count);
+        Assert.Equal(3, github.Requests.Count);
         Assert.Equal("custom", File.ReadAllText(script));
     }
 
@@ -143,12 +201,91 @@ public sealed class LibCommandTests : IDisposable
         Assert.Single(github.Requests);
 
         github.Status = HttpStatusCode.OK;
-        github.Archive = Archive(("libraries/missing-other/index.kscript", "other", 0), ("libraries/index.kscript", "other", 0));
+        github.ContentsStatus = HttpStatusCode.NotFound;
         var missingLibrary = Add("missing");
         Assert.Equal(ExitCodes.Failed, missingLibrary.Code);
         Assert.Contains("libraries/missing/ was not found in kylepantall/kscript", missingLibrary.Error);
         Assert.Equal(3, github.Requests.Count);
-        Assert.Empty(Directory.GetFileSystemEntries(Path.Combine(root, "lib")));
+        Assert.False(Directory.Exists(Path.Combine(root, "lib", "missing")));
+    }
+
+    private static string Gitlink(string type, string url, string commit) =>
+        JsonSerializer.Serialize(new { type, name = "slugs", path = "libraries/slugs", submodule_git_url = url, sha = commit });
+
+    [Theory]
+    [InlineData("org/catalog@slugs", "HEAD", "submodule", "https://github.com/Upstream/Slug-Tools.git", "upstream/slug-tools")]
+    [InlineData("org/catalog@slugs", "HEAD", "file", "git@github.com:other/slug-tools.git", "other/slug-tools")]
+    [InlineData("org/catalog@slugs", "HEAD", "submodule", "../slug-tools.git", "org/slug-tools")]
+    [InlineData("https://github.com/org/catalog/tree/v2/libraries/slugs", "v2", "submodule", "ssh://git@github.com/other/slug-tools.git", "other/slug-tools")]
+    public void SubmoduleDownloadsTheCatalogPinAndPreservesCatalogIdentity(string selector, string reference, string type,
+        string gitUrl, string repository)
+    {
+        if (selector.Contains('@')) LibraryRepositories.Add(root, "org/catalog");
+        github.Contents = Gitlink(type, gitUrl, UpstreamSha);
+        github.Archive = Archive(("index.kscript", "fn slug() => 'ready'", 0), ("data/names.json", "[]", 0));
+        var result = Add(selector);
+        Assert.True(result.Code == ExitCodes.Ok, result.Error);
+        Assert.Contains("import \"lib/slugs/index.kscript\"", result.Output);
+        var expected = new[] {
+            $"https://api.github.com/repos/org/catalog/commits/{reference}",
+            $"https://api.github.com/repos/org/catalog/contents/libraries/slugs?ref={Sha}",
+            $"https://codeload.github.com/{repository}/zip/{UpstreamSha}"
+        };
+        Assert.Equal(expected, github.Requests);
+        string installed = Path.Combine(root, "lib", "slugs");
+        string script = Path.Combine(installed, "index.kscript");
+        Assert.Equal("fn slug() => 'ready'", File.ReadAllText(script));
+        Assert.Equal("[]", File.ReadAllText(Path.Combine(installed, "data", "names.json")));
+        using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(installed, ".kscript-lib.json")));
+        Assert.Equal($"https://github.com/org/catalog/tree/{reference}/libraries/slugs", receipt.RootElement.GetProperty("source").GetString());
+        Assert.Equal(Sha, receipt.RootElement.GetProperty("commit").GetString());
+        var submodule = receipt.RootElement.GetProperty("submodule");
+        Assert.Equal(repository, submodule.GetProperty("repository").GetString());
+        Assert.Equal(UpstreamSha, submodule.GetProperty("commit").GetString());
+
+        File.WriteAllText(script, "local changes");
+        github.Status = HttpStatusCode.ServiceUnavailable;
+        Assert.Contains("Already installed", Add(selector).Output);
+        Assert.Equal(ExitCodes.Failed, Add("slugs").Code);
+        Assert.Equal(expected, github.Requests);
+        Assert.Equal("local changes", File.ReadAllText(script));
+    }
+
+    [Theory]
+    [InlineData("submodule", "https://git.example.org/tools/slugs.git", UpstreamSha)]
+    [InlineData("submodule", "git@example.org:tools/slugs.git", UpstreamSha)]
+    [InlineData("submodule", "https://github.com/tools/slugs/tree/main", UpstreamSha)]
+    [InlineData("submodule", "/tmp/slugs", UpstreamSha)]
+    [InlineData("submodule", null, UpstreamSha)]
+    [InlineData("submodule", "../slugs", "main")]
+    [InlineData("submodule", "../slugs", null)]
+    [InlineData("file", null, UpstreamSha)]
+    [InlineData("symlink", "https://github.com/tools/slugs.git", UpstreamSha)]
+    public void InvalidCatalogEntriesFailBeforeFetchingAnArchive(string type, string gitUrl, string commit)
+    {
+        github.Contents = Gitlink(type, gitUrl, commit);
+        var result = Add("slugs");
+        Assert.Equal(ExitCodes.Failed, result.Code);
+        Assert.NotEmpty(result.Error);
+        Assert.Equal(new[] { "https://api.github.com/repos/kylepantall/kscript/commits/HEAD",
+            $"https://api.github.com/repos/kylepantall/kscript/contents/libraries/slugs?ref={Sha}" }, github.Requests);
+        Assert.False(Directory.Exists(Path.Combine(root, "lib", "slugs")));
+    }
+
+    [Fact]
+    public void MissingPinnedCommitLeavesTheDestinationFreeForARetry()
+    {
+        github.Contents = Gitlink("submodule", "https://github.com/other/repo.git", UpstreamSha);
+        github.ArchiveStatus = HttpStatusCode.NotFound;
+        Assert.Equal(ExitCodes.Failed, Add("slugs").Code);
+        Assert.Equal($"https://codeload.github.com/other/repo/zip/{UpstreamSha}", github.Requests.Last());
+        Assert.False(Directory.Exists(Path.Combine(root, "lib", "slugs")));
+
+        github.ArchiveStatus = HttpStatusCode.OK;
+        github.Archive = Archive(("index.kscript", "fn answer() => 42", 0));
+        var retry = Add("slugs");
+        Assert.True(retry.Code == ExitCodes.Ok, retry.Error);
+        Assert.Equal("fn answer() => 42", File.ReadAllText(Path.Combine(root, "lib", "slugs", "index.kscript")));
     }
 
     [Theory]
@@ -182,6 +319,19 @@ public sealed class LibCommandTests : IDisposable
     }
 
     [Theory]
+    [InlineData("examples/hello")]
+    [InlineData("libraries/sdk/hello")]
+    public void DirectTreeOutsideANamedLibraryStillInstallsFromTheCatalogArchive(string path)
+    {
+        github.Archive = Archive(($"{path}/index.kscript", "fn hello() => 'hi'", 0));
+        var result = Add($"https://github.com/org/tools/tree/v1/{path}");
+        Assert.True(result.Code == ExitCodes.Ok, result.Error);
+        Assert.Equal(new[] { "https://api.github.com/repos/org/tools/commits/v1",
+            $"https://codeload.github.com/org/tools/zip/{Sha}" }, github.Requests);
+        Assert.Equal("fn hello() => 'hi'", File.ReadAllText(Path.Combine(root, "lib", "hello", "index.kscript")));
+    }
+
+    [Theory]
     [InlineData("", "repo", HttpStatusCode.UnprocessableEntity)]
     [InlineData("/libraries/hello", "hello", HttpStatusCode.NotFound)]
     public void SlashBranchesInstallTheRepoOrItsSubfolderAndRepeatOffline(string tail, string name, HttpStatusCode unknown)
@@ -197,9 +347,11 @@ public sealed class LibCommandTests : IDisposable
 
         var result = Add(url);
         Assert.True(result.Code == 0, result.Error);
-        Assert.Equal(new[] { "https://api.github.com/repos/org/repo/commits/codex",
-            "https://api.github.com/repos/org/repo/commits/codex%2Flibraries-and-type-methods",
-            $"https://codeload.github.com/org/repo/zip/{Sha}" }, github.Requests);
+        var expected = new List<string> { "https://api.github.com/repos/org/repo/commits/codex",
+            "https://api.github.com/repos/org/repo/commits/codex%2Flibraries-and-type-methods" };
+        if (tail.Length > 0) expected.Add($"https://api.github.com/repos/org/repo/contents/libraries/hello?ref={Sha}");
+        expected.Add($"https://codeload.github.com/org/repo/zip/{Sha}");
+        Assert.Equal(expected, github.Requests);
         Assert.Contains($"import \"lib/{name}/index.kscript\"", result.Output);
         string file = Path.Combine(root, "lib", name, "index.kscript");
         Assert.Equal(tail == "" ? "repo" : "subfolder", File.ReadAllText(file));
@@ -209,7 +361,7 @@ public sealed class LibCommandTests : IDisposable
         Assert.Contains($"Already installed {name}", Add(url).Output);
         Assert.Contains($"Already installed {name}", Add(url.Replace(branch, Uri.EscapeDataString(branch))).Output);
         Assert.Equal("local edit", File.ReadAllText(file));
-        Assert.Equal(3, github.Requests.Count);
+        Assert.Equal(expected, github.Requests);
     }
 
     [Fact]

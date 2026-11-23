@@ -12,11 +12,11 @@ echo "::group::Run sample script"
 $k samples/scripts/oldest.kscript
 
 group "Check KScript 2 samples"
-$k check samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents \
+$k check libraries samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents \
   samples/queue-app samples/data --warnings-as-errors
 
 group "Check KScript formatting"
-$k fmt --check samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage \
+$k fmt --check libraries samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage \
   samples/documents samples/queue-app samples/data samples/types "Example Sites/team"
 
 group "Run KScript tests"

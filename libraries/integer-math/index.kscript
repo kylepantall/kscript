@@ -1,0 +1,45 @@
+// KScript numbers represent every integer from -(2^53 - 1) to 2^53 - 1 exactly.
+const max_safe_integer = 9007199254740991
+
+/// The nonnegative greatest common divisor. Two zeros give zero.
+/// @public
+fn gcd(a: int, b: int) {
+  left = $a->abs()
+  right = $b->abs()
+  if not ($left >= 0 and $left <= $max_safe_integer and $right >= 0 and $right <= $max_safe_integer) {
+    throw Argument "Operands must be integers within ±9007199254740991."
+  }
+  while $right != 0 {
+    remainder = $left % $right
+    left = $right
+    right = $remainder
+  }
+  return $left
+}
+
+/// The nonnegative least common multiple. A zero operand gives zero.
+/// @public
+fn lcm(a: int, b: int) {
+  divisor = @gcd($a, $b)
+  if $a == 0 or $b == 0 {
+    return 0
+  }
+  result = ($a / $divisor * $b)->abs()
+  if $result > $max_safe_integer {
+    throw Argument "The least common multiple exceeds 9007199254740991."
+  }
+  return $result
+}
+
+/// The factorial of a whole number from 0 to 170 inclusive.
+/// @public
+fn factorial(n: int) {
+  if not ($n >= 0 and $n <= 170) {
+    throw Argument "factorial needs a whole number from 0 to 170."
+  }
+  result = 1
+  for factor in 1..($n + 1) {
+    result *= $factor
+  }
+  return $result
+}
