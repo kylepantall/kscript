@@ -29,6 +29,7 @@ public class EnumAndFlagTests
 
     [Theory]
     [InlineData("@pack(huge)", "'huge' isn't a Size. Use small, medium or large.")]
+    [InlineData("@pack(Size.huge)", "'Size.huge' isn't a Size. Use small, medium or large.")]
     [InlineData("@pack('huge')", "'huge' isn't a Size.")]
     [InlineData("@pack(large, giift)", "no flag 'giift'. Did you mean gift?")]
     [InlineData("@pack(large, not gfit)", "no flag 'gfit'")]

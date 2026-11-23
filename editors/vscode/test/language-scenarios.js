@@ -191,6 +191,15 @@ async function discoverCorpus(connection, runCli) {
       });
       assert.equal(declaration[0].range.start.line, position(text, '} catch Network | NotFound as err').line);
     }
+    if (path.basename(file) === 'extension-methods.test.kscript') {
+      const extension = path.join(corpus, 'extensions', 'calendar.kscript');
+      const method = position(fs.readFileSync(extension, 'utf8'), 'fn month_key(', 'fn '.length);
+      const definitions = await connection.sendRequest('textDocument/definition', {
+        textDocument, position: position(text, '$invoice_date->month_key(', '$invoice_date->'.length),
+      });
+      assert.deepEqual(definitions.map((d) => [d.uri, d.range.start]), [[pathToFileURL(extension).href, method]],
+        'Go to Definition opens the month_key declaration in the imported calendar extension');
+    }
     if (path.basename(file) === 'dynamic-dispatch.test.kscript') {
       const line = position(text, 'fn trim_dynamic(key: any)').line;
       const hints = await connection.sendRequest('textDocument/inlayHint', {

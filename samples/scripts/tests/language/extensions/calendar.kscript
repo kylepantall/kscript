@@ -1,0 +1,6 @@
+extend date {
+  /// The calendar month used to group invoices, including the year.
+  fn month_key() => $this->format('yyyy-MM')
+
+  fn shares_month(other: date) => $this->month_key() == $other->month_key()
+}

@@ -1,0 +1,71 @@
+fn total_branch(branch: map) {
+  total = $branch.hours
+  for child in $branch.children {
+    total += @total_branch($child)
+  }
+  return $total
+}
+
+fn even_count(n: int) {
+  if $n == 0 {
+    return true
+  }
+  return @odd_count($n - 1)
+}
+
+fn odd_count(n: int) {
+  if $n == 0 {
+    return false
+  }
+  return @even_count($n - 1)
+}
+
+describe(name: 'Recursion and lexical scope') {
+  test(name: 'a recursive tree walk keeps a subtotal for each branch') {
+    tree = {
+      hours: 1,
+      children: [
+        { hours: 4, children: [{ hours: 2, children: [] }] },
+        { hours: 3, children: [] },
+      ],
+    }
+    expect(value: @total_branch($tree), same: 10)
+    expect(value: @total_branch($tree.children[0]), same: 6)
+  }
+
+  test(name: 'mutually recursive functions reach the base case through either entry') {
+    expect(value: @even_count(0), same: true)
+    expect(value: @odd_count(0), same: false)
+    expect(value: @even_count(3), same: false)
+    expect(value: @odd_count(5), same: true)
+  }
+
+  test(name: 'a parameter shadows a variable with the same name in the enclosing scope') {
+    units = 10
+    fn add_one(units: int) {
+      units += 1
+      return $units
+    }
+    expect(value: @add_one(4), same: 5)
+    expect(value: $units, same: 10)
+  }
+
+  test(name: 'each loop iteration captures its own value in a deferred function') {
+    actions = []
+    for name in ['Ada', 'Mo', 'Ren'] {
+      actions = $actions->push(fn() => $name)
+    }
+    labels = $actions->map(fn(action) => $action())
+    expect(value: $labels, equals: ['Ada', 'Mo', 'Ren'])
+  }
+
+  test(name: 'a callback resolves its free variable in the defining scope') {
+    label = 'definition'
+    reader = fn() => $label
+    fn read_in_context(label: string, read: fn) => [$label, $read()]
+    expect(
+      value: @read_in_context('caller', $reader),
+      equals: ['caller', 'definition']
+    )
+  }
+}

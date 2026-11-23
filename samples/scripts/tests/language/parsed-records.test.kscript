@@ -1,0 +1,42 @@
+type PageSpan {
+  pattern: /^(?<first>\d+)\.\.(?<last>\d+)$/
+  first: int(min: 1)
+  last: int(min: 1)
+  validate: $first <= $last, 'The first page must precede or equal the last'
+
+  fn page_count() => $this.last - $this.first + 1
+}
+
+describe(name: 'Page spans read from text') {
+  test(name: 'named captures convert digit strings to typed record fields') {
+    pages = PageSpan('007..012')
+    expect(value: $pages.first, same: 7)
+    expect(value: $pages.last, same: 12)
+    expect(value: $pages->page_count(), same: 6)
+  }
+
+  test(name: 'a map and a printed span produce equivalent typed records') {
+    from_map = PageSpan({ first: '3', last: '5' })
+    from_text = '3..5' as PageSpan
+    expect(value: $from_map.first, same: $from_text.first)
+    expect(value: $from_map->page_count(), same: $from_text->page_count())
+  }
+
+  test(name: 'a one-page span includes its endpoint once') {
+    pages: PageSpan = '1..1'
+    expect(value: $pages->page_count(), same: 1)
+    expect(value: PageSpan->check('1..1'), count: 0)
+  }
+
+  test(name: 'text must match the entire page span grammar') {
+    expect(value: PageSpan('3..5 pages'), throws: Shape)
+    expect(value: PageSpan('3..'), throws: Shape)
+  }
+
+  test(name: 'well-formed text still has to pass field and cross-field validation') {
+    expect(value: PageSpan('0..5'), throws: Shape)
+    problems = PageSpan->check('6..5')
+    expect(value: $problems, count: 1)
+    expect(value: $problems[0].message, contains: 'first page')
+  }
+}

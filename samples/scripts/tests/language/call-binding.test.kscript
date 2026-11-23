@@ -1,0 +1,36 @@
+fn join_parts(left: string, right: string, separator = '/') =>
+  $left + $separator + $right
+
+describe(name: 'Call binding') {
+  test(name: 'positional values after named arguments fill the open slots in order') {
+    expect(
+      value: @join_parts(separator: '.', 'readme', 'md'),
+      same: 'readme.md'
+    )
+    expect(value: @join_parts(right: 'file', 'dir'), same: 'dir/file')
+  }
+
+  test(name: 'a pipe passes its value as the first argument to a named function') {
+    path = 'src' |> @join_parts('images') |> @join_parts(right: 'logo.svg')
+    expect(value: $path, same: 'src/images/logo.svg')
+  }
+
+  test(name: 'piped methods bind their named arguments to the receiver') {
+    label = '  North Gate  ' |> trim() |> replace(new: '-', old: ' ') |> lower()
+    expect(value: $label, same: 'north-gate')
+  }
+
+  test(name: 'a nested call binds its own separator independently') {
+    path = @join_parts(
+      right: @join_parts(right: 'csv', separator: '.', left: 'orders'),
+      left: 'reports'
+    )
+    expect(value: $path, same: 'reports/orders.csv')
+  }
+
+  test(name: 'callbacks keep their parameter names when invoked as values') {
+    subtract = fn(amount, discount) => $amount - $discount
+    expect(value: $subtract(discount: 3, amount: 10), same: 7)
+    expect(value: $subtract->call(amount: 3, discount: 10), same: -7)
+  }
+}
