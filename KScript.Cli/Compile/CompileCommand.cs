@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 
 using KScript.Projects;
 using KScript.Runtime;
+using KScript.Syntax.Markup;
 using KScript.Updates;
 
 namespace KScript.Compile
@@ -281,11 +282,21 @@ namespace KScript.Compile
             if (skipped.Count > 0) log.WriteLine($"Left out {string.Join(", ", skipped)}: secrets don't belong in a program. Set them as environment variables where it runs.");
             if (plan.Kind == ProgramKind.Site)
             {
-                // Pages import packages at their top; any file that names one brings it in.
+                // A site can reach source libraries through pages, routes or other scripts.
                 var import = new Regex("<import\\s[^>]*package\\s*=\\s*\"([^\"]+)\"");
                 foreach (var file in plan.Files.Where(f => !f.Key.EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
-                    foreach (Match m in import.Matches(Encoding.UTF8.GetString(file.Value)))
+                {
+                    string text = Encoding.UTF8.GetString(file.Value);
+                    if (MarkupParser.IsCodePath(file.Key))
+                    {
+                        foreach (var element in CodeParser.Parse(text).DescendantElements())
+                            if (element.Name == "import" && element.GetAttributeValue("package") is string package)
+                                plan.Packages.Add(PackageRegistry.Normalise(package));
+                        continue;
+                    }
+                    foreach (Match m in import.Matches(text))
                         plan.Packages.Add(PackageRegistry.Normalise(m.Groups[1].Value));
+                }
             }
             AddRequired(plan.Packages);
 

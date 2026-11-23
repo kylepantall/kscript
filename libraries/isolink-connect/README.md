@@ -3,7 +3,7 @@
 Use this library from a KScript program on the same Windows, macOS or Linux computer as Isolink. It opens the Isolink desktop consent window on first use and gives the program access to its own spaces and records.
 
 ```sh
-kscript lib add https://github.com/kylepantall/kscript/tree/master/libraries/isolink-connect
+kscript lib add isolink-connect
 ```
 
 From a script next to the project's `lib` folder, import the installed entry file and pass a function to `with_session`. Use a stable app id so later runs can reopen the same space.

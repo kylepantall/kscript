@@ -163,7 +163,11 @@ public sealed class CommandLineTests : IDisposable
         string script = Write("ok.ks.xml", "<kscript>\n  <echo>hi</echo>\n</kscript>\n");
         Assert.Contains("  kscript update ", Kscript("update", "--help").Out);
         Assert.Contains("kscript ide install", Kscript("ide", "help").Out);
-        Assert.Contains("kscript lib add <owner/repo|github-url>", Kscript("lib", "--help").Out);
+        Assert.Contains("kscript repo add <owner/repo|github-url>", Kscript("repo", "--help").Out);
+        var missingRepo = Kscript("repo", "add");
+        Assert.Equal(ExitCodes.Usage, missingRepo.Code);
+        Assert.Contains("kscript repo add", missingRepo.Err);
+        Assert.Contains("kscript lib add <library|owner/repo@library|owner/repo|github-url>", Kscript("lib", "--help").Out);
         var missingLibrary = Kscript("lib", "add");
         Assert.Equal(ExitCodes.Usage, missingLibrary.Code);
         Assert.Contains("kscript lib add", missingLibrary.Err);
@@ -183,6 +187,28 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("  kscript worker ", Kscript("worker", "--help").Out);
         Assert.Contains("  kscript queue ", Kscript("queue", "--help").Out);
         Assert.Contains("Did you mean db migrate?", Kscript("db", "migrat").Err);
+    }
+
+    [Fact]
+    public void An_external_named_library_points_to_its_repo_add_command()
+    {
+        Write("kscript.json", "{}");
+        string nested = Directory.CreateDirectory(Path.Combine(dir, "scripts")).FullName;
+        string previous = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(nested);
+            var missing = Kscript("lib", "add", "acme/kscript-libraries@slugs");
+            Assert.Equal(ExitCodes.Usage, missing.Code);
+            Assert.Contains("kscript repo add acme/kscript-libraries", missing.Err);
+
+            Assert.Equal(0, Kscript("repo", "add", "https://github.com/acme/kscript-libraries").Code);
+            Assert.True(Directory.Exists(Path.Combine(dir, ".kscript", "repos")));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(previous);
+        }
     }
 
     [Fact]

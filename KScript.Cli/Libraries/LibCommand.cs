@@ -20,7 +20,7 @@ namespace KScript.Cli
     {
         private const string Receipt = ".kscript-lib.json";
         private const long SizeLimit = 64L * 1024 * 1024;
-        private const string Usage = "Usage: kscript lib add <owner/repo | GitHub URL>";
+        private const string Usage = "Usage: kscript lib add <library | owner/repo@library | owner/repo | GitHub URL>";
 
         public static int Run(string[] args, TextWriter output, TextWriter error) =>
             Run(args, output, error, WorkingFolder.Current, new HttpClientHandler { AllowAutoRedirect = false });
@@ -43,6 +43,11 @@ namespace KScript.Cli
             {
                 ProjectConfig project = ProjectConfig.FindAndLoad(workingDirectory);
                 string root = project?.Directory ?? workingDirectory;
+                if (source.Named && !LibraryRepositories.Contains(root, source.Repository))
+                {
+                    error.WriteLine($"Library repository {source.Repository} is not registered for this project. Run kscript repo add {source.Repository} first.");
+                    return ExitCodes.Usage;
+                }
                 string libraryFolder = Path.GetFullPath(Path.Combine(project?.SiteRoot ?? root, project?.PathFor("lib") ?? "lib"));
                 CheckDestination(root, libraryFolder);
                 Install(client, source, libraryFolder, project?.SiteRoot ?? root, output).GetAwaiter().GetResult();
@@ -56,11 +61,29 @@ namespace KScript.Cli
             }
         }
 
+        internal static bool TryParseRepository(string input, out string repository)
+        {
+            repository = null;
+            if (!Source.TryParseDirect(input, out var source) || source.Ref != null) return false;
+            repository = source.Repository;
+            return true;
+        }
+
         private sealed record Source(string Owner, string Repo, string Ref, string Folder)
         {
+            internal string Repository => Owner + "/" + Repo;
+            internal bool Named => Ref == null && Folder.Length > 0;
             internal string Name => Folder.Length == 0 ? Repo : Folder.Split('/')[^1];
-            internal string Url => $"https://github.com/{Owner}/{Repo}" + (Ref == null ? "" : "/tree/" + Uri.EscapeDataString(Ref)
-                + (Folder.Length == 0 ? "" : "/" + string.Join('/', Folder.Split('/').Select(Uri.EscapeDataString))));
+            internal string Url
+            {
+                get
+                {
+                    string url = $"https://github.com/{Repository}";
+                    if (Ref == null && !Named) return url;
+                    string tree = url + "/tree/" + Uri.EscapeDataString(Ref ?? "HEAD");
+                    return Folder.Length == 0 ? tree : tree + "/" + string.Join('/', Folder.Split('/').Select(Uri.EscapeDataString));
+                }
+            }
 
             // GitHub's ordinary tree URLs leave slashes in a branch name unescaped.
             internal Source LongerRef()
@@ -71,9 +94,22 @@ namespace KScript.Cli
 
             internal static bool TryParse(string input, out Source source)
             {
+                if (TryParseDirect(input, out source)) return true;
+                if (string.IsNullOrEmpty(input) || input.Contains("://")) return false;
+                int at = input.IndexOf('@');
+                string name = at < 0 ? input : input[(at + 1)..];
+                if (!Regex.IsMatch(name, @"\A[A-Za-z0-9][A-Za-z0-9._-]*\z") || !SafePart(name)) return false;
+                string repository = at < 0 ? LibraryRepositories.DefaultRepository : input[..at];
+                if (repository.EndsWith('/') || !TryParseDirect(repository, out var root) || root.Ref != null) return false;
+                source = root with { Folder = "libraries/" + name };
+                return true;
+            }
+
+            internal static bool TryParseDirect(string input, out Source source)
+            {
                 source = null;
                 const string host = "https://github.com/";
-                if (input.Contains('#') || input.Contains('?')) return false;
+                if (string.IsNullOrEmpty(input) || input.Contains('#') || input.Contains('?')) return false;
                 bool url = input.StartsWith(host, StringComparison.OrdinalIgnoreCase);
                 string[] parts = (url ? input.Substring(host.Length) : input).TrimEnd('/').Split('/');
                 if (parts.Length < 2 || (parts.Length != 2 && (!url || parts.Length < 4 || parts[2] != "tree"))) return false;
@@ -94,7 +130,7 @@ namespace KScript.Cli
             !part.Equals(".git", StringComparison.OrdinalIgnoreCase) &&
             !Regex.IsMatch(part, @"\A(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|\z)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-        private static void CheckDestination(string root, string destination)
+        internal static void CheckDestination(string root, string destination)
         {
             if (Path.GetRelativePath(root, destination) == ".") return;
             string path = root;
@@ -109,7 +145,7 @@ namespace KScript.Cli
         private static async Task Install(HttpClient client, Source source, string libraryFolder, string site, TextWriter output)
         {
             string requested = source.Url;
-            bool ambiguous = source.Folder.Length > 0 && !source.Ref.Contains('/');
+            bool ambiguous = source.Folder.Length > 0 && source.Ref != null && !source.Ref.Contains('/');
             // The last URL component names the library if it's a subfolder. If the entire tail
             // names a branch, the library takes the repo name. Check both receipts offline.
             foreach (string name in (ambiguous ? new[] { source.Name, source.Repo } : new[] { source.Name }).Distinct())
@@ -134,6 +170,10 @@ namespace KScript.Cli
                 {
                     source = source.LongerRef();
                 }
+                catch (HttpRequestException ex) when (source.Named && ex.StatusCode == HttpStatusCode.NotFound)
+                {
+                    throw new IOException($"Could not find the public GitHub repository {source.Repository}.", ex);
+                }
             }
             using var metadata = JsonDocument.Parse(details);
             if (metadata.RootElement.ValueKind != JsonValueKind.Object || !metadata.RootElement.TryGetProperty("sha", out var sha)
@@ -151,7 +191,7 @@ namespace KScript.Cli
             Directory.CreateDirectory(stage);
             try
             {
-                string entry = Extract(archive, source.Folder, stage);
+                string entry = Extract(archive, source, stage);
                 var receipt = new JsonObject { ["source"] = source.Url, ["commit"] = commit, ["entry"] = entry };
                 if (requested != source.Url) receipt["requested"] = requested;
                 File.WriteAllText(Path.Combine(stage, Receipt), receipt.ToJsonString() + "\n");
@@ -193,12 +233,13 @@ namespace KScript.Cli
             output.WriteLine($"From a script in {site}: import \"{Path.GetRelativePath(site, Path.Combine(destination, entry)).Replace('\\', '/')}\"");
         }
 
-        private static string Extract(ZipArchive archive, string folder, string stage)
+        private static string Extract(ZipArchive archive, Source source, string stage)
         {
             var scripts = new List<string>();
-            string prefix = folder.Length == 0 ? "" : folder + "/";
+            string prefix = source.Folder.Length == 0 ? "" : source.Folder + "/";
             byte[] buffer = new byte[81920];
             long total = 0;
+            bool foundFolder = false;
             foreach (var file in archive.Entries)
             {
                 // GitHub prefixes every archive path with a generated root directory.
@@ -206,6 +247,7 @@ namespace KScript.Cli
                 if (slash < 1 || !SafePart(file.FullName[..slash])) throw new InvalidDataException("Invalid GitHub archive root.");
                 string path = file.FullName[(slash + 1)..];
                 if (!path.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                foundFolder = true;
                 string relative = path[prefix.Length..].TrimEnd('/');
                 if (relative.Length == 0) continue;
                 if (!relative.Split('/').All(SafePart) || relative.Split('/')[0].Equals(Receipt, StringComparison.OrdinalIgnoreCase))
@@ -232,6 +274,7 @@ namespace KScript.Cli
                 if (relative.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase))
                     scripts.Add(relative);
             }
+            if (!foundFolder && source.Folder.Length > 0) throw new InvalidDataException($"Folder {source.Folder}/ was not found in {source.Repository}.");
             return scripts.OrderBy(s => s == "index.kscript" ? 0 : s == "index.ks.xml" ? 1 : 2).ThenBy(s => s.Count(c => c == '/')).ThenBy(s => s, StringComparer.Ordinal).FirstOrDefault()
                 ?? throw new InvalidDataException("The selected library contains no .kscript or .ks.xml files.");
         }

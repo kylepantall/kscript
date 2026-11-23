@@ -602,6 +602,11 @@ namespace KScript
                 return KScript.Queueing.QueueCommand.RunQueue(args.Skip(1).ToArray(), Out, Error, environment: EnvironmentName);
             }
 
+            if (args[0] == "repo")
+            {
+                return KScript.Cli.RepoCommand.Run(args.Skip(1).ToArray(), Out, Error);
+            }
+
             if (args[0] == "lib")
             {
                 return KScript.Cli.LibCommand.Run(args.Skip(1).ToArray(), Out, Error);
