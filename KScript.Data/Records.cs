@@ -107,6 +107,13 @@ namespace KScript.Data
         /// <summary><c>User->create({...})</c>: checks the values against the model, saves them and returns the record.</summary>
         public static Record Create(CallContext call, ModelInfo model, Dictionary<string, object> values, bool fillable = true)
         {
+            Record record = Prepare(call, model, values, fillable);
+            Insert(call, model, record);
+            return record;
+        }
+
+        internal static Record Prepare(CallContext call, ModelInfo model, Dictionary<string, object> values, bool fillable = true)
+        {
             Dictionary<string, object> fill = (fillable ? Fillable(model, values) : values).ToDictionary(kv => kv.Key, kv => kv.Value is BareWord w ? w.Name : kv.Value, StringComparer.Ordinal);
             // A belongs-to record given (author: $user) is its key: the model it is may be one this model's file
             // doesn't import (it was loaded from the models folder), so its type can't be checked by name here.
@@ -120,7 +127,6 @@ namespace KScript.Data
             }
             var record = (Record)Shapes.MapAs(call.Interpreter, fill, model.Type, $"The {model.Name}");
             Link(model, record);
-            Insert(call, model, record);
             return record;
         }
 
@@ -148,12 +154,20 @@ namespace KScript.Data
         /// <summary>A record made with <c>User()</c>, or a new one, as a row of the table.</summary>
         internal static void Insert(CallContext call, ModelInfo model, Record record)
         {
+            List<(string Name, SqlExpr Value)> values = InsertValues(model, record);
+            Database db = Database.For(call, model);
+            Column key = model.KeyColumn;
+            record[key.Name] = Rows.FromDb(db.Insert(call.Interpreter, model.Table, values, key), key, call.Interpreter);
+            Remember(record);
+        }
+
+        internal static List<(string Name, SqlExpr Value)> InsertValues(ModelInfo model, Record record)
+        {
             foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.BelongsTo && !r.Optional))
             {
                 if (record.GetValueOrDefault(r.ForeignKey) == null)
                     throw new KScriptException($"A {model.Name} needs its {r.Name} (a {r.Target.Name}): give {r.Name}: ${ModelInfo.Snake(r.Target.Name)} or {r.ForeignKey}, or make it optional with {r.Name}?: {r.Target.Name}.", "Shape");
             }
-            Database db = Database.For(call, model);
             DateTime now = Rows.Clock();
             if (model.Timestamps)
             {
@@ -168,9 +182,7 @@ namespace KScript.Data
                 if (c.AutoIncrement && value == null) continue;
                 values.Add((c.Name, new SqlValue(value, c)));
             }
-            Column key = model.KeyColumn;
-            record[key.Name] = Rows.FromDb(db.Insert(call.Interpreter, model.Table, values, key), key, call.Interpreter);
-            Remember(record);
+            return values;
         }
 
         /// <summary>Passwords are stored as hashes: a password set on the record becomes its hash before it is saved.</summary>

@@ -345,8 +345,21 @@ namespace KScript
         /// <summary>kscript routes [folder]: the route table of a site (the project's site root by default).</summary>
         int Routes(string[] args)
         {
-            string folder = args.FirstOrDefault(a => !a.StartsWith("-", StringComparison.Ordinal));
-            bool verbose = args.Contains("-v") || args.Contains("--verbose");
+            string folder = null;
+            string format = "text";
+            bool verbose = false;
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] is "-v" or "--verbose") verbose = true;
+                else if (args[i] == "--output" || args[i].StartsWith("--output=", StringComparison.Ordinal))
+                    format = args[i] == "--output" ? (++i < args.Length ? args[i] : null) : args[i][9..];
+                else if (!args[i].StartsWith("-", StringComparison.Ordinal)) folder ??= args[i];
+            }
+            if (format is not ("text" or "json"))
+            {
+                Error.WriteLine("kscript routes --output needs text or json.");
+                return ExitCodes.Usage;
+            }
             KScript.Projects.ProjectConfig project;
             try
             {
@@ -365,7 +378,7 @@ namespace KScript
                 Error.WriteLine($"Site folder not found: {folder}");
                 return ExitCodes.Usage;
             }
-            return KScript.Http.HttpServer.ListRoutes(folder ?? ".", project, Out, Error, verbose);
+            return KScript.Http.HttpServer.ListRoutes(folder ?? ".", project, Out, Error, verbose, json: format == "json");
         }
 
         /// <summary>
@@ -852,6 +865,12 @@ namespace KScript
                     report = Path.GetFullPath(at.File) + report.Substring(Path.GetFileName(at.File).Length);
                 }
                 ErrorReport.WriteMessage(Error, report);
+                if (Environment.GetEnvironmentVariable("KSCRIPT_RUN_ERROR_FILE") is { Length: > 0 } errorFile)
+                {
+                    // Keep editor annotations independent of the terminal and its task problem matcher.
+                    try { File.WriteAllText(errorFile, "ERROR " + report); }
+                    catch (Exception writeError) when (writeError is IOException or UnauthorizedAccessException or ArgumentException) { }
+                }
                 return ExitCodes.ScriptError;
             }
             finally

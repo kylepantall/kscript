@@ -135,8 +135,8 @@ namespace KScript
                 },
                 "kscript db diff\nkscript db migrate\nkscript db rollback\nkscript db fresh --seed", "data")
             { Group = "data", Details = "The database is the project's default connection: database in config, else SQLite at data/app.sqlite." },
-            new CliCommand("routes", "kscript routes [site folder] [-v]",
-                "List the routes of a site.", new[] { O("-v, --verbose", "Also show each route's middleware, and the file and line it is declared on.") }, "kscript routes\nkscript routes samples/http-app -v", "http") { Group = "web" },
+            new CliCommand("routes", "kscript routes [site folder] [-v] [--output text|json]",
+                "List the routes of a site.", new[] { O("-v, --verbose", "Also show each route's middleware, and the file and line it is declared on."), O("--output text|json", "Print the route table as text, or return structured HTTP routes and file-based pages as JSON.") }, "kscript routes\nkscript routes samples/http-app -v", "http") { Group = "web" },
             new CliCommand("openapi", "kscript openapi [site folder] [--output json|yaml] [--out file]",
                 "Write the OpenAPI 3.1 document for a site's routes, made from the code. kscript serve also answers /_openapi.json, /_openapi.yaml and /_api.",
                 new[]

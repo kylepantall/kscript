@@ -8,8 +8,8 @@ namespace KScript.Language.Analysis
     /// <summary>Works out the shape of an expression's value from the source (literals, declarations, return types).</summary>
     public sealed class TypeInference
     {
-        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip", "only", "without" };
-        private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "max", "min", "max_by", "min_by", "pop", "latest" };
+        private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "unique_by", "push", "take", "skip", "only", "without" };
+        private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "find_last", "max", "min", "max_by", "min_by", "pop", "latest" };
 
         private readonly LanguageCatalog catalog;
         private readonly DocumentAnalysis result;
@@ -40,7 +40,8 @@ namespace KScript.Language.Analysis
             }
             if (MappedShape(command, c.Arguments, 0, json, region) is TypeShape mapped)
             {
-                return mapped;
+                return command.ReturnType == KType.List && mapped.Type != KType.List
+                    ? new TypeShape(KType.List) { Element = mapped } : mapped;
             }
             if (json != null)
             {
@@ -54,6 +55,17 @@ namespace KScript.Language.Analysis
             if (command.ReturnShape != null && ShapeText.Parse(command.ReturnShape) is TypeShape described)
             {
                 // The package says what fields the result has: @user() is { id, email, ... }.
+                var fields = described.Type == KType.List ? described.Element?.Fields : described.Fields;
+                var parameters = command.Signatures.FirstOrDefault()?.Parameters ?? Array.Empty<ParameterInfo>();
+                for (int i = 0; i < parameters.Count && fields != null; i++)
+                {
+                    var parameter = parameters[i];
+                    if (parameter.ResultField == null) continue;
+                    ExprNode value = c.Arguments.FirstOrDefault(argument => argument.Name == parameter.Name)?.Value
+                        ?? (i < c.Arguments.Count && c.Arguments[i].Name == null ? c.Arguments[i].Value : null);
+                    if (value != null && Infer(value, region).Instance is TypeShape supplied)
+                        fields[parameter.ResultField] = new FieldInfo(parameter.ResultField, supplied, null);
+                }
                 return described;
             }
             TypeShape shape = new TypeShape(command.ReturnType);

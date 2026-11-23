@@ -45,6 +45,7 @@ namespace KScript.Pages
         public Dictionary<string, object> Request { get; }
 
         public KScript.Runtime.ConfigValue StartupConfig { get; init; }
+        public Dictionary<string, object> HostItems { get; } = new Dictionary<string, object>();
 
         /// <summary>Maximum evaluation steps for one request, so an endless loop can't hang the server.</summary>
         public long MaxSteps { get; set; } = 5_000_000;

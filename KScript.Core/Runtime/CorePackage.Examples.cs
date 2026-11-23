@@ -9,6 +9,17 @@ namespace KScript.Runtime
         private static void RegisterExamples(PackageBuilder p)
         {
             p.Examples(
+                ("list->flat_map", "<echo>{ [1, 2]->flat_map(fn(n) => [$n, -$n]) }</echo>"),
+                ("list->partition", "<echo>{ [1, 2, 3]->partition(fn(n) => $n->is_odd()) }</echo>"),
+                ("list->find_last", "<echo>{ [1, 2, 3]->find_last(fn(n) => $n->is_odd()) }</echo>"),
+                ("list->unique_by", "<echo>{ ['Ada', 'Amy', 'Bea']->unique_by(fn(name) => $name->first()) }</echo>"),
+                ("map->pick", "<echo>{ { name: 'Ada', active: true }->pick(['name']) }</echo>"),
+                ("map->omit", "<echo>{ { name: 'Ada', active: true }->omit(['active']) }</echo>"),
+                ("map->deep_merge", "<echo>{ { nav: { order: 1 } }->deep_merge({ nav: { label: 'Home' } }) }</echo>"),
+                ("date->duration_since", "<echo>{ '2025-01-01T10:00:00Z'->to_date()->duration_since('2025-01-01T09:00:00Z'->to_date()) }</echo>"),
+                ("string->strip_prefix", "<echo>{ 'draft-notes'->strip_prefix('draft-') }</echo>"),
+                ("string->strip_suffix", "<echo>{ 'notes.md'->strip_suffix('.md') }</echo>"),
+                ("string->normalize_unicode", "<echo>{ ('e' + @char_of(769))->normalize_unicode() }</echo>"),
                 // Any value
                 ("any->type", "[1, 2]->type()"),
                 ("any->to_string", "42->to_string() + '!'"),

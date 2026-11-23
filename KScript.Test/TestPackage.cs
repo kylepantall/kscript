@@ -96,6 +96,8 @@ namespace KScript.Testing
                 Example = "<capture into=\"out\">\n  <call fn=\"greet\" args=\"'Joan'\" />\n</capture>\n<expect value=\"$out\" equals=\"'Hello, Joan!'\" />",
             }, Capture);
 
+            TestHelpers.Register(p, AssertionType);
+
             p.Command("fail", "message?", "Fails the test now.", KType.Null, c =>
                 throw new KScriptException(c.Has(0) ? c.Str(0) : "@fail() was called.", AssertionType));
 

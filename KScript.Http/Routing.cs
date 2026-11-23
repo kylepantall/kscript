@@ -252,6 +252,9 @@ namespace KScript.Http
         public string ControllerName { get; init; }
 
         public string View { get; init; }
+        public string LabelKey { get; init; }
+        public Record Data { get; init; }
+
         public string RedirectTo { get; init; }
         public int RedirectStatus { get; init; } = 302;
 

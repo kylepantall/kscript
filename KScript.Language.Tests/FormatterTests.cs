@@ -340,6 +340,17 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void FormatsInlineTagsWithoutAddingWhitespaceToTheirText()
+        {
+            string input = Lines("<div><p>Meet <a    href=\"/people\"  title=\"People in our community\">people</a><strong>!</strong></p></div>");
+            string expected = Lines("<div>", "  <p>Meet <a", "    href=\"/people\"", "    title=\"People in our community\">people</a><strong>!</strong></p>", "</div>");
+            var options = new FormatOptions { PrintWidth = 40 };
+            Assert.Equal(expected, Fmt(input, "page.html", options));
+            Assert.Equal(expected, Fmt(expected, "page.html", options));
+            AssertSameMeaning(input, expected, DocumentKind.Page);
+        }
+
+        [Fact]
         public void PreTextareaScriptAndStyleAreKeptExactly()
         {
             string input = "<body>\n<div>\n<pre>\n  line one   \n      line two\n</pre>\n<textarea>\n a\n</textarea>\n" +

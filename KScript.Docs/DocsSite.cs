@@ -93,6 +93,7 @@ namespace KScript.Docs
             new Guide("agents", "agents.md", "Tools", "Coding agents", "kscript"),
             new Guide("upgrading", "upgrading.md", "More", "What changed", "kscript"),
             new Guide("roadmap", "roadmap.md", "More", "Roadmap"),
+            new Guide("builtin-api-gaps", "builtin-api-gaps.md", "More", "Built-in API gaps"),
         };
 
         /// <summary>

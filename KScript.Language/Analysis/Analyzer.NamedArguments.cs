@@ -17,7 +17,7 @@ namespace KScript.Language.Analysis
         /// <remarks><paramref name="RawText"/>: how a bare word is read for the parameter's type, as text ("word") or a handle ("handle").</remarks>
         internal readonly record struct ParameterSlot(string Name, bool Required, bool Variadic, bool Flag = false, IReadOnlyList<string> Values = null, string TypeName = null,
             IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null, bool AcceptsModel = false, bool OptionalNativeCallback = false,
-            bool ScriptParameter = false)
+            bool ScriptParameter = false, TypeArgumentConstraint TypeConstraint = TypeArgumentConstraint.None, Signature FunctionSignature = null)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
 
@@ -50,7 +50,8 @@ namespace KScript.Language.Analysis
             callables.SelectMany(c => c.Signatures)
                 .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null,
                     RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : p.Type == "word" ? "word" : null,
-                    Type: p.Type, AcceptsModel: knownReceiver && p.AcceptsModel, OptionalNativeCallback: p.Optional && p.Type == KType.Fn)).ToList())
+                    Type: p.Type, AcceptsModel: knownReceiver && p.AcceptsModel, OptionalNativeCallback: p.Optional && p.Type == KType.Fn,
+                    TypeConstraint: p.TypeConstraint, FunctionSignature: p.FunctionSignature)).ToList())
                 .ToList();
 
         private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
@@ -94,11 +95,48 @@ namespace KScript.Language.Analysis
             && catalog.GetCommand(c.Name) == null && catalog.GetRetiredCommand(c.Name) == null
             && scope.Lookup(c.Name, region.Source.ToSource(c.Span.Start))?.Kind != SymbolKind.Function;
 
+        private void CheckTypeConstraint(ExprNode value, ParameterSlot slot, ExpressionRegion region)
+        {
+            if (!slot.Required && value is LiteralNode { Kind: LiteralKind.Null }) return;
+            TypeShape supplied = Infer(value, region);
+            TypeShape shape = supplied.Instance;
+            if (slot.TypeConstraint != TypeArgumentConstraint.DeclaredRecord && value is LiteralNode { Kind: LiteralKind.String } literal)
+                shape = new TypeInference(catalog, result).TypeNamed(literal.Value, region.Source.ToSource(value.Span.Start));
+            if (supplied.Type == KType.Any && shape == null) return;
+            bool accepts = slot.TypeConstraint switch
+            {
+                TypeArgumentConstraint.DeclaredRecord => shape is { Type: KType.Map, Name: not null, Kind: null },
+                TypeArgumentConstraint.Array => shape?.Type == KType.List,
+                TypeArgumentConstraint.Mappable => shape?.Type is KType.List or KType.Map,
+                TypeArgumentConstraint.Iterable => shape?.Type is (KType.List or KType.Map or KType.Number or KType.String)
+                    || (shape != null && NativeTypes.Get(shape.Type)?.Iterates != null),
+                _ => true,
+            };
+            if (!accepts)
+                Report(region.Source.ToSource(value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                    $"The '{slot.Name}' argument requires a type with the {slot.TypeConstraint} constraint.");
+        }
+
         /// <summary>An argument that reached its parameter: a waiting <c>@kyle</c> is a handle there, and a literal is checked against the type.</summary>
         private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
+            if (slot.TypeConstraint != TypeArgumentConstraint.None && a.Value != null)
+                CheckTypeConstraint(a.Value, slot, region);
+
             if (slot.Type is "fn" or "fn?" && a.Value != null)
             {
+                if (slot.FunctionSignature is Signature contract)
+                {
+                    Signature actualSignature = a.Value switch
+                    {
+                        LambdaNode lambda => new Signature(lambda.Parameters.Select(p => new ParameterInfo(p.Name)).ToArray()),
+                        CommandCallNode { ArgumentList: null } command => region.Scope.Lookup(command.Name, region.Source.ToSource(command.Span.Start))?.PositionalSignature,
+                        _ => null,
+                    };
+                    if (actualSignature != null && !actualSignature.AcceptsPositionalCall(contract))
+                        Report(region.Source.ToSource(a.Value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                            $"The '{slot.Name}' argument must accept {contract.FunctionLabel}.");
+                }
                 string actual = Infer(a.Value, region).Type;
                 bool acceptsNull = slot.Type == "fn?" || slot.OptionalNativeCallback;
                 if (actual is not (KType.Any or KType.Fn) && !(actual == KType.Null && acceptsNull))

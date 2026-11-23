@@ -49,6 +49,7 @@ namespace KScript.Pages
                 FileRootName = "the site folder",
                 CanWriteFiles = false,
             };
+            foreach (var entry in ctx.HostItems) host.Items[entry.Key] = entry.Value;
             host.Items[ContextKey] = ctx;
             if (ctx.Request != null) host.Items[Translator.RequestKey] = ctx.Request;
             ctx.StartupConfig?.CopyTo(host);

@@ -27,4 +27,26 @@ describe(name: 'Product') {
     expect(value: $names, count: 3)
     expect(value: @queries(), count_at_most: 4)
   }
+
+  test(name: 'upserts by sku and pages by a stable key') {
+    Product->insert([
+      { sku: 'TEA-9', name: 'Black tea', price: 5 },
+      { sku: 'MUG-1', name: 'Blue mug', price: 8 },
+    ])
+    Product->upsert({ sku: 'TEA-9', name: 'Green tea', price: 6 }, key: 'sku')
+    expect(value: Product->count(), same: 2)
+    expect(value: Product->where(sku: 'TEA-9')->first().name, same: 'Green tea')
+
+    first = Product->cursor_paginate(per_page: 1)
+    expect(value: $first.has_more, same: true)
+    second = Product->cursor_paginate(per_page: 1, after: $first.next)
+    expect(value: $second.items->first().name, same: 'Blue mug')
+    expect(value: $second.has_more, same: false)
+
+    description = @db()->describe_table(Product)
+    expect(
+      value: $description.columns->pluck('name')->contains('sku'),
+      same: true
+    )
+  }
 }

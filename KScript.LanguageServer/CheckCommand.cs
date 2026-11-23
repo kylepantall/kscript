@@ -1,4 +1,5 @@
 using KScript.Language.Analysis;
+using KScript.Language.Rules;
 using KScript.Syntax;
 using KScript.Syntax.Text;
 using KScript.Projects;
@@ -135,7 +136,7 @@ namespace KScript.LanguageServer
                         fixedFiles++;
                     }
                 }
-                DocumentAnalysis analysis = Analyzer.Analyze(fileText, file);
+                DocumentAnalysis analysis = Analyzer.Analyze(fileText, file, rules: DocumentRules.ForProject(config?.Directory));
                 // A file named on the command line is checked even if lint.exclude covers it.
                 LintRules.Apply(analysis.Diagnostics, config, isExplicit ? null : file);
                 foreach (Diagnostic d in analysis.Diagnostics.OrderBy(d => d.Span.Start))

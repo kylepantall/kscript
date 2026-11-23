@@ -1,0 +1,21 @@
+// The built-in style shared by kscript fmt and the editor.
+Style(
+  indent_size: 2,
+  use_tabs: false,
+  print_width: 80,
+  max_blank_lines: 1,
+  end_of_line: 'auto',
+  indent: true,
+  statement_per_line: true,
+  tidy_tags: true,
+  wrap_attributes: true,
+  trim_trailing_whitespace: true,
+  collapse_blank_lines: true,
+  final_newline: true,
+  spacing: true,
+  brace_style: true,
+  wrap_strings: true,
+  wrap_chains: true,
+  wrap_bodies: true,
+  wrap_comments: true,
+)

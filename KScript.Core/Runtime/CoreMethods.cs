@@ -86,8 +86,34 @@ namespace KScript.Runtime
             p.Method(l, "filter", "fn", "The items for which fn(item, index) is true.", l, (t, c) => ListFilters.Where(L(t), (x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))));
             p.Method(l, "reject", "fn", "The items for which fn is false.", l, (t, c) => ListFilters.Where(L(t), (x, i) => !Values.Truthy(Apply(c, c.Fn(0), x, i))));
             p.Method(l, "map", "fn", "A new list with fn(item, index) applied to each item.", l, (t, c) => L(t).Select((x, i) => Apply(c, c.Fn(0), x, i)).ToList());
+            p.Method(l, "flat_map", "fn: fn", "Maps each item, then spreads each result list by one level.", l, (t, c) =>
+            {
+                ICallable fn = c.Fn(0);
+                return L(t).SelectMany((item, index) => FlattenItem(Apply(c, fn, item, index))).ToList();
+            });
+            p.Method(l, "partition", "fn: fn", "Returns [matching, remaining], testing each item once.", l, (t, c) =>
+            {
+                var items = L(t);
+                ICallable fn = c.Fn(0);
+                var matching = new List<object>();
+                var remaining = new List<object>();
+                for (int i = 0; i < items.Count; i++)
+                    (Values.Truthy(Apply(c, fn, items[i], i)) ? matching : remaining).Add(items[i]);
+                var type = ListFilters.ElementTypeOf(items)?.Name;
+                if (matching.Count == 0) ListFilters.RememberEmptyType(matching, type);
+                if (remaining.Count == 0) ListFilters.RememberEmptyType(remaining, type);
+                return new List<object> { matching, remaining };
+            });
             p.Method(l, "pluck", "key", "One field from each item, or a map of the selected fields for each item when given a list of keys.", l, Pluck).Info.KeepsBareWords = true;
             p.Method(l, "find", "fn", "The first item for which fn is true, or null.", KType.Any, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).FirstOrDefault());
+            p.Method(l, "find_last", "fn: fn", "The last item for which fn(item, index) is true, or null. Indexes refer to the original list.", KType.Any, (t, c) =>
+            {
+                var list = L(t);
+                ICallable fn = c.Fn(0);
+                for (int i = list.Count - 1; i >= 0; i--)
+                    if (Values.Truthy(Apply(c, fn, list[i], i))) return list[i];
+                return null;
+            });
             p.Method(l, "find_index", "fn", "The index of the first item for which fn is true, or -1.", KType.Number, (t, c) =>
             {
                 var list = L(t);
@@ -158,6 +184,19 @@ namespace KScript.Runtime
             p.Method(l, "take", "count: number", "The first count items.", l, (t, c) => L(t).Take(c.Int(0)).ToList());
             p.Method(l, "skip", "count: number", "All but the first count items.", l, (t, c) => L(t).Skip(c.Int(0)).ToList());
             p.Method(l, "unique", "", "The list without duplicates, using strict equality (===).", l, (t, c) => L(t).Aggregate(new List<object>(), (acc, x) => { if (!acc.Any(y => Values.StrictEquals(x, y))) acc.Add(x); return acc; }));
+            p.Method(l, "unique_by", "fn: fn", "Keeps the first item for each key returned by fn. Keys use strict equality.", l, (t, c) =>
+            {
+                var list = L(t);
+                ICallable fn = c.Fn(0);
+                var keys = new List<object>();
+                return ListFilters.Where(list, (item, index) =>
+                {
+                    object key = Apply(c, fn, item, index);
+                    if (keys.Any(seen => Values.StrictEquals(seen, key))) return false;
+                    keys.Add(key);
+                    return true;
+                });
+            });
             p.Method(l, "push", "items...", "A new list with items added to the end.", l, (t, c) => L(t).Concat(c.Args).ToList());
             p.Method(l, "prepend", "items...", "A new list with items added to the start.", l, (t, c) => c.Args.Concat(L(t)).ToList());
             p.Method(l, "insert", "index: number, item", "A new list with item inserted at index.", l, (t, c) =>
@@ -176,7 +215,7 @@ namespace KScript.Runtime
                 if (i >= 0 && i < copy.Count) copy.RemoveAt(i);
                 return copy;
             });
-            p.Method(l, "flatten", "", "Lists inside the list are spread into it.", l, (t, c) => L(t).SelectMany(x => Values.Unwrap(x) is List<object> inner ? inner : new List<object> { x }).ToList());
+            p.Method(l, "flatten", "", "Lists inside the list are spread into it.", l, (t, c) => L(t).SelectMany(FlattenItem).ToList());
             p.Method(l, "chunk", "size: number", "The items in lists of size.", l, (t, c) =>
             {
                 int size = Math.Max(1, c.Int(0));
@@ -190,6 +229,9 @@ namespace KScript.Runtime
                 return map;
             });
         }
+
+        private static IEnumerable<object> FlattenItem(object value) =>
+            Values.Unwrap(value) is List<object> list ? list : new[] { value };
 
         private static object Pluck(object target, CallContext call)
         {
@@ -244,10 +286,31 @@ namespace KScript.Runtime
                 foreach (var kv in c.Map(0)) copy[kv.Key] = kv.Value;
                 return copy;
             });
+            p.Method(m, "pick", "keys: list", "A copy containing only the given keys, in the original map's order.", m, (t, c) => SelectKeys(M(t), c.List(0), keep: true));
+            p.Method(m, "omit", "keys: list", "A copy without the given keys, in the original map's order.", m, (t, c) => SelectKeys(M(t), c.List(0), keep: false));
+            p.Method(m, "deep_merge", "other: map", "Recursively merges maps. The right value replaces lists, nulls, and other leaves.", m, (t, c) => DeepMerge(M(t), c.Map(0), c, 0));
             p.Method(m, "count", "", "The number of keys.", KType.Number, (t, c) => (double)M(t).Count);
             p.Method(m, "is_empty", "", "True when the map has no keys.", KType.Bool, (t, c) => M(t).Count == 0);
             p.Method(m, "map", "fn", "A new map with fn(value, key) applied to each value.", m, (t, c) => M(t).ToDictionary(kv => kv.Key, kv => c.Call(c.Fn(0), kv.Value, kv.Key)));
             p.Method(m, "filter", "fn", "The entries for which fn(value, key) is true.", m, (t, c) => M(t).Where(kv => Values.Truthy(c.Call(c.Fn(0), kv.Value, kv.Key))).ToDictionary(kv => kv.Key, kv => kv.Value));
+        }
+
+        private static Dictionary<string, object> SelectKeys(Dictionary<string, object> map, IEnumerable<object> keys, bool keep)
+        {
+            var requested = keys.Select(Values.ToStr).ToHashSet(map.Comparer);
+            return map.Where(entry => requested.Contains(entry.Key) == keep).ToDictionary(entry => entry.Key, entry => entry.Value, map.Comparer);
+        }
+
+        private static Dictionary<string, object> DeepMerge(Dictionary<string, object> left, Dictionary<string, object> right, CallContext call, int depth)
+        {
+            if (depth >= 128) throw call.Error("Maps are nested too deeply to merge.", "Argument");
+            var result = new Dictionary<string, object>(left, left.Comparer);
+            foreach (var entry in right)
+            {
+                result[entry.Key] = result.TryGetValue(entry.Key, out object current) && current is Dictionary<string, object> a
+                    && entry.Value is Dictionary<string, object> b ? DeepMerge(a, b, call, depth + 1) : entry.Value;
+            }
+            return result;
         }
 
         private static void RegisterNumberMethods(PackageBuilder p)
@@ -290,6 +353,11 @@ namespace KScript.Runtime
             p.Method(d, "add_months", "months: number", "The date plus a number of months.", d, (t, c) => D(t).AddMonths(c.Int(0)));
             p.Method(d, "date", "", "The date at midnight.", d, (t, c) => D(t).Date);
             p.Method(d, "iso", "", "The date in ISO 8601 format.", KType.String, (t, c) => D(t).ToString("o", CultureInfo.InvariantCulture));
+            p.Method(d, "duration_since", "other: date", "The signed time from other to this date, as a duration. Dates without an offset use local time.", "duration", (t, c) =>
+            {
+                if (Values.Unwrap(c.Need(0)) is not DateTime other) throw c.Error("duration_since needs another date.", "Type");
+                return DurationType.Of((new DateTimeOffset(D(t)) - new DateTimeOffset(other)).TotalSeconds);
+            });
             p.Method(d, "timestamp", "", "Seconds since 1970-01-01 UTC.", KType.Number, (t, c) => (double)new DateTimeOffset(D(t)).ToUnixTimeSeconds());
         }
 
@@ -310,6 +378,18 @@ namespace KScript.Runtime
             p.Method(s, "contains", "text", "True when the text contains this text.", KType.Bool, (t, c) => S(t).Contains(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "starts_with", "text", "True when the text starts with this text.", KType.Bool, (t, c) => S(t).StartsWith(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "ends_with", "text", "True when the text ends with this text.", KType.Bool, (t, c) => S(t).EndsWith(c.Str(0), StringComparison.Ordinal));
+            p.Method(s, "strip_prefix", "text: string", "Removes one exact prefix when present.", s, (t, c) =>
+                S(t).StartsWith(c.Str(0), StringComparison.Ordinal) ? S(t)[c.Str(0).Length..] : S(t));
+            p.Method(s, "strip_suffix", "text: string", "Removes one exact suffix when present.", s, (t, c) =>
+                S(t).EndsWith(c.Str(0), StringComparison.Ordinal) ? S(t)[..(S(t).Length - c.Str(0).Length)] : S(t));
+            p.Method(s, "normalize_unicode", "form?: NFC|NFD|NFKC|NFKD", "Normalizes Unicode using the given form (NFC by default).", s, (t, c) => S(t).Normalize(c.Str(0, "NFC") switch
+            {
+                "NFC" => NormalizationForm.FormC,
+                "NFD" => NormalizationForm.FormD,
+                "NFKC" => NormalizationForm.FormKC,
+                "NFKD" => NormalizationForm.FormKD,
+                _ => throw c.Error("Unicode normalization needs NFC, NFD, NFKC, or NFKD.", "Argument"),
+            }));
             p.Method(s, "replace", "old, new", "The text with every old replaced by new. old can be a regex: ->replace(/\\s+/, ' ').", s, (t, c) =>
                 Values.Unwrap(c.Arg(0)) is RegexValue rx ? RegexValue.Run(rx, r => r.Replace(S(t), c.Str(1)))
                 : c.Str(0).Length == 0 ? S(t) : S(t).Replace(c.Str(0), c.Str(1), StringComparison.Ordinal));

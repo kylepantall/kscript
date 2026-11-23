@@ -1,5 +1,6 @@
 using System.Text;
 
+using KScript.Language.Rules;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
@@ -14,7 +15,8 @@ namespace KScript.Language.Formatting
     /// indentation by nesting (one level per line that opens brackets, one more for a statement carried onto the next
     /// line), one statement per line (<c>a = 1; b = 2</c> and one-line blocks are split), <c>} else {</c> on one line,
     /// spaces after commas and after the colon of <c>name: value</c>, around assignments and before a block's
-    /// <c>{</c>, long argument lists, arrays and maps wrapped one item per line, trailing spaces, blank lines and the
+    /// <c>{</c>, long argument lists, arrays and maps wrapped one item per line, trailing commas in multiline model
+    /// options, trailing spaces, blank lines and the
     /// final newline. A match statement's arms (<c>1, 2 =&gt; statement</c> or <c>=&gt; { block }</c>) are laid out as
     /// statements: one arm per line as written, and an arm's block opened up like any other.
     /// </para>
@@ -49,7 +51,10 @@ namespace KScript.Language.Formatting
             "else", "elif", "catch", "finally",
         };
 
-        public static FormatResult Format(string text, FormatOptions options = null)
+        public static FormatResult Format(string text, FormatOptions options = null) =>
+            Format(text, options, DocumentRules.Default);
+
+        internal static FormatResult Format(string text, FormatOptions options, DocumentRules rules)
         {
             options ??= FormatOptions.Default;
             text ??= string.Empty;
@@ -80,7 +85,7 @@ namespace KScript.Language.Formatting
             string where = null;
             foreach (bool full in new[] { true, false })
             {
-                string formatted = Run(lf, options, full);
+                string formatted = Run(lf, options, full, rules);
                 if (Tamper != null) formatted = Tamper(formatted);
                 if (CodeMeaning.Same(original, CodeParser.Parse(formatted), out where))
                 {
@@ -94,7 +99,7 @@ namespace KScript.Language.Formatting
         [ThreadStatic]
         internal static Func<string, string> Tamper;
 
-        private static string Run(string text, FormatOptions options, bool full)
+        private static string Run(string text, FormatOptions options, bool full, DocumentRules rules)
         {
             if (full && (options.StatementPerLine || options.BraceStyle))
             {
@@ -105,10 +110,15 @@ namespace KScript.Language.Formatting
                 text = Space(text);
             }
             text = Layout(text, options);
-            if (full && (options.WrapAttributes || options.WrapStrings || options.WrapChains || options.WrapBodies || options.WrapComments))
+            if (full && (options.WrapAttributes || options.WrapStrings || options.WrapChains || options.WrapBodies || options.WrapComments || rules.HasModelRules))
             {
                 for (int i = 0; i < 24; i++)
                 {
+                    if (options.WrapAttributes || rules.HasModelRules)
+                    {
+                        string models = WrapModelOptions(text, options, rules);
+                        if (models != text) text = Layout(models, options);
+                    }
                     string wrapped = Wrap(text, options);
                     if (wrapped == text) break;
                     text = Layout(wrapped, options);
@@ -1108,6 +1118,58 @@ namespace KScript.Language.Formatting
         #endregion
 
         #region Wrapping
+
+        /// <summary>Lay out long or already split model headers with one option and a comma on each line.</summary>
+        private static string WrapModelOptions(string text, FormatOptions options, DocumentRules rules)
+        {
+            if (!text.Contains("model", StringComparison.Ordinal)) return text;
+
+            Scan scan = null;
+            Edits edits = new Edits();
+            foreach (MarkupElement model in CodeParser.Parse(text).DescendantElements().Where(e => e.Name == "model"))
+            {
+                MarkupAttribute name = model.GetAttribute("name");
+                bool forced = rules.WrapModel(name?.ValueText);
+                if (!forced && !options.WrapAttributes) continue;
+                int nameEnd = name?.Span.End ?? model.NameSpan.End;
+                int open = SkipAllSpaces(text, nameEnd);
+                if (Peek(text, open) != '(') continue;
+
+                scan ??= Read(text);
+                int close = scan.Match[open];
+                if (close < 0 || Array.IndexOf(scan.Verbatim, true, open, close - open + 1) >= 0) continue;
+
+                MarkupAttribute[] args = model.Attributes.Where(a => a.Span.Start > open && a.Span.End <= close).ToArray();
+                if (args.Length == 0) continue;
+                List<int> commas = TopLevelCommas(scan, open, close);
+                bool trailingComma = commas.Count > 0 && commas[^1] >= args[^1].Span.End;
+                if (!forced && !trailingComma && text.IndexOf('\n', open, close - open) < 0)
+                {
+                    int start = text.LastIndexOf('\n', open) + 1;
+                    int end = text.IndexOf('\n', close);
+                    if (end < 0) end = text.Length;
+                    int headerWidth = Columns(text.Substring(start, end - start), options) + end - start - LeadingWidth(text, start, end);
+                    if (headerWidth <= options.PrintWidth) continue;
+                }
+
+                for (int i = 0; i < args.Length; i++)
+                {
+                    TextSpan arg = args[i].Span;
+                    BreakBefore(arg.Start);
+                    int next = i + 1 < args.Length ? args[i + 1].Span.Start : close;
+                    if (!commas.Any(comma => comma >= arg.End && comma < next)) edits.Insert(arg.End, ",");
+                }
+                BreakBefore(close);
+            }
+            return edits.Apply(text);
+
+            void BreakBefore(int token)
+            {
+                int before = token;
+                while (before > 0 && text[before - 1] is ' ' or '\t') before--;
+                if (before > 0 && text[before - 1] != '\n') edits.Replace(before, token - before, "\n");
+            }
+        }
 
         /// <summary>
         /// Breaks each line that runs past the print width, one step per pass (the caller re-lays the text out and

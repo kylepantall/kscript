@@ -39,8 +39,10 @@ namespace KScript.Http
 
         public override string Description => "Routes, controllers and middleware: <KScript.Routes> files served by kscript serve.";
 
-        private static A Middleware(string description) =>
-            new A("middleware", K.FunctionReferences, description, false, BuiltInMiddleware);
+        private static readonly Signature MiddlewareSignature = Signature.Parse("request: map, next: fn");
+
+        private static A Middleware(string description, string name = "middleware", bool required = false) =>
+            new A(name, K.FunctionReferences, description, required, BuiltInMiddleware) { FunctionSignature = MiddlewareSignature };
 
         protected override void Register(PackageBuilder p)
         {
@@ -115,7 +117,7 @@ namespace KScript.Http
             });
 
             p.Element(new ElementInfo("Middleware", "Middleware for the routes that follow it in this file or group.", ContentKind.Empty,
-                new A("use", K.FunctionReferences, "Built-ins (log, cors, auth, throttle:30) or <fn>s taking ($request, $next): [log, cors, my_check].", true, BuiltInMiddleware))
+                Middleware("Built-ins or custom functions to run before the routes that follow.", name: "use", required: true))
             {
                 Context = ElementContext.Script,
                 MustBeInside = new[] { "Routes", "Group" },
@@ -123,7 +125,7 @@ namespace KScript.Http
                 Example = "<KScript.Routes>\n  <Middleware use=\"log, cors\" />\n</KScript.Routes>",
             }, run =>
             {
-                Context(run).Top.Middleware.AddRange(ResolveMiddleware(run, run.RequiredRaw("use")));
+                Context(run).Top.Middleware.AddRange(ResolveMiddleware(run, run.RequiredRaw("use"), "use"));
                 return null;
             });
 
@@ -177,11 +179,13 @@ namespace KScript.Http
             p.Command("route", "name, params...", "The address of a named route, with its {parameters} filled in: @route('people.show', id: 3) is /people/3. Other values become the query.",
                 KType.String, c =>
                 {
-                    RequestContext ctx = RequestContext.Current(c.Host) ?? throw c.Error("@route() works while kscript serve handles a request.", "Http");
+                    RouteTable table = RouteCatalog.Current(c).Table;
                     var values = new Dictionary<string, object>(c.Named, StringComparer.Ordinal);
                     if (c.Count > 1 && Values.Unwrap(c.Arg(1)) is Dictionary<string, object> map) foreach (var kv in map) values[kv.Key] = kv.Value;
-                    return ctx.Table.Url(c.Str(0), values);
+                    return table.Url(c.Str(0), values);
                 }, "<a href=\"{@route('people.show', id: $p.id)}\">");
+
+            RouteCatalog.Register(p);
 
             foreach (var f in HttpResponse.Fields)
                 p.Field(KType.HttpResponse, f.Name, f.Type, f.Description);
@@ -201,6 +205,8 @@ namespace KScript.Http
             new A("redirect", K.Text, "Answer with a redirect to this address instead."),
             new A("status", K.Expression, "The redirect's status code, 302 by default."),
             new A("name", K.Text, "A name for the route, for @route('name', ...)."),
+            new A("label_key", K.Text, "A translation key for the route's display label."),
+            new A("data", K.Expression, "Optional route metadata made from a declared record type.") { RequiresDeclaredRecord = true },
             Middleware("Middleware for this route, comma separated."),
             new A("where", K.Text, "Rules for the parameters: where=\"id: int, slug: slug\". Rules: number, int, alpha, alnum, slug, uuid or a regular expression.") { Literal = true },
             new A("etag", K.Bool, "true tags GET answers with an ETag (a hash of the body) and answers If-None-Match with 304 Not Modified when the client already has that version."),
@@ -254,11 +260,16 @@ namespace KScript.Http
             middleware.AddRange(ResolveMiddleware(run, run.Raw("middleware")));
             AddCaching(run, middleware);
             string name = run.Raw("name")?.Trim();
+            object data = run.Has("data") ? Values.Unwrap(run.Eval("data")) : null;
+            if (run.Has("data") && data is not Record { Type.Kind: null })
+                throw run.Error("Route data must be a value of a declared record, such as NavigationData(order: 10).", "data", "Type");
             ctx.Add(run, new Route
             {
                 Methods = methods,
                 Pattern = pattern,
                 Name = name != null ? ctx.NamePrefix + name : null,
+                LabelKey = run.Raw("label_key"),
+                Data = data as Record,
                 Middleware = middleware,
                 Controller = to != null ? ResolveFunction(run, to, "to") : null,
                 ControllerName = to,
@@ -363,7 +374,7 @@ namespace KScript.Http
         /// Finds a controller or middleware function: a <c>&lt;fn&gt;</c> in scope (<c>show</c>), a function of a
         /// script or package imported with as (<c>people.show</c>), or a command.
         /// </summary>
-        internal static ICallable ResolveFunction(ElementRun run, string text, string attribute)
+        internal static ICallable ResolveFunction(ElementRun run, string text, string attribute, Signature contract = null)
         {
             string name = text.Trim().TrimStart('@');
             int dot = name.IndexOf('.');
@@ -377,27 +388,37 @@ namespace KScript.Http
                 }
                 if (ns.TryGet(member, out object found))
                 {
-                    if (found is ICallable fn) return fn;
-                    if (found is CommandDefinition cmd) return Command(run.Interpreter, cmd);
+                    if (found is ICallable fn) return Check(fn);
+                    if (found is CommandDefinition cmd) return Check(Command(run.Interpreter, cmd), cmd.Info.Signatures);
                     throw run.Error($"{ns.Display}'s '{member}' is {Values.Describe(found)}, not a function.", attribute, "Http");
                 }
                 string suggestion = Values.Closest(member, ns.Names);
                 throw run.Error($"{ns.Display} has no function '{member}'." + (suggestion != null ? $" Did you mean {alias}.{suggestion}?" : $" It exports: {string.Join(", ", ns.Names)}."), attribute, "Http");
             }
 
-            if (run.Scope.TryGet(name, out object value) && value is ICallable callable) return callable;
+            if (run.Scope.TryGet(name, out object value) && value is ICallable callable) return Check(callable);
             if (run.Module.Commands.TryGetValue(name, out CommandDefinition command))
-                return Command(run.Interpreter, command);
+                return Check(Command(run.Interpreter, command), command.Info.Signatures);
             string near = Values.Closest(name, run.Scope.Names().Where(n => run.Scope.TryGet(n, out object f) && f is ICallable));
             throw run.Error(Wording.Of($"No function named '{name}'. Declare it with <fn name=\"{name}\"> or import a controller (<import path=\"...\" as=\"people\" /> then people.{name}).")
                 + (near != null ? $" Did you mean {near}?" : string.Empty), attribute, "Http");
+
+            ICallable Check(ICallable fn, IReadOnlyList<Signature> signatures = null)
+            {
+                if (contract == null) return fn;
+                if (fn is UserFunction user)
+                    signatures = new[] { user.PositionalSignature };
+                if (signatures != null && !signatures.Any(s => s.AcceptsPositionalCall(contract)))
+                    throw run.Error($"Middleware '{name}' must accept {contract.FunctionLabel}.", attribute, "Http");
+                return fn;
+            }
         }
 
         private static ICallable Command(Interpreter interpreter, CommandDefinition cmd) =>
             new NativeFunction(cmd.Name, call => interpreter.InvokeCommand(cmd, call));
 
         /// <summary>Reads a middleware list: <c>[log, cors, auth:ADMIN_TOKEN, throttle:30, my_check]</c> (or the same without brackets).</summary>
-        internal static List<MiddlewareRef> ResolveMiddleware(ElementRun run, string list)
+        internal static List<MiddlewareRef> ResolveMiddleware(ElementRun run, string list, string attribute = "middleware")
         {
             var result = new List<MiddlewareRef>();
             if (string.IsNullOrWhiteSpace(list)) return result;
@@ -409,7 +430,7 @@ namespace KScript.Http
                 string argument = colon > 0 ? raw[(colon + 1)..].Trim() : null;
                 if (ctx.Settings.Groups.TryGetValue(name, out List<string> group))
                 {
-                    result.AddRange(ResolveMiddleware(run, string.Join(",", group)));
+                    result.AddRange(ResolveMiddleware(run, string.Join(",", group), attribute));
                     continue;
                 }
                 // A <fn> of the same name replaces a built-in; a variable such as $log does not.
@@ -418,7 +439,7 @@ namespace KScript.Http
                     result.Add(new MiddlewareRef(name, argument, null));
                     continue;
                 }
-                result.Add(new MiddlewareRef(name, argument, ResolveFunction(run, name, "middleware")));
+                result.Add(new MiddlewareRef(name, argument, ResolveFunction(run, name, attribute, MiddlewareSignature)));
             }
             return result;
         }

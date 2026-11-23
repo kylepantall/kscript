@@ -25,6 +25,19 @@ echo $joan.id
 
 The database is SQLite, in `data/app.sqlite` in your project folder (the folder with `kscript.json`, or the script's folder). Nothing needs installing: KScript ships SQLite. Postgres, MySQL and MariaDB are a url away: see [Connections](#connections).
 
+Split longer model option lists across lines. A trailing comma is accepted and the formatter keeps it, so adding another option only changes one line.
+
+```kscript
+import KScript.Data
+
+model Attachments(
+  timestamps,
+  soft_deletes,
+) {
+  name: string
+}
+```
+
 ## Models
 
 A model is declared like a [type](types.md), with `model` instead of `type`. Its fields are the table's columns.

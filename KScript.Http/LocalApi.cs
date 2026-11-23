@@ -53,10 +53,16 @@ namespace KScript.Http
         }
 
         /// <summary>The app of the project around <paramref name="folder"/>, or null when it has no routes.</summary>
-        private static HttpApp AppFor(string folder)
+        internal static HttpApp AppFor(string folder, bool includePages = false)
         {
             string file = ProjectConfig.Find(folder);
-            if (file == null) return null;
+            if (file == null)
+            {
+                if (!includePages) return null;
+                for (DirectoryInfo dir = new DirectoryInfo(folder); dir != null; dir = dir.Parent)
+                    if (Serving.TryGetValue(dir.FullName, out HttpApp running)) return running;
+                return new HttpApp(folder);
+            }
             ProjectConfig project = ProjectConfig.Load(file);
             if (Serving.TryGetValue(project.SiteRoot, out HttpApp serving)) return serving;
             DateTime stamp = File.GetLastWriteTimeUtc(file);
@@ -65,7 +71,7 @@ namespace KScript.Http
                 cached = (stamp, new HttpApp(project.SiteRoot, project));
                 Apps[file] = cached;
             }
-            return cached.App.HasRoutes ? cached.App : null;
+            return includePages || cached.App.HasRoutes ? cached.App : null;
         }
 
         /// <summary>Sends on who is asking: the cookies and Authorization header, unless the call gave its own.</summary>

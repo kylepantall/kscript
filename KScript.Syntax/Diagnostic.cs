@@ -63,11 +63,17 @@ namespace KScript.Syntax
     /// <summary>Diagnostic codes. KS1xxx are markup, KS2xxx expressions, KS3xxx elements, KS4xxx names, KS5xxx calls and KS6xxx style.</summary>
     public static class DiagnosticCodes
     {
+        private static readonly HashSet<string> BuiltInCodes = typeof(DiagnosticCodes).GetFields()
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue())
+            .ToHashSet(StringComparer.Ordinal);
+
         public const string MarkupSyntax = "KS1001";
         public const string MismatchedEndTag = "KS1002";
         public const string UnclosedElement = "KS1003";
         public const string InvalidAttribute = "KS1004";
         public const string DuplicateAttribute = "KS1005";
+        public const string InvalidToolingRule = "KS1006";
 
         public const string ExpressionSyntax = "KS2001";
         public const string AssignmentNotAllowed = "KS2002";
@@ -177,6 +183,8 @@ namespace KScript.Syntax
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>
             "https://github.com/kylepantall/kscript/blob/master/docs/errors.md#" + (code ?? string.Empty).ToLowerInvariant();
+
+        public static bool IsBuiltIn(string code) => BuiltInCodes.Contains(code);
 
         /// <summary>
         /// True for the unused-code rules (KS6002-KS6005). Editors show their code faded, as unnecessary, as well as

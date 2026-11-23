@@ -28,6 +28,19 @@ namespace KScript.Pages
         /// <summary>The file, relative to the site folder, with forward slashes.</summary>
         public string File { get; init; }
 
+        public string Path
+        {
+            get
+            {
+                if (File == null) return null;
+                string stem = File[..^System.IO.Path.GetExtension(File).Length];
+                if (stem == "index") return "/";
+                if (stem.EndsWith("/index", StringComparison.Ordinal)) stem = stem[..^6];
+                return "/" + string.Join("/", stem.Split('/').Select(part =>
+                    part.Length > 2 && part[0] == '[' && part[^1] == ']' ? "{" + part[1..^1] + "}" : Uri.EscapeDataString(part)));
+            }
+        }
+
         /// <summary>The locale from a /fr/... path prefix, when the site has translations for it.</summary>
         public string Locale { get; init; }
 
@@ -88,32 +101,20 @@ namespace KScript.Pages
         /// <summary>Renders file pages in the host's request and session context.</summary>
         public Func<PageRoute, Dictionary<string, object>, PageResult> RenderPage { get; set; }
 
-        public PageRoute Resolve(string urlPath)
+        public PageRoute Resolve(string urlPath) => Resolve(urlPath, IsRoutedPath);
+
+        public PageRoute Resolve(string urlPath, Func<string, bool> isRoutedPath)
         {
             string path = Uri.UnescapeDataString((urlPath ?? "/").Split('?')[0]).Replace('\\', '/');
             var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
 
-            if (segments.Any(s => s == ".." || s.StartsWith("_", StringComparison.Ordinal) || s.StartsWith(".", StringComparison.Ordinal)))
-                return NotFound();
             string relative = string.Join("/", segments);
-            if (HiddenFiles.Contains(relative) || HiddenFolders.Any(folder => folder == "." ||
-                    relative.Equals(folder, StringComparison.OrdinalIgnoreCase) ||
-                    relative.StartsWith(folder + "/", StringComparison.OrdinalIgnoreCase)))
-                return NotFound();
-            // The project's settings file is not part of the site.
-            if (segments.Count > 0 && string.Equals(segments[^1], Projects.ProjectConfig.FileName, StringComparison.OrdinalIgnoreCase))
-                return NotFound();
-            // Nor are the settings $config reads (config.json, config.staging.yaml), which may hold secrets.
-            if (segments.Count > 0 && IsConfigFile(segments[^1]))
-                return NotFound();
-            // Nor are the notes for coding agents (AGENTS.md, CLAUDE.md), with or without .md.
-            if (segments.Count == 1 && new[] { "AGENTS", "AGENTS.md", "CLAUDE", "CLAUDE.md" }.Contains(segments[0], StringComparer.OrdinalIgnoreCase))
-                return NotFound();
+            if (IsHidden(segments, relative)) return NotFound();
 
             // /fr/about is the about page in French when locales/fr.json (or .yaml, or a locales/fr folder) exists.
             if (segments.Count > 0 && IsLocalePrefix(segments[0]))
             {
-                PageRoute inner = Resolve("/" + string.Join("/", segments.Skip(1)));
+                PageRoute inner = Resolve("/" + string.Join("/", segments.Skip(1)), isRoutedPath);
                 return new PageRoute { Kind = inner.Kind, File = inner.File, Params = inner.Params, Locale = segments[0] };
             }
 
@@ -137,16 +138,79 @@ namespace KScript.Pages
                 {
                     string ext = Path.GetExtension(full).ToLowerInvariant();
                     if (HiddenExtensions.Contains(ext)) return NotFound();
-                    return CheckPageRoute(new PageRoute { Kind = PageExtensions.Contains(ext) ? PageRoute.RouteKind.Page : PageRoute.RouteKind.Static, File = rel }, relative);
+                    return CheckPageRoute(new PageRoute { Kind = PageExtensions.Contains(ext) ? PageRoute.RouteKind.Page : PageRoute.RouteKind.Static, File = rel }, relative, isRoutedPath);
                 }
             }
 
-            return CheckPageRoute(MatchPage(Root, segments, 0, new Dictionary<string, object>()) ?? NotFound(), relative);
+            return CheckPageRoute(MatchPage(Root, segments, 0, new Dictionary<string, object>()) ?? NotFound(), relative, isRoutedPath);
         }
 
-        private PageRoute CheckPageRoute(PageRoute page, string relative)
+        private bool IsHidden(IReadOnlyList<string> segments, string relative)
         {
-            if (page.Kind != PageRoute.RouteKind.Page || IsRoutedPath == null) return page;
+            if (segments.Any(s => s == ".." || s.StartsWith("_", StringComparison.Ordinal) || s.StartsWith(".", StringComparison.Ordinal)))
+                return true;
+            if (HiddenFiles.Contains(relative) || HiddenFolders.Any(folder => folder == "." ||
+                    relative.Equals(folder, StringComparison.OrdinalIgnoreCase) ||
+                    relative.StartsWith(folder + "/", StringComparison.OrdinalIgnoreCase)))
+                return true;
+            // The project's settings file is not part of the site.
+            if (segments.Count > 0 && string.Equals(segments[^1], Projects.ProjectConfig.FileName, StringComparison.OrdinalIgnoreCase))
+                return true;
+            // Nor are the settings $config reads (config.json, config.staging.yaml), which may hold secrets.
+            if (segments.Count > 0 && IsConfigFile(segments[^1]))
+                return true;
+            // Nor are the notes for coding agents (AGENTS.md, CLAUDE.md), with or without .md.
+            if (segments.Count == 1 && new[] { "AGENTS", "AGENTS.md", "CLAUDE", "CLAUDE.md" }.Contains(segments[0], StringComparer.OrdinalIgnoreCase))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>Canonical file-backed page patterns, with aliases collapsed and private files excluded.</summary>
+        public IEnumerable<(string Path, string File, string[] Parameters)> Pages(Func<string, bool> isRoutedPath)
+        {
+            var options = new EnumerationOptions { AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = true };
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            return Walk(Root, Array.Empty<string>());
+
+            IEnumerable<(string Path, string File, string[] Parameters)> Walk(string directory, string[] parents)
+            {
+                foreach (string file in Directory.EnumerateFiles(directory, "*", options)
+                    .Where(file => PageExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                    .OrderBy(file => Path.GetFileNameWithoutExtension(file).Equals("index", StringComparison.OrdinalIgnoreCase))
+                    .ThenBy(file => IsParam(Path.GetFileNameWithoutExtension(file), out _) ? -1 : Array.IndexOf(PageExtensions, Path.GetExtension(file).ToLowerInvariant()))
+                    .ThenBy(file => file, StringComparer.Ordinal))
+                {
+                    string filename = Path.GetFileName(file);
+                    string[] parts = parents.Append(filename).ToArray();
+                    string relative = string.Join("/", parts);
+                    if (IsHidden(parts, relative)) continue;
+                    string stem = Path.GetFileNameWithoutExtension(file);
+                    parts = stem.Equals("index", StringComparison.OrdinalIgnoreCase) ? parents : parents.Append(stem).ToArray();
+                    var names = new List<string>();
+                    string[] pattern = parts.Select(part =>
+                    {
+                        if (!IsParam(part, out string name)) return Uri.EscapeDataString(part);
+                        names.Add(name);
+                        return "{" + name + "}";
+                    }).ToArray();
+                    string path = "/" + string.Join("/", pattern);
+                    if (names.Count == 0 && (Resolve(path, isRoutedPath) is not { Kind: PageRoute.RouteKind.Page } match || match.File != relative)) continue;
+                    string shape = "/" + string.Join("/", parts.Select(part => IsParam(part, out _) ? "{}" : Uri.EscapeDataString(part)));
+                    if (seen.Add(shape)) yield return (path, relative, names.ToArray());
+                }
+                foreach (string child in Directory.EnumerateDirectories(directory, "*", options).OrderBy(dir => dir, StringComparer.Ordinal))
+                {
+                    string[] parts = parents.Append(Path.GetFileName(child)).ToArray();
+                    if (IsHidden(parts, string.Join("/", parts))) continue;
+                    foreach (var page in Walk(child, parts)) yield return page;
+                }
+            }
+        }
+
+        private static PageRoute CheckPageRoute(PageRoute page, string relative, Func<string, bool> isRoutedPath)
+        {
+            if (page.Kind != PageRoute.RouteKind.Page || isRoutedPath == null) return page;
             // A physical page has several URLs. A protected controller owns the page at all of them,
             // including when the legacy /_ks/live endpoint resolves a posted page name.
             string file = "/" + page.File;
@@ -154,7 +218,7 @@ namespace KScript.Pages
             string stem = file[..^Path.GetExtension(file).Length];
             string pretty = stem.EndsWith("/index", StringComparison.OrdinalIgnoreCase) ? stem[..^6] : stem;
             var aliases = new[] { "/" + relative, file, stem, pretty.Length == 0 ? "/" : pretty };
-            return aliases.Distinct(StringComparer.Ordinal).Any(IsRoutedPath) ? NotFound() : page;
+            return aliases.Distinct(StringComparer.Ordinal).Any(isRoutedPath) ? NotFound() : page;
         }
 
         private static PageRoute NotFound() => new PageRoute { Kind = PageRoute.RouteKind.NotFound };
@@ -498,6 +562,7 @@ namespace KScript.Pages
                 [RequestFields.Cookies.Name] = cookies,
                 [RequestFields.Body.Name] = body,
                 [RequestFields.Params.Name] = new Dictionary<string, object>(),
+                [RequestFields.RouteInfo.Name] = null,
             };
         }
 

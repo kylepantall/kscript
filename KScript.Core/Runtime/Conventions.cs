@@ -61,6 +61,7 @@ namespace KScript.Runtime
         {
             "contains", "starts_with", "ends_with", "matches", // text and lists: does it contain, start with, end with, match this?
             "exists",                                          // @exists(path), $storage->exists(name), $query->exists(): is it there?
+            "route_is",                                        // @route_is(name or pattern)
             "between",                                         // $n->between(1, 10)
             "any", "all",                                      // $list->any(fn), $list->all(fn)
             "in",                                              // $ip->in(block)
@@ -79,7 +80,7 @@ namespace KScript.Runtime
         /// <summary>Actions that do something and say whether they did: the name is the action, not a question.</summary>
         public static readonly IReadOnlySet<string> ActionsThatReport = new HashSet<string>(StringComparer.Ordinal)
         {
-            "set", "remove", "delete", "force_delete", "add", "save", "restore", "retry", "drop_table", "create_table", "revoke_token", "revoke_passkey", "send", "copy", "move",
+            "set", "set_if_absent", "remove", "delete", "force_delete", "add", "save", "restore", "retry", "drop_table", "create_table", "revoke_token", "revoke_passkey", "send", "copy", "move",
             "confirm", "assert", "to_bool", "attempt", "login", "logout", "release", "acquire",
         };
 

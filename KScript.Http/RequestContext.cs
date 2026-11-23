@@ -63,6 +63,7 @@ namespace KScript.Http
         public PageContext Page => page ??= new PageContext(App.SiteRoot, Request)
         {
             Live = Live,
+            HostItems = { [HttpPackage.ContextKey] = this },
             StartupConfig = App.StartupConfig,
             RoutedLiveProof = Values.ToStr(Request.GetValueOrDefault("method")) == "GET"
                 ? () => PageLive.Sign(new Dictionary<string, object>(), LiveProofScope) : null,

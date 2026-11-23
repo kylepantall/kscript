@@ -823,8 +823,8 @@ namespace KScript.Runtime
                 MoneyExchangeRates.Set(c.Host, Values.ToStr(c.Arg(0, "from")), Values.ToStr(c.Arg(1, "to")), c.Arg(2, "rate"));
                 return null;
             }, "@set_exchange_rate(from: 'EUR', to: 'GBP', rate: 0.80)");
-            p.Command("now", "", "The current date and time.", KType.Date, c => DateTime.Now, "@now()->format('d MMMM yyyy')");
-            p.Command("today", "", "Today's date, at midnight.", KType.Date, c => DateTime.Today);
+            p.Command("now", "", "The current date and time.", KType.Date, c => c.Host.Now, "@now()->format('d MMMM yyyy')");
+            p.Command("today", "", "Today's date, at midnight.", KType.Date, c => c.Host.Now.Date);
             p.Command("range", "start, end?, step?", "Numbers from start up to (not including) end; with one argument, from 0. start..end is the short form when the step is 1.", KType.List, c =>
             {
                 double start = c.Count > 1 ? c.Num(0) : 0;
@@ -847,9 +847,12 @@ namespace KScript.Runtime
             p.Command("env", "name, default?", "An environment variable, or default when it isn't set.", KType.String, c =>
             {
                 string name = c.Str(0);
+                object fallback = c.Arg(1);
+                if (c.Host.EnvironmentOverrides?.TryGetValue(name, out string overridden) == true)
+                    return overridden ?? fallback;
                 return Environment.GetEnvironmentVariable(name)
                     ?? (c.Host.ConfigEnvironment?.TryGetValue(name, out string configured) == true ? configured : null)
-                    ?? (c.Has(1) ? c.Arg(1) : null);
+                    ?? fallback;
             });
         }
 
@@ -866,10 +869,16 @@ namespace KScript.Runtime
             p.Variable("args", KType.List, "The command line arguments after the script path.", (i, m) => i.Host.Arguments.Cast<object>().ToList());
             p.Variable("env", KType.Map, "Environment variables: $env.HOME, $env['PATH'].", (i, m) =>
             {
-                var map = new Dictionary<string, object>();
+                var map = new Dictionary<string, object>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
                 if (i.Host.ConfigEnvironment != null)
                     foreach (var entry in i.Host.ConfigEnvironment) map[entry.Key] = entry.Value;
                 foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables()) map[(string)e.Key] = (string)e.Value;
+                if (i.Host.EnvironmentOverrides != null)
+                    foreach (var entry in i.Host.EnvironmentOverrides)
+                    {
+                        if (entry.Value == null) map.Remove(entry.Key);
+                        else map[entry.Key] = entry.Value;
+                    }
                 return map;
             });
             p.Variable("os", KType.Map, "The computer: $os.name (windows, macos or linux), $os.user, $os.machine, $os.home, $os.temp, $os.separator, $os.newline.", (i, m) => new Dictionary<string, object>

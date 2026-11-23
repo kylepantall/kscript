@@ -124,6 +124,27 @@ namespace KScript.Runtime
         // Untyped and any parameters can store or return the caller's value with its own methods.
         private static CallContext ForNativeParameters(CallContext call, Signature signature)
         {
+            for (int i = 0; i < Math.Min(signature.Parameters.Count, call.Count); i++)
+            {
+                ParameterInfo parameter = signature.Parameters[i];
+                if (!call.Has(i)) continue;
+                object value = Values.Unwrap(call.Args[i]);
+                if (parameter.TypeConstraint != TypeArgumentConstraint.None && (value != null || !parameter.Optional))
+                    Shapes.CheckTypeArgument(call, parameter, value);
+                if (parameter.FunctionSignature is Signature contract && (value != null || !parameter.Optional))
+                {
+                    if (value is not ICallable handler)
+                        throw call.Error($"'{parameter.Name}' needs a function that accepts {contract.FunctionLabel}.", "Type");
+                    Signature supplied = handler switch
+                    {
+                        UserFunction user => user.PositionalSignature,
+                        Lambda lambda => new Signature(lambda.Parameters.Select(name => new ParameterInfo(name)).ToArray()),
+                        _ => null,
+                    };
+                    if (supplied != null && !supplied.AcceptsPositionalCall(contract))
+                        throw call.Error($"'{parameter.Name}' must accept {contract.FunctionLabel}.", "Type");
+                }
+            }
             object[] raw = null;
             for (int i = 0; i < call.Count; i++)
             {

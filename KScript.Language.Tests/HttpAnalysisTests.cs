@@ -22,8 +22,9 @@ namespace KScript.Language.Tests
 
         private static readonly FakeFiles Files = new FakeFiles(new Dictionary<string, string>
         {
+            [Path.Combine(Site, "types", "navigation.kscript")] = "type NavigationData { order: int }",
             [Path.Combine(Site, "kscript.json")] = "{ \"http\": { \"groups\": { \"admin\": [\"auth\", \"log\"] } } }",
-            [Path.Combine(Site, "controllers", "people.ks.xml")] = "<kscript>\n<import package=\"KScript.Http\" />\n<fn name=\"index\" value=\"[]\" />\n<fn name=\"show\" params=\"id\" value=\"{ id: $id }\" />\n</kscript>",
+            [Path.Combine(Site, "controllers", "people.ks.xml")] = "<kscript>\n<import package=\"KScript.Http\" />\n<fn name=\"index\" value=\"[]\" />\n<fn name=\"show\" params=\"id\" value=\"{ id: $id }\" />\n<fn name=\"stamp\" params=\"request: map, next: fn\" value=\"$next($request)\" />\n</kscript>",
         });
 
         private static readonly LanguageService Service = new LanguageService(files: Files);
@@ -109,7 +110,33 @@ namespace KScript.Language.Tests
             DocumentAnalysis analysis = Service.Analyze(text, Path.Combine(Site, "routes.kscript"));
             List<string> labels = Service.GetCompletions(analysis, offset).Select(i => i.Label).ToList();
             Assert.Contains("throttle", labels);
-            Assert.Contains("people.show", labels);
+            Assert.Contains("people.stamp", labels);
+            Assert.DoesNotContain("people.show", labels);
+        }
+
+        [Theory]
+        [InlineData("<Group middleware=\"people.show\" />", "people.show")]
+        [InlineData("<fn name=\"stamp\" params=\"request: string, next: fn\" value=\"$next($request)\" /><Middleware use=\"stamp\" />", "stamp")]
+        [InlineData("<fn name=\"stamp\" params=\"request, next, extra\" value=\"$next($request)\" /><Middleware use=\"stamp\" />", "stamp")]
+        public void IncompatibleMiddlewareIsReportedAtTheReference(string body, string name)
+        {
+            var diagnostic = Assert.Single(Analyze(body).Diagnostics, d => d.Code == DiagnosticCodes.TypeMismatch);
+            Assert.Contains($"'{name}' must accept fn(request: map, next: fn)", diagnostic.Message);
+        }
+
+        [Fact]
+        public void TypedRouteDataCompletesInAHtmlLoop()
+        {
+            string page = """
+                <import package="KScript.Http" />
+                <import path="types/navigation.kscript" />
+                <for each="entry" in="@routes(data_type: NavigationData)">
+                  <p>{ $entry.data.‸ }</p>
+                </for>
+                """;
+            int at = page.IndexOf('‸');
+            var analysis = Service.Analyze(page.Remove(at, 1), Path.Combine(Site, "index.html"));
+            Assert.Contains(Service.GetCompletions(analysis, at), completion => completion.Label == "order");
         }
 
         [Theory]

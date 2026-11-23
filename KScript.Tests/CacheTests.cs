@@ -14,6 +14,24 @@ public sealed class CacheTests : StorageFixture
         ScriptFile = "app" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".ks.xml";
     }
 
+    [Fact]
+    public void FileReservationHasOneWinnerAndGroupsDoNotShareKeys()
+    {
+        string path = Path.Combine(Root, "reservations");
+        var store = new FileCacheStore("main", path);
+        int winners = 0;
+        Parallel.For(0, 16, i =>
+        {
+            if (new FileCacheStore("main", path).PutIfAbsent("slot", (double)i, null))
+                Interlocked.Increment(ref winners);
+        });
+        Assert.Equal(1, winners);
+        CacheStore group = store.Group("menu");
+        Assert.True(group.PutIfAbsent("slot", "other", null));
+        Assert.Equal(1, group.Flush());
+        Assert.True(store.TryGet("slot", out _, out _));
+    }
+
     private string ScriptFile { get; }
 
     private string Run(string body) => base.Run(body, ScriptFile);

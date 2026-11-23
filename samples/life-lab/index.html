@@ -71,7 +71,10 @@
                 aria-label="How full the soup is">
               <span class="muted">{$soup}%</span>
             </div>
-            <label class="check"><input type="checkbox" checked="{$world.wrap}" on-change="world = $world->merge({ wrap: $event.checked })"> Wrap edges</label>
+            <label class="check"><input
+              type="checkbox"
+              checked="{$world.wrap}"
+              on-change="world = $world->merge({ wrap: $event.checked })"> Wrap edges</label>
             <button on-click="world = @new_world(@blank(width: $cols, height: $rows), wrap: $world.wrap); playing = false">Clear</button>
           </section>
 

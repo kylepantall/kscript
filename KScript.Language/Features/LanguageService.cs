@@ -1,5 +1,6 @@
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
+using KScript.Language.Rules;
 using KScript.Syntax.Markup;
 using KScript.Syntax;
 using KScript.Syntax.Text;
@@ -27,7 +28,7 @@ namespace KScript.Language.Features
         /// </summary>
         public string DocsCommand { get; set; }
 
-        public DocumentAnalysis Analyze(string text, string path) => Analyzer.Analyze(text, path, Files, Catalog);
+        public DocumentAnalysis Analyze(string text, string path, DocumentKind? kind = null, DocumentRules rules = null) => Analyzer.Analyze(text, path, Files, Catalog, kind, rules);
 
         #region Cursor context
 

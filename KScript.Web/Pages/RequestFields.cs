@@ -17,9 +17,10 @@ namespace KScript.Pages
         public static readonly ValueFieldInfo Cookies = Field("cookies", KType.Map, "Cookies sent by the client.");
         public static readonly ValueFieldInfo Body = Field("body", KType.String, "The raw request body.");
         public static readonly ValueFieldInfo Params = Field("params", KType.Map, "Parameters captured from the request path.");
+        public static readonly ValueFieldInfo RouteInfo = Field("route_info", KType.Map, "Metadata of the matched route or file-based page.");
         public static readonly ValueFieldInfo Locale = Field("locale", KType.String, "The locale when a page matches a locale-prefixed path.");
 
-        public static IReadOnlyList<ValueFieldInfo> Common { get; } = new[] { Method, Scheme, Path, Url, Query, Form, Headers, Cookies, Body, Params };
+        public static IReadOnlyList<ValueFieldInfo> Common { get; } = new[] { Method, Scheme, Path, Url, Query, Form, Headers, Cookies, Body, Params, RouteInfo };
 
         private static ValueFieldInfo Field(string name, string type, string description) => new ValueFieldInfo(KType.Request, name, type, description);
     }

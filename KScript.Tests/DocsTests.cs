@@ -42,7 +42,7 @@ public sealed class DocsTests
         var api = site.Catalog.GetCommand("api");
         var options = api.Signatures.Single().Parameters.Single(p => p.Name == "options");
         Assert.Equal(KType.Map, options.Type);
-        Assert.Equal(new[] { "method", "headers", "body", "timeout" }, options.Fields.Select(f => f.Name));
+        Assert.Equal(new[] { "method", "headers", "body", "timeout", "retries", "retry_delay" }, options.Fields.Select(f => f.Name));
         string html = site.Find("/reference/net").Body;
         Assert.Contains("href=\"#cmd-api-options\"", html);
         Assert.Contains("id=\"cmd-api-options\"", html);
@@ -55,7 +55,8 @@ public sealed class DocsTests
             Assert.Contains("kscript://docs/reference/methods/response", page);
             foreach (var field in options.Fields)
             {
-                Assert.Contains($"id=\"cmd-api-options-{field.Name}-field\"", html);
+                string slug = field.Name.Replace('_', '-');
+                Assert.Contains($"id=\"cmd-api-options-{slug}-field\"", html);
                 Assert.Contains(field.DefaultValue, WebUtility.HtmlDecode(html));
                 Assert.Contains(field.Description, page);
                 Assert.Contains(field.Example, page);
@@ -779,7 +780,7 @@ public sealed class DocsTests
     /// <summary>Functions that examples call as if the reader's script declared them; every other unknown @name fails.</summary>
     private static readonly HashSet<string> AssumedFunctions = new HashSet<string> { "greet", "greeting", "slugify", "set_age", "sign_up" };
 
-    private static readonly Regex ScriptFence = new Regex(@"^```(kscript|xml)[^\n]*\n(.*?)^```[ \t]*$", RegexOptions.Multiline | RegexOptions.Singleline);
+    private static readonly Regex ScriptFence = new Regex(@"^```(kscript|xml)(?<info>[^\n]*)\n(.*?)^```[ \t]*$", RegexOptions.Multiline | RegexOptions.Singleline);
 
     [Fact]
     public void Every_example_in_the_guides_and_readme_matches_the_code()
@@ -797,10 +798,13 @@ public sealed class DocsTests
             {
                 bool code = m.Groups[1].Value == "kscript";
                 string body = m.Groups[2].Value;
+                string ruleFile = KScript.Language.Rules.DocumentRules.FileName;
+                bool rules = code && m.Groups["info"].Value.Trim() == ruleFile;
                 if (!code && !Regex.IsMatch(body.TrimStart(), @"^(<!--.*?-->\s*)*<(kscript|KScript\.)", RegexOptions.Singleline)) body = "<kscript>\n" + body + "\n</kscript>";
-                var analysis = KScript.Language.Analysis.Analyzer.Analyze(body, code ? "example.kscript" : "example.ks.xml", KScript.Language.Analysis.EmptyFileSystem.Instance);
+                string path = rules ? ruleFile : code ? "example.kscript" : "example.ks.xml";
+                var analysis = KScript.Language.Analysis.Analyzer.Analyze(body, path, KScript.Language.Analysis.EmptyFileSystem.Instance);
                 checkedCount++;
-                foreach (var d in analysis.Diagnostics.Where(d => OutOfSync.Contains(d.Code)))
+                foreach (var d in analysis.Diagnostics.Where(d => OutOfSync.Contains(d.Code) || (rules && d.Severity == DiagnosticSeverity.Error)))
                 {
                     // Examples import files of the reader's that aren't here, and use types declared in an earlier example.
                     if (d.Code == DiagnosticCodes.InvalidAttributeValue && (d.Message.StartsWith("File not found", StringComparison.Ordinal)

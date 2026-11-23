@@ -34,8 +34,13 @@ namespace KScript.Language.Analysis
         private DocumentKind Kind => result.Kind;
 
         /// <summary>Analyzes a document. The kind is chosen from the path's extension unless given.</summary>
-        public static DocumentAnalysis Analyze(string text, string path = null, IFileSystem files = null, LanguageCatalog catalog = null, DocumentKind? kind = null) =>
-            Analyze(text, path, files, catalog, kind, projectWide: true);
+        public static DocumentAnalysis Analyze(string text, string path = null, IFileSystem files = null, LanguageCatalog catalog = null, DocumentKind? kind = null, Rules.DocumentRules rules = null)
+        {
+            if (Rules.DocumentRules.IsRuleFile(path)) return Rules.DocumentRules.Analyze(text, path);
+            DocumentAnalysis document = Analyze(text, path, files, catalog, kind, projectWide: true);
+            rules?.Check(document);
+            return document;
+        }
 
         /// <summary>
         /// Analyses one file without reading the rest of the project for calls to its functions: for listing what a
@@ -1230,7 +1235,14 @@ namespace KScript.Language.Analysis
             switch (a.Kind)
             {
                 case AttributeKind.Expression:
-                    AnalyzeExpressionRegion(attr.Value, RegionKind.Expression, scope, e, attr);
+                    var expression = AnalyzeExpressionRegion(attr.Value, RegionKind.Expression, scope, e, attr);
+                    if (a.RequiresDeclaredRecord && expression.Parse?.Root is ExprNode value)
+                    {
+                        TypeShape shape = Infer(value, expression);
+                        if (value is MapNode || (shape.Type != KType.Any && (shape.Type != KType.Map || shape.Kind != null)))
+                            Report(TrimmedSpan(attr.Value), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                                $"'{attr.Name}' requires a value of a declared record type.");
+                    }
                     break;
                 case AttributeKind.ExpressionList:
                     AnalyzeExpressionRegion(attr.Value, RegionKind.ExpressionList, scope, e, attr);
@@ -1264,7 +1276,7 @@ namespace KScript.Language.Analysis
                             {
                                 continue;
                             }
-                            ReferenceFunction(bare, new TextSpan(span.Start, bare.Length), scope);
+                            ReferenceFunction(bare, new TextSpan(span.Start, bare.Length), scope, a.FunctionSignature);
                         }
                     }
                     break;

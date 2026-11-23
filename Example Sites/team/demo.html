@@ -59,7 +59,10 @@
       <ul class="todos">
         <for each="t" in="$todos">
           <li class="{ $t.done ? 'done' : '' }">
-            <label><input type="checkbox" checked="{$t.done}" on-change="todos = $todos->map(fn(x) => $x.id == $t.id ? $x->set(key: 'done', value: not $x.done) : $x)"> {$t.text}</label>
+            <label><input
+              type="checkbox"
+              checked="{$t.done}"
+              on-change="todos = $todos->map(fn(x) => $x.id == $t.id ? $x->set(key: 'done', value: not $x.done) : $x)"> {$t.text}</label>
             <button
               class="remove"
               title="Remove"

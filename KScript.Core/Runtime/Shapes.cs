@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using System.Globalization;
 using System.Text;
 
@@ -323,6 +324,7 @@ namespace KScript.Runtime
         public string Description { get; }
         public ExtraKeys Extra { get; }
         public IReadOnlyList<FieldDefinition> Fields => fields;
+        internal int? DeclarationOffset { get; init; }
         internal IReadOnlyList<TypeCatch> Catches { get; set; } = Array.Empty<TypeCatch>();
 
         internal Scope Closure { get; }
@@ -377,6 +379,11 @@ namespace KScript.Runtime
         internal bool ReadsText => Pattern != null || Parse != null;
 
         /// <summary>True if a record of this type can be used where <paramref name="other"/> is expected: it is that type, or joins it.</summary>
+        /// <summary>Recognizes the same declaration in separately loaded instances of a script.</summary>
+        public bool SameDeclaration(RecordType other) =>
+            ReferenceEquals(this, other) || (other != null && Name == other.Name && Module.Path != null && Module.Path == other.Module.Path
+                && DeclarationOffset != null && DeclarationOffset == other.DeclarationOffset);
+
         public bool IsA(RecordType other) => this == other || bases.Any(b => b.IsA(other));
 
         /// <summary>"type", or the kind of type a package declares with it, such as "model": package methods for that kind work on it.</summary>
@@ -528,6 +535,36 @@ namespace KScript.Runtime
 
         public RecordType Type { get; }
 
+        /// <summary>A copy of the stored data. Maps, lists, and records retain their shapes without sharing mutable containers.</summary>
+        public Record Copy()
+        {
+            var copies = new Dictionary<object, object>(ReferenceEqualityComparer.Instance);
+            return (Record)Clone(this);
+
+            object Clone(object value)
+            {
+                if (value == null) return null;
+                if (copies.TryGetValue(value, out object existing)) return existing;
+                if (value is Dictionary<string, object> map)
+                {
+                    Dictionary<string, object> result = value is Record record
+                        ? new Record(record.Type) : new Dictionary<string, object>(map.Comparer);
+                    copies[value] = result;
+                    foreach (var entry in map) result[entry.Key] = Clone(entry.Value);
+                    return result;
+                }
+                if (value is List<object> list)
+                {
+                    var result = new List<object>(list.Count);
+                    copies[value] = result;
+                    foreach (object member in list) result.Add(Clone(member));
+                    if (result.Count == 0) ListFilters.RememberEmptyType(result, ListFilters.ElementTypeOf(list)?.Name);
+                    return result;
+                }
+                return value;
+            }
+        }
+
         /// <summary>Reads a field, or fails with the type's fields as suggestions.</summary>
         internal object Get(string name)
         {
@@ -628,6 +665,31 @@ namespace KScript.Runtime
             var mapper = new ShapeMapper(interpreter, scope, module);
             mapper.Convert(value, true, type, "$", null, 0);
             return mapper.Problems.Select(p => (object)p.ToValue()).ToList();
+        }
+
+        internal static void CheckTypeArgument(CallContext call, ParameterInfo parameter, object value)
+        {
+            bool accepts;
+            if (parameter.TypeConstraint == TypeArgumentConstraint.DeclaredRecord)
+            {
+                accepts = value is RecordType { Kind: null };
+            }
+            else
+            {
+                TypeRef type = TypeArgument(value, call.Scope, call.Module, out Scope scope, out Module module);
+                if (!type.IsBuiltIn) _ = Resolve(type, scope, module);
+                string root = type.ListDepth > 0 ? KType.List : type.Name;
+                accepts = parameter.TypeConstraint switch
+                {
+                    TypeArgumentConstraint.Array => root == KType.List,
+                    TypeArgumentConstraint.Mappable => root is KType.List or KType.Map || value is RecordType,
+                    TypeArgumentConstraint.Iterable => root is (KType.List or KType.Map or KType.Number or KType.String or "int" or "float") || value is RecordType
+                        || NativeTypes.Get(root)?.Iterates != null,
+                    _ => true,
+                };
+            }
+            if (!accepts)
+                throw call.Error($"'{parameter.Name}' requires a type with the {parameter.TypeConstraint} constraint.", "Type");
         }
 
         /// <summary>An <c>as:</c> argument: a &lt;type&gt; or &lt;enum&gt; value, or a type written as text.</summary>
@@ -760,7 +822,7 @@ namespace KScript.Runtime
             string extraText = run.Raw("extra")?.Trim().ToLowerInvariant() ?? "drop";
             // The loader has already checked extra is one of drop, keep and error.
             ExtraKeys extra = extraText == "keep" ? ExtraKeys.Keep : extraText == "error" ? ExtraKeys.Error : ExtraKeys.Drop;
-            var type = new RecordType(name, run.Raw("description"), extra, run.Scope, run.Module);
+            var type = new RecordType(name, run.Raw("description"), extra, run.Scope, run.Module) { DeclarationOffset = run.Element.NameSpan.Start };
             Dictionary<string, string> conflicts = JoinBases(type, with, run);
             type.Catches = TypeCatch.Collect(run, type.Bases.SelectMany(b => b.Catches), recordFields: true);
             if (run.Has("pattern"))

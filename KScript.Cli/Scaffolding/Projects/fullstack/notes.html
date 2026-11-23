@@ -27,7 +27,10 @@ unless: auth
     <ul class="notes">
       <for each="n" in="$notes">
         <li class="{ $n.done ? 'done' : '' }">
-          <label><input type="checkbox" checked="{$n.done}" on-change="@toggle_note($n)"> {$n.title}</label>
+          <label><input
+            type="checkbox"
+            checked="{$n.done}"
+            on-change="@toggle_note($n)"> {$n.title}</label>
           <button class="remove" title="Delete" on-click="@delete_note($n.id)">✕</button>
         </li>
       </for>
