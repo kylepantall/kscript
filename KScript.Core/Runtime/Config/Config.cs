@@ -341,6 +341,7 @@ namespace KScript.Runtime
         private Dictionary<string, object> values;
         private List<ConfigSource> sources;
         private string environment;
+        private bool IsShared { get; init; }
 
         public ConfigValue(KScriptHost host, string directory, ConfigOptions options)
         {
@@ -355,7 +356,7 @@ namespace KScript.Runtime
             lock (host.Items)
             {
                 if (host.Items.TryGetValue(HostKey, out object existing) && existing is ConfigValue c) return c;
-                var created = new ConfigValue(host, directory, host.Config?.Clone() ?? ProjectOptions(directory));
+                var created = new ConfigValue(host, directory, host.Config?.Clone() ?? ProjectOptions(directory)) { IsShared = true };
                 host.Items[HostKey] = created;
                 return created;
             }
@@ -406,7 +407,9 @@ namespace KScript.Runtime
         private void EnsureLoaded()
         {
             if (values != null) return;
-            (values, sources, environment) = ConfigLoader.Load(options, host, directory);
+            var loaded = ConfigLoader.Load(options, host, directory);
+            if (IsShared) MoneyExchangeRates.ValidateSettings(loaded.Values);
+            (values, sources, environment) = loaded;
         }
 
         /// <summary>Reads the settings again with other options (the &lt;config&gt; element).</summary>

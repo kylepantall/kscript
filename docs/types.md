@@ -163,7 +163,37 @@ echo "$pay { $pay.brand }"
 | --- | --- | --- | --- |
 | `iban` | A bank account number, checked with its mod-97 digits. | Capitals without spaces. | `.country`, `->formatted()`, `.bban` |
 | `card` | A payment card number, checked with the Luhn digit. Like a password, it prints masked: `•••• 4242`, in logs and JSON too. | Spaces and dashes are dropped. | `.last4`, `.brand`, `->reveal()` |
-| `money` | An amount in a currency: `GBP 9.50`, `9.50 GBP`, `£9.50`, `$12` (USD), `€3.50`, `¥1200` (JPY). The decimal point is always `.`. | The code, a space and the currency's decimal places: `£9.5` is `GBP 9.50`. | `.amount`, `.currency`, `->format(locale?)`, `->split(parts)`, `->allocate(ratios)` |
+| `money` | An amount in a currency: `GBP 9.50`, `9.50 GBP`, `£9.50`, `$12` (USD), `€3.50`, `¥1200` (JPY). The decimal point is always `.`. | The code, a space and the currency's decimal places: `£9.5` is `GBP 9.50`. | `.amount`, `.currency`, `->format(locale?)`, `->add(other, rate?)`, `->split(parts)`, `->allocate(ratios)` |
+
+A compact amount such as `GBP1.0` is a money literal. Use an uppercase ISO currency code followed immediately by an amount. It works in assignments, lists and function arguments. For a negative amount, write `-GBP1.0`. An explicitly typed variable also accepts text such as `price: money = 'GBP 1.00'`.
+
+Addition returns the left amount's currency. To add euros to pounds, supply the number of pounds per euro. You can set the rate once for the running host.
+
+```kscript
+@set_exchange_rate(from: 'EUR', to: 'GBP', rate: 0.80)
+price = GBP1.00
+extra = EUR0.75
+echo $price + $extra                  // GBP 1.60
+echo $price->add($extra, rate: 0.92)  // GBP 1.69
+```
+
+To share rates across fresh runs, put them in your project's `config.yaml` or `config.json`. The outer key names the incoming currency and the inner key names the receiving currency.
+
+```yaml
+money:
+  exchange_rates:
+    EUR:
+      GBP: 0.80
+```
+
+You can also attach a quote to a particular balance with `price: money(rates: { EUR: 0.85 }) = GBP1.00`. For each addition, KScript uses the first available rate in this order.
+
+1. An explicit `rate:` in `->add()`, for one call.
+2. The receiving value's `money(rates: ...)` table.
+3. A rate registered with `@set_exchange_rate()` for this run.
+4. The project's `$config.money.exchange_rates` setting.
+
+`+`, `+=`, `->add()` and `money[]->total()` use the same rule. A list accumulates in its first amount's currency. Each incoming amount rounds to the receiving currency's smallest unit before addition, with ties rounded away from zero. A missing direction raises `Type`, even when the reverse or an indirect pair exists. Subtraction, comparison and division between two money amounts still require the same currency.
 
 ### Arguments for the newer types
 
@@ -173,6 +203,7 @@ echo "$pay { $pay.brand }"
 | `ip` | `version` (4 or 6) |
 | `hex` | `bytes` (how many bytes it must hold) |
 | `phone` | `countries` (the calling codes allowed, such as `['+44', '+353']`) |
+| `money` | `rates` (a map from incoming ISO currency codes to positive numeric rates for incoming additions) |
 
 ```kscript
 api: url(schemes: ['https'], hosts: ['api.example.com']) = https://api.example.com/v1
@@ -209,7 +240,7 @@ Text next to a native value is read as that type, so `$wait + '15m'` and `$v < '
 | Type | Operators | `<` `>` and sorting | `for` | False when |
 | --- | --- | --- | --- | --- |
 | `duration` | `duration + duration`, `duration - duration`, `duration * number`, `number * duration`, `duration / number` (a duration), `duration / duration` (a number), `duration % duration`, `date + duration`, `duration + date`, `date - duration`, `-duration`, `date..date step duration` | by length | | `0s` |
-| `money` | `money + money`, `money - money` (one currency), `money * number`, `number * money`, `money / number` (rounded to the currency's smallest unit), `money / money` (a number), `-money` | by amount, in one currency | | the amount is 0 |
+| `money` | `money + money` (mixed currencies need a directed rate), `money - money` (one currency), `money * number`, `number * money`, `money / number` (rounded to the currency's smallest unit), `money / money` (a number), `-money` | by amount, in one currency | | the amount is 0 |
 | `ip` | `ip + number`, `ip - number`, `ip - ip` (a number), `ip..ip step number` | by address, IPv4 first | | |
 | `cidr` | `ip in cidr`, `cidr in cidr` | by network, then prefix | its addresses (up to 65,536) | |
 | `semver` | | by version: `1.0.0-rc.1 < 1.0.0 < 1.10.0`. `==` ignores build metadata. | | |

@@ -1,0 +1,139 @@
+type CheckoutLine {
+  sku: string(min: 1)
+  quantity: int(min: 1)
+  unit_price: money
+  discount_percent: int(min: 0, max: 100) = 0
+  validate: $unit_price.amount >= 0, 'A unit price must be zero or more'
+
+  fn charge_for(units: int) =>
+    ($this.unit_price * $units) * ((100 - $this.discount_percent) / 100)
+
+  fn charge() => $this->charge_for($this.quantity)
+
+  fn refund(units: int) {
+    throw if $units < 1 or $units > $this.quantity {
+      type: 'Validation'
+      message: "Refund quantity is out of range for {$this.sku}"
+      requested: $units
+    }
+    // Keep the retained quantity at its original line discount, including penny
+    // rounding.
+    return $this->charge_for($this.quantity - $units) - $this->charge()
+  }
+}
+
+fn checkout(lines: CheckoutLine[], opening_balance: money) {
+  throw if $lines->is_empty() {
+    type: 'Validation'
+    message: 'An invoice needs at least one line'
+  }
+  total = $opening_balance
+  charges = []
+  units = 0
+  for line in $lines {
+    charge = $line->charge()
+    try {
+      total += $charge
+    } catch Type as err {
+      throw Validation(
+        message: "Missing exchange quote for {$line.sku}",
+        cause: $err
+      )
+    }
+    charges = $charges->push({ sku: $line.sku, charged: $charge })
+    units += $line.quantity
+  }
+  return { units: $units, charges: $charges, total: $total }
+}
+
+describe(name: 'Shop checkout') {
+  test(name: 'an invoice preserves line currencies and bills the exact sterling total') {
+    lines = [
+      { sku: 'tea', quantity: 2, unit_price: GBP4.50, discount_percent: 10 },
+      { sku: 'filter', quantity: 3, unit_price: EUR2.50 }
+    ]
+    settlement: money(rates: { EUR: 0.80 }) = GBP0
+    invoice = @checkout($lines, $settlement)
+    expect(value: $invoice.units, same: 5)
+    expect(
+      value: $invoice.charges->map(fn(line) => $line.sku),
+      equals: ['tea', 'filter']
+    )
+    expect(value: $invoice.charges[0].charged, same: GBP8.10)
+    expect(value: $invoice.charges[1].charged, same: EUR7.50)
+    expect(value: $invoice.total, same: GBP14.10)
+  }
+
+  test(name: 'a missing quote identifies the line and a fresh quote permits a retry') {
+    lines = [
+      { sku: 'bag', quantity: 1, unit_price: GBP2 },
+      { sku: 'cup', quantity: 2, unit_price: NZD3 }
+    ]
+    expect_error(type: Validation, as: err) {
+      @checkout($lines, GBP0)
+    }
+    expect(value: $err.message, same: 'Missing exchange quote for cup')
+    expect(value: $err.cause.type, same: 'Type')
+    quoted: money(rates: { NZD: 0.50 }) = GBP0
+    expect(value: @checkout($lines, $quoted).total, same: GBP5)
+  }
+
+  test(name: 'an empty basket is rejected while a fully discounted order still invoices') {
+    expect_error(type: Validation, as: err) {
+      @checkout([], GBP0)
+    }
+    expect(value: $err.message, same: 'An invoice needs at least one line')
+    gift = CheckoutLine(
+      sku: 'gift',
+      quantity: 1,
+      unit_price: GBP7,
+      discount_percent: 100
+    )
+    invoice = @checkout([$gift], GBP0)
+    expect(value: $invoice.units, same: 1)
+    expect(value: $invoice.total, same: GBP0)
+  }
+
+  test(name: 'invalid quantities, prices and discounts fail record validation') {
+    expect(
+      value: CheckoutLine(sku: 'bag', quantity: 0, unit_price: GBP2),
+      throws: Shape
+    )
+    expect(
+      value: CheckoutLine(sku: 'bag', quantity: 1, unit_price: -GBP2),
+      throws: Shape
+    )
+    expect(
+      value: CheckoutLine(
+        sku: 'bag',
+        quantity: 1,
+        unit_price: GBP2,
+        discount_percent: 101
+      ),
+      throws: Shape
+    )
+  }
+
+  test(name: 'a partial refund credits the difference from the rounded line charge') {
+    samples = CheckoutLine(
+      sku: 'sample',
+      quantity: 3,
+      unit_price: GBP0.05,
+      discount_percent: 10
+    )
+    expect(value: $samples->charge(), same: GBP0.14)
+    expect(value: $samples->refund(1), same: -GBP0.05)
+    expect(value: $samples->charge() + $samples->refund(1), same: GBP0.09)
+    expect(value: $samples->charge() + $samples->refund(3), same: GBP0)
+  }
+
+  test(name: 'a refund cannot exceed the number of units purchased') {
+    mug = CheckoutLine(sku: 'mug', quantity: 2, unit_price: GBP3)
+    expect_error(type: Validation, as: err) {
+      $mug->refund(3)
+    }
+    expect(value: $err.message, same: 'Refund quantity is out of range for mug')
+    expect(value: $err['requested'], same: 3)
+    expect(value: $mug->charge(), same: GBP6)
+  }
+}

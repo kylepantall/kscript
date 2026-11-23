@@ -1,0 +1,7 @@
+import "dispatch-team.kscript"
+
+type WorkOrder {
+  id: int(min: 1)
+  team: DispatchTeam
+  priority: int(min: 1, max: 5) = 3
+}

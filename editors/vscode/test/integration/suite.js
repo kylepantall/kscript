@@ -183,6 +183,21 @@ async function interpolatedLinks(folder) {
   }
 }
 
+async function dispatchWorkflow(folder) {
+  const doc = await vscode.workspace.openTextDocument(path.join(folder, 'dispatch-workflow.test.kscript'));
+  await vscode.window.showTextDocument(doc);
+  const call = doc.getText().indexOf('->dispatch(');
+  assert.ok(call >= 0);
+  const definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', doc.uri, doc.positionAt(call + 4));
+  assert.strictEqual(definitions.length, 1);
+  const target = definitions[0];
+  const policy = await vscode.workspace.openTextDocument(target.targetUri || target.uri);
+  assert.strictEqual(policy.uri.fsPath, path.join(folder, 'types', 'dispatch-policy.kscript'));
+  const range = target.targetSelectionRange || target.range;
+  assert.strictEqual(policy.getText(range), 'dispatch');
+  assert.strictEqual(await vscode.commands.executeCommand('kscript.runTestsInFile', doc.uri), 0);
+}
+
 async function declarationHandlers(folder) {
   const doc = await vscode.workspace.openTextDocument(path.join(folder, 'declaration-catches.test.kscript'));
   await vscode.window.showTextDocument(doc);
@@ -252,6 +267,7 @@ async function run() {
   await runsScripts(folder);
   await normalizerEdits(folder);
   await declarationHandlers(folder);
+  await dispatchWorkflow(folder);
   await interpolatedLinks(folder);
 
   console.log('VS Code integration test passed');

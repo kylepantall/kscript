@@ -73,6 +73,8 @@ namespace KScript.Language.Analysis
         /// <summary>The shape of an expression's value, as far as it can be told from the source.</summary>
         public TypeShape Infer(ExprNode node, ExpressionRegion region)
         {
+            if (node is IdentifierNode or BinaryNode && result.MoneyLiterals.ContainsKey(region.Source.ToSource(node.Span)))
+                return new TypeShape("money");
             switch (node)
             {
                 case CastNode cast:
@@ -384,7 +386,8 @@ namespace KScript.Language.Analysis
                 case IdentifierNode id:
                 {
                     int offset = region.Source.ToSource(id.Span.Start);
-                    return !result.PatternLiteralTypes.ContainsKey(offset) && result.RootScope?.Innermost(offset).Lookup(id.Name, offset) == null;
+                    return !result.MoneyLiterals.ContainsKey(region.Source.ToSource(id.Span))
+                        && !result.PatternLiteralTypes.ContainsKey(offset) && result.RootScope?.Innermost(offset).Lookup(id.Name, offset) == null;
                 }
                 case BinaryNode { Operator: "+" or "-" or "*" or "/" or "%" or "**" } b:
                     return IsBareWord(b.Left, region) || IsBareWord(b.Right, region);

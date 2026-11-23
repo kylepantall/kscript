@@ -230,6 +230,12 @@ test(name: "a note is saved") {
 }
 ```
 
+## Workflows that exercise several language features
+
+Run `kscript test samples/scripts/tests/language/checkout-workflow.test.kscript` to follow a mixed-currency invoice from line validation through discounts, settlement and refunds. The tests assert amounts in both currencies, recover the original error from a missing quote and check the penny retained after a partial refund. [Checkout script](../samples/scripts/tests/language/checkout-workflow.test.kscript)
+
+Run `kscript test samples/scripts/tests/language/dispatch-workflow.test.kscript` to follow incoming JSON through typed records, team-name normalization, priority sorting and queue selection. The same policy handles an unknown team by selecting a fallback or propagating the lookup error. [Dispatch script](../samples/scripts/tests/language/dispatch-workflow.test.kscript)
+
 ## In the editor
 
 The language server treats `*.test.kscript` and `*.test.ks.xml` files as importing KScript.Test, so `test`, `expect` and the rest get completion, hover and checking, and the variables of a `for` loop round a test are known inside it. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.

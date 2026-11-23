@@ -184,14 +184,25 @@ namespace KScript.Runtime
         {
             ParseResult parsed = ExpressionParser.ParseExpression("{" + text + "}");
             if (!parsed.Success || parsed.Root is not MapNode map) return null;
-            var args = new Dictionary<string, object>(StringComparer.Ordinal);
+            var options = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (MapEntryNode entry in map.Entries)
             {
+                if (entry.Key == "rates" && entry.Value is MapNode rates)
+                {
+                    var table = new Dictionary<string, object>(StringComparer.Ordinal);
+                    foreach (MapEntryNode currency in rates.Entries)
+                    {
+                        object rate = TypeRules.PlainValue(currency.Value);
+                        if (rate is TypeRules.Unplain || !table.TryAdd(currency.Key, rate)) return null;
+                    }
+                    options[entry.Key] = table;
+                    continue;
+                }
                 object value = TypeRules.PlainValue(entry.Value);
                 if (value is TypeRules.Unplain) return null;
-                args[entry.Key] = value;
+                options[entry.Key] = value;
             }
-            return args;
+            return options;
         }
 
         private string ToItemString() => Args != null ? ArgBase + "(" + ArgsText + ")" : Name;
@@ -1302,12 +1313,12 @@ namespace KScript.Runtime
                 if (result.Count == 0) ListFilters.RememberEmptyType(result, item.Root(scope));
                 return result;
             }
-            if (type.Args != null) return MapRefined(value, type.Refined(scope, module), path, field, depth);
+            if (type.Args != null) return MapRefined(value, type.Refined(scope, module), path, field, depth, replaceRates: type.Args.ContainsKey("rates"));
             if (type.IsBuiltIn && !type.NoDefaults && TypeDefaults.For(module, type.Name) is TypeRules defaults)
             {
                 // The project's defaults for the type (kscript.json "types") are rules on top of it.
                 TypeRef plain = TypeRef.Parse(type.Name).WithoutDefaults();
-                return MapRefined(value, new RefinedType(type.Name, plain, defaults, null, scope, module), path, field, depth);
+                return MapRefined(value, new RefinedType(type.Name, plain, defaults, null, scope, module), path, field, depth, replaceRates: false);
             }
             if (type.IsBuiltIn)
             {
@@ -1353,7 +1364,7 @@ namespace KScript.Runtime
         /// Converts to the base type (which checks the base's own rules), then normalises, then checks this type's
         /// rules. A value that doesn't fit the base isn't checked any further, so it gets one problem, not several.
         /// </summary>
-        private object MapRefined(object value, RefinedType type, string path, string field, int depth)
+        private object MapRefined(object value, RefinedType type, string path, string field, int depth, bool replaceRates = true)
         {
             bool normalizeValue = normalize;
             if (value is RefinedValue typed)
@@ -1391,6 +1402,9 @@ namespace KScript.Runtime
                 Problem(path, field, problem + ".");
             if (result is PasswordValue password && type.Rules.Options.TryGetValue("algorithm", out object algorithm)) result = password.WithAlgorithm(Values.ToStr(algorithm));
             if (Problems.Count != before) return null;
+            if (result is NativeText { TypeName: "money" } money && type.Rules.Options.TryGetValue("rates", out object rates)
+                && (replaceRates || !MoneyType.HasRates(money)))
+                result = MoneyType.WithRates(money, rates);
             if (type.HasMethods) return new RefinedValue(type, result);
             // A field may reference a type declared later in the same module.
             return mapped is RefinedValue inherited ? new RefinedValue(inherited.Type, result) : result;

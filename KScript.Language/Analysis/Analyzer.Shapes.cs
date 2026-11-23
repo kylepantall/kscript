@@ -552,6 +552,7 @@ namespace KScript.Language.Analysis
             }
             foreach (string n in names)
             {
+                CheckMoneyRates(n, span);
                 string baseType = TypeInference.WithoutTypeArguments(n).TrimEnd('?');
                 string bare = baseType.Replace("[]", string.Empty);
                 bool list = bare != baseType;
@@ -710,7 +711,7 @@ namespace KScript.Language.Analysis
 
         private bool CheckTypeText(string text, TextSpan span, int offset, Scope scope = null)
         {
-            // Arguments given where the type is used (uuid(v: 4), string(min: 1)) are checked when the script runs.
+            CheckMoneyRates(text, span);
             string name = TypeBase(text);
             if (name.Length == 0 || !Lexer.IsIdentStart(name[0]) || !name.All(Lexer.IsIdentChar))
             {

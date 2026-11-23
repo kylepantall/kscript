@@ -1,6 +1,7 @@
 using KScript.Metadata;
 using System.Globalization;
 using KScript.Language.Catalog;
+using KScript.Runtime;
 using KScript.Syntax.Markup;
 using KScript.Syntax;
 using KScript.Syntax.Text;
@@ -24,6 +25,9 @@ namespace KScript.Language.Analysis
             {
                 case null:
                 case ErrorNode _:
+                    return;
+
+                case IdentifierNode or BinaryNode when CheckMoneyLiteral(node, region, scope):
                     return;
 
                 case BinaryNode or MemberNode when TryCompoundPatternLiteral(node, region, scope):
@@ -219,6 +223,7 @@ namespace KScript.Language.Analysis
             argumentTexts.UnionWith(args.Select(a => a.Value).OfType<LiteralNode>());
             foreach (ArgumentNode arg in args)
             {
+                if (arg.Value is BinaryNode && CheckMoneyLiteral(arg.Value, region, scope)) continue;
                 if (BareWord(arg) is (_, false, IdentifierNode typeNode) && (ReferenceDeclaredType(typeNode, region, scope) || ReferenceBareErrorType(typeNode, region, scope)))
                 {
                     continue;
@@ -235,7 +240,8 @@ namespace KScript.Language.Analysis
                     pendingRaw.Add(arg);
                     continue;
                 }
-                if ((arg.Value as MemberNode)?.DottedName != null)
+                if (arg.Value is MemberNode { DottedName: not null } field && !(MoneyLiterals.AmountReceiverName(field) is string receiver
+                    && IsUnboundLiteralWord(receiver, scope, region.Source.ToSource(field.Span.Start))))
                 {
                     // posts.tags: names for a method that reads them (->with), otherwise checked as an expression.
                     pendingBare.Add(arg);
@@ -299,6 +305,21 @@ namespace KScript.Language.Analysis
                 }
             }
             return Collect(node) && words.Count > 0 ? words : null;
+        }
+
+        private bool CheckMoneyLiteral(ExprNode node, ExpressionRegion region, Scope scope, bool record = true)
+        {
+            if (!MoneyLiterals.TryRead(node, out string name, out string text)) return false;
+            int offset = region.Source.ToSource(node.Span.Start);
+            scope ??= result.ScopeAt(offset);
+            if (!IsUnboundLiteralWord(name, scope, offset)) return false;
+            if (!record) return true;
+            int start = region.Source.Value.IndexOf(text, node.Span.Start, node.Span.Length, StringComparison.Ordinal);
+            if (start < 0) return false;
+            TextSpan literal = region.Source.ToSource(new TextSpan(start, text.Length));
+            result.MoneyLiterals[region.Source.ToSource(node.Span)] = literal;
+            CheckLiteralFits(text, "money", literal, scope, literal.Start);
+            return true;
         }
 
         /// <summary>One problem for the whole of <c>dd-MM-yyyy</c>, with a fix that quotes it, instead of one per word.</summary>

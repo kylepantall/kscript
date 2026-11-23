@@ -25,7 +25,12 @@ const { runTests } = require('@vscode/test-electron');
     "test(name: \"starts empty\") {\n  expect(value: 0, equals: 0)\n}\ntest(name: \"fails\") {\n  expect(value: 1, equals: 2)\n}\n");
   const languageSamples = path.resolve(__dirname, '../../../../samples/scripts/tests/language');
   fs.mkdirSync(path.join(workspace, 'types'));
-  for (const file of ['normalizers.test.kscript', 'types/login-name.kscript', 'declaration-catches.test.kscript', 'types/status-reader.kscript']) {
+  for (const file of [
+    'normalizers.test.kscript', 'types/login-name.kscript',
+    'declaration-catches.test.kscript', 'types/status-reader.kscript',
+    'dispatch-workflow.test.kscript', 'types/dispatch-policy.kscript', 'types/work-order.kscript',
+    'types/dispatch-team.kscript', 'types/dispatch-ticket.kscript',
+  ]) {
     fs.copyFileSync(path.join(languageSamples, file), path.join(workspace, file));
   }
   // A kscript serve page: VS Code's HTML grammar must still apply, with KScript { } highlighted on top.

@@ -223,6 +223,7 @@ namespace KScript.Language.Tests
             // Rules already given aren't offered again; a native type's own options follow.
             Assert.Equal(new[] { "max", "pattern", "one_of", "not", "v" }, Labels(Model("  ref: uuid(min: 1, ‸)")));
             Assert.Contains("min", Labels("fn f(name: string(‸)) {\n}\n"));
+            Assert.Contains("rates", Labels(Model("  price: money(‸)")));
             // A call, text or a nested list isn't a type's rules.
             Assert.DoesNotContain("min", Labels("x = @round(‸)\n"));
             Assert.DoesNotContain("min", Labels("x = [@round(1, ‸)]\n"));
@@ -244,6 +245,7 @@ namespace KScript.Language.Tests
             Assert.StartsWith("**min** (rule)", Hover("type Age with [int] {\n  m‸in: 0\n}\n").Markdown);
             Assert.StartsWith("**min** (rule)", Hover(Model("  title: string(m‸in: 1)")).Markdown);
             Assert.Equal("**v** (uuid option)", Hover(Model("  ref: uuid(‸v: 4)")).Markdown);
+            Assert.Equal("**rates** (money option)", Hover(Model("  price: money(ra‸tes: { EUR: 0.8 })")).Markdown);
             Assert.Null(Hover(Model("  ref: uuid(no‸pe: 4)")));
             Assert.Null(Hover(Model("  title: string(min‸)")));
         }

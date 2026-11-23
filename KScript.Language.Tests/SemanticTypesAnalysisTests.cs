@@ -15,6 +15,29 @@ namespace KScript.Language.Tests
         private static DocumentAnalysis Code(string code) => Analyze(code, "types.kscript");
 
         [Theory]
+        [InlineData("cash: money(rates: { EUR: 0 }) = 'GBP 1'")]
+        [InlineData("type Invoice { price: money(rates: { EUR: 0 }) }")]
+        [InlineData("fn credit(price: money(rates: { EUR: 0 })) => $price")]
+        [InlineData("type Local with [money(rates: { EUR: 0, USD: 0.5 })] {}")]
+        [InlineData("cash = 'GBP 1' as money(rates: { EUR: 0 })")]
+        [InlineData("rate = 2\ncash: money(rates: { EUR: $rate }) = 'GBP 1'")]
+        public void InvalidMoneyRatesAreReportedWhereTheTypeIsWritten(string code)
+        {
+            Diagnostic diagnostic = AssertSingle(Code(code), DiagnosticCodes.InvalidAttributeValue);
+            Assert.Contains("rate", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void MultipleMoneyRatesInARefinementRemainOneBaseType()
+        {
+            AssertClean(Code("""
+                type Budget with [money(rates: { EUR: 0.8, USD: 0.75 })] {}
+                balance: Budget = 'GBP 1'
+                echo $balance
+                """));
+        }
+
+        [Theory]
         [InlineData("e: email = 'joan@'", "'joan@' isn't an email: there's nothing after the @.")]
         [InlineData("e: email = joan@example", "'joan@example' isn't an email: the domain needs a dot")]
         [InlineData("u: uuid(v: 4) = 3f2a8c1e-9b7d-8c2a-8e1f-0a9b8c7d6e5f", "This doesn't fit uuid(v: 4): it must be a version 4 UUID, but it is version 8.")]

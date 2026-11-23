@@ -118,19 +118,22 @@ namespace KScript.Runtime
         /// Runs <c>a op b</c> when a native type declares it for these values. False when none does; the caller then
         /// does what it does for plain values (text joins with +, numbers add).
         /// </summary>
-        public static bool TryBinary(string op, object a, object b, out object result)
+        public static bool TryBinary(string op, object a, object b, out object result) =>
+            TryBinary(op, a, b, null, null, out result);
+
+        internal static bool TryBinary(string op, object a, object b, KScriptHost host, string directory, out object result)
         {
             result = null;
             if (!Involves(a, b)) return false;
-            List<NativeOperator> candidates = All.SelectMany(t => t.Operators.BinaryList).Where(o => o.Operator == op).ToList();
+            var candidates = All.SelectMany(t => t.Operators.BinaryList).Where(o => o.Operator == op).ToList();
             string ta = TypeOf(a), tb = TypeOf(b);
             // The exact types first, then text on a native side parsed: $d + '30m'.
-            foreach (NativeOperator o in candidates.Where(o => o.Left == ta && o.Right == tb).Concat(candidates))
+            foreach (var o in candidates.Where(o => o.Left == ta && o.Right == tb).Concat(candidates))
             {
                 object x = As(o.Left, a);
                 object y = x == null ? null : As(o.Right, b);
                 if (x == null || y == null) continue;
-                result = o.Run(x, y, null);
+                result = o.Run(x, y, host, directory);
                 return true;
             }
             return false;

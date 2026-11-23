@@ -1,0 +1,58 @@
+import "types/dispatch-policy.kscript"
+import "types/work-order.kscript"
+
+describe(name: "Dispatching work orders") {
+  test(name: "typed JSON is normalized before priority sorting and queue lookup") {
+    body = ```json
+      [
+        { "id": "10", "team": " Ops " },
+        { "id": 11, "team": "QA", "priority": 5 },
+        { "id": 12, "team": "ops", "priority": 3 }
+      ]
+      ```
+    orders: WorkOrder[] = $body->json(as: WorkOrder)
+    policy = DispatchPolicy(
+      queues: { ops: 'field', qa: 'lab' },
+      fallback: 'triage'
+    )
+    tickets = $policy->dispatch($orders)
+
+    expect(value: $tickets->pluck(id), same: [11, 10, 12])
+    expect(value: $tickets->pluck(queue), same: ['lab', 'field', 'field'])
+    expect(value: $tickets[0]->type(), same: 'DispatchTicket')
+    expect(value: $orders[0].team, equals: 'ops')
+    expect(value: $orders->pluck(id), same: [10, 11, 12])
+  }
+
+  test(name: "unmapped teams share a fallback queue while known teams keep theirs") {
+    orders: WorkOrder[] = [
+      { id: 1, team: 'ops' },
+      { id: 2, team: 'sales' },
+      { id: 3, team: 'legal' }
+    ]
+    policy = DispatchPolicy(queues: { ops: 'field' }, fallback: 'triage')
+    queues = $policy->dispatch($orders)->group_by(fn(ticket) => $ticket.queue)
+    expect(value: $queues.field->pluck(id), same: [1])
+    expect(value: $queues.triage->pluck(id), same: [2, 3])
+  }
+
+  test(name: "a strict policy propagates the lookup error for a normalized team") {
+    orders: WorkOrder[] = [{ id: 1, team: ' Sales ' }]
+    policy = DispatchPolicy(queues: {}, fallback: '')
+    expect_error(type: NotFound, contains: 'No queue for sales') {
+      $policy->dispatch($orders)
+    }
+  }
+
+  test(name: "malformed data fails shape validation before a fallback is considered") {
+    policy = DispatchPolicy(queues: {}, fallback: 'triage')
+    expect_error(type: Shape, contains: 'priority') {
+      $policy->dispatch([{ id: 1, team: 'ops', priority: 9 }])
+    }
+  }
+
+  test(name: "empty input succeeds even for a strict policy with no routes") {
+    policy = DispatchPolicy(queues: {}, fallback: '')
+    expect(value: $policy->dispatch([]), same: [])
+  }
+}
