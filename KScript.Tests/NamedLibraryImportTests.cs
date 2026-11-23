@@ -9,8 +9,10 @@ namespace KScript.Tests;
 
 public sealed class NamedLibraryImportTests
 {
-    [Fact]
-    public void RegisteredLibraryAndItsDependenciesWorkInScriptsAndCompilePlans()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RegisteredLibraryAndItsDependenciesWorkInScriptsAndCompilePlans(bool submodule)
     {
         string project = Directory.CreateTempSubdirectory("kscript-named-import-").FullName;
         try
@@ -34,11 +36,14 @@ public sealed class NamedLibraryImportTests
                     using var writer = new StreamWriter(zip.CreateEntry("upstream/libraries/roots/" + path).Open());
                     writer.Write(content);
                 }
+                using var other = new StreamWriter(zip.CreateEntry("upstream/other-sdk/index.kscript").Open());
+                other.Write("fn unrelated() => 42");
             }
 
             using var error = new StringWriter();
             Assert.True(RepoCommand.Run(new[] { "add", "acme/catalog" }, TextWriter.Null, error, scripts) == 0, error.ToString());
-            Assert.True(LibCommand.Run(new[] { "add", "acme/catalog@roots" }, TextWriter.Null, error, scripts, new GitHub(archive.ToArray())) == 0, error.ToString());
+            Assert.True(LibCommand.Run(new[] { "add", "acme/catalog@roots" }, TextWriter.Null, error, scripts, new GitHub(archive.ToArray(), submodule)) == 0, error.ToString());
+            Assert.False(Directory.Exists(Path.Combine(project, "site", "vendor", "roots", "other-sdk")));
             string main = Path.Combine(scripts, "app.kscript");
             File.WriteAllText(main, """
                 import "../vendor/roots/index.kscript" as roots
@@ -63,15 +68,19 @@ public sealed class NamedLibraryImportTests
         finally { Directory.Delete(project, recursive: true); }
     }
 
-    private sealed class GitHub(byte[] archive) : HttpMessageHandler
+    private sealed class GitHub(byte[] archive, bool submodule) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             const string sha = "1234567890abcdef1234567890abcdef12345678";
+            const string pinned = "abcdef1234567890abcdef1234567890abcdef12";
             HttpContent body = request.RequestUri.AbsoluteUri switch
             {
                 "https://api.github.com/repos/acme/catalog/commits/HEAD" => new StringContent($"{{\"sha\":\"{sha}\"}}"),
-                "https://codeload.github.com/acme/catalog/zip/" + sha => new ByteArrayContent(archive),
+                "https://api.github.com/repos/acme/catalog/contents/libraries/roots?ref=" + sha =>
+                    new StringContent(submodule ? $$"""{"type":"submodule","path":"libraries/roots","sha":"{{pinned}}","submodule_git_url":"https://github.com/acme/all-sdks.git"}""" : "[]"),
+                "https://codeload.github.com/acme/catalog/zip/" + sha when !submodule => new ByteArrayContent(archive),
+                "https://codeload.github.com/acme/all-sdks/zip/" + pinned when submodule => new ByteArrayContent(archive),
                 _ => throw new InvalidOperationException($"Unexpected repository request {request.RequestUri}"),
             };
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = body });

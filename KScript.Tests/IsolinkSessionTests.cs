@@ -54,7 +54,7 @@ public sealed class IsolinkSessionTests
         registry.Register(new LoopbackNetPackage(port));
         new Interpreter(KScriptHost.ForText(output), registry).RunText(
             "import \"isolink-connect/index.kscript\" as link\n" + program,
-            ScriptRunner.RepoFile("libraries", "client.kscript"));
+            ScriptRunner.RepoFile("libraries", "isolink-connect", "libraries", "client.kscript"));
     }
 
     private static async Task Hello(StreamReader reader, StreamWriter writer, string token = null, bool issueToken = true)

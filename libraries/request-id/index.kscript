@@ -1,0 +1,8 @@
+import KScript.Http
+
+/// Adds the caller's X-Request-Id to the response, generating a UUID when the header is absent.
+/// @public
+fn request_id(request: map, next: fn) {
+  id = $request.headers['x-request-id'] ?? @uuid()
+  return $next($request)->with_header('X-Request-Id', $id)
+}

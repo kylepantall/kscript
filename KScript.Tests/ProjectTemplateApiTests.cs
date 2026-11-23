@@ -59,6 +59,27 @@ public sealed class ProjectTemplateApiTests : IDisposable
 
     // ---- the api template -----------------------------------------------------------------------------------------
 
+    [Theory]
+    [InlineData("api", "lib/cache.kscript", "app-cache")]
+    [InlineData("fullstack", "lib/cache.kscript", "app-cache")]
+    [InlineData("api", "middleware/request-id.kscript", "request-id")]
+    public void LibraryTemplatesPublishEditableSourceAndAlsoWorkFromTheSourceFolder(string name, string path, string library)
+    {
+        using var parent = new TempSite();
+        string repository = Conventions.CliConventionTests.RepoRoot();
+        string source = File.ReadAllText(Path.Combine(repository, "libraries", library, "index.kscript")).Replace("\r\n", "\n");
+        string expected = library == "app-cache" ? "--- make\nwhen: cache\n---\n" + source : source;
+        string folder = Path.Combine(parent.Root, "template");
+        ProjectTemplate.Publish(folder, false, name);
+        string exported = Path.Combine(folder, path);
+        Assert.Equal(expected, File.ReadAllText(exported));
+
+        var direct = ProjectTemplate.FromFolder(Path.Combine(repository, "KScript.Cli", "Scaffolding", "Projects", name));
+        Assert.Equal(expected, direct.Files.Single(f => f.Path == path).Source);
+        File.AppendAllText(exported, "// Project-specific changes\n");
+        Assert.EndsWith("// Project-specific changes\n", ProjectTemplate.FromFolder(folder).Files.Single(f => f.Path == path).Source);
+    }
+
     [Fact]
     public void TheApiTemplateMakesAnApiWithAModelAuthCacheAndTests()
     {

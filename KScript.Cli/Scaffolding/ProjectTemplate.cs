@@ -148,7 +148,7 @@ namespace KScript.Scaffolding
                 {
                     using var stream = asm.GetManifestResourceStream(r.Resource)!;
                     using var reader = new StreamReader(stream);
-                    return (r.Path, reader.ReadToEnd().Replace("\r\n", "\n"));
+                    return (r.Path, TemplateSource(r.Path, reader.ReadToEnd()));
                 })
                 .OrderBy(f => f.Path, StringComparer.Ordinal)
                 .ToList();
@@ -172,10 +172,26 @@ namespace KScript.Scaffolding
                 .Select(f => Path.GetRelativePath(folder, f).Replace('\\', '/'))
                 .Where(rel => !rel.Split('/').Any(s => s == ".git" || s == ".DS_Store"))
                 .OrderBy(rel => rel, StringComparer.Ordinal)
-                .Select(rel => (rel, File.ReadAllText(Path.Combine(folder, rel)).Replace("\r\n", "\n")))
+                .Select(rel => (rel, TemplateSource(rel, File.ReadAllText(Path.Combine(folder, rel)))))
                 .ToList();
             if (files.Count == 0) throw new StubException($"The project template at '{folder}' has no files.");
             return Build(folder, files, name);
+        }
+
+        // Inline a bundled library when reading the template, so an exported template includes the editable source.
+        private static string TemplateSource(string path, string source)
+        {
+            source = source.Replace("\r\n", "\n");
+            if (!source.Contains("library:", StringComparison.OrdinalIgnoreCase)) return source;
+            var (header, body) = Scaffolder.SplitHeader(source, path);
+            if (!header.Remove("library", out string name)) return source;
+            if (!string.IsNullOrWhiteSpace(body))
+                throw new StubException($"{path}: a template with 'library: {name}' gets its body from that library.");
+            using var stream = typeof(ProjectTemplate).Assembly.GetManifestResourceStream("KScript.Scaffolding.Libraries/" + name)
+                ?? throw new StubException($"{path}: '{name}' is not a bundled template library.");
+            using var reader = new StreamReader(stream);
+            string controls = header.Count == 0 ? "" : "--- make\n" + string.Join("\n", header.Select(h => $"{h.Key}: {h.Value}")) + "\n---\n";
+            return controls + reader.ReadToEnd().Replace("\r\n", "\n");
         }
 
         private static ProjectTemplate Build(string folder, List<(string Path, string Source)> files, string name)

@@ -1,0 +1,17 @@
+import KScript.Cache
+
+/// Returns the app's named cache store from cache.store (memory by default).
+/// @public
+fn app_cache() =>
+  @cache($config->get('cache.store', default: 'memory'), name: 'app')
+
+/// Returns the cached value or computes it and keeps it for cache.ttl (five
+/// minutes by default).
+/// @public
+fn cached(key: string, compute: fn) =>
+  @app_cache()
+    ->remember($key, $compute, ttl: $config->get('cache.ttl', default: 5m))
+
+/// Forgets a key, so the next request works the value out again.
+/// @public
+fn forget_cached(key: string) => @app_cache()->remove($key)

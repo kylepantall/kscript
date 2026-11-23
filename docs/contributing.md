@@ -7,6 +7,7 @@ KScript is open source, and contributions are welcome. This page covers building
 KScript targets .NET 8 and runs on Windows, Linux and macOS. Install the [.NET 8 SDK](https://dotnet.microsoft.com/download), then:
 
 ```sh
+git submodule update --init   # fetch pinned SDKs for integration tests
 dotnet build KScript.sln
 dotnet test KScript.sln
 

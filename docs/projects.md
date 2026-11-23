@@ -161,10 +161,26 @@ kscript make project my-app --template ../starters/api   # any folder
 
 ## Installing source libraries
 
-`kscript lib add` installs KScript source files from public GitHub repositories. A library name selects the matching folder under `libraries/` on the default branch of `kylepantall/kscript`. For example, install Isolink Connect by name.
+`kscript lib add` installs KScript source files from public GitHub repositories. A library name selects the matching folder under `libraries/` on the default branch of `kylepantall/kscript`.
+
+| Official library | What it provides | Runtime package it uses |
+| --- | --- | --- |
+| [`integer-math`](../libraries/integer-math/README.md) | Greatest common divisor, least common multiple and factorial | Core only |
+| [`app-cache`](../libraries/app-cache/README.md) | Caches computed values using the project's cache store and expiry settings | `KScript.Cache` |
+| [`request-id`](../libraries/request-id/README.md) | HTTP middleware that passes through a caller's request ID or generates one for the response | `KScript.Http` |
+| [`isolink-connect`](https://github.com/waggr-gb/isolink-connect/blob/HEAD/libraries/isolink-connect/README.md) | Opens an Isolink desktop session and works with spaces and records | `KScript.Net` |
+
+Core is available in every script. The other runtime packages in the table ship with KScript, and each library imports the one it uses. For example, install Isolink Connect by name.
 
 ```sh
 kscript lib add isolink-connect
+```
+
+The official repository pins the Isolink SDK as a Git submodule. With KScript v0.14.0, install the same library directly from the SDK repository using these commands.
+
+```sh
+kscript repo add waggr-gb/isolink-connect
+kscript lib add waggr-gb/isolink-connect@isolink-connect
 ```
 
 Import the installed file from a script in the site root.
@@ -190,7 +206,7 @@ The library can include sibling scripts and data files. An `index.kscript` or `i
 
 ### Publishing a named library
 
-On the default branch of your public repository, put each library in its own folder under `libraries/`. Include its entry script and any files that it imports. For the `acme/kscript-libraries@slugs` example, the repository could contain these files.
+On the default branch of your public repository, put each library in an ordinary folder under `libraries/` or pin a separate public GitHub repository there as a Git submodule. Both layouts publish source directly. For an ordinary folder, include the entry script, any scripts it imports by path, and any data it reads. The `acme/kscript-libraries@slugs` example could contain these files.
 
 ```text
 libraries/
@@ -200,6 +216,14 @@ libraries/
 ```
 
 Declare the library's public functions at the top level of `index.kscript`. Once you push that folder, users can register your repository and install the library by its qualified name.
+
+To publish `slugs` from a separate repository, run this in your library catalog and commit both `.gitmodules` and `libraries/slugs`.
+
+```sh
+git submodule add https://github.com/acme/slug-tools.git libraries/slugs
+```
+
+`kscript lib add acme/kscript-libraries@slugs` downloads the upstream commit pinned by the catalog. If the upstream contains `libraries/slugs/`, only that folder is installed, so other SDKs can share the repository. Otherwise the installer uses the upstream root. Keep all scripts and assets in the selected folder. The installer follows one submodule level, and records both repositories' commits in `.kscript-lib.json`. To publish an update, commit the new submodule pin in the catalog.
 
 ## Project settings: kscript.json
 
